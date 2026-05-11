@@ -1,0 +1,44 @@
+{
+  "aldi": {
+    "label": "Aldi",
+    "url": "https://www.aldi.us/store/aldi/s?k=",
+    "urlStoreSelector": "https://www.aldi.us/store/aldi/s?k=",
+    "username": "ntylerbert@gmail.com",
+    "password": "Benjamin123@@4"
+  },
+  "costco": {
+    "label": "Costco",
+    "url": "https://www.costco.com/CatalogSearch?keyword=",
+    "urlStoreSelector": "https://www.costco.com/s?keyword=&openFMW=true",
+    "username": "",
+    "password": ""
+  },
+  "kroger": {
+    "label": "Kroger",
+    "url": "https://www.kroger.com/search?query=",
+    "urlStoreSelector": "https://www.kroger.com/stores/search",
+    "username": "ntylerbert@gmail.com",
+    "password": "bhRZCLZi6tk:rXH"
+  },
+  "meijer": {
+    "label": "Meijer",
+    "url": "https://www.meijer.com/shopping/search.html?text=",
+    "urlStoreSelector": "https://www.meijer.com/",
+    "username": "ntylerbert@gmail.com",
+    "password": "vawzuf-2tyjna-pevweP"
+  },
+  "target": {
+    "label": "Target",
+    "url": "https://www.target.com/s?searchTerm=",
+    "urlStoreSelector": "https://www.target.com/store-locator/find-stores",
+    "username": "ntylerbert@gmail.com",
+    "password": ":GaBZzbHzk4iqJf"
+  },
+  "walmart": {
+    "label": "Walmart",
+    "url": "https://www.walmart.com/search?q=",
+    "urlStoreSelector": "https://www.walmart.com/",
+    "username": "ntylerbert@gmail.com",
+    "password": "2nJkegZY!52-.EC"
+  }
+}

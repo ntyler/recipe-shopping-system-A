@@ -1,0 +1,70 @@
+{
+  "cilantro": {
+    "store": "aldi",
+    "checked": true
+  },
+  "garlic": {
+    "store": "meijer"
+  },
+  "green bell pepper": {
+    "store": "meijer",
+    "checked": true
+  },
+  "jalapeño": {
+    "store": "meijer",
+    "checked": true
+  },
+  "lime juice": {
+    "store": "meijer",
+    "checked": true
+  },
+  "poblano peppers": {
+    "store": "aldi",
+    "checked": true
+  },
+  "tomatillos": {
+    "store": "aldi",
+    "checked": true
+  },
+  "yellow onion": {
+    "store": "aldi",
+    "checked": true
+  },
+  "cream cheese": {
+    "store": "aldi",
+    "checked": true
+  },
+  "monterey jack cheese": {
+    "store": "meijer"
+  },
+  "diced green chiles": {
+    "store": "meijer"
+  },
+  "green enchilada sauce": {
+    "store": "aldi",
+    "checked": true
+  },
+  "vegetable broth": {
+    "store": "aldi",
+    "checked": true
+  },
+  "chili powder": {
+    "store": "aldi",
+    "checked": true
+  },
+  "white beans": {
+    "store": "meijer"
+  },
+  "young green jackfruit": {
+    "store": "meijer"
+  },
+  "salt": {
+    "store": "meijer"
+  },
+  "ground cumin": {
+    "store": "meijer"
+  },
+  "olive oil": {
+    "store": "meijer"
+  }
+}

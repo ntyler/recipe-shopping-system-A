@@ -1,0 +1,301 @@
+You are helping choose the closest pickup store.
+
+STORE:
+kroger
+
+SEARCH ADDRESS OR ZIP:
+5905 Arlo Drive, Apt 2213, Indianapolis, IN 46237
+
+FULL ADDRESS TO COMPARE AGAINST:
+5905 Arlo Drive, Apt 2213, Indianapolis, IN 46237
+
+LOCATOR RESULTS URL:
+https://www.kroger.com/stores/search?searchText=5905 Arlo Drive, Apt 2213, Indianapolis, IN 46237
+
+LOCAL FULL HTML FILE:
+D:\GitHub\recipe-shopping-system\nearest_store_html\kroger_locator_page.html
+
+LOCAL VISIBLE TEXT FILE:
+D:\GitHub\recipe-shopping-system\nearest_store_html\kroger_visible_text.txt
+
+STRUCTURED STORE CANDIDATES:
+[
+  {
+    "store": "kroger",
+    "store_name_guess": "Kroger Southport and Franklin Rd CLOSED Until Tuesday 6 AM 8130 E Southport Rd Indianapolis",
+    "address": "11 PM 8745 S Emerson Ave Indianapolis, IN 46237",
+    "distance": "0.9 miles",
+    "phone": "317-884-3320",
+    "url": null,
+    "link_text": null,
+    "context": "Claybrooke Commons Open Until 11 PM 8745 S Emerson Ave Indianapolis, IN 46237 317-884-3320 0.9 miles View Store Details Kroger Southport and Franklin Rd CLOSED Until Tuesday 6 AM 8130 E Southport Rd Indianapolis, IN 46259 317-245-4453 2.89 miles View Store Details Ross Park Open Until 11 PM 5350 E Thompson Rd Indianapolis, IN 46237 317-781-3560 3.71 miles View Store Details Madison Edgewood CLOSED Until Tuesday 6 AM 5911 Madison Ave Indianapolis, IN 46227 317-783-4947 4.29 miles View Store Details Whiteland CLOSED Until Tuesday 7 AM 2200 Independence Dr Greenwood, IN 46143 317-883-4140 4.56 miles View Store Details Meridian Park CLOSED Until Tuesday 6 AM 3100 Meridian Parke Dr Greenwood, IN 46142 317-887-5745 5.32 miles View Store Details Southern Plaza CLOSED Until Tuesday 7 AM 4202 S East St Indianapolis, IN 46227 317-781-4245 6.28 miles View Store Details Bluff Southport Open Until 11 PM 1330 W Southport Rd Indianapolis, IN 46217 317-884-4245 6.44 miles View Store Details Smokey Row Kroger CLOSED Until Tuesday 6 AM 5961 N State Road 135 Greenwood, IN 46143 317-530-3086 7.39 miles View Store Details",
+    "address_compare_full_address": "5905 Arlo Drive, Apt 2213, Indianapolis, IN 46237",
+    "address_compare_distance_number": 0.9,
+    "address_compare_score": -90
+  },
+  {
+    "store": "kroger",
+    "store_name_guess": "Kroger Skip to content Shop Save Pickup & Delivery Services Pharmacy & Health Sign In Cart Loading Digital Coupons Weekly Ad 5 Times Digital Coupons Celebrate Mom 4X Gift Cards Meal Planning & Recipes Store Locator Return to top navigation Store Locator 17 results Find a Store Location Access Turning on your device's location allows us to give you options on how you can get your groceries. By sharing your location you can see your shopping options and get started. How it Works No Thanks Allow Location Access Find Fuel by City",
+    "address": "17 results Claybrooke Commons Open Until 11 PM 8745 S Emerson Ave Indianapolis, IN 46237",
+    "distance": "0.9 miles",
+    "phone": "317-884-3320",
+    "url": null,
+    "link_text": null,
+    "context": "Find a Grocery Store, Gas or Pharmacy Near You - Kroger Skip to content Shop Save Pickup & Delivery Services Pharmacy & Health Sign In Cart Loading Digital Coupons Weekly Ad 5 Times Digital Coupons Celebrate Mom 4X Gift Cards Meal Planning & Recipes Store Locator Return to top navigation Store Locator 17 results Find a Store Location Access Turning on your device's location allows us to give you options on how you can get your groceries. By sharing your location you can see your shopping options and get started. How it Works No Thanks Allow Location Access Find Fuel by City, State or ZIP Code Search Using My Location Filter Stores Popular Features Bank Fuel Pharmacy Pickup All Store Features Account Funding Bakery Deli Diesel E-85 Floral Growler Fill The Little Clinic Home Chef Meal Solutions Hometown Pickup Liquor Lottery Tickets Marketplace Money Services Natural And Organics Online Deli/Bakery Ordering Scan, Bag, Go Sports Betting Starbucks List View Map View 17 results Claybrooke Commons Open Until 11 PM 8745 S Emerson Ave Indianapolis, IN 46237 317-884-3320 0.9 miles View Store Details Kroger Southport and Franklin Rd CLOSED Until Tuesday 6 AM 8130 E Southport Rd Indianapolis, IN 46259 317-245-4453 2.89 miles View Store Details Ross Park Open Until 11 PM 5350 E Thompson Rd Indianapolis, IN 46237 317-781-3560 3.71 miles View Store Details Madison Edgewood CLOSED Until Tuesday 6 AM 5911 Madison Ave Indianapolis, IN 46227 317-783-4947 4.29 miles View Store Details Whiteland",
+    "address_compare_full_address": "5905 Arlo Drive, Apt 2213, Indianapolis, IN 46237",
+    "address_compare_distance_number": 0.9,
+    "address_compare_score": -90
+  },
+  {
+    "store": "kroger",
+    "store_name_guess": "Kroger Southport and Franklin Rd CLOSED Until Tuesday 6 AM 8130 E Southport Rd Indianapolis",
+    "address": "6 AM 8130 E Southport Rd Indianapolis, IN 46259",
+    "distance": "2.89 miles",
+    "phone": "317-245-4453",
+    "url": null,
+    "link_text": null,
+    "context": "Kroger Southport and Franklin Rd CLOSED Until Tuesday 6 AM 8130 E Southport Rd Indianapolis, IN 46259 317-245-4453 2.89 miles View Store Details",
+    "address_compare_full_address": "5905 Arlo Drive, Apt 2213, Indianapolis, IN 46237",
+    "address_compare_distance_number": 2.89,
+    "address_compare_score": 167
+  },
+  {
+    "store": "kroger",
+    "store_name_guess": "Kroger Southport and Franklin Rd CLOSED Until Tuesday 6 AM 8130 E Southport Rd Indianapolis",
+    "address": "8130 E Southport Rd Indianapolis, IN 46259",
+    "distance": "2.89 miles",
+    "phone": "317-245-4453",
+    "url": null,
+    "link_text": null,
+    "context": "Kroger Southport and Franklin Rd CLOSED Until Tuesday 6 AM 8130 E Southport Rd Indianapolis, IN 46259 317-245-4453 2.89 miles View Store Details",
+    "address_compare_full_address": "5905 Arlo Drive, Apt 2213, Indianapolis, IN 46237",
+    "address_compare_distance_number": 2.89,
+    "address_compare_score": 167
+  },
+  {
+    "store": "kroger",
+    "store_name_guess": "Kroger",
+    "address": "11 PM 5350 E Thompson Rd Indianapolis, IN 46237",
+    "distance": "3.71 miles",
+    "phone": "317-781-3560",
+    "url": null,
+    "link_text": null,
+    "context": "Ross Park Open Until 11 PM 5350 E Thompson Rd Indianapolis, IN 46237 317-781-3560 3.71 miles View Store Details",
+    "address_compare_full_address": "5905 Arlo Drive, Apt 2213, Indianapolis, IN 46237",
+    "address_compare_distance_number": 3.71,
+    "address_compare_score": -90
+  },
+  {
+    "store": "kroger",
+    "store_name_guess": "Kroger",
+    "address": "5911 Madison Ave Indianapolis, IN 46227",
+    "distance": "4.29 miles",
+    "phone": "317-783-4947",
+    "url": null,
+    "link_text": null,
+    "context": "Madison Edgewood CLOSED Until Tuesday 6 AM 5911 Madison Ave Indianapolis, IN 46227 317-783-4947 4.29 miles View Store Details",
+    "address_compare_full_address": "5905 Arlo Drive, Apt 2213, Indianapolis, IN 46237",
+    "address_compare_distance_number": 4.29,
+    "address_compare_score": 167
+  },
+  {
+    "store": "kroger",
+    "store_name_guess": "Kroger",
+    "address": "6 AM 5911 Madison Ave Indianapolis, IN 46227",
+    "distance": "4.29 miles",
+    "phone": "317-783-4947",
+    "url": null,
+    "link_text": null,
+    "context": "Madison Edgewood CLOSED Until Tuesday 6 AM 5911 Madison Ave Indianapolis, IN 46227 317-783-4947 4.29 miles View Store Details",
+    "address_compare_full_address": "5905 Arlo Drive, Apt 2213, Indianapolis, IN 46237",
+    "address_compare_distance_number": 4.29,
+    "address_compare_score": 167
+  },
+  {
+    "store": "kroger",
+    "store_name_guess": "Kroger",
+    "address": "2200 Independence Dr Greenwood, IN 46143",
+    "distance": "4.56 miles",
+    "phone": "317-883-4140",
+    "url": null,
+    "link_text": null,
+    "context": "Whiteland CLOSED Until Tuesday 7 AM 2200 Independence Dr Greenwood, IN 46143 317-883-4140 4.56 miles View Store Details",
+    "address_compare_full_address": "5905 Arlo Drive, Apt 2213, Indianapolis, IN 46237",
+    "address_compare_distance_number": 4.56,
+    "address_compare_score": 292
+  },
+  {
+    "store": "kroger",
+    "store_name_guess": "Kroger",
+    "address": "7 AM 2200 Independence Dr Greenwood, IN 46143",
+    "distance": "4.56 miles",
+    "phone": "317-883-4140",
+    "url": null,
+    "link_text": null,
+    "context": "Whiteland CLOSED Until Tuesday 7 AM 2200 Independence Dr Greenwood, IN 46143 317-883-4140 4.56 miles View Store Details",
+    "address_compare_full_address": "5905 Arlo Drive, Apt 2213, Indianapolis, IN 46237",
+    "address_compare_distance_number": 4.56,
+    "address_compare_score": 292
+  },
+  {
+    "store": "kroger",
+    "store_name_guess": "Kroger",
+    "address": "3100 Meridian Parke Dr Greenwood, IN 46142",
+    "distance": "5.32 miles",
+    "phone": "317-887-5745",
+    "url": null,
+    "link_text": null,
+    "context": "Meridian Park CLOSED Until Tuesday 6 AM 3100 Meridian Parke Dr Greenwood, IN 46142 317-887-5745 5.32 miles View Store Details",
+    "address_compare_full_address": "5905 Arlo Drive, Apt 2213, Indianapolis, IN 46237",
+    "address_compare_distance_number": 5.32,
+    "address_compare_score": 292
+  },
+  {
+    "store": "kroger",
+    "store_name_guess": "Kroger",
+    "address": "6 AM 3100 Meridian Parke Dr Greenwood, IN 46142",
+    "distance": "5.32 miles",
+    "phone": "317-887-5745",
+    "url": null,
+    "link_text": null,
+    "context": "Meridian Park CLOSED Until Tuesday 6 AM 3100 Meridian Parke Dr Greenwood, IN 46142 317-887-5745 5.32 miles View Store Details",
+    "address_compare_full_address": "5905 Arlo Drive, Apt 2213, Indianapolis, IN 46237",
+    "address_compare_distance_number": 5.32,
+    "address_compare_score": 292
+  },
+  {
+    "store": "kroger",
+    "store_name_guess": "Kroger",
+    "address": "4202 S East St Indianapolis, IN 46227",
+    "distance": "6.28 miles",
+    "phone": "317-781-4245",
+    "url": null,
+    "link_text": null,
+    "context": "Southern Plaza CLOSED Until Tuesday 7 AM 4202 S East St Indianapolis, IN 46227 317-781-4245 6.28 miles View Store Details",
+    "address_compare_full_address": "5905 Arlo Drive, Apt 2213, Indianapolis, IN 46237",
+    "address_compare_distance_number": 6.28,
+    "address_compare_score": 167
+  },
+  {
+    "store": "kroger",
+    "store_name_guess": "Kroger",
+    "address": "7 AM 4202 S East St Indianapolis, IN 46227",
+    "distance": "6.28 miles",
+    "phone": "317-781-4245",
+    "url": null,
+    "link_text": null,
+    "context": "Southern Plaza CLOSED Until Tuesday 7 AM 4202 S East St Indianapolis, IN 46227 317-781-4245 6.28 miles View Store Details",
+    "address_compare_full_address": "5905 Arlo Drive, Apt 2213, Indianapolis, IN 46237",
+    "address_compare_distance_number": 6.28,
+    "address_compare_score": 167
+  },
+  {
+    "store": "kroger",
+    "store_name_guess": "Kroger",
+    "address": "11 PM 1330 W Southport Rd Indianapolis, IN 46217",
+    "distance": "6.44 miles",
+    "phone": "317-884-4245",
+    "url": null,
+    "link_text": null,
+    "context": "Bluff Southport Open Until 11 PM 1330 W Southport Rd Indianapolis, IN 46217 317-884-4245 6.44 miles View Store Details",
+    "address_compare_full_address": "5905 Arlo Drive, Apt 2213, Indianapolis, IN 46237",
+    "address_compare_distance_number": 6.44,
+    "address_compare_score": 167
+  },
+  {
+    "store": "kroger",
+    "store_name_guess": "Kroger CLOSED Until Tuesday 6 AM 5961 N State Road 135 Greenwood",
+    "address": "5961 N State Road 135 Greenwood, IN 46143",
+    "distance": "7.39 miles",
+    "phone": "317-530-3086",
+    "url": null,
+    "link_text": null,
+    "context": "Smokey Row Kroger CLOSED Until Tuesday 6 AM 5961 N State Road 135 Greenwood, IN 46143 317-530-3086 7.39 miles View Store Details",
+    "address_compare_full_address": "5905 Arlo Drive, Apt 2213, Indianapolis, IN 46237",
+    "address_compare_distance_number": 7.39,
+    "address_compare_score": 299
+  },
+  {
+    "store": "kroger",
+    "store_name_guess": "Kroger CLOSED Until Tuesday 6 AM 5961 N State Road 135 Greenwood",
+    "address": "6 AM 5961 N State Road 135 Greenwood, IN 46143",
+    "distance": "7.39 miles",
+    "phone": "317-530-3086",
+    "url": null,
+    "link_text": null,
+    "context": "Smokey Row Kroger CLOSED Until Tuesday 6 AM 5961 N State Road 135 Greenwood, IN 46143 317-530-3086 7.39 miles View Store Details",
+    "address_compare_full_address": "5905 Arlo Drive, Apt 2213, Indianapolis, IN 46237",
+    "address_compare_distance_number": 7.39,
+    "address_compare_score": 299
+  },
+  {
+    "store": "kroger",
+    "store_name_guess": "Kroger",
+    "address": "5350 E Thompson Rd Indianapolis, IN 46237",
+    "distance": null,
+    "phone": "317-781-3560",
+    "url": null,
+    "link_text": null,
+    "context": "Ross Park Open Until 11 PM 5350 E Thompson Rd Indianapolis, IN 46237 317-781-3560",
+    "address_compare_full_address": "5905 Arlo Drive, Apt 2213, Indianapolis, IN 46237",
+    "address_compare_distance_number": 999999.0,
+    "address_compare_score": -90
+  },
+  {
+    "store": "kroger",
+    "store_name_guess": "Claybrooke Commons",
+    "address": "8745 S Emerson Ave Indianapolis, IN 46237",
+    "distance": null,
+    "phone": "317-884-3320",
+    "url": null,
+    "link_text": null,
+    "context": "Claybrooke Commons Open Until 11 PM 8745 S Emerson Ave Indianapolis, IN 46237 317-884-3320",
+    "address_compare_full_address": "5905 Arlo Drive, Apt 2213, Indianapolis, IN 46237",
+    "address_compare_distance_number": 999999.0,
+    "address_compare_score": -90
+  },
+  {
+    "store": "kroger",
+    "store_name_guess": "Kroger",
+    "address": "1330 W Southport Rd Indianapolis, IN 46217",
+    "distance": null,
+    "phone": "317-884-4245",
+    "url": null,
+    "link_text": null,
+    "context": "Bluff Southport Open Until 11 PM 1330 W Southport Rd Indianapolis, IN 46217 317-884-4245",
+    "address_compare_full_address": "5905 Arlo Drive, Apt 2213, Indianapolis, IN 46237",
+    "address_compare_distance_number": 999999.0,
+    "address_compare_score": 167
+  }
+]
+
+WEBPAGE RESULTS TEXT:
+Find a Grocery Store, Gas or Pharmacy Near You - Kroger Skip to content Shop Save Pickup & Delivery Services Pharmacy & Health Sign In Cart Loading Digital Coupons Weekly Ad 5 Times Digital Coupons Celebrate Mom 4X Gift Cards Meal Planning & Recipes Store Locator Return to top navigation Store Locator 17 results Find a Store Location Access Turning on your device's location allows us to give you options on how you can get your groceries. By sharing your location you can see your shopping options and get started. How it Works No Thanks Allow Location Access Find Fuel by City, State or ZIP Code Search Using My Location Filter Stores Popular Features Bank Fuel Pharmacy Pickup All Store Features Account Funding Bakery Deli Diesel E-85 Floral Growler Fill The Little Clinic Home Chef Meal Solutions Hometown Pickup Liquor Lottery Tickets Marketplace Money Services Natural And Organics Online Deli/Bakery Ordering Scan, Bag, Go Sports Betting Starbucks List View Map View 17 results Claybrooke Commons Open Until 11 PM 8745 S Emerson Ave Indianapolis, IN 46237 317-884-3320 0.9 miles View Store Details Kroger Southport and Franklin Rd CLOSED Until Tuesday 6 AM 8130 E Southport Rd Indianapolis, IN 46259 317-245-4453 2.89 miles View Store Details Ross Park Open Until 11 PM 5350 E Thompson Rd Indianapolis, IN 46237 317-781-3560 3.71 miles View Store Details Madison Edgewood CLOSED Until Tuesday 6 AM 5911 Madison Ave Indianapolis, IN 46227 317-783-4947 4.29 miles View Store Details Whiteland CLOSED Until Tuesday 7 AM 2200 Independence Dr Greenwood, IN 46143 317-883-4140 4.56 miles View Store Details Meridian Park CLOSED Until Tuesday 6 AM 3100 Meridian Parke Dr Greenwood, IN 46142 317-887-5745 5.32 miles View Store Details Southern Plaza CLOSED Until Tuesday 7 AM 4202 S East St Indianapolis, IN 46227 317-781-4245 6.28 miles View Store Details Bluff Southport Open Until 11 PM 1330 W Southport Rd Indianapolis, IN 46217 317-884-4245 6.44 miles View Store Details Smokey Row Kroger CLOSED Until Tuesday 6 AM 5961 N State Road 135 Greenwood, IN 46143 317-530-3086 7.39 miles View Store Details 1 2 ABOUT US About the Company Shop Store Brands Zero Hunger | Zero Waste Community Rewards Careers Request a Donation Vendors & Suppliers Newsroom ABOUT US About the Company Shop Store Brands Zero Hunger | Zero Waste Community Rewards Careers Request a Donation Vendors & Suppliers Newsroom HELP Customer Service FAQs Find a Store Find a Pharmacy Freshness Guarantee Privacy Center Recall Alerts HELP Customer Service FAQs Find a Store Find a Pharmacy Freshness Guarantee Privacy Center Recall Alerts LEARN MORE Loyalty Card Boost Membership Fuel Points Grocery Pickup Delivery Providers Find Your Delivery Location Custom Cakes Party Platters LEARN MORE Loyalty Card Boost Membership Fuel Points Grocery Pickup Delivery Providers Find Your Delivery Location Custom Cakes Party Platters SERVICES Pharmacy & Health Healthcare Appointments Money Services Gift Cards SNAP EBT SERVICES Pharmacy & Health Healthcare Appointments Money Services Gift Cards SNAP EBT QUICK LINKS Shop All Deals Clip Digital Coupons Shop Weekly Ad Start Your Order Shop Recipes Explore Easy Meals Schedule an Appointment QUICK LINKS Shop All Deals Clip Digital Coupons Shop Weekly Ad Start Your Order Shop Recipes Explore Easy Meals Schedule an Appointment GET THE APP GET THE APP All Contents ©2026 The Kroger Co. All Rights Reserved Accessibility Statement If you are using a screen reader and having difficulty with this website, please call 1-800-576-4377 . Financial Products & Services Privacy Policy HIPAA Notice of Privacy Practice Privacy Policy Your Privacy Choices Do Not Sell My Personal Information Terms and Conditions TLC Terms and Conditions TLC Patient Bill of Rights Notice for California Dietitian Patients Dietitian/Telemedicine Consent to Treat Form Let's Connect Privacy Request Center Privacy Request Center Welcome! Contacting our Privacy Office Welcome! Welcome! Welcome to our Privacy Request Center! Please see our Privacy Policy Privacy Policy Privacy Policy Privacy Policy Privacy Policy Privacy Policy Privacy Policy Privacy Policy Privacy Policy Privacy Policy Privacy Policy Privacy Policy Privacy Policy Privacy Policy Privacy Policy Privacy Policy Privacy Policy Privacy Policy Privacy Policy to learn about how we collect and use your information. More information about your rights and choices can be found here here here here here here here here here here here here here here here here here here here Contacting our Privacy Office Always Active Contacting our Privacy Office Our customer contact centers are ready to take your questions and comments regarding our privacy practices. You can reach us by telephone at 1-800-KROGERS (1-800-576-4377) or via email at KrogerPrivacyOffice@kroger.com . Back Button Cookie List Filter Button Consent Leg.Interest checkbox label label checkbox label label checkbox label label Clear checkbox label label Apply Cancel Close Allow All
+
+Return ONLY valid JSON.
+
+Pick the closest store from the webpage results.
+
+Required JSON format:
+{
+  "store": "kroger",
+  "closest_store_name": null,
+  "closest_address": null,
+  "closest_distance": null,
+  "closest_phone": null,
+  "closest_store_url": null,
+  "reason": null
+}
+
+Rules:
+- Use only information from the structured candidates, webpage results text, and saved HTML.
+- Compare every candidate address against FULL ADDRESS TO COMPARE_AGAINST.
+- Prefer STRUCTURED STORE CANDIDATES when available.
+- If multiple stores are listed, choose the one with the smallest displayed numeric distance in miles.
+- If distance is missing or tied, choose the address that best matches the same ZIP, city, and state as FULL ADDRESS TO COMPARE AGAINST.
+- closest_address must be the exact candidate address chosen.
+- closest_store_url must be the embedded candidate URL associated with the chosen address.
+- The embedded URL must come from the same card/container as the selected address.
+- Do not return a store URL connected to a different address.
+- If a value is missing, use null.
+- Return only valid JSON.

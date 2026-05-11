@@ -1,0 +1,2436 @@
+"""
+store_product_scraper.py
+
+Scrapes store search pages and product URLs.
+
+Examples:
+
+    py -3.11 store_product_scraper.py --store meijer --item "broccoli florets"
+
+    py -3.11 store_product_scraper.py --all-stores --item "carrots" --headed
+
+    py -3.11 store_product_scraper.py --all-stores --item "carrots" --parallel-stores --workers 4 --headed
+
+    py -3.11 store_product_scraper.py --url-file product_urls.txt --workers 4 --headed --max-results 10 --output scraped_products.json
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import queue
+import re
+import subprocess
+import sys
+import threading
+import time
+import tkinter as tk
+from dataclasses import asdict, dataclass
+from multiprocessing import cpu_count
+from pathlib import Path
+from typing import Any
+from urllib.parse import quote_plus, unquote_plus, urljoin, urlparse, parse_qs
+
+from bs4 import BeautifulSoup
+import undetected_chromedriver as uc
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.action_chains import ActionChains
+
+
+CHROME_VERSION_MAIN = 147
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+
+STORE_JSON_CANDIDATES = [
+    SCRIPT_DIR / "stores.json",
+    SCRIPT_DIR / "shopping_stores.json",
+    SCRIPT_DIR / "PushShoppingList" / "stores.json",
+    SCRIPT_DIR / "PushShoppingList" / "shopping_stores.json",
+]
+
+STORE_RESULTS_JSON_CANDIDATES = [
+    SCRIPT_DIR / "shopping_stores_Results.json",
+    SCRIPT_DIR / "PushShoppingList" / "shopping_stores_Results.json",
+]
+
+DEFAULT_STORES = {
+    "aldi": {
+        "label": "Aldi",
+        "url": "https://www.aldi.us/store/aldi/s?k=",
+        "base_url": "https://www.aldi.us",
+        "location": "Aldi",
+        "order": 1,
+    },
+    "costco": {
+        "label": "Costco",
+        "url": "https://www.costco.com/CatalogSearch?keyword=",
+        "base_url": "https://www.costco.com",
+        "location": "Costco",
+        "order": 2,
+    },
+    "kroger": {
+        "label": "Kroger",
+        "url": "https://www.kroger.com/search?query=",
+        "base_url": "https://www.kroger.com",
+        "location": "Kroger",
+        "order": 3,
+    },
+    "meijer": {
+        "label": "Meijer",
+        "url": "https://www.meijer.com/shopping/search.html?text=",
+        "base_url": "https://www.meijer.com",
+        "location": "Meijer",
+        "order": 4,
+    },
+    "target": {
+        "label": "Target",
+        "url": "https://www.target.com/s?searchTerm=",
+        "base_url": "https://www.target.com",
+        "location": "Target",
+        "order": 5,
+    },
+    "walmart": {
+        "label": "Walmart",
+        "url": "https://www.walmart.com/search?q=",
+        "base_url": "https://www.walmart.com",
+        "location": "Walmart",
+        "order": 6,
+    },
+}
+
+STORE_PRODUCT_URL_PATTERNS = {
+    "aldi": ["/products/", "/p/"],
+    "costco": ["/.product.", "/p/", "/product/"],
+    "kroger": ["/p/", "/product/"],
+    "meijer": ["/shopping/product/", "/product/"],
+    "target": ["/p/"],
+    "walmart": ["/ip/"],
+}
+
+GENERIC_PRODUCT_URL_PATTERNS = [
+    "/p/",
+    "/product/",
+    "/products/",
+    "/ip/",
+    "/shopping/product/",
+    "/.product.",
+]
+
+
+# =========================================================
+# STORE CONFIG
+# =========================================================
+
+def find_stores_file() -> Path | None:
+    for candidate in STORE_JSON_CANDIDATES:
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def find_store_results_file() -> Path | None:
+    for candidate in STORE_RESULTS_JSON_CANDIDATES:
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def read_json_file(path: Path | None, default: Any) -> Any:
+    if not path or not path.exists():
+        return default
+
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        print(f"⚠️ Could not read JSON file {path}: {exc}")
+        return default
+
+
+def normalize_store_search_url(url: str) -> str:
+    url = str(url or "").strip()
+
+    if not url:
+        return ""
+
+    if "{query}" in url:
+        return url
+
+    return url + "{query}"
+
+
+def base_url_from_search_url(search_url: str) -> str:
+    without_token = search_url.replace("{query}", "")
+    parsed = urlparse(without_token)
+
+    if parsed.scheme and parsed.netloc:
+        return f"{parsed.scheme}://{parsed.netloc}"
+
+    return ""
+
+
+def sort_stores_alpha(stores: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    return dict(
+        sorted(
+            stores.items(),
+            key=lambda item: str(item[1].get("label") or item[0]).lower(),
+        )
+    )
+
+
+def normalize_store_results_payload(raw_results: Any) -> tuple[dict[str, Any], dict[str, Any]]:
+    """
+    shopping_stores_Results.json is expected to look like:
+
+    {
+      "home_address": {"zip": "46237", ...},
+      "stores": {
+        "meijer": {"selected_name": "...", "exact_address": "...", ...}
+      }
+    }
+
+    This also accepts a direct {store_key: store_info} dict.
+    """
+    if not isinstance(raw_results, dict):
+        return {}, {}
+
+    home_address = raw_results.get("home_address") or {}
+    stores = raw_results.get("stores") if isinstance(raw_results.get("stores"), dict) else raw_results
+
+    if not isinstance(stores, dict):
+        stores = {}
+
+    return home_address if isinstance(home_address, dict) else {}, stores
+
+
+def load_store_inputs() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], Path | None, Path | None]:
+    stores_file = find_stores_file()
+    results_file = find_store_results_file()
+
+    raw_stores = read_json_file(stores_file, DEFAULT_STORES.copy())
+    raw_results = read_json_file(results_file, {})
+
+    if not isinstance(raw_stores, dict):
+        raw_stores = DEFAULT_STORES.copy()
+
+    home_address, store_results = normalize_store_results_payload(raw_results)
+
+    return raw_stores, home_address, store_results, stores_file, results_file
+
+
+def merge_store_config(
+    store_key: str,
+    raw_store: dict[str, Any],
+    result_store: dict[str, Any],
+    home_address: dict[str, Any],
+) -> dict[str, Any] | None:
+    label = str(
+        raw_store.get("label")
+        or result_store.get("store_name")
+        or store_key.title()
+    ).strip()
+
+    raw_url = (
+        raw_store.get("search_url")
+        or raw_store.get("url")
+        or result_store.get("search_url_template")
+        or ""
+    )
+
+    search_url = normalize_store_search_url(raw_url)
+
+    if not search_url:
+        return None
+
+    base_url = str(raw_store.get("base_url") or "").strip()
+
+    if not base_url:
+        website = str(result_store.get("website") or "").strip()
+        base_url = base_url_from_search_url(website) if website else ""
+
+    if not base_url:
+        base_url = base_url_from_search_url(search_url)
+
+    selected_name = result_store.get("selected_name")
+    exact_address = result_store.get("exact_address")
+    pickup_zip = (
+        raw_store.get("pickup_zip")
+        or result_store.get("pickup_zip")
+        or home_address.get("zip")
+    )
+
+    location = (
+        exact_address
+        or selected_name
+        or raw_store.get("location")
+        or label
+    )
+
+    return {
+        "key": store_key,
+        "label": label,
+        "search_url": search_url,
+        "base_url": base_url,
+        "location": location,
+        "order": raw_store.get("order", 999),
+        "manual_only": bool(raw_store.get("manual_only", False)),
+        "pickup_zip": pickup_zip,
+        "pickup_store_name": raw_store.get("pickup_store_name") or selected_name or label,
+        "selected_name": selected_name,
+        "exact_address": exact_address,
+        "lat": result_store.get("lat"),
+        "lng": result_store.get("lng"),
+        "distance_miles": result_store.get("distance_miles"),
+        "website": result_store.get("website"),
+        "place_url": result_store.get("place_url"),
+        "phone": result_store.get("phone"),
+        "store_source": {
+            "shopping_stores_json": True,
+            "shopping_stores_results_json": bool(result_store),
+        },
+    }
+
+
+def load_available_stores() -> dict[str, dict[str, Any]]:
+    raw_stores, home_address, store_results, stores_file, results_file = load_store_inputs()
+
+    cleaned: dict[str, dict[str, Any]] = {}
+    all_keys = set()
+
+    all_keys.update(str(key).strip().lower() for key in raw_stores.keys())
+    all_keys.update(str(key).strip().lower() for key in store_results.keys())
+
+    for store_key in sorted(key for key in all_keys if key):
+        raw_store = raw_stores.get(store_key) or {}
+        result_store = store_results.get(store_key) or {}
+
+        if not isinstance(raw_store, dict):
+            raw_store = {}
+
+        if not isinstance(result_store, dict):
+            result_store = {}
+
+        merged = merge_store_config(
+            store_key=store_key,
+            raw_store=raw_store,
+            result_store=result_store,
+            home_address=home_address,
+        )
+
+        if merged:
+            cleaned[store_key] = merged
+
+    cleaned = cleaned or DEFAULT_STORES.copy()
+
+    print(f"🏬 Store search config: {stores_file or 'DEFAULT_STORES'}")
+    print(f"📍 Store location results: {results_file or 'not found'}")
+    print(f"✅ Available store keys: {list(cleaned.keys())}")
+
+    return sort_stores_alpha(cleaned)
+
+
+AVAILABLE_STORES = load_available_stores()
+
+
+# =========================================================
+# DATA MODEL
+# =========================================================
+
+@dataclass
+class ProductResult:
+    query: str
+    store: str
+    store_name: str | None
+    store_key: str | None
+    product_name: str | None
+    product_url: str | None
+    product_location: str | None
+    product_cost: str | None
+    is_organic: bool
+    score: int
+    store_exact_address: str | None = None
+    store_selected_name: str | None = None
+    store_distance_miles: float | None = None
+    store_website: str | None = None
+    store_place_url: str | None = None
+    store_phone: str | None = None
+
+
+# =========================================================
+# TEXT / SCORING
+# =========================================================
+
+def normalize_text(value: Any) -> str:
+    return " ".join(str(value or "").lower().strip().split())
+
+
+def clean_name(text: str) -> str:
+    text = re.sub(r"\s+", " ", text or "").strip()
+
+    junk_phrases = [
+        "sponsored",
+        "add to cart",
+        "add",
+        "pickup",
+        "delivery",
+        "shipping",
+        "in stock",
+        "out of stock",
+        "current price",
+        "price",
+        "each",
+        "shop now",
+    ]
+
+    for phrase in junk_phrases:
+        text = re.sub(rf"\b{re.escape(phrase)}\b", "", text, flags=re.I)
+
+    text = re.sub(r"\s+", " ", text).strip(" -|•")
+    return text
+
+
+def money_from_text(text: str) -> str | None:
+    patterns = [
+        r"\$\s?\d+(?:[.,]\d{2})?",
+        r"\d+(?:[.,]\d{2})?\s?USD",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, text or "", flags=re.I)
+
+        if match:
+            return match.group(0).replace(" ", "")
+
+    return None
+
+
+def item_keywords(item: str) -> list[str]:
+    stop_words = {
+        "fresh",
+        "whole",
+        "chopped",
+        "diced",
+        "sliced",
+        "large",
+        "small",
+        "medium",
+        "organic",
+        "optional",
+        "finely",
+        "roughly",
+        "cups",
+        "cup",
+        "tbsp",
+        "tsp",
+        "tablespoon",
+        "teaspoon",
+        "oz",
+        "ounce",
+        "ounces",
+        "lb",
+        "lbs",
+        "pound",
+        "pounds",
+        "package",
+        "bag",
+        "can",
+        "canned",
+        "and",
+        "with",
+        "for",
+        "the",
+    }
+
+    words = re.findall(r"[a-zA-Z0-9]+", normalize_text(item))
+    return [word for word in words if len(word) > 2 and word not in stop_words]
+
+
+def score_product(query: str, name: str, url: str, price: str | None) -> tuple[int, bool]:
+    name_norm = normalize_text(name)
+    url_norm = normalize_text(url)
+    query_norm = normalize_text(query)
+    organic = "organic" in name_norm or "organic" in url_norm
+
+    score = 0
+
+    if organic:
+        score += 1000
+
+    for word in item_keywords(query):
+        if word in name_norm:
+            score += 80
+        elif word in url_norm:
+            score += 25
+
+    produce_equivalents = {
+        "broccoli": ["broccoli crown", "bunch broccoli", "broccoli florets", "organic broccoli"],
+        "carrot": ["carrots", "whole carrots", "baby carrots", "organic carrots"],
+        "carrots": ["carrot", "whole carrots", "baby carrots", "organic carrots"],
+        "leek": ["leeks", "fresh leeks"],
+        "leeks": ["leek", "fresh leeks"],
+        "garlic": ["fresh garlic", "garlic bulb", "garlic cloves"],
+    }
+
+    for main_word, equivalents in produce_equivalents.items():
+        if main_word in query_norm and main_word in name_norm:
+            score += 120
+
+        if main_word in query_norm:
+            for equivalent in equivalents:
+                if equivalent in name_norm:
+                    score += 80
+                    break
+
+    unrelated_terms = [
+        "cake",
+        "cookie",
+        "cookies",
+        "chips",
+        "snack",
+        "candy",
+        "sauce",
+        "dressing",
+        "seasoning",
+        "mix",
+        "frozen meal",
+        "prepared",
+        "baby food",
+        "dog",
+        "cat",
+        "pet",
+    ]
+
+    for term in unrelated_terms:
+        if term in name_norm:
+            score -= 120
+
+    if price:
+        score += 20
+
+    if name_norm:
+        score += 5
+
+    return score, organic
+
+
+# =========================================================
+# CHROME HELPERS
+# =========================================================
+
+def get_chrome_major_version() -> int:
+    try:
+        result = subprocess.check_output(
+            r'reg query "HKEY_CURRENT_USER\Software\Google\Chrome\BLBeacon" /v version',
+            shell=True,
+        ).decode(errors="ignore")
+
+        version = re.search(r"\d+\.\d+\.\d+\.\d+", result).group(0)
+        return int(version.split(".")[0])
+
+    except Exception as exc:
+        print(f"Could not detect Chrome version. Using fallback {CHROME_VERSION_MAIN}. Error: {exc}")
+        return CHROME_VERSION_MAIN
+
+
+def get_screen_size() -> tuple[int, int]:
+    try:
+        root = tk.Tk()
+        root.withdraw()
+        width = root.winfo_screenwidth()
+        height = root.winfo_screenheight()
+        root.destroy()
+        return width, height
+    except Exception:
+        return 1600, 900
+
+
+def tile_driver_window(driver, worker_id: int, num_workers: int) -> None:
+    try:
+        screen_width, screen_height = get_screen_size()
+        screen_height -= 80
+
+        if num_workers == 8:
+            cols = 4
+            rows = 2
+        else:
+            cols = math.ceil(math.sqrt(num_workers))
+            rows = math.ceil(num_workers / cols)
+
+        window_width = max(500, screen_width // cols)
+        window_height = max(500, screen_height // rows)
+
+        col = worker_id % cols
+        row = worker_id // cols
+
+        x = col * window_width
+        y = row * window_height
+
+        driver.set_window_rect(
+            x=x,
+            y=y,
+            width=window_width,
+            height=window_height,
+        )
+    except Exception as exc:
+        print(f"[Worker {worker_id}] Could not tile window: {exc}")
+
+
+def init_driver(
+    headless: bool = True,
+    worker_id: int = 0,
+    num_workers: int = 1,
+):
+    options = uc.ChromeOptions()
+
+    if headless:
+        options.add_argument("--headless=new")
+
+    options.add_argument("--disable-gpu")
+    options.add_argument("--no-first-run")
+    options.add_argument("--no-default-browser-check")
+    options.add_argument("--disable-notifications")
+    options.add_argument("--disable-popup-blocking")
+    options.add_argument("--disable-dev-shm-usage")
+    try:
+        options.add_experimental_option("prefs", {
+            "profile.default_content_setting_values.geolocation": 2,
+            "profile.default_content_setting_values.notifications": 2,
+        })
+    except Exception:
+        pass
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-blink-features=AutomationControlled")
+
+    chrome_version = get_chrome_major_version()
+
+    last_error = None
+
+    for attempt in range(1, 4):
+        try:
+            print(f"[Worker {worker_id}] Starting undetected Chrome attempt {attempt}/3")
+
+            driver = uc.Chrome(
+                options=options,
+                headless=headless,
+                use_subprocess=True,
+                version_main=chrome_version or CHROME_VERSION_MAIN,
+            )
+
+            driver.set_page_load_timeout(45)
+
+            if not headless:
+                tile_driver_window(driver, worker_id, num_workers)
+
+            print(f"[Worker {worker_id}] Chrome started successfully")
+            return driver
+
+        except Exception as exc:
+            last_error = exc
+            print(f"[Worker {worker_id}] Chrome failed attempt {attempt}/3: {exc}")
+            time.sleep(3)
+
+    raise RuntimeError(
+        f"[Worker {worker_id}] Could not start Chrome after 3 attempts: {last_error}"
+    )
+
+
+def scroll_page(driver, scrolls: int = 6, delay: float = 1.0) -> None:
+    for _ in range(scrolls):
+        driver.execute_script(
+            "window.scrollBy(0, Math.max(500, document.body.scrollHeight / 3));"
+        )
+        time.sleep(delay)
+
+
+def safe_get_page_html(
+    url: str,
+    headless: bool = True,
+    wait_seconds: float = 5.0,
+    worker_id: int = 0,
+    num_workers: int = 1,
+):
+    driver = init_driver(
+        headless=headless,
+        worker_id=worker_id,
+        num_workers=num_workers,
+    )
+
+    start_time = time.time()
+
+    try:
+        driver.get(url)
+        time.sleep(wait_seconds)
+        scroll_page(driver)
+        time.sleep(1)
+
+        load_time = round(time.time() - start_time, 2)
+
+        return driver.page_source, load_time
+
+    finally:
+        try:
+            driver.quit()
+        except Exception:
+            pass
+
+
+# =========================================================
+# URL HELPERS
+# =========================================================
+
+def make_search_url(store: str, item: str) -> str:
+    store_info = AVAILABLE_STORES[store]
+    return store_info["search_url"].format(query=quote_plus(item))
+
+
+def absolute_url(href: str, store: str) -> str | None:
+    if not href:
+        return None
+
+    href = href.strip()
+
+    if href.startswith("javascript:") or href.startswith("#"):
+        return None
+
+    base_url = AVAILABLE_STORES.get(store, {}).get("base_url", "")
+
+    if not base_url:
+        return href
+
+    return urljoin(base_url, href)
+
+
+def looks_like_product_url(url: str | None, store: str) -> bool:
+    if not url:
+        return False
+
+    parsed = urlparse(url)
+    path = parsed.path.lower()
+
+    patterns = STORE_PRODUCT_URL_PATTERNS.get(store) or GENERIC_PRODUCT_URL_PATTERNS
+    return any(pattern in path for pattern in patterns)
+
+
+def infer_store_from_url(url: str) -> str:
+    host = urlparse(url).netloc.lower()
+
+    if "aldi" in host:
+        return "aldi"
+    if "costco" in host:
+        return "costco"
+    if "kroger" in host:
+        return "kroger"
+    if "meijer" in host:
+        return "meijer"
+    if "target" in host:
+        return "target"
+    if "walmart" in host:
+        return "walmart"
+
+    return "manual"
+
+
+def search_query_from_url(url: str) -> str:
+    parsed = urlparse(url)
+    params = parse_qs(parsed.query)
+
+    for key in ["text", "query", "q", "searchTerm", "keyword", "k"]:
+        values = params.get(key)
+        if values:
+            return unquote_plus(values[0]).strip()
+
+    return url
+
+
+# =========================================================
+# PRODUCT EXTRACTION
+# =========================================================
+
+def guess_product_name_from_card(card_text: str, query: str) -> str | None:
+    if not card_text:
+        return None
+
+    chunks = re.split(
+        r"(\$\s?\d+(?:[.,]\d{2})?|add to cart|pickup|delivery|shipping|sponsored)",
+        card_text,
+        flags=re.I,
+    )
+
+    keywords = item_keywords(query)
+    best_chunk = ""
+
+    for chunk in chunks:
+        chunk = clean_name(chunk)
+
+        if len(chunk) < 3:
+            continue
+
+        if any(word in normalize_text(chunk) for word in keywords):
+            if not best_chunk or len(chunk) < len(best_chunk):
+                best_chunk = chunk
+
+    if best_chunk:
+        return best_chunk[:180]
+
+    return clean_name(card_text[:180]) or None
+
+
+def dedupe_and_sort(products: list[ProductResult]) -> list[ProductResult]:
+    deduped: dict[str, ProductResult] = {}
+
+    for product in products:
+        key = product.product_url or normalize_text(product.product_name)
+
+        if not key:
+            continue
+
+        if key not in deduped or product.score > deduped[key].score:
+            deduped[key] = product
+
+    return sorted(
+        deduped.values(),
+        key=lambda product: product.score,
+        reverse=True,
+    )
+
+
+def extract_product_cards_generic(html: str, store: str, query: str) -> list[ProductResult]:
+    soup = BeautifulSoup(html, "html.parser")
+    candidates: list[ProductResult] = []
+    seen_urls: set[str] = set()
+
+    for link in soup.find_all("a", href=True):
+        product_url = absolute_url(link.get("href", ""), store)
+
+        if not looks_like_product_url(product_url, store):
+            continue
+
+        if product_url in seen_urls:
+            continue
+
+        seen_urls.add(product_url)
+
+        card = link
+
+        for _ in range(6):
+            if card.parent:
+                card = card.parent
+            else:
+                break
+
+            card_text = clean_name(card.get_text(" ", strip=True))
+
+            if money_from_text(card_text) or len(card_text) > 40:
+                break
+
+        link_text = clean_name(link.get_text(" ", strip=True))
+        card_text = clean_name(card.get_text(" ", strip=True))
+
+        product_name = link_text
+
+        if not product_name or len(product_name) < 3:
+            product_name = guess_product_name_from_card(card_text, query)
+
+        product_cost = money_from_text(card_text)
+
+        score, organic = score_product(
+            query,
+            product_name or "",
+            product_url or "",
+            product_cost,
+        )
+
+        candidates.append(
+            ProductResult(
+                query=query,
+                store=store,
+                store_name=AVAILABLE_STORES.get(store, {}).get("label", store.title()),
+                store_key=AVAILABLE_STORES.get(store, {}).get("key", store),
+                product_name=product_name or None,
+                product_url=product_url,
+                product_location=AVAILABLE_STORES.get(store, {}).get("location", store.title()),
+                product_cost=product_cost,
+                is_organic=organic,
+                score=score,
+                store_exact_address=AVAILABLE_STORES.get(store, {}).get("exact_address"),
+                store_selected_name=AVAILABLE_STORES.get(store, {}).get("selected_name"),
+                store_distance_miles=AVAILABLE_STORES.get(store, {}).get("distance_miles"),
+                store_website=AVAILABLE_STORES.get(store, {}).get("website"),
+                store_place_url=AVAILABLE_STORES.get(store, {}).get("place_url"),
+                store_phone=AVAILABLE_STORES.get(store, {}).get("phone"),
+            )
+        )
+
+    return dedupe_and_sort(candidates)
+
+
+def extract_direct_product_page(
+    html: str,
+    url: str,
+    store: str,
+) -> dict[str, Any]:
+    soup = BeautifulSoup(html, "html.parser")
+
+    title = soup.find("title")
+    page_title = clean_name(title.get_text(" ", strip=True)) if title else None
+
+    h1 = soup.find("h1")
+    h1_text = clean_name(h1.get_text(" ", strip=True)) if h1 else None
+
+    og_title = soup.find("meta", attrs={"property": "og:title"})
+    og_title_text = None
+
+    if og_title and og_title.get("content"):
+        og_title_text = clean_name(og_title.get("content"))
+
+    text = clean_name(soup.get_text(" ", strip=True))
+    price = money_from_text(text)
+
+    product_name = h1_text or og_title_text or page_title
+
+    return {
+        "store": store,
+        "product_name": product_name,
+        "product_url": url,
+        "product_cost": price,
+    }
+
+
+# =========================================================
+# STORE SEARCH MODE
+# =========================================================
+
+def scrape_store_product(
+    store: str,
+    item: str,
+    headless: bool = True,
+    wait_seconds: float = 5.0,
+    max_results: int = 10,
+) -> dict[str, Any]:
+    global AVAILABLE_STORES
+    AVAILABLE_STORES = load_available_stores()
+
+    start_time = time.time()
+    store = str(store or "").strip().lower()
+
+    if store not in AVAILABLE_STORES:
+        return {
+            "ok": False,
+            "error": f"Unknown store: {store}",
+            "available_stores": list(AVAILABLE_STORES.keys()),
+        }
+
+    search_url = make_search_url(store, item)
+    home_store_update = None
+
+    try:
+        html, load_time = safe_get_page_html(
+            search_url,
+            headless=headless,
+            wait_seconds=wait_seconds,
+        )
+
+        products = extract_product_cards_generic(html, store, item)
+        products = products[:max_results]
+
+        best = products[0] if products else None
+
+        return {
+            "ok": True,
+            "query": item,
+            "store": store,
+            "store_name": AVAILABLE_STORES.get(store, {}).get("label", store.title()),
+            "store_info": AVAILABLE_STORES.get(store, {}),
+            "home_store_update": home_store_update,
+            "search_url": search_url,
+            "load_time": load_time,
+            "best_match": asdict(best) if best else None,
+            "results": [asdict(product) for product in products],
+        }
+
+    except Exception as exc:
+        return {
+            "ok": False,
+            "query": item,
+            "store": store,
+            "store_name": AVAILABLE_STORES.get(store, {}).get("label", store.title()),
+            "store_info": AVAILABLE_STORES.get(store, {}),
+            "home_store_update": home_store_update,
+            "search_url": search_url,
+            "load_time": round(time.time() - start_time, 2),
+            "error": str(exc),
+        }
+
+
+def scrape_store_product_with_driver(
+    driver,
+    store: str,
+    item: str,
+    wait_seconds: float = 5.0,
+    max_results: int = 10,
+    worker_id: int = 0,
+    home_store_update: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    global AVAILABLE_STORES
+    AVAILABLE_STORES = load_available_stores()
+
+    start_time = time.time()
+    store = str(store or "").strip().lower()
+
+    if store not in AVAILABLE_STORES:
+        return {
+            "ok": False,
+            "query": item,
+            "store": store,
+            "error": f"Unknown store: {store}",
+            "available_stores": list(AVAILABLE_STORES.keys()),
+            "worker": worker_id,
+        }
+
+    search_url = make_search_url(store, item)
+
+    try:
+        driver.execute_script(f"document.title = 'Worker {worker_id} - {store}'")
+    except Exception:
+        pass
+
+    try:
+        driver.get(search_url)
+        time.sleep(wait_seconds)
+        scroll_page(driver)
+        time.sleep(1)
+
+        load_time = round(time.time() - start_time, 2)
+
+        products = extract_product_cards_generic(driver.page_source, store, item)
+        products = products[:max_results]
+
+        best = products[0] if products else None
+
+        return {
+            "ok": True,
+            "worker": worker_id,
+            "query": item,
+            "store": store,
+            "store_name": AVAILABLE_STORES.get(store, {}).get("label", store.title()),
+            "store_info": AVAILABLE_STORES.get(store, {}),
+            "home_store_update": home_store_update,
+            "search_url": search_url,
+            "load_time": load_time,
+            "best_match": asdict(best) if best else None,
+            "results": [asdict(product) for product in products],
+        }
+
+    except Exception as exc:
+        return {
+            "ok": False,
+            "worker": worker_id,
+            "query": item,
+            "store": store,
+            "store_name": AVAILABLE_STORES.get(store, {}).get("label", store.title()),
+            "store_info": AVAILABLE_STORES.get(store, {}),
+            "home_store_update": home_store_update,
+            "search_url": search_url,
+            "load_time": round(time.time() - start_time, 2),
+            "error": str(exc),
+        }
+
+
+def scrape_all_stores(
+    item: str,
+    stores: list[str] | None = None,
+    headless: bool = True,
+    wait_seconds: float = 5.0,
+    max_results: int = 10,
+) -> dict[str, Any]:
+    global AVAILABLE_STORES
+    AVAILABLE_STORES = load_available_stores()
+
+    if stores:
+        stores = [
+            str(store).strip().lower()
+            for store in stores
+            if str(store).strip().lower() in AVAILABLE_STORES
+        ]
+    else:
+        stores = sorted(
+            AVAILABLE_STORES.keys(),
+            key=lambda store: (
+                str(AVAILABLE_STORES[store].get("label") or store).lower(),
+                AVAILABLE_STORES[store].get("order", 999),
+            ),
+        )
+
+    store_results = []
+
+    for store in stores:
+        result = scrape_store_product(
+            store=store,
+            item=item,
+            headless=headless,
+            wait_seconds=wait_seconds,
+            max_results=max_results,
+        )
+        store_results.append(result)
+
+    best_matches = [
+        result.get("best_match")
+        for result in store_results
+        if result.get("ok") and result.get("best_match")
+    ]
+
+    best_matches = sorted(
+        best_matches,
+        key=lambda product: product.get("score", 0),
+        reverse=True,
+    )
+
+    return {
+        "ok": True,
+        "query": item,
+        "best_overall": best_matches[0] if best_matches else None,
+        "stores": store_results,
+    }
+
+
+# =========================================================
+# URL-FILE WORKER QUEUE MODE
+# =========================================================
+
+def scrape_product_url_with_driver(
+    driver,
+    url: str,
+    store: str = "auto",
+    wait_seconds: float = 5.0,
+    worker_id: int = 0,
+    max_results: int = 10,
+    home_store_update: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    start_time = time.time()
+    url = str(url or "").strip()
+
+    if not store or store == "auto":
+        store = infer_store_from_url(url)
+
+    query_text = search_query_from_url(url)
+
+    try:
+        try:
+            driver.execute_script(f"document.title = 'Worker {worker_id} - {store}'")
+        except Exception:
+            pass
+
+        driver.get(url)
+        time.sleep(wait_seconds)
+        scroll_page(driver)
+        time.sleep(1)
+
+        load_time = round(time.time() - start_time, 2)
+        html = driver.page_source
+
+        products = extract_product_cards_generic(
+            html=html,
+            store=store,
+            query=query_text,
+        )
+
+        products = products[:max_results]
+        best = products[0] if products else None
+
+        product_data = extract_direct_product_page(
+            html=html,
+            url=url,
+            store=store,
+        )
+
+        return {
+            "ok": True,
+            "worker": worker_id,
+            "url": url,
+            "store": store,
+            "store_name": AVAILABLE_STORES.get(store, {}).get("label", store.title()) if store in AVAILABLE_STORES else store.title(),
+            "store_info": AVAILABLE_STORES.get(store, {}),
+            "home_store_update": home_store_update,
+            "query": query_text,
+            "load_time": load_time,
+            "best_match": asdict(best) if best else None,
+            "results": [asdict(product) for product in products],
+            "product_name": product_data.get("product_name"),
+            "product_url": product_data.get("product_url"),
+            "product_cost": product_data.get("product_cost"),
+        }
+
+    except Exception as exc:
+        return {
+            "ok": False,
+            "worker": worker_id,
+            "url": url,
+            "store": store,
+            "store_name": AVAILABLE_STORES.get(store, {}).get("label", store.title()) if store in AVAILABLE_STORES else store.title(),
+            "store_info": AVAILABLE_STORES.get(store, {}),
+            "home_store_update": home_store_update,
+            "query": query_text,
+            "load_time": round(time.time() - start_time, 2),
+            "error": str(exc),
+        }
+
+
+def worker_loop(
+    worker_id: int,
+    num_workers: int,
+    task_queue: queue.Queue,
+    results: list[dict[str, Any]],
+    results_lock: threading.Lock,
+    headless: bool,
+    wait_seconds: float,
+    max_results: int,
+):
+    driver = None
+
+    try:
+        driver = init_driver(
+            headless=headless,
+            worker_id=worker_id,
+            num_workers=num_workers,
+        )
+
+        print(f"[Worker {worker_id}] started")
+
+        worker_home_stores_done: set[str] = set()
+        worker_home_store_updates: dict[str, dict[str, Any]] = {}
+
+        while True:
+            job = task_queue.get()
+
+            if job == "STOP":
+                print(f"[Worker {worker_id}] stopping")
+                task_queue.task_done()
+                break
+
+            mode = job.get("mode")
+
+            try:
+                if mode == "product_url":
+                    url = job["url"]
+                    requested_store = job.get("store", "auto")
+                    actual_store = infer_store_from_url(url) if not requested_store or requested_store == "auto" else str(requested_store).lower().strip()
+                    print(f"[Worker {worker_id}] URL: {url}")
+
+                    home_store_update = ensure_home_store_for_worker(
+                        driver=driver,
+                        store=actual_store,
+                        worker_home_stores_done=worker_home_stores_done,
+                        worker_home_store_updates=worker_home_store_updates,
+                        worker_id=worker_id,
+                        wait_seconds=wait_seconds,
+                    )
+
+                    result = scrape_product_url_with_driver(
+                        driver=driver,
+                        url=url,
+                        store=actual_store,
+                        wait_seconds=wait_seconds,
+                        worker_id=worker_id,
+                        max_results=max_results,
+                        home_store_update=home_store_update,
+                    )
+
+                elif mode == "store_search":
+                    store = str(job["store"]).lower().strip()
+                    item = job["item"]
+                    print(f"[Worker {worker_id}] Store search: {store} | {item}")
+
+                    home_store_update = ensure_home_store_for_worker(
+                        driver=driver,
+                        store=store,
+                        worker_home_stores_done=worker_home_stores_done,
+                        worker_home_store_updates=worker_home_store_updates,
+                        worker_id=worker_id,
+                        wait_seconds=wait_seconds,
+                    )
+
+                    result = scrape_store_product_with_driver(
+                        driver=driver,
+                        store=store,
+                        item=item,
+                        wait_seconds=wait_seconds,
+                        max_results=max_results,
+                        worker_id=worker_id,
+                        home_store_update=home_store_update,
+                    )
+
+                else:
+                    result = {
+                        "ok": False,
+                        "worker": worker_id,
+                        "error": f"Unknown job mode: {mode}",
+                        "job": job,
+                    }
+
+            except Exception as exc:
+                result = {
+                    "ok": False,
+                    "worker": worker_id,
+                    "error": str(exc),
+                    "job": job,
+                }
+
+            with results_lock:
+                results.append(result)
+
+            status = "✅" if result.get("ok") else "❌"
+            print(f"{status} [Worker {worker_id}] finished")
+
+            task_queue.task_done()
+
+    finally:
+        if driver:
+            try:
+                driver.quit()
+            except Exception:
+                pass
+
+
+def run_worker_queue(
+    jobs: list[dict[str, Any]],
+    workers: int = 4,
+    headless: bool = True,
+    wait_seconds: float = 5.0,
+    max_results: int = 10,
+) -> dict[str, Any]:
+    if not jobs:
+        return {
+            "ok": False,
+            "mode": "worker_queue",
+            "total": 0,
+            "workers": 0,
+            "results": [],
+            "error": "No jobs to process.",
+        }
+
+    max_cpu_workers = cpu_count()
+    workers = max(1, min(int(workers or 1), max_cpu_workers, len(jobs)))
+
+    task_queue: queue.Queue = queue.Queue()
+    results: list[dict[str, Any]] = []
+    results_lock = threading.Lock()
+
+    for job in jobs:
+        task_queue.put(job)
+
+    for _ in range(workers):
+        task_queue.put("STOP")
+
+    threads = []
+
+    for worker_id in range(workers):
+        thread = threading.Thread(
+            target=worker_loop,
+            args=(
+                worker_id,
+                workers,
+                task_queue,
+                results,
+                results_lock,
+                headless,
+                wait_seconds,
+                max_results,
+            ),
+            daemon=False,
+        )
+
+        thread.start()
+        threads.append(thread)
+
+    for thread in threads:
+        thread.join()
+
+    return {
+        "ok": True,
+        "mode": "worker_queue",
+        "total": len(jobs),
+        "workers": workers,
+        "results": results,
+    }
+
+
+def scrape_url_list_parallel(
+    urls: list[str],
+    store: str = "auto",
+    headless: bool = True,
+    wait_seconds: float = 5.0,
+    max_workers: int = 4,
+    max_results: int = 10,
+) -> dict[str, Any]:
+    cleaned_urls = [
+        str(url).strip()
+        for url in urls
+        if str(url or "").strip().startswith("http")
+    ]
+
+    jobs = [
+        {
+            "mode": "product_url",
+            "url": url,
+            "store": store or "auto",
+        }
+        for url in cleaned_urls
+    ]
+
+    result = run_worker_queue(
+        jobs=jobs,
+        workers=max_workers,
+        headless=headless,
+        wait_seconds=wait_seconds,
+        max_results=max_results,
+    )
+
+    result["mode"] = "url_file_worker_queue"
+    return result
+
+
+def scrape_store_searches_parallel(
+    item: str,
+    stores: list[str],
+    headless: bool = True,
+    wait_seconds: float = 5.0,
+    max_workers: int = 4,
+    max_results: int = 10,
+) -> dict[str, Any]:
+    jobs = [
+        {
+            "mode": "store_search",
+            "store": store,
+            "item": item,
+        }
+        for store in stores
+    ]
+
+    result = run_worker_queue(
+        jobs=jobs,
+        workers=max_workers,
+        headless=headless,
+        wait_seconds=wait_seconds,
+        max_results=max_results,
+    )
+
+    store_results = result.get("results", [])
+
+    best_matches = [
+        store_result.get("best_match")
+        for store_result in store_results
+        if store_result.get("ok") and store_result.get("best_match")
+    ]
+
+    best_matches = sorted(
+        best_matches,
+        key=lambda product: product.get("score", 0),
+        reverse=True,
+    )
+
+    return {
+        "ok": True,
+        "mode": "store_search_worker_queue",
+        "query": item,
+        "workers": result.get("workers", 0),
+        "best_overall": best_matches[0] if best_matches else None,
+        "stores": store_results,
+    }
+
+
+
+# =========================================================
+# INTEGRATED HOME STORE WEBSITE UPDATE
+# =========================================================
+
+def clean_store_text(value: Any) -> str:
+    return re.sub(r"\s+", " ", str(value or "")).strip()
+
+
+def extract_zip_from_text(value: str | None) -> str | None:
+    match = re.search(r"\b\d{5}(?:-\d{4})?\b", value or "")
+    return match.group(0) if match else None
+
+
+def store_number_from_url(url: str | None) -> str | None:
+    url = url or ""
+    patterns = [
+        r"/store/(\d+)",
+        r"/store-locator/(\d+)\.html",
+        r"/sl/[^/]+/(\d+)",
+        r"/(\d{3,5})[-_.]",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            return match.group(1)
+
+    return None
+
+
+def build_home_store_context(store: str) -> dict[str, Any]:
+    store = str(store or "").lower().strip()
+    store_info = AVAILABLE_STORES.get(store, {})
+
+    exact_address = clean_store_text(store_info.get("exact_address"))
+    selected_name = clean_store_text(
+        store_info.get("selected_name")
+        or store_info.get("pickup_store_name")
+        or store_info.get("label")
+        or store
+    )
+    website = clean_store_text(store_info.get("website"))
+    base_url = clean_store_text(store_info.get("base_url"))
+    pickup_zip = (
+        clean_store_text(store_info.get("pickup_zip"))
+        or extract_zip_from_text(exact_address)
+    )
+    store_number = store_number_from_url(website)
+
+    return {
+        "store_key": store,
+        "store_name": clean_store_text(store_info.get("label") or store.title()),
+        "selected_name": selected_name,
+        "exact_address": exact_address,
+        "pickup_zip": pickup_zip,
+        "website": website,
+        "base_url": base_url,
+        "store_number": store_number,
+        "search_values": [
+            value
+            for value in [
+                pickup_zip,
+                exact_address,
+                selected_name,
+                store_number,
+            ]
+            if value
+        ],
+    }
+
+
+def page_contains_any(driver, needles: list[str | None]) -> bool:
+    try:
+        text = clean_store_text(driver.page_source).lower()
+    except Exception:
+        return False
+
+    return any(clean_store_text(needle).lower() in text for needle in needles if clean_store_text(needle))
+
+
+def click_visible_xpath(driver, xpaths: list[str], wait: float = 1.5) -> bool:
+    for xpath in xpaths:
+        try:
+            elements = driver.find_elements(By.XPATH, xpath)
+        except Exception:
+            continue
+
+        for element in elements:
+            try:
+                if element.is_displayed() and element.is_enabled():
+                    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
+                    time.sleep(0.25)
+                    element.click()
+                    time.sleep(wait)
+                    return True
+            except Exception:
+                continue
+
+    return False
+
+
+def type_visible_location_input(driver, values: list[str], wait: float = 1.5) -> bool:
+    if not values:
+        return False
+
+    input_xpaths = [
+        "//input[not(@type='hidden')]",
+        "//*[@contenteditable='true']",
+        "//textarea",
+    ]
+
+    for value in values:
+        for xpath in input_xpaths:
+            try:
+                boxes = driver.find_elements(By.XPATH, xpath)
+            except Exception:
+                continue
+
+            for box in boxes:
+                try:
+                    if box.is_displayed() and box.is_enabled():
+                        driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", box)
+                        time.sleep(0.2)
+                        box.click()
+                        try:
+                            box.clear()
+                        except Exception:
+                            pass
+                        box.send_keys(value)
+                        time.sleep(0.5)
+                        box.send_keys(Keys.ENTER)
+                        time.sleep(wait)
+                        return True
+                except Exception:
+                    continue
+
+    return False
+
+
+def common_location_xpaths() -> list[str]:
+    phrases = [
+        "change store",
+        "select store",
+        "choose store",
+        "my store",
+        "store",
+        "pickup",
+        "delivery",
+        "location",
+        "change location",
+        "find a store",
+        "store locator",
+        "warehouse",
+        "find a warehouse",
+        "change warehouse",
+        "how do you want your items",
+    ]
+
+    xpaths: list[str] = []
+
+    for phrase in phrases:
+        lowered = phrase.lower()
+        xpaths.extend([
+            f"//button[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '{lowered}')]",
+            f"//a[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '{lowered}')]",
+            f"//*[contains(translate(@aria-label, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '{lowered}')]",
+        ])
+
+    return xpaths
+
+
+def final_home_store_xpaths(context: dict[str, Any]) -> list[str]:
+    selected = clean_store_text(context.get("selected_name")).lower()
+    address_part = clean_store_text(context.get("exact_address")).split(",")[0].lower()
+    store_number = clean_store_text(context.get("store_number"))
+
+    phrases = [
+        "set store",
+        "make this my store",
+        "select store",
+        "shop this store",
+        "start shopping",
+        "save",
+        "update location",
+        "make it my store",
+        "set as my warehouse",
+        "select",
+        "use this store",
+        "choose this store",
+    ]
+
+    if selected:
+        phrases.insert(0, selected)
+    if address_part:
+        phrases.insert(0, address_part)
+    if store_number:
+        phrases.insert(0, store_number)
+
+    xpaths: list[str] = []
+
+    for phrase in phrases:
+        lowered = phrase.lower()
+        xpaths.extend([
+            f"//button[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '{lowered}')]",
+            f"//a[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '{lowered}')]",
+            f"//*[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '{lowered}')]",
+        ])
+
+    return xpaths
+
+
+
+def click_text_button(driver, phrases: list[str], wait: float = 1.0) -> bool:
+    """Click an obvious button/link by visible text."""
+    for phrase in phrases:
+        phrase = clean_store_text(phrase)
+        if not phrase:
+            continue
+        lowered = phrase.lower()
+        xpaths = [
+            f"//button[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '{lowered}')]",
+            f"//a[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '{lowered}')]",
+            f"//*[@role='button' and contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '{lowered}')]",
+        ]
+        if click_visible_xpath(driver, xpaths, wait=wait):
+            return True
+    return False
+
+
+def js_click(driver, element) -> bool:
+    try:
+        driver.execute_script("arguments[0].scrollIntoView({block: 'center', inline: 'center'});", element)
+        time.sleep(0.25)
+        driver.execute_script("arguments[0].click();", element)
+        time.sleep(0.75)
+        return True
+    except Exception:
+        try:
+            ActionChains(driver).move_to_element(element).pause(0.2).click().perform()
+            time.sleep(0.75)
+            return True
+        except Exception:
+            return False
+
+
+def xpath_literal(value: str) -> str:
+    """Safely quote a string for XPath."""
+    value = str(value or "")
+    if "'" not in value:
+        return f"'{value}'"
+    if '"' not in value:
+        return f'"{value}"'
+    parts = value.split("'")
+    return "concat(" + ', "\'", '.join(f"'{part}'" for part in parts) + ")"
+
+
+def click_store_card_that_matches_context(driver, context: dict[str, Any], wait: float = 2.0) -> bool:
+    """
+    This is the important part: click the actual visible store result card/radio.
+
+    For Meijer, this targets the card containing the real selected address, e.g.
+    "5325 E Southport Rd", clicks the radio/card, then caller clicks Continue shopping.
+    """
+    exact_address = clean_store_text(context.get("exact_address"))
+    address_line_1 = clean_store_text(exact_address.split(",")[0]) if exact_address else ""
+    selected_name = clean_store_text(context.get("selected_name"))
+    pickup_zip = clean_store_text(context.get("pickup_zip"))
+    store_number = clean_store_text(context.get("store_number"))
+
+    target_texts = []
+    for value in [address_line_1, exact_address, store_number, selected_name, pickup_zip]:
+        value = clean_store_text(value)
+        if value and value.lower() not in {v.lower() for v in target_texts}:
+            target_texts.append(value)
+
+    # Never use a generic store name alone if we have a real address.
+    if address_line_1:
+        target_texts = [address_line_1, exact_address, store_number, pickup_zip]
+        target_texts = [v for v in target_texts if v]
+
+    for target in target_texts:
+        literal = xpath_literal(target)
+        possible_text_nodes = []
+        xpaths = [
+            f"//*[contains(normalize-space(.), {literal})]",
+            f"//*[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), {xpath_literal(target.lower())})]",
+        ]
+
+        for xp in xpaths:
+            try:
+                possible_text_nodes.extend(driver.find_elements(By.XPATH, xp))
+            except Exception:
+                continue
+
+        # Sort smallest visible elements first so we don't click the whole modal/body.
+        visible_nodes = []
+        for el in possible_text_nodes:
+            try:
+                if not el.is_displayed():
+                    continue
+                rect = el.rect or {}
+                area = float(rect.get("width", 0) or 0) * float(rect.get("height", 0) or 0)
+                if area <= 0:
+                    continue
+                visible_nodes.append((area, el))
+            except Exception:
+                continue
+
+        for _, text_el in sorted(visible_nodes, key=lambda x: x[0]):
+            # Walk up to the store card. The card usually contains the address plus a radio.
+            card = text_el
+            for _ in range(8):
+                try:
+                    parent = card.find_element(By.XPATH, "..")
+                except Exception:
+                    break
+
+                try:
+                    parent_text = clean_store_text(parent.text)
+                    has_target = target.lower() in parent_text.lower()
+                    radios = parent.find_elements(By.XPATH, ".//input[@type='radio'] | .//*[@role='radio']")
+                    buttons = parent.find_elements(By.XPATH, ".//button | .//*[@role='button']")
+                    rect = parent.rect or {}
+                    area = float(rect.get("width", 0) or 0) * float(rect.get("height", 0) or 0)
+                except Exception:
+                    parent = None
+                    has_target = False
+                    radios = []
+                    buttons = []
+                    area = 999999999
+
+                if parent is not None and has_target and (radios or buttons or area < 350000):
+                    card = parent
+                    break
+
+                if parent is not None:
+                    card = parent
+
+            # Prefer the actual radio circle/input when present.
+            click_targets = []
+            try:
+                click_targets.extend(card.find_elements(By.XPATH, ".//input[@type='radio']"))
+            except Exception:
+                pass
+            try:
+                click_targets.extend(card.find_elements(By.XPATH, ".//*[@role='radio']"))
+            except Exception:
+                pass
+            try:
+                click_targets.extend(card.find_elements(By.XPATH, ".//button[contains(@aria-label, 'Select') or contains(@aria-label, 'select')]"))
+            except Exception:
+                pass
+            click_targets.append(card)
+            click_targets.append(text_el)
+
+            for target_el in click_targets:
+                try:
+                    if target_el.is_displayed() and js_click(driver, target_el):
+                        print(f"      ✅ Clicked matching store card/radio: {target}")
+                        time.sleep(wait)
+                        return True
+                except Exception:
+                    continue
+
+    return False
+
+
+def click_continue_shopping(driver, wait: float = 2.0) -> bool:
+    """After selecting the store card/radio, click Continue shopping / Start shopping."""
+    return click_text_button(
+        driver,
+        [
+            "Continue shopping",
+            "Start shopping",
+            "Shop this store",
+            "Use this store",
+            "Select store",
+            "Save",
+            "Done",
+        ],
+        wait=wait,
+    )
+
+
+def accept_cookies_if_present(driver, wait: float = 0.75) -> bool:
+    return click_text_button(
+        driver,
+        [
+            "Accept all",
+            "Accept All",
+            "I accept",
+            "Accept",
+            "Agree",
+            "Got it",
+        ],
+        wait=wait,
+    )
+
+
+def update_home_store_on_existing_driver(
+    driver,
+    store: str,
+    worker_id: int = 0,
+    wait_seconds: float = 4.0,
+) -> dict[str, Any]:
+    """
+    This is the update_home_stores.py behavior moved into this scraper.
+    It uses the SAME already-open worker browser, sets the home/pickup store,
+    then the same worker continues ingredient/product scraping.
+    """
+    context = build_home_store_context(store)
+    start_url = context.get("website") or context.get("base_url")
+
+    if not start_url:
+        return {
+            "attempted": True,
+            "ok": False,
+            "store_key": store,
+            "message": "No store website/base URL found.",
+            **context,
+        }
+
+    print(f"[Worker {worker_id}] 🏬 First time seeing {store}; setting home store on website")
+    print(f"[Worker {worker_id}] 🌐 Opening: {start_url}")
+
+    try:
+        driver.get(start_url)
+        time.sleep(wait_seconds)
+
+        accept_cookies_if_present(driver, wait=0.75)
+
+        already_visible = page_contains_any(
+            driver,
+            [
+                context.get("selected_name"),
+                context.get("exact_address"),
+                context.get("pickup_zip"),
+                context.get("store_number"),
+            ],
+        )
+
+        clicked_location = click_visible_xpath(driver, common_location_xpaths(), wait=wait_seconds)
+        accept_cookies_if_present(driver, wait=0.75)
+
+        typed_location = type_visible_location_input(driver, context.get("search_values", []), wait=wait_seconds)
+        accept_cookies_if_present(driver, wait=0.75)
+
+        # IMPORTANT: click the real visible store result card/radio, not just text.
+        clicked_store_card = click_store_card_that_matches_context(
+            driver=driver,
+            context=context,
+            wait=wait_seconds,
+        )
+
+        # IMPORTANT: finish the modal flow. For Meijer this is the blue Continue shopping button.
+        clicked_continue = click_continue_shopping(driver, wait=wait_seconds)
+
+        # Fallback generic final clicks for other stores.
+        clicked_final = False
+        if not clicked_continue:
+            clicked_final = click_visible_xpath(driver, final_home_store_xpaths(context), wait=wait_seconds)
+
+        time.sleep(wait_seconds)
+
+        confirmed = page_contains_any(
+            driver,
+            [
+                context.get("selected_name"),
+                context.get("exact_address"),
+                context.get("pickup_zip"),
+                context.get("store_number"),
+            ],
+        )
+
+        ok = bool(confirmed or clicked_continue or clicked_store_card or clicked_final or already_visible)
+
+        message = "Home store update attempted in existing worker browser."
+        if not ok:
+            message = "Could not confirm home store, but continuing ingredient search in same browser."
+
+        print(f"[Worker {worker_id}] {'✅' if ok else '⚠️'} {store}: {message}")
+
+        return {
+            "attempted": True,
+            "ok": ok,
+            "message": message,
+            "clicked_location": clicked_location,
+            "typed_location": typed_location,
+            "clicked_store_card": clicked_store_card,
+            "clicked_continue": clicked_continue,
+            "clicked_final": clicked_final,
+            **context,
+        }
+
+    except Exception as exc:
+        message = f"Home store update failed, continuing ingredient search: {exc}"
+        print(f"[Worker {worker_id}] ⚠️ {store}: {message}")
+        return {
+            "attempted": True,
+            "ok": False,
+            "message": message,
+            **context,
+        }
+
+
+def ensure_home_store_for_worker(
+    driver,
+    store: str,
+    worker_home_stores_done: set[str],
+    worker_home_store_updates: dict[str, dict[str, Any]],
+    worker_id: int = 0,
+    wait_seconds: float = 4.0,
+) -> dict[str, Any] | None:
+    store = str(store or "").lower().strip()
+
+    if not store or store in {"auto", "manual"}:
+        return None
+
+    if store in worker_home_stores_done:
+        return worker_home_store_updates.get(store)
+
+    result = update_home_store_on_existing_driver(
+        driver=driver,
+        store=store,
+        worker_id=worker_id,
+        wait_seconds=wait_seconds,
+    )
+
+    worker_home_stores_done.add(store)
+    worker_home_store_updates[store] = result
+
+    return result
+
+# =========================================================
+# OUTPUT HELPERS
+# =========================================================
+
+def flatten_results(scrape_result: dict[str, Any]) -> list[dict[str, Any]]:
+    flattened: list[dict[str, Any]] = []
+
+    if scrape_result.get("results"):
+        flattened.extend(scrape_result.get("results") or [])
+
+    for store_result in scrape_result.get("stores", []):
+        flattened.extend(store_result.get("results") or [])
+
+    seen = set()
+    unique = []
+
+    for product in flattened:
+        key = product.get("product_url") or normalize_text(product.get("product_name"))
+
+        if not key or key in seen:
+            continue
+
+        seen.add(key)
+        unique.append(product)
+
+    return sorted(
+        unique,
+        key=lambda product: product.get("score", 0),
+        reverse=True,
+    )
+
+
+def update_output_file(output_file: Path, item: str, scrape_result: dict[str, Any]) -> None:
+    if output_file.exists():
+        try:
+            data = json.loads(output_file.read_text(encoding="utf-8"))
+        except Exception:
+            data = {}
+    else:
+        data = {}
+
+    if not isinstance(data, dict):
+        data = {}
+
+    item_key = normalize_text(item)
+    data[item_key] = scrape_result
+
+    output_file.write_text(
+        json.dumps(data, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+
+
+
+def store_pickup_config(store: str) -> dict[str, Any]:
+    store_info = AVAILABLE_STORES.get(store, {})
+    return {
+        "pickup_zip": store_info.get("pickup_zip"),
+        "pickup_store_name": store_info.get("pickup_store_name"),
+    }
+
+
+def click_first_matching_text(driver, text_options: list[str], wait: float = 1.5) -> bool:
+    for text in text_options:
+        try:
+            elements = driver.find_elements(
+                "xpath",
+                f"//*[contains(translate(normalize-space(text()), "
+                f"'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), "
+                f"'{text.lower()}')]"
+            )
+
+            for element in elements:
+                try:
+                    if element.is_displayed() and element.is_enabled():
+                        element.click()
+                        time.sleep(wait)
+                        return True
+                except Exception:
+                    continue
+        except Exception:
+            continue
+
+    return False
+
+
+def type_into_first_visible_input(driver, value: str, wait: float = 1.5) -> bool:
+    if not value:
+        return False
+
+    try:
+        inputs = driver.find_elements("xpath", "//input")
+    except Exception:
+        return False
+
+    for input_box in inputs:
+        try:
+            if input_box.is_displayed() and input_box.is_enabled():
+                input_box.clear()
+                input_box.send_keys(value)
+                time.sleep(wait)
+                return True
+        except Exception:
+            continue
+
+    return False
+
+
+def set_store_pickup_location(driver, store: str, worker_id: int = 0) -> None:
+    config = store_pickup_config(store)
+    pickup_zip = config.get("pickup_zip")
+    pickup_store_name = config.get("pickup_store_name")
+
+    if not pickup_zip:
+        return
+
+    store = str(store or "").lower().strip()
+    store_info = AVAILABLE_STORES.get(store, {})
+    base_url = store_info.get("base_url")
+
+    if not base_url:
+        return
+
+    print(f"[Worker {worker_id}] Setting pickup location for {store}: {pickup_zip}")
+
+    try:
+        driver.get(base_url)
+        time.sleep(4)
+
+        if store == "meijer":
+            click_first_matching_text(
+                driver,
+                ["change store", "select store", "my store", "choose store", "pickup"],
+            )
+            type_into_first_visible_input(driver, pickup_zip)
+
+            click_first_matching_text(driver, ["search", "submit", "find stores"])
+
+            if pickup_store_name:
+                click_first_matching_text(driver, [pickup_store_name])
+
+            click_first_matching_text(driver, ["set store", "make this my store", "select store"])
+
+        elif store == "aldi":
+            click_first_matching_text(
+                driver,
+                ["find a store", "change store", "select store", "store locator"],
+            )
+            type_into_first_visible_input(driver, pickup_zip)
+
+            click_first_matching_text(driver, ["search", "submit", "find stores"])
+
+            if pickup_store_name:
+                click_first_matching_text(driver, [pickup_store_name])
+
+            click_first_matching_text(driver, ["shop this store", "select store"])
+
+        elif store == "kroger":
+            click_first_matching_text(
+                driver,
+                ["change store", "select store", "my store", "pickup"],
+            )
+            type_into_first_visible_input(driver, pickup_zip)
+
+            click_first_matching_text(driver, ["search", "submit", "find stores"])
+
+            if pickup_store_name:
+                click_first_matching_text(driver, [pickup_store_name])
+
+            click_first_matching_text(driver, ["select store", "shop this store", "start shopping"])
+
+        elif store == "walmart":
+            click_first_matching_text(
+                driver,
+                ["pickup", "delivery", "change", "how do you want your items"],
+            )
+            type_into_first_visible_input(driver, pickup_zip)
+
+            click_first_matching_text(driver, ["update location", "save", "search"])
+
+            if pickup_store_name:
+                click_first_matching_text(driver, [pickup_store_name])
+
+            click_first_matching_text(driver, ["save", "select store"])
+
+        elif store == "target":
+            click_first_matching_text(
+                driver,
+                ["my store", "change store", "select store", "store"],
+            )
+            type_into_first_visible_input(driver, pickup_zip)
+
+            click_first_matching_text(driver, ["search", "submit", "find stores"])
+
+            if pickup_store_name:
+                click_first_matching_text(driver, [pickup_store_name])
+
+            click_first_matching_text(driver, ["make it my store", "select store"])
+
+        elif store == "costco":
+            click_first_matching_text(
+                driver,
+                ["warehouse", "find a warehouse", "change warehouse"],
+            )
+            type_into_first_visible_input(driver, pickup_zip)
+
+            click_first_matching_text(driver, ["search", "submit"])
+
+            if pickup_store_name:
+                click_first_matching_text(driver, [pickup_store_name])
+
+            click_first_matching_text(driver, ["set as my warehouse", "select"])
+
+        time.sleep(2)
+
+    except Exception as exc:
+        print(f"[Worker {worker_id}] Pickup location setup failed for {store}: {exc}")
+
+        
+# =========================================================
+# TEST / MAIN
+# =========================================================
+
+def run_internal_test() -> None:
+    print("\n==============================")
+    print("🚀 SEQUENTIAL WORKER TEST")
+    print("==============================\n")
+
+    test_urls = [
+        "https://www.meijer.com/shopping/search.html?text=broccoli%20florets",
+        "https://www.meijer.com/shopping/search.html?text=carrots",
+        "https://www.meijer.com/shopping/search.html?text=garlic",
+        "https://www.meijer.com/shopping/search.html?text=onion",
+        "https://www.meijer.com/shopping/search.html?text=spinach",
+        "https://www.meijer.com/shopping/search.html?text=zucchini",
+        "https://www.meijer.com/shopping/search.html?text=leeks",
+        "https://www.meijer.com/shopping/search.html?text=potatoes",
+    ]
+
+    result = scrape_url_list_parallel(
+        urls=test_urls,
+        store="auto",
+        headless=False,
+        wait_seconds=5,
+        max_workers=2,
+        max_results=10,
+    )
+
+    print(json.dumps(result, indent=2, ensure_ascii=False))
+
+
+def run_scraper(url_list):
+    return scrape_url_list_parallel(
+        urls=url_list,
+        store="auto",
+        headless=False,
+        wait_seconds=5,
+        max_workers=4,
+        max_results=10,
+    )
+    from concurrent.futures import ThreadPoolExecutor
+
+    def scrape(url):
+        print(f"Opening: {url}")
+        # your scraping logic here
+
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        executor.map(scrape, url_list)
+
+
+def main() -> int:
+    global AVAILABLE_STORES
+    AVAILABLE_STORES = load_available_stores()
+
+    parser = argparse.ArgumentParser(
+        description="Scrape store search pages and product result URLs."
+    )
+
+    parser.add_argument("--item", help="Shopping item to search for.")
+
+    parser.add_argument(
+        "--store",
+        choices=list(AVAILABLE_STORES.keys()) + ["auto", "manual"],
+        help="Store to search.",
+    )
+
+    parser.add_argument(
+        "--all-stores",
+        action="store_true",
+        help="Search all supported stores.",
+    )
+
+    parser.add_argument(
+        "--stores",
+        nargs="*",
+        choices=list(AVAILABLE_STORES.keys()),
+        help="Optional list of stores to search with --all-stores.",
+    )
+
+    parser.add_argument(
+        "--url-file",
+        help="Text file containing one product URL per line.",
+    )
+
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=4,
+        help="Number of Chrome worker windows.",
+    )
+
+    parser.add_argument(
+        "--headed",
+        action="store_true",
+        help="Show browser windows instead of headless mode.",
+    )
+
+    parser.add_argument(
+        "--wait",
+        type=float,
+        default=5.0,
+        help="Seconds to wait after page load.",
+    )
+
+    parser.add_argument(
+        "--max-results",
+        type=int,
+        default=10,
+        help="Maximum results returned per store/search URL.",
+    )
+
+    parser.add_argument(
+        "--output",
+        help="Optional JSON file to update/write scrape results.",
+    )
+
+    parser.add_argument(
+        "--parallel-stores",
+        action="store_true",
+        help="Use worker queue for --all-stores store search mode.",
+    )
+
+    args = parser.parse_args()
+    headless = not args.headed
+
+    if args.url_file:
+        url_file = Path(args.url_file)
+
+        if not url_file.exists():
+            print(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "error": f"URL file not found: {url_file}",
+                    },
+                    indent=2,
+                )
+            )
+            return 1
+
+        urls = [
+            line.strip()
+            for line in url_file.read_text(encoding="utf-8").splitlines()
+            if line.strip().startswith("http")
+        ]
+
+        result = scrape_url_list_parallel(
+            urls=urls,
+            store=args.store or "auto",
+            headless=headless,
+            wait_seconds=args.wait,
+            max_workers=args.workers,
+            max_results=args.max_results,
+        )
+
+        if args.output:
+            Path(args.output).write_text(
+                json.dumps(result, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+        return 0
+
+    if not args.item:
+        parser.error("Use --item ITEM, or use --url-file product_urls.txt")
+
+    if not args.store and not args.all_stores:
+        parser.error("Use --store STORE, --all-stores, or --url-file")
+
+    if args.all_stores:
+        if args.stores:
+            stores = [
+                str(store).strip().lower()
+                for store in args.stores
+                if str(store).strip().lower() in AVAILABLE_STORES
+            ]
+        else:
+            stores = sorted(
+                AVAILABLE_STORES.keys(),
+                key=lambda store: (
+                    str(AVAILABLE_STORES[store].get("label") or store).lower(),
+                    AVAILABLE_STORES[store].get("order", 999),
+                ),
+            )
+
+        if args.parallel_stores:
+            result = scrape_store_searches_parallel(
+                item=args.item,
+                stores=stores,
+                headless=headless,
+                wait_seconds=args.wait,
+                max_workers=args.workers,
+                max_results=args.max_results,
+            )
+        else:
+            result = scrape_all_stores(
+                item=args.item,
+                stores=stores,
+                headless=headless,
+                wait_seconds=args.wait,
+                max_results=args.max_results,
+            )
+
+    else:
+        if args.store in {"auto", "manual"}:
+            parser.error("--store auto/manual is only for --url-file mode")
+
+        result = scrape_store_product(
+            store=args.store,
+            item=args.item,
+            headless=headless,
+            wait_seconds=args.wait,
+            max_results=args.max_results,
+        )
+
+    if args.output:
+        update_output_file(Path(args.output), args.item, result)
+
+    print(json.dumps(result, indent=2, ensure_ascii=False))
+
+    return 0
+
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        # 👇 external input (CLI or app.py subprocess)
+        urls = sys.argv[1:]
+        result = run_scraper(urls)
+        print(json.dumps(result, indent=2))
+    else:
+        # 👇 fallback test
+        urls = [
+            "https://www.meijer.com/shopping/search.html?text=chicken",
+            "https://www.meijer.com/shopping/search.html?text=bread",
+            "https://www.meijer.com/shopping/search.html?text=hotdog",
+        ]
+
+        result = run_scraper(urls)
+        print(json.dumps(result, indent=2)) 
