@@ -1,0 +1,18 @@
+<div class="app-card">
+    <h2>Edit Shopping Items</h2>
+
+    <form method="POST" action="/save" onsubmit="saveScroll()">
+        <textarea class="edit-items-box" name="items">{{ raw_items }}</textarea>
+        <button class="save-btn">Save List</button>
+    </form>
+
+    <div class="actions-grid">
+        <form method="POST" action="/sort" onsubmit="saveScroll()">
+            <button class="sort-btn" type="submit">Sort List</button>
+        </form>
+
+        <form method="POST" action="/clear">
+            <button class="clear-btn" type="submit">Clear List</button>
+        </form>
+    </div>
+</div>

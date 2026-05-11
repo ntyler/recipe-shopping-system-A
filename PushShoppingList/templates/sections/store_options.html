@@ -1,0 +1,91 @@
+<div class="app-card">
+    <button type="button"
+            class="card-collapse-toggle"
+            onclick="toggleCardCollapse('store-options')">
+        <span>Store Options</span>
+        <span class="card-collapse-icon" data-collapse-icon="store-options">Show ▾</span>
+    </button>
+
+    <div class="card-collapse-content collapsed" data-collapse-content="store-options">
+        <p class="helper-text">
+            This is your editable store list. Check stores to show buttons next to each item.
+        </p>
+
+        <form id="store-options-form" method="POST" action="/save_store_settings" onsubmit="saveScroll()"></form>
+
+        <div class="store-manager-list">
+            {% for store_key, store in available_stores.items() %}
+                <div class="store-manager-row">
+                    <input type="checkbox"
+                           form="store-options-form"
+                           name="enabled_stores"
+                           value="{{ store_key }}"
+                           {% if store_key in enabled_stores %}checked{% endif %}>
+
+                    <div class="store-manager-label">{{ store.label }}</div>
+
+                    <div class="store-manager-url">
+                        <div class="store-detail-line">
+                            <span class="store-detail-label">Search</span>
+                            <a class="store-detail-link" href="{{ store.url }}" target="_blank">{{ store.url }}</a>
+                        </div>
+
+                        {% if store.urlStoreSelector %}
+                            <div class="store-detail-line">
+                                <span class="store-detail-label">Store Selector URL</span>
+                                <a class="store-detail-link" href="{{ store.urlStoreSelector }}" target="_blank">{{ store.urlStoreSelector }}</a>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="store-action-row">
+                        <button type="button" class="store-edit-btn">Edit</button>
+                        <button type="button" class="store-credentials-btn">Credentials</button>
+                        <button type="button" class="store-delete-btn">Delete</button>
+                    </div>
+
+                    <div class="store-location-details">
+                        <div class="store-detail-line">
+                            <span class="store-detail-label">Nearest</span>
+                            No nearest location saved yet. Run <code>update_home_stores.py</code>.
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <button type="submit" form="store-options-form" class="store-save-btn">Save Store Options</button>
+
+        <div class="view-control-section">
+            <div class="view-control-title">Add Store</div>
+
+            <form method="POST" action="/add_store" onsubmit="saveScroll()">
+                <div class="add-store-grid">
+                    <input name="store_label" placeholder="Store name, e.g. Costco">
+                    <input name="homepage_url" placeholder="Homepage, e.g. https://www.costco.com">
+                    <input name="store_url" placeholder="Search URL override, e.g. https://site.com/search?q=">
+                    <input name="urlStoreSelector" placeholder="Store Selector URL, e.g. https://info.aldi.us/stores">
+                    <input name="store_username" placeholder="Username / email optional" autocomplete="username">
+                    <div class="password-input-wrap">
+                        <input id="add-store-password"
+                               name="store_password"
+                               type="password"
+                               placeholder="Password optional"
+                               autocomplete="current-password">
+                        <button type="button"
+                                class="password-toggle-btn"
+                                onclick="togglePasswordVisibility('add-store-password', this)">
+                            👁
+                        </button>
+                    </div>
+                </div>
+
+                <div class="add-store-help">
+                    Enter a homepage and the app will guess a search URL. Store Selector URL is the first page opened when setting a store location.
+                </div>
+
+                <button type="submit" class="store-save-btn">Add Store</button>
+            </form>
+        </div>
+    </div>
+</div>

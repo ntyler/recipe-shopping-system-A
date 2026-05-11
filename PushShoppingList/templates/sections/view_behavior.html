@@ -1,0 +1,77 @@
+<div class="app-card view-settings-card">
+    <h2>View &amp; Behavior</h2>
+    <p class="helper-text">Choose how the list is displayed, how buttons behave, and manage resets.</p>
+
+    <div class="view-control-section">
+        <div class="view-control-title">Display View</div>
+        <div class="view-toggle-box view-control-row">
+            <button type="button" id="sectionViewBtn" class="view-toggle-btn" onclick="showView('section')">
+                Section View
+            </button>
+
+            <button type="button" id="storeViewBtn" class="view-toggle-btn" onclick="showView('store')">
+                Store View
+            </button>
+
+            <button type="button" id="recipeViewBtn" class="view-toggle-btn" onclick="showView('recipe')">
+                Recipe View
+            </button>
+        </div>
+    </div>
+
+    <div class="view-control-section">
+        <div class="view-control-title">Button Behavior</div>
+        <div class="view-control-row">
+            <label class="behavior-toggle">
+                <input type="checkbox" id="openStoreUrlsToggle" checked onchange="saveOpenStoreUrlsSetting()">
+                Open store URLs
+            </label>
+
+            <label class="behavior-toggle">
+                <input type="checkbox" id="showItemButtonsToggle" checked onchange="saveShowItemButtonsSetting()">
+                Show item buttons
+            </label>
+
+            <label class="behavior-toggle">
+                <input type="checkbox" id="showBestProductToggle" checked onchange="saveShowBestProductSetting()">
+                Show best product
+            </label>
+
+            <label class="behavior-toggle">
+                <input type="checkbox" id="hideCheckedItemsToggle" onchange="saveHideCheckedItemsSetting()">
+                Hide checked items
+            </label>
+
+            <label class="behavior-toggle">
+                <input type="checkbox" id="compactModeToggle" onchange="saveCompactModeSetting()">
+                Compact mode
+            </label>
+        </div>
+    </div>
+
+    <div class="view-control-section">
+        <div class="view-control-title">Product Tools</div>
+        <div class="view-control-row">
+            <form class="view-action-form" method="POST" action="/preview_grab_best_products" onsubmit="saveScroll();">
+                <button type="submit" class="grab-products-btn view-action-btn">Grab Best Products</button>
+            </form>
+
+            <form class="view-action-form" method="POST" action="/clear_product_picks" onsubmit="saveScroll();">
+                <button type="submit" class="clear-products-btn view-action-btn">Clear Product Picks</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="view-control-section">
+        <div class="view-control-title">Reset Tools</div>
+        <div class="view-control-row">
+            <form class="view-action-form" method="POST" action="/reset_checks" onsubmit="saveScroll();">
+                <button class="reset-checks-btn view-action-btn" type="submit">Reset Checkboxes</button>
+            </form>
+
+            <form class="view-action-form" method="POST" action="/reset_stores" onsubmit="saveScroll()">
+                <button class="reset-stores-btn view-action-btn" type="submit">Reset Stores</button>
+            </form>
+        </div>
+    </div>
+</div>

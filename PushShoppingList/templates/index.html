@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Shopping List</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+
+<body>
+
+<h1>Shopping List</h1>
+
+{% if message %}
+<div class="message">{{ message }}</div>
+{% endif %}
+
+{% include "sections/extraction_overlay.html" %}
+{% include "sections/products_overlay.html" %}
+
+{% include "sections/enter_recipe_links.html" %}
+{% include "sections/edit_items.html" %}
+{% include "sections/current_recipe_url_log.html" %}
+{% include "sections/home_address.html" %}
+{% include "sections/store_options.html" %}
+{% include "sections/view_behavior.html" %}
+{% include "sections/items.html" %}
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+
+</body>
+</html>

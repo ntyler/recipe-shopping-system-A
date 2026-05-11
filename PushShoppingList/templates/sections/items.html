@@ -1,0 +1,58 @@
+<div id="sectionView">
+    <h2 class="items-title">Items</h2>
+
+    {% if items %}
+        {% for item in items %}
+            {% if is_section_header(item) %}
+                {% set section_name = item.replace("===", "").strip() %}
+                <div class="section-header-row collapsible-header">
+                    <span class="header-title">{{ section_name }}</span>
+                    <span class="header-toggle-icon">Hide ▴</span>
+                </div>
+            {% else %}
+                <div class="row" data-key="{{ normalize(item) }}">
+                    <div class="item">
+                        <div class="item-main-line">
+                            <input type="checkbox" class="item-check">
+                            <span class="item-text">{{ item }}</span>
+                        </div>
+                    </div>
+
+                    <div class="item-actions">
+                        {% for store_key in enabled_stores %}
+                            {% set store = available_stores.get(store_key) %}
+                            {% if store %}
+                                <button type="button" class="store-btn" data-store="{{ store_key }}">
+                                    {{ store.label }}
+                                </button>
+                            {% endif %}
+                        {% endfor %}
+
+                        <form method="POST" action="/find_products" class="product-search-form" onsubmit="saveScroll()">
+                            <input type="hidden" name="item" value="{{ item }}">
+                            <button type="submit" class="product-search-btn">Products</button>
+                        </form>
+                    </div>
+                </div>
+            {% endif %}
+        {% endfor %}
+    {% else %}
+        <div class="recipe-view-card">
+            <div class="source-line">No shopping items yet.</div>
+        </div>
+    {% endif %}
+</div>
+
+<div id="storeView" style="display:none;">
+    <h2 class="items-title">Items by Store</h2>
+    <div class="recipe-view-card">
+        <div class="source-line">No store view items yet.</div>
+    </div>
+</div>
+
+<div id="recipeView" style="display:none;">
+    <h2 class="items-title">Items by Recipe</h2>
+    <div class="recipe-view-card">
+        <div class="source-line">No recipe URLs yet.</div>
+    </div>
+</div>

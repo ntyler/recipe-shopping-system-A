@@ -1,0 +1,36 @@
+<div class="product-modal-backdrop" id="extractProgressModalBackdrop" style="display:none;">
+    <div class="product-choice-card" role="dialog" aria-modal="true">
+        <div class="product-choice-header">
+            <div class="product-choice-title-row">
+                <div style="width:52px;"></div>
+                <h2>Extracting Ingredients</h2>
+                <button type="button" class="product-close-btn" onclick="hideExtractProgressModal()">Hide</button>
+            </div>
+
+            <p class="product-choice-subtitle">
+                Your recipes are being processed. This page will update when extraction finishes.
+            </p>
+        </div>
+
+        <div class="bulk-progress-status">
+            <div id="extractSpinner" class="bulk-spinner"></div>
+
+            <div class="bulk-active-line">
+                Status:
+                <span id="extractStatusText" class="bulk-active-ingredient">Starting...</span>
+            </div>
+
+            <div id="extractSummary" class="product-choice-subtitle">Preparing extraction...</div>
+
+            <div class="bulk-progress-bar-wrap">
+                <div id="extractProgressBar" class="bulk-progress-bar" style="width: 15%;"></div>
+            </div>
+        </div>
+
+        <div id="extractUrlList" class="bulk-preview-list"></div>
+
+        <div class="bulk-modal-actions">
+            <button type="button" class="bulk-secondary-btn" onclick="hideExtractProgressModal()">Hide</button>
+        </div>
+    </div>
+</div>

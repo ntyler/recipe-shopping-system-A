@@ -1,0 +1,27 @@
+<div class="app-card" id="home-address-section">
+    <h2>Home Address</h2>
+    <p class="helper-text">
+        This address is used by <strong>find_nearest_stores.py</strong> and saved into
+        <strong>PushShoppingList/shopping_stores_Results.json</strong>.
+    </p>
+
+    <form method="POST" action="/save_home_address" onsubmit="saveScroll();">
+        <div class="address-grid">
+            <input name="address_street" value="{{ home_address.street }}" placeholder="Street, e.g. 5905 Arlo Drive">
+            <input name="address_apartment" value="{{ home_address.apartment }}" placeholder="Apartment, e.g. Apt 2213">
+            <input name="address_city" value="{{ home_address.city }}" placeholder="City, e.g. Indianapolis">
+            <input name="address_state" value="{{ home_address.state }}" placeholder="State, e.g. IN">
+            <input name="address_zip" value="{{ home_address.zip }}" placeholder="ZIP">
+        </div>
+
+        <div class="address-summary-box">
+            <span class="store-detail-label">Current full address</span>
+            {{ home_address.full_address }}
+        </div>
+
+        <div class="address-actions-grid">
+            <button type="submit" name="action" value="save" class="address-save-btn">Save Address</button>
+            <button type="submit" name="action" value="run_find_nearest" class="nearest-stores-btn">Run Find Nearest Stores</button>
+        </div>
+    </form>
+</div>

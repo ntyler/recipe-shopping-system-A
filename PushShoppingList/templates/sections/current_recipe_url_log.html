@@ -1,0 +1,26 @@
+<div class="app-card">
+    <h2>Current Recipe URL Log</h2>
+
+    {% if current_urls %}
+        <div class="log-box">
+        {% for recipe in current_urls %}
+            <div class="recipe-row">
+                <div class="recipe-left">
+                    <span class="recipe-label">Recipe {{ loop.index }}:</span>
+                    <a href="{{ recipe.url }}" target="_blank">{{ recipe.name }}</a>
+                </div>
+
+                <form method="POST"
+                      action="/remove_recipe"
+                      class="remove-recipe-form"
+                      onsubmit="saveScroll(); return confirm('Remove this recipe URL?');">
+                    <input type="hidden" name="url" value="{{ recipe.url }}">
+                    <button type="submit" class="remove-recipe-btn">Remove</button>
+                </form>
+            </div>
+        {% endfor %}
+        </div>
+    {% else %}
+        <div class="log-box">No current recipe URLs yet.</div>
+    {% endif %}
+</div>
