@@ -1,36 +1,71 @@
-<div class="product-modal-backdrop" id="extractProgressModalBackdrop" style="display:none;">
-    <div class="product-choice-card" role="dialog" aria-modal="true">
-        <div class="product-choice-header">
-            <div class="product-choice-title-row">
-                <div style="width:52px;"></div>
-                <h2>Extracting Ingredients</h2>
-                <button type="button" class="product-close-btn" onclick="hideExtractProgressModal()">Hide</button>
-            </div>
+<div class="product-modal-backdrop extract-old-backdrop"
+     id="extractProgressModalBackdrop"
+     style="display:none;">
 
-            <p class="product-choice-subtitle">
-                Your recipes are being processed. This page will update when extraction finishes.
-            </p>
+    <div class="product-choice-card extract-old-card"
+         role="dialog"
+         aria-modal="true">
+
+        <div class="product-choice-header extract-old-header">
+            <div class="product-choice-title-row extract-old-title-row">
+
+                <div class="extract-old-spacer"></div>
+
+                <div class="extract-old-title-wrap">
+                    <h2>Extracting<br class="mobile-title-break"> Ingredients</h2>
+
+                    <p class="product-choice-subtitle extract-old-subtitle">
+                        Your recipes are being processed. This page will update when extraction finishes.
+                    </p>
+                </div>
+
+                <button type="button"
+                        class="product-close-btn extract-top-hide-btn"
+                        onclick="hideExtractProgressModal()">
+                    Hide
+                </button>
+
+            </div>
         </div>
 
-        <div class="bulk-progress-status">
-            <div id="extractSpinner" class="bulk-spinner"></div>
+        <div class="bulk-progress-status extract-old-status-card">
 
-            <div class="bulk-active-line">
+            <div id="extractSpinner"
+                 class="bulk-spinner extract-old-spinner"></div>
+
+            <div class="bulk-active-line extract-old-active-line">
                 Status:
-                <span id="extractStatusText" class="bulk-active-ingredient">Starting...</span>
+                <span id="extractStatusText"
+                      class="bulk-active-ingredient">
+                    Starting...
+                </span>
             </div>
 
-            <div id="extractSummary" class="product-choice-subtitle">Preparing extraction...</div>
-
-            <div class="bulk-progress-bar-wrap">
-                <div id="extractProgressBar" class="bulk-progress-bar" style="width: 15%;"></div>
+            <div id="extractSummary"
+                 class="product-choice-subtitle extract-old-summary">
+                Preparing extraction...
             </div>
+
+            <div class="bulk-progress-bar-wrap extract-old-progress-wrap">
+                <div id="extractProgressBar"
+                     class="bulk-progress-bar extract-old-progress-bar"
+                     style="width:15%;">
+                </div>
+            </div>
+
         </div>
 
-        <div id="extractUrlList" class="bulk-preview-list"></div>
-
-        <div class="bulk-modal-actions">
-            <button type="button" class="bulk-secondary-btn" onclick="hideExtractProgressModal()">Hide</button>
+        <div id="extractUrlList"
+             class="bulk-preview-list extract-old-url-list">
         </div>
+
+        <div class="bulk-modal-actions extract-old-actions">
+            <button type="button"
+                    class="bulk-secondary-btn extract-bottom-hide-btn"
+                    onclick="hideExtractProgressModal()">
+                Hide
+            </button>
+        </div>
+
     </div>
 </div>

@@ -2,9 +2,10 @@
     <h2>Enter Recipe Links</h2>
     <p class="helper-text">Paste one recipe URL per line</p>
 
-    <form method="POST" action="/extract_recipe" onsubmit="saveScroll(); showExtractionOverlay();">
+    <form id="extractRecipeForm" onsubmit="startRecipeExtraction(event)">
         <textarea
             class="recipe-url-box"
+            id="recipeUrlsTextarea"
             name="recipe_urls"
             placeholder="https://www.forkinthekitchen.com/homemade-cheese-ravioli/&#10;https://www.forkinthekitchen.com/homemade-crispy-falafel/"></textarea>
 

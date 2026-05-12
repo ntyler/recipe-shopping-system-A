@@ -13,6 +13,7 @@ function restoreScroll() {
 
 function showExtractionOverlay() {
     const modal = document.getElementById("extractProgressModalBackdrop");
+
     if (modal) {
         modal.style.display = "flex";
     }
@@ -20,13 +21,23 @@ function showExtractionOverlay() {
 
 function hideExtractProgressModal() {
     const modal = document.getElementById("extractProgressModalBackdrop");
+
     if (modal) {
         modal.style.display = "none";
     }
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete("extract_job");
+    window.history.replaceState({}, "", url.toString());
+}
+
+function hideExtractionOverlay() {
+    hideExtractProgressModal();
 }
 
 function showProductsOverlay() {
     const modal = document.getElementById("productsOverlay");
+
     if (modal) {
         modal.style.display = "flex";
     }
@@ -34,98 +45,110 @@ function showProductsOverlay() {
 
 function hideProductsOverlay() {
     const modal = document.getElementById("productsOverlay");
+
     if (modal) {
         modal.style.display = "none";
     }
 }
 
-function showView(viewName) {
-    const sectionView = document.getElementById("sectionView");
-    const storeView = document.getElementById("storeView");
-    const recipeView = document.getElementById("recipeView");
-
-    const sectionBtn = document.getElementById("sectionViewBtn");
-    const storeBtn = document.getElementById("storeViewBtn");
-    const recipeBtn = document.getElementById("recipeViewBtn");
-
-    if (sectionView) sectionView.style.display = "none";
-    if (storeView) storeView.style.display = "none";
-    if (recipeView) recipeView.style.display = "none";
-
-    if (sectionBtn) sectionBtn.classList.remove("active");
-    if (storeBtn) storeBtn.classList.remove("active");
-    if (recipeBtn) recipeBtn.classList.remove("active");
-
-    if (viewName === "store") {
-        if (storeView) storeView.style.display = "block";
-        if (storeBtn) storeBtn.classList.add("active");
-    } else if (viewName === "recipe") {
-        if (recipeView) recipeView.style.display = "block";
-        if (recipeBtn) recipeBtn.classList.add("active");
-    } else {
-        if (sectionView) sectionView.style.display = "block";
-        if (sectionBtn) sectionBtn.classList.add("active");
-    }
-
-    localStorage.setItem("shopping_view", viewName);
-}
-
-function restoreView() {
-    showView(localStorage.getItem("shopping_view") || "section");
-}
-
-function toggleCardCollapse(key) {
-    const content = document.querySelector('[data-collapse-content="' + key + '"]');
-    const icon = document.querySelector('[data-collapse-icon="' + key + '"]');
-
-    if (!content) return;
-
-    const collapsed = content.classList.toggle("collapsed");
-
-    if (icon) {
-        icon.textContent = collapsed ? "Show ▾" : "Hide ▴";
-    }
-
-    localStorage.setItem("card_collapsed|" + key, collapsed ? "closed" : "open");
-}
-
-function setupCardCollapseToggles() {
-    document.querySelectorAll("[data-collapse-content]").forEach(content => {
-        const key = content.dataset.collapseContent;
-        const icon = document.querySelector('[data-collapse-icon="' + key + '"]');
-        const saved = localStorage.getItem("card_collapsed|" + key);
-
-        if (saved === "open") {
-            content.classList.remove("collapsed");
-            if (icon) icon.textContent = "Hide ▴";
-        } else {
-            content.classList.add("collapsed");
-            if (icon) icon.textContent = "Show ▾";
-        }
-    });
-}
-
-function togglePasswordVisibility(inputId, button) {
-    const input = document.getElementById(inputId);
-
-    if (!input) return;
-
-    const showing = input.type === "text";
-    input.type = showing ? "password" : "text";
-
-    if (button) {
-        button.textContent = showing ? "👁" : "🙈";
-    }
-}
-
-function saveOpenStoreUrlsSetting() {}
-function saveShowItemButtonsSetting() {}
-function saveShowBestProductSetting() {}
-function saveHideCheckedItemsSetting() {}
-function saveCompactModeSetting() {}
-
 document.addEventListener("DOMContentLoaded", function () {
     restoreScroll();
-    restoreView();
-    setupCardCollapseToggles();
 });
+
+async function startRecipeExtraction(event) {
+    event.preventDefault();
+
+    const textarea = document.getElementById("recipeUrlsTextarea");
+    const urls = textarea.value
+        .split(/\r?\n/)
+        .map(x => x.trim())
+        .filter(Boolean);
+
+    if (!urls.length) {
+        alert("Paste at least one recipe URL.");
+        return;
+    }
+
+    showExtractionOverlay();
+
+    const list = document.getElementById("extractUrlList");
+    const status = document.getElementById("extractStatusText");
+    const summary = document.getElementById("extractSummary");
+    const bar = document.getElementById("extractProgressBar");
+
+    list.innerHTML = "";
+
+    urls.forEach((url, index) => {
+        const row = document.createElement("div");
+        row.className = "bulk-progress-item";
+        row.id = `extract-url-${index}`;
+
+        row.innerHTML = `
+            <input type="checkbox" class="bulk-progress-check" disabled>
+            <div class="bulk-progress-main">
+                <div class="bulk-progress-title-line">
+                    <span class="bulk-progress-text">
+                        ${index + 1}. ${url}
+                    </span>
+                </div>
+                <div class="bulk-skip-reason">
+                    waiting...
+                </div>
+            </div>
+        `;
+
+        list.appendChild(row);
+    });
+
+    for (let i = 0; i < urls.length; i++) {
+        const url = urls[i];
+        const row = document.getElementById(`extract-url-${i}`);
+        const checkbox = row.querySelector(".bulk-progress-check");
+        const text = row.querySelector(".bulk-progress-text");
+        const reason = row.querySelector(".bulk-skip-reason");
+
+        status.textContent = `Downloading recipe ${i + 1} of ${urls.length}...`;
+        summary.textContent = "Fetching recipe page and extracting ingredients.";
+        reason.textContent = "extracting • Running recipe extractor...";
+        text.classList.add("active");
+
+        bar.style.width = `${Math.max(10, Math.round((i / urls.length) * 100))}%`;
+
+        try {
+            const response = await fetch("/api/extract_recipe", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    url: url,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (data.ok) {
+                checkbox.checked = true;
+                text.classList.remove("active");
+                text.classList.add("done");
+                reason.textContent = `done • ${data.ingredients.length} ingredients extracted`;
+            } else {
+                text.classList.remove("active");
+                reason.textContent = `failed • ${data.error || "unknown error"}`;
+            }
+        } catch (err) {
+            text.classList.remove("active");
+            reason.textContent = `failed • ${err}`;
+        }
+
+        bar.style.width = `${Math.round(((i + 1) / urls.length) * 100)}%`;
+    }
+
+    status.textContent = "Extraction complete.";
+    summary.textContent = "Refreshing shopping list...";
+    bar.style.width = "100%";
+
+    setTimeout(() => {
+        window.location.href = "/";
+    }, 800);
+}

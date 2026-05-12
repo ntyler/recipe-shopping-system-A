@@ -1,0 +1,383 @@
+/* =========================================================
+   RESTORED OLD MOBILE EXTRACTION OVERLAY FORMAT
+   This matches the earlier iPhone-style modal:
+   big centered title, top hide button, rounded bordered card,
+   status card, URL progress card, and full-width bottom Hide.
+========================================================= */
+
+.product-modal-backdrop.extract-old-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 16px;
+
+    background: rgba(0, 0, 0, 0.74);
+    backdrop-filter: blur(3px);
+
+    box-sizing: border-box;
+}
+
+.extract-old-card {
+    width: min(940px, 94vw);
+    max-height: 88vh;
+    overflow-y: auto;
+
+    background: #1b1b1b;
+    border: 1px solid #777;
+    border-radius: 14px;
+
+    padding: 18px;
+
+    box-shadow: 0 18px 60px rgba(0,0,0,0.75);
+    box-sizing: border-box;
+}
+
+.extract-old-header {
+    position: sticky;
+    top: -18px;
+    z-index: 5;
+
+    background: #1b1b1b;
+
+    padding: 4px 0 20px 0;
+    border-bottom: 1px solid #333;
+    margin-bottom: 12px;
+}
+
+.extract-old-title-row {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr) 72px;
+    align-items: start;
+    gap: 10px;
+}
+
+.extract-old-spacer {
+    width: 72px;
+}
+
+.extract-old-title-wrap {
+    min-width: 0;
+    text-align: center;
+}
+
+.extract-old-title-wrap h2 {
+    margin: 0;
+    padding: 0;
+
+    color: #fff;
+
+    text-align: center;
+    font-size: 26px;
+    line-height: 1.12;
+    font-weight: 800;
+}
+
+.extract-old-subtitle {
+    margin: 8px auto 0 auto;
+
+    max-width: 760px;
+
+    text-align: center;
+    color: #cfcfcf;
+    font-size: 14px;
+    line-height: 1.35;
+}
+
+.extract-top-hide-btn {
+    width: auto;
+    min-width: 52px;
+    margin: 0;
+    padding: 7px 11px;
+
+    font-size: 14px;
+    font-weight: 700;
+
+    background: #444;
+    border-radius: 8px;
+    color: #fff;
+}
+
+.extract-top-hide-btn:hover {
+    background: #666;
+}
+
+.extract-old-status-card {
+    background: #111;
+    border: 1px solid #444;
+    border-radius: 10px;
+
+    padding: 18px 14px;
+    margin-top: 12px;
+}
+
+.extract-old-spinner {
+    width: 44px;
+    height: 44px;
+
+    border: 5px solid #333;
+    border-top: 5px solid #00cc66;
+    border-radius: 50%;
+
+    animation: spin 0.85s linear infinite;
+
+    margin: 0 auto 12px auto;
+}
+
+.extract-old-active-line {
+    color: #fff;
+    font-weight: 800;
+    text-align: center;
+
+    margin-bottom: 10px;
+    font-size: 16px;
+    line-height: 1.35;
+}
+
+.extract-old-active-line .bulk-active-ingredient,
+.extract-old-active-line #extractStatusText {
+    color: #00ff88;
+}
+
+.extract-old-summary {
+    color: #bdbdbd;
+    text-align: center;
+    font-size: 14px;
+    margin: 0;
+}
+
+.extract-old-progress-wrap {
+    height: 12px;
+    border-radius: 999px;
+    background: #2a2a2a;
+    overflow: hidden;
+
+    margin-top: 14px;
+}
+
+.extract-old-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: #0078D7;
+    transition: width 0.25s ease;
+}
+
+.extract-old-url-list {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+
+    padding: 0;
+    margin-top: 12px;
+
+    max-height: none;
+    overflow-y: visible;
+}
+
+.extract-old-url-list .bulk-progress-item {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+
+    padding: 18px 16px;
+    margin-top: 12px;
+
+    border: 1px solid #333;
+    border-radius: 10px;
+
+    background: #181818;
+    color: #ddd;
+}
+
+.extract-old-url-list .bulk-progress-check {
+    width: 18px;
+    height: 18px;
+
+    accent-color: #00cc66;
+}
+
+.extract-old-url-list .bulk-progress-main {
+    min-width: 0;
+}
+
+.extract-old-url-list .bulk-progress-title-line {
+    min-width: 0;
+}
+
+.extract-old-url-list .bulk-progress-text {
+    display: block;
+
+    color: #00ff88;
+    font-size: 16px;
+    line-height: 1.25;
+    font-weight: 800;
+
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.extract-old-url-list .bulk-progress-text.active {
+    color: #00ff88;
+}
+
+.extract-old-url-list .bulk-progress-text.done {
+    color: #777;
+    text-decoration: line-through;
+}
+
+.extract-old-url-list .bulk-skip-reason {
+    color: #fbbf24;
+    font-size: 13px;
+    margin-top: 4px;
+    line-height: 1.25;
+}
+
+.extract-old-actions {
+    display: block;
+    margin-top: 14px;
+}
+
+.extract-bottom-hide-btn {
+    width: 100%;
+    margin: 0;
+
+    padding: 14px 16px;
+
+    border: none;
+    border-radius: 10px;
+
+    background: #444;
+    color: #fff;
+
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.extract-bottom-hide-btn:hover {
+    background: #666;
+}
+
+@media (max-width: 650px) {
+    .product-modal-backdrop.extract-old-backdrop {
+        align-items: flex-start;
+        padding: 44px 16px 24px 16px;
+    }
+
+    .extract-old-card {
+        width: 100%;
+        max-height: calc(100vh - 88px);
+
+        padding: 18px;
+
+        border-radius: 16px;
+    }
+
+    .extract-old-header {
+        top: -18px;
+        padding-bottom: 20px;
+    }
+
+    .extract-old-title-row {
+        grid-template-columns: 56px minmax(0, 1fr) 64px;
+        gap: 8px;
+    }
+
+    .extract-old-spacer {
+        width: 56px;
+    }
+
+    .extract-old-title-wrap h2 {
+        font-size: 34px;
+        line-height: 1.08;
+    }
+
+    .mobile-title-break {
+        display: block;
+    }
+
+    .extract-old-subtitle {
+        font-size: 22px;
+        line-height: 1.2;
+        margin-top: 12px;
+        color: #bfbfbf;
+    }
+
+    .extract-top-hide-btn {
+        min-width: 62px;
+        padding: 10px 14px;
+        font-size: 20px;
+        border-radius: 12px;
+    }
+
+    .extract-old-status-card {
+        border-radius: 14px;
+        padding: 24px 16px;
+        margin-top: 18px;
+    }
+
+    .extract-old-spinner {
+        width: 54px;
+        height: 54px;
+
+        border-width: 6px;
+
+        margin-bottom: 18px;
+    }
+
+    .extract-old-active-line {
+        font-size: 22px;
+    }
+
+    .extract-old-summary {
+        font-size: 20px;
+        line-height: 1.25;
+    }
+
+    .extract-old-progress-wrap {
+        height: 14px;
+        margin-top: 22px;
+    }
+
+    .extract-old-url-list .bulk-progress-item {
+        grid-template-columns: 34px minmax(0, 1fr);
+
+        padding: 22px 18px;
+
+        border-radius: 14px;
+        gap: 14px;
+    }
+
+    .extract-old-url-list .bulk-progress-check {
+        width: 28px;
+        height: 28px;
+    }
+
+    .extract-old-url-list .bulk-progress-text {
+        font-size: 22px;
+        line-height: 1.25;
+    }
+
+    .extract-old-url-list .bulk-skip-reason {
+        font-size: 18px;
+        margin-top: 8px;
+    }
+
+    .extract-bottom-hide-btn {
+        padding: 20px 16px;
+
+        border-radius: 14px;
+
+        font-size: 28px;
+    }
+}
+
+@media (min-width: 651px) {
+    .mobile-title-break {
+        display: none;
+    }
+}
