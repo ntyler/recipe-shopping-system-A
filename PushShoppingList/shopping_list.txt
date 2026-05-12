@@ -1,27 +1,14 @@
-=== PRODUCE ===
-1 egg
 === DAIRY ===
-¼ cup plain yogurt
-¼ cup (60 g) plain yogurt
+egg
+plain yogurt
 === DRY GOODS ===
-125 g all-purpose flour
-125 g (125 g) all-purpose flour
-¼ cup brown sugar
-¼ cup (50 g) brown sugar
-¼ cup granulated sugar
-¼ cup (50 g) granulated sugar
-¾ teaspoon baking powder
-¼ teaspoon baking soda
-½ teaspoon kosher salt
-⅛ teaspoon cinnamon
-¾ cup mini chocolate chips
-¾ cup (130-145 g) mini chocolate chips
-=== CANNED ===
-=== BEVERAGES ===
-=== SPICES ===
-=== OILS ===
-4 Tablespoons unsalted butter, melted
-4 Tablespoons unsalted butter, mleted
-1 teaspoon vanilla extract
-=== BAKERY ===
-=== MISC ===
+all-purpose flour
+brown sugar
+granulated sugar
+baking powder
+baking soda
+kosher salt
+cinnamon
+mini chocolate chips
+unsalted butter
+vanilla extract

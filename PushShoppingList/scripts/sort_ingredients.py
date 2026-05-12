@@ -6,6 +6,11 @@ from pathlib import Path
 
 from openai import OpenAI
 
+from PushShoppingList.services.recipe_extract_service import (
+    normalize_ingredient_for_shopping_list,
+    normalize_ingredient_key,
+)
+
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -65,6 +70,42 @@ def load_ingredient_list():
         for line in SHOPPING_LIST_FILE.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
+
+
+def unique_shopping_ingredients(items):
+    unique_items = []
+    seen = set()
+
+    for item in items:
+        if is_section_header(item):
+            continue
+
+        cleaned = normalize_ingredient_for_shopping_list(item)
+        key = normalize_ingredient_key(cleaned)
+
+        if cleaned and key not in seen:
+            unique_items.append(cleaned)
+            seen.add(key)
+
+    return unique_items
+
+
+def remove_empty_sections(items):
+    cleaned_items = []
+    pending_header = None
+
+    for item in items:
+        if is_section_header(item):
+            pending_header = item
+            continue
+
+        if pending_header:
+            cleaned_items.append(pending_header)
+            pending_header = None
+
+        cleaned_items.append(item)
+
+    return cleaned_items
 
 
 def is_section_header(text):
@@ -184,6 +225,8 @@ def save_sorted_response(response_text, original_items):
         sorted_ingredients = data.get("sorted_ingredients", [])
 
         validate_sorted_list(original_items, sorted_ingredients)
+        sorted_ingredients = remove_empty_sections(sorted_ingredients)
+        data["sorted_ingredients"] = sorted_ingredients
 
         SORTED_JSON_FILE.write_text(
             json.dumps(data, indent=2, ensure_ascii=False),
@@ -238,11 +281,7 @@ def main():
         print("No ingredients found in shopping_list.txt.")
         return None
 
-    ingredient_list = [
-        item
-        for item in ingredient_list
-        if not is_section_header(item)
-    ]
+    ingredient_list = unique_shopping_ingredients(ingredient_list)
 
     if not ingredient_list:
         print("No actual ingredients found after removing section headers.")

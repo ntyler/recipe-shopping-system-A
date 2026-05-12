@@ -130,8 +130,16 @@ INGREDIENT RULES
 ========================
 - Split into: quantity, unit, ingredient, preparation when possible.
 - Preserve original_text exactly.
+- The ingredient field must be the unique grocery item name only.
+- Do NOT include quantity, unit, package size, metric conversion, or preparation in the ingredient field.
+- Examples:
+  - "1 egg" -> ingredient "egg"
+  - "125 g all-purpose flour" -> ingredient "all-purpose flour"
+  - "4 Tablespoons unsalted butter, melted" -> ingredient "unsalted butter", preparation "melted"
+  - "1 teaspoon vanilla extract" -> ingredient "vanilla extract"
+- If the same grocery item appears more than once because the page lists both US and metric measurements, keep only one ingredient object for that grocery item.
 - Assign store_section and store_section_order.
-- Do NOT rename, merge, add, or remove ingredient text.
+- Do NOT add ingredients that are not in the recipe.
 
 STORE SECTIONS:
 PRODUCE, DAIRY, DRY GOODS, CANNED, BEVERAGES, SPICES, OILS, BAKERY, MISC
@@ -322,17 +330,73 @@ def save_json_response(recipe_url, response_text):
 
 def extract_ingredients_from_result(json_data):
     ingredients = []
+    seen = set()
 
     for item in json_data.get("ingredients", []):
         if not isinstance(item, dict):
             continue
 
-        value = item.get("original_text") or item.get("ingredient")
+        value = normalize_ingredient_for_shopping_list(
+            item.get("ingredient") or item.get("original_text")
+        )
 
-        if value:
+        key = normalize_ingredient_key(value)
+
+        if value and key not in seen:
             ingredients.append(str(value).strip())
+            seen.add(key)
 
     return ingredients
+
+
+def normalize_ingredient_key(text):
+    return re.sub(r"\s+", " ", str(text or "").strip().lower())
+
+
+def normalize_ingredient_for_shopping_list(text):
+    value = str(text or "").strip()
+
+    if not value:
+        return ""
+
+    value = (
+        value.replace("Â", "")
+        .replace("Ľ", "¼")
+        .replace("˝", "½")
+        .replace("ľ", "¾")
+        .replace("â…›", "⅛")
+    )
+    value = re.sub(r"\([^)]*\)", " ", value)
+    value = re.sub(r"\s+", " ", value).strip()
+    value = value.split(",", 1)[0].strip()
+
+    quantity_pattern = r"(?:\d+(?:[./]\d+)?|\d+\s+\d+/\d+|[¼½¾⅐⅑⅒⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞])+"
+    unit_pattern = (
+        r"(?:cups?|c|teaspoons?|tsp\.?|tablespoons?|tbsp\.?|pounds?|lbs?\.?|"
+        r"ounces?|oz\.?|grams?|g|kilograms?|kg|milliliters?|ml|liters?|l|"
+        r"pinch|pinches|dash|dashes|cloves?|sticks?)"
+    )
+
+    value = re.sub(
+        rf"^{quantity_pattern}(?:\s*(?:-|to)\s*{quantity_pattern})?\s+{unit_pattern}\b\s*",
+        "",
+        value,
+        flags=re.IGNORECASE,
+    )
+    value = re.sub(
+        rf"^{quantity_pattern}\s+",
+        "",
+        value,
+        flags=re.IGNORECASE,
+    )
+    value = re.sub(
+        rf"^{unit_pattern}\b\s+",
+        "",
+        value,
+        flags=re.IGNORECASE,
+    )
+
+    return re.sub(r"\s+", " ", value).strip()
 
 
 def extract_recipe_from_url(recipe_url):
