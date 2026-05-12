@@ -48,14 +48,83 @@
 
 <div id="storeView" style="display:none;">
     <h2 class="items-title">Items by Store</h2>
-    <div class="recipe-view-card">
-        <div class="source-line">No store view items yet.</div>
-    </div>
+    {% if shopping_items and enabled_stores %}
+        {% for store_key in enabled_stores %}
+            {% set store = available_stores.get(store_key) %}
+            {% if store %}
+                <div class="recipe-view-card">
+                    <div class="recipe-view-title">{{ store.label }}</div>
+                    {% for item in shopping_items %}
+                        <div class="row" data-key="store-{{ store_key }}-{{ normalize(item) }}">
+                            <div class="item">
+                                <div class="item-main-line">
+                                    <input type="checkbox" class="item-check">
+                                    <span class="item-text">{{ item }}</span>
+                                </div>
+                            </div>
+
+                            <div class="item-actions">
+                                <button type="button"
+                                        class="store-btn"
+                                        data-store="{{ store_key }}"
+                                        data-store-url="{{ store.url }}">
+                                    Search {{ store.label }}
+                                </button>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endfor %}
+    {% else %}
+        <div class="recipe-view-card">
+            <div class="source-line">No store view items yet.</div>
+        </div>
+    {% endif %}
 </div>
 
 <div id="recipeView" style="display:none;">
     <h2 class="items-title">Items by Recipe</h2>
-    <div class="recipe-view-card">
-        <div class="source-line">No recipe URLs yet.</div>
-    </div>
+    {% if recipe_view_rows %}
+        {% for recipe in recipe_view_rows %}
+            <div class="recipe-view-card">
+                <div class="recipe-view-title">
+                    <a href="{{ recipe.url }}" target="_blank">{{ recipe.name }}</a>
+                </div>
+
+                {% if recipe.ingredients %}
+                    {% for item in recipe.ingredients %}
+                        <div class="row" data-key="recipe-{{ normalize(recipe.url) }}-{{ normalize(item) }}">
+                            <div class="item">
+                                <div class="item-main-line">
+                                    <input type="checkbox" class="item-check">
+                                    <span class="item-text">{{ item }}</span>
+                                </div>
+                            </div>
+
+                            <div class="item-actions">
+                                {% for store_key in enabled_stores %}
+                                    {% set store = available_stores.get(store_key) %}
+                                    {% if store %}
+                                        <button type="button"
+                                                class="store-btn"
+                                                data-store="{{ store_key }}"
+                                                data-store-url="{{ store.url }}">
+                                            {{ store.label }}
+                                        </button>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="source-line">No saved ingredients for this recipe yet.</div>
+                {% endif %}
+            </div>
+        {% endfor %}
+    {% else %}
+        <div class="recipe-view-card">
+            <div class="source-line">No recipe URLs yet.</div>
+        </div>
+    {% endif %}
 </div>

@@ -8,6 +8,8 @@ from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
 from PushShoppingList.services.home_address_service import load_home_address
 from PushShoppingList.services.home_address_service import save_home_address
 from PushShoppingList.services.recipe_url_service import recipe_url_rows
+from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
+from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
 from PushShoppingList.services.shopping_list_service import load_items
 from PushShoppingList.services.shopping_list_service import save_items
 from PushShoppingList.services.store_settings_service import load_store_settings
@@ -58,20 +60,48 @@ def is_section_header(text):
     return text.startswith("===") and text.endswith("===")
 
 
+def shopping_items_only(items):
+    return [
+        item
+        for item in items
+        if not is_section_header(item)
+    ]
+
+
+def recipe_view_rows(recipe_urls, recipe_ingredients):
+    rows = []
+
+    for recipe in recipe_urls:
+        recipe_data = recipe_ingredients.get(normalize_recipe_url_key(recipe["url"]), {})
+        ingredients = recipe_data.get("ingredients", [])
+
+        rows.append({
+            "name": recipe["name"],
+            "url": recipe["url"],
+            "ingredients": ingredients,
+        })
+
+    return rows
+
+
 @main_bp.route("/")
 def index():
     items = load_items()
     store_settings = load_store_settings()
+    recipe_urls = recipe_url_rows()
+    recipe_ingredients = load_recipe_ingredients()
 
     return render_template(
         "index.html",
         message="",
         raw_items="\n".join(items),
         items=items,
-        current_urls=recipe_url_rows(),
+        current_urls=recipe_urls,
         home_address=load_home_address(),
         available_stores=store_settings["stores"],
         enabled_stores=store_settings["enabled_stores"],
+        shopping_items=shopping_items_only(items),
+        recipe_view_rows=recipe_view_rows(recipe_urls, recipe_ingredients),
         normalize=normalize,
         is_section_header=is_section_header,
     )

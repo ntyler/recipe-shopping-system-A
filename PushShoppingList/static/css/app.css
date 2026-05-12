@@ -1083,6 +1083,24 @@ body {
             width: 100%;
         }
 
+        #sectionView .row {
+            flex-direction: row;
+            align-items: center;
+            gap: 12px;
+        }
+
+        #sectionView .row > .item {
+            width: auto;
+            min-width: 0;
+        }
+
+        #sectionView .item-actions {
+            width: auto;
+            margin-top: 0;
+            margin-left: auto;
+            justify-content: flex-end;
+        }
+
 
 
         .item-main-line {
@@ -1131,7 +1149,7 @@ body {
         .store-btn.active {
             background: #0078D7;
             color: white;
-            font-weight: bold;
+            font-weight: inherit;
         }
 
         .message {
@@ -1866,6 +1884,11 @@ body {
                 align-items: center;
             }
 
+            #sectionView .row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
             .item {
                 min-width: 0;
                 flex: 1 0 100%;
@@ -1873,6 +1896,13 @@ body {
 
             .item-actions {
                 margin-left: 30px;
+            }
+
+            #sectionView .item-actions {
+                width: 100%;
+                margin-top: 6px;
+                margin-left: 30px;
+                justify-content: flex-start;
             }
 
             .store-btn,

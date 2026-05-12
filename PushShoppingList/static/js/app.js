@@ -246,6 +246,7 @@ function restoreToggleSetting(inputId, storageKey, defaultChecked, bodyClass, in
 function restoreItemCheckState() {
     document.querySelectorAll(".row[data-key]").forEach(row => {
         const checkbox = row.querySelector(".item-check");
+        const itemText = row.querySelector(".item-text");
 
         if (!checkbox) {
             return;
@@ -254,9 +255,15 @@ function restoreItemCheckState() {
         const key = row.dataset.key;
         checkbox.checked = localStorage.getItem(`item-checked:${key}`) === "1";
         row.classList.toggle("row-checked", checkbox.checked);
+        if (itemText) {
+            itemText.classList.toggle("checked-item-text", checkbox.checked);
+        }
 
         checkbox.addEventListener("change", () => {
             row.classList.toggle("row-checked", checkbox.checked);
+            if (itemText) {
+                itemText.classList.toggle("checked-item-text", checkbox.checked);
+            }
             localStorage.setItem(`item-checked:${key}`, checkbox.checked ? "1" : "0");
         });
     });
@@ -283,6 +290,43 @@ function bindStoreButtons() {
     });
 }
 
+function bindSectionHeaderToggles() {
+    document.querySelectorAll("#sectionView .collapsible-header").forEach(header => {
+        const title = header.querySelector(".header-title");
+        const icon = header.querySelector(".header-toggle-icon");
+        const sectionKey = title ? normalizeSectionKey(title.textContent) : "";
+        const isCollapsed = localStorage.getItem(`section-collapsed:${sectionKey}`) === "1";
+
+        setSectionCollapsed(header, icon, isCollapsed);
+
+        header.addEventListener("click", () => {
+            const shouldCollapse = !(icon && icon.textContent.trim().toLowerCase().startsWith("show"));
+            setSectionCollapsed(header, icon, shouldCollapse);
+            localStorage.setItem(`section-collapsed:${sectionKey}`, shouldCollapse ? "1" : "0");
+        });
+    });
+}
+
+function setSectionCollapsed(header, icon, collapsed) {
+    let sibling = header.nextElementSibling;
+
+    while (sibling && !sibling.classList.contains("section-header-row")) {
+        sibling.classList.toggle("collapsed-by-header", collapsed);
+        sibling = sibling.nextElementSibling;
+    }
+
+    if (icon) {
+        icon.textContent = collapsed ? "Show v" : "Hide ^";
+    }
+}
+
+function normalizeSectionKey(text) {
+    return String(text || "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, "-");
+}
+
 function resetItemChecks(event) {
     event.preventDefault();
 
@@ -295,6 +339,10 @@ function resetItemChecks(event) {
 
         checkbox.checked = false;
         row.classList.remove("row-checked");
+        const itemText = row.querySelector(".item-text");
+        if (itemText) {
+            itemText.classList.remove("checked-item-text");
+        }
         localStorage.removeItem(`item-checked:${row.dataset.key}`);
     });
 
@@ -497,11 +545,14 @@ async function refreshStoreMarkup() {
     const nextPage = new DOMParser().parseFromString(html, "text/html");
     replaceSectionFromPage(nextPage, "#storeOptionsSection");
     replaceSectionFromPage(nextPage, "#sectionView");
+    replaceSectionFromPage(nextPage, "#storeView");
+    replaceSectionFromPage(nextPage, "#recipeView");
     restoreCardCollapseState();
     restoreOpenStorePanels();
     restoreViewBehaviorSettings();
     restoreItemCheckState();
     bindStoreButtons();
+    bindSectionHeaderToggles();
     window.scrollTo(scrollX, scrollY);
 }
 
@@ -541,6 +592,7 @@ document.addEventListener("DOMContentLoaded", function () {
     restoreViewBehaviorSettings();
     restoreItemCheckState();
     bindStoreButtons();
+    bindSectionHeaderToggles();
     startExtractionProgressPolling();
 });
 
