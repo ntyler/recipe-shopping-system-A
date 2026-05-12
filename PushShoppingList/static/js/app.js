@@ -152,6 +152,170 @@ function togglePasswordVisibility(inputId, button) {
     }
 }
 
+function showView(viewName) {
+    const views = {
+        section: document.getElementById("sectionView"),
+        store: document.getElementById("storeView"),
+        recipe: document.getElementById("recipeView"),
+    };
+    const buttons = {
+        section: document.getElementById("sectionViewBtn"),
+        store: document.getElementById("storeViewBtn"),
+        recipe: document.getElementById("recipeViewBtn"),
+    };
+
+    Object.entries(views).forEach(([key, view]) => {
+        if (view) {
+            view.style.display = key === viewName ? "" : "none";
+        }
+    });
+
+    Object.entries(buttons).forEach(([key, button]) => {
+        if (button) {
+            button.classList.toggle("active", key === viewName);
+        }
+    });
+
+    localStorage.setItem("shopping-view", viewName);
+}
+
+function saveOpenStoreUrlsSetting() {
+    saveToggleSetting("openStoreUrlsToggle", "open-store-urls", null);
+}
+
+function saveShowItemButtonsSetting() {
+    saveToggleSetting("showItemButtonsToggle", "show-item-buttons", "hide-item-buttons", true);
+}
+
+function saveShowBestProductSetting() {
+    saveToggleSetting("showBestProductToggle", "show-best-product", "hide-best-product", true);
+}
+
+function saveHideCheckedItemsSetting() {
+    saveToggleSetting("hideCheckedItemsToggle", "hide-checked-items", "hide-checked-items");
+}
+
+function saveCompactModeSetting() {
+    saveToggleSetting("compactModeToggle", "compact-mode", "compact-mode");
+}
+
+function saveToggleSetting(inputId, storageKey, bodyClass, invertBodyClass = false) {
+    const input = document.getElementById(inputId);
+
+    if (!input) {
+        return;
+    }
+
+    localStorage.setItem(storageKey, input.checked ? "1" : "0");
+
+    if (bodyClass) {
+        document.body.classList.toggle(
+            bodyClass,
+            invertBodyClass ? !input.checked : input.checked
+        );
+    }
+}
+
+function restoreViewBehaviorSettings() {
+    restoreToggleSetting("openStoreUrlsToggle", "open-store-urls", true);
+    restoreToggleSetting("showItemButtonsToggle", "show-item-buttons", true, "hide-item-buttons", true);
+    restoreToggleSetting("showBestProductToggle", "show-best-product", true, "hide-best-product", true);
+    restoreToggleSetting("hideCheckedItemsToggle", "hide-checked-items", false, "hide-checked-items");
+    restoreToggleSetting("compactModeToggle", "compact-mode", false, "compact-mode");
+    showView(localStorage.getItem("shopping-view") || "section");
+}
+
+function restoreToggleSetting(inputId, storageKey, defaultChecked, bodyClass, invertBodyClass = false) {
+    const input = document.getElementById(inputId);
+
+    if (!input) {
+        return;
+    }
+
+    const savedValue = localStorage.getItem(storageKey);
+    input.checked = savedValue === null ? defaultChecked : savedValue === "1";
+
+    if (bodyClass) {
+        document.body.classList.toggle(
+            bodyClass,
+            invertBodyClass ? !input.checked : input.checked
+        );
+    }
+}
+
+function restoreItemCheckState() {
+    document.querySelectorAll(".row[data-key]").forEach(row => {
+        const checkbox = row.querySelector(".item-check");
+
+        if (!checkbox) {
+            return;
+        }
+
+        const key = row.dataset.key;
+        checkbox.checked = localStorage.getItem(`item-checked:${key}`) === "1";
+        row.classList.toggle("row-checked", checkbox.checked);
+
+        checkbox.addEventListener("change", () => {
+            row.classList.toggle("row-checked", checkbox.checked);
+            localStorage.setItem(`item-checked:${key}`, checkbox.checked ? "1" : "0");
+        });
+    });
+}
+
+function bindStoreButtons() {
+    document.querySelectorAll(".store-btn").forEach(button => {
+        button.addEventListener("click", () => {
+            button.classList.toggle("active");
+
+            if (localStorage.getItem("open-store-urls") === "0") {
+                return;
+            }
+
+            const row = button.closest(".row");
+            const itemText = row ? row.querySelector(".item-text") : null;
+            const searchBaseUrl = button.dataset.storeUrl || "";
+            const ingredient = itemText ? itemText.textContent.trim() : "";
+
+            if (searchBaseUrl && ingredient) {
+                window.open(`${searchBaseUrl}${encodeURIComponent(ingredient)}`, "_blank", "noopener");
+            }
+        });
+    });
+}
+
+function resetItemChecks(event) {
+    event.preventDefault();
+
+    document.querySelectorAll(".row[data-key]").forEach(row => {
+        const checkbox = row.querySelector(".item-check");
+
+        if (!checkbox) {
+            return;
+        }
+
+        checkbox.checked = false;
+        row.classList.remove("row-checked");
+        localStorage.removeItem(`item-checked:${row.dataset.key}`);
+    });
+
+    return false;
+}
+
+async function resetStores(event) {
+    event.preventDefault();
+
+    const form = event.currentTarget;
+
+    try {
+        await submitStoreForm(form);
+        await refreshStoreMarkup();
+    } catch (err) {
+        console.warn("Unable to reset stores in the background.", err);
+    }
+
+    return false;
+}
+
 async function saveHomeAddress(event) {
     const form = event.currentTarget;
     const submitter = event.submitter || document.activeElement;
@@ -335,6 +499,9 @@ async function refreshStoreMarkup() {
     replaceSectionFromPage(nextPage, "#sectionView");
     restoreCardCollapseState();
     restoreOpenStorePanels();
+    restoreViewBehaviorSettings();
+    restoreItemCheckState();
+    bindStoreButtons();
     window.scrollTo(scrollX, scrollY);
 }
 
@@ -371,6 +538,9 @@ document.addEventListener("DOMContentLoaded", function () {
     restoreScroll();
     restoreCardCollapseState();
     restoreOpenStorePanels();
+    restoreViewBehaviorSettings();
+    restoreItemCheckState();
+    bindStoreButtons();
     startExtractionProgressPolling();
 });
 

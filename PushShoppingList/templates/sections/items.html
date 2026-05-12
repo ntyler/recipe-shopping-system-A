@@ -22,7 +22,10 @@
                         {% for store_key in enabled_stores %}
                             {% set store = available_stores.get(store_key) %}
                             {% if store %}
-                                <button type="button" class="store-btn" data-store="{{ store_key }}">
+                                <button type="button"
+                                        class="store-btn"
+                                        data-store="{{ store_key }}"
+                                        data-store-url="{{ store.url }}">
                                     {{ store.label }}
                                 </button>
                             {% endif %}

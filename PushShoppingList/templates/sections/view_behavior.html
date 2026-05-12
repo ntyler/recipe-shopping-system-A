@@ -65,11 +65,11 @@
     <div class="view-control-section">
         <div class="view-control-title">Reset Tools</div>
         <div class="view-control-row">
-            <form class="view-action-form" method="POST" action="/reset_checks" onsubmit="saveScroll();">
+            <form class="view-action-form" method="POST" action="/reset_checks" onsubmit="return resetItemChecks(event);">
                 <button class="reset-checks-btn view-action-btn" type="submit">Reset Checkboxes</button>
             </form>
 
-            <form class="view-action-form" method="POST" action="/reset_stores" onsubmit="saveScroll()">
+            <form class="view-action-form" method="POST" action="/reset_stores" onsubmit="return resetStores(event);">
                 <button class="reset-stores-btn view-action-btn" type="submit">Reset Stores</button>
             </form>
         </div>
