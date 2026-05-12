@@ -43,7 +43,16 @@ WRITE_BACK_TO_SHOPPING_LIST = True
 SAVE_SECTION_HEADERS_TO_SHOPPING_LIST = True
 REQUEST_DELAY_SECONDS = 1
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = None
+
+
+def get_openai_client():
+    global client
+
+    if client is None:
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+    return client
 
 
 def load_ingredient_list():
@@ -78,7 +87,7 @@ STRICT RULES:
 - Every ingredient from the input MUST appear exactly once in the output.
 
 STORE LAYOUT ORDER:
-produce → dairy → dry goods → canned → beverages → spices → oils → bakery → misc
+produce -> dairy -> dry goods -> canned -> beverages -> spices -> oils -> bakery -> misc
 
 SECTION RULES:
 - Use ONLY these exact section names:
@@ -148,7 +157,7 @@ def validate_sorted_list(original_items, sorted_items):
 
 
 def send_prompt_to_openai(prompt_text):
-    response = client.chat.completions.create(
+    response = get_openai_client().chat.completions.create(
         model=MODEL,
         messages=[
             {
@@ -201,17 +210,17 @@ def save_sorted_response(response_text, original_items):
                 encoding="utf-8",
             )
 
-            print(f"✅ Updated shopping list: {SHOPPING_LIST_FILE}")
+            print(f"Updated shopping list: {SHOPPING_LIST_FILE}")
 
-        print(f"✅ Saved sorted JSON: {SORTED_JSON_FILE}")
-        print(f"✅ Saved sorted TXT: {SORTED_TXT_FILE}")
+        print(f"Saved sorted JSON: {SORTED_JSON_FILE}")
+        print(f"Saved sorted TXT: {SORTED_TXT_FILE}")
 
         return data
 
     except Exception as exc:
         RAW_RESPONSE_FILE.write_text(response_text, encoding="utf-8")
 
-        print("⚠️ Could not save sorted response.")
+        print("Could not save sorted response.")
         print(f"Raw response saved to: {RAW_RESPONSE_FILE}")
         print(f"Error: {exc}")
 
@@ -220,7 +229,7 @@ def save_sorted_response(response_text, original_items):
 
 def main():
     if not os.getenv("OPENAI_API_KEY"):
-        print("❌ Missing OPENAI_API_KEY environment variable.")
+        print("Missing OPENAI_API_KEY environment variable.")
         return None
 
     ingredient_list = load_ingredient_list()
@@ -239,12 +248,12 @@ def main():
         print("No actual ingredients found after removing section headers.")
         return None
 
-    print(f"✅ Loaded {len(ingredient_list)} ingredients from shopping_list.txt.")
+    print(f"Loaded {len(ingredient_list)} ingredients from shopping_list.txt.")
 
     prompt_text = build_sort_prompt(ingredient_list)
 
     try:
-        print("🤖 Sending sort request to OpenAI API...")
+        print("Sending sort request to OpenAI API...")
         response_text = send_prompt_to_openai(prompt_text)
 
         RAW_RESPONSE_FILE.write_text(response_text, encoding="utf-8")
@@ -254,7 +263,7 @@ def main():
         return save_sorted_response(response_text, ingredient_list)
 
     except Exception as exc:
-        print("❌ API sorting failed.")
+        print("API sorting failed.")
         print(exc)
         return None
 

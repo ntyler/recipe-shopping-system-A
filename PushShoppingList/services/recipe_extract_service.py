@@ -24,7 +24,16 @@ MODEL = "gpt-4o-mini"
 MAX_PAGE_TEXT_CHARS = 35000
 REQUEST_DELAY_SECONDS = 1
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = None
+
+
+def get_openai_client():
+    global client
+
+    if client is None:
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+    return client
 
 
 def safe_filename(text):
@@ -53,7 +62,7 @@ def clean_json_response(text):
 
 
 def fetch_recipe_page_text(recipe_url):
-    print(f"🌐 Fetching recipe page: {recipe_url}")
+    print(f"Fetching recipe page: {recipe_url}")
 
     headers = {
         "User-Agent": (
@@ -83,7 +92,7 @@ def fetch_recipe_page_text(recipe_url):
     raw_page_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_PAGE_TEXT.txt"
     raw_page_path.write_text(page_text, encoding="utf-8")
 
-    print(f"✅ Loaded webpage text: {len(page_text)} characters")
+    print(f"Loaded webpage text: {len(page_text)} characters")
 
     return page_text
 
@@ -264,7 +273,7 @@ FINAL OUTPUT FORMAT
 
 
 def send_prompt_to_openai(prompt_text):
-    response = client.chat.completions.create(
+    response = get_openai_client().chat.completions.create(
         model=MODEL,
         messages=[
             {
@@ -298,14 +307,14 @@ def save_json_response(recipe_url, response_text):
             encoding="utf-8",
         )
 
-        print(f"✅ Saved JSON: {json_path}")
+        print(f"Saved JSON: {json_path}")
 
         return True, json_data
 
     except json.JSONDecodeError as exc:
         raw_path.write_text(response_text, encoding="utf-8")
 
-        print(f"⚠️ Invalid JSON. Saved raw response: {raw_path}")
+        print(f"Invalid JSON. Saved raw response: {raw_path}")
         print(f"JSON error: {exc}")
 
         return False, None
@@ -361,7 +370,7 @@ def extract_recipe_from_url(recipe_url):
 
         prompt_text = build_prompt(recipe_url, page_text)
 
-        print("🤖 Sending to OpenAI API...")
+        print("Sending to OpenAI API...")
         response_text = send_prompt_to_openai(prompt_text)
 
         raw_api_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_API_RESPONSE.txt"

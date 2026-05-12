@@ -1,6 +1,8 @@
 from flask import Blueprint
 from flask import render_template
 
+from PushShoppingList.services.shopping_list_service import load_items
+
 main_bp = Blueprint("main_bp", __name__)
 
 
@@ -49,11 +51,13 @@ def is_section_header(text):
 
 @main_bp.route("/")
 def index():
+    items = load_items()
+
     return render_template(
         "index.html",
         message="",
-        raw_items="",
-        items=[],
+        raw_items="\n".join(items),
+        items=items,
         current_urls=[],
         home_address={
             "street": "5905 Arlo Drive",

@@ -3,25 +3,15 @@ from flask import jsonify
 from flask import redirect
 from flask import request
 
-import subprocess
 from pathlib import Path
+
+from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
+from PushShoppingList.services.recipe_extract_service import extract_recipe_from_url
+from PushShoppingList.services.shopping_list_service import add_items
 
 recipe_bp = Blueprint("recipe_bp", __name__)
 
 PROJECT_DIR = Path(__file__).resolve().parents[2]
-
-EXTRACT_SCRIPT = (
-    PROJECT_DIR /
-    "recipe-extractor" /
-    "extract_recipes.py"
-)
-
-SORT_SCRIPT = (
-    PROJECT_DIR /
-    "PushShoppingList" /
-    "scripts" /
-    "sort_ingredients.py"
-)
 
 URLS_FILE = (
     PROJECT_DIR /
@@ -45,15 +35,17 @@ def extract_recipe_route():
         encoding="utf-8",
     )
 
-    subprocess.run(
-        ["py", "-3.11", str(EXTRACT_SCRIPT)],
-        cwd=str(PROJECT_DIR),
-    )
+    extracted_any = False
 
-    subprocess.run(
-        ["py", "-3.11", str(SORT_SCRIPT)],
-        cwd=str(PROJECT_DIR),
-    )
+    for url in urls:
+        result = extract_recipe_from_url(url)
+
+        if result.get("ok"):
+            add_items(result.get("ingredients", []))
+            extracted_any = True
+
+    if extracted_any:
+        sort_ingredients()
 
     return redirect("/")
 
@@ -69,16 +61,12 @@ def api_extract_recipe_route():
         encoding="utf-8",
     )
 
-    subprocess.run(
-        ["py", "-3.11", str(EXTRACT_SCRIPT)],
-        cwd=str(PROJECT_DIR),
-    )
+    result = extract_recipe_from_url(url)
 
-    subprocess.run(
-        ["py", "-3.11", str(SORT_SCRIPT)],
-        cwd=str(PROJECT_DIR),
-    )
+    if not result.get("ok"):
+        return jsonify(result), 400
 
-    return jsonify({
-        "ok": True,
-    })
+    add_items(result.get("ingredients", []))
+    sort_ingredients()
+
+    return jsonify(result)
