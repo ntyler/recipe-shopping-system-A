@@ -1,7 +1,6 @@
 import json
 import os
 import re
-import time
 from pathlib import Path
 
 from openai import OpenAI
@@ -46,7 +45,6 @@ RAW_RESPONSE_FILE = OUTPUT_FOLDER / "sorted_ingredients_RAW.txt"
 MODEL = "gpt-4o-mini"
 WRITE_BACK_TO_SHOPPING_LIST = True
 SAVE_SECTION_HEADERS_TO_SHOPPING_LIST = True
-REQUEST_DELAY_SECONDS = 1
 
 client = None
 
@@ -324,8 +322,6 @@ def main():
         response_text = send_prompt_to_openai(prompt_text)
 
         RAW_RESPONSE_FILE.write_text(response_text, encoding="utf-8")
-
-        time.sleep(REQUEST_DELAY_SECONDS)
 
         return save_sorted_response(response_text, ingredient_list)
 

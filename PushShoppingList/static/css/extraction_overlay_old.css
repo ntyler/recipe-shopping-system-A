@@ -80,8 +80,8 @@
     color: #fff;
 
     text-align: center;
-    font-size: 26px;
-    line-height: 1.12;
+    font-size: 22px;
+    line-height: 1.15;
     font-weight: 800;
 }
 
@@ -301,8 +301,8 @@
     }
 
     .extract-old-title-wrap h2 {
-        font-size: 34px;
-        line-height: 1.08;
+        font-size: 26px;
+        line-height: 1.12;
     }
 
     .mobile-title-break {
@@ -310,16 +310,16 @@
     }
 
     .extract-old-subtitle {
-        font-size: 22px;
-        line-height: 1.2;
-        margin-top: 12px;
+        font-size: 15px;
+        line-height: 1.3;
+        margin-top: 10px;
         color: #bfbfbf;
     }
 
     .extract-top-hide-btn {
         min-width: 62px;
-        padding: 10px 14px;
-        font-size: 20px;
+        padding: 8px 12px;
+        font-size: 15px;
         border-radius: 12px;
     }
 
@@ -339,12 +339,12 @@
     }
 
     .extract-old-active-line {
-        font-size: 22px;
+        font-size: 16px;
     }
 
     .extract-old-summary {
-        font-size: 20px;
-        line-height: 1.25;
+        font-size: 15px;
+        line-height: 1.3;
     }
 
     .extract-old-progress-wrap {
@@ -367,21 +367,21 @@
     }
 
     .extract-old-url-list .bulk-progress-text {
-        font-size: 22px;
+        font-size: 16px;
         line-height: 1.25;
     }
 
     .extract-old-url-list .bulk-skip-reason {
-        font-size: 18px;
-        margin-top: 8px;
+        font-size: 13px;
+        margin-top: 6px;
     }
 
     .extract-bottom-hide-btn {
-        padding: 20px 16px;
+        padding: 14px 16px;
 
         border-radius: 14px;
 
-        font-size: 28px;
+        font-size: 18px;
     }
 }
 

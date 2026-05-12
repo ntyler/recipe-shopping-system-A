@@ -5,3 +5,4 @@ venv/
 .vscode/
 .idea/
 recipe-extractor/data/extract_progress.json
+recipe-extractor/data/recipe_ingredients.json

@@ -4,7 +4,7 @@
   "servings": "8 muffins",
   "ingredients": [
     {
-      "section": null,
+      "section": "DAIRY & EGGS",
       "original_text": "4 Tablespoons unsalted butter, melted",
       "quantity": "4",
       "unit": "Tablespoons",
@@ -15,7 +15,7 @@
       "store_section_order": 3
     },
     {
-      "section": null,
+      "section": "DAIRY & EGGS",
       "original_text": "¼ cup (60 g) plain yogurt",
       "quantity": "¼",
       "unit": "cup",
@@ -26,7 +26,7 @@
       "store_section_order": 3
     },
     {
-      "section": null,
+      "section": "BAKING",
       "original_text": "¼ cup (50 g) brown sugar",
       "quantity": "¼",
       "unit": "cup",
@@ -37,7 +37,7 @@
       "store_section_order": 7
     },
     {
-      "section": null,
+      "section": "BAKING",
       "original_text": "¼ cup (50 g) granulated sugar",
       "quantity": "¼",
       "unit": "cup",
@@ -48,7 +48,7 @@
       "store_section_order": 7
     },
     {
-      "section": null,
+      "section": "BAKING",
       "original_text": "1 teaspoon vanilla extract",
       "quantity": "1",
       "unit": "teaspoon",
@@ -59,7 +59,7 @@
       "store_section_order": 7
     },
     {
-      "section": null,
+      "section": "DAIRY & EGGS",
       "original_text": "1 egg",
       "quantity": "1",
       "unit": null,
@@ -70,7 +70,7 @@
       "store_section_order": 3
     },
     {
-      "section": null,
+      "section": "BAKING",
       "original_text": "125 g (125 g) all-purpose flour",
       "quantity": "125",
       "unit": "g",
@@ -81,7 +81,7 @@
       "store_section_order": 7
     },
     {
-      "section": null,
+      "section": "BAKING",
       "original_text": "¾ teaspoon baking powder",
       "quantity": "¾",
       "unit": "teaspoon",
@@ -92,7 +92,7 @@
       "store_section_order": 7
     },
     {
-      "section": null,
+      "section": "BAKING",
       "original_text": "¼ teaspoon baking soda",
       "quantity": "¼",
       "unit": "teaspoon",
@@ -103,7 +103,7 @@
       "store_section_order": 7
     },
     {
-      "section": null,
+      "section": "SPICES & SEASONINGS",
       "original_text": "½ teaspoon kosher salt",
       "quantity": "½",
       "unit": "teaspoon",
@@ -114,7 +114,7 @@
       "store_section_order": 12
     },
     {
-      "section": null,
+      "section": "SPICES & SEASONINGS",
       "original_text": "⅛ teaspoon cinnamon",
       "quantity": "⅛",
       "unit": "teaspoon",
@@ -125,7 +125,7 @@
       "store_section_order": 12
     },
     {
-      "section": null,
+      "section": "BAKING",
       "original_text": "¾ cup (130-145 g) mini chocolate chips",
       "quantity": "¾",
       "unit": "cup",
@@ -138,16 +138,16 @@
   ],
   "equipment": [
     {
+      "name": "mixing bowl",
+      "category": "prep"
+    },
+    {
       "name": "oven",
       "category": "appliance"
     },
     {
       "name": "muffin tin",
       "category": "cookware"
-    },
-    {
-      "name": "mixing bowl",
-      "category": "prep"
     },
     {
       "name": "whisk",

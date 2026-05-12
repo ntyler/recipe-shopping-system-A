@@ -12,6 +12,8 @@ from PushShoppingList.services.extraction_progress_service import mark_url_runni
 from PushShoppingList.services.extraction_progress_service import new_job_id
 from PushShoppingList.services.extraction_progress_service import start_progress
 from PushShoppingList.services.recipe_extract_service import extract_recipe_from_url
+from PushShoppingList.services.recipe_ingredient_service import remove_recipe_and_unused_ingredients
+from PushShoppingList.services.recipe_ingredient_service import save_ingredients_for_recipe
 from PushShoppingList.services.recipe_url_service import add_recipe_urls
 from PushShoppingList.services.recipe_url_service import remove_recipe_url
 from PushShoppingList.services.shopping_list_service import add_items
@@ -40,9 +42,11 @@ def extract_recipe_route():
         result = extract_recipe_from_url(url)
 
         if result.get("ok"):
-            add_items(result.get("ingredients", []))
+            ingredients = result.get("ingredients", [])
+            add_items(ingredients)
+            save_ingredients_for_recipe(url, ingredients)
             extracted_any = True
-            mark_url_done(job_id, urls, index, len(result.get("ingredients", [])))
+            mark_url_done(job_id, urls, index, len(ingredients))
         else:
             mark_url_failed(job_id, urls, index, result.get("error"))
 
@@ -83,11 +87,13 @@ def api_extract_recipe_route():
 
         return jsonify(result), 400
 
-    add_items(result.get("ingredients", []))
-    mark_url_done(job_id, urls, index, len(result.get("ingredients", [])))
-    sort_ingredients()
+    ingredients = result.get("ingredients", [])
+    add_items(ingredients)
+    save_ingredients_for_recipe(url, ingredients)
+    mark_url_done(job_id, urls, index, len(ingredients))
 
     if index >= len(urls) - 1:
+        sort_ingredients()
         finish_progress(job_id, ok=True)
 
     return jsonify(result)
@@ -103,6 +109,7 @@ def remove_recipe_route():
     data = request.get_json(silent=True) or {}
     url = request.form.get("url") or data.get("url", "")
 
+    remove_recipe_and_unused_ingredients(url)
     remove_recipe_url(url)
 
     return redirect("/")
