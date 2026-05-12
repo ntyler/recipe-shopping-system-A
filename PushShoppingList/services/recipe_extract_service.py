@@ -88,6 +88,9 @@ def fetch_recipe_page_text(recipe_url):
     return page_text
 
 
+# =========================================================
+# PROMPT
+# =========================================================
 def build_prompt(recipe_url, page_text):
     return f"""
 Extract the recipe information from this web page:
