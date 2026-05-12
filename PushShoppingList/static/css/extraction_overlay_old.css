@@ -10,11 +10,13 @@
     inset: 0;
     z-index: 9999;
 
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: center;
 
     padding: 16px;
+    min-height: 100vh;
+    min-height: 100dvh;
 
     background: rgba(0, 0, 0, 0.74);
     backdrop-filter: blur(3px);
@@ -22,10 +24,16 @@
     box-sizing: border-box;
 }
 
+.product-modal-backdrop.extract-old-backdrop.open {
+    display: flex;
+}
+
 .extract-old-card {
     width: min(940px, 94vw);
     max-height: 88vh;
+    max-height: 88dvh;
     overflow-y: auto;
+    overscroll-behavior: contain;
 
     background: #1b1b1b;
     border: 1px solid #777;
@@ -271,6 +279,7 @@
     .extract-old-card {
         width: 100%;
         max-height: calc(100vh - 88px);
+        max-height: calc(100dvh - 88px);
 
         padding: 18px;
 

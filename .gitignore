@@ -4,3 +4,4 @@ venv/
 .env
 .vscode/
 .idea/
+recipe-extractor/data/extract_progress.json

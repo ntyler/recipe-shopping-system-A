@@ -5,6 +5,10 @@ body {
             color: white;
         }
 
+        body.modal-open {
+            overflow: hidden;
+        }
+
         h1, h2 {
             text-align: center;
         }
