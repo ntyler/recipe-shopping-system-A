@@ -6,6 +6,8 @@ from pathlib import Path
 from openai import OpenAI
 
 from PushShoppingList.services.recipe_extract_service import (
+    LOG_FOLDER,
+    OUTPUT_FOLDER,
     STORE_SECTION_ORDER,
     classify_store_section,
     normalize_ingredient_for_shopping_list,
@@ -16,25 +18,10 @@ from PushShoppingList.services.recipe_extract_service import (
 BASE_DIR = Path(__file__).resolve().parent
 
 PUSH_DIR = BASE_DIR.parent
-PROJECT_DIR = PUSH_DIR.parent
 
 SHOPPING_LIST_FILE = (
     PUSH_DIR /
     "shopping_list.txt"
-)
-
-OUTPUT_FOLDER = (
-    PROJECT_DIR /
-    "recipe-extractor" /
-    "data" /
-    "output"
-)
-
-LOG_FOLDER = (
-    PROJECT_DIR /
-    "recipe-extractor" /
-    "data" /
-    "logs"
 )
 
 OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)

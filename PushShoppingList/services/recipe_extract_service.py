@@ -11,9 +11,10 @@ from openai import OpenAI
 BASE_DIR = Path(__file__).resolve().parent.parent
 PROJECT_DIR = BASE_DIR.parent
 
-OUTPUT_FOLDER = PROJECT_DIR / "recipe-extractor" / "data" / "output"
-RAW_FOLDER = PROJECT_DIR / "recipe-extractor" / "data" / "raw"
-LOG_FOLDER = PROJECT_DIR / "recipe-extractor" / "data" / "logs"
+EXTRACTOR_FOLDER = Path(__file__).resolve().parent / "recipe-extractor"
+OUTPUT_FOLDER = EXTRACTOR_FOLDER / "data" / "output"
+RAW_FOLDER = EXTRACTOR_FOLDER / "data" / "raw"
+LOG_FOLDER = EXTRACTOR_FOLDER / "data" / "logs"
 
 OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
 RAW_FOLDER.mkdir(parents=True, exist_ok=True)

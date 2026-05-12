@@ -3,9 +3,8 @@ import re
 from pathlib import Path
 
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-PROJECT_DIR = BASE_DIR.parent
-STORE_SETTINGS_FILE = PROJECT_DIR / "recipe-extractor" / "data" / "store_settings.json"
+BASE_DIR = Path(__file__).resolve().parent
+STORE_SETTINGS_FILE = BASE_DIR / "recipe-extractor" / "data" / "store_settings.json"
 
 DEFAULT_STORES = {
     "aldi": {

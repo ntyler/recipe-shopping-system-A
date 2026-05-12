@@ -7,9 +7,8 @@ from pathlib import Path
 import requests
 
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-PROJECT_DIR = BASE_DIR.parent
-PROGRESS_FILE = PROJECT_DIR / "recipe-extractor" / "data" / "extract_progress.json"
+BASE_DIR = Path(__file__).resolve().parent
+PROGRESS_FILE = BASE_DIR / "recipe-extractor" / "data" / "extract_progress.json"
 NTFY_TOPIC = os.getenv("NTFY_TOPIC", "nathaniel-shopping-list-12345")
 
 PROGRESS_FILE.parent.mkdir(parents=True, exist_ok=True)

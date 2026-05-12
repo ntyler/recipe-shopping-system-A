@@ -10,14 +10,8 @@ from PushShoppingList.services.shopping_list_service import load_items
 from PushShoppingList.services.shopping_list_service import save_items
 
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-PROJECT_DIR = BASE_DIR.parent
-RECIPE_INGREDIENTS_FILE = (
-    PROJECT_DIR /
-    "recipe-extractor" /
-    "data" /
-    "recipe_ingredients.json"
-)
+BASE_DIR = Path(__file__).resolve().parent
+RECIPE_INGREDIENTS_FILE = BASE_DIR / "recipe-extractor" / "data" / "recipe_ingredients.json"
 
 RECIPE_INGREDIENTS_FILE.parent.mkdir(parents=True, exist_ok=True)
 

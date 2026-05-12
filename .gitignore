@@ -4,8 +4,8 @@ venv/
 .env
 .vscode/
 .idea/
-recipe-extractor/data/extract_progress.json
-recipe-extractor/data/recipe_ingredients.json
-recipe-extractor/data/home_address.json
-recipe-extractor/data/store_settings.json
-recipe-extractor/data/shopping_item_state.json
+PushShoppingList/services/recipe-extractor/data/extract_progress.json
+PushShoppingList/services/recipe-extractor/data/recipe_ingredients.json
+PushShoppingList/services/recipe-extractor/data/home_address.json
+PushShoppingList/services/recipe-extractor/data/store_settings.json
+PushShoppingList/services/recipe-extractor/data/shopping_item_state.json

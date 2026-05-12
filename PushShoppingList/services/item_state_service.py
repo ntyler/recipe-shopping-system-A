@@ -2,9 +2,8 @@ import json
 from pathlib import Path
 
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-PROJECT_DIR = BASE_DIR.parent
-ITEM_STATE_FILE = PROJECT_DIR / "recipe-extractor" / "data" / "shopping_item_state.json"
+BASE_DIR = Path(__file__).resolve().parent
+ITEM_STATE_FILE = BASE_DIR / "recipe-extractor" / "data" / "shopping_item_state.json"
 
 ITEM_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
 

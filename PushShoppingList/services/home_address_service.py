@@ -2,9 +2,8 @@ import json
 from pathlib import Path
 
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-PROJECT_DIR = BASE_DIR.parent
-HOME_ADDRESS_FILE = PROJECT_DIR / "recipe-extractor" / "data" / "home_address.json"
+BASE_DIR = Path(__file__).resolve().parent
+HOME_ADDRESS_FILE = BASE_DIR / "recipe-extractor" / "data" / "home_address.json"
 
 DEFAULT_HOME_ADDRESS = {
     "street": "5905 Arlo Drive",
