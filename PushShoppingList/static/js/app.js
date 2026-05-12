@@ -69,6 +69,7 @@ function toggleCardCollapse(key) {
     }
 
     const isCollapsed = content.classList.toggle("collapsed");
+    localStorage.setItem(`card-collapse:${key}`, isCollapsed ? "collapsed" : "expanded");
 
     if (icon) {
         icon.textContent = isCollapsed ? "Show v" : "Hide ^";
@@ -79,8 +80,61 @@ function toggleStorePanel(panelId) {
     const panel = document.getElementById(panelId);
 
     if (panel) {
-        panel.classList.toggle("open");
+        const isOpen = panel.classList.toggle("open");
+        const openPanels = getOpenStorePanels();
+
+        if (isOpen) {
+            openPanels.add(panelId);
+        } else {
+            openPanels.delete(panelId);
+        }
+
+        saveOpenStorePanels(openPanels);
     }
+}
+
+function restoreCardCollapseState() {
+    document.querySelectorAll("[data-collapse-content]").forEach(content => {
+        const key = content.dataset.collapseContent;
+        const icon = document.querySelector(`[data-collapse-icon="${key}"]`);
+        const savedState = localStorage.getItem(`card-collapse:${key}`);
+        const shouldCollapse = savedState !== "expanded";
+
+        content.classList.toggle("collapsed", shouldCollapse);
+
+        if (icon) {
+            icon.textContent = shouldCollapse ? "Show v" : "Hide ^";
+        }
+    });
+}
+
+function getOpenStorePanels() {
+    try {
+        const savedPanels = JSON.parse(localStorage.getItem("store-open-panels") || "[]");
+        return new Set(Array.isArray(savedPanels) ? savedPanels : []);
+    } catch (err) {
+        return new Set();
+    }
+}
+
+function saveOpenStorePanels(openPanels) {
+    localStorage.setItem("store-open-panels", JSON.stringify([...openPanels]));
+}
+
+function restoreOpenStorePanels() {
+    const openPanels = getOpenStorePanels();
+    const validOpenPanels = new Set();
+
+    openPanels.forEach(panelId => {
+        const panel = document.getElementById(panelId);
+
+        if (panel) {
+            panel.classList.add("open");
+            validOpenPanels.add(panelId);
+        }
+    });
+
+    saveOpenStorePanels(validOpenPanels);
 }
 
 function togglePasswordVisibility(inputId, button) {
@@ -183,6 +237,8 @@ function buildAddressSummaryFromForm(form) {
 
 document.addEventListener("DOMContentLoaded", function () {
     restoreScroll();
+    restoreCardCollapseState();
+    restoreOpenStorePanels();
     startExtractionProgressPolling();
 });
 
