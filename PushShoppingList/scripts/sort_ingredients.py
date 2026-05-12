@@ -128,11 +128,31 @@ STRICT RULES:
 - Every ingredient from the input MUST appear exactly once in the output.
 
 STORE LAYOUT ORDER:
-produce -> dairy -> dry goods -> canned -> beverages -> spices -> oils -> bakery -> misc
+produce -> meat & seafood -> dairy & eggs -> frozen -> dry goods -> pasta, rice & grains -> baking -> canned -> sauces & condiments -> snacks -> beverages -> spices & seasonings -> oils & vinegars -> bakery -> deli -> household -> personal care -> pet supplies -> misc
 
 SECTION RULES:
 - Use ONLY these exact section names:
-  PRODUCE, DAIRY, DRY GOODS, CANNED, BEVERAGES, SPICES, OILS, BAKERY, MISC
+
+PRODUCE
+MEAT & SEAFOOD
+DAIRY & EGGS
+FROZEN
+DRY GOODS
+PASTA, RICE & GRAINS
+BAKING
+CANNED
+SAUCES & CONDIMENTS
+SNACKS
+BEVERAGES
+SPICES & SEASONINGS
+OILS & VINEGARS
+BAKERY
+DELI
+HOUSEHOLD
+PERSONAL CARE
+PET SUPPLIES
+MISC
+
 - Each section header MUST be formatted exactly as:
   === SECTION NAME ===
 - Do NOT create empty sections.
@@ -147,7 +167,7 @@ Return ONLY valid JSON:
     "=== PRODUCE ===",
     "item 1",
     "item 2",
-    "=== DAIRY ===",
+    "=== DAIRY & EGGS ===",
     "item 3"
   ]
 }}

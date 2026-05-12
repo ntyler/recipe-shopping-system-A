@@ -1,7 +1,7 @@
-=== DAIRY ===
+=== DAIRY & EGGS ===
 egg
 plain yogurt
-=== DRY GOODS ===
+=== BAKING ===
 all-purpose flour
 brown sugar
 granulated sugar
@@ -10,5 +10,6 @@ baking soda
 kosher salt
 cinnamon
 mini chocolate chips
+=== OILS & VINEGARS ===
 unsalted butter
 vanilla extract
