@@ -88,8 +88,8 @@
       "ingredient": "Homemade Tomato Sauce",
       "preparation": "for serving)",
       "optional": false,
-      "store_section": "PRODUCE",
-      "store_section_order": 1
+      "store_section": "SAUCES & CONDIMENTS",
+      "store_section_order": 9
     },
     {
       "section": null,
@@ -99,8 +99,8 @@
       "ingredient": "Parmesan and/or basil",
       "preparation": null,
       "optional": false,
-      "store_section": "PRODUCE",
-      "store_section_order": 1
+      "store_section": "DAIRY & EGGS",
+      "store_section_order": 3
     }
   ],
   "equipment": [],

@@ -101,7 +101,7 @@ def mark_url_done(job_id, urls, index, ingredients_count):
         progress["urls"][index]["message"] = f"done - {ingredients_count} ingredients extracted"
         progress["urls"][index]["ingredients_count"] = ingredients_count
 
-    progress["percent"] = progress_percent(index + 1, progress["total"])
+    progress["percent"] = progress_percent(completed_count(progress), progress["total"])
     return save_progress(progress)
 
 
@@ -112,7 +112,7 @@ def mark_url_failed(job_id, urls, index, error):
         progress["urls"][index]["state"] = "failed"
         progress["urls"][index]["message"] = f"failed - {error or 'unknown error'}"
 
-    progress["percent"] = progress_percent(index + 1, progress["total"])
+    progress["percent"] = progress_percent(completed_count(progress), progress["total"])
     return save_progress(progress)
 
 
@@ -154,6 +154,26 @@ def progress_percent(done_count, total):
         return 0
 
     return max(10, min(100, round((done_count / total) * 100)))
+
+
+def completed_count(progress):
+    return sum(
+        1
+        for item in progress.get("urls", [])
+        if item.get("state") in {"done", "failed"}
+    )
+
+
+def batch_is_finished(progress):
+    total = progress.get("total", 0)
+    return total > 0 and completed_count(progress) >= total
+
+
+def batch_has_success(progress):
+    return any(
+        item.get("state") == "done"
+        for item in progress.get("urls", [])
+    )
 
 
 def send_ntfy(title, message):

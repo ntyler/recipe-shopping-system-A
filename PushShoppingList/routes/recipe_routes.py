@@ -4,6 +4,8 @@ from flask import redirect
 from flask import request
 
 from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
+from PushShoppingList.services.extraction_progress_service import batch_has_success
+from PushShoppingList.services.extraction_progress_service import batch_is_finished
 from PushShoppingList.services.extraction_progress_service import finish_progress
 from PushShoppingList.services.extraction_progress_service import load_progress
 from PushShoppingList.services.extraction_progress_service import mark_url_done
@@ -80,21 +82,16 @@ def api_extract_recipe_route():
     result = extract_recipe_from_url(url)
 
     if not result.get("ok"):
-        mark_url_failed(job_id, urls, index, result.get("error"))
-
-        if index >= len(urls) - 1:
-            finish_progress(job_id, ok=False)
+        progress = mark_url_failed(job_id, urls, index, result.get("error"))
+        finish_batch_if_ready(job_id, progress)
 
         return jsonify(result), 400
 
     ingredients = result.get("ingredients", [])
     add_items(ingredients)
     save_ingredients_for_recipe(url, ingredients)
-    mark_url_done(job_id, urls, index, len(ingredients))
-
-    if index >= len(urls) - 1:
-        sort_ingredients()
-        finish_progress(job_id, ok=True)
+    progress = mark_url_done(job_id, urls, index, len(ingredients))
+    finish_batch_if_ready(job_id, progress)
 
     return jsonify(result)
 
@@ -113,3 +110,16 @@ def remove_recipe_route():
     remove_recipe_url(url)
 
     return redirect("/")
+
+
+def finish_batch_if_ready(job_id, progress):
+    if not batch_is_finished(progress):
+        return
+
+    if batch_has_success(progress):
+        sort_ingredients()
+
+    finish_progress(job_id, ok=not any(
+        item.get("state") == "failed"
+        for item in progress.get("urls", [])
+    ))

@@ -87,7 +87,6 @@ async function startRecipeExtraction(event) {
     const list = document.getElementById("extractUrlList");
     const status = document.getElementById("extractStatusText");
     const summary = document.getElementById("extractSummary");
-    const bar = document.getElementById("extractProgressBar");
 
     list.innerHTML = "";
 
@@ -115,60 +114,32 @@ async function startRecipeExtraction(event) {
 
     await waitForNextPaint();
 
-    for (let i = 0; i < urls.length; i++) {
-        const url = urls[i];
-        const row = document.getElementById(`extract-url-${i}`);
-        const checkbox = row.querySelector(".bulk-progress-check");
+    status.textContent = `Downloading ${urls.length} recipe${urls.length === 1 ? "" : "s"}...`;
+    summary.textContent = "Fetching recipe pages and extracting ingredients.";
+
+    const extractionRequests = urls.map((url, index) => {
+        const row = document.getElementById(`extract-url-${index}`);
         const text = row.querySelector(".bulk-progress-text");
         const reason = row.querySelector(".bulk-skip-reason");
 
-        status.textContent = `Downloading recipe ${i + 1} of ${urls.length}...`;
-        summary.textContent = "Fetching recipe page and extracting ingredients.";
-        reason.textContent = "extracting • Running recipe extractor...";
+        reason.textContent = "extracting - Running recipe extractor...";
         text.classList.add("active");
 
-        bar.style.width = `${Math.max(10, Math.round((i / urls.length) * 100))}%`;
+        return fetch("/api/extract_recipe", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                url: url,
+                urls: urls,
+                index: index,
+                job_id: jobId,
+            }),
+        });
+    });
 
-        try {
-            const response = await fetch("/api/extract_recipe", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    url: url,
-                    urls: urls,
-                    index: i,
-                    job_id: jobId,
-                }),
-            });
-
-            const data = await response.json();
-
-            if (data.ok) {
-                checkbox.checked = true;
-                text.classList.remove("active");
-                text.classList.add("done");
-                reason.textContent = `done • ${data.ingredients.length} ingredients extracted`;
-            } else {
-                text.classList.remove("active");
-                reason.textContent = `failed • ${data.error || "unknown error"}`;
-            }
-        } catch (err) {
-            text.classList.remove("active");
-            reason.textContent = `failed • ${err}`;
-        }
-
-        bar.style.width = `${Math.round(((i + 1) / urls.length) * 100)}%`;
-    }
-
-    status.textContent = "Extraction complete.";
-    summary.textContent = "Refreshing shopping list...";
-    bar.style.width = "100%";
-
-    setTimeout(() => {
-        window.location.href = "/";
-    }, 800);
+    await Promise.allSettled(extractionRequests);
 }
 
 function waitForNextPaint() {
@@ -222,7 +193,7 @@ function renderExtractionProgress(progress) {
     }
 
     status.textContent = progressStatusText(progress);
-    summary.textContent = progress.summary || "Fetching recipe page and extracting ingredients.";
+    summary.textContent = progress.summary || "Fetching recipe pages and extracting ingredients.";
     bar.style.width = `${Math.max(0, Math.min(100, progress.percent || 0))}%`;
 
     list.innerHTML = "";
@@ -283,13 +254,16 @@ function progressStatusText(progress) {
     }
 
     const total = progress.total || 0;
-    const index = (progress.current_index || 0) + 1;
 
     if (!total) {
         return "Starting...";
     }
 
-    return `Downloading recipe ${Math.min(index, total)} of ${total}...`;
+    const completed = (progress.urls || []).filter(item => {
+        return item.state === "done" || item.state === "failed";
+    }).length;
+
+    return `Downloading recipes ${completed} of ${total} complete...`;
 }
 
 function scheduleExtractionRefresh(jobId) {
