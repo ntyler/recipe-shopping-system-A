@@ -7,3 +7,4 @@ venv/
 recipe-extractor/data/extract_progress.json
 recipe-extractor/data/recipe_ingredients.json
 recipe-extractor/data/home_address.json
+recipe-extractor/data/store_settings.json

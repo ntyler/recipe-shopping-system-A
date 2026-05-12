@@ -10,6 +10,7 @@ from PushShoppingList.services.home_address_service import save_home_address
 from PushShoppingList.services.recipe_url_service import recipe_url_rows
 from PushShoppingList.services.shopping_list_service import load_items
 from PushShoppingList.services.shopping_list_service import save_items
+from PushShoppingList.services.store_settings_service import load_store_settings
 
 main_bp = Blueprint("main_bp", __name__)
 
@@ -60,6 +61,7 @@ def is_section_header(text):
 @main_bp.route("/")
 def index():
     items = load_items()
+    store_settings = load_store_settings()
 
     return render_template(
         "index.html",
@@ -68,8 +70,8 @@ def index():
         items=items,
         current_urls=recipe_url_rows(),
         home_address=load_home_address(),
-        available_stores=DEFAULT_STORES,
-        enabled_stores=["meijer", "aldi"],
+        available_stores=store_settings["stores"],
+        enabled_stores=store_settings["enabled_stores"],
         normalize=normalize,
         is_section_header=is_section_header,
     )

@@ -60,6 +60,44 @@ function hideProductsOverlay() {
     }
 }
 
+function toggleCardCollapse(key) {
+    const content = document.querySelector(`[data-collapse-content="${key}"]`);
+    const icon = document.querySelector(`[data-collapse-icon="${key}"]`);
+
+    if (!content) {
+        return;
+    }
+
+    const isCollapsed = content.classList.toggle("collapsed");
+
+    if (icon) {
+        icon.textContent = isCollapsed ? "Show v" : "Hide ^";
+    }
+}
+
+function toggleStorePanel(panelId) {
+    const panel = document.getElementById(panelId);
+
+    if (panel) {
+        panel.classList.toggle("open");
+    }
+}
+
+function togglePasswordVisibility(inputId, button) {
+    const input = document.getElementById(inputId);
+
+    if (!input) {
+        return;
+    }
+
+    const showing = input.type === "text";
+    input.type = showing ? "password" : "text";
+
+    if (button) {
+        button.textContent = showing ? "Show" : "Hide";
+    }
+}
+
 async function saveHomeAddress(event) {
     const form = event.currentTarget;
     const submitter = event.submitter || document.activeElement;

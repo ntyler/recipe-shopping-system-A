@@ -3,7 +3,7 @@
             class="card-collapse-toggle"
             onclick="toggleCardCollapse('store-options')">
         <span>Store Options</span>
-        <span class="card-collapse-icon" data-collapse-icon="store-options">Show ▾</span>
+        <span class="card-collapse-icon" data-collapse-icon="store-options">Show v</span>
     </button>
 
     <div class="card-collapse-content collapsed" data-collapse-content="store-options">
@@ -39,9 +39,21 @@
                     </div>
 
                     <div class="store-action-row">
-                        <button type="button" class="store-edit-btn">Edit</button>
-                        <button type="button" class="store-credentials-btn">Credentials</button>
-                        <button type="button" class="store-delete-btn">Delete</button>
+                        <button type="button"
+                                class="store-edit-btn"
+                                onclick="toggleStorePanel('store-edit-{{ store_key }}')">
+                            Edit
+                        </button>
+                        <button type="button"
+                                class="store-credentials-btn"
+                                onclick="toggleStorePanel('store-credentials-{{ store_key }}')">
+                            Credentials
+                        </button>
+                        <form method="POST"
+                              action="/delete_store/{{ store_key }}"
+                              onsubmit="saveScroll(); return confirm('Delete {{ store.label }}?');">
+                            <button type="submit" class="store-delete-btn">Delete</button>
+                        </form>
                     </div>
 
                     <div class="store-location-details">
@@ -50,6 +62,55 @@
                             No nearest location saved yet. Run <code>update_home_stores.py</code>.
                         </div>
                     </div>
+
+                    <form id="store-edit-{{ store_key }}"
+                          class="store-edit-form"
+                          method="POST"
+                          action="/update_store/{{ store_key }}"
+                          onsubmit="saveScroll()">
+                        <label class="store-edit-field">
+                            Store Name
+                            <input name="store_label" value="{{ store.label }}">
+                        </label>
+                        <label class="store-edit-field">
+                            Search URL
+                            <input name="store_url" value="{{ store.url }}">
+                        </label>
+                        <label class="store-edit-field full-width">
+                            Store Selector URL
+                            <input name="urlStoreSelector" value="{{ store.urlStoreSelector }}">
+                        </label>
+                        <button type="submit" class="store-edit-save-btn">Save Store Details</button>
+                    </form>
+
+                    <form id="store-credentials-{{ store_key }}"
+                          class="store-edit-form"
+                          method="POST"
+                          action="/update_store_credentials/{{ store_key }}"
+                          onsubmit="saveScroll()">
+                        <label class="store-edit-field">
+                            Username / Email
+                            <input name="store_username"
+                                   value="{{ store.username or '' }}"
+                                   autocomplete="username">
+                        </label>
+                        <label class="store-edit-field">
+                            Password
+                            <div class="password-input-wrap">
+                                <input id="store-password-{{ store_key }}"
+                                       name="store_password"
+                                       type="password"
+                                       value="{{ store.password or '' }}"
+                                       autocomplete="current-password">
+                                <button type="button"
+                                        class="password-toggle-btn"
+                                        onclick="togglePasswordVisibility('store-password-{{ store_key }}', this)">
+                                    Show
+                                </button>
+                            </div>
+                        </label>
+                        <button type="submit" class="store-edit-save-btn">Save Credentials</button>
+                    </form>
                 </div>
             {% endfor %}
         </div>
@@ -75,7 +136,7 @@
                         <button type="button"
                                 class="password-toggle-btn"
                                 onclick="togglePasswordVisibility('add-store-password', this)">
-                            👁
+                            Show
                         </button>
                     </div>
                 </div>
