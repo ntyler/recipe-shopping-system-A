@@ -4,143 +4,139 @@
   "servings": "8 muffins",
   "ingredients": [
     {
-      "section": null,
+      "section": "DAIRY & EGGS",
       "original_text": "4 Tablespoons unsalted butter, melted",
       "quantity": "4",
       "unit": "Tablespoons",
       "ingredient": "unsalted butter",
       "preparation": "melted",
       "optional": false,
-      "store_section": "DAIRY",
-      "store_section_order": 2
+      "store_section": "DAIRY & EGGS",
+      "store_section_order": 3
     },
     {
-      "section": null,
+      "section": "DAIRY & EGGS",
       "original_text": "¼ cup (60 g) plain yogurt",
       "quantity": "¼",
       "unit": "cup",
       "ingredient": "plain yogurt",
       "preparation": null,
       "optional": false,
-      "store_section": "DAIRY",
-      "store_section_order": 2
+      "store_section": "DAIRY & EGGS",
+      "store_section_order": 3
     },
     {
-      "section": null,
+      "section": "BAKING",
       "original_text": "¼ cup (50 g) brown sugar",
       "quantity": "¼",
       "unit": "cup",
       "ingredient": "brown sugar",
       "preparation": null,
       "optional": false,
-      "store_section": "DRY GOODS",
-      "store_section_order": 3
+      "store_section": "BAKING",
+      "store_section_order": 7
     },
     {
-      "section": null,
+      "section": "BAKING",
       "original_text": "¼ cup (50 g) granulated sugar",
       "quantity": "¼",
       "unit": "cup",
       "ingredient": "granulated sugar",
       "preparation": null,
       "optional": false,
-      "store_section": "DRY GOODS",
-      "store_section_order": 3
+      "store_section": "BAKING",
+      "store_section_order": 7
     },
     {
-      "section": null,
+      "section": "BAKING",
       "original_text": "1 teaspoon vanilla extract",
       "quantity": "1",
       "unit": "teaspoon",
       "ingredient": "vanilla extract",
       "preparation": null,
       "optional": false,
-      "store_section": "MISC",
-      "store_section_order": 9
+      "store_section": "BAKING",
+      "store_section_order": 7
     },
     {
-      "section": null,
+      "section": "DAIRY & EGGS",
       "original_text": "1 egg",
       "quantity": "1",
       "unit": null,
       "ingredient": "egg",
       "preparation": null,
       "optional": false,
-      "store_section": "DAIRY",
-      "store_section_order": 2
+      "store_section": "DAIRY & EGGS",
+      "store_section_order": 3
     },
     {
-      "section": null,
+      "section": "BAKING",
       "original_text": "125 g (125 g) all-purpose flour",
       "quantity": "125",
       "unit": "g",
       "ingredient": "all-purpose flour",
       "preparation": null,
       "optional": false,
-      "store_section": "DRY GOODS",
-      "store_section_order": 3
+      "store_section": "BAKING",
+      "store_section_order": 7
     },
     {
-      "section": null,
+      "section": "BAKING",
       "original_text": "¾ teaspoon baking powder",
       "quantity": "¾",
       "unit": "teaspoon",
       "ingredient": "baking powder",
       "preparation": null,
       "optional": false,
-      "store_section": "SPICES",
-      "store_section_order": 6
+      "store_section": "BAKING",
+      "store_section_order": 7
     },
     {
-      "section": null,
+      "section": "BAKING",
       "original_text": "¼ teaspoon baking soda",
       "quantity": "¼",
       "unit": "teaspoon",
       "ingredient": "baking soda",
       "preparation": null,
       "optional": false,
-      "store_section": "SPICES",
-      "store_section_order": 6
+      "store_section": "BAKING",
+      "store_section_order": 7
     },
     {
-      "section": null,
+      "section": "SPICES & SEASONINGS",
       "original_text": "½ teaspoon kosher salt",
       "quantity": "½",
       "unit": "teaspoon",
       "ingredient": "kosher salt",
       "preparation": null,
       "optional": false,
-      "store_section": "SPICES",
-      "store_section_order": 6
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12
     },
     {
-      "section": null,
+      "section": "SPICES & SEASONINGS",
       "original_text": "⅛ teaspoon cinnamon",
       "quantity": "⅛",
       "unit": "teaspoon",
       "ingredient": "cinnamon",
       "preparation": null,
       "optional": false,
-      "store_section": "SPICES",
-      "store_section_order": 6
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12
     },
     {
-      "section": null,
+      "section": "BAKING",
       "original_text": "¾ cup (130-145 g) mini chocolate chips",
       "quantity": "¾",
       "unit": "cup",
       "ingredient": "mini chocolate chips",
       "preparation": null,
       "optional": false,
-      "store_section": "BAKERY",
-      "store_section_order": 8
+      "store_section": "BAKING",
+      "store_section_order": 7
     }
   ],
   "equipment": [
-    {
-      "name": "mixing bowl",
-      "category": "prep"
-    },
     {
       "name": "oven",
       "category": "appliance"
@@ -150,11 +146,19 @@
       "category": "cookware"
     },
     {
+      "name": "cookie scoop",
+      "category": "utensil"
+    },
+    {
+      "name": "mixing bowl",
+      "category": "prep"
+    },
+    {
       "name": "whisk",
       "category": "utensil"
     },
     {
-      "name": "cookie scoop",
+      "name": "spatula",
       "category": "utensil"
     }
   ],
@@ -198,7 +202,8 @@
       "temperature": null,
       "time": null,
       "equipment_used": [
-        "mixing bowl"
+        "mixing bowl",
+        "spatula"
       ]
     },
     {
@@ -208,7 +213,8 @@
       "temperature": null,
       "time": null,
       "equipment_used": [
-        "mixing bowl"
+        "mixing bowl",
+        "spatula"
       ]
     },
     {
@@ -227,7 +233,7 @@
       "step_number": 7,
       "instruction": "Bake at 400°F for 6 minutes, then reduce oven temperature to 350°F and bake another 6-8 minutes, or until a toothpick comes out clean.",
       "temperature": "400°F",
-      "time": "6 minutes, then reduce oven temperature to 350°F and bake another 6-8 minutes",
+      "time": "6 minutes, then 6-8 minutes",
       "equipment_used": [
         "oven"
       ]

@@ -1,7 +1,11 @@
 from flask import Blueprint
+from flask import redirect
+from flask import request
 from flask import render_template
 
+from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
 from PushShoppingList.services.shopping_list_service import load_items
+from PushShoppingList.services.shopping_list_service import save_items
 
 main_bp = Blueprint("main_bp", __name__)
 
@@ -72,3 +76,31 @@ def index():
         normalize=normalize,
         is_section_header=is_section_header,
     )
+
+
+@main_bp.route("/clear", methods=["POST"])
+def clear_list():
+    save_items([])
+
+    return redirect("/")
+
+
+@main_bp.route("/save", methods=["POST"])
+def save_list():
+    raw_items = request.form.get("items", "")
+    items = [
+        line.strip()
+        for line in raw_items.splitlines()
+        if line.strip()
+    ]
+
+    save_items(items)
+
+    return redirect("/")
+
+
+@main_bp.route("/sort", methods=["POST"])
+def sort_list():
+    sort_ingredients()
+
+    return redirect("/")

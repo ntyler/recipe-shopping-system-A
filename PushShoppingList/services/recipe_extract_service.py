@@ -139,7 +139,20 @@ INGREDIENT RULES
   - "1 teaspoon vanilla extract" -> ingredient "vanilla extract"
 - If the same grocery item appears more than once because the page lists both US and metric measurements, keep only one ingredient object for that grocery item.
 - Assign store_section and store_section_order.
+- Use the grocery section that best matches the ingredient's real grocery store placement.
 - Do NOT add ingredients that are not in the recipe.
+
+CLASSIFICATION GUIDANCE:
+- Eggs, milk, butter, yogurt, cream, cheese, and sour cream go in DAIRY & EGGS.
+- Flour, sugar, brown sugar, powdered sugar, baking powder, baking soda, cocoa powder, chocolate chips, vanilla extract, and yeast go in BAKING.
+- Salt, kosher salt, sea salt, black pepper, cinnamon, paprika, cumin, chili powder, garlic powder, onion powder, oregano, thyme, basil, and spice blends go in SPICES & SEASONINGS.
+- Olive oil, vegetable oil, avocado oil, sesame oil, coconut oil, cooking spray, and vinegars go in OILS & VINEGARS.
+- Pasta, noodles, rice, oats, quinoa, breadcrumbs, stuffing mix, and grains go in PASTA, RICE & GRAINS.
+- Ketchup, mustard, mayonnaise, salsa, soy sauce, hot sauce, barbecue sauce, salad dressing, and marinades go in SAUCES & CONDIMENTS.
+- Bread, buns, tortillas, bagels, rolls, croissants, and pastries go in BAKERY.
+- Chips, crackers, popcorn, pretzels, granola bars, and cookies go in SNACKS.
+- Frozen vegetables, frozen fruit, ice cream, frozen pizza, and frozen meals go in FROZEN.
+- Fresh fruits, vegetables, herbs, and refrigerated produce go in PRODUCE.
 
 STORE SECTIONS:
 PRODUCE, MEAT & SEAFOOD, DAIRY & EGGS, FROZEN, DRY GOODS, PASTA, RICE & GRAINS, BAKING, CANNED, SAUCES & CONDIMENTS, SNACKS, BEVERAGES, SPICES & SEASONINGS, OILS & VINEGARS, BAKERY, DELI, HOUSEHOLD, PERSONAL CARE, PET SUPPLIES, MISC

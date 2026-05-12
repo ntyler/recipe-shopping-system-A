@@ -153,6 +153,14 @@ PERSONAL CARE
 PET SUPPLIES
 MISC
 
+CLASSIFICATION GUIDANCE:
+- Eggs go in DAIRY & EGGS.
+- Butter, yogurt, milk, cream, cheese, and sour cream go in DAIRY & EGGS.
+- Flour, sugar, brown sugar, baking powder, baking soda, vanilla extract, chocolate chips, cocoa powder, and yeast go in BAKING.
+- Salt, kosher salt, sea salt, pepper, cinnamon, garlic powder, onion powder, paprika, chili powder, cumin, and dried herbs go in SPICES & SEASONINGS.
+- Olive oil, vegetable oil, sesame oil, cooking spray, and vinegars go in OILS & VINEGARS.
+- Pasta, rice, quinoa, oats, breadcrumbs, and grains go in PASTA, RICE & GRAINS.
+
 - Each section header MUST be formatted exactly as:
   === SECTION NAME ===
 - Do NOT create empty sections.

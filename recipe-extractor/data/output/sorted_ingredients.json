@@ -1,18 +1,19 @@
 {
   "sorted_ingredients": [
-    "=== DAIRY ===",
-    "egg",
+    "=== DAIRY & EGGS ===",
+    "unsalted butter",
     "plain yogurt",
-    "=== DRY GOODS ===",
-    "all-purpose flour",
+    "egg",
+    "=== BAKING ===",
     "brown sugar",
     "granulated sugar",
+    "vanilla extract",
+    "all-purpose flour",
     "baking powder",
     "baking soda",
-    "kosher salt",
-    "cinnamon",
     "mini chocolate chips",
-    "unsalted butter",
-    "vanilla extract"
+    "=== SPICES & SEASONINGS ===",
+    "kosher salt",
+    "cinnamon"
   ]
 }
