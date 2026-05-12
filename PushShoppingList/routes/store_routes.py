@@ -69,7 +69,14 @@ def update_store_route(store_key):
 
 @store_bp.route("/delete_store/<store_key>", methods=["POST"])
 def delete_store_route(store_key):
-    delete_store(store_key)
+    settings = delete_store(store_key)
+
+    if wants_json_response():
+        return jsonify({
+            "ok": True,
+            "stores": settings["stores"],
+            "enabled_stores": settings["enabled_stores"],
+        })
 
     return redirect("/#store-options")
 

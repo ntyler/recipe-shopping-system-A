@@ -50,7 +50,7 @@
                         </button>
                         <form method="POST"
                               action="/delete_store/{{ store_key }}"
-                              onsubmit="saveScroll(); return confirm('Delete {{ store.label }}?');">
+                              onsubmit="return deleteStore(event, 'Delete {{ store.label }}?');">
                             <button type="submit" class="store-delete-btn">Delete</button>
                         </form>
                     </div>

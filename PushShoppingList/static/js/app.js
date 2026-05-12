@@ -268,6 +268,34 @@ async function addStore(event) {
     return false;
 }
 
+async function deleteStore(event, message) {
+    event.preventDefault();
+
+    if (!confirm(message)) {
+        return false;
+    }
+
+    const form = event.currentTarget;
+    const submitButton = form.querySelector('button[type="submit"]');
+
+    if (submitButton) {
+        submitButton.disabled = true;
+    }
+
+    try {
+        await submitStoreForm(form);
+        await refreshStoreMarkup();
+    } catch (err) {
+        console.warn("Unable to delete store in the background.", err);
+
+        if (submitButton) {
+            submitButton.disabled = false;
+        }
+    }
+
+    return false;
+}
+
 async function submitStoreForm(form) {
     const formData = new FormData(form);
     formData.set("ajax", "1");
@@ -291,6 +319,8 @@ async function submitStoreForm(form) {
 }
 
 async function refreshStoreMarkup() {
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
     const response = await fetch(window.location.href, {
         cache: "no-store",
     });
@@ -305,6 +335,7 @@ async function refreshStoreMarkup() {
     replaceSectionFromPage(nextPage, "#sectionView");
     restoreCardCollapseState();
     restoreOpenStorePanels();
+    window.scrollTo(scrollX, scrollY);
 }
 
 function replaceSectionFromPage(nextPage, selector) {
