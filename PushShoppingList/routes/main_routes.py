@@ -4,6 +4,7 @@ from flask import request
 from flask import render_template
 
 from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
+from PushShoppingList.services.recipe_url_service import recipe_url_rows
 from PushShoppingList.services.shopping_list_service import load_items
 from PushShoppingList.services.shopping_list_service import save_items
 
@@ -62,7 +63,7 @@ def index():
         message="",
         raw_items="\n".join(items),
         items=items,
-        current_urls=[],
+        current_urls=recipe_url_rows(),
         home_address={
             "street": "5905 Arlo Drive",
             "apartment": "Apt 2213",

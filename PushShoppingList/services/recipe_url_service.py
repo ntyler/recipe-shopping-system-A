@@ -1,0 +1,64 @@
+from pathlib import Path
+from urllib.parse import urlparse
+
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+URLS_FILE = BASE_DIR / "urls.txt"
+
+
+def load_recipe_urls():
+    if not URLS_FILE.exists():
+        return []
+
+    return [
+        line.strip()
+        for line in URLS_FILE.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+
+def save_recipe_urls(urls):
+    cleaned_urls = []
+    seen = set()
+
+    for url in urls:
+        url = str(url or "").strip()
+
+        if url and url not in seen:
+            cleaned_urls.append(url)
+            seen.add(url)
+
+    URLS_FILE.write_text(
+        "\n".join(cleaned_urls) + ("\n" if cleaned_urls else ""),
+        encoding="utf-8",
+    )
+
+
+def add_recipe_urls(urls):
+    save_recipe_urls(load_recipe_urls() + list(urls))
+
+
+def remove_recipe_url(url):
+    target = str(url or "").strip()
+    save_recipe_urls([
+        existing_url
+        for existing_url in load_recipe_urls()
+        if existing_url != target
+    ])
+
+
+def recipe_url_rows():
+    return [
+        {
+            "url": url,
+            "name": recipe_url_name(url),
+        }
+        for url in load_recipe_urls()
+    ]
+
+
+def recipe_url_name(url):
+    parsed = urlparse(url)
+    path_name = parsed.path.strip("/").split("/")[-1]
+    name = path_name or parsed.netloc or url
+    return name.replace("-", " ").replace("_", " ").title()

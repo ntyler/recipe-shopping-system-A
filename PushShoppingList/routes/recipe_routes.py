@@ -3,21 +3,13 @@ from flask import jsonify
 from flask import redirect
 from flask import request
 
-from pathlib import Path
-
 from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
 from PushShoppingList.services.recipe_extract_service import extract_recipe_from_url
+from PushShoppingList.services.recipe_url_service import add_recipe_urls
+from PushShoppingList.services.recipe_url_service import remove_recipe_url
 from PushShoppingList.services.shopping_list_service import add_items
 
 recipe_bp = Blueprint("recipe_bp", __name__)
-
-PROJECT_DIR = Path(__file__).resolve().parents[2]
-
-URLS_FILE = (
-    PROJECT_DIR /
-    "PushShoppingList" /
-    "urls.txt"
-)
 
 
 @recipe_bp.route("/extract_recipe", methods=["POST"])
@@ -30,10 +22,7 @@ def extract_recipe_route():
         if line.strip()
     ]
 
-    URLS_FILE.write_text(
-        "\n".join(urls),
-        encoding="utf-8",
-    )
+    add_recipe_urls(urls)
 
     extracted_any = False
 
@@ -56,10 +45,7 @@ def api_extract_recipe_route():
 
     url = str(data.get("url", "")).strip()
 
-    URLS_FILE.write_text(
-        url,
-        encoding="utf-8",
-    )
+    add_recipe_urls([url])
 
     result = extract_recipe_from_url(url)
 
@@ -70,3 +56,10 @@ def api_extract_recipe_route():
     sort_ingredients()
 
     return jsonify(result)
+
+
+@recipe_bp.route("/remove_recipe", methods=["POST"])
+def remove_recipe_route():
+    remove_recipe_url(request.form.get("url", ""))
+
+    return redirect("/")
