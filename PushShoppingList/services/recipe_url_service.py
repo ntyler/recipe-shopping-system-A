@@ -1,13 +1,19 @@
 from pathlib import Path
+from threading import Lock
 from urllib.parse import urlparse
 from urllib.parse import urlunparse
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 URLS_FILE = BASE_DIR / "urls.txt"
+url_file_lock = Lock()
 
 
 def load_recipe_urls():
+    return read_recipe_urls()
+
+
+def read_recipe_urls():
     if not URLS_FILE.exists():
         return []
 
@@ -19,6 +25,11 @@ def load_recipe_urls():
 
 
 def save_recipe_urls(urls):
+    with url_file_lock:
+        write_recipe_urls(urls)
+
+
+def write_recipe_urls(urls):
     cleaned_urls = []
     seen = set()
 
@@ -37,16 +48,18 @@ def save_recipe_urls(urls):
 
 
 def add_recipe_urls(urls):
-    save_recipe_urls(load_recipe_urls() + list(urls))
+    with url_file_lock:
+        write_recipe_urls(read_recipe_urls() + list(urls))
 
 
 def remove_recipe_url(url):
     target = normalize_recipe_url_key(url)
-    save_recipe_urls([
-        existing_url
-        for existing_url in load_recipe_urls()
-        if normalize_recipe_url_key(existing_url) != target
-    ])
+    with url_file_lock:
+        write_recipe_urls([
+            existing_url
+            for existing_url in read_recipe_urls()
+            if normalize_recipe_url_key(existing_url) != target
+        ])
 
 
 def recipe_url_rows():

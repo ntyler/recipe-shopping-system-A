@@ -33,7 +33,6 @@ def extract_recipe_route():
         if line.strip()
     ]
 
-    add_recipe_urls(urls)
     job_id = new_job_id()
     start_progress(urls, job_id=job_id)
 
@@ -47,6 +46,7 @@ def extract_recipe_route():
             ingredients = result.get("ingredients", [])
             add_items(ingredients)
             save_ingredients_for_recipe(url, ingredients)
+            add_recipe_urls([url])
             extracted_any = True
             mark_url_done(job_id, urls, index, len(ingredients))
         else:
@@ -76,7 +76,6 @@ def api_extract_recipe_route():
     if not urls:
         urls = [url]
 
-    add_recipe_urls([url])
     mark_url_running(job_id, urls, index)
 
     result = extract_recipe_from_url(url)
@@ -90,6 +89,7 @@ def api_extract_recipe_route():
     ingredients = result.get("ingredients", [])
     add_items(ingredients)
     save_ingredients_for_recipe(url, ingredients)
+    add_recipe_urls([url])
     progress = mark_url_done(job_id, urls, index, len(ingredients))
     finish_batch_if_ready(job_id, progress)
 
