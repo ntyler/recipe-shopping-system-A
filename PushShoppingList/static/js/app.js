@@ -215,6 +215,107 @@ async function saveHomeAddress(event) {
     return false;
 }
 
+async function saveStoreOptions(event) {
+    event.preventDefault();
+
+    const form = event.currentTarget;
+    await saveStoreOptionsForm(form);
+    return false;
+}
+
+async function saveStoreToggle(toggle) {
+    const form = document.getElementById("store-options-form");
+
+    if (!form) {
+        return false;
+    }
+
+    await saveStoreOptionsForm(form);
+
+    return false;
+}
+
+async function saveStoreOptionsForm(form) {
+    try {
+        await submitStoreForm(form);
+        await refreshStoreMarkup();
+    } catch (err) {
+        console.warn("Unable to save store options in the background.", err);
+    }
+}
+
+async function addStore(event) {
+    event.preventDefault();
+
+    const form = event.currentTarget;
+    const submitButton = form.querySelector('button[type="submit"]');
+
+    if (submitButton) {
+        submitButton.disabled = true;
+    }
+
+    try {
+        await submitStoreForm(form);
+        await refreshStoreMarkup();
+    } catch (err) {
+        console.warn("Unable to add store in the background.", err);
+    } finally {
+        if (submitButton) {
+            submitButton.disabled = false;
+        }
+    }
+
+    return false;
+}
+
+async function submitStoreForm(form) {
+    const formData = new FormData(form);
+    formData.set("ajax", "1");
+
+    const response = await fetch(form.action, {
+        method: "POST",
+        headers: {
+            "X-Requested-With": "fetch",
+        },
+        body: formData,
+    });
+
+    const contentType = response.headers.get("content-type") || "";
+    const data = contentType.includes("application/json")
+        ? await response.json()
+        : null;
+
+    if (!response.ok || (data && !data.ok)) {
+        throw new Error((data && data.error) || "Store update failed.");
+    }
+}
+
+async function refreshStoreMarkup() {
+    const response = await fetch(window.location.href, {
+        cache: "no-store",
+    });
+
+    if (!response.ok) {
+        throw new Error("Unable to refresh store markup.");
+    }
+
+    const html = await response.text();
+    const nextPage = new DOMParser().parseFromString(html, "text/html");
+    replaceSectionFromPage(nextPage, "#storeOptionsSection");
+    replaceSectionFromPage(nextPage, "#sectionView");
+    restoreCardCollapseState();
+    restoreOpenStorePanels();
+}
+
+function replaceSectionFromPage(nextPage, selector) {
+    const currentSection = document.querySelector(selector);
+    const nextSection = nextPage.querySelector(selector);
+
+    if (currentSection && nextSection) {
+        currentSection.replaceWith(nextSection);
+    }
+}
+
 function buildAddressSummaryFromForm(form) {
     const streetInput = form.querySelector('[name="address_street"]');
     const apartmentInput = form.querySelector('[name="address_apartment"]');

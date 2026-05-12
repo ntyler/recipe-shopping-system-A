@@ -122,19 +122,12 @@ def update_store(store_key, form_data):
     store["urlStoreSelector"] = str(
         form_data.get("urlStoreSelector", store.get("urlStoreSelector", "")) or ""
     ).strip()
-    save_store_settings(settings)
-    return settings
-
-
-def update_store_credentials(store_key, form_data):
-    settings = load_store_settings()
-    store = settings["stores"].get(store_key)
-
-    if not store:
-        return settings
-
-    store["username"] = str(form_data.get("store_username", "") or "").strip()
-    store["password"] = str(form_data.get("store_password", "") or "").strip()
+    store["username"] = str(
+        form_data.get("store_username", store.get("username", "")) or ""
+    ).strip()
+    store["password"] = str(
+        form_data.get("store_password", store.get("password", "")) or ""
+    ).strip()
     save_store_settings(settings)
     return settings
 

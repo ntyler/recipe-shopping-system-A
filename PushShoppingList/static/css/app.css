@@ -163,8 +163,7 @@ body {
         }
 
         .store-edit-btn,
-        .store-delete-btn,
-        .store-credentials-btn {
+        .store-delete-btn {
             width: 86px;
             min-width: 86px;
             max-width: 86px;
@@ -198,18 +197,6 @@ body {
 
         .store-delete-btn:hover {
             background: #991b1b;
-        }
-
-        .store-credentials-btn {
-            width: 126px;
-            min-width: 126px;
-            max-width: 126px;
-            flex-basis: 126px;
-            background: #0f766e;
-        }
-
-        .store-credentials-btn:hover {
-            background: #0d9488;
         }
 
         .store-location-details {
@@ -1846,13 +1833,6 @@ body {
                 min-width: 86px;
                 max-width: 86px;
                 flex: 0 0 86px;
-            }
-
-            .store-credentials-btn {
-                width: 136px;
-                min-width: 136px;
-                max-width: 136px;
-                flex: 0 0 136px;
             }
 
             .store-location-details {
