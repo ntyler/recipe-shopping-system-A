@@ -144,17 +144,6 @@ def delete_store(store_key):
     return settings
 
 
-def reset_enabled_stores():
-    settings = load_store_settings()
-    settings["enabled_stores"] = [
-        key
-        for key in DEFAULT_ENABLED_STORES
-        if key in settings["stores"]
-    ]
-    save_store_settings(settings)
-    return settings
-
-
 def save_store_settings(settings):
     STORE_SETTINGS_FILE.write_text(
         json.dumps(settings, indent=2, ensure_ascii=False),

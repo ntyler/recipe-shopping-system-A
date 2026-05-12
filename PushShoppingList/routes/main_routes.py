@@ -7,6 +7,7 @@ from flask import render_template
 from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
 from PushShoppingList.services.home_address_service import load_home_address
 from PushShoppingList.services.home_address_service import save_home_address
+from PushShoppingList.services.item_state_service import load_item_state
 from PushShoppingList.services.recipe_url_service import recipe_url_rows
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
 from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
@@ -84,12 +85,70 @@ def recipe_view_rows(recipe_urls, recipe_ingredients):
     return rows
 
 
+def build_store_view(items, item_state, available_stores, enabled_stores):
+    section_order = []
+    item_sections = {}
+    current_section = "MISC"
+
+    for item in items:
+        if is_section_header(item):
+            current_section = item.replace("===", "").strip()
+            if current_section not in section_order:
+                section_order.append(current_section)
+            continue
+
+        item_sections[item] = current_section
+
+    if "MISC" not in section_order:
+        section_order.append("MISC")
+
+    store_keys = [
+        store_key
+        for store_key in enabled_stores
+        if store_key in available_stores
+    ]
+    buckets = {store_key: {} for store_key in store_keys}
+    buckets["unselected"] = {}
+
+    for item, section in item_sections.items():
+        selected_store = item_state.get(normalize(item), {}).get("store")
+        bucket_key = selected_store if selected_store in store_keys else "unselected"
+        buckets[bucket_key].setdefault(section, []).append(item)
+
+    display_rows = []
+
+    for store_key in store_keys + ["unselected"]:
+        sections = buckets.get(store_key, {})
+        cleaned_sections = []
+
+        for section in section_order:
+            section_items = sections.get(section, [])
+            if section_items:
+                cleaned_sections.append({
+                    "name": section,
+                    "items": sorted(section_items, key=normalize),
+                })
+
+        if not cleaned_sections:
+            continue
+
+        store = available_stores.get(store_key, {})
+        display_rows.append({
+            "key": store_key,
+            "label": store.get("label", "Unselected" if store_key == "unselected" else store_key.title()),
+            "sections": cleaned_sections,
+        })
+
+    return display_rows
+
+
 @main_bp.route("/")
 def index():
     items = load_items()
     store_settings = load_store_settings()
     recipe_urls = recipe_url_rows()
     recipe_ingredients = load_recipe_ingredients()
+    item_state = load_item_state()
 
     return render_template(
         "index.html",
@@ -101,6 +160,13 @@ def index():
         available_stores=store_settings["stores"],
         enabled_stores=store_settings["enabled_stores"],
         shopping_items=shopping_items_only(items),
+        item_state=item_state,
+        store_view=build_store_view(
+            items,
+            item_state,
+            store_settings["stores"],
+            store_settings["enabled_stores"],
+        ),
         recipe_view_rows=recipe_view_rows(recipe_urls, recipe_ingredients),
         normalize=normalize,
         is_section_header=is_section_header,

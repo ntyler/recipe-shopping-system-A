@@ -23,9 +23,10 @@
                             {% set store = available_stores.get(store_key) %}
                             {% if store %}
                                 <button type="button"
-                                        class="store-btn"
+                                        class="store-btn {% if item_state.get(normalize(item), {}).get('store') == store_key %}active{% endif %}"
                                         data-store="{{ store_key }}"
-                                        data-store-url="{{ store.url }}">
+                                        data-store-url="{{ store.url }}"
+                                        data-item-key="{{ normalize(item) }}">
                                     {{ store.label }}
                                 </button>
                             {% endif %}
@@ -48,33 +49,52 @@
 
 <div id="storeView" style="display:none;">
     <h2 class="items-title">Items by Store</h2>
-    {% if shopping_items and enabled_stores %}
-        {% for store_key in enabled_stores %}
-            {% set store = available_stores.get(store_key) %}
-            {% if store %}
-                <div class="recipe-view-card">
-                    <div class="recipe-view-title">{{ store.label }}</div>
-                    {% for item in shopping_items %}
-                        <div class="row" data-key="store-{{ store_key }}-{{ normalize(item) }}">
-                            <div class="item">
-                                <div class="item-main-line">
-                                    <input type="checkbox" class="item-check">
-                                    <span class="item-text">{{ item }}</span>
-                                </div>
-                            </div>
+    {% if store_view %}
+        {% for store_group in store_view %}
+            <div class="store-header-row collapsible-header"
+                 data-collapse-scope="store"
+                 data-collapse-key="store|{{ store_group.key }}">
+                <span class="header-title">{{ store_group.label.upper() }}</span>
+                <span class="header-toggle-icon">Hide ^</span>
+            </div>
 
-                            <div class="item-actions">
-                                <button type="button"
-                                        class="store-btn"
-                                        data-store="{{ store_key }}"
-                                        data-store-url="{{ store.url }}">
-                                    Search {{ store.label }}
-                                </button>
+            {% for section in store_group.sections %}
+                <div class="store-section-header collapsible-header"
+                     data-collapse-scope="store-section"
+                     data-collapse-key="store-section|{{ store_group.key }}|{{ section.name }}">
+                    <span class="header-title">
+                        {{ section.name }}
+                        <span class="header-count">({{ section["items"]|length }})</span>
+                    </span>
+                    <span class="header-toggle-icon">Hide ^</span>
+                </div>
+
+                {% for item in section["items"] %}
+                    <div class="row" data-key="{{ normalize(item) }}">
+                        <div class="item">
+                            <div class="item-main-line">
+                                <input type="checkbox" class="item-check">
+                                <span class="item-text">{{ item }}</span>
                             </div>
                         </div>
-                    {% endfor %}
-                </div>
-            {% endif %}
+
+                        <div class="item-actions">
+                            {% for store_key in enabled_stores %}
+                                {% set store = available_stores.get(store_key) %}
+                                {% if store %}
+                                    <button type="button"
+                                            class="store-btn {% if item_state.get(normalize(item), {}).get('store') == store_key %}active{% endif %}"
+                                            data-store="{{ store_key }}"
+                                            data-store-url="{{ store.url }}"
+                                            data-item-key="{{ normalize(item) }}">
+                                        {{ store.label }}
+                                    </button>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endfor %}
+            {% endfor %}
         {% endfor %}
     {% else %}
         <div class="recipe-view-card">
@@ -107,9 +127,10 @@
                                     {% set store = available_stores.get(store_key) %}
                                     {% if store %}
                                         <button type="button"
-                                                class="store-btn"
+                                                class="store-btn {% if item_state.get(normalize(item), {}).get('store') == store_key %}active{% endif %}"
                                                 data-store="{{ store_key }}"
-                                                data-store-url="{{ store.url }}">
+                                                data-store-url="{{ store.url }}"
+                                                data-item-key="{{ normalize(item) }}">
                                             {{ store.label }}
                                         </button>
                                     {% endif %}

@@ -271,14 +271,30 @@ function restoreItemCheckState() {
 
 function bindStoreButtons() {
     document.querySelectorAll(".store-btn").forEach(button => {
-        button.addEventListener("click", () => {
-            button.classList.toggle("active");
+        button.addEventListener("click", async () => {
+            const row = button.closest(".row");
+            const itemKey = button.dataset.itemKey || (row ? row.dataset.key : "");
+            const storeKey = button.dataset.store || "";
+            const wasActive = button.classList.contains("active");
+
+            if (row) {
+                row.querySelectorAll(".store-btn").forEach(rowButton => {
+                    rowButton.classList.remove("active");
+                });
+            }
+
+            if (!wasActive) {
+                button.classList.add("active");
+            }
+
+            if (itemKey) {
+                await saveItemStoreSelection(itemKey, wasActive ? "" : storeKey);
+            }
 
             if (localStorage.getItem("open-store-urls") === "0") {
                 return;
             }
 
-            const row = button.closest(".row");
             const itemText = row ? row.querySelector(".item-text") : null;
             const searchBaseUrl = button.dataset.storeUrl || "";
             const ingredient = itemText ? itemText.textContent.trim() : "";
@@ -290,27 +306,68 @@ function bindStoreButtons() {
     });
 }
 
+async function saveItemStoreSelection(itemKey, storeKey) {
+    const formData = new FormData();
+    formData.set("item_key", itemKey);
+    formData.set("store_key", storeKey);
+    formData.set("ajax", "1");
+
+    try {
+        const response = await fetch("/save_item_store", {
+            method: "POST",
+            headers: {
+                "X-Requested-With": "fetch",
+            },
+            body: formData,
+        });
+
+        if (!response.ok) {
+            throw new Error("Unable to save item store.");
+        }
+
+        await refreshStoreMarkup();
+    } catch (err) {
+        console.warn("Unable to save the selected store.", err);
+    }
+}
+
 function bindSectionHeaderToggles() {
-    document.querySelectorAll("#sectionView .collapsible-header").forEach(header => {
+    document.querySelectorAll("#sectionView .collapsible-header, #storeView .collapsible-header").forEach(header => {
         const title = header.querySelector(".header-title");
+        const collapseKey = header.dataset.collapseKey || (title ? normalizeSectionKey(title.textContent) : "");
         const icon = header.querySelector(".header-toggle-icon");
-        const sectionKey = title ? normalizeSectionKey(title.textContent) : "";
-        const isCollapsed = localStorage.getItem(`section-collapsed:${sectionKey}`) === "1";
+        const isCollapsed = localStorage.getItem(`section-collapsed:${collapseKey}`) === "1";
 
         setSectionCollapsed(header, icon, isCollapsed);
 
         header.addEventListener("click", () => {
             const shouldCollapse = !(icon && icon.textContent.trim().toLowerCase().startsWith("show"));
             setSectionCollapsed(header, icon, shouldCollapse);
-            localStorage.setItem(`section-collapsed:${sectionKey}`, shouldCollapse ? "1" : "0");
+            localStorage.setItem(`section-collapsed:${collapseKey}`, shouldCollapse ? "1" : "0");
         });
     });
 }
 
 function setSectionCollapsed(header, icon, collapsed) {
+    const scope = header.dataset.collapseScope || "section";
     let sibling = header.nextElementSibling;
 
-    while (sibling && !sibling.classList.contains("section-header-row")) {
+    while (sibling) {
+        if (scope === "section" && sibling.classList.contains("section-header-row")) {
+            break;
+        }
+
+        if (scope === "store" && sibling.classList.contains("store-header-row")) {
+            break;
+        }
+
+        if (
+            scope === "store-section" &&
+            (sibling.classList.contains("store-section-header") || sibling.classList.contains("store-header-row"))
+        ) {
+            break;
+        }
+
         sibling.classList.toggle("collapsed-by-header", collapsed);
         sibling = sibling.nextElementSibling;
     }

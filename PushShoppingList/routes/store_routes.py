@@ -5,8 +5,9 @@ from flask import request
 
 from PushShoppingList.services.store_settings_service import add_store
 from PushShoppingList.services.store_settings_service import delete_store
+from PushShoppingList.services.item_state_service import reset_item_stores
+from PushShoppingList.services.item_state_service import save_item_store
 from PushShoppingList.services.store_settings_service import load_store_settings
-from PushShoppingList.services.store_settings_service import reset_enabled_stores
 from PushShoppingList.services.store_settings_service import save_enabled_stores
 from PushShoppingList.services.store_settings_service import update_store
 
@@ -84,12 +85,27 @@ def delete_store_route(store_key):
 
 @store_bp.route("/reset_stores", methods=["POST"])
 def reset_stores_route():
-    settings = reset_enabled_stores()
+    reset_item_stores()
 
     if wants_json_response():
         return jsonify({
             "ok": True,
-            "enabled_stores": settings["enabled_stores"],
+        })
+
+    return redirect("/")
+
+
+@store_bp.route("/save_item_store", methods=["POST"])
+def save_item_store_route():
+    item_key = str(request.form.get("item_key", "") or "").strip()
+    store_key = str(request.form.get("store_key", "") or "").strip()
+
+    if item_key:
+        save_item_store(item_key, store_key)
+
+    if wants_json_response():
+        return jsonify({
+            "ok": True,
         })
 
     return redirect("/")
