@@ -11,7 +11,7 @@
                 </div>
 
                 <form method="POST"
-                      action="/remove_recipe"
+                      action="{{ url_for('recipe_bp.remove_recipe_route') }}"
                       class="remove-recipe-form"
                       onsubmit="saveScroll(); return confirm('Remove this recipe URL?');">
                     <input type="hidden" name="url" value="{{ recipe.url }}">

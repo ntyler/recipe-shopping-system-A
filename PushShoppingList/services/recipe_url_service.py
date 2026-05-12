@@ -1,5 +1,6 @@
 from pathlib import Path
 from urllib.parse import urlparse
+from urllib.parse import urlunparse
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -23,10 +24,11 @@ def save_recipe_urls(urls):
 
     for url in urls:
         url = str(url or "").strip()
+        key = normalize_recipe_url_key(url)
 
-        if url and url not in seen:
+        if url and key not in seen:
             cleaned_urls.append(url)
-            seen.add(url)
+            seen.add(key)
 
     URLS_FILE.write_text(
         "\n".join(cleaned_urls) + ("\n" if cleaned_urls else ""),
@@ -39,11 +41,11 @@ def add_recipe_urls(urls):
 
 
 def remove_recipe_url(url):
-    target = str(url or "").strip()
+    target = normalize_recipe_url_key(url)
     save_recipe_urls([
         existing_url
         for existing_url in load_recipe_urls()
-        if existing_url != target
+        if normalize_recipe_url_key(existing_url) != target
     ])
 
 
@@ -62,3 +64,26 @@ def recipe_url_name(url):
     path_name = parsed.path.strip("/").split("/")[-1]
     name = path_name or parsed.netloc or url
     return name.replace("-", " ").replace("_", " ").title()
+
+
+def normalize_recipe_url_key(url):
+    url = str(url or "").strip()
+
+    if not url:
+        return ""
+
+    parsed = urlparse(url)
+
+    if not parsed.scheme or not parsed.netloc:
+        return url.rstrip("/")
+
+    normalized_path = parsed.path.rstrip("/")
+
+    return urlunparse((
+        parsed.scheme.lower(),
+        parsed.netloc.lower(),
+        normalized_path,
+        "",
+        parsed.query,
+        "",
+    ))

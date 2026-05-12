@@ -60,6 +60,9 @@ def api_extract_recipe_route():
 
 @recipe_bp.route("/remove_recipe", methods=["POST"])
 def remove_recipe_route():
-    remove_recipe_url(request.form.get("url", ""))
+    data = request.get_json(silent=True) or {}
+    url = request.form.get("url") or data.get("url", "")
+
+    remove_recipe_url(url)
 
     return redirect("/")
