@@ -5,7 +5,7 @@
         <strong>PushShoppingList/shopping_stores_Results.json</strong>.
     </p>
 
-    <form method="POST" action="/save_home_address" onsubmit="saveScroll();">
+    <form id="homeAddressForm" method="POST" action="/save_home_address" onsubmit="return saveHomeAddress(event);">
         <div class="address-grid">
             <input name="address_street" value="{{ home_address.street }}" placeholder="Street, e.g. 5905 Arlo Drive">
             <input name="address_apartment" value="{{ home_address.apartment }}" placeholder="Apartment, e.g. Apt 2213">
@@ -16,7 +16,7 @@
 
         <div class="address-summary-box">
             <span class="store-detail-label">Current full address</span>
-            {{ home_address.full_address }}
+            <span id="homeAddressSummary">{{ home_address.full_address }}</span>
         </div>
 
         <div class="address-actions-grid">

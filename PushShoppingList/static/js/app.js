@@ -60,6 +60,89 @@ function hideProductsOverlay() {
     }
 }
 
+async function saveHomeAddress(event) {
+    const form = event.currentTarget;
+    const submitter = event.submitter || document.activeElement;
+    const action = submitter ? submitter.value : "";
+
+    if (action === "run_find_nearest") {
+        saveScroll();
+        return true;
+    }
+
+    event.preventDefault();
+
+    const summary = document.getElementById("homeAddressSummary");
+    const saveButton = form.querySelector('button[name="action"][value="save"]');
+    const formData = new FormData(form);
+    formData.set("ajax", "1");
+
+    if (summary) {
+        summary.textContent = buildAddressSummaryFromForm(form);
+    }
+
+    if (saveButton) {
+        saveButton.disabled = true;
+    }
+
+    try {
+        const response = await fetch(form.action, {
+            method: "POST",
+            headers: {
+                "X-Requested-With": "fetch",
+            },
+            body: formData,
+        });
+        const contentType = response.headers.get("content-type") || "";
+
+        if (!contentType.includes("application/json")) {
+            if (!response.ok) {
+                throw new Error("Unable to save address.");
+            }
+
+            return false;
+        }
+
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error(data.error || "Unable to save address.");
+        }
+
+        if (summary) {
+            summary.textContent = data.home_address.full_address || "";
+        }
+    } catch (err) {
+        console.warn("Unable to save address in the background.", err);
+    } finally {
+        if (saveButton) {
+            saveButton.disabled = false;
+        }
+    }
+
+    return false;
+}
+
+function buildAddressSummaryFromForm(form) {
+    const streetInput = form.querySelector('[name="address_street"]');
+    const apartmentInput = form.querySelector('[name="address_apartment"]');
+    const cityInput = form.querySelector('[name="address_city"]');
+    const stateInput = form.querySelector('[name="address_state"]');
+    const zipInput = form.querySelector('[name="address_zip"]');
+
+    const street = streetInput ? streetInput.value.trim() : "";
+    const apartment = apartmentInput ? apartmentInput.value.trim() : "";
+    const city = cityInput ? cityInput.value.trim() : "";
+    const state = stateInput ? stateInput.value.trim() : "";
+    const zip = zipInput ? zipInput.value.trim() : "";
+
+    const streetLine = [street, apartment].filter(Boolean).join(" ");
+    const cityStateZip = [state, zip].filter(Boolean).join(" ");
+    const cityLine = [city, cityStateZip].filter(Boolean).join(", ");
+
+    return [streetLine, cityLine].filter(Boolean).join(", ");
+}
+
 document.addEventListener("DOMContentLoaded", function () {
     restoreScroll();
     startExtractionProgressPolling();

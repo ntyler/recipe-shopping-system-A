@@ -1,9 +1,12 @@
 from flask import Blueprint
+from flask import jsonify
 from flask import redirect
 from flask import request
 from flask import render_template
 
 from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
+from PushShoppingList.services.home_address_service import load_home_address
+from PushShoppingList.services.home_address_service import save_home_address
 from PushShoppingList.services.recipe_url_service import recipe_url_rows
 from PushShoppingList.services.shopping_list_service import load_items
 from PushShoppingList.services.shopping_list_service import save_items
@@ -64,14 +67,7 @@ def index():
         raw_items="\n".join(items),
         items=items,
         current_urls=recipe_url_rows(),
-        home_address={
-            "street": "5905 Arlo Drive",
-            "apartment": "Apt 2213",
-            "city": "Indianapolis",
-            "state": "IN",
-            "zip": "46237",
-            "full_address": "5905 Arlo Drive Apt 2213, Indianapolis, IN 46237",
-        },
+        home_address=load_home_address(),
         available_stores=DEFAULT_STORES,
         enabled_stores=["meijer", "aldi"],
         normalize=normalize,
@@ -105,3 +101,19 @@ def sort_list():
     sort_ingredients()
 
     return redirect("/")
+
+
+@main_bp.route("/save_home_address", methods=["POST"])
+def save_home_address_route():
+    saved_address = save_home_address(request.form)
+
+    if (
+        request.headers.get("X-Requested-With") == "fetch"
+        or request.form.get("ajax") == "1"
+    ):
+        return jsonify({
+            "ok": True,
+            "home_address": saved_address,
+        })
+
+    return redirect("/#home-address-section")
