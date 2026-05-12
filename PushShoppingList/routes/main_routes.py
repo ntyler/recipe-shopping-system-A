@@ -72,6 +72,22 @@ def shopping_items_only(items):
     ]
 
 
+def section_counts(items):
+    counts = {}
+    current_section = None
+
+    for item in items:
+        if is_section_header(item):
+            current_section = item.replace("===", "").strip()
+            counts.setdefault(current_section, 0)
+            continue
+
+        if current_section:
+            counts[current_section] = counts.get(current_section, 0) + 1
+
+    return counts
+
+
 def recipe_view_rows(recipe_urls):
     rows = []
 
@@ -301,6 +317,7 @@ def index():
         enabled_stores=store_settings["enabled_stores"],
         shopping_items=shopping_items_only(items),
         item_state=item_state,
+        section_counts=section_counts(items),
         store_view=build_store_view(
             items,
             item_state,

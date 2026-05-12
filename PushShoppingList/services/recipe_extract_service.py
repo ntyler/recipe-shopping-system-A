@@ -396,19 +396,105 @@ STRICT RULES:
 ========================
 INGREDIENT RULES
 ========================
-- Split into: quantity, unit, ingredient, preparation when possible.
+- ALWAYS split ingredients into: quantity, unit, ingredient, preparation.
+- quantity and unit should only be null when truly absent from the recipe text.
 - Preserve original_text exactly.
 - The ingredient field must be the unique grocery item name only.
 - Do NOT include quantity, unit, package size, metric conversion, or preparation in the ingredient field.
-- Examples:
-  - "1 egg" -> ingredient "egg"
-  - "125 g all-purpose flour" -> ingredient "all-purpose flour"
-  - "4 Tablespoons unsalted butter, melted" -> ingredient "unsalted butter", preparation "melted"
-  - "1 teaspoon vanilla extract" -> ingredient "vanilla extract"
+- Do NOT include words like "divided", "chopped", "melted", "shredded", "to taste", or "optional" in the ingredient field.
+- Put preparation words in preparation.
+- If an ingredient is optional, set optional = true.
+
+- Preserve recipe usage modifiers in preparation:
+  - "divided"
+  - "room temperature"
+  - "softened"
+  - "cold"
+  - "drained"
+  - "rinsed"
+
+INGREDIENT CONFIDENCE RULES:
+- Only extract ingredients that are explicitly present in the recipe.
+- Do NOT infer missing ingredients from general cooking knowledge.
+- Do NOT add water, oil, salt, or pepper unless explicitly mentioned.
+- If uncertain whether something is an ingredient or instruction text, exclude it.
+
+IMPORTANT QUANTITY EXTRACTION RULES:
+- ALWAYS attempt to extract quantity and unit.
+- If ingredient quantities appear anywhere in the page, including ingredient lists, instruction steps, notes, fillings, sauces, dough sections, headings, or recipe cards, extract them.
+- NEVER discard quantities when they are present.
+- Preserve fractional values exactly as strings.
+- Preserve ranges exactly as strings.
+- Preserve package sizes.
+
+Examples:
+- "1 egg"
+  -> quantity = "1"
+  -> unit = null
+  -> ingredient = "egg"
+
+- "125 g all-purpose flour"
+  -> quantity = "125"
+  -> unit = "g"
+  -> ingredient = "all-purpose flour"
+
+- "4 Tablespoons unsalted butter, melted"
+  -> quantity = "4"
+  -> unit = "Tablespoons"
+  -> ingredient = "unsalted butter"
+  -> preparation = "melted"
+
+- "1 teaspoon vanilla extract"
+  -> quantity = "1"
+  -> unit = "teaspoon"
+  -> ingredient = "vanilla extract"
+
+- "salt and pepper to taste"
+  -> quantity = null
+  -> unit = null
+  -> ingredient = "salt"
+  -> preparation = "to taste"
+
+- If the webpage only contains instructions and no formal ingredient list:
+  - infer ingredients from cooking steps
+  - still extract quantities whenever they appear in the instructions
+
 - If the same grocery item appears more than once because the page lists both US and metric measurements, keep only one ingredient object for that grocery item.
 - Assign store_section and store_section_order.
 - Use the grocery section that best matches the ingredient's real grocery store placement.
 - Do NOT add ingredients that are not in the recipe.
+- Combine duplicate ingredients when they clearly refer to the same grocery item.
+- Keep the most complete quantity and preparation information.
+- Do NOT create separate entries for metric conversions of the same ingredient.
+
+- Convert unicode fractions into standard fraction strings:
+  - "½" -> "1/2"
+  - "¼" -> "1/4"
+  - "¾" -> "3/4"
+
+- Preserve mixed fractions exactly:
+  - "1 1/2"
+  - "2 3/4"
+
+- Preserve quantity ranges exactly:
+  - "2-4"
+  - "3 to 5"
+
+- If multiple units are shown for the same ingredient:
+  - prefer the primary US measurement
+  - ignore duplicate metric conversions when they refer to the same ingredient
+
+NORMALIZATION RULES:
+- Singularize grocery ingredient names when appropriate.
+  - "eggs" -> "egg"
+  - "lemons" -> "lemon"
+
+- Preserve branded or compound ingredient names exactly:
+  - "cream of mushroom soup"
+  - "soy sauce"
+  - "olive oil"
+
+- Do NOT over-normalize ingredient names.
 
 CLASSIFICATION GUIDANCE:
 - Eggs, milk, butter, yogurt, cream, cheese, and sour cream go in DAIRY & EGGS.
@@ -490,6 +576,11 @@ COOKING INSTRUCTION RULES
 - If instructions are split into sections such as "Make the sauce", "Cook the pasta", or "Assemble", preserve that section name.
 - If no cooking instructions are found, return an empty list [].
 - For each step, include "equipment_used" as a list of equipment names used in that step.
+
+INSTRUCTION DEDUPE RULES:
+- Remove duplicate instruction steps.
+- Prefer the cleanest and most complete version of repeated instructions.
+- Preserve original recipe order.
 
 ========================
 NUTRITION RULES
