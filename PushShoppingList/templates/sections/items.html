@@ -109,37 +109,154 @@
         {% for recipe in recipe_view_rows %}
             <div class="recipe-view-card">
                 <div class="recipe-view-title">
+                    Recipe {{ recipe.number }}:
                     <a href="{{ recipe.url }}" target="_blank">{{ recipe.name }}</a>
                 </div>
 
-                {% if recipe.ingredients %}
-                    {% for item in recipe.ingredients %}
-                        <div class="row" data-key="recipe-{{ normalize(recipe.url) }}-{{ normalize(item) }}">
-                            <div class="item">
-                                <div class="item-main-line">
-                                    <input type="checkbox" class="item-check">
-                                    <span class="item-text">{{ item }}</span>
+                {% if recipe.servings %}
+                    <div class="recipe-meta">Servings: {{ recipe.servings }}</div>
+                {% endif %}
+
+                <button type="button"
+                        class="detail-toggle"
+                        data-detail-key="equipment|{{ recipe.url }}">
+                    <span>Equipment</span>
+                    <span class="detail-toggle-icon">Show v</span>
+                </button>
+
+                <div class="detail-content collapsed" data-detail-content="equipment|{{ recipe.url }}">
+                    {% if recipe.equipment_items %}
+                        <ul class="recipe-detail-list">
+                            {% for equipment_item in recipe.equipment_items %}
+                                <li>
+                                    <div class="recipe-task-row">
+                                        <input type="checkbox"
+                                               class="recipe-task-check"
+                                               data-task-key="equipment|{{ recipe.url }}|{{ loop.index }}">
+                                        <span class="recipe-task-text">{{ equipment_item }}</span>
+                                    </div>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <div class="recipe-detail-muted">No equipment found.</div>
+                    {% endif %}
+                </div>
+
+                <div class="recipe-divider"></div>
+
+                <button type="button"
+                        class="detail-toggle"
+                        data-detail-key="instructions|{{ recipe.url }}">
+                    <span>Instructions</span>
+                    <span class="detail-toggle-icon">Show v</span>
+                </button>
+
+                <div class="detail-content collapsed" data-detail-content="instructions|{{ recipe.url }}">
+                    {% if recipe.instruction_items %}
+                        <ol class="recipe-detail-list">
+                            {% for instruction in recipe.instruction_items %}
+                                <li>
+                                    <div class="recipe-task-row">
+                                        <input type="checkbox"
+                                               class="recipe-task-check"
+                                               data-task-key="instruction|{{ recipe.url }}|{{ loop.index }}">
+                                        <span class="recipe-task-text">{{ instruction }}</span>
+                                    </div>
+                                </li>
+                            {% endfor %}
+                        </ol>
+                    {% else %}
+                        <div class="recipe-detail-muted">No instructions found.</div>
+                    {% endif %}
+                </div>
+
+                <div class="recipe-divider"></div>
+
+                <button type="button"
+                        class="nutrition-toggle"
+                        data-nutrition-key="nutrition|{{ recipe.url }}">
+                    <span>Nutrition</span>
+                    <span class="nutrition-toggle-icon">Show v</span>
+                </button>
+
+                <div class="nutrition-content collapsed" data-nutrition-content="nutrition|{{ recipe.url }}">
+                    {% if recipe.nutrition_items %}
+                        <div class="nutrition-grid">
+                            {% for nutrition_item in recipe.nutrition_items %}
+                                <div class="nutrition-item">
+                                    <div class="nutrition-label">{{ nutrition_item.label }}</div>
+                                    <div class="nutrition-value">{{ nutrition_item.value }}</div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="recipe-detail-muted">No nutrition found.</div>
+                    {% endif %}
+                </div>
+
+                {% if recipe["sections"] %}
+                    <div class="store-section-header">INGREDIENTS</div>
+
+                    {% for section_name, section_items in recipe["sections"].items() %}
+                        <div class="store-section-header collapsible-header"
+                             data-collapse-scope="recipe-section"
+                             data-collapse-key="recipe-section|{{ recipe.url }}|{{ section_name }}">
+                            <span class="header-title">
+                                {{ section_name }}
+                                <span class="header-count">({{ section_items|length }})</span>
+                            </span>
+                            <span class="header-toggle-icon">Hide ^</span>
+                        </div>
+
+                        {% for recipe_item in section_items %}
+                            {% set item_key = normalize(recipe_item.name) %}
+                            {% set state = item_state.get(item_key, {}) %}
+
+                            <div class="row" data-key="{{ item_key }}">
+                                <div class="item">
+                                    <div class="item-main-line">
+                                        <input type="checkbox" class="item-check">
+                                        <span class="item-text">{{ recipe_item.name }}</span>
+                                    </div>
+
+                                    <div class="source-line">
+                                        {% if recipe_item.quantity %}
+                                            <span>{{ recipe_item.quantity }} {{ recipe_item.unit or "" }}</span>
+                                        {% endif %}
+
+                                        {% if recipe_item.url %}
+                                            <a class="source-link" href="{{ recipe_item.url }}" target="_blank">
+                                                (recipe {{ recipe.number }})
+                                            </a>
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                                <div class="item-actions">
+                                    {% for store_key in enabled_stores %}
+                                        {% set store = available_stores.get(store_key) %}
+                                        {% if store %}
+                                            <button type="button"
+                                                    class="store-btn {% if state.get('store') == store_key %}active{% endif %}"
+                                                    data-store="{{ store_key }}"
+                                                    data-store-url="{{ store.url }}"
+                                                    data-item-key="{{ item_key }}">
+                                                {{ store.label }}
+                                            </button>
+                                        {% endif %}
+                                    {% endfor %}
+
+                                    <form method="POST" action="/find_products" class="product-search-form" onsubmit="saveScroll()">
+                                        <input type="hidden" name="item" value="{{ recipe_item.name }}">
+                                        <button type="submit" class="product-search-btn">Products</button>
+                                    </form>
                                 </div>
                             </div>
-
-                            <div class="item-actions">
-                                {% for store_key in enabled_stores %}
-                                    {% set store = available_stores.get(store_key) %}
-                                    {% if store %}
-                                        <button type="button"
-                                                class="store-btn {% if item_state.get(normalize(item), {}).get('store') == store_key %}active{% endif %}"
-                                                data-store="{{ store_key }}"
-                                                data-store-url="{{ store.url }}"
-                                                data-item-key="{{ normalize(item) }}">
-                                            {{ store.label }}
-                                        </button>
-                                    {% endif %}
-                                {% endfor %}
-                            </div>
-                        </div>
+                        {% endfor %}
                     {% endfor %}
                 {% else %}
-                    <div class="source-line">No saved ingredients for this recipe yet.</div>
+                    <div class="source-line">No ingredients found for this recipe.</div>
                 {% endif %}
             </div>
         {% endfor %}

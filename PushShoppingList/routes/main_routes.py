@@ -1,3 +1,5 @@
+import json
+
 from flask import Blueprint
 from flask import jsonify
 from flask import redirect
@@ -10,7 +12,8 @@ from PushShoppingList.services.home_address_service import save_home_address
 from PushShoppingList.services.item_state_service import load_item_state
 from PushShoppingList.services.recipe_url_service import recipe_url_rows
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
-from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
+from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
+from PushShoppingList.services.recipe_extract_service import STORE_SECTION_ORDER
 from PushShoppingList.services.shopping_list_service import load_items
 from PushShoppingList.services.shopping_list_service import save_items
 from PushShoppingList.services.store_settings_service import load_store_settings
@@ -69,20 +72,158 @@ def shopping_items_only(items):
     ]
 
 
-def recipe_view_rows(recipe_urls, recipe_ingredients):
+def recipe_view_rows(recipe_urls):
     rows = []
 
-    for recipe in recipe_urls:
-        recipe_data = recipe_ingredients.get(normalize_recipe_url_key(recipe["url"]), {})
-        ingredients = recipe_data.get("ingredients", [])
+    for index, recipe in enumerate(recipe_urls, start=1):
+        recipe_data = load_saved_recipe_output(recipe["url"])
+        sections = build_recipe_sections(recipe_data)
 
         rows.append({
-            "name": recipe["name"],
+            "number": index,
+            "name": recipe_data.get("recipe_title") or recipe["name"],
             "url": recipe["url"],
-            "ingredients": ingredients,
+            "servings": recipe_data.get("servings"),
+            "equipment_items": normalize_text_list(recipe_data.get("equipment", [])),
+            "instruction_items": normalize_instruction_items(recipe_data.get("instructions", [])),
+            "nutrition_items": normalize_nutrition_items(recipe_data.get("nutrition", {})),
+            "sections": sections,
         })
 
     return rows
+
+
+def load_saved_recipe_output(recipe_url):
+    recipe_key = normalize_recipe_url_key(recipe_url)
+
+    for json_path in OUTPUT_FOLDER.glob("*.json"):
+        if json_path.name == "sorted_ingredients.json":
+            continue
+
+        try:
+            data = json.loads(json_path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+
+        if normalize_recipe_url_key(data.get("source_url", "")) == recipe_key:
+            return data
+
+    return {}
+
+
+def build_recipe_sections(recipe_data):
+    sections = {section: [] for section in STORE_SECTION_ORDER.keys()}
+
+    for ingredient in recipe_data.get("ingredients", []) or []:
+        if not isinstance(ingredient, dict):
+            continue
+
+        name = str(ingredient.get("ingredient", "") or "").strip()
+        if not name:
+            continue
+
+        section = str(ingredient.get("store_section", "") or "MISC").strip().upper()
+        if section not in sections:
+            section = "MISC"
+
+        sections[section].append({
+            "name": name,
+            "quantity": ingredient.get("quantity"),
+            "unit": ingredient.get("unit"),
+            "url": recipe_data.get("source_url"),
+        })
+
+    return {
+        section: sorted(items, key=lambda item: normalize(item["name"]))
+        for section, items in sections.items()
+        if items
+    }
+
+
+def normalize_text_list(value):
+    if not value:
+        return []
+
+    if isinstance(value, str):
+        return [value]
+
+    if not isinstance(value, list):
+        return []
+
+    items = []
+    for item in value:
+        if isinstance(item, str):
+            text = item.strip()
+        elif isinstance(item, dict):
+            text = str(item.get("name") or item.get("text") or "").strip()
+        else:
+            text = str(item or "").strip()
+
+        if text:
+            items.append(text)
+
+    return items
+
+
+def normalize_instruction_items(value):
+    if not isinstance(value, list):
+        return normalize_text_list(value)
+
+    items = []
+    for item in value:
+        if isinstance(item, dict):
+            text = str(item.get("instruction") or item.get("text") or "").strip()
+        else:
+            text = str(item or "").strip()
+
+        if text:
+            items.append(text)
+
+    return items
+
+
+def normalize_nutrition_items(nutrition):
+    if not isinstance(nutrition, dict):
+        return []
+
+    labels = {
+        "serving_basis": "Serving basis",
+        "calories": "Calories",
+        "carbohydrates": "Carbohydrates",
+        "protein": "Protein",
+        "fat": "Fat",
+        "saturated_fat": "Saturated fat",
+        "polyunsaturated_fat": "Polyunsaturated fat",
+        "monounsaturated_fat": "Monounsaturated fat",
+        "trans_fat": "Trans fat",
+        "cholesterol": "Cholesterol",
+        "sodium": "Sodium",
+        "potassium": "Potassium",
+        "fiber": "Fiber",
+        "sugar": "Sugar",
+        "vitamin_a": "Vitamin A",
+        "vitamin_c": "Vitamin C",
+        "calcium": "Calcium",
+        "iron": "Iron",
+    }
+
+    items = [
+        {"label": label, "value": value}
+        for key, label in labels.items()
+        for value in [nutrition.get(key)]
+        if value
+    ]
+
+    other = nutrition.get("other", [])
+    if isinstance(other, list):
+        for item in other:
+            if isinstance(item, dict):
+                label = item.get("label") or item.get("name") or "Other"
+                value = item.get("value") or item.get("amount")
+                if value:
+                    items.append({"label": label, "value": value})
+
+    return items
 
 
 def build_store_view(items, item_state, available_stores, enabled_stores):
@@ -147,7 +288,6 @@ def index():
     items = load_items()
     store_settings = load_store_settings()
     recipe_urls = recipe_url_rows()
-    recipe_ingredients = load_recipe_ingredients()
     item_state = load_item_state()
 
     return render_template(
@@ -167,7 +307,7 @@ def index():
             store_settings["stores"],
             store_settings["enabled_stores"],
         ),
-        recipe_view_rows=recipe_view_rows(recipe_urls, recipe_ingredients),
+        recipe_view_rows=recipe_view_rows(recipe_urls),
         normalize=normalize,
         is_section_header=is_section_header,
     )

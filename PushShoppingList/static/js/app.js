@@ -332,7 +332,7 @@ async function saveItemStoreSelection(itemKey, storeKey) {
 }
 
 function bindSectionHeaderToggles() {
-    document.querySelectorAll("#sectionView .collapsible-header, #storeView .collapsible-header").forEach(header => {
+    document.querySelectorAll("#sectionView .collapsible-header, #storeView .collapsible-header, #recipeView .collapsible-header").forEach(header => {
         const title = header.querySelector(".header-title");
         const collapseKey = header.dataset.collapseKey || (title ? normalizeSectionKey(title.textContent) : "");
         const icon = header.querySelector(".header-toggle-icon");
@@ -368,6 +368,13 @@ function setSectionCollapsed(header, icon, collapsed) {
             break;
         }
 
+        if (
+            scope === "recipe-section" &&
+            (sibling.classList.contains("store-section-header") || sibling.classList.contains("recipe-view-card"))
+        ) {
+            break;
+        }
+
         sibling.classList.toggle("collapsed-by-header", collapsed);
         sibling = sibling.nextElementSibling;
     }
@@ -375,6 +382,84 @@ function setSectionCollapsed(header, icon, collapsed) {
     if (icon) {
         icon.textContent = collapsed ? "Show v" : "Hide ^";
     }
+}
+
+function bindRecipeDetailToggles() {
+    document.querySelectorAll(".detail-toggle").forEach(button => {
+        const key = button.dataset.detailKey;
+        const content = document.querySelector(`[data-detail-content="${cssEscape(key)}"]`);
+        const icon = button.querySelector(".detail-toggle-icon");
+
+        if (!content) {
+            return;
+        }
+
+        const collapsed = localStorage.getItem(`detail-collapsed:${key}`) !== "0";
+        content.classList.toggle("collapsed", collapsed);
+        if (icon) {
+            icon.textContent = collapsed ? "Show v" : "Hide ^";
+        }
+
+        button.addEventListener("click", () => {
+            const isCollapsed = content.classList.toggle("collapsed");
+            localStorage.setItem(`detail-collapsed:${key}`, isCollapsed ? "1" : "0");
+            if (icon) {
+                icon.textContent = isCollapsed ? "Show v" : "Hide ^";
+            }
+        });
+    });
+
+    document.querySelectorAll(".nutrition-toggle").forEach(button => {
+        const key = button.dataset.nutritionKey;
+        const content = document.querySelector(`[data-nutrition-content="${cssEscape(key)}"]`);
+        const icon = button.querySelector(".nutrition-toggle-icon");
+
+        if (!content) {
+            return;
+        }
+
+        const collapsed = localStorage.getItem(`nutrition-collapsed:${key}`) !== "0";
+        content.classList.toggle("collapsed", collapsed);
+        if (icon) {
+            icon.textContent = collapsed ? "Show v" : "Hide ^";
+        }
+
+        button.addEventListener("click", () => {
+            const isCollapsed = content.classList.toggle("collapsed");
+            localStorage.setItem(`nutrition-collapsed:${key}`, isCollapsed ? "1" : "0");
+            if (icon) {
+                icon.textContent = isCollapsed ? "Show v" : "Hide ^";
+            }
+        });
+    });
+}
+
+function bindRecipeTaskChecks() {
+    document.querySelectorAll(".recipe-task-check").forEach(checkbox => {
+        const key = checkbox.dataset.taskKey;
+        const taskRow = checkbox.closest(".recipe-task-row");
+        const text = taskRow ? taskRow.querySelector(".recipe-task-text") : null;
+
+        checkbox.checked = localStorage.getItem(`recipe-task-checked:${key}`) === "1";
+        if (text) {
+            text.classList.toggle("checked-item-text", checkbox.checked);
+        }
+
+        checkbox.addEventListener("change", () => {
+            localStorage.setItem(`recipe-task-checked:${key}`, checkbox.checked ? "1" : "0");
+            if (text) {
+                text.classList.toggle("checked-item-text", checkbox.checked);
+            }
+        });
+    });
+}
+
+function cssEscape(value) {
+    if (window.CSS && CSS.escape) {
+        return CSS.escape(value);
+    }
+
+    return String(value || "").replace(/"/g, '\\"');
 }
 
 function normalizeSectionKey(text) {
@@ -610,6 +695,8 @@ async function refreshStoreMarkup() {
     restoreItemCheckState();
     bindStoreButtons();
     bindSectionHeaderToggles();
+    bindRecipeDetailToggles();
+    bindRecipeTaskChecks();
     window.scrollTo(scrollX, scrollY);
 }
 
@@ -650,6 +737,8 @@ document.addEventListener("DOMContentLoaded", function () {
     restoreItemCheckState();
     bindStoreButtons();
     bindSectionHeaderToggles();
+    bindRecipeDetailToggles();
+    bindRecipeTaskChecks();
     startExtractionProgressPolling();
 });
 
