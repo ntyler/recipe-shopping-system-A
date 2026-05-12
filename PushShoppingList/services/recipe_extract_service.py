@@ -225,6 +225,10 @@ def build_structured_ingredients(raw_ingredients):
 def classify_store_section(ingredient):
     normalized = normalize_ingredient_key(ingredient)
 
+    for keyword, section in INGREDIENT_STORE_SECTIONS.items():
+        if keyword in normalized:
+            return section
+
     produce_words = (
         "basil",
         "lemon",
@@ -239,10 +243,6 @@ def classify_store_section(ingredient):
 
     if any(word in normalized for word in produce_words):
         return "PRODUCE"
-
-    for keyword, section in INGREDIENT_STORE_SECTIONS.items():
-        if keyword in normalized:
-            return section
 
     return "MISC"
 

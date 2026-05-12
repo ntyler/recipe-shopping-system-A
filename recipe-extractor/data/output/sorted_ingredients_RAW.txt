@@ -1,7 +1,11 @@
 {
   "sorted_ingredients": [
     "=== PRODUCE ===",
+    "lemon zest",
+    "fresh basil",
     "=== DAIRY & EGGS ===",
+    "whole milk ricotta",
+    "parmesan cheese*",
     "unsalted butter",
     "plain yogurt",
     "egg",
@@ -12,9 +16,15 @@
     "all-purpose flour",
     "baking powder",
     "baking soda",
-    "mini chocolate chips",
     "=== SPICES & SEASONINGS ===",
+    "Salt and pepper to taste",
     "kosher salt",
-    "cinnamon"
+    "cinnamon",
+    "ground nutmeg",
+    "=== CANNED ===",
+    "Homemade Tomato Sauce",
+    "Parmesan and/or basil",
+    "=== SNACKS ===",
+    "mini chocolate chips"
   ]
 }

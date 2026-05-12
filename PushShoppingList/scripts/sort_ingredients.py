@@ -6,6 +6,8 @@ from pathlib import Path
 from openai import OpenAI
 
 from PushShoppingList.services.recipe_extract_service import (
+    STORE_SECTION_ORDER,
+    classify_store_section,
     normalize_ingredient_for_shopping_list,
     normalize_ingredient_key,
 )
@@ -104,6 +106,68 @@ def remove_empty_sections(items):
         cleaned_items.append(item)
 
     return cleaned_items
+
+
+def build_locally_sorted_items(ingredient_list):
+    sections = {
+        section: []
+        for section in sorted(
+            STORE_SECTION_ORDER,
+            key=STORE_SECTION_ORDER.get,
+        )
+    }
+
+    for ingredient in ingredient_list:
+        section = classify_store_section(ingredient)
+        sections.setdefault(section, []).append(ingredient)
+
+    sorted_items = []
+
+    for section in sorted(
+        sections,
+        key=lambda value: STORE_SECTION_ORDER.get(value, 999),
+    ):
+        items = sections[section]
+
+        if not items:
+            continue
+
+        sorted_items.append(f"=== {section} ===")
+        sorted_items.extend(items)
+
+    return sorted_items
+
+
+def save_locally_sorted_items(sorted_items):
+    data = {
+        "sorted_ingredients": sorted_items,
+    }
+
+    SORTED_JSON_FILE.write_text(
+        json.dumps(data, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    SORTED_TXT_FILE.write_text(
+        "\n".join(sorted_items),
+        encoding="utf-8",
+    )
+
+    if WRITE_BACK_TO_SHOPPING_LIST:
+        items_to_write = sorted_items if SAVE_SECTION_HEADERS_TO_SHOPPING_LIST else [
+            item
+            for item in sorted_items
+            if not is_section_header(item)
+        ]
+        SHOPPING_LIST_FILE.write_text(
+            "\n".join(items_to_write),
+            encoding="utf-8",
+        )
+
+    print(f"Updated shopping list: {SHOPPING_LIST_FILE}")
+    print(f"Saved sorted JSON: {SORTED_JSON_FILE}")
+    print(f"Saved sorted TXT: {SORTED_TXT_FILE}")
+
+    return data
 
 
 def is_section_header(text):
@@ -297,10 +361,6 @@ def save_sorted_response(response_text, original_items):
 
 
 def main():
-    if not os.getenv("OPENAI_API_KEY"):
-        print("Missing OPENAI_API_KEY environment variable.")
-        return None
-
     ingredient_list = load_ingredient_list()
 
     if not ingredient_list:
@@ -314,21 +374,8 @@ def main():
         return None
 
     print(f"Loaded {len(ingredient_list)} ingredients from shopping_list.txt.")
-
-    prompt_text = build_sort_prompt(ingredient_list)
-
-    try:
-        print("Sending sort request to OpenAI API...")
-        response_text = send_prompt_to_openai(prompt_text)
-
-        RAW_RESPONSE_FILE.write_text(response_text, encoding="utf-8")
-
-        return save_sorted_response(response_text, ingredient_list)
-
-    except Exception as exc:
-        print("API sorting failed.")
-        print(exc)
-        return None
+    sorted_items = build_locally_sorted_items(ingredient_list)
+    return save_locally_sorted_items(sorted_items)
 
 
 if __name__ == "__main__":
