@@ -36,13 +36,22 @@
                            data-recipe-url="{{ recipe.url }}">
                 </div>
 
-                <form method="POST"
-                      action="{{ url_for('recipe_bp.remove_recipe_route') }}"
-                      class="remove-recipe-form"
-                      onsubmit="saveScroll(); return confirm('Remove this recipe URL?');">
-                    <input type="hidden" name="url" value="{{ recipe.url }}">
-                    <button type="submit" class="remove-recipe-btn">Remove</button>
-                </form>
+                <div class="recipe-row-actions">
+                    <button type="button"
+                            class="edit-recipe-btn"
+                            data-recipe-url="{{ recipe.url }}"
+                            onclick="openRecipeEditor(this)">
+                        Edit
+                    </button>
+
+                    <form method="POST"
+                          action="{{ url_for('recipe_bp.remove_recipe_route') }}"
+                          class="remove-recipe-form"
+                          onsubmit="saveScroll(); return confirm('Remove this recipe URL?');">
+                        <input type="hidden" name="url" value="{{ recipe.url }}">
+                        <button type="submit" class="remove-recipe-btn">Remove</button>
+                    </form>
+                </div>
             </div>
         {% endfor %}
         </div>
@@ -55,4 +64,79 @@
     {% else %}
         <div class="log-box">No current recipe URLs yet.</div>
     {% endif %}
+</div>
+
+<div id="recipeEditModal"
+     class="recipe-edit-backdrop"
+     aria-hidden="true">
+    <div class="recipe-edit-dialog" role="dialog" aria-modal="true" aria-labelledby="recipeEditTitle">
+        <form id="recipeEditForm" onsubmit="return saveRecipeEditor(event)">
+            <div class="recipe-edit-header">
+                <h2 id="recipeEditTitle">Edit Recipe</h2>
+                <button type="button" class="recipe-edit-close" onclick="closeRecipeEditor()">Close</button>
+            </div>
+
+            <input type="hidden" name="original_url" id="recipeEditOriginalUrl">
+
+            <div id="recipeEditStatus" class="recipe-edit-status"></div>
+
+            <div class="recipe-edit-grid">
+                <label>
+                    <span>Display Name</span>
+                    <input type="text" name="display_name" id="recipeEditDisplayName">
+                </label>
+                <label>
+                    <span>Recipe Title</span>
+                    <input type="text" name="recipe_title" id="recipeEditTitleInput">
+                </label>
+                <label class="recipe-edit-wide">
+                    <span>Source URL</span>
+                    <input type="text" name="source_url" id="recipeEditSourceUrl">
+                </label>
+                <label>
+                    <span>Quantity</span>
+                    <input type="number" min="1" step="1" name="quantity" id="recipeEditQuantity">
+                </label>
+                <label>
+                    <span>Servings</span>
+                    <input type="text" name="servings" id="recipeEditServings">
+                </label>
+            </div>
+
+            <section class="recipe-edit-section">
+                <div class="recipe-edit-section-header">
+                    <h3>Ingredients</h3>
+                    <button type="button" onclick="addRecipeIngredientRow()">Add Ingredient</button>
+                </div>
+                <div id="recipeEditIngredients" class="recipe-edit-ingredients"></div>
+            </section>
+
+            <section class="recipe-edit-section">
+                <label>
+                    <span>Equipment</span>
+                    <textarea id="recipeEditEquipment" rows="4"></textarea>
+                </label>
+            </section>
+
+            <section class="recipe-edit-section">
+                <label>
+                    <span>Instructions</span>
+                    <textarea id="recipeEditInstructions" rows="7"></textarea>
+                </label>
+            </section>
+
+            <section class="recipe-edit-section">
+                <div class="recipe-edit-section-header">
+                    <h3>Nutrition</h3>
+                    <button type="button" onclick="addRecipeNutritionRow()">Add Nutrition</button>
+                </div>
+                <div id="recipeEditNutrition" class="recipe-edit-nutrition"></div>
+            </section>
+
+            <div class="recipe-edit-actions">
+                <button type="button" class="recipe-edit-cancel" onclick="closeRecipeEditor()">Cancel</button>
+                <button type="submit" class="recipe-edit-save">Save Recipe</button>
+            </div>
+        </form>
+    </div>
 </div>

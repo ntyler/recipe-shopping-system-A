@@ -19,6 +19,8 @@ from PushShoppingList.services.extraction_progress_service import request_cancel
 from PushShoppingList.services.extraction_progress_service import start_progress
 from PushShoppingList.services.recipe_extract_service import extract_recipe_from_upload
 from PushShoppingList.services.recipe_extract_service import extract_recipe_from_url
+from PushShoppingList.services.recipe_edit_service import load_editable_recipe
+from PushShoppingList.services.recipe_edit_service import save_editable_recipe
 from PushShoppingList.services.recipe_ingredient_service import remove_recipe_and_unused_ingredients
 from PushShoppingList.services.recipe_ingredient_service import save_ingredients_for_recipe
 from PushShoppingList.services.recipe_url_service import add_recipe_urls
@@ -237,6 +239,28 @@ def api_recipe_name_route():
         "url": url,
         "name": name,
     })
+
+
+@recipe_bp.route("/api/recipe", methods=["GET", "POST"])
+def api_recipe_route():
+    if request.method == "GET":
+        url = str(request.args.get("url", "") or "").strip()
+
+        if not url:
+            return jsonify({"ok": False, "error": "Recipe URL is required."}), 400
+
+        return jsonify(load_editable_recipe(url))
+
+    data = request.get_json(silent=True) or {}
+    original_url = str(data.get("original_url", "") or "").strip()
+
+    if not original_url:
+        return jsonify({"ok": False, "error": "Recipe URL is required."}), 400
+
+    result = save_editable_recipe(original_url, data.get("recipe", {}))
+    status = 200 if result.get("ok") else 400
+
+    return jsonify(result), status
 
 
 @recipe_bp.route("/remove_recipe", methods=["POST"])

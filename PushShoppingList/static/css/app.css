@@ -1318,6 +1318,24 @@ body {
             box-shadow: 0 0 0 1px rgba(0, 204, 102, 0.35);
         }
 
+        .recipe-row-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        .edit-recipe-btn {
+            margin: 0;
+            padding: 7px 12px;
+            border-radius: 6px;
+            background: #155da8;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
         .save-recipe-qty-btn {
             width: 100%;
             margin-top: 12px;
@@ -1330,6 +1348,176 @@ body {
         .save-recipe-qty-btn:disabled {
             cursor: wait;
             opacity: 0.75;
+        }
+
+        .recipe-edit-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 11000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+            background: rgba(0, 0, 0, 0.72);
+            box-sizing: border-box;
+        }
+
+        .recipe-edit-backdrop.open {
+            display: flex;
+        }
+
+        .recipe-edit-dialog {
+            width: min(1040px, 100%);
+            max-height: min(92vh, 900px);
+            overflow: auto;
+            border: 1px solid #59544a;
+            border-radius: 10px;
+            background: #111414;
+            color: #fff;
+            box-shadow: 0 22px 70px rgba(0, 0, 0, 0.62);
+        }
+
+        .recipe-edit-dialog form {
+            margin: 0;
+            padding: 20px;
+        }
+
+        .recipe-edit-header,
+        .recipe-edit-section-header,
+        .recipe-edit-actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .recipe-edit-header {
+            margin-bottom: 14px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #333;
+        }
+
+        .recipe-edit-header h2,
+        .recipe-edit-section h3 {
+            margin: 0;
+        }
+
+        .recipe-edit-close,
+        .recipe-edit-cancel {
+            background: #333;
+        }
+
+        .recipe-edit-status {
+            display: none;
+            margin-bottom: 12px;
+            padding: 10px 12px;
+            border-radius: 6px;
+            border: 1px solid #4b5563;
+            background: #1d2325;
+            color: #dbeafe;
+            font-weight: 700;
+        }
+
+        .recipe-edit-status.visible {
+            display: block;
+        }
+
+        .recipe-edit-status.error {
+            border-color: #7f1d1d;
+            background: #2a1111;
+            color: #fecaca;
+        }
+
+        .recipe-edit-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .recipe-edit-wide {
+            grid-column: 1 / -1;
+        }
+
+        .recipe-edit-section {
+            margin-top: 18px;
+        }
+
+        .recipe-edit-dialog label {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            color: #cbd5d1;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .recipe-edit-dialog input,
+        .recipe-edit-dialog textarea,
+        .recipe-edit-dialog select {
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid #4b5563;
+            border-radius: 6px;
+            background: #1b2021;
+            color: #fff;
+            padding: 9px 10px;
+            font-size: 14px;
+        }
+
+        .recipe-edit-dialog textarea {
+            resize: vertical;
+            line-height: 1.4;
+        }
+
+        .recipe-edit-dialog .recipe-edit-check-label {
+            align-items: center;
+        }
+
+        .recipe-edit-dialog .recipe-edit-check-label input {
+            width: 20px;
+            height: 20px;
+            margin: 8px 0 0;
+            padding: 0;
+        }
+
+        .recipe-edit-ingredient-row,
+        .recipe-edit-nutrition-row {
+            display: grid;
+            gap: 8px;
+            align-items: end;
+            margin-top: 8px;
+        }
+
+        .recipe-edit-ingredient-row {
+            grid-template-columns: minmax(70px, 0.45fr) minmax(80px, 0.5fr) minmax(140px, 1fr) minmax(150px, 1fr) minmax(110px, 0.75fr) minmax(100px, 0.7fr) minmax(120px, 0.8fr) minmax(74px, 0.35fr) auto;
+        }
+
+        .recipe-edit-nutrition-row {
+            grid-template-columns: minmax(160px, 0.8fr) minmax(180px, 1fr) auto;
+        }
+
+        .recipe-edit-remove-row {
+            min-width: 38px;
+            height: 38px;
+            margin: 0;
+            padding: 0 10px;
+            border-radius: 6px;
+            background: #8b0000;
+            font-weight: 800;
+        }
+
+        .recipe-edit-actions {
+            margin-top: 18px;
+            padding-top: 14px;
+            border-top: 1px solid #333;
+            justify-content: flex-end;
+        }
+
+        .recipe-edit-save {
+            background: #107C10;
+            font-weight: 800;
         }
 
         .recipe-quantity-update-overlay {
@@ -2548,13 +2736,19 @@ body {
                 font-size: 15px;
             }
 
-            .remove-recipe-form {
-                grid-column: 2 / 3;
+            .recipe-row-actions {
+                grid-column: 1 / -1;
                 grid-row: 4;
+                justify-content: flex-start;
+                flex-wrap: wrap;
+            }
+
+            .remove-recipe-form {
                 width: auto;
                 margin: 0;
             }
 
+            .edit-recipe-btn,
             .remove-recipe-btn {
                 width: auto;
                 min-width: 84px;
@@ -2567,6 +2761,34 @@ body {
             .save-recipe-qty-btn {
                 padding: 11px 14px;
                 font-size: 17px;
+            }
+
+            .recipe-edit-backdrop {
+                align-items: stretch;
+                padding: 10px;
+            }
+
+            .recipe-edit-dialog {
+                max-height: calc(100vh - 20px);
+            }
+
+            .recipe-edit-dialog form {
+                padding: 14px;
+            }
+
+            .recipe-edit-grid,
+            .recipe-edit-ingredient-row,
+            .recipe-edit-nutrition-row {
+                grid-template-columns: 1fr;
+            }
+
+            .recipe-edit-actions {
+                justify-content: stretch;
+                flex-direction: column-reverse;
+            }
+
+            .recipe-edit-actions button {
+                width: 100%;
             }
 
             .recipe-qty-progress-card {

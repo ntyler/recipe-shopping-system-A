@@ -21,11 +21,10 @@
         <input id="recipeMediaUploadInput"
                name="recipe_media"
                type="file"
-               accept="image/*,.txt,.md,.pdf"
                onchange="submitRecipeMediaUpload(this)"
                hidden>
         <button class="recipe-media-upload-btn" type="button" onclick="openRecipeMediaUpload()">
-            Load File
+            Extract Ingredients from Photo or Document
         </button>
         <div id="recipeMediaUploadStatus" class="recipe-media-upload-status" aria-live="polite"></div>
     </form>

@@ -725,6 +725,298 @@ function escapeHtml(value) {
     return div.innerHTML;
 }
 
+function escapeAttribute(value) {
+    return escapeHtml(value).replace(/"/g, "&quot;");
+}
+
+let recipeEditStoreSections = [];
+
+async function openRecipeEditor(button) {
+    const url = button ? button.dataset.recipeUrl || "" : "";
+    const modal = document.getElementById("recipeEditModal");
+
+    if (!url || !modal) {
+        return;
+    }
+
+    setRecipeEditStatus("Loading recipe...");
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+
+    try {
+        const response = await fetch(`/api/recipe?url=${encodeURIComponent(url)}`, {
+            cache: "no-store",
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to load recipe.");
+        }
+
+        recipeEditStoreSections = data.store_sections || [];
+        populateRecipeEditor(data.recipe, url);
+        setRecipeEditStatus("");
+    } catch (err) {
+        console.warn("Unable to open recipe editor.", err);
+        setRecipeEditStatus("Unable to load recipe.", true);
+    }
+}
+
+function closeRecipeEditor() {
+    const modal = document.getElementById("recipeEditModal");
+
+    if (modal) {
+        modal.classList.remove("open");
+        modal.setAttribute("aria-hidden", "true");
+        document.body.classList.remove("modal-open");
+    }
+}
+
+function populateRecipeEditor(recipe, originalUrl) {
+    setValue("recipeEditOriginalUrl", originalUrl);
+    setValue("recipeEditDisplayName", recipe.display_name || "");
+    setValue("recipeEditTitleInput", recipe.recipe_title || "");
+    setValue("recipeEditSourceUrl", recipe.source_url || originalUrl);
+    setValue("recipeEditQuantity", recipe.quantity || "1");
+    setValue("recipeEditServings", recipe.servings || "");
+    setValue("recipeEditEquipment", (recipe.equipment || []).join("\n"));
+    setValue("recipeEditInstructions", (recipe.instructions || []).join("\n"));
+
+    const ingredientWrap = document.getElementById("recipeEditIngredients");
+    const nutritionWrap = document.getElementById("recipeEditNutrition");
+
+    if (ingredientWrap) {
+        ingredientWrap.innerHTML = "";
+        (recipe.ingredients || []).forEach(item => addRecipeIngredientRow(item));
+        if (!recipe.ingredients || !recipe.ingredients.length) {
+            addRecipeIngredientRow();
+        }
+    }
+
+    if (nutritionWrap) {
+        nutritionWrap.innerHTML = "";
+        (recipe.nutrition || []).forEach(item => addRecipeNutritionRow(item));
+        if (!recipe.nutrition || !recipe.nutrition.length) {
+            addRecipeNutritionRow();
+        }
+    }
+}
+
+function setValue(id, value) {
+    const element = document.getElementById(id);
+
+    if (element) {
+        element.value = value;
+    }
+}
+
+function setRecipeEditStatus(message, isError = false) {
+    const status = document.getElementById("recipeEditStatus");
+
+    if (!status) {
+        return;
+    }
+
+    status.textContent = message || "";
+    status.classList.toggle("visible", Boolean(message));
+    status.classList.toggle("error", Boolean(isError));
+}
+
+function addRecipeIngredientRow(item = {}) {
+    const wrap = document.getElementById("recipeEditIngredients");
+
+    if (!wrap) {
+        return;
+    }
+
+    const row = document.createElement("div");
+    row.className = "recipe-edit-ingredient-row";
+    row.innerHTML = `
+        <label>
+            <span>Qty</span>
+            <input type="text" data-field="quantity" value="${escapeAttribute(item.quantity || "")}">
+        </label>
+        <label>
+            <span>Unit</span>
+            <input type="text" data-field="unit" value="${escapeAttribute(item.unit || "")}">
+        </label>
+        <label>
+            <span>Ingredient</span>
+            <input type="text" data-field="ingredient" value="${escapeAttribute(item.ingredient || "")}">
+        </label>
+        <label>
+            <span>Original Text</span>
+            <input type="text" data-field="original_text" value="${escapeAttribute(item.original_text || "")}">
+        </label>
+        <label>
+            <span>Preparation</span>
+            <input type="text" data-field="preparation" value="${escapeAttribute(item.preparation || "")}">
+        </label>
+        <label>
+            <span>Section</span>
+            <input type="text" data-field="section" value="${escapeAttribute(item.section || "")}">
+        </label>
+        <label>
+            <span>Store Section</span>
+            <select data-field="store_section">${recipeStoreSectionOptions(item.store_section || "")}</select>
+        </label>
+        <label class="recipe-edit-check-label">
+            <span>Optional</span>
+            <input type="checkbox" data-field="optional" ${item.optional ? "checked" : ""}>
+        </label>
+        <button type="button" class="recipe-edit-remove-row" aria-label="Remove ingredient" onclick="removeRecipeEditRow(this)">X</button>
+    `;
+    wrap.appendChild(row);
+}
+
+function recipeStoreSectionOptions(selected) {
+    const selectedValue = String(selected || "").toUpperCase();
+    const sections = recipeEditStoreSections.length ? recipeEditStoreSections : ["MISC"];
+
+    return sections.map(section => {
+        const value = String(section || "");
+        const isSelected = value.toUpperCase() === selectedValue ? " selected" : "";
+        return `<option value="${escapeAttribute(value)}"${isSelected}>${escapeHtml(value)}</option>`;
+    }).join("");
+}
+
+function addRecipeNutritionRow(item = {}) {
+    const wrap = document.getElementById("recipeEditNutrition");
+
+    if (!wrap) {
+        return;
+    }
+
+    const row = document.createElement("div");
+    row.className = "recipe-edit-nutrition-row";
+    row.innerHTML = `
+        <label>
+            <span>Label</span>
+            <input type="text" data-field="key" value="${escapeAttribute(item.key || "")}">
+        </label>
+        <label>
+            <span>Value</span>
+            <input type="text" data-field="value" value="${escapeAttribute(item.value || "")}">
+        </label>
+        <button type="button" class="recipe-edit-remove-row" aria-label="Remove nutrition" onclick="removeRecipeEditRow(this)">X</button>
+    `;
+    wrap.appendChild(row);
+}
+
+function removeRecipeEditRow(button) {
+    const row = button ? button.closest(".recipe-edit-ingredient-row, .recipe-edit-nutrition-row") : null;
+
+    if (row) {
+        row.remove();
+    }
+}
+
+async function saveRecipeEditor(event) {
+    if (event) {
+        event.preventDefault();
+    }
+
+    const form = document.getElementById("recipeEditForm");
+    const saveButton = form ? form.querySelector(".recipe-edit-save") : null;
+
+    if (!form) {
+        return false;
+    }
+
+    if (saveButton) {
+        saveButton.disabled = true;
+        saveButton.textContent = "Saving...";
+    }
+
+    setRecipeEditStatus("Saving recipe...");
+
+    try {
+        const payload = collectRecipeEditorPayload();
+        const response = await fetch("/api/recipe", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to save recipe.");
+        }
+
+        closeRecipeEditor();
+        await refreshStoreMarkup();
+        showRecipeQuantityUpdatedMessage("", "", "", "Recipe updated.");
+    } catch (err) {
+        console.warn("Unable to save recipe.", err);
+        setRecipeEditStatus("Unable to save recipe.", true);
+    } finally {
+        if (saveButton) {
+            saveButton.disabled = false;
+            saveButton.textContent = "Save Recipe";
+        }
+    }
+
+    return false;
+}
+
+function collectRecipeEditorPayload() {
+    const originalUrl = document.getElementById("recipeEditOriginalUrl").value || "";
+    const quantity = Math.max(1, parseInt(document.getElementById("recipeEditQuantity").value || "1", 10) || 1);
+
+    return {
+        original_url: originalUrl,
+        recipe: {
+            display_name: document.getElementById("recipeEditDisplayName").value.trim(),
+            recipe_title: document.getElementById("recipeEditTitleInput").value.trim(),
+            source_url: document.getElementById("recipeEditSourceUrl").value.trim(),
+            quantity,
+            servings: document.getElementById("recipeEditServings").value.trim(),
+            ingredients: collectRecipeIngredientRows(),
+            equipment: textareaLines("recipeEditEquipment"),
+            instructions: textareaLines("recipeEditInstructions"),
+            nutrition: collectRecipeNutritionRows(),
+        },
+    };
+}
+
+function collectRecipeIngredientRows() {
+    return [...document.querySelectorAll("#recipeEditIngredients .recipe-edit-ingredient-row")]
+        .map(row => fieldValuesFromRow(row))
+        .filter(item => item.ingredient || item.original_text);
+}
+
+function collectRecipeNutritionRows() {
+    return [...document.querySelectorAll("#recipeEditNutrition .recipe-edit-nutrition-row")]
+        .map(row => fieldValuesFromRow(row))
+        .filter(item => item.key || item.value);
+}
+
+function fieldValuesFromRow(row) {
+    const item = {};
+
+    row.querySelectorAll("[data-field]").forEach(input => {
+        item[input.dataset.field] = input.type === "checkbox" ? input.checked : input.value.trim();
+    });
+
+    return item;
+}
+
+function textareaLines(id) {
+    const input = document.getElementById(id);
+
+    if (!input) {
+        return [];
+    }
+
+    return input.value
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(Boolean);
+}
+
 async function saveRecipeQuantity(input, options = {}) {
     const queuedSave = recipeQuantitySaveTimers.get(input);
 

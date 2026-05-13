@@ -5,6 +5,8 @@ import html
 import base64
 import mimetypes
 import uuid
+import zipfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import requests
@@ -1285,10 +1287,16 @@ def extract_recipe_from_upload(file_storage):
             prompt_text = build_prompt(recipe_url, page_text[:MAX_PAGE_TEXT_CHARS])
             response_text = send_prompt_to_openai(prompt_text)
         else:
-            return {
-                "ok": False,
-                "error": "Unsupported upload type. Use a photo/image, PDF, .txt, or .md recipe document.",
-            }
+            page_text = extract_text_from_generic_document(upload_path)
+
+            if not page_text.strip():
+                return {
+                    "ok": False,
+                    "error": "No readable recipe text was found in that file. Try a photo, PDF, Word document, or text-based recipe file.",
+                }
+
+            prompt_text = build_prompt(recipe_url, page_text[:MAX_PAGE_TEXT_CHARS])
+            response_text = send_prompt_to_openai(prompt_text)
 
         ok, json_data = save_json_response(recipe_url, response_text)
 
@@ -1340,6 +1348,49 @@ def extract_text_from_pdf(upload_path):
         page_text.append(page.extract_text() or "")
 
     return "\n".join(page_text)
+
+
+def extract_text_from_generic_document(upload_path):
+    suffix = upload_path.suffix.lower()
+
+    if suffix == ".docx":
+        return extract_text_from_docx(upload_path)
+
+    text = upload_path.read_text(encoding="utf-8", errors="ignore")
+
+    if suffix in {".html", ".htm"}:
+        soup = BeautifulSoup(text, "html.parser")
+        return soup.get_text("\n")
+
+    if suffix == ".rtf":
+        text = re.sub(r"\\'[0-9a-fA-F]{2}", " ", text)
+        text = re.sub(r"[{}]", " ", text)
+        text = re.sub(r"\\[a-zA-Z]+-?\d* ?", " ", text)
+
+    return text
+
+
+def extract_text_from_docx(upload_path):
+    try:
+        with zipfile.ZipFile(upload_path) as archive:
+            xml_text = archive.read("word/document.xml")
+    except Exception as exc:
+        raise RuntimeError("Could not read text from that Word document.") from exc
+
+    root = ET.fromstring(xml_text)
+    namespace = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+    paragraphs = []
+
+    for paragraph in root.findall(".//w:p", namespace):
+        text = "".join(
+            node.text or ""
+            for node in paragraph.findall(".//w:t", namespace)
+        ).strip()
+
+        if text:
+            paragraphs.append(text)
+
+    return "\n".join(paragraphs)
 
 
 def build_extract_result(recipe_url, json_data, extraction_method):
