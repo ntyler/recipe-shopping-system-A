@@ -23,6 +23,7 @@ def default_progress():
         "active": False,
         "job_id": None,
         "status": "idle",
+        "cancel_requested": False,
         "summary": "No extraction running.",
         "current_index": 0,
         "total": 0,
@@ -58,6 +59,7 @@ def start_progress(urls, job_id=None):
         "active": True,
         "job_id": job_id,
         "status": "running",
+        "cancel_requested": False,
         "summary": "Fetching recipe page and extracting ingredients.",
         "current_index": 0,
         "total": len(urls),
@@ -79,6 +81,10 @@ def start_progress(urls, job_id=None):
 
 def mark_url_running(job_id, urls, index):
     progress = ensure_job(job_id, urls)
+
+    if progress.get("job_id") != job_id or progress.get("cancel_requested"):
+        return progress
+
     progress["active"] = True
     progress["status"] = "running"
     progress["current_index"] = index
@@ -95,6 +101,9 @@ def mark_url_running(job_id, urls, index):
 def mark_url_done(job_id, urls, index, ingredients_count):
     progress = ensure_job(job_id, urls)
 
+    if progress.get("job_id") != job_id or progress.get("cancel_requested"):
+        return progress
+
     if 0 <= index < len(progress["urls"]):
         progress["urls"][index]["state"] = "done"
         progress["urls"][index]["message"] = f"done - {ingredients_count} ingredients extracted"
@@ -107,6 +116,9 @@ def mark_url_done(job_id, urls, index, ingredients_count):
 def mark_url_failed(job_id, urls, index, error):
     progress = ensure_job(job_id, urls)
 
+    if progress.get("job_id") != job_id or progress.get("cancel_requested"):
+        return progress
+
     if 0 <= index < len(progress["urls"]):
         progress["urls"][index]["state"] = "failed"
         progress["urls"][index]["message"] = f"failed - {error or 'unknown error'}"
@@ -115,10 +127,35 @@ def mark_url_failed(job_id, urls, index, error):
     return save_progress(progress)
 
 
+def request_cancel(job_id=None):
+    progress = load_progress()
+
+    if job_id and progress.get("job_id") != job_id:
+        return progress
+
+    progress["active"] = False
+    progress["status"] = "cancelled"
+    progress["cancel_requested"] = True
+    progress["summary"] = "Extraction cancelled. Use Redo Missing to run anything that did not finish."
+
+    for item in progress.get("urls", []):
+        if item.get("state") in {"waiting", "running"}:
+            item["state"] = "cancelled"
+            item["message"] = "cancelled"
+
+    progress["percent"] = progress_percent(completed_count(progress), progress.get("total", 0))
+    save_progress(progress)
+    send_ntfy("Recipe extraction cancelled", progress["summary"])
+    return progress
+
+
 def finish_progress(job_id, ok=True):
     progress = load_progress()
 
     if job_id and progress.get("job_id") != job_id:
+        return progress
+
+    if progress.get("cancel_requested"):
         return progress
 
     has_failed_url = any(
@@ -143,9 +180,24 @@ def ensure_job(job_id, urls):
     urls = [str(url).strip() for url in urls if str(url).strip()]
 
     if progress.get("job_id") != job_id or progress.get("total") != len(urls):
+        if progress.get("active") and progress.get("job_id") != job_id:
+            return progress
         progress = start_progress(urls, job_id=job_id)
 
     return progress
+
+
+def is_cancel_requested(job_id=None):
+    progress = load_progress()
+
+    if job_id and progress.get("job_id") != job_id:
+        return False
+
+    return bool(progress.get("cancel_requested"))
+
+
+def is_current_job(job_id):
+    return bool(job_id) and load_progress().get("job_id") == job_id
 
 
 def progress_percent(done_count, total):
@@ -159,7 +211,7 @@ def completed_count(progress):
     return sum(
         1
         for item in progress.get("urls", [])
-        if item.get("state") in {"done", "failed"}
+        if item.get("state") in {"done", "failed", "cancelled"}
     )
 
 

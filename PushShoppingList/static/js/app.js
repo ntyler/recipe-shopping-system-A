@@ -5,6 +5,9 @@ function saveScroll() {
 let hiddenExtractJobId = null;
 let lastRenderedExtractJobId = null;
 let extractRefreshTimer = null;
+let lastRenderedExtractProgress = null;
+let currentExtractAbortController = null;
+let cancelExtractRequested = false;
 
 function restoreScroll() {
     const scrollY = localStorage.getItem("scrollY");
@@ -756,16 +759,28 @@ async function startRecipeExtraction(event) {
         return;
     }
 
+    await startRecipeExtractionUrls(urls);
+}
+
+async function startRecipeExtractionUrls(urls) {
     showExtractionOverlay();
     const jobId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     hiddenExtractJobId = null;
     lastRenderedExtractJobId = jobId;
+    lastRenderedExtractProgress = null;
+    cancelExtractRequested = false;
 
     const list = document.getElementById("extractUrlList");
     const status = document.getElementById("extractStatusText");
     const summary = document.getElementById("extractSummary");
+    const bar = document.getElementById("extractProgressBar");
 
     list.innerHTML = "";
+    updateExtractionActionButtons({
+        active: true,
+        status: "running",
+        urls: urls.map(url => ({ url: url, state: "waiting" })),
+    });
 
     urls.forEach((url, index) => {
         const row = document.createElement("div");
@@ -793,30 +808,98 @@ async function startRecipeExtraction(event) {
 
     status.textContent = `Downloading ${urls.length} recipe${urls.length === 1 ? "" : "s"}...`;
     summary.textContent = "Fetching recipe pages and extracting ingredients.";
+    if (bar) {
+        bar.style.width = "10%";
+    }
 
-    const extractionRequests = urls.map((url, index) => {
+    for (const [index, url] of urls.entries()) {
+        if (cancelExtractRequested) {
+            break;
+        }
+
         const row = document.getElementById(`extract-url-${index}`);
-        const text = row.querySelector(".bulk-progress-text");
-        const reason = row.querySelector(".bulk-skip-reason");
+        const text = row ? row.querySelector(".bulk-progress-text") : null;
+        const reason = row ? row.querySelector(".bulk-skip-reason") : null;
 
-        reason.textContent = "extracting - Running recipe extractor...";
-        text.classList.add("active");
+        if (reason) {
+            reason.textContent = "extracting - Running recipe extractor...";
+        }
 
-        return fetch("/api/extract_recipe", {
+        if (text) {
+            text.classList.add("active");
+        }
+
+        currentExtractAbortController = new AbortController();
+
+        try {
+            await fetch("/api/extract_recipe", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                signal: currentExtractAbortController.signal,
+                body: JSON.stringify({
+                    url: url,
+                    urls: urls,
+                    index: index,
+                    job_id: jobId,
+                }),
+            });
+        } catch (err) {
+            if (!cancelExtractRequested) {
+                throw err;
+            }
+        } finally {
+            currentExtractAbortController = null;
+        }
+    }
+}
+
+async function cancelRecipeExtraction() {
+    cancelExtractRequested = true;
+
+    if (currentExtractAbortController) {
+        currentExtractAbortController.abort();
+        currentExtractAbortController = null;
+    }
+
+    if (!lastRenderedExtractJobId) {
+        return;
+    }
+
+    try {
+        await fetch("/api/cancel_extract", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
-                url: url,
-                urls: urls,
-                index: index,
-                job_id: jobId,
+                job_id: lastRenderedExtractJobId,
             }),
         });
-    });
+        await pollExtractionProgress();
+    } catch (err) {
+        // Cancel is best-effort; polling will catch the final state.
+    }
+}
 
-    await Promise.allSettled(extractionRequests);
+async function redoMissingRecipeExtraction() {
+    const progress = lastRenderedExtractProgress;
+
+    if (!progress || progress.active) {
+        return;
+    }
+
+    const missingUrls = (progress.urls || [])
+        .filter(item => item.state !== "done")
+        .map(item => item.url)
+        .filter(Boolean);
+
+    if (!missingUrls.length) {
+        return;
+    }
+
+    await startRecipeExtractionUrls(missingUrls);
 }
 
 function waitForNextPaint() {
@@ -855,6 +938,7 @@ function renderExtractionProgress(progress) {
     }
 
     lastRenderedExtractJobId = progress.job_id;
+    lastRenderedExtractProgress = progress;
 
     if (progress.active && hiddenExtractJobId !== progress.job_id) {
         showExtractionOverlay();
@@ -872,6 +956,7 @@ function renderExtractionProgress(progress) {
     status.textContent = progressStatusText(progress);
     summary.textContent = progress.summary || "Fetching recipe pages and extracting ingredients.";
     bar.style.width = `${Math.max(0, Math.min(100, progress.percent || 0))}%`;
+    updateExtractionActionButtons(progress);
 
     list.innerHTML = "";
 
@@ -902,6 +987,10 @@ function renderExtractionProgress(progress) {
             text.classList.add("done");
         }
 
+        if (item.state === "cancelled") {
+            text.classList.add("cancelled");
+        }
+
         text.textContent = `${index + 1}. ${item.url}`;
 
         const reason = document.createElement("div");
@@ -916,7 +1005,7 @@ function renderExtractionProgress(progress) {
         list.appendChild(row);
     });
 
-    if (!progress.active && (progress.status === "complete" || progress.status === "failed")) {
+    if (!progress.active && progress.status === "complete") {
         scheduleExtractionRefresh(progress.job_id);
     }
 }
@@ -930,6 +1019,10 @@ function progressStatusText(progress) {
         return "Extraction finished with errors.";
     }
 
+    if (!progress.active && progress.status === "cancelled") {
+        return "Extraction cancelled.";
+    }
+
     const total = progress.total || 0;
 
     if (!total) {
@@ -937,10 +1030,31 @@ function progressStatusText(progress) {
     }
 
     const completed = (progress.urls || []).filter(item => {
-        return item.state === "done" || item.state === "failed";
+        return item.state === "done" || item.state === "failed" || item.state === "cancelled";
     }).length;
 
     return `Downloading recipes ${completed} of ${total} complete...`;
+}
+
+function updateExtractionActionButtons(progress) {
+    const cancelBtn = document.getElementById("cancelExtractBtn");
+    const redoBtn = document.getElementById("redoMissingExtractBtn");
+
+    if (cancelBtn) {
+        cancelBtn.style.display = progress && progress.active ? "inline-flex" : "none";
+        cancelBtn.disabled = !progress || !progress.active;
+    }
+
+    if (redoBtn) {
+        const hasMissing = Boolean(
+            progress &&
+            !progress.active &&
+            (progress.urls || []).some(item => item.state !== "done")
+        );
+
+        redoBtn.style.display = hasMissing ? "inline-flex" : "none";
+        redoBtn.disabled = !hasMissing;
+    }
 }
 
 function scheduleExtractionRefresh(jobId) {

@@ -7,11 +7,14 @@ from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
 from PushShoppingList.services.extraction_progress_service import batch_has_success
 from PushShoppingList.services.extraction_progress_service import batch_is_finished
 from PushShoppingList.services.extraction_progress_service import finish_progress
+from PushShoppingList.services.extraction_progress_service import is_cancel_requested
+from PushShoppingList.services.extraction_progress_service import is_current_job
 from PushShoppingList.services.extraction_progress_service import load_progress
 from PushShoppingList.services.extraction_progress_service import mark_url_done
 from PushShoppingList.services.extraction_progress_service import mark_url_failed
 from PushShoppingList.services.extraction_progress_service import mark_url_running
 from PushShoppingList.services.extraction_progress_service import new_job_id
+from PushShoppingList.services.extraction_progress_service import request_cancel
 from PushShoppingList.services.extraction_progress_service import start_progress
 from PushShoppingList.services.recipe_extract_service import extract_recipe_from_url
 from PushShoppingList.services.recipe_ingredient_service import remove_recipe_and_unused_ingredients
@@ -39,8 +42,14 @@ def extract_recipe_route():
     extracted_any = False
 
     for index, url in enumerate(urls):
+        if is_cancel_requested(job_id):
+            break
+
         mark_url_running(job_id, urls, index)
         result = extract_recipe_from_url(url)
+
+        if is_cancel_requested(job_id):
+            break
 
         if result.get("ok"):
             ingredients = result.get("ingredients", [])
@@ -76,9 +85,18 @@ def api_extract_recipe_route():
     if not urls:
         urls = [url]
 
+    if is_cancel_requested(job_id):
+        return jsonify({"ok": False, "cancelled": True, "error": "Extraction cancelled."}), 409
+
     mark_url_running(job_id, urls, index)
 
+    if not is_current_job(job_id):
+        return jsonify({"ok": False, "cancelled": True, "error": "Extraction superseded."}), 409
+
     result = extract_recipe_from_url(url)
+
+    if is_cancel_requested(job_id) or not is_current_job(job_id):
+        return jsonify({"ok": False, "cancelled": True, "error": "Extraction cancelled."}), 409
 
     if not result.get("ok"):
         progress = mark_url_failed(job_id, urls, index, result.get("error"))
@@ -101,6 +119,16 @@ def api_extract_progress_route():
     return jsonify(load_progress())
 
 
+@recipe_bp.route("/api/cancel_extract", methods=["POST"])
+def api_cancel_extract_route():
+    data = request.get_json(silent=True) or {}
+    job_id = str(data.get("job_id") or "").strip() or None
+
+    progress = request_cancel(job_id)
+
+    return jsonify(progress)
+
+
 @recipe_bp.route("/remove_recipe", methods=["POST"])
 def remove_recipe_route():
     data = request.get_json(silent=True) or {}
@@ -113,6 +141,9 @@ def remove_recipe_route():
 
 
 def finish_batch_if_ready(job_id, progress):
+    if progress.get("cancel_requested"):
+        return
+
     if not batch_is_finished(progress):
         return
 

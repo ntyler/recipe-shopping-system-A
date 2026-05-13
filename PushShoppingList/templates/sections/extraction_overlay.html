@@ -61,6 +61,22 @@
 
         <div class="bulk-modal-actions extract-old-actions">
             <button type="button"
+                    id="redoMissingExtractBtn"
+                    class="bulk-secondary-btn extract-redo-missing-btn"
+                    onclick="redoMissingRecipeExtraction()"
+                    style="display:none;">
+                Redo Missing
+            </button>
+
+            <button type="button"
+                    id="cancelExtractBtn"
+                    class="bulk-secondary-btn extract-cancel-btn"
+                    onclick="cancelRecipeExtraction()"
+                    style="display:none;">
+                Cancel
+            </button>
+
+            <button type="button"
                     class="bulk-secondary-btn extract-bottom-hide-btn"
                     onclick="hideExtractProgressModal()">
                 Hide

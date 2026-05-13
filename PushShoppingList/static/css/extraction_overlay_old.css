@@ -238,6 +238,10 @@
     text-decoration: line-through;
 }
 
+.extract-old-url-list .bulk-progress-text.cancelled {
+    color: #b0a18a;
+}
+
 .extract-old-url-list .bulk-skip-reason {
     color: #fbbf24;
     font-size: 13px;
@@ -246,11 +250,15 @@
 }
 
 .extract-old-actions {
-    display: block;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
     margin-top: 14px;
 }
 
-.extract-bottom-hide-btn {
+.extract-bottom-hide-btn,
+.extract-cancel-btn,
+.extract-redo-missing-btn {
     width: 100%;
     margin: 0;
 
@@ -264,6 +272,24 @@
 
     font-size: 18px;
     font-weight: 700;
+    align-items: center;
+    justify-content: center;
+}
+
+.extract-cancel-btn {
+    background: #8a1414;
+}
+
+.extract-cancel-btn:hover {
+    background: #aa1d1d;
+}
+
+.extract-redo-missing-btn {
+    background: #0078D7;
+}
+
+.extract-redo-missing-btn:hover {
+    background: #1388e5;
 }
 
 .extract-bottom-hide-btn:hover {
