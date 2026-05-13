@@ -22,8 +22,8 @@
       "ingredient": "yolks",
       "preparation": null,
       "optional": false,
-      "store_section": "MISC",
-      "store_section_order": 19
+      "store_section": "DAIRY & EGGS",
+      "store_section_order": 3
     },
     {
       "section": null,
@@ -66,8 +66,8 @@
       "ingredient": "Dutch-processed cocoa powder",
       "preparation": null,
       "optional": false,
-      "store_section": "MISC",
-      "store_section_order": 19
+      "store_section": "BAKING",
+      "store_section_order": 7
     },
     {
       "section": null,
@@ -132,8 +132,8 @@
       "ingredient": "semisweet chocolate",
       "preparation": "chopped",
       "optional": false,
-      "store_section": "MISC",
-      "store_section_order": 19
+      "store_section": "BAKING",
+      "store_section_order": 7
     },
     {
       "section": null,
@@ -143,8 +143,8 @@
       "ingredient": "cocoa butter or 1/4 cup vegetable oil",
       "preparation": null,
       "optional": false,
-      "store_section": "DAIRY & EGGS",
-      "store_section_order": 3
+      "store_section": "BAKING",
+      "store_section_order": 7
     }
   ],
   "equipment": [

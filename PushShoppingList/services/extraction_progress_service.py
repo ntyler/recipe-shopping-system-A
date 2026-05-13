@@ -1,5 +1,6 @@
 import json
 import os
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -12,6 +13,7 @@ PROGRESS_FILE = BASE_DIR / "recipe-extractor" / "data" / "extract_progress.json"
 NTFY_TOPIC = os.getenv("NTFY_TOPIC", "nathaniel-shopping-list-12345")
 
 PROGRESS_FILE.parent.mkdir(parents=True, exist_ok=True)
+PROGRESS_LOCK = threading.RLock()
 
 
 def new_job_id():
@@ -34,117 +36,124 @@ def default_progress():
 
 
 def load_progress():
-    if not PROGRESS_FILE.exists():
-        return default_progress()
+    with PROGRESS_LOCK:
+        if not PROGRESS_FILE.exists():
+            return default_progress()
 
-    try:
-        return json.loads(PROGRESS_FILE.read_text(encoding="utf-8"))
-    except Exception:
-        return default_progress()
+        try:
+            return json.loads(PROGRESS_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            return default_progress()
 
 
 def save_progress(progress):
-    progress["updated_at"] = time.time()
-    PROGRESS_FILE.write_text(
-        json.dumps(progress, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
-    return progress
+    with PROGRESS_LOCK:
+        progress["updated_at"] = time.time()
+        PROGRESS_FILE.write_text(
+            json.dumps(progress, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        return progress
 
 
 def start_progress(urls, job_id=None):
-    urls = [str(url).strip() for url in urls if str(url).strip()]
-    job_id = job_id or new_job_id()
-    progress = {
-        "active": True,
-        "job_id": job_id,
-        "status": "running",
-        "cancel_requested": False,
-        "summary": "Fetching recipe page and extracting ingredients.",
-        "current_index": 0,
-        "total": len(urls),
-        "percent": 10 if urls else 0,
-        "urls": [
-            {
-                "url": url,
-                "state": "waiting",
-                "message": "waiting...",
-                "ingredients_count": None,
-            }
-            for url in urls
-        ],
-    }
-    save_progress(progress)
+    with PROGRESS_LOCK:
+        urls = [str(url).strip() for url in urls if str(url).strip()]
+        job_id = job_id or new_job_id()
+        progress = {
+            "active": True,
+            "job_id": job_id,
+            "status": "running",
+            "cancel_requested": False,
+            "summary": "Fetching recipe page and extracting ingredients.",
+            "current_index": 0,
+            "total": len(urls),
+            "percent": 10 if urls else 0,
+            "urls": [
+                {
+                    "url": url,
+                    "state": "waiting",
+                    "message": "waiting...",
+                    "ingredients_count": None,
+                }
+                for url in urls
+            ],
+        }
+        save_progress(progress)
     send_ntfy("Recipe extraction started", f"Extracting {len(urls)} recipe URL(s).")
     return progress
 
 
 def mark_url_running(job_id, urls, index):
-    progress = ensure_job(job_id, urls)
+    with PROGRESS_LOCK:
+        progress = ensure_job(job_id, urls)
 
-    if progress.get("job_id") != job_id or progress.get("cancel_requested"):
-        return progress
+        if progress.get("job_id") != job_id or progress.get("cancel_requested"):
+            return progress
 
-    progress["active"] = True
-    progress["status"] = "running"
-    progress["current_index"] = index
-    progress["summary"] = "Fetching recipe page and extracting ingredients."
-    progress["percent"] = progress_percent(index, progress["total"])
+        progress["active"] = True
+        progress["status"] = "running"
+        progress["current_index"] = index
+        progress["summary"] = "Fetching recipe page and extracting ingredients."
+        progress["percent"] = progress_percent(index, progress["total"])
 
-    if 0 <= index < len(progress["urls"]):
-        progress["urls"][index]["state"] = "running"
-        progress["urls"][index]["message"] = "extracting - Running recipe extractor..."
+        if 0 <= index < len(progress["urls"]):
+            progress["urls"][index]["state"] = "running"
+            progress["urls"][index]["message"] = "extracting - Running recipe extractor..."
 
-    return save_progress(progress)
+        return save_progress(progress)
 
 
 def mark_url_message(job_id, urls, index, message, summary=None):
-    progress = ensure_job(job_id, urls)
+    with PROGRESS_LOCK:
+        progress = ensure_job(job_id, urls)
 
-    if progress.get("job_id") != job_id or progress.get("cancel_requested"):
-        return progress
+        if progress.get("job_id") != job_id or progress.get("cancel_requested"):
+            return progress
 
-    progress["active"] = True
-    progress["status"] = "running"
-    progress["current_index"] = index
+        progress["active"] = True
+        progress["status"] = "running"
+        progress["current_index"] = index
 
-    if summary:
-        progress["summary"] = summary
+        if summary:
+            progress["summary"] = summary
 
-    if 0 <= index < len(progress["urls"]):
-        progress["urls"][index]["state"] = "running"
-        progress["urls"][index]["message"] = message
+        if 0 <= index < len(progress["urls"]):
+            progress["urls"][index]["state"] = "running"
+            progress["urls"][index]["message"] = message
 
-    return save_progress(progress)
+        return save_progress(progress)
 
 
 def mark_url_done(job_id, urls, index, ingredients_count):
-    progress = ensure_job(job_id, urls)
+    with PROGRESS_LOCK:
+        progress = ensure_job(job_id, urls)
 
-    if progress.get("job_id") != job_id or progress.get("cancel_requested"):
-        return progress
+        if progress.get("job_id") != job_id or progress.get("cancel_requested"):
+            return progress
 
-    if 0 <= index < len(progress["urls"]):
-        progress["urls"][index]["state"] = "done"
-        progress["urls"][index]["message"] = f"done - {ingredients_count} ingredients extracted"
-        progress["urls"][index]["ingredients_count"] = ingredients_count
+        if 0 <= index < len(progress["urls"]):
+            progress["urls"][index]["state"] = "done"
+            progress["urls"][index]["message"] = f"done - {ingredients_count} ingredients extracted"
+            progress["urls"][index]["ingredients_count"] = ingredients_count
 
-    progress["percent"] = progress_percent(completed_count(progress), progress["total"])
-    return save_progress(progress)
+        progress["percent"] = progress_percent(completed_count(progress), progress["total"])
+        return save_progress(progress)
 
 
 def mark_url_failed(job_id, urls, index, error):
-    progress = ensure_job(job_id, urls)
+    with PROGRESS_LOCK:
+        progress = ensure_job(job_id, urls)
 
-    if progress.get("job_id") != job_id or progress.get("cancel_requested"):
-        return progress
+        if progress.get("job_id") != job_id or progress.get("cancel_requested"):
+            return progress
 
-    if 0 <= index < len(progress["urls"]):
-        progress["urls"][index]["state"] = "failed"
-        progress["urls"][index]["message"] = f"failed - {friendly_error_message(error)}"
+        if 0 <= index < len(progress["urls"]):
+            progress["urls"][index]["state"] = "failed"
+            progress["urls"][index]["message"] = f"failed - {friendly_error_message(error)}"
 
-    progress["percent"] = progress_percent(completed_count(progress), progress["total"])
-    return save_progress(progress)
+        progress["percent"] = progress_percent(completed_count(progress), progress["total"])
+        return save_progress(progress)
 
 
 def friendly_error_message(error):

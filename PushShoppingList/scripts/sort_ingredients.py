@@ -35,6 +35,79 @@ MODEL = "gpt-4o-mini"
 WRITE_BACK_TO_SHOPPING_LIST = True
 SAVE_SECTION_HEADERS_TO_SHOPPING_LIST = True
 
+SECTION_ITEM_ORDER = {
+    "PRODUCE": [
+        "lemon",
+        "zest",
+        "basil",
+        "herb",
+        "garlic",
+        "onion",
+        "tomato",
+    ],
+    "DAIRY & EGGS": [
+        "egg",
+        "yolk",
+        "ricotta",
+        "parmesan",
+        "cheese",
+        "milk",
+        "cream",
+        "yogurt",
+        "butter",
+    ],
+    "PASTA, RICE & GRAINS": [
+        "pasta",
+        "noodle",
+        "rice",
+        "grain",
+        "oat",
+        "quinoa",
+        "breadcrumb",
+    ],
+    "BAKING": [
+        "flour",
+        "baking powder",
+        "baking soda",
+        "yeast",
+        "sugar",
+        "corn syrup",
+        "vanilla",
+        "chocolate chip",
+        "chocolate",
+        "cocoa powder",
+        "cocoa",
+        "cocoa butter",
+    ],
+    "SAUCES & CONDIMENTS": [
+        "tomato sauce",
+        "sauce",
+        "ketchup",
+        "mustard",
+        "mayonnaise",
+        "soy sauce",
+        "hot sauce",
+        "salsa",
+    ],
+    "SPICES & SEASONINGS": [
+        "salt",
+        "pepper",
+        "cinnamon",
+        "nutmeg",
+        "paprika",
+        "cumin",
+        "oregano",
+        "thyme",
+        "basil",
+    ],
+    "OILS & VINEGARS": [
+        "oil",
+        "olive oil",
+        "vegetable oil",
+        "vinegar",
+    ],
+}
+
 client = None
 
 
@@ -114,7 +187,10 @@ def build_locally_sorted_items(ingredient_list):
         sections,
         key=lambda value: STORE_SECTION_ORDER.get(value, 999),
     ):
-        items = sections[section]
+        items = sorted(
+            sections[section],
+            key=lambda item: section_item_sort_key(section, item),
+        )
 
         if not items:
             continue
@@ -123,6 +199,17 @@ def build_locally_sorted_items(ingredient_list):
         sorted_items.extend(items)
 
     return sorted_items
+
+
+def section_item_sort_key(section, item):
+    normalized = normalize_ingredient_key(item).replace("*", "")
+    order = SECTION_ITEM_ORDER.get(section, [])
+
+    for index, keyword in enumerate(order):
+        if keyword in normalized:
+            return index, normalized
+
+    return len(order), normalized
 
 
 def save_locally_sorted_items(sorted_items):

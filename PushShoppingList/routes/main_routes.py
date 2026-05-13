@@ -354,6 +354,7 @@ def save_list():
     ]
 
     save_items(items)
+    sort_ingredients()
 
     return redirect("/")
 
