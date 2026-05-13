@@ -125,6 +125,138 @@ def recipe_view_rows(recipe_urls):
     return rows
 
 
+def recipe_quantity_lookup(recipe_rows):
+    quantities = {}
+
+    for recipe in recipe_rows:
+        for section_items in recipe.get("sections", {}).values():
+            for item in section_items:
+                display_name = item.get("display_name") or item.get("name")
+                quantity_display = item.get("quantity_display") or item.get("base_display")
+
+                if not display_name or not quantity_display:
+                    continue
+
+                key = normalize(display_name)
+                quantities.setdefault(key, []).append(str(quantity_display).strip())
+
+    return {
+        key: summarize_quantity_displays(values)
+        for key, values in quantities.items()
+    }
+
+
+def summarize_quantity_displays(values):
+    cleaned_values = [
+        value
+        for value in values
+        if value
+    ]
+
+    if not cleaned_values:
+        return ""
+
+    if len(cleaned_values) == 1:
+        return cleaned_values[0]
+
+    summed = sum_quantity_displays(cleaned_values)
+    if summed:
+        return summed
+
+    unique_values = []
+    seen = set()
+
+    for value in cleaned_values:
+        key = normalize(value)
+
+        if key not in seen:
+            unique_values.append(value)
+            seen.add(key)
+
+    return " + ".join(unique_values)
+
+
+def sum_quantity_displays(values):
+    parsed_values = [
+        parse_quantity_display(value)
+        for value in values
+    ]
+
+    if not parsed_values or any(value is None for value in parsed_values):
+        return ""
+
+    units = {value["unit"] for value in parsed_values}
+
+    if len(units) != 1:
+        return ""
+
+    unit = next(iter(units))
+    low_total = sum(value["low"] for value in parsed_values)
+    high_values = [
+        value["high"]
+        for value in parsed_values
+        if value["high"] is not None
+    ]
+    high_total = sum(high_values) if high_values else None
+
+    if high_total is not None and high_total != low_total:
+        quantity_text = f"{format_fraction(low_total)} to {format_fraction(high_total)}"
+    else:
+        quantity_text = format_fraction(low_total)
+
+    return format_quantity_unit(quantity_text, unit)
+
+
+def parse_quantity_display(value):
+    text = str(value or "").strip()
+
+    if not text or " OR " in text.upper():
+        return None
+
+    match = re.match(
+        r"^(?P<low>\d+(?:\s+\d+/\d+|/\d+)?)(?:\s*(?:-|to)\s*(?P<high>\d+(?:\s+\d+/\d+|/\d+)?))?(?:\s+(?P<unit>.+))?$",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    if not match:
+        return None
+
+    low = parse_quantity_fraction(match.group("low"))
+    high = parse_quantity_fraction(match.group("high")) if match.group("high") else None
+
+    if low is None or (match.group("high") and high is None):
+        return None
+
+    return {
+        "low": low,
+        "high": high,
+        "unit": normalize_quantity_unit(match.group("unit")),
+    }
+
+
+def normalize_quantity_unit(unit):
+    unit = str(unit or "").strip()
+    unit_key = unit.lower()
+    singular_units = {
+        "cups": "cup",
+        "teaspoons": "teaspoon",
+        "tablespoons": "tablespoon",
+        "ounces": "ounce",
+        "pounds": "pound",
+        "grams": "gram",
+        "kilograms": "kilogram",
+        "milliliters": "milliliter",
+        "liters": "liter",
+        "pinches": "pinch",
+        "dashes": "dash",
+        "cloves": "clove",
+        "sticks": "stick",
+    }
+
+    return singular_units.get(unit_key, unit)
+
+
 def load_saved_recipe_output(recipe_url):
     recipe_key = normalize_recipe_url_key(recipe_url)
 
@@ -469,6 +601,8 @@ def index():
     store_settings = load_store_settings()
     recipe_urls = recipe_url_rows()
     item_state = load_item_state()
+    recipe_rows = recipe_view_rows(recipe_urls)
+    item_quantities = recipe_quantity_lookup(recipe_rows)
 
     return render_template(
         "index.html",
@@ -481,6 +615,7 @@ def index():
         enabled_stores=store_settings["enabled_stores"],
         shopping_items=shopping_items_only(items),
         item_state=item_state,
+        item_quantities=item_quantities,
         section_counts=section_counts(items),
         store_view=build_store_view(
             items,
@@ -488,7 +623,7 @@ def index():
             store_settings["stores"],
             store_settings["enabled_stores"],
         ),
-        recipe_view_rows=recipe_view_rows(recipe_urls),
+        recipe_view_rows=recipe_rows,
         normalize=normalize,
         is_section_header=is_section_header,
         food_rule_status=shopping_item_food_rule_status,

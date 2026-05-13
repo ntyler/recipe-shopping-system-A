@@ -32,6 +32,9 @@
                                 <span class="food-rule-marker" title="{{ food_status.marker }}">Food Review</span>
                             {% endif %}
                         </div>
+                        {% if item_quantities.get(item_key) %}
+                            <div class="source-line">{{ item_quantities.get(item_key) }}</div>
+                        {% endif %}
                     </div>
 
                     <div class="item-actions">
@@ -86,8 +89,9 @@
                 </div>
 
                 {% for item in section["items"] %}
+                    {% set item_key = normalize(item) %}
                     {% set food_status = food_rule_status(item) %}
-                    <div class="row" data-key="{{ normalize(item) }}">
+                    <div class="row" data-key="{{ item_key }}">
                         <div class="item">
                             <div class="item-main-line">
                                 <input type="checkbox" class="item-check">
@@ -96,6 +100,9 @@
                                     <span class="food-rule-marker" title="{{ food_status.marker }}">Food Review</span>
                                 {% endif %}
                             </div>
+                            {% if item_quantities.get(item_key) %}
+                                <div class="source-line">{{ item_quantities.get(item_key) }}</div>
+                            {% endif %}
                         </div>
 
                         <div class="item-actions">
@@ -106,7 +113,7 @@
                                             class="store-btn {% if item_state.get(normalize(item), {}).get('store') == store_key %}active{% endif %}"
                                             data-store="{{ store_key }}"
                                             data-store-url="{{ store.url }}"
-                                            data-item-key="{{ normalize(item) }}">
+                                            data-item-key="{{ item_key }}">
                                         {{ store.label }}
                                     </button>
                                 {% endif %}

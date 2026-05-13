@@ -61,8 +61,8 @@
     {
       "section": null,
       "original_text": "Pinch ground nutmeg",
-      "quantity": null,
-      "unit": null,
+      "quantity": "1",
+      "unit": "Pinch",
       "ingredient": "ground nutmeg",
       "preparation": null,
       "optional": false,
@@ -74,8 +74,8 @@
       "original_text": "Salt and pepper to taste",
       "quantity": null,
       "unit": null,
-      "ingredient": "Salt and pepper to taste",
-      "preparation": null,
+      "ingredient": "Salt and pepper",
+      "preparation": "to taste",
       "optional": false,
       "store_section": "SPICES & SEASONINGS",
       "store_section_order": 12
