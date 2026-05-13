@@ -399,6 +399,13 @@ def extract_preparation(original_text):
         "as desired",
         "for garnish",
         "for garnishing",
+        "for serving",
+    ]
+    lowered = text.lower()
+    matched_modifiers = [
+        modifier
+        for modifier in usage_modifiers
+        if re.search(rf"\b{re.escape(modifier)}\b", lowered)
     ]
 
     parenthetical_matches = [
@@ -407,21 +414,15 @@ def extract_preparation(original_text):
         if match.strip() and not re.search(r"\d", match)
     ]
 
-    if parenthetical_matches:
-        return clean_preparation_text(", ".join(parenthetical_matches))
+    preparation_parts = []
+    preparation_parts.extend(matched_modifiers)
+    preparation_parts.extend(parenthetical_matches)
 
     if "," in text:
-        return clean_preparation_text(text.split(",", 1)[1].strip()) or None
+        preparation_parts.append(text.split(",", 1)[1].strip())
 
-    lowered = text.lower()
-    matched_modifiers = [
-        modifier
-        for modifier in usage_modifiers
-        if re.search(rf"\b{re.escape(modifier)}\b", lowered)
-    ]
-
-    if matched_modifiers:
-        return clean_preparation_text(", ".join(matched_modifiers))
+    if preparation_parts:
+        return clean_preparation_text(", ".join(preparation_parts))
 
     return None
 
@@ -435,7 +436,17 @@ def clean_preparation_text(text):
     for bad_value, good_value in replacements.items():
         value = value.replace(bad_value, good_value)
 
-    return value.strip() or None
+    parts = []
+    seen = set()
+
+    for part in value.split(","):
+        part = part.strip()
+
+        if part and part not in seen:
+            parts.append(part)
+            seen.add(part)
+
+    return ", ".join(parts).strip() or None
 
 
 def clean_recipe_text(text):
@@ -818,6 +829,12 @@ Examples:
   -> unit = "Pinch"
   -> ingredient = "ground nutmeg"
   -> preparation = null
+
+- "Salt and pepper to taste (as desired)"
+  -> quantity = null
+  -> unit = null
+  -> ingredient = "Salt and pepper"
+  -> preparation = "to taste, as desired"
 
 - "Parmesan and/or basil, for garnish"
   -> quantity = null
