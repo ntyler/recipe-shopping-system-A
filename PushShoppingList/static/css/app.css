@@ -2691,7 +2691,7 @@ body {
 
             .recipe-row {
                 display: grid;
-                grid-template-columns: minmax(0, 1fr) auto;
+                grid-template-columns: minmax(0, 1fr) auto auto;
                 gap: 8px 10px;
                 align-items: center;
                 margin-bottom: 14px;
@@ -2745,14 +2745,14 @@ body {
             }
 
             .recipe-row-actions {
-                grid-column: 1 / 2;
+                grid-column: 2 / 3;
                 grid-row: 4;
                 justify-content: flex-start;
-                flex-wrap: wrap;
+                flex-wrap: nowrap;
             }
 
             .remove-recipe-form {
-                grid-column: 2 / 3;
+                grid-column: 3 / 4;
                 grid-row: 4;
                 width: auto;
                 margin: 0;
