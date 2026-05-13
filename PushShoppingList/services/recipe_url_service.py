@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 from threading import Lock
 from urllib.parse import urlparse
 from urllib.parse import urlunparse
@@ -6,7 +7,9 @@ from urllib.parse import urlunparse
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 URLS_FILE = BASE_DIR / "urls.txt"
+URL_META_FILE = BASE_DIR / "services" / "recipe-extractor" / "data" / "recipe_url_meta.json"
 url_file_lock = Lock()
+URL_META_FILE.parent.mkdir(parents=True, exist_ok=True)
 
 
 def load_recipe_urls():
@@ -60,6 +63,9 @@ def remove_recipe_url(url):
             for existing_url in read_recipe_urls()
             if normalize_recipe_url_key(existing_url) != target
         ])
+        meta = load_recipe_url_meta()
+        meta.pop(target, None)
+        save_recipe_url_meta(meta)
 
 
 def recipe_url_rows():
@@ -67,9 +73,60 @@ def recipe_url_rows():
         {
             "url": url,
             "name": recipe_url_name(url),
+            "quantity": recipe_url_quantity(url),
         }
         for url in load_recipe_urls()
     ]
+
+
+def recipe_url_quantity(url):
+    key = normalize_recipe_url_key(url)
+    meta = load_recipe_url_meta()
+    recipe_meta = meta.get(key, {})
+    return normalize_recipe_quantity(recipe_meta.get("quantity", 1))
+
+
+def save_recipe_url_quantity(url, quantity):
+    key = normalize_recipe_url_key(url)
+
+    if not key:
+        return load_recipe_url_meta()
+
+    with url_file_lock:
+        meta = load_recipe_url_meta()
+        recipe_meta = meta.get(key, {})
+        recipe_meta["quantity"] = normalize_recipe_quantity(quantity)
+        meta[key] = recipe_meta
+        save_recipe_url_meta(meta)
+        return meta
+
+
+def load_recipe_url_meta():
+    if not URL_META_FILE.exists():
+        return {}
+
+    try:
+        data = json.loads(URL_META_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+    return data if isinstance(data, dict) else {}
+
+
+def save_recipe_url_meta(meta):
+    URL_META_FILE.write_text(
+        json.dumps(meta, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+
+def normalize_recipe_quantity(quantity):
+    try:
+        value = int(quantity)
+    except (TypeError, ValueError):
+        value = 1
+
+    return max(1, value)
 
 
 def recipe_url_name(url):

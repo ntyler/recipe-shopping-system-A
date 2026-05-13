@@ -273,6 +273,48 @@ function restoreItemCheckState() {
     });
 }
 
+function bindRecipeQuantityInputs() {
+    document.querySelectorAll(".recipe-quantity-input").forEach(input => {
+        input.addEventListener("change", () => {
+            saveRecipeQuantity(input);
+        });
+
+        input.addEventListener("blur", () => {
+            saveRecipeQuantity(input);
+        });
+    });
+}
+
+async function saveRecipeQuantity(input) {
+    const url = input.dataset.recipeUrl || "";
+    const quantity = Math.max(1, parseInt(input.value || "1", 10) || 1);
+    input.value = quantity;
+
+    try {
+        const response = await fetch("/api/recipe_quantity", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                url: url,
+                quantity: quantity,
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error("Unable to save recipe quantity.");
+        }
+
+        input.classList.add("saved");
+        setTimeout(() => {
+            input.classList.remove("saved");
+        }, 700);
+    } catch (err) {
+        console.warn("Unable to save recipe quantity.", err);
+    }
+}
+
 function bindStoreButtons() {
     document.querySelectorAll(".store-btn").forEach(button => {
         button.addEventListener("click", async () => {
@@ -697,6 +739,7 @@ async function refreshStoreMarkup() {
     restoreOpenStorePanels();
     restoreViewBehaviorSettings();
     restoreItemCheckState();
+    bindRecipeQuantityInputs();
     bindStoreButtons();
     bindSectionHeaderToggles();
     bindRecipeDetailToggles();
