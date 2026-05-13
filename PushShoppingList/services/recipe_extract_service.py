@@ -499,7 +499,7 @@ def build_structured_nutrition(nutrition):
     }
 
 
-def fetch_recipe_page(recipe_url):
+def fetch_recipe_page(recipe_url, progress_callback=None):
     print(f"Fetching recipe page: {recipe_url}")
 
     headers = {
@@ -507,7 +507,12 @@ def fetch_recipe_page(recipe_url):
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/147.0.0.0 Safari/537.36"
-        )
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+        "Upgrade-Insecure-Requests": "1",
     }
 
     html_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_PAGE_HTML.html"
@@ -517,12 +522,37 @@ def fetch_recipe_page(recipe_url):
         response.raise_for_status()
         html_text = response.text
         html_path.write_text(html_text, encoding="utf-8")
-    except Exception:
-        if html_path.exists() and os.getenv("DISABLE_RECIPE_HTML_CACHE_FALLBACK") != "1":
+    except Exception as exc:
+        if is_forbidden_response(exc) and os.getenv("DISABLE_BROWSER_RECIPE_FETCH") != "1":
+            if progress_callback:
+                progress_callback(
+                    "website blocked direct download - trying browser fetch...",
+                    "The site returned 403, so Chrome is opening the page to grab the HTML.",
+                )
+
+            try:
+                html_text = fetch_recipe_page_with_browser(recipe_url)
+                html_path.write_text(html_text, encoding="utf-8")
+            except Exception as browser_exc:
+                if html_path.exists() and os.getenv("DISABLE_RECIPE_HTML_CACHE_FALLBACK") != "1":
+                    print(f"Browser fetch failed; using cached HTML: {html_path}")
+                    html_text = html_path.read_text(encoding="utf-8")
+                else:
+                    raise RuntimeError(
+                        "Website blocked automated download with 403 Forbidden, "
+                        f"and browser fallback failed: {browser_exc}"
+                    ) from browser_exc
+        elif html_path.exists() and os.getenv("DISABLE_RECIPE_HTML_CACHE_FALLBACK") != "1":
             print(f"Live fetch failed; using cached HTML: {html_path}")
             html_text = html_path.read_text(encoding="utf-8")
         else:
             raise
+
+    if progress_callback:
+        progress_callback(
+            "HTML downloaded - reading recipe card data...",
+            "Reading structured recipe data from the webpage HTML.",
+        )
 
     soup = BeautifulSoup(html_text, "html.parser")
 
@@ -541,6 +571,48 @@ def fetch_recipe_page(recipe_url):
     print(f"Loaded webpage text: {len(page_text)} characters")
 
     return html_text, page_text
+
+
+def is_forbidden_response(exc):
+    response = getattr(exc, "response", None)
+    return response is not None and response.status_code == 403
+
+
+def fetch_recipe_page_with_browser(recipe_url):
+    driver = None
+
+    try:
+        try:
+            import undetected_chromedriver as uc
+
+            options = uc.ChromeOptions()
+            options.add_argument("--headless=new")
+            options.add_argument("--disable-gpu")
+            options.add_argument("--no-sandbox")
+            options.add_argument("--disable-dev-shm-usage")
+            options.add_argument("--window-size=1365,900")
+            driver = uc.Chrome(options=options, use_subprocess=True)
+        except Exception:
+            from selenium import webdriver
+            from selenium.webdriver.chrome.options import Options
+
+            options = Options()
+            options.add_argument("--headless=new")
+            options.add_argument("--disable-gpu")
+            options.add_argument("--no-sandbox")
+            options.add_argument("--disable-dev-shm-usage")
+            options.add_argument("--window-size=1365,900")
+            driver = webdriver.Chrome(options=options)
+
+        driver.set_page_load_timeout(25)
+        driver.get(recipe_url)
+        return driver.page_source or ""
+    finally:
+        if driver:
+            try:
+                driver.quit()
+            except Exception:
+                pass
 
 
 def fetch_recipe_page_text(recipe_url):
@@ -1083,11 +1155,7 @@ def extract_recipe_from_url(recipe_url, progress_callback=None):
             "downloading webpage HTML...",
             "Opening the recipe URL and saving the page HTML.",
         )
-        html_text, page_text = fetch_recipe_page(recipe_url)
-        report(
-            "HTML downloaded - reading recipe card data...",
-            "Reading structured recipe data from the webpage HTML.",
-        )
+        html_text, page_text = fetch_recipe_page(recipe_url, progress_callback=report)
 
         if not page_text:
             return {
