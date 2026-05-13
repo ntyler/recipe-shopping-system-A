@@ -5,6 +5,7 @@ function saveScroll() {
 let hiddenExtractJobId = null;
 let lastRenderedExtractJobId = null;
 let extractRefreshTimer = null;
+let extractAutoCloseTimer = null;
 let lastRenderedExtractProgress = null;
 let currentExtractAbortController = null;
 let currentExtractAbortControllers = [];
@@ -1439,6 +1440,7 @@ function renderExtractionProgress(progress) {
     });
 
     if (!progress.active && progress.status === "complete") {
+        scheduleExtractionAutoClose(progress.job_id);
         scheduleExtractionRefresh(progress.job_id);
     }
 }
@@ -1504,4 +1506,20 @@ function scheduleExtractionRefresh(jobId) {
     extractRefreshTimer = setTimeout(() => {
         window.location.href = "/";
     }, 1200);
+}
+
+function scheduleExtractionAutoClose(jobId) {
+    if (!jobId || localStorage.getItem(`extract_closed_${jobId}`)) {
+        return;
+    }
+
+    localStorage.setItem(`extract_closed_${jobId}`, "1");
+
+    if (extractAutoCloseTimer) {
+        clearTimeout(extractAutoCloseTimer);
+    }
+
+    extractAutoCloseTimer = setTimeout(() => {
+        hideExtractProgressModal();
+    }, 700);
 }
