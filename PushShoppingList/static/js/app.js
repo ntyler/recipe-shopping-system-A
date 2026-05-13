@@ -673,6 +673,7 @@ function openItemQtyEditor(button) {
     const manualInput = document.getElementById("itemQtyManualInput");
     const nameDisplay = document.getElementById("itemQtyName");
     const currentDisplay = document.getElementById("itemQtyCurrent");
+    const sourcesDisplay = document.getElementById("itemQtySources");
 
     if (!modal || !keyInput || !manualInput || !nameDisplay || !currentDisplay) {
         return;
@@ -687,11 +688,54 @@ function openItemQtyEditor(button) {
     nameDisplay.textContent = itemName;
     currentDisplay.textContent = currentQty || "No recipe quantity found.";
     currentDisplay.classList.toggle("muted", !currentQty);
+    renderItemQtySources(sourcesDisplay, button.dataset.recipeQtySources);
 
     modal.style.display = "flex";
     modal.setAttribute("aria-hidden", "false");
     document.body.classList.add("modal-open");
     setTimeout(() => manualInput.focus(), 0);
+}
+
+function renderItemQtySources(container, sourcesJson) {
+    if (!container) {
+        return;
+    }
+
+    let sources = [];
+
+    try {
+        sources = JSON.parse(sourcesJson || "[]");
+    } catch (err) {
+        sources = [];
+    }
+
+    sources = sources.filter(source => source && source.quantity);
+    container.replaceChildren();
+    container.hidden = sources.length <= 1;
+
+    if (sources.length <= 1) {
+        return;
+    }
+
+    sources.forEach(source => {
+        const row = document.createElement("div");
+        row.className = "item-qty-source-row";
+
+        const label = document.createElement("span");
+        label.className = "item-qty-source-label";
+        label.textContent = source.label || "Recipe qty";
+
+        const ingredient = document.createElement("span");
+        ingredient.className = "item-qty-source-ingredient";
+        ingredient.textContent = source.ingredient || "Ingredient";
+
+        const quantity = document.createElement("span");
+        quantity.className = "item-qty-source-value";
+        quantity.textContent = source.quantity;
+
+        row.append(label, ingredient, quantity);
+        container.appendChild(row);
+    });
 }
 
 function closeItemQtyEditor() {

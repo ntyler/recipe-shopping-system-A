@@ -147,6 +147,31 @@ def recipe_quantity_lookup(recipe_rows):
     }
 
 
+def recipe_quantity_sources_lookup(recipe_rows):
+    sources = {}
+
+    for recipe in recipe_rows:
+        recipe_number = recipe.get("number")
+        recipe_label = f"Recipe {recipe_number} qty" if recipe_number else "Recipe qty"
+
+        for section_items in recipe.get("sections", {}).values():
+            for item in section_items:
+                display_name = item.get("display_name") or item.get("name")
+                quantity_display = item.get("quantity_display") or item.get("base_display")
+
+                if not display_name or not quantity_display:
+                    continue
+
+                key = normalize(display_name)
+                sources.setdefault(key, []).append({
+                    "label": recipe_label,
+                    "ingredient": str(item.get("name") or display_name).strip(),
+                    "quantity": str(quantity_display).strip(),
+                })
+
+    return sources
+
+
 def apply_manual_item_quantities(item_quantities, item_state):
     quantities = dict(item_quantities)
 
@@ -618,6 +643,7 @@ def index():
     item_state = load_item_state()
     recipe_rows = recipe_view_rows(recipe_urls)
     recipe_item_quantities = recipe_quantity_lookup(recipe_rows)
+    recipe_item_quantity_sources = recipe_quantity_sources_lookup(recipe_rows)
     item_quantities = apply_manual_item_quantities(
         recipe_item_quantities,
         item_state,
@@ -636,6 +662,7 @@ def index():
         item_state=item_state,
         item_quantities=item_quantities,
         recipe_item_quantities=recipe_item_quantities,
+        recipe_item_quantity_sources=recipe_item_quantity_sources,
         section_counts=section_counts(items),
         store_view=build_store_view(
             items,

@@ -1570,6 +1570,43 @@ body {
             color: #888;
         }
 
+        .item-qty-sources {
+            margin-top: 8px;
+            display: grid;
+            gap: 6px;
+        }
+
+        .item-qty-source-row {
+            display: grid;
+            grid-template-columns: minmax(96px, auto) minmax(0, 1fr) auto;
+            gap: 10px;
+            align-items: baseline;
+            padding: 8px 10px;
+            border: 1px solid #3d4447;
+            border-radius: 8px;
+            background: #171a1b;
+        }
+
+        .item-qty-source-label {
+            color: #b8c0c3;
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .item-qty-source-ingredient {
+            color: #f3f4f6;
+            font-size: 14px;
+            overflow-wrap: anywhere;
+        }
+
+        .item-qty-source-value {
+            color: #fff;
+            font-size: 14px;
+            text-align: right;
+            overflow-wrap: anywhere;
+        }
+
         .item-qty-help {
             margin-top: 8px;
             color: #aaa;
