@@ -56,13 +56,47 @@ def calculate_scaled_recipe_values(recipe_data, quantity):
             "ingredients": {},
         }
 
+    local_scaled = calculate_scaled_values_locally(recipe_data, quantity)
+
     if os.getenv("OPENAI_API_KEY"):
         try:
-            return calculate_scaled_values_with_openai(recipe_data, quantity)
+            api_scaled = calculate_scaled_values_with_openai(recipe_data, quantity)
+            return repair_unscaled_api_values(recipe_data, quantity, api_scaled, local_scaled)
         except Exception as exc:
             print(f"Recipe quantity API scaling failed; using local fallback: {exc}")
 
-    return calculate_scaled_values_locally(recipe_data, quantity)
+    return local_scaled
+
+
+def repair_unscaled_api_values(recipe_data, quantity, api_scaled, local_scaled):
+    if quantity <= 1:
+        return api_scaled
+
+    api_ingredients = api_scaled.get("ingredients", {})
+    local_ingredients = local_scaled.get("ingredients", {})
+
+    for item in recipe_data.get("ingredients", []):
+        if not isinstance(item, dict):
+            continue
+
+        name = str(item.get("ingredient", "") or "").strip()
+        if not name:
+            continue
+
+        api_value = api_ingredients.get(name) or api_ingredients.get(ingredient_key(name))
+        local_value = local_ingredients.get(name)
+
+        if not isinstance(api_value, dict) or not isinstance(local_value, dict):
+            continue
+
+        original_display = format_quantity_display(item.get("quantity"), item.get("unit"))
+        api_display = str(api_value.get("display") or "").strip()
+
+        if original_display and api_display == original_display:
+            api_ingredients[name] = local_value
+
+    api_scaled["ingredients"] = api_ingredients
+    return api_scaled
 
 
 def calculate_scaled_values_with_openai(recipe_data, quantity):

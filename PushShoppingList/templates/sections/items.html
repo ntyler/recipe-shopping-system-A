@@ -258,16 +258,15 @@
 
                                     <div class="source-line">
                                         {% if recipe_item.quantity %}
-                                            <span class="recipe-ingredient-base-quantity">
-                                                {{ recipe_item.quantity }} {{ recipe_item.unit or "" }}
-                                            </span>
                                             <span class="recipe-ingredient-scaled-quantity"
                                                   data-recipe-url="{{ recipe.url }}"
                                                   data-ingredient-name="{{ recipe_item.name }}"
                                                   data-base-quantity="{{ recipe_item.base_quantity or "" }}"
                                                   data-unit="{{ recipe_item.unit or "" }}">
                                                 {% if recipe.quantity > 1 %}
-                                                    -> {{ recipe_item.quantity_display or (recipe_item.scaled_quantity ~ " " ~ (recipe_item.unit or "")) }}
+                                                    {{ recipe_item.quantity_display or (recipe_item.scaled_quantity ~ " " ~ (recipe_item.unit or "")) }}
+                                                {% else %}
+                                                    {{ recipe_item.quantity }} {{ recipe_item.unit or "" }}
                                                 {% endif %}
                                             </span>
                                         {% endif %}

@@ -12,6 +12,7 @@ let cancelExtractRequested = false;
 const recipeQuantitySaveTimers = new WeakMap();
 const recipeQuantityNoticeTimers = new Map();
 let recipeQuantityStepButtonsBound = false;
+const recipeQuantitySaveDelayMs = 2000;
 
 function restoreScroll() {
     const scrollY = localStorage.getItem("scrollY");
@@ -286,7 +287,7 @@ function bindRecipeQuantityInputs() {
         input.dataset.lastSavedValue = input.value || "1";
 
         input.addEventListener("input", () => {
-            queueRecipeQuantitySave(input);
+            queueRecipeQuantitySave(input, recipeQuantitySaveDelayMs);
         });
 
         input.addEventListener("change", () => {
@@ -324,11 +325,11 @@ function bindRecipeQuantityInputs() {
         const step = parseInt(button.dataset.step || "0", 10);
         const currentValue = parseInt(input.value || "1", 10) || 1;
         input.value = Math.max(1, currentValue + step);
-        saveRecipeQuantity(input);
+        queueRecipeQuantitySave(input, recipeQuantitySaveDelayMs);
     });
 }
 
-function queueRecipeQuantitySave(input) {
+function queueRecipeQuantitySave(input, delayMs = recipeQuantitySaveDelayMs) {
     const existingTimer = recipeQuantitySaveTimers.get(input);
 
     if (existingTimer) {
@@ -338,7 +339,7 @@ function queueRecipeQuantitySave(input) {
     const timer = setTimeout(() => {
         saveRecipeQuantity(input);
         recipeQuantitySaveTimers.delete(input);
-    }, 450);
+    }, delayMs);
 
     recipeQuantitySaveTimers.set(input, timer);
 }
@@ -426,18 +427,19 @@ function updateRecipeQuantityDisplays(recipeUrl, multiplier, apiData = null) {
     document.querySelectorAll(`.recipe-ingredient-scaled-quantity[data-recipe-url="${cssEscape(recipeUrl)}"]`).forEach(element => {
         const ingredientName = element.dataset.ingredientName || "";
         const apiIngredient = findScaledIngredient(apiData, ingredientName);
+        const baseQuantity = element.dataset.baseQuantity || "";
+        const unit = element.dataset.unit || "";
+        const baseDisplay = `${baseQuantity} ${unit}`.trim();
 
         if (apiIngredient && apiIngredient.display) {
-            element.textContent = multiplier > 1 ? ` -> ${apiIngredient.display}` : "";
+            element.textContent = multiplier > 1 ? apiIngredient.display : baseDisplay;
             return;
         }
 
-        const baseQuantity = element.dataset.baseQuantity || "";
-        const unit = element.dataset.unit || "";
         const scaledQuantity = scaleQuantityForDisplay(baseQuantity, multiplier);
 
         if (scaledQuantity) {
-            element.textContent = multiplier > 1 ? ` -> ${`${scaledQuantity} ${unit}`.trim()}` : "";
+            element.textContent = multiplier > 1 ? `${scaledQuantity} ${unit}`.trim() : baseDisplay;
         }
     });
 }
