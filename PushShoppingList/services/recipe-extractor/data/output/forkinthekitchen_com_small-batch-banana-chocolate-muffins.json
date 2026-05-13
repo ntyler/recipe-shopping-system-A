@@ -1,0 +1,234 @@
+{
+  "source_url": "https://www.forkinthekitchen.com/small-batch-banana-chocolate-muffins/",
+  "recipe_title": "Small Batch Banana Chocolate Muffins",
+  "servings": "8",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "4 Tablespoon  unsalted butter (melted and cooled slightly)",
+      "quantity": "4",
+      "unit": "Tablespoon",
+      "ingredient": "unsalted butter",
+      "preparation": "melted and cooled slightly",
+      "optional": false,
+      "store_section": "DAIRY & EGGS",
+      "store_section_order": 3
+    },
+    {
+      "section": null,
+      "original_text": "1  egg (room temperature)",
+      "quantity": "1",
+      "unit": null,
+      "ingredient": "egg",
+      "preparation": "room temperature",
+      "optional": false,
+      "store_section": "DAIRY & EGGS",
+      "store_section_order": 3
+    },
+    {
+      "section": null,
+      "original_text": "½ teaspoon vanilla extract",
+      "quantity": "½",
+      "unit": "teaspoon",
+      "ingredient": "vanilla extract",
+      "preparation": null,
+      "optional": false,
+      "store_section": "BAKING",
+      "store_section_order": 7
+    },
+    {
+      "section": null,
+      "original_text": "¼ cup brown sugar",
+      "quantity": "¼",
+      "unit": "cup",
+      "ingredient": "brown sugar",
+      "preparation": null,
+      "optional": false,
+      "store_section": "BAKING",
+      "store_section_order": 7
+    },
+    {
+      "section": null,
+      "original_text": "¼ cup granulated sugar",
+      "quantity": "¼",
+      "unit": "cup",
+      "ingredient": "granulated sugar",
+      "preparation": null,
+      "optional": false,
+      "store_section": "BAKING",
+      "store_section_order": 7
+    },
+    {
+      "section": null,
+      "original_text": "1 cup all-purpose flour",
+      "quantity": "1",
+      "unit": "cup",
+      "ingredient": "all-purpose flour",
+      "preparation": null,
+      "optional": false,
+      "store_section": "BAKING",
+      "store_section_order": 7
+    },
+    {
+      "section": null,
+      "original_text": "½ teaspoon baking powder",
+      "quantity": "½",
+      "unit": "teaspoon",
+      "ingredient": "baking powder",
+      "preparation": null,
+      "optional": false,
+      "store_section": "BAKING",
+      "store_section_order": 7
+    },
+    {
+      "section": null,
+      "original_text": "½ teaspoon baking soda",
+      "quantity": "½",
+      "unit": "teaspoon",
+      "ingredient": "baking soda",
+      "preparation": null,
+      "optional": false,
+      "store_section": "BAKING",
+      "store_section_order": 7
+    },
+    {
+      "section": null,
+      "original_text": "¼ teaspoon fine sea salt",
+      "quantity": "¼",
+      "unit": "teaspoon",
+      "ingredient": "fine sea salt",
+      "preparation": null,
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12
+    },
+    {
+      "section": null,
+      "original_text": "⅛ teaspoon cinnamon",
+      "quantity": "⅛",
+      "unit": "teaspoon",
+      "ingredient": "cinnamon",
+      "preparation": null,
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12
+    },
+    {
+      "section": null,
+      "original_text": "¾ cup mashed bananas (~2 medium) (extra ripe)",
+      "quantity": "¾",
+      "unit": "cup",
+      "ingredient": "mashed bananas",
+      "preparation": "extra ripe",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19
+    },
+    {
+      "section": null,
+      "original_text": "½ cup chocolate chips*",
+      "quantity": "½",
+      "unit": "cup",
+      "ingredient": "chocolate chips*",
+      "preparation": null,
+      "optional": false,
+      "store_section": "BAKING",
+      "store_section_order": 7
+    }
+  ],
+  "equipment": [
+    {
+      "name": "mixing bowl",
+      "category": "prep"
+    },
+    {
+      "name": "muffin tin",
+      "category": "cookware"
+    },
+    {
+      "name": "oven",
+      "category": "appliance"
+    },
+    {
+      "name": "spatula",
+      "category": "utensil"
+    },
+    {
+      "name": "whisk",
+      "category": "utensil"
+    }
+  ],
+  "instructions": [
+    {
+      "section": null,
+      "step_number": 1,
+      "instruction": "Preheat oven to 350°F and line 8-9 muffin tins with paper liners.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [
+        "muffin tin",
+        "oven"
+      ]
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "In a medium mixing bowl, whisk together melted butter, egg, vanilla extract, and sugars.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [
+        "mixing bowl",
+        "whisk"
+      ]
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "Add the flour, baking powder, baking soda, salt, and cinnamon and stir until just combined (the dough will seem dry here - don't worry!).",
+      "temperature": null,
+      "time": null,
+      "equipment_used": []
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "Fold in mashed bananas and chocolate chips just until incorporated (you don't want to overmix).",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [
+        "spatula"
+      ]
+    },
+    {
+      "section": null,
+      "step_number": 5,
+      "instruction": "Fill muffin liners almost to the top (see note to fill less). If desired, place several additional chocolate chips on top of the muffins. Bake for 20-22 minutes until edges are golden brown and centers bounce back when lightly touched. Remove from pan and let cool slightly before eating. Enjoy!",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [
+        "oven"
+      ]
+    }
+  ],
+  "nutrition": {
+    "serving_basis": "per serving",
+    "calories": "179 kcal",
+    "carbohydrates": "28 g",
+    "protein": "3 g",
+    "fat": "6 g",
+    "saturated_fat": "4 g",
+    "polyunsaturated_fat": null,
+    "monounsaturated_fat": null,
+    "trans_fat": "1 g",
+    "cholesterol": "36 mg",
+    "sodium": "179 mg",
+    "potassium": null,
+    "fiber": "1 g",
+    "sugar": "15 g",
+    "vitamin_a": null,
+    "vitamin_c": null,
+    "calcium": null,
+    "iron": null,
+    "other": []
+  }
+}

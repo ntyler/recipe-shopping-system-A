@@ -361,29 +361,57 @@ async function saveAllRecipeQuantities(button) {
         return false;
     }
 
+    const progressItems = buildRecipeQuantityProgressItems(inputs);
+    showRecipeQuantityProgressOverlay(progressItems);
+
     if (button) {
         button.disabled = true;
         button.textContent = "Saving Qty...";
     }
 
+    let failedCount = 0;
+
     try {
-        for (const input of inputs) {
-            await saveRecipeQuantity(input, {
-                force: true,
-                refresh: false,
-                message: false,
-            });
+        for (const [index, input] of inputs.entries()) {
+            updateRecipeQuantityProgressItem(index, "running", "Updating quantities with API...");
+
+            try {
+                await saveRecipeQuantity(input, {
+                    force: true,
+                    refresh: false,
+                    message: false,
+                    throwOnError: true,
+                });
+                updateRecipeQuantityProgressItem(index, "done", "Updated");
+            } catch (err) {
+                failedCount += 1;
+                updateRecipeQuantityProgressItem(index, "failed", "Failed to update");
+            }
         }
+
+        setRecipeQuantityProgressSummary("Refreshing shopping list...");
 
         try {
             await refreshStoreMarkup();
+            setRecipeQuantityProgressSummary(
+                failedCount
+                    ? `Finished with ${failedCount} failed update(s).`
+                    : "All recipe quantities updated."
+            );
         } catch (refreshErr) {
             console.warn("Unable to refresh recipe quantities in the background.", refreshErr);
+            setRecipeQuantityProgressSummary("Quantities saved, but the page refresh failed.");
         }
 
-        showRecipeQuantityUpdatedMessage("", "", "", "Recipe quantities updated.");
+        showRecipeQuantityUpdatedMessage(
+            "",
+            "",
+            "",
+            failedCount ? "Some recipe quantities failed." : "Recipe quantities updated."
+        );
     } catch (err) {
         console.warn("Unable to save recipe quantities.", err);
+        setRecipeQuantityProgressSummary("Unable to save recipe quantities.");
     } finally {
         if (button) {
             button.disabled = false;
@@ -392,6 +420,102 @@ async function saveAllRecipeQuantities(button) {
     }
 
     return false;
+}
+
+function buildRecipeQuantityProgressItems(inputs) {
+    return inputs.map(input => {
+        const row = input.closest(".recipe-row");
+        const left = row ? row.querySelector(".recipe-left") : null;
+        const label = left ? " ".join(left.textContent.split()) : `Recipe ${input.dataset.recipeNumber || ""}`.trim();
+        const previousQty = input.dataset.lastSavedValue || input.defaultValue || "1";
+        const nextQty = String(Math.max(1, parseInt(input.value || "1", 10) || 1));
+
+        return {
+            label,
+            previousQty,
+            nextQty,
+        };
+    });
+}
+
+function showRecipeQuantityProgressOverlay(items) {
+    let overlay = document.getElementById("recipeQtyProgressOverlay");
+
+    if (!overlay) {
+        overlay = document.createElement("div");
+        overlay.id = "recipeQtyProgressOverlay";
+        overlay.className = "recipe-qty-progress-backdrop";
+        overlay.innerHTML = `
+            <div class="recipe-qty-progress-card" role="dialog" aria-modal="true" aria-labelledby="recipeQtyProgressTitle">
+                <div class="recipe-qty-progress-header">
+                    <h2 id="recipeQtyProgressTitle">Updating Recipe Qty</h2>
+                    <button type="button" class="recipe-qty-progress-close" onclick="hideRecipeQuantityProgressOverlay()">Hide</button>
+                </div>
+                <div id="recipeQtyProgressSummary" class="recipe-qty-progress-summary">Starting quantity updates...</div>
+                <div id="recipeQtyProgressList" class="recipe-qty-progress-list"></div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+    }
+
+    const list = overlay.querySelector("#recipeQtyProgressList");
+    if (list) {
+        list.innerHTML = items.map((item, index) => `
+            <div class="recipe-qty-progress-row" data-progress-index="${index}">
+                <div class="recipe-qty-progress-main">
+                    <div class="recipe-qty-progress-name">${escapeHtml(item.label)}</div>
+                    <div class="recipe-qty-progress-qty">Qty ${escapeHtml(item.previousQty)} -> ${escapeHtml(item.nextQty)}</div>
+                </div>
+                <div class="recipe-qty-progress-status waiting">Waiting</div>
+            </div>
+        `).join("");
+    }
+
+    setRecipeQuantityProgressSummary("Starting quantity updates...");
+    overlay.classList.add("open");
+    overlay.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+}
+
+function hideRecipeQuantityProgressOverlay() {
+    const overlay = document.getElementById("recipeQtyProgressOverlay");
+
+    if (overlay) {
+        overlay.classList.remove("open");
+        overlay.setAttribute("aria-hidden", "true");
+        document.body.classList.remove("modal-open");
+    }
+}
+
+function setRecipeQuantityProgressSummary(message) {
+    const summary = document.getElementById("recipeQtyProgressSummary");
+
+    if (summary) {
+        summary.textContent = message;
+    }
+}
+
+function updateRecipeQuantityProgressItem(index, state, message) {
+    const row = document.querySelector(`.recipe-qty-progress-row[data-progress-index="${index}"]`);
+
+    if (!row) {
+        return;
+    }
+
+    const status = row.querySelector(".recipe-qty-progress-status");
+    row.classList.remove("waiting", "running", "done", "failed");
+    row.classList.add(state);
+
+    if (status) {
+        status.className = `recipe-qty-progress-status ${state}`;
+        status.textContent = message;
+    }
+}
+
+function escapeHtml(value) {
+    const div = document.createElement("div");
+    div.textContent = String(value || "");
+    return div.innerHTML;
 }
 
 async function saveRecipeQuantity(input, options = {}) {
@@ -407,7 +531,7 @@ async function saveRecipeQuantity(input, options = {}) {
     input.value = quantity;
 
     if (!options.force && input.dataset.lastSavedValue === String(quantity) && !input.dataset.savePending) {
-        return;
+        return { skipped: true };
     }
 
     input.dataset.savePending = "1";
@@ -449,12 +573,18 @@ async function saveRecipeQuantity(input, options = {}) {
         setTimeout(() => {
             input.classList.remove("saved");
         }, 700);
+        return data;
     } catch (err) {
         console.warn("Unable to save recipe quantity.", err);
+        if (options.throwOnError) {
+            throw err;
+        }
     } finally {
         setRecipeQuantityControlSaving(input, false);
         delete input.dataset.savePending;
     }
+
+    return null;
 }
 
 function setRecipeQuantityControlSaving(input, isSaving) {
