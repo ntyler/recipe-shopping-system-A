@@ -164,14 +164,31 @@ def build_recipe_sections(recipe_data, recipe_quantity=1, scaled_ingredients=Non
         scaled_unit = scaled_value.get("unit") if isinstance(scaled_value, dict) else None
         scaled_display = scaled_value.get("display") if isinstance(scaled_value, dict) else None
         fallback_quantity = scale_quantity(ingredient.get("quantity"), recipe_quantity)
+        display_name = name
+        base_display = format_quantity_unit(ingredient.get("quantity"), ingredient.get("unit"))
+        quantity_display = scaled_display
+        alternative = parse_quantity_alternative(
+            name,
+            ingredient.get("quantity"),
+            ingredient.get("unit"),
+            recipe_quantity,
+            scaled_quantity or fallback_quantity,
+        )
+
+        if alternative:
+            display_name = alternative["name"]
+            base_display = alternative["base_display"]
+            quantity_display = alternative["scaled_display"] if recipe_quantity > 1 else alternative["base_display"]
 
         sections[section].append({
             "name": name,
+            "display_name": display_name,
             "quantity": ingredient.get("quantity"),
             "base_quantity": ingredient.get("quantity"),
             "scaled_quantity": scaled_quantity or fallback_quantity,
             "unit": scaled_unit if scaled_unit is not None else ingredient.get("unit"),
-            "quantity_display": scaled_display,
+            "base_display": base_display,
+            "quantity_display": quantity_display,
             "url": recipe_data.get("source_url"),
         })
 
@@ -210,6 +227,42 @@ def scale_quantity(quantity, multiplier):
         return f"{left}{separator}{right}"
 
     return scale_quantity_part(quantity_text, multiplier)
+
+
+def parse_quantity_alternative(name, quantity, unit, recipe_quantity, scaled_quantity):
+    match = re.match(
+        r"^(?P<first>.+?)\s+or\s+(?P<quantity>\d+(?:\s+\d+/\d+|/\d+)?|\d+/\d+)\s+(?P<unit>[A-Za-z]+)\s+(?P<second>.+)$",
+        str(name or "").strip(),
+        flags=re.IGNORECASE,
+    )
+
+    if not match:
+        return None
+
+    first_name = match.group("first").strip()
+    second_quantity = match.group("quantity").strip()
+    second_unit = match.group("unit").strip()
+    second_name = match.group("second").strip()
+    first_base = format_quantity_unit(quantity, unit)
+    second_base = format_quantity_unit(second_quantity, second_unit)
+    first_scaled = format_quantity_unit(scaled_quantity, unit)
+    second_scaled = format_quantity_unit(scale_quantity(second_quantity, recipe_quantity), second_unit)
+
+    return {
+        "name": f"{first_name} OR {second_name}",
+        "base_display": f"{first_base} OR {second_base}",
+        "scaled_display": f"{first_scaled} OR {second_scaled}",
+    }
+
+
+def format_quantity_unit(quantity, unit):
+    quantity = str(quantity or "").strip()
+    unit = str(unit or "").strip()
+
+    if not quantity:
+        return ""
+
+    return f"{quantity} {unit}".strip()
 
 
 def scale_quantity_part(value, multiplier):
