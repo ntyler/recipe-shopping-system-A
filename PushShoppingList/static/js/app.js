@@ -10,6 +10,7 @@ let currentExtractAbortController = null;
 let currentExtractAbortControllers = [];
 let cancelExtractRequested = false;
 const recipeQuantitySaveTimers = new WeakMap();
+const recipeQuantityNoticeTimers = new Map();
 let recipeQuantityStepButtonsBound = false;
 
 function restoreScroll() {
@@ -343,6 +344,13 @@ function queueRecipeQuantitySave(input) {
 }
 
 async function saveRecipeQuantity(input) {
+    const queuedSave = recipeQuantitySaveTimers.get(input);
+
+    if (queuedSave) {
+        clearTimeout(queuedSave);
+        recipeQuantitySaveTimers.delete(input);
+    }
+
     const url = input.dataset.recipeUrl || "";
     const quantity = Math.max(1, parseInt(input.value || "1", 10) || 1);
     input.value = quantity;
@@ -352,6 +360,7 @@ async function saveRecipeQuantity(input) {
     }
 
     input.dataset.savePending = "1";
+    setRecipeQuantityControlSaving(input, true);
 
     try {
         const response = await fetch("/api/recipe_quantity", {
@@ -373,14 +382,38 @@ async function saveRecipeQuantity(input) {
         input.dataset.lastSavedValue = String(quantity);
         input.classList.add("saved");
         updateRecipeQuantityDisplays(url, quantity, data);
+
+        try {
+            await refreshStoreMarkup();
+        } catch (refreshErr) {
+            console.warn("Unable to refresh recipe quantities in the background.", refreshErr);
+        }
+
+        showRecipeQuantityUpdatedMessage(url, quantity);
+
         setTimeout(() => {
             input.classList.remove("saved");
         }, 700);
     } catch (err) {
         console.warn("Unable to save recipe quantity.", err);
     } finally {
+        setRecipeQuantityControlSaving(input, false);
         delete input.dataset.savePending;
     }
+}
+
+function setRecipeQuantityControlSaving(input, isSaving) {
+    const control = input.closest(".recipe-quantity-control");
+
+    if (!control) {
+        input.disabled = isSaving;
+        return;
+    }
+
+    control.classList.toggle("saving", isSaving);
+    control.querySelectorAll("button, input").forEach(element => {
+        element.disabled = isSaving;
+    });
 }
 
 function updateRecipeQuantityDisplays(recipeUrl, multiplier, apiData = null) {
@@ -407,6 +440,39 @@ function updateRecipeQuantityDisplays(recipeUrl, multiplier, apiData = null) {
             element.textContent = multiplier > 1 ? ` -> ${`${scaledQuantity} ${unit}`.trim()}` : "";
         }
     });
+}
+
+function showRecipeQuantityUpdatedMessage(recipeUrl, quantity) {
+    const selector = `.recipe-quantity-update-notice[data-recipe-url="${cssEscape(recipeUrl)}"]`;
+    const notice = document.querySelector(selector);
+
+    if (!notice) {
+        return;
+    }
+
+    const existingTimer = recipeQuantityNoticeTimers.get(recipeUrl);
+
+    if (existingTimer) {
+        clearTimeout(existingTimer.fade);
+        clearTimeout(existingTimer.clear);
+    }
+
+    notice.textContent = `Quantities updated for Qty ${quantity}.`;
+    notice.classList.remove("fading");
+    notice.classList.add("visible");
+
+    const fade = setTimeout(() => {
+        notice.classList.add("fading");
+        notice.classList.remove("visible");
+    }, 1400);
+
+    const clear = setTimeout(() => {
+        notice.textContent = "";
+        notice.classList.remove("fading");
+        recipeQuantityNoticeTimers.delete(recipeUrl);
+    }, 2200);
+
+    recipeQuantityNoticeTimers.set(recipeUrl, { fade, clear });
 }
 
 function findScaledIngredient(apiData, ingredientName) {

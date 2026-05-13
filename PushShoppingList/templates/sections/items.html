@@ -133,6 +133,10 @@
                     <a href="{{ recipe.url }}" target="_blank">{{ recipe.name }}</a>
                 </div>
 
+                <div class="recipe-quantity-update-notice"
+                     data-recipe-url="{{ recipe.url }}"
+                     aria-live="polite"></div>
+
                 {% if recipe.base_servings %}
                     <div class="recipe-meta">
                         Servings:

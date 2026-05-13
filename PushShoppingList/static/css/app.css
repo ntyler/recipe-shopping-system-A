@@ -1260,6 +1260,28 @@ body {
             box-shadow: 0 0 0 1px rgba(0, 204, 102, 0.35);
         }
 
+        .recipe-quantity-update-notice {
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            margin: 0;
+            color: #00ff9d;
+            font-size: 14px;
+            font-weight: 700;
+            text-align: center;
+            transition: opacity 0.45s ease, max-height 0.45s ease, margin 0.45s ease;
+        }
+
+        .recipe-quantity-update-notice.visible {
+            max-height: 28px;
+            opacity: 1;
+            margin: 8px 0 4px 0;
+        }
+
+        .recipe-quantity-update-notice.fading {
+            opacity: 0;
+        }
+
         .remove-recipe-form { margin: 0; }
 
         .remove-recipe-btn {
