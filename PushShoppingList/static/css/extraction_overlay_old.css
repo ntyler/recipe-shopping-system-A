@@ -218,7 +218,7 @@
 }
 
 .extract-old-url-list .bulk-progress-text {
-    display: block;
+    display: inline;
 
     color: #00ff88;
     font-size: 16px;
@@ -227,6 +227,14 @@
 
     overflow-wrap: anywhere;
     word-break: break-word;
+}
+
+.extract-old-url-list .extract-url-progress-link {
+    text-decoration: none;
+}
+
+.extract-old-url-list .extract-url-progress-link:hover {
+    text-decoration: underline;
 }
 
 .extract-old-url-list .bulk-progress-text.active {
