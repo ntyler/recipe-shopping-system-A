@@ -719,6 +719,10 @@ body {
             display: none !important;
         }
 
+        body.hide-qty .item-qty-line {
+            display: none !important;
+        }
+
         body.hide-checked-items .row.row-checked {
             display: none !important;
         }

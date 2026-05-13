@@ -200,6 +200,10 @@ function saveShowBestProductSetting() {
     saveToggleSetting("showBestProductToggle", "show-best-product", "hide-best-product", true);
 }
 
+function saveShowQtySetting() {
+    saveToggleSetting("showQtyToggle", "show-qty", "hide-qty", true);
+}
+
 function saveHideCheckedItemsSetting() {
     saveToggleSetting("hideCheckedItemsToggle", "hide-checked-items", "hide-checked-items");
 }
@@ -229,6 +233,7 @@ function restoreViewBehaviorSettings() {
     restoreToggleSetting("openStoreUrlsToggle", "open-store-urls", true);
     restoreToggleSetting("showItemButtonsToggle", "show-item-buttons", true, "hide-item-buttons", true);
     restoreToggleSetting("showBestProductToggle", "show-best-product", true, "hide-best-product", true);
+    restoreToggleSetting("showQtyToggle", "show-qty", true, "hide-qty", true);
     restoreToggleSetting("hideCheckedItemsToggle", "hide-checked-items", false, "hide-checked-items");
     restoreToggleSetting("compactModeToggle", "compact-mode", false, "compact-mode");
     showView(localStorage.getItem("shopping-view") || "section");
