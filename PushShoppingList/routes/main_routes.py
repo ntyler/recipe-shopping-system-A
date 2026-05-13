@@ -1,3 +1,4 @@
+import html
 import json
 
 from flask import Blueprint
@@ -188,14 +189,18 @@ def normalize_instruction_items(value):
     items = []
     for item in value:
         if isinstance(item, dict):
-            text = str(item.get("instruction") or item.get("text") or "").strip()
+            text = clean_display_text(item.get("instruction") or item.get("text") or "")
         else:
-            text = str(item or "").strip()
+            text = clean_display_text(item)
 
         if text:
             items.append(text)
 
     return items
+
+
+def clean_display_text(value):
+    return " ".join(html.unescape(str(value or "")).split())
 
 
 def normalize_nutrition_items(nutrition):

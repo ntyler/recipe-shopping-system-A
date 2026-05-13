@@ -373,7 +373,7 @@ def build_structured_instructions(raw_instructions):
     instructions = []
 
     for index, instruction in enumerate(flattened, start=1):
-        instruction = str(instruction or "").strip()
+        instruction = clean_recipe_text(instruction)
 
         if instruction:
             instructions.append({
