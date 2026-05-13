@@ -535,6 +535,103 @@ function showRecipeQuantityUpdatedMessage(recipeUrl, quantity, recipeNumber = ""
     recipeQuantityNoticeTimers.set("global", { fade, clear });
 }
 
+function openItemQtyEditor(button) {
+    const modal = document.getElementById("itemQtyModal");
+    const keyInput = document.getElementById("itemQtyKeyInput");
+    const manualInput = document.getElementById("itemQtyManualInput");
+    const nameDisplay = document.getElementById("itemQtyName");
+    const currentDisplay = document.getElementById("itemQtyCurrent");
+
+    if (!modal || !keyInput || !manualInput || !nameDisplay || !currentDisplay) {
+        return;
+    }
+
+    const itemName = button.dataset.itemName || "";
+    const currentQty = button.dataset.currentQty || "";
+    const manualQty = button.dataset.manualQty || "";
+
+    keyInput.value = button.dataset.itemKey || "";
+    manualInput.value = manualQty;
+    nameDisplay.textContent = itemName;
+    currentDisplay.textContent = currentQty || "No recipe quantity found.";
+    currentDisplay.classList.toggle("muted", !currentQty);
+
+    modal.style.display = "flex";
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+    setTimeout(() => manualInput.focus(), 0);
+}
+
+function closeItemQtyEditor() {
+    const modal = document.getElementById("itemQtyModal");
+
+    if (modal) {
+        modal.style.display = "none";
+        modal.setAttribute("aria-hidden", "true");
+        document.body.classList.remove("modal-open");
+    }
+}
+
+async function clearItemQtyOverride() {
+    const manualInput = document.getElementById("itemQtyManualInput");
+
+    if (manualInput) {
+        manualInput.value = "";
+    }
+
+    await saveItemQtyOverride();
+}
+
+async function saveItemQtyOverride(event) {
+    if (event) {
+        event.preventDefault();
+    }
+
+    const form = document.getElementById("itemQtyForm");
+
+    if (!form) {
+        return false;
+    }
+
+    const saveButton = form.querySelector(".item-qty-save-btn");
+    const formData = new FormData(form);
+    formData.set("ajax", "1");
+
+    if (saveButton) {
+        saveButton.disabled = true;
+        saveButton.textContent = "Saving...";
+    }
+
+    try {
+        const response = await fetch("/save_item_qty", {
+            method: "POST",
+            headers: {
+                "X-Requested-With": "fetch",
+            },
+            body: formData,
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error("Unable to save item quantity.");
+        }
+
+        closeItemQtyEditor();
+        await refreshStoreMarkup();
+        showRecipeQuantityUpdatedMessage("", "", "", "Item quantity updated.");
+    } catch (err) {
+        console.warn("Unable to save item quantity.", err);
+        alert("Unable to save item quantity.");
+    } finally {
+        if (saveButton) {
+            saveButton.disabled = false;
+            saveButton.textContent = "Save Qty";
+        }
+    }
+
+    return false;
+}
+
 function findScaledIngredient(apiData, ingredientName) {
     if (!apiData || !apiData.ingredients) {
         return null;

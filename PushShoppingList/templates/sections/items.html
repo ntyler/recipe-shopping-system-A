@@ -55,6 +55,16 @@
                             <input type="hidden" name="item" value="{{ item }}">
                             <button type="submit" class="product-search-btn">Products</button>
                         </form>
+
+                        <button type="button"
+                                class="edit-qty-btn"
+                                data-item-key="{{ item_key }}"
+                                data-item-name="{{ item }}"
+                                data-current-qty="{{ recipe_item_quantities.get(item_key, '') }}"
+                                data-manual-qty="{{ state.get('manual_qty', '') }}"
+                                onclick="openItemQtyEditor(this)">
+                            EDIT
+                        </button>
                     </div>
                 </div>
             {% endif %}
@@ -90,6 +100,7 @@
 
                 {% for item in section["items"] %}
                     {% set item_key = normalize(item) %}
+                    {% set state = item_state.get(item_key, {}) %}
                     {% set food_status = food_rule_status(item) %}
                     <div class="row" data-key="{{ item_key }}">
                         <div class="item">
@@ -110,7 +121,7 @@
                                 {% set store = available_stores.get(store_key) %}
                                 {% if store %}
                                     <button type="button"
-                                            class="store-btn {% if item_state.get(normalize(item), {}).get('store') == store_key %}active{% endif %}"
+                                            class="store-btn {% if state.get('store') == store_key %}active{% endif %}"
                                             data-store="{{ store_key }}"
                                             data-store-url="{{ store.url }}"
                                             data-item-key="{{ item_key }}">
@@ -118,6 +129,16 @@
                                     </button>
                                 {% endif %}
                             {% endfor %}
+
+                            <button type="button"
+                                    class="edit-qty-btn"
+                                    data-item-key="{{ item_key }}"
+                                    data-item-name="{{ item }}"
+                                    data-current-qty="{{ recipe_item_quantities.get(item_key, '') }}"
+                                    data-manual-qty="{{ state.get('manual_qty', '') }}"
+                                    onclick="openItemQtyEditor(this)">
+                                EDIT
+                            </button>
                         </div>
                     </div>
                 {% endfor %}
@@ -264,8 +285,10 @@
                                         {% endif %}
                                     </div>
 
-                                    <div class="source-line">
-                                        {% if recipe_item.quantity %}
+                                    <div class="source-line item-qty-line">
+                                        {% if state.get('manual_qty') %}
+                                            {{ state.get('manual_qty') }}
+                                        {% elif recipe_item.quantity %}
                                             <span class="recipe-ingredient-scaled-quantity"
                                                   data-recipe-url="{{ recipe.url }}"
                                                   data-ingredient-name="{{ recipe_item.name }}"
@@ -299,6 +322,16 @@
                                         <input type="hidden" name="item" value="{{ display_name }}">
                                         <button type="submit" class="product-search-btn">Products</button>
                                     </form>
+
+                                    <button type="button"
+                                            class="edit-qty-btn"
+                                            data-item-key="{{ item_key }}"
+                                            data-item-name="{{ display_name }}"
+                                            data-current-qty="{{ recipe_item.base_display or '' }}"
+                                            data-manual-qty="{{ state.get('manual_qty', '') }}"
+                                            onclick="openItemQtyEditor(this)">
+                                        EDIT
+                                    </button>
                                 </div>
                             </div>
                         {% endfor %}

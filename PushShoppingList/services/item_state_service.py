@@ -33,6 +33,23 @@ def save_item_store(item_key, store_key):
     return state
 
 
+def save_item_manual_qty(item_key, manual_qty):
+    state = load_item_state()
+    item = state.setdefault(item_key, {})
+    manual_qty = str(manual_qty or "").strip()
+
+    if manual_qty:
+        item["manual_qty"] = manual_qty
+    else:
+        item.pop("manual_qty", None)
+
+    if not item:
+        state.pop(item_key, None)
+
+    save_item_state(state)
+    return state
+
+
 def reset_item_stores():
     state = load_item_state()
 

@@ -1,0 +1,39 @@
+<div id="itemQtyModal" class="item-qty-modal-backdrop" style="display:none;" aria-hidden="true">
+    <div class="item-qty-modal-card" role="dialog" aria-modal="true" aria-labelledby="itemQtyModalTitle">
+        <div class="item-qty-modal-header">
+            <h2 id="itemQtyModalTitle">Edit Qty</h2>
+            <button type="button" class="item-qty-close-btn" onclick="closeItemQtyEditor()">Close</button>
+        </div>
+
+        <form id="itemQtyForm" onsubmit="return saveItemQtyOverride(event)">
+            <input type="hidden" id="itemQtyKeyInput" name="item_key">
+
+            <div class="item-qty-field">
+                <label>Ingredient</label>
+                <div id="itemQtyName" class="item-qty-readonly"></div>
+            </div>
+
+            <div class="item-qty-field">
+                <label>Recipe qty</label>
+                <div id="itemQtyCurrent" class="item-qty-readonly muted">No recipe quantity found.</div>
+            </div>
+
+            <div class="item-qty-field">
+                <label for="itemQtyManualInput">Manual qty</label>
+                <input id="itemQtyManualInput"
+                       name="manual_qty"
+                       type="text"
+                       placeholder="e.g. 1 bottle, 2 cups, 12 oz">
+            </div>
+
+            <div class="item-qty-help">
+                Leave manual qty blank to go back to the recipe quantity.
+            </div>
+
+            <div class="item-qty-actions">
+                <button type="submit" class="item-qty-save-btn">Save Qty</button>
+                <button type="button" class="item-qty-clear-btn" onclick="clearItemQtyOverride()">Use Recipe Qty</button>
+            </div>
+        </form>
+    </div>
+</div>

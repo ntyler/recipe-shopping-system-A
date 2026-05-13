@@ -14,6 +14,7 @@ from PushShoppingList.services.food_rules_service import shopping_item_food_rule
 from PushShoppingList.services.home_address_service import load_home_address
 from PushShoppingList.services.home_address_service import save_home_address
 from PushShoppingList.services.item_state_service import load_item_state
+from PushShoppingList.services.item_state_service import save_item_manual_qty
 from PushShoppingList.services.recipe_url_service import recipe_url_rows
 from PushShoppingList.services.recipe_url_service import save_recipe_urls
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
@@ -144,6 +145,20 @@ def recipe_quantity_lookup(recipe_rows):
         key: summarize_quantity_displays(values)
         for key, values in quantities.items()
     }
+
+
+def apply_manual_item_quantities(item_quantities, item_state):
+    quantities = dict(item_quantities)
+
+    for item_key, state in item_state.items():
+        if not isinstance(state, dict):
+            continue
+
+        manual_qty = str(state.get("manual_qty") or "").strip()
+        if manual_qty:
+            quantities[normalize(item_key)] = manual_qty
+
+    return quantities
 
 
 def summarize_quantity_displays(values):
@@ -602,7 +617,11 @@ def index():
     recipe_urls = recipe_url_rows()
     item_state = load_item_state()
     recipe_rows = recipe_view_rows(recipe_urls)
-    item_quantities = recipe_quantity_lookup(recipe_rows)
+    recipe_item_quantities = recipe_quantity_lookup(recipe_rows)
+    item_quantities = apply_manual_item_quantities(
+        recipe_item_quantities,
+        item_state,
+    )
 
     return render_template(
         "index.html",
@@ -616,6 +635,7 @@ def index():
         shopping_items=shopping_items_only(items),
         item_state=item_state,
         item_quantities=item_quantities,
+        recipe_item_quantities=recipe_item_quantities,
         section_counts=section_counts(items),
         store_view=build_store_view(
             items,
@@ -675,3 +695,24 @@ def save_home_address_route():
         })
 
     return redirect("/#home-address-section")
+
+
+@main_bp.route("/save_item_qty", methods=["POST"])
+def save_item_qty_route():
+    item_key = normalize(request.form.get("item_key", ""))
+    manual_qty = str(request.form.get("manual_qty", "") or "").strip()
+
+    if item_key:
+        save_item_manual_qty(item_key, manual_qty)
+
+    if (
+        request.headers.get("X-Requested-With") == "fetch"
+        or request.form.get("ajax") == "1"
+    ):
+        return jsonify({
+            "ok": True,
+            "item_key": item_key,
+            "manual_qty": manual_qty,
+        })
+
+    return redirect("/")
