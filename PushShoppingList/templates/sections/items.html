@@ -330,7 +330,7 @@
                                             data-item-key="{{ item_key }}"
                                             data-item-name="{{ display_name }}"
                                             data-current-qty="{{ recipe_item.quantity_display or recipe_item.base_display or '' }}"
-                                            data-recipe-qty-sources='{{ [{"label": "Recipe " ~ recipe.number ~ " qty", "ingredient": recipe_item.name or display_name, "quantity": recipe_item.quantity_display or recipe_item.base_display or ""}]|tojson }}'
+                                            data-recipe-qty-sources='{{ [{"label": "Recipe " ~ recipe.number ~ " Qry", "ingredient": recipe_item.name or display_name, "default_quantity": recipe_item.base_display or "", "default_quantity_value": recipe_item.base_quantity or "", "default_unit": recipe_item.unit or "", "recipe_number": recipe.number, "recipe_quantity": recipe.quantity, "url": recipe.url, "quantity": recipe_item.quantity_display or recipe_item.base_display or ""}]|tojson }}'
                                             data-manual-qty="{{ state.get('manual_qty', '') }}"
                                             onclick="openItemQtyEditor(this)">
                                         EDIT

@@ -23,6 +23,7 @@ from PushShoppingList.services.recipe_ingredient_service import save_ingredients
 from PushShoppingList.services.recipe_url_service import add_recipe_urls
 from PushShoppingList.services.recipe_url_service import normalize_recipe_quantity
 from PushShoppingList.services.recipe_url_service import remove_recipe_url
+from PushShoppingList.services.recipe_quantity_service import update_recipe_ingredient_quantity
 from PushShoppingList.services.recipe_quantity_service import update_recipe_quantity
 from PushShoppingList.services.shopping_list_service import add_items
 
@@ -171,6 +172,20 @@ def api_recipe_quantity_route():
     quantity = normalize_recipe_quantity(quantity)
 
     return jsonify(update_recipe_quantity(url, quantity))
+
+
+@recipe_bp.route("/api/recipe_ingredient_quantity", methods=["POST"])
+def api_recipe_ingredient_quantity_route():
+    data = request.get_json(silent=True) or {}
+    url = str(data.get("url", "") or "").strip()
+    ingredient = str(data.get("ingredient", "") or "").strip()
+    quantity = str(data.get("quantity", "") or "").strip()
+    unit = str(data.get("unit", "") or "").strip()
+
+    result = update_recipe_ingredient_quantity(url, ingredient, quantity, unit)
+    status = 200 if result.get("ok") else 404
+
+    return jsonify(result), status
 
 
 @recipe_bp.route("/remove_recipe", methods=["POST"])

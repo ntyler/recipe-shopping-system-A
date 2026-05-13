@@ -152,7 +152,7 @@ def recipe_quantity_sources_lookup(recipe_rows):
 
     for recipe in recipe_rows:
         recipe_number = recipe.get("number")
-        recipe_label = f"Recipe {recipe_number} qty" if recipe_number else "Recipe qty"
+        recipe_label = f"Recipe {recipe_number} Qry" if recipe_number else "Recipe Qry"
 
         for section_items in recipe.get("sections", {}).values():
             for item in section_items:
@@ -166,6 +166,12 @@ def recipe_quantity_sources_lookup(recipe_rows):
                 sources.setdefault(key, []).append({
                     "label": recipe_label,
                     "ingredient": str(item.get("name") or display_name).strip(),
+                    "default_quantity": str(item.get("base_display") or "").strip(),
+                    "default_quantity_value": str(item.get("base_quantity") or "").strip(),
+                    "default_unit": str(item.get("unit") or "").strip(),
+                    "recipe_number": recipe_number,
+                    "recipe_quantity": recipe.get("quantity") or 1,
+                    "url": recipe.get("url") or "",
                     "quantity": str(quantity_display).strip(),
                 })
 

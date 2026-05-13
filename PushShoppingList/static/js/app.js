@@ -672,6 +672,7 @@ function openItemQtyEditor(button) {
     const keyInput = document.getElementById("itemQtyKeyInput");
     const manualInput = document.getElementById("itemQtyManualInput");
     const nameDisplay = document.getElementById("itemQtyName");
+    const titleNameDisplay = document.getElementById("itemQtyTitleName");
     const currentDisplay = document.getElementById("itemQtyCurrent");
     const sourcesDisplay = document.getElementById("itemQtySources");
 
@@ -686,9 +687,12 @@ function openItemQtyEditor(button) {
     keyInput.value = button.dataset.itemKey || "";
     manualInput.value = manualQty;
     nameDisplay.textContent = itemName;
+    if (titleNameDisplay) {
+        titleNameDisplay.textContent = itemName ? itemName : "";
+    }
     currentDisplay.textContent = currentQty || "No recipe quantity found.";
     currentDisplay.classList.toggle("muted", !currentQty);
-    renderItemQtySources(sourcesDisplay, button.dataset.recipeQtySources);
+    renderItemQtySources(sourcesDisplay, button.dataset.recipeQtySources, button.dataset.itemKey || "");
 
     modal.style.display = "flex";
     modal.setAttribute("aria-hidden", "false");
@@ -696,7 +700,7 @@ function openItemQtyEditor(button) {
     setTimeout(() => manualInput.focus(), 0);
 }
 
-function renderItemQtySources(container, sourcesJson) {
+function renderItemQtySources(container, sourcesJson, itemKey = "") {
     if (!container) {
         return;
     }
@@ -709,13 +713,22 @@ function renderItemQtySources(container, sourcesJson) {
         sources = [];
     }
 
-    sources = sources.filter(source => source && source.quantity);
+    sources = sources.filter(source => source && (source.quantity || source.ingredient || source.url));
     container.replaceChildren();
-    container.hidden = sources.length <= 1;
+    container.hidden = sources.length === 0;
 
-    if (sources.length <= 1) {
+    if (!sources.length) {
         return;
     }
+
+    const header = document.createElement("div");
+    header.className = "item-qty-source-header";
+    ["Recipe", "Default qty", "Unit", "Recipe Qry"].forEach(text => {
+        const cell = document.createElement("span");
+        cell.textContent = text;
+        header.appendChild(cell);
+    });
+    container.appendChild(header);
 
     sources.forEach(source => {
         const row = document.createElement("div");
@@ -725,17 +738,152 @@ function renderItemQtySources(container, sourcesJson) {
         label.className = "item-qty-source-label";
         label.textContent = source.label || "Recipe qty";
 
-        const ingredient = document.createElement("span");
-        ingredient.className = "item-qty-source-ingredient";
-        ingredient.textContent = source.ingredient || "Ingredient";
+        const defaultQuantity = document.createElement("div");
+        defaultQuantity.className = "item-qty-source-default";
+        const defaultQuantityValue = source.default_quantity_value || source.default_quantity || source.quantity || "";
+        const defaultQuantityInput = document.createElement("input");
+        defaultQuantityInput.className = "item-qty-source-default-input";
+        defaultQuantityInput.type = "text";
+        defaultQuantityInput.value = defaultQuantityValue;
+        defaultQuantityInput.placeholder = "qty";
+        defaultQuantityInput.dataset.recipeUrl = source.url || "";
+        defaultQuantityInput.dataset.ingredientName = source.ingredient || "";
+        defaultQuantityInput.dataset.itemKey = itemKey;
+        defaultQuantityInput.setAttribute("aria-label", `${source.label || "Recipe"} default quantity`);
 
-        const quantity = document.createElement("span");
-        quantity.className = "item-qty-source-value";
-        quantity.textContent = source.quantity;
+        const defaultUnitInput = document.createElement("input");
+        defaultUnitInput.className = "item-qty-source-unit-input";
+        defaultUnitInput.type = "text";
+        defaultUnitInput.value = source.default_unit || "";
+        defaultUnitInput.placeholder = "unit";
+        defaultUnitInput.dataset.recipeUrl = source.url || "";
+        defaultUnitInput.dataset.ingredientName = source.ingredient || "";
+        defaultUnitInput.dataset.itemKey = itemKey;
+        defaultUnitInput.setAttribute("aria-label", `${source.label || "Recipe"} default unit`);
 
-        row.append(label, ingredient, quantity);
+        [defaultQuantityInput, defaultUnitInput].forEach(input => {
+            input.addEventListener("change", () => {
+                saveItemModalDefaultQuantity(defaultQuantityInput, defaultUnitInput);
+            });
+
+            input.addEventListener("keydown", event => {
+                if (event.key === "Enter") {
+                    event.preventDefault();
+                    saveItemModalDefaultQuantity(defaultQuantityInput, defaultUnitInput);
+                }
+            });
+        });
+
+        defaultQuantity.append(defaultQuantityInput, defaultUnitInput);
+
+        const quantityInput = document.createElement("input");
+        quantityInput.className = "item-qty-source-value recipe-quantity-input";
+        quantityInput.type = "number";
+        quantityInput.min = "1";
+        quantityInput.step = "1";
+        quantityInput.value = source.recipe_quantity || 1;
+        quantityInput.placeholder = "1";
+        quantityInput.dataset.recipeUrl = source.url || "";
+        quantityInput.dataset.recipeNumber = source.recipe_number || "";
+        quantityInput.dataset.lastSavedValue = String(source.recipe_quantity || 1);
+        quantityInput.dataset.itemKey = itemKey;
+        quantityInput.title = source.quantity ? `Ingredient qty: ${source.quantity}` : "";
+
+        quantityInput.addEventListener("change", () => {
+            saveItemModalRecipeQuantity(quantityInput);
+        });
+
+        quantityInput.addEventListener("keydown", event => {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                saveItemModalRecipeQuantity(quantityInput);
+            }
+        });
+
+        row.append(label, defaultQuantity, quantityInput);
         container.appendChild(row);
     });
+}
+
+async function saveItemModalDefaultQuantity(quantityInput, unitInput) {
+    const url = quantityInput.dataset.recipeUrl || unitInput.dataset.recipeUrl || "";
+    const ingredient = quantityInput.dataset.ingredientName || unitInput.dataset.ingredientName || "";
+    const itemKey = quantityInput.dataset.itemKey || unitInput.dataset.itemKey || "";
+
+    quantityInput.disabled = true;
+    unitInput.disabled = true;
+
+    try {
+        const response = await fetch("/api/recipe_ingredient_quantity", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                url: url,
+                ingredient: ingredient,
+                quantity: quantityInput.value.trim(),
+                unit: unitInput.value.trim(),
+            }),
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to save recipe ingredient quantity.");
+        }
+
+        await refreshStoreMarkup();
+        syncOpenItemQtyEditor(itemKey);
+        showRecipeQuantityUpdatedMessage("", "", "", "Recipe ingredient qty updated.");
+    } catch (err) {
+        console.warn("Unable to save recipe ingredient quantity.", err);
+        alert("Unable to save recipe ingredient quantity.");
+    } finally {
+        quantityInput.disabled = false;
+        unitInput.disabled = false;
+    }
+}
+
+async function saveItemModalRecipeQuantity(input) {
+    let data = null;
+
+    try {
+        normalizeRecipeQuantityInput(input);
+        data = await saveRecipeQuantity(input, { throwOnError: true });
+    } catch (err) {
+        console.warn("Unable to save recipe quantity from item modal.", err);
+        alert("Unable to save recipe quantity.");
+        return;
+    }
+
+    if (data) {
+        syncOpenItemQtyEditor(input.dataset.itemKey || "");
+    }
+}
+
+function syncOpenItemQtyEditor(itemKey) {
+    if (!itemKey) {
+        return;
+    }
+
+    const modal = document.getElementById("itemQtyModal");
+
+    if (!modal || modal.getAttribute("aria-hidden") === "true") {
+        return;
+    }
+
+    const sourceButton = document.querySelector(`.edit-qty-btn[data-item-key="${cssEscape(itemKey)}"]`);
+    const currentDisplay = document.getElementById("itemQtyCurrent");
+    const sourcesDisplay = document.getElementById("itemQtySources");
+
+    if (!sourceButton || !currentDisplay) {
+        return;
+    }
+
+    const currentQty = sourceButton.dataset.currentQty || "";
+    currentDisplay.textContent = currentQty || "No recipe quantity found.";
+    currentDisplay.classList.toggle("muted", !currentQty);
+    renderItemQtySources(sourcesDisplay, sourceButton.dataset.recipeQtySources, itemKey);
 }
 
 function closeItemQtyEditor() {

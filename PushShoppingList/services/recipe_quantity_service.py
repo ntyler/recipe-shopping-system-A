@@ -49,6 +49,59 @@ def update_recipe_quantity(url, quantity):
     }
 
 
+def update_recipe_ingredient_quantity(url, ingredient_name, quantity, unit):
+    recipe_path, recipe_data = load_saved_recipe_output_with_path(url)
+    ingredient_name = str(ingredient_name or "").strip()
+    quantity = str(quantity or "").strip()
+    unit = str(unit or "").strip()
+
+    if not recipe_path or not recipe_data or not ingredient_name:
+        return {
+            "ok": False,
+            "error": "Recipe ingredient not found.",
+        }
+
+    target_key = ingredient_key(ingredient_name)
+    updated_item = None
+
+    for item in recipe_data.get("ingredients", []) or []:
+        if not isinstance(item, dict):
+            continue
+
+        if ingredient_key(item.get("ingredient")) != target_key:
+            continue
+
+        item["quantity"] = quantity or None
+        item["unit"] = unit or None
+        updated_item = item
+        break
+
+    if not updated_item:
+        return {
+            "ok": False,
+            "error": "Recipe ingredient not found.",
+        }
+
+    recipe_path.write_text(
+        json.dumps(recipe_data, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    recipe_meta = load_recipe_ingredients().get(normalize_recipe_url_key(url), {})
+    recipe_quantity = normalize_recipe_quantity(recipe_meta.get("quantity", 1))
+    scaled = update_recipe_quantity(url, recipe_quantity)
+
+    return {
+        "ok": True,
+        "url": url,
+        "ingredient": updated_item.get("ingredient"),
+        "quantity": updated_item.get("quantity"),
+        "unit": updated_item.get("unit"),
+        "recipe_quantity": recipe_quantity,
+        "scaled": scaled,
+    }
+
+
 def calculate_scaled_recipe_values(recipe_data, quantity):
     if not recipe_data:
         return {
@@ -219,6 +272,11 @@ def normalize_scaled_values(data):
 
 
 def load_saved_recipe_output(recipe_url):
+    _json_path, data = load_saved_recipe_output_with_path(recipe_url)
+    return data
+
+
+def load_saved_recipe_output_with_path(recipe_url):
     recipe_key = normalize_recipe_url_key(recipe_url)
 
     for json_path in OUTPUT_FOLDER.glob("*.json"):
@@ -231,9 +289,9 @@ def load_saved_recipe_output(recipe_url):
             continue
 
         if normalize_recipe_url_key(data.get("source_url", "")) == recipe_key:
-            return data
+            return json_path, data
 
-    return {}
+    return None, {}
 
 
 def ingredient_key(text):
