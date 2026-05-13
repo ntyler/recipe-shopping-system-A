@@ -9,6 +9,7 @@ let lastRenderedExtractProgress = null;
 let currentExtractAbortController = null;
 let currentExtractAbortControllers = [];
 let cancelExtractRequested = false;
+const recipeQuantitySaveTimers = new WeakMap();
 
 function restoreScroll() {
     const scrollY = localStorage.getItem("scrollY");
@@ -275,6 +276,12 @@ function restoreItemCheckState() {
 
 function bindRecipeQuantityInputs() {
     document.querySelectorAll(".recipe-quantity-input").forEach(input => {
+        input.dataset.lastSavedValue = input.value || "1";
+
+        input.addEventListener("input", () => {
+            queueRecipeQuantitySave(input);
+        });
+
         input.addEventListener("change", () => {
             saveRecipeQuantity(input);
         });
@@ -283,12 +290,56 @@ function bindRecipeQuantityInputs() {
             saveRecipeQuantity(input);
         });
     });
+
+    document.addEventListener("click", event => {
+        const button = event.target.closest(".recipe-quantity-step");
+
+        if (!button) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        const control = button.closest(".recipe-quantity-control");
+        const input = control ? control.querySelector(".recipe-quantity-input") : null;
+
+        if (!input) {
+            return;
+        }
+
+        const step = parseInt(button.dataset.step || "0", 10);
+        const currentValue = parseInt(input.value || "1", 10) || 1;
+        input.value = Math.max(1, currentValue + step);
+        saveRecipeQuantity(input);
+    });
+}
+
+function queueRecipeQuantitySave(input) {
+    const existingTimer = recipeQuantitySaveTimers.get(input);
+
+    if (existingTimer) {
+        clearTimeout(existingTimer);
+    }
+
+    const timer = setTimeout(() => {
+        saveRecipeQuantity(input);
+        recipeQuantitySaveTimers.delete(input);
+    }, 450);
+
+    recipeQuantitySaveTimers.set(input, timer);
 }
 
 async function saveRecipeQuantity(input) {
     const url = input.dataset.recipeUrl || "";
     const quantity = Math.max(1, parseInt(input.value || "1", 10) || 1);
     input.value = quantity;
+
+    if (input.dataset.lastSavedValue === String(quantity) && !input.dataset.savePending) {
+        return;
+    }
+
+    input.dataset.savePending = "1";
 
     try {
         const response = await fetch("/api/recipe_quantity", {
@@ -307,6 +358,7 @@ async function saveRecipeQuantity(input) {
         }
 
         const data = await response.json();
+        input.dataset.lastSavedValue = String(quantity);
         input.classList.add("saved");
         updateRecipeQuantityDisplays(url, quantity, data);
         setTimeout(() => {
@@ -314,21 +366,24 @@ async function saveRecipeQuantity(input) {
         }, 700);
     } catch (err) {
         console.warn("Unable to save recipe quantity.", err);
+    } finally {
+        delete input.dataset.savePending;
     }
 }
 
 function updateRecipeQuantityDisplays(recipeUrl, multiplier, apiData = null) {
-    document.querySelectorAll(`.recipe-servings-value[data-recipe-url="${cssEscape(recipeUrl)}"]`).forEach(element => {
+    document.querySelectorAll(`.recipe-servings-scaled[data-recipe-url="${cssEscape(recipeUrl)}"]`).forEach(element => {
         const baseServings = element.dataset.baseServings || "";
-        element.textContent = (apiData && apiData.servings) || scaleServingsForDisplay(baseServings, multiplier);
+        const scaledServings = (apiData && apiData.servings) || scaleServingsForDisplay(baseServings, multiplier);
+        element.textContent = multiplier > 1 && scaledServings ? ` -> ${scaledServings}` : "";
     });
 
-    document.querySelectorAll(`.recipe-ingredient-quantity[data-recipe-url="${cssEscape(recipeUrl)}"]`).forEach(element => {
+    document.querySelectorAll(`.recipe-ingredient-scaled-quantity[data-recipe-url="${cssEscape(recipeUrl)}"]`).forEach(element => {
         const ingredientName = element.dataset.ingredientName || "";
         const apiIngredient = findScaledIngredient(apiData, ingredientName);
 
         if (apiIngredient && apiIngredient.display) {
-            element.textContent = apiIngredient.display;
+            element.textContent = multiplier > 1 ? ` -> ${apiIngredient.display}` : "";
             return;
         }
 
@@ -337,7 +392,7 @@ function updateRecipeQuantityDisplays(recipeUrl, multiplier, apiData = null) {
         const scaledQuantity = scaleQuantityForDisplay(baseQuantity, multiplier);
 
         if (scaledQuantity) {
-            element.textContent = `${scaledQuantity} ${unit}`.trim();
+            element.textContent = multiplier > 1 ? ` -> ${`${scaledQuantity} ${unit}`.trim()}` : "";
         }
     });
 }

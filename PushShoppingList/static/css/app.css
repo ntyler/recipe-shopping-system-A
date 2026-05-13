@@ -1226,6 +1226,23 @@ body {
             white-space: nowrap;
         }
 
+        .recipe-quantity-step {
+            width: 30px;
+            height: 30px;
+            margin: 0;
+            padding: 0;
+            border-radius: 6px;
+            background: #333;
+            color: #fff;
+            font-size: 18px;
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        .recipe-quantity-step:hover {
+            background: #555;
+        }
+
         .recipe-quantity-input {
             width: 62px;
             margin: 0;

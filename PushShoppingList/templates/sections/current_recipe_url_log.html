@@ -10,15 +10,27 @@
                     <a href="{{ recipe.url }}" target="_blank">{{ recipe.name }}</a>
                 </div>
 
-                <label class="recipe-quantity-control">
+                <div class="recipe-quantity-control">
                     <span>Qty</span>
+                    <button type="button"
+                            class="recipe-quantity-step"
+                            data-step="-1"
+                            aria-label="Decrease recipe quantity">
+                        -
+                    </button>
                     <input type="number"
                            class="recipe-quantity-input"
                            min="1"
                            step="1"
                            value="{{ recipe.quantity }}"
                            data-recipe-url="{{ recipe.url }}">
-                </label>
+                    <button type="button"
+                            class="recipe-quantity-step"
+                            data-step="1"
+                            aria-label="Increase recipe quantity">
+                        +
+                    </button>
+                </div>
 
                 <form method="POST"
                       action="{{ url_for('recipe_bp.remove_recipe_route') }}"

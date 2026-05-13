@@ -113,7 +113,7 @@ def recipe_view_rows(recipe_urls):
             "url": recipe["url"],
             "quantity": recipe_quantity,
             "base_servings": recipe_data.get("servings"),
-            "servings": scaled_servings or scale_servings(recipe_data.get("servings"), recipe_quantity),
+            "scaled_servings": scaled_servings or scale_servings(recipe_data.get("servings"), recipe_quantity),
             "equipment_items": normalize_text_list(recipe_data.get("equipment", [])),
             "instruction_items": normalize_instruction_items(recipe_data.get("instructions", [])),
             "nutrition_items": normalize_nutrition_items(recipe_data.get("nutrition", {})),
@@ -165,8 +165,9 @@ def build_recipe_sections(recipe_data, recipe_quantity=1, scaled_ingredients=Non
 
         sections[section].append({
             "name": name,
-            "quantity": scaled_quantity or fallback_quantity,
+            "quantity": ingredient.get("quantity"),
             "base_quantity": ingredient.get("quantity"),
+            "scaled_quantity": scaled_quantity or fallback_quantity,
             "unit": scaled_unit if scaled_unit is not None else ingredient.get("unit"),
             "quantity_display": scaled_display,
             "url": recipe_data.get("source_url"),

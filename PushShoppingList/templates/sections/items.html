@@ -133,13 +133,18 @@
                     <a href="{{ recipe.url }}" target="_blank">{{ recipe.name }}</a>
                 </div>
 
-                {% if recipe.servings %}
+                {% if recipe.base_servings %}
                     <div class="recipe-meta">
                         Servings:
-                        <span class="recipe-servings-value"
+                        <span class="recipe-servings-base">
+                            {{ recipe.base_servings }}
+                        </span>
+                        <span class="recipe-servings-scaled"
                               data-recipe-url="{{ recipe.url }}"
                               data-base-servings="{{ recipe.base_servings or "" }}">
-                            {{ recipe.servings }}
+                            {% if recipe.quantity > 1 and recipe.scaled_servings %}
+                                -> {{ recipe.scaled_servings }}
+                            {% endif %}
                         </span>
                     </div>
                 {% endif %}
@@ -253,12 +258,17 @@
 
                                     <div class="source-line">
                                         {% if recipe_item.quantity %}
-                                            <span class="recipe-ingredient-quantity"
+                                            <span class="recipe-ingredient-base-quantity">
+                                                {{ recipe_item.quantity }} {{ recipe_item.unit or "" }}
+                                            </span>
+                                            <span class="recipe-ingredient-scaled-quantity"
                                                   data-recipe-url="{{ recipe.url }}"
                                                   data-ingredient-name="{{ recipe_item.name }}"
                                                   data-base-quantity="{{ recipe_item.base_quantity or "" }}"
                                                   data-unit="{{ recipe_item.unit or "" }}">
-                                                {{ recipe_item.quantity_display or (recipe_item.quantity ~ " " ~ (recipe_item.unit or "")) }}
+                                                {% if recipe.quantity > 1 %}
+                                                    -> {{ recipe_item.quantity_display or (recipe_item.scaled_quantity ~ " " ~ (recipe_item.unit or "")) }}
+                                                {% endif %}
                                             </span>
                                         {% endif %}
                                     </div>
