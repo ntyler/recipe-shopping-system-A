@@ -99,6 +99,22 @@ body {
         }
 
         .extract-btn { background: #107C10; }
+        .recipe-media-upload-form {
+            margin-top: 10px;
+        }
+
+        .recipe-media-upload-btn {
+            background: #0f766e;
+        }
+
+        .recipe-media-upload-status {
+            min-height: 18px;
+            margin-top: 8px;
+            color: #aaa;
+            font-size: 13px;
+            text-align: center;
+        }
+
         .save-btn { background: #0078D7; }
         .sort-btn { background: #6a00cc; }
         .clear-btn { background: #cc0000; }
@@ -1206,19 +1222,74 @@ body {
             font-weight: bold;
         }
 
+        .recipe-url-link {
+            flex: 0 0 auto;
+            white-space: nowrap;
+        }
+
+        .recipe-log-header,
         .recipe-row {
-            display: flex;
+            display: grid;
+            grid-template-columns: 80px 70px minmax(180px, 1fr) auto auto;
             align-items: center;
-            justify-content: space-between;
             margin-bottom: 8px;
             gap: 10px;
+        }
+
+        .recipe-log-header {
+            margin-bottom: 10px;
+            color: #8f989c;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
         }
 
         .recipe-row:last-child {
             margin-bottom: 0;
         }
 
-        .recipe-left { flex: 1; }
+        .recipe-name-input {
+            width: 100%;
+            min-width: 160px;
+            margin: 0;
+            padding: 7px 9px;
+            border-radius: 6px;
+            border: 1px solid transparent;
+            background: transparent;
+            color: #fff;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        .recipe-name-input:hover,
+        .recipe-name-input:focus {
+            border-color: #555;
+            background: #202425;
+            outline: none;
+        }
+
+        .recipe-name-input.saved {
+            border-color: #00cc66;
+            box-shadow: 0 0 0 1px rgba(0, 204, 102, 0.35);
+        }
+
+        .recipe-type-pill {
+            justify-self: start;
+            min-width: 48px;
+            padding: 4px 8px;
+            border-radius: 999px;
+            color: #dbeafe;
+            background: #1f2937;
+            font-size: 12px;
+            font-weight: 800;
+            text-align: center;
+        }
+
+        .recipe-type-file {
+            color: #ccfbf1;
+            background: #134e4a;
+        }
 
         .recipe-quantity-control {
             display: inline-flex;
@@ -1228,23 +1299,6 @@ body {
             font-size: 12px;
             font-weight: 700;
             white-space: nowrap;
-        }
-
-        .recipe-quantity-step {
-            width: 30px;
-            height: 30px;
-            margin: 0;
-            padding: 0;
-            border-radius: 6px;
-            background: #333;
-            color: #fff;
-            font-size: 18px;
-            font-weight: 800;
-            line-height: 1;
-        }
-
-        .recipe-quantity-step:hover {
-            background: #555;
         }
 
         .recipe-quantity-input {
@@ -2449,27 +2503,36 @@ body {
                 border-bottom: 1px solid #333;
             }
 
+            .recipe-log-header {
+                display: none;
+            }
+
             .recipe-row:last-child {
                 margin-bottom: 0;
                 padding-bottom: 0;
                 border-bottom: none;
             }
 
-            .recipe-left {
+            .recipe-url-link {
                 grid-column: 1 / -1;
-                width: 100%;
-                min-width: 0;
-                line-height: 1.35;
             }
 
-            .recipe-left a {
-                display: inline;
-                overflow-wrap: anywhere;
-                word-break: normal;
+            .recipe-type-pill {
+                grid-column: 1 / 2;
+                grid-row: 2;
+                justify-self: start;
+            }
+
+            .recipe-name-input {
+                grid-column: 1 / -1;
+                grid-row: 3;
+                min-width: 0;
+                font-size: 15px;
             }
 
             .recipe-quantity-control {
                 grid-column: 1 / 2;
+                grid-row: 4;
                 width: auto;
                 justify-content: flex-start;
                 gap: 6px;
@@ -2485,14 +2548,9 @@ body {
                 font-size: 15px;
             }
 
-            .recipe-quantity-step {
-                width: 34px;
-                height: 34px;
-                font-size: 18px;
-            }
-
             .remove-recipe-form {
                 grid-column: 2 / 3;
+                grid-row: 4;
                 width: auto;
                 margin: 0;
             }

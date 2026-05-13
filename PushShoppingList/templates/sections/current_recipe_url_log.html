@@ -3,21 +3,30 @@
 
     {% if current_urls %}
         <div class="log-box">
+            <div class="recipe-log-header">
+                <span>Recipe</span>
+                <span>Type</span>
+                <span>Name</span>
+                <span>Qty</span>
+                <span></span>
+            </div>
         {% for recipe in current_urls %}
             <div class="recipe-row">
-                <div class="recipe-left">
-                    <span class="recipe-label">Recipe {{ loop.index }}:</span>
-                    <a href="{{ recipe.url }}" target="_blank">{{ recipe.name }}</a>
-                </div>
+                <a class="recipe-label recipe-url-link"
+                   href="{{ recipe.url }}"
+                   target="_blank"
+                   rel="noopener noreferrer">Recipe {{ loop.index }}</a>
+
+                <span class="recipe-type-pill recipe-type-{{ recipe.type|lower }}">{{ recipe.type }}</span>
+
+                <input type="text"
+                       class="recipe-name-input"
+                       value="{{ recipe.name }}"
+                       data-recipe-url="{{ recipe.url }}"
+                       aria-label="Recipe {{ loop.index }} name">
 
                 <div class="recipe-quantity-control">
                     <span>Qty</span>
-                    <button type="button"
-                            class="recipe-quantity-step"
-                            data-step="-1"
-                            aria-label="Decrease recipe quantity">
-                        -
-                    </button>
                     <input type="number"
                            class="recipe-quantity-input"
                            min="1"
@@ -25,12 +34,6 @@
                            value="{{ recipe.quantity }}"
                            data-recipe-number="{{ loop.index }}"
                            data-recipe-url="{{ recipe.url }}">
-                    <button type="button"
-                            class="recipe-quantity-step"
-                            data-step="1"
-                            aria-label="Increase recipe quantity">
-                        +
-                    </button>
                 </div>
 
                 <form method="POST"

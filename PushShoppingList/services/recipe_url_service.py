@@ -72,11 +72,16 @@ def recipe_url_rows():
     return [
         {
             "url": url,
-            "name": recipe_url_name(url),
+            "name": recipe_url_display_name(url),
+            "type": recipe_url_type(url),
             "quantity": recipe_url_quantity(url),
         }
         for url in load_recipe_urls()
     ]
+
+
+def recipe_url_type(url):
+    return "File" if str(url or "").strip().lower().startswith("uploaded://") else "URL"
 
 
 def recipe_url_quantity(url):
@@ -84,6 +89,36 @@ def recipe_url_quantity(url):
     meta = load_recipe_url_meta()
     recipe_meta = meta.get(key, {})
     return normalize_recipe_quantity(recipe_meta.get("quantity", 1))
+
+
+def recipe_url_display_name(url):
+    key = normalize_recipe_url_key(url)
+    meta = load_recipe_url_meta()
+    recipe_meta = meta.get(key, {})
+    custom_name = str(recipe_meta.get("name") or "").strip()
+
+    return custom_name or recipe_url_name(url)
+
+
+def save_recipe_url_name(url, name):
+    key = normalize_recipe_url_key(url)
+    name = str(name or "").strip()
+
+    if not key:
+        return load_recipe_url_meta()
+
+    with url_file_lock:
+        meta = load_recipe_url_meta()
+        recipe_meta = meta.get(key, {})
+
+        if name:
+            recipe_meta["name"] = name
+        else:
+            recipe_meta.pop("name", None)
+
+        meta[key] = recipe_meta
+        save_recipe_url_meta(meta)
+        return meta
 
 
 def save_recipe_url_quantity(url, quantity):

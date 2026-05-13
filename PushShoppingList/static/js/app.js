@@ -12,7 +12,6 @@ let currentExtractAbortControllers = [];
 let cancelExtractRequested = false;
 const recipeQuantitySaveTimers = new WeakMap();
 const recipeQuantityNoticeTimers = new Map();
-let recipeQuantityStepButtonsBound = false;
 const recipeQuantitySaveDelayMs = 2000;
 
 function restoreScroll() {
@@ -66,6 +65,164 @@ function hideProductsOverlay() {
 
     if (modal) {
         modal.style.display = "none";
+    }
+}
+
+function openRecipeMediaUpload() {
+    const input = document.getElementById("recipeMediaUploadInput");
+
+    if (input) {
+        input.click();
+    }
+}
+
+async function submitRecipeMediaUpload(input) {
+    const form = document.getElementById("recipeMediaUploadForm");
+    const status = document.getElementById("recipeMediaUploadStatus");
+
+    if (!form || !input || !input.files || !input.files.length) {
+        return;
+    }
+
+    const file = input.files[0];
+
+    if (status) {
+        status.textContent = `Loading ${file.name}...`;
+    }
+
+    showRecipeFileLoadingOverlay(file.name);
+    await waitForNextPaint();
+
+    const formData = new FormData(form);
+    formData.set("ajax", "1");
+
+    updateRecipeFileLoadingStep("upload", "running", "Uploading file");
+    const readingTimer = setTimeout(() => {
+        updateRecipeFileLoadingStep("upload", "done", "Uploaded");
+        updateRecipeFileLoadingStep("read", "running", "Reading file contents");
+        setRecipeFileLoadingSummary("Reading the recipe from the selected file...");
+    }, 600);
+    const extractTimer = setTimeout(() => {
+        updateRecipeFileLoadingStep("read", "done", "Readable text found");
+        updateRecipeFileLoadingStep("extract", "running", "Extracting recipe data");
+        setRecipeFileLoadingSummary("Extracting ingredients, quantities, instructions, and sections...");
+    }, 1600);
+
+    try {
+        const response = await fetch(form.action, {
+            method: "POST",
+            headers: {
+                "X-Requested-With": "fetch",
+            },
+            body: formData,
+        });
+        const data = await response.json();
+
+        clearTimeout(readingTimer);
+        clearTimeout(extractTimer);
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to load file.");
+        }
+
+        updateRecipeFileLoadingStep("upload", "done", "Uploaded");
+        updateRecipeFileLoadingStep("read", "done", "Read");
+        updateRecipeFileLoadingStep("extract", "done", `${(data.ingredients || []).length} ingredients found`);
+        updateRecipeFileLoadingStep("save", "running", "Saving to shopping list");
+        setRecipeFileLoadingSummary("Saving ingredients and refreshing the shopping list...");
+        await waitForNextPaint();
+
+        window.location.reload();
+    } catch (err) {
+        clearTimeout(readingTimer);
+        clearTimeout(extractTimer);
+        updateRecipeFileLoadingStep("extract", "failed", "Failed");
+        updateRecipeFileLoadingStep("save", "failed", "Not saved");
+        setRecipeFileLoadingSummary(err.message || "Unable to load file.");
+
+        if (status) {
+            status.textContent = err.message || "Unable to load file.";
+        }
+    } finally {
+        input.value = "";
+    }
+}
+
+function showRecipeFileLoadingOverlay(fileName) {
+    let overlay = document.getElementById("recipeFileLoadingOverlay");
+
+    if (!overlay) {
+        overlay = document.createElement("div");
+        overlay.id = "recipeFileLoadingOverlay";
+        overlay.className = "recipe-qty-progress-backdrop recipe-file-loading-backdrop";
+        overlay.setAttribute("aria-hidden", "true");
+        overlay.innerHTML = `
+            <div class="recipe-qty-progress-card" role="dialog" aria-modal="true" aria-labelledby="recipeFileLoadingTitle">
+                <div class="recipe-qty-progress-header">
+                    <h2 id="recipeFileLoadingTitle">Loading File</h2>
+                    <button type="button" class="recipe-qty-progress-close" onclick="hideRecipeFileLoadingOverlay()">Hide</button>
+                </div>
+                <div id="recipeFileLoadingSummary" class="recipe-qty-progress-summary">Preparing file...</div>
+                <div id="recipeFileLoadingList" class="recipe-qty-progress-list"></div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+    }
+
+    const list = overlay.querySelector("#recipeFileLoadingList");
+    const steps = [
+        ["upload", "Upload", fileName],
+        ["read", "Read File", "Detect text from photo, image, PDF, or document"],
+        ["extract", "Extract Recipe", "Find ingredients, quantities, instructions, and recipe details"],
+        ["save", "Save List", "Put ingredients where they belong"],
+    ];
+
+    list.innerHTML = steps.map(([key, name, detail]) => `
+        <div class="recipe-qty-progress-row" data-file-step="${key}">
+            <div class="recipe-qty-progress-main">
+                <div class="recipe-qty-progress-name">${escapeHtml(name)}</div>
+                <div class="recipe-qty-progress-qty">${escapeHtml(detail)}</div>
+            </div>
+            <div class="recipe-qty-progress-status waiting">Waiting</div>
+        </div>
+    `).join("");
+
+    setRecipeFileLoadingSummary("Preparing to load the selected file...");
+    overlay.classList.add("open");
+    overlay.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+}
+
+function hideRecipeFileLoadingOverlay() {
+    const overlay = document.getElementById("recipeFileLoadingOverlay");
+
+    if (overlay) {
+        overlay.classList.remove("open");
+        overlay.setAttribute("aria-hidden", "true");
+        document.body.classList.remove("modal-open");
+    }
+}
+
+function updateRecipeFileLoadingStep(stepKey, state, message) {
+    const row = document.querySelector(`[data-file-step="${stepKey}"]`);
+
+    if (!row) {
+        return;
+    }
+
+    const status = row.querySelector(".recipe-qty-progress-status");
+
+    if (status) {
+        status.className = `recipe-qty-progress-status ${state}`;
+        status.textContent = message;
+    }
+}
+
+function setRecipeFileLoadingSummary(message) {
+    const summary = document.getElementById("recipeFileLoadingSummary");
+
+    if (summary) {
+        summary.textContent = message;
     }
 }
 
@@ -305,34 +462,75 @@ function bindRecipeQuantityInputs() {
         });
     });
 
-    if (recipeQuantityStepButtonsBound) {
+}
+
+function bindRecipeNameInputs() {
+    document.querySelectorAll(".recipe-name-input").forEach(input => {
+        if (input.dataset.nameBound === "1") {
+            return;
+        }
+
+        input.dataset.nameBound = "1";
+        input.dataset.lastSavedValue = input.value || "";
+
+        input.addEventListener("change", () => {
+            saveRecipeName(input);
+        });
+
+        input.addEventListener("blur", () => {
+            saveRecipeName(input);
+        });
+
+        input.addEventListener("keydown", event => {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                input.blur();
+            }
+        });
+    });
+}
+
+async function saveRecipeName(input) {
+    const name = input.value.trim();
+
+    if (input.dataset.lastSavedValue === name || input.dataset.savePending) {
         return;
     }
 
-    recipeQuantityStepButtonsBound = true;
+    input.dataset.savePending = "1";
+    input.disabled = true;
 
-    document.addEventListener("click", event => {
-        const button = event.target.closest(".recipe-quantity-step");
+    try {
+        const response = await fetch("/api/recipe_name", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                url: input.dataset.recipeUrl || "",
+                name: name,
+            }),
+        });
+        const data = await response.json();
 
-        if (!button) {
-            return;
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to save recipe name.");
         }
 
-        event.preventDefault();
-        event.stopPropagation();
+        input.dataset.lastSavedValue = name;
+        input.classList.add("saved");
+        showRecipeQuantityUpdatedMessage("", "", "", "Recipe name updated.");
 
-        const control = button.closest(".recipe-quantity-control");
-        const input = control ? control.querySelector(".recipe-quantity-input") : null;
-
-        if (!input) {
-            return;
-        }
-
-        const step = parseInt(button.dataset.step || "0", 10);
-        const currentValue = parseInt(input.value || "1", 10) || 1;
-        input.value = Math.max(1, currentValue + step);
-        normalizeRecipeQuantityInput(input);
-    });
+        setTimeout(() => {
+            input.classList.remove("saved");
+        }, 700);
+    } catch (err) {
+        console.warn("Unable to save recipe name.", err);
+        alert("Unable to save recipe name.");
+    } finally {
+        input.disabled = false;
+        delete input.dataset.savePending;
+    }
 }
 
 function normalizeRecipeQuantityInput(input) {
@@ -355,9 +553,16 @@ function queueRecipeQuantitySave(input, delayMs = recipeQuantitySaveDelayMs) {
 }
 
 async function saveAllRecipeQuantities(button) {
-    const inputs = [...document.querySelectorAll(".recipe-quantity-input")];
+    const inputs = [...document.querySelectorAll(".recipe-quantity-input")]
+        .filter(input => {
+            const nextQty = String(Math.max(1, parseInt(input.value || "1", 10) || 1));
+            const savedQty = String(input.dataset.lastSavedValue || input.defaultValue || "1");
+
+            return nextQty !== savedQty;
+        });
 
     if (!inputs.length) {
+        showRecipeQuantityUpdatedMessage("", "", "", "No recipe quantities changed.");
         return false;
     }
 
@@ -1525,6 +1730,7 @@ async function refreshStoreMarkup() {
     restoreViewBehaviorSettings();
     restoreItemCheckState();
     bindRecipeQuantityInputs();
+    bindRecipeNameInputs();
     bindStoreButtons();
     bindSectionHeaderToggles();
     bindRecipeDetailToggles();
@@ -1568,6 +1774,7 @@ document.addEventListener("DOMContentLoaded", function () {
     restoreViewBehaviorSettings();
     restoreItemCheckState();
     bindRecipeQuantityInputs();
+    bindRecipeNameInputs();
     bindStoreButtons();
     bindSectionHeaderToggles();
     bindRecipeDetailToggles();

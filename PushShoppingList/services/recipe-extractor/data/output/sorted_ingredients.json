@@ -1,11 +1,15 @@
 {
   "sorted_ingredients": [
     "=== PRODUCE ===",
+    "lemon",
     "lemon zest",
     "fresh basil",
+    "garlic cloves",
+    "yellow onion",
     "=== DAIRY & EGGS ===",
     "egg",
     "yolks",
+    "ricotta",
     "whole milk ricotta",
     "Parmesan and/or basil",
     "parmesan cheese*",
@@ -15,7 +19,9 @@
     "clarified butter",
     "unsalted butter",
     "=== PASTA, RICE & GRAINS ===",
+    "dried farfalle pasta",
     "Fresh Pasta Dough*",
+    "reserved pasta water",
     "=== BAKING ===",
     "all-purpose flour",
     "baking powder",
@@ -35,9 +41,16 @@
     "=== SPICES & SEASONINGS ===",
     "kosher salt",
     "Salt and pepper",
+    "red pepper flakes",
     "cinnamon",
     "ground nutmeg",
+    "nutmeg",
+    "=== OILS & VINEGARS ===",
+    "olive oil",
     "=== MISC ===",
-    "frozen raspberries"
+    "asparagus",
+    "frozen peas",
+    "frozen raspberries",
+    "white wine OR vegetable broth"
   ]
 }

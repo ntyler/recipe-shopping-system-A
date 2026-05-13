@@ -17,12 +17,14 @@ from PushShoppingList.services.extraction_progress_service import mark_url_runni
 from PushShoppingList.services.extraction_progress_service import new_job_id
 from PushShoppingList.services.extraction_progress_service import request_cancel
 from PushShoppingList.services.extraction_progress_service import start_progress
+from PushShoppingList.services.recipe_extract_service import extract_recipe_from_upload
 from PushShoppingList.services.recipe_extract_service import extract_recipe_from_url
 from PushShoppingList.services.recipe_ingredient_service import remove_recipe_and_unused_ingredients
 from PushShoppingList.services.recipe_ingredient_service import save_ingredients_for_recipe
 from PushShoppingList.services.recipe_url_service import add_recipe_urls
 from PushShoppingList.services.recipe_url_service import normalize_recipe_quantity
 from PushShoppingList.services.recipe_url_service import remove_recipe_url
+from PushShoppingList.services.recipe_url_service import save_recipe_url_name
 from PushShoppingList.services.recipe_quantity_service import update_recipe_ingredient_quantity
 from PushShoppingList.services.recipe_quantity_service import update_recipe_quantity
 from PushShoppingList.services.shopping_list_service import add_items
@@ -78,6 +80,37 @@ def extract_recipe_route():
         sort_ingredients()
 
     finish_progress(job_id, ok=extracted_any)
+
+    return redirect("/")
+
+
+@recipe_bp.route("/upload_recipe_media", methods=["POST"])
+def upload_recipe_media_route():
+    uploaded_file = request.files.get("recipe_media")
+    wants_json = (
+        request.headers.get("X-Requested-With") == "fetch"
+        or request.form.get("ajax") == "1"
+    )
+
+    if not uploaded_file or not uploaded_file.filename:
+        if wants_json:
+            return jsonify({"ok": False, "error": "No file was selected."}), 400
+
+        return redirect("/")
+
+    result = extract_recipe_from_upload(uploaded_file)
+
+    if result.get("ok"):
+        recipe_url = result.get("source_url")
+        ingredients = result.get("ingredients", [])
+        add_items(ingredients)
+        save_ingredients_for_recipe(recipe_url, ingredients)
+        add_recipe_urls([recipe_url])
+        sort_ingredients()
+
+    if wants_json:
+        status = 200 if result.get("ok") else 400
+        return jsonify(result), status
 
     return redirect("/")
 
@@ -186,6 +219,24 @@ def api_recipe_ingredient_quantity_route():
     status = 200 if result.get("ok") else 404
 
     return jsonify(result), status
+
+
+@recipe_bp.route("/api/recipe_name", methods=["POST"])
+def api_recipe_name_route():
+    data = request.get_json(silent=True) or {}
+    url = str(data.get("url", "") or "").strip()
+    name = str(data.get("name", "") or "").strip()
+
+    if not url:
+        return jsonify({"ok": False, "error": "Recipe URL is required."}), 400
+
+    save_recipe_url_name(url, name)
+
+    return jsonify({
+        "ok": True,
+        "url": url,
+        "name": name,
+    })
 
 
 @recipe_bp.route("/remove_recipe", methods=["POST"])

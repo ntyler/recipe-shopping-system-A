@@ -2,6 +2,9 @@ import json
 import os
 import re
 import html
+import base64
+import mimetypes
+import uuid
 from pathlib import Path
 
 import requests
@@ -16,10 +19,12 @@ EXTRACTOR_FOLDER = Path(__file__).resolve().parent / "recipe-extractor"
 OUTPUT_FOLDER = EXTRACTOR_FOLDER / "data" / "output"
 RAW_FOLDER = EXTRACTOR_FOLDER / "data" / "raw"
 LOG_FOLDER = EXTRACTOR_FOLDER / "data" / "logs"
+UPLOAD_FOLDER = EXTRACTOR_FOLDER / "data" / "uploads"
 
 OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
 RAW_FOLDER.mkdir(parents=True, exist_ok=True)
 LOG_FOLDER.mkdir(parents=True, exist_ok=True)
+UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 
 MODEL = "gpt-4o-mini"
 MAX_PAGE_TEXT_CHARS = 35000
@@ -1105,6 +1110,37 @@ def send_prompt_to_openai(prompt_text):
     return response.choices[0].message.content
 
 
+def send_image_prompt_to_openai(prompt_text, image_path, mime_type):
+    image_bytes = image_path.read_bytes()
+    image_data = base64.b64encode(image_bytes).decode("ascii")
+
+    response = get_openai_client().chat.completions.create(
+        model=MODEL,
+        messages=[
+            {
+                "role": "system",
+                "content": "You extract recipe ingredients from recipe photos and documents and return only valid JSON.",
+            },
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt_text},
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{mime_type};base64,{image_data}",
+                        },
+                    },
+                ],
+            },
+        ],
+        response_format={"type": "json_object"},
+        temperature=0,
+    )
+
+    return response.choices[0].message.content
+
+
 def save_json_response(recipe_url, response_text):
     cleaned = clean_json_response(response_text)
 
@@ -1214,6 +1250,96 @@ def save_extracted_recipe_json(recipe_url, json_data):
         encoding="utf-8",
     )
     return json_path
+
+
+def extract_recipe_from_upload(file_storage):
+    filename = Path(file_storage.filename or "uploaded-recipe").name
+    safe_name = f"{uuid.uuid4().hex}_{safe_filename(filename)}"
+    upload_path = UPLOAD_FOLDER / safe_name
+    file_storage.save(upload_path)
+
+    recipe_url = f"uploaded://{safe_name}"
+    mime_type = (
+        file_storage.mimetype
+        or mimetypes.guess_type(str(upload_path))[0]
+        or "application/octet-stream"
+    )
+
+    try:
+        if mime_type.startswith("image/"):
+            prompt_text = build_upload_prompt(recipe_url, filename)
+            response_text = send_image_prompt_to_openai(prompt_text, upload_path, mime_type)
+        elif mime_type.startswith("text/") or upload_path.suffix.lower() in {".txt", ".md"}:
+            page_text = upload_path.read_text(encoding="utf-8", errors="ignore")
+            prompt_text = build_prompt(recipe_url, page_text[:MAX_PAGE_TEXT_CHARS])
+            response_text = send_prompt_to_openai(prompt_text)
+        elif mime_type == "application/pdf" or upload_path.suffix.lower() == ".pdf":
+            page_text = extract_text_from_pdf(upload_path)
+
+            if not page_text.strip():
+                return {
+                    "ok": False,
+                    "error": "No selectable text found in that PDF. Try uploading a photo of the recipe page instead.",
+                }
+
+            prompt_text = build_prompt(recipe_url, page_text[:MAX_PAGE_TEXT_CHARS])
+            response_text = send_prompt_to_openai(prompt_text)
+        else:
+            return {
+                "ok": False,
+                "error": "Unsupported upload type. Use a photo/image, PDF, .txt, or .md recipe document.",
+            }
+
+        ok, json_data = save_json_response(recipe_url, response_text)
+
+        if not ok or not json_data:
+            return {
+                "ok": False,
+                "error": "The uploaded recipe could not be parsed into recipe JSON.",
+            }
+
+        json_data["source_url"] = recipe_url
+        save_extracted_recipe_json(recipe_url, json_data)
+
+        return build_extract_result(recipe_url, json_data, "upload")
+    except Exception as exc:
+        raw_error_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_UPLOAD_ERROR.txt"
+        raw_error_path.write_text(str(exc), encoding="utf-8")
+
+        return {
+            "ok": False,
+            "error": f"Upload extraction failed: {exc}",
+        }
+
+
+def build_upload_prompt(recipe_url, filename):
+    return build_prompt(
+        recipe_url,
+        f"""
+This recipe was uploaded as an image or document named {filename}.
+
+Read the visible recipe content from the uploaded file. Extract the recipe title, servings,
+ingredients, equipment, instructions, and nutrition if visible.
+
+If the upload is a grocery package, handwritten note, printed recipe card, cookbook page,
+screenshot, or recipe photo, use only the visible text. Do not invent hidden ingredients.
+""",
+    )
+
+
+def extract_text_from_pdf(upload_path):
+    try:
+        from PyPDF2 import PdfReader
+    except Exception as exc:
+        raise RuntimeError("PDF support requires PyPDF2 to be installed.") from exc
+
+    reader = PdfReader(str(upload_path))
+    page_text = []
+
+    for page in reader.pages:
+        page_text.append(page.extract_text() or "")
+
+    return "\n".join(page_text)
 
 
 def build_extract_result(recipe_url, json_data, extraction_method):

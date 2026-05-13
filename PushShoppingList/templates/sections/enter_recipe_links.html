@@ -11,4 +11,22 @@
 
         <button class="extract-btn" type="submit">Extract Ingredients</button>
     </form>
+
+    <form id="recipeMediaUploadForm"
+          class="recipe-media-upload-form"
+          method="POST"
+          action="/upload_recipe_media"
+          enctype="multipart/form-data"
+          onsubmit="saveScroll()">
+        <input id="recipeMediaUploadInput"
+               name="recipe_media"
+               type="file"
+               accept="image/*,.txt,.md,.pdf"
+               onchange="submitRecipeMediaUpload(this)"
+               hidden>
+        <button class="recipe-media-upload-btn" type="button" onclick="openRecipeMediaUpload()">
+            Load File
+        </button>
+        <div id="recipeMediaUploadStatus" class="recipe-media-upload-status" aria-live="polite"></div>
+    </form>
 </div>
