@@ -7,6 +7,7 @@ let lastRenderedExtractJobId = null;
 let extractRefreshTimer = null;
 let lastRenderedExtractProgress = null;
 let currentExtractAbortController = null;
+let currentExtractAbortControllers = [];
 let cancelExtractRequested = false;
 
 function restoreScroll() {
@@ -791,9 +792,11 @@ async function startRecipeExtractionUrls(urls) {
             <input type="checkbox" class="bulk-progress-check" disabled>
             <div class="bulk-progress-main">
                 <div class="bulk-progress-title-line">
-                    <span class="bulk-progress-text">
-                        ${index + 1}. ${url}
-                    </span>
+                    <span class="bulk-progress-text">${index + 1}. </span>
+                    <a class="bulk-progress-text extract-url-progress-link"
+                       href="${url}"
+                       target="_blank"
+                       rel="noopener noreferrer">${url}</a>
                 </div>
                 <div class="bulk-skip-reason">
                     waiting...
@@ -812,13 +815,22 @@ async function startRecipeExtractionUrls(urls) {
         bar.style.width = "10%";
     }
 
-    for (const [index, url] of urls.entries()) {
-        if (cancelExtractRequested) {
-            break;
-        }
+    await fetch("/api/start_extract_progress", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            urls: urls,
+            job_id: jobId,
+        }),
+    });
 
+    currentExtractAbortControllers = [];
+
+    const extractionRequests = urls.map((url, index) => {
         const row = document.getElementById(`extract-url-${index}`);
-        const text = row ? row.querySelector(".bulk-progress-text") : null;
+        const text = row ? row.querySelector(".extract-url-progress-link") : null;
         const reason = row ? row.querySelector(".bulk-skip-reason") : null;
 
         if (reason) {
@@ -829,34 +841,44 @@ async function startRecipeExtractionUrls(urls) {
             text.classList.add("active");
         }
 
-        currentExtractAbortController = new AbortController();
+        const controller = new AbortController();
+        currentExtractAbortControllers.push(controller);
+        currentExtractAbortController = controller;
 
-        try {
-            await fetch("/api/extract_recipe", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                signal: currentExtractAbortController.signal,
-                body: JSON.stringify({
-                    url: url,
-                    urls: urls,
-                    index: index,
-                    job_id: jobId,
-                }),
-            });
-        } catch (err) {
+        return fetch("/api/extract_recipe", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            signal: controller.signal,
+            body: JSON.stringify({
+                url: url,
+                urls: urls,
+                index: index,
+                job_id: jobId,
+            }),
+        }).catch(err => {
             if (!cancelExtractRequested) {
                 throw err;
             }
-        } finally {
-            currentExtractAbortController = null;
-        }
+        });
+    });
+
+    try {
+        await Promise.allSettled(extractionRequests);
+    } finally {
+        currentExtractAbortController = null;
+        currentExtractAbortControllers = [];
     }
 }
 
 async function cancelRecipeExtraction() {
     cancelExtractRequested = true;
+
+    currentExtractAbortControllers.forEach(controller => {
+        controller.abort();
+    });
+    currentExtractAbortControllers = [];
 
     if (currentExtractAbortController) {
         currentExtractAbortController.abort();
@@ -976,8 +998,16 @@ function renderExtractionProgress(progress) {
         const titleLine = document.createElement("div");
         titleLine.className = "bulk-progress-title-line";
 
-        const text = document.createElement("span");
+        const prefix = document.createElement("span");
+        prefix.className = "bulk-progress-text";
+        prefix.textContent = `${index + 1}. `;
+
+        const text = document.createElement("a");
         text.className = "bulk-progress-text";
+        text.classList.add("extract-url-progress-link");
+        text.href = item.url;
+        text.target = "_blank";
+        text.rel = "noopener noreferrer";
 
         if (item.state === "running") {
             text.classList.add("active");
@@ -991,12 +1021,13 @@ function renderExtractionProgress(progress) {
             text.classList.add("cancelled");
         }
 
-        text.textContent = `${index + 1}. ${item.url}`;
+        text.textContent = item.url;
 
         const reason = document.createElement("div");
         reason.className = "bulk-skip-reason";
         reason.textContent = item.message || "waiting...";
 
+        titleLine.appendChild(prefix);
         titleLine.appendChild(text);
         main.appendChild(titleLine);
         main.appendChild(reason);

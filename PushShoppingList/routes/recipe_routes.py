@@ -114,6 +114,19 @@ def api_extract_recipe_route():
     return jsonify(result)
 
 
+@recipe_bp.route("/api/start_extract_progress", methods=["POST"])
+def api_start_extract_progress_route():
+    data = request.get_json(force=True)
+    urls = [
+        str(item).strip()
+        for item in data.get("urls", [])
+        if str(item).strip()
+    ]
+    job_id = str(data.get("job_id") or new_job_id())
+
+    return jsonify(start_progress(urls, job_id=job_id))
+
+
 @recipe_bp.route("/api/extract_progress", methods=["GET"])
 def api_extract_progress_route():
     return jsonify(load_progress())

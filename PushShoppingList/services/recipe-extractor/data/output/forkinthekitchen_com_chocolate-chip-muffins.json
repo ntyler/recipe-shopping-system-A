@@ -1,11 +1,11 @@
 {
   "source_url": "https://www.forkinthekitchen.com/chocolate-chip-muffins/",
   "recipe_title": "Moist Chocolate Chip Muffins with Yogurt (Small Batch)",
-  "servings": "8",
+  "servings": "8 muffins",
   "ingredients": [
     {
-      "section": null,
-      "original_text": "4 Tablespoons unsalted butter (mleted)",
+      "section": "DAIRY & EGGS",
+      "original_text": "4 Tablespoons unsalted butter, melted",
       "quantity": "4",
       "unit": "Tablespoons",
       "ingredient": "unsalted butter",
@@ -15,9 +15,9 @@
       "store_section_order": 3
     },
     {
-      "section": null,
-      "original_text": "¼ cup plain yogurt",
-      "quantity": "¼",
+      "section": "DAIRY & EGGS",
+      "original_text": "¼ cup (60 g) plain yogurt",
+      "quantity": "1/4",
       "unit": "cup",
       "ingredient": "plain yogurt",
       "preparation": null,
@@ -26,9 +26,9 @@
       "store_section_order": 3
     },
     {
-      "section": null,
-      "original_text": "¼ cup brown sugar",
-      "quantity": "¼",
+      "section": "BAKING",
+      "original_text": "¼ cup (50 g) brown sugar",
+      "quantity": "1/4",
       "unit": "cup",
       "ingredient": "brown sugar",
       "preparation": null,
@@ -37,9 +37,9 @@
       "store_section_order": 7
     },
     {
-      "section": null,
-      "original_text": "¼ cup granulated sugar",
-      "quantity": "¼",
+      "section": "BAKING",
+      "original_text": "¼ cup (50 g) granulated sugar",
+      "quantity": "1/4",
       "unit": "cup",
       "ingredient": "granulated sugar",
       "preparation": null,
@@ -48,7 +48,7 @@
       "store_section_order": 7
     },
     {
-      "section": null,
+      "section": "BAKING",
       "original_text": "1 teaspoon vanilla extract",
       "quantity": "1",
       "unit": "teaspoon",
@@ -59,8 +59,8 @@
       "store_section_order": 7
     },
     {
-      "section": null,
-      "original_text": "1  egg",
+      "section": "DAIRY & EGGS",
+      "original_text": "1 egg",
       "quantity": "1",
       "unit": null,
       "ingredient": "egg",
@@ -70,8 +70,8 @@
       "store_section_order": 3
     },
     {
-      "section": null,
-      "original_text": "125 g all-purpose flour",
+      "section": "BAKING",
+      "original_text": "125 g (125 g) all-purpose flour",
       "quantity": "125",
       "unit": "g",
       "ingredient": "all-purpose flour",
@@ -81,9 +81,9 @@
       "store_section_order": 7
     },
     {
-      "section": null,
+      "section": "BAKING",
       "original_text": "¾ teaspoon baking powder",
-      "quantity": "¾",
+      "quantity": "3/4",
       "unit": "teaspoon",
       "ingredient": "baking powder",
       "preparation": null,
@@ -92,9 +92,9 @@
       "store_section_order": 7
     },
     {
-      "section": null,
+      "section": "BAKING",
       "original_text": "¼ teaspoon baking soda",
-      "quantity": "¼",
+      "quantity": "1/4",
       "unit": "teaspoon",
       "ingredient": "baking soda",
       "preparation": null,
@@ -103,9 +103,9 @@
       "store_section_order": 7
     },
     {
-      "section": null,
+      "section": "SPICES & SEASONINGS",
       "original_text": "½ teaspoon kosher salt",
-      "quantity": "½",
+      "quantity": "1/2",
       "unit": "teaspoon",
       "ingredient": "kosher salt",
       "preparation": null,
@@ -114,9 +114,9 @@
       "store_section_order": 12
     },
     {
-      "section": null,
+      "section": "SPICES & SEASONINGS",
       "original_text": "⅛ teaspoon cinnamon",
-      "quantity": "⅛",
+      "quantity": "1/8",
       "unit": "teaspoon",
       "ingredient": "cinnamon",
       "preparation": null,
@@ -125,9 +125,9 @@
       "store_section_order": 12
     },
     {
-      "section": null,
-      "original_text": "¾ cup mini chocolate chips",
-      "quantity": "¾",
+      "section": "BAKING",
+      "original_text": "¾ cup (130-145 g) mini chocolate chips",
+      "quantity": "3/4",
       "unit": "cup",
       "ingredient": "mini chocolate chips",
       "preparation": null,
@@ -136,15 +136,39 @@
       "store_section_order": 7
     }
   ],
-  "equipment": [],
+  "equipment": [
+    {
+      "name": "mixing bowl",
+      "category": "prep"
+    },
+    {
+      "name": "whisk",
+      "category": "utensil"
+    },
+    {
+      "name": "muffin tin",
+      "category": "cookware"
+    },
+    {
+      "name": "cookie scoop",
+      "category": "utensil"
+    },
+    {
+      "name": "oven",
+      "category": "appliance"
+    }
+  ],
   "instructions": [
     {
       "section": null,
       "step_number": 1,
       "instruction": "Preheat oven to 400°F (204°C). Line 8 muffin tins with liners or grease well.",
-      "temperature": null,
+      "temperature": "400°F",
       "time": null,
-      "equipment_used": []
+      "equipment_used": [
+        "muffin tin",
+        "oven"
+      ]
     },
     {
       "section": null,
@@ -152,12 +176,15 @@
       "instruction": "In a large bowl, whisk together the melted butter, yogurt, sugars, vanilla, and egg until smooth.",
       "temperature": null,
       "time": null,
-      "equipment_used": []
+      "equipment_used": [
+        "mixing bowl",
+        "whisk"
+      ]
     },
     {
       "section": null,
       "step_number": 3,
-      "instruction": "Add the flour, baking powder, baking soda, salt, and cinnamon. Fold the dry ingredients into the wet until halfway combined (with some flour streaks remaining).",
+      "instruction": "Add the flour, baking powder, baking soda, salt, and cinnamon.",
       "temperature": null,
       "time": null,
       "equipment_used": []
@@ -165,7 +192,7 @@
     {
       "section": null,
       "step_number": 4,
-      "instruction": "Gently fold in the mini chocolate chips just until combined.",
+      "instruction": "Fold the dry ingredients into the wet until halfway combined (with some flour streaks remaining).",
       "temperature": null,
       "time": null,
       "equipment_used": []
@@ -173,7 +200,7 @@
     {
       "section": null,
       "step_number": 5,
-      "instruction": "Scoop batter into muffin cups, approximately ¾ full, or nearly to the top. I use a #20 cookie scoop.",
+      "instruction": "Gently fold in the mini chocolate chips just until combined.",
       "temperature": null,
       "time": null,
       "equipment_used": []
@@ -181,7 +208,28 @@
     {
       "section": null,
       "step_number": 6,
-      "instruction": "Bake at 400°F for 6 minutes, then reduce oven temperature to 350°F and bake another 6-8 minutes, or until a toothpick comes out clean. A darker pan will cook more quickly. Let cool in the pan for a few minutes, then transfer to a wire rack.",
+      "instruction": "Scoop batter into muffin cups, approximately ¾ full, or nearly to the top.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [
+        "muffin tin",
+        "cookie scoop"
+      ]
+    },
+    {
+      "section": null,
+      "step_number": 7,
+      "instruction": "Bake at 400°F for 6 minutes, then reduce oven temperature to 350°F and bake another 6-8 minutes, or until a toothpick comes out clean.",
+      "temperature": "400°F",
+      "time": "6-8 minutes",
+      "equipment_used": [
+        "oven"
+      ]
+    },
+    {
+      "section": null,
+      "step_number": 8,
+      "instruction": "Let cool in the pan for a few minutes, then transfer to a wire rack.",
       "temperature": null,
       "time": null,
       "equipment_used": []
@@ -194,18 +242,18 @@
     "protein": "3 g",
     "fat": "11 g",
     "saturated_fat": "6 g",
-    "polyunsaturated_fat": null,
-    "monounsaturated_fat": null,
+    "polyunsaturated_fat": "0.4 g",
+    "monounsaturated_fat": "2 g",
     "trans_fat": "0.3 g",
     "cholesterol": "39 mg",
     "sodium": "245 mg",
-    "potassium": null,
+    "potassium": "48 mg",
     "fiber": "1 g",
     "sugar": "24 g",
-    "vitamin_a": null,
-    "vitamin_c": null,
-    "calcium": null,
-    "iron": null,
+    "vitamin_a": "250 IU",
+    "vitamin_c": "0.1 mg",
+    "calcium": "64 mg",
+    "iron": "1 mg",
     "other": []
   }
 }
