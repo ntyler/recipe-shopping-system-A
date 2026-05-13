@@ -737,6 +737,14 @@ IMPORTANT QUANTITY EXTRACTION RULES:
 - Preserve ranges exactly as strings.
 - Preserve package sizes.
 
+ALTERNATIVE INGREDIENT RULES:
+- If one ingredient line gives a choice using "or", keep it as ONE ingredient object when the alternatives are substitutes for each other.
+- Do NOT put the second alternative's quantity or unit inside the ingredient name.
+- The ingredient field should contain only the alternative grocery item names joined by " OR ".
+- If the alternatives have different quantities or units, put the complete quantity choices in quantity and set unit to null.
+- Preserve the full original line in original_text.
+- Assign the store_section for the best primary grocery placement.
+
 Examples:
 - "1 egg"
   -> quantity = "1"
@@ -764,6 +772,18 @@ Examples:
   -> unit = null
   -> ingredient = "salt"
   -> preparation = "to taste"
+
+- "2 ounces cocoa butter or 1/4 cup vegetable oil"
+  -> quantity = "2 ounces OR 1/4 cup"
+  -> unit = null
+  -> ingredient = "cocoa butter OR vegetable oil"
+  -> preparation = null
+
+- "1 cup butter or coconut oil, melted"
+  -> quantity = "1"
+  -> unit = "cup"
+  -> ingredient = "butter OR coconut oil"
+  -> preparation = "melted"
 
 - If the webpage only contains instructions and no formal ingredient list:
   - infer ingredients from cooking steps
@@ -801,6 +821,7 @@ FINAL INGREDIENT VALIDATION CHECK:
   - If original_text = "¼ cup plain yogurt", output quantity "1/4", unit "cup", ingredient "plain yogurt".
   - If original_text = "4 Tablespoons unsalted butter, melted", output quantity "4", unit "Tablespoons", ingredient "unsalted butter", preparation "melted".
   - If original_text = "4 Tablespoons unsalted butter (melted)", output quantity "4", unit "Tablespoons", ingredient "unsalted butter", preparation "melted".
+  - If original_text = "2 ounces cocoa butter or 1/4 cup vegetable oil", output quantity "2 ounces OR 1/4 cup", unit null, ingredient "cocoa butter OR vegetable oil".
   - If any of these fields can be read from original_text, do not leave them null.
 
 NORMALIZATION RULES:
