@@ -834,16 +834,16 @@ function addRecipeIngredientRow(item = {}) {
     row.className = "recipe-edit-ingredient-row";
     row.innerHTML = `
         <label>
+            <span>Ingredient</span>
+            <input type="text" data-field="ingredient" value="${escapeAttribute(item.ingredient || "")}">
+        </label>
+        <label>
             <span>Qty</span>
             <input type="text" data-field="quantity" value="${escapeAttribute(item.quantity || "")}">
         </label>
         <label>
             <span>Unit</span>
             <input type="text" data-field="unit" value="${escapeAttribute(item.unit || "")}">
-        </label>
-        <label>
-            <span>Ingredient</span>
-            <input type="text" data-field="ingredient" value="${escapeAttribute(item.ingredient || "")}">
         </label>
         <label>
             <span>Original Text</span>
@@ -1220,7 +1220,7 @@ function renderItemQtySources(container, sourcesJson, itemKey = "") {
 
     const header = document.createElement("div");
     header.className = "item-qty-source-header";
-    ["Recipe", "Default qty", "Unit", "Recipe Qry"].forEach(text => {
+    ["Recipe", "Default qty", "Unit", "Recipe Qty"].forEach(text => {
         const cell = document.createElement("span");
         cell.textContent = text;
         header.appendChild(cell);

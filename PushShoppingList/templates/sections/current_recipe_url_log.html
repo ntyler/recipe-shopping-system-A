@@ -5,9 +5,10 @@
         <div class="log-box">
             <div class="recipe-log-header">
                 <span>Recipe</span>
-                <span>Type</span>
                 <span>Name</span>
+                <span>Type</span>
                 <span>Qty</span>
+                <span></span>
                 <span></span>
             </div>
         {% for recipe in current_urls %}
@@ -17,13 +18,13 @@
                    target="_blank"
                    rel="noopener noreferrer">Recipe {{ loop.index }}</a>
 
-                <span class="recipe-type-pill recipe-type-{{ recipe.type|lower }}">{{ recipe.type }}</span>
-
                 <input type="text"
                        class="recipe-name-input"
                        value="{{ recipe.name }}"
                        data-recipe-url="{{ recipe.url }}"
                        aria-label="Recipe {{ loop.index }} name">
+
+                <span class="recipe-type-pill recipe-type-{{ recipe.type|lower }}">{{ recipe.type }}</span>
 
                 <div class="recipe-quantity-control">
                     <span>Qty</span>
@@ -43,15 +44,15 @@
                             onclick="openRecipeEditor(this)">
                         Edit
                     </button>
-
-                    <form method="POST"
-                          action="{{ url_for('recipe_bp.remove_recipe_route') }}"
-                          class="remove-recipe-form"
-                          onsubmit="saveScroll(); return confirm('Remove this recipe URL?');">
-                        <input type="hidden" name="url" value="{{ recipe.url }}">
-                        <button type="submit" class="remove-recipe-btn">Remove</button>
-                    </form>
                 </div>
+
+                <form method="POST"
+                      action="{{ url_for('recipe_bp.remove_recipe_route') }}"
+                      class="remove-recipe-form"
+                      onsubmit="saveScroll(); return confirm('Remove this recipe URL?');">
+                    <input type="hidden" name="url" value="{{ recipe.url }}">
+                    <button type="submit" class="remove-recipe-btn" aria-label="Remove recipe">X</button>
+                </form>
             </div>
         {% endfor %}
         </div>

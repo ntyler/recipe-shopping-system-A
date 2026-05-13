@@ -152,7 +152,7 @@ def recipe_quantity_sources_lookup(recipe_rows):
 
     for recipe in recipe_rows:
         recipe_number = recipe.get("number")
-        recipe_label = f"Recipe {recipe_number} Qry" if recipe_number else "Recipe Qry"
+        recipe_label = f"Recipe {recipe_number} Qty" if recipe_number else "Recipe Qty"
 
         for section_items in recipe.get("sections", {}).values():
             for item in section_items:
