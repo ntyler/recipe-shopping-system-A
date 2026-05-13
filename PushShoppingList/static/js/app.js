@@ -307,12 +307,151 @@ async function saveRecipeQuantity(input) {
         }
 
         input.classList.add("saved");
+        updateRecipeQuantityDisplays(url, quantity);
         setTimeout(() => {
             input.classList.remove("saved");
         }, 700);
     } catch (err) {
         console.warn("Unable to save recipe quantity.", err);
     }
+}
+
+function updateRecipeQuantityDisplays(recipeUrl, multiplier) {
+    document.querySelectorAll(`.recipe-servings-value[data-recipe-url="${cssEscape(recipeUrl)}"]`).forEach(element => {
+        const baseServings = element.dataset.baseServings || "";
+        element.textContent = scaleServingsForDisplay(baseServings, multiplier);
+    });
+
+    document.querySelectorAll(`.recipe-ingredient-quantity[data-recipe-url="${cssEscape(recipeUrl)}"]`).forEach(element => {
+        const baseQuantity = element.dataset.baseQuantity || "";
+        const unit = element.dataset.unit || "";
+        const scaledQuantity = scaleQuantityForDisplay(baseQuantity, multiplier);
+
+        if (scaledQuantity) {
+            element.textContent = `${scaledQuantity} ${unit}`.trim();
+        }
+    });
+}
+
+function scaleServingsForDisplay(servings, multiplier) {
+    const value = String(servings || "").trim();
+
+    if (!value || multiplier === 1) {
+        return value;
+    }
+
+    return value.replace(/\d+(?:\.\d+)?/, match => {
+        const scaled = Number(match) * multiplier;
+        return Number.isInteger(scaled) ? String(scaled) : String(scaled);
+    });
+}
+
+function scaleQuantityForDisplay(quantity, multiplier) {
+    const value = String(quantity || "").trim();
+
+    if (!value || multiplier === 1) {
+        return value;
+    }
+
+    const rangeMatch = value.match(/^(.+?)\s*(-|to)\s*(.+)$/);
+    if (rangeMatch) {
+        const separator = rangeMatch[2] === "to" ? " to " : "-";
+        return `${scaleQuantityPart(rangeMatch[1], multiplier)}${separator}${scaleQuantityPart(rangeMatch[3], multiplier)}`;
+    }
+
+    return scaleQuantityPart(value, multiplier);
+}
+
+function scaleQuantityPart(value, multiplier) {
+    const fraction = parseQuantityFraction(value);
+
+    if (!fraction) {
+        return value;
+    }
+
+    return formatQuantityFraction({
+        numerator: fraction.numerator * multiplier,
+        denominator: fraction.denominator,
+    });
+}
+
+function parseQuantityFraction(value) {
+    const text = String(value || "").trim();
+    let match = text.match(/^(\d+)\s+(\d+)\/(\d+)$/);
+
+    if (match) {
+        const whole = parseInt(match[1], 10);
+        const numerator = parseInt(match[2], 10);
+        const denominator = parseInt(match[3], 10);
+        return {
+            numerator: whole * denominator + numerator,
+            denominator: denominator,
+        };
+    }
+
+    match = text.match(/^(\d+)\/(\d+)$/);
+    if (match) {
+        return {
+            numerator: parseInt(match[1], 10),
+            denominator: parseInt(match[2], 10),
+        };
+    }
+
+    match = text.match(/^\d+(?:\.\d+)?$/);
+    if (match) {
+        const numberValue = Number(text);
+        const denominator = text.includes(".") ? 1000 : 1;
+        return reduceFraction({
+            numerator: Math.round(numberValue * denominator),
+            denominator: denominator,
+        });
+    }
+
+    return null;
+}
+
+function formatQuantityFraction(fraction) {
+    const reduced = reduceFraction(fraction);
+
+    if (reduced.denominator === 1) {
+        return String(reduced.numerator);
+    }
+
+    const whole = Math.floor(reduced.numerator / reduced.denominator);
+    const remainder = reduced.numerator % reduced.denominator;
+
+    if (whole) {
+        return `${whole} ${remainder}/${reduced.denominator}`;
+    }
+
+    return `${remainder}/${reduced.denominator}`;
+}
+
+function reduceFraction(fraction) {
+    const divisor = gcd(Math.abs(fraction.numerator), Math.abs(fraction.denominator));
+
+    return {
+        numerator: fraction.numerator / divisor,
+        denominator: fraction.denominator / divisor,
+    };
+}
+
+function gcd(a, b) {
+    while (b) {
+        const next = a % b;
+        a = b;
+        b = next;
+    }
+
+    return a || 1;
+}
+
+function cssEscape(value) {
+    if (window.CSS && typeof window.CSS.escape === "function") {
+        return window.CSS.escape(value);
+    }
+
+    return String(value).replace(/"/g, '\\"');
 }
 
 function bindStoreButtons() {

@@ -134,7 +134,14 @@
                 </div>
 
                 {% if recipe.servings %}
-                    <div class="recipe-meta">Servings: {{ recipe.servings }}</div>
+                    <div class="recipe-meta">
+                        Servings:
+                        <span class="recipe-servings-value"
+                              data-recipe-url="{{ recipe.url }}"
+                              data-base-servings="{{ recipe.base_servings or "" }}">
+                            {{ recipe.servings }}
+                        </span>
+                    </div>
                 {% endif %}
 
                 <button type="button"
@@ -246,7 +253,12 @@
 
                                     <div class="source-line">
                                         {% if recipe_item.quantity %}
-                                            <span>{{ recipe_item.quantity }} {{ recipe_item.unit or "" }}</span>
+                                            <span class="recipe-ingredient-quantity"
+                                                  data-recipe-url="{{ recipe.url }}"
+                                                  data-base-quantity="{{ recipe_item.base_quantity or "" }}"
+                                                  data-unit="{{ recipe_item.unit or "" }}">
+                                                {{ recipe_item.quantity }} {{ recipe_item.unit or "" }}
+                                            </span>
                                         {% endif %}
 
                                         {% if recipe_item.url %}

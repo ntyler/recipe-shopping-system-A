@@ -1,13 +1,14 @@
 <div class="app-card">
     <h2>Edit Shopping Items</h2>
 
-    <form method="POST" action="/save" onsubmit="saveScroll()">
-        <textarea class="edit-items-box" name="items">{{ raw_items }}</textarea>
-        <button class="save-btn">Save List</button>
-    </form>
+    <textarea class="edit-items-box" name="items" form="saveItemsForm">{{ raw_items }}</textarea>
 
     <div class="actions-grid">
-        <form method="POST" action="/clear">
+        <form id="saveItemsForm" method="POST" action="/save" onsubmit="saveScroll()">
+            <button class="save-btn">Save List</button>
+        </form>
+
+        <form method="POST" action="/clear" onsubmit="saveScroll()">
             <button class="clear-btn" type="submit">Clear List</button>
         </form>
     </div>

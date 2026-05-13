@@ -1,5 +1,7 @@
 import html
 import json
+import re
+from fractions import Fraction
 
 from flask import Blueprint
 from flask import jsonify
@@ -94,14 +96,17 @@ def recipe_view_rows(recipe_urls):
     rows = []
 
     for index, recipe in enumerate(recipe_urls, start=1):
+        recipe_quantity = int(recipe.get("quantity") or 1)
         recipe_data = load_saved_recipe_output(recipe["url"])
-        sections = build_recipe_sections(recipe_data)
+        sections = build_recipe_sections(recipe_data, recipe_quantity)
 
         rows.append({
             "number": index,
             "name": recipe_data.get("recipe_title") or recipe["name"],
             "url": recipe["url"],
-            "servings": recipe_data.get("servings"),
+            "quantity": recipe_quantity,
+            "base_servings": recipe_data.get("servings"),
+            "servings": scale_servings(recipe_data.get("servings"), recipe_quantity),
             "equipment_items": normalize_text_list(recipe_data.get("equipment", [])),
             "instruction_items": normalize_instruction_items(recipe_data.get("instructions", [])),
             "nutrition_items": normalize_nutrition_items(recipe_data.get("nutrition", {})),
@@ -129,7 +134,7 @@ def load_saved_recipe_output(recipe_url):
     return {}
 
 
-def build_recipe_sections(recipe_data):
+def build_recipe_sections(recipe_data, recipe_quantity=1):
     sections = {section: [] for section in STORE_SECTION_ORDER.keys()}
 
     for ingredient in recipe_data.get("ingredients", []) or []:
@@ -146,7 +151,8 @@ def build_recipe_sections(recipe_data):
 
         sections[section].append({
             "name": name,
-            "quantity": ingredient.get("quantity"),
+            "quantity": scale_quantity(ingredient.get("quantity"), recipe_quantity),
+            "base_quantity": ingredient.get("quantity"),
             "unit": ingredient.get("unit"),
             "url": recipe_data.get("source_url"),
         })
@@ -156,6 +162,87 @@ def build_recipe_sections(recipe_data):
         for section, items in sections.items()
         if items
     }
+
+
+def scale_servings(servings, multiplier):
+    servings_text = str(servings or "").strip()
+
+    if not servings_text or multiplier == 1:
+        return servings
+
+    match = re.search(r"\d+(?:\.\d+)?", servings_text)
+    if not match:
+        return servings
+
+    scaled = format_number(float(match.group(0)) * multiplier)
+    return servings_text[:match.start()] + scaled + servings_text[match.end():]
+
+
+def scale_quantity(quantity, multiplier):
+    quantity_text = str(quantity or "").strip()
+
+    if not quantity_text or multiplier == 1:
+        return quantity
+
+    range_match = re.match(r"^(.+?)\s*(?:-|to)\s*(.+)$", quantity_text)
+    if range_match:
+        left = scale_quantity_part(range_match.group(1), multiplier)
+        right = scale_quantity_part(range_match.group(2), multiplier)
+        separator = " to " if " to " in quantity_text else "-"
+        return f"{left}{separator}{right}"
+
+    return scale_quantity_part(quantity_text, multiplier)
+
+
+def scale_quantity_part(value, multiplier):
+    parsed = parse_quantity_fraction(value)
+
+    if parsed is None:
+        return value
+
+    return format_fraction(parsed * multiplier)
+
+
+def parse_quantity_fraction(value):
+    text = str(value or "").strip()
+
+    mixed_match = re.match(r"^(\d+)\s+(\d+)/(\d+)$", text)
+    if mixed_match:
+        whole, numerator, denominator = mixed_match.groups()
+        return Fraction(int(whole), 1) + Fraction(int(numerator), int(denominator))
+
+    fraction_match = re.match(r"^(\d+)/(\d+)$", text)
+    if fraction_match:
+        numerator, denominator = fraction_match.groups()
+        return Fraction(int(numerator), int(denominator))
+
+    decimal_match = re.match(r"^\d+(?:\.\d+)?$", text)
+    if decimal_match:
+        return Fraction(text)
+
+    return None
+
+
+def format_fraction(value):
+    value = Fraction(value)
+
+    if value.denominator == 1:
+        return str(value.numerator)
+
+    whole = value.numerator // value.denominator
+    remainder = value - whole
+
+    if whole:
+        return f"{whole} {remainder.numerator}/{remainder.denominator}"
+
+    return f"{remainder.numerator}/{remainder.denominator}"
+
+
+def format_number(value):
+    if float(value).is_integer():
+        return str(int(value))
+
+    return f"{value:g}"
 
 
 def normalize_text_list(value):

@@ -7,9 +7,9 @@ from urllib.parse import urlunparse
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 URLS_FILE = BASE_DIR / "urls.txt"
-URL_META_FILE = BASE_DIR / "services" / "recipe-extractor" / "data" / "recipe_url_meta.json"
+RECIPE_INGREDIENTS_FILE = BASE_DIR / "services" / "recipe-extractor" / "data" / "recipe_ingredients.json"
 url_file_lock = Lock()
-URL_META_FILE.parent.mkdir(parents=True, exist_ok=True)
+RECIPE_INGREDIENTS_FILE.parent.mkdir(parents=True, exist_ok=True)
 
 
 def load_recipe_urls():
@@ -102,11 +102,11 @@ def save_recipe_url_quantity(url, quantity):
 
 
 def load_recipe_url_meta():
-    if not URL_META_FILE.exists():
+    if not RECIPE_INGREDIENTS_FILE.exists():
         return {}
 
     try:
-        data = json.loads(URL_META_FILE.read_text(encoding="utf-8"))
+        data = json.loads(RECIPE_INGREDIENTS_FILE.read_text(encoding="utf-8"))
     except Exception:
         return {}
 
@@ -114,7 +114,7 @@ def load_recipe_url_meta():
 
 
 def save_recipe_url_meta(meta):
-    URL_META_FILE.write_text(
+    RECIPE_INGREDIENTS_FILE.write_text(
         json.dumps(meta, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
