@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import html
 from pathlib import Path
 
 import requests
@@ -84,6 +85,7 @@ STORE_SECTION_ORDER = {
     "PET SUPPLIES": 18,
     "MISC": 19,
 }
+FRACTION_CHARS = "\u00bc\u00bd\u00be\u2150\u2151\u2152\u2153\u2154\u2155\u2156\u2157\u2158\u2159\u215a\u215b\u215c\u215d\u215e"
 
 client = None
 
@@ -200,7 +202,8 @@ def build_structured_ingredients(raw_ingredients):
 
     for original_text in raw_ingredients or []:
         original_text = str(original_text or "").strip()
-        ingredient = normalize_ingredient_for_shopping_list(original_text)
+        parsed = parse_structured_ingredient_line(original_text)
+        ingredient = parsed["ingredient"]
         key = normalize_ingredient_key(ingredient)
 
         if not ingredient or key in seen:
@@ -210,10 +213,10 @@ def build_structured_ingredients(raw_ingredients):
         ingredient_rows.append({
             "section": None,
             "original_text": original_text,
-            "quantity": None,
-            "unit": None,
+            "quantity": parsed["quantity"],
+            "unit": parsed["unit"],
             "ingredient": ingredient,
-            "preparation": extract_preparation(original_text),
+            "preparation": parsed["preparation"],
             "optional": "optional" in original_text.lower(),
             "store_section": store_section,
             "store_section_order": STORE_SECTION_ORDER[store_section],
@@ -221,6 +224,64 @@ def build_structured_ingredients(raw_ingredients):
         seen.add(key)
 
     return ingredient_rows
+
+
+def parse_structured_ingredient_line(original_text):
+    text = clean_recipe_text(original_text)
+    preparation = extract_preparation(text)
+    text_without_prep = remove_preparation_text(text, preparation)
+    quantity, unit, remainder = split_quantity_unit(text_without_prep)
+    ingredient = normalize_ingredient_for_shopping_list(remainder or text_without_prep)
+
+    return {
+        "quantity": quantity,
+        "unit": unit,
+        "ingredient": ingredient,
+        "preparation": preparation,
+    }
+
+
+def split_quantity_unit(text):
+    text = re.sub(r"\s+", " ", str(text or "").strip())
+    text = re.sub(r"\s*[-–—]\s*", "-", text)
+
+    fraction_pattern = f"[{FRACTION_CHARS}]"
+    quantity_value_pattern = rf"(?:\d+\s+\d+/\d+|\d+(?:[./]\d+)?|{fraction_pattern})"
+    quantity_pattern = rf"{quantity_value_pattern}(?:\s*(?:-|to)\s*{quantity_value_pattern})?"
+    unit_pattern = (
+        r"cups?|c|teaspoons?|tsp\.?|tablespoons?|tbsp\.?|pounds?|lbs?\.?|"
+        r"ounces?|oz\.?|grams?|g|kilograms?|kg|milliliters?|ml|liters?|l|"
+        r"pinch|pinches|dash|dashes|cloves?|sticks?"
+    )
+
+    match = re.match(
+        rf"^(?P<quantity>{quantity_pattern})(?:\s+(?P<unit>{unit_pattern}))?\s+(?P<ingredient>.+)$",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    if not match:
+        return None, None, text
+
+    unit = match.group("unit")
+
+    return (
+        match.group("quantity").strip(),
+        unit.strip() if unit else None,
+        match.group("ingredient").strip(),
+    )
+
+
+def remove_preparation_text(text, preparation):
+    if not preparation:
+        return text
+
+    text = re.sub(r"\([^)]*\)", " ", text)
+
+    if "," in text:
+        text = text.split(",", 1)[0]
+
+    return re.sub(r"\s+", " ", text).strip()
 
 
 def classify_store_section(ingredient):
@@ -249,10 +310,62 @@ def classify_store_section(ingredient):
 
 
 def extract_preparation(original_text):
-    if "," in original_text:
-        return original_text.split(",", 1)[1].strip() or None
+    text = clean_recipe_text(original_text)
+
+    parenthetical_matches = [
+        match.strip()
+        for match in re.findall(r"\(([^)]*)\)", text)
+        if match.strip() and not re.search(r"\d", match)
+    ]
+
+    if parenthetical_matches:
+        return clean_preparation_text(", ".join(parenthetical_matches))
+
+    if "," in text:
+        return clean_preparation_text(text.split(",", 1)[1].strip()) or None
 
     return None
+
+
+def clean_preparation_text(text):
+    value = clean_recipe_text(text).lower()
+    replacements = {
+        "mleted": "melted",
+    }
+
+    for bad_value, good_value in replacements.items():
+        value = value.replace(bad_value, good_value)
+
+    return value.strip() or None
+
+
+def clean_recipe_text(text):
+    value = html.unescape(str(text or ""))
+    replacements = {
+        "Â¼": "¼",
+        "Â½": "½",
+        "Â¾": "¾",
+        "â…": "⅐",
+        "â…‘": "⅑",
+        "â…’": "⅒",
+        "â…“": "⅓",
+        "â…”": "⅔",
+        "â…•": "⅕",
+        "â…–": "⅖",
+        "â…—": "⅗",
+        "â…˜": "⅘",
+        "â…™": "⅙",
+        "â…š": "⅚",
+        "â…›": "⅛",
+        "â…œ": "⅜",
+        "â…": "⅝",
+        "â…ž": "⅞",
+    }
+
+    for bad_value, good_value in replacements.items():
+        value = value.replace(bad_value, good_value)
+
+    return re.sub(r"\s+", " ", value).strip()
 
 
 def build_structured_instructions(raw_instructions):
@@ -399,6 +512,10 @@ INGREDIENT RULES
 - ALWAYS split ingredients into: quantity, unit, ingredient, preparation.
 - quantity and unit should only be null when truly absent from the recipe text.
 - Preserve original_text exactly.
+- Before returning JSON, re-read every original_text and verify quantity, unit, ingredient, and preparation are split correctly.
+- If original_text starts with a number, fraction, mixed fraction, or range, quantity must not be null.
+- If original_text has a measurement word immediately after the quantity, unit must not be null.
+- If original_text has text after a comma or a non-metric parenthetical such as "(melted)", "(chopped)", "(divided)", or "(room temperature)", preparation must not be null.
 - The ingredient field must be the unique grocery item name only.
 - Do NOT include quantity, unit, package size, metric conversion, or preparation in the ingredient field.
 - Do NOT include words like "divided", "chopped", "melted", "shredded", "to taste", or "optional" in the ingredient field.
@@ -421,6 +538,7 @@ INGREDIENT CONFIDENCE RULES:
 
 IMPORTANT QUANTITY EXTRACTION RULES:
 - ALWAYS attempt to extract quantity and unit.
+- Do this for EVERY ingredient object, using original_text as the source of truth.
 - If ingredient quantities appear anywhere in the page, including ingredient lists, instruction steps, notes, fillings, sauces, dough sections, headings, or recipe cards, extract them.
 - NEVER discard quantities when they are present.
 - Preserve fractional values exactly as strings.
@@ -483,6 +601,15 @@ Examples:
 - If multiple units are shown for the same ingredient:
   - prefer the primary US measurement
   - ignore duplicate metric conversions when they refer to the same ingredient
+
+FINAL INGREDIENT VALIDATION CHECK:
+- For every item in ingredients:
+  - Check original_text again.
+  - If original_text = "1 egg", output quantity "1", unit null, ingredient "egg".
+  - If original_text = "¼ cup plain yogurt", output quantity "1/4", unit "cup", ingredient "plain yogurt".
+  - If original_text = "4 Tablespoons unsalted butter, melted", output quantity "4", unit "Tablespoons", ingredient "unsalted butter", preparation "melted".
+  - If original_text = "4 Tablespoons unsalted butter (melted)", output quantity "4", unit "Tablespoons", ingredient "unsalted butter", preparation "melted".
+  - If any of these fields can be read from original_text, do not leave them null.
 
 NORMALIZATION RULES:
 - Singularize grocery ingredient names when appropriate.
@@ -691,6 +818,7 @@ def save_json_response(recipe_url, response_text):
 
     try:
         json_data = json.loads(cleaned)
+        normalize_extracted_ingredient_fields(json_data)
 
         json_path.write_text(
             json.dumps(json_data, indent=2, ensure_ascii=False),
@@ -708,6 +836,36 @@ def save_json_response(recipe_url, response_text):
         print(f"JSON error: {exc}")
 
         return False, None
+
+
+def normalize_extracted_ingredient_fields(json_data):
+    for item in json_data.get("ingredients", []):
+        if not isinstance(item, dict):
+            continue
+
+        original_text = item.get("original_text") or ""
+
+        if not original_text:
+            continue
+
+        parsed = parse_structured_ingredient_line(original_text)
+
+        if parsed["quantity"] and not item.get("quantity"):
+            item["quantity"] = parsed["quantity"]
+
+        if parsed["unit"] and not item.get("unit"):
+            item["unit"] = parsed["unit"]
+
+        if parsed["preparation"] and not item.get("preparation"):
+            item["preparation"] = parsed["preparation"]
+
+        if parsed["ingredient"]:
+            current_ingredient = normalize_ingredient_for_shopping_list(
+                item.get("ingredient") or original_text
+            )
+
+            if not current_ingredient or current_ingredient == normalize_ingredient_for_shopping_list(original_text):
+                item["ingredient"] = parsed["ingredient"]
 
 
 def extract_ingredients_from_result(json_data):
@@ -736,7 +894,7 @@ def normalize_ingredient_key(text):
 
 
 def normalize_ingredient_for_shopping_list(text):
-    value = str(text or "").strip()
+    value = clean_recipe_text(text)
 
     if not value:
         return ""
@@ -752,7 +910,7 @@ def normalize_ingredient_for_shopping_list(text):
     value = re.sub(r"\s+", " ", value).strip()
     value = value.split(",", 1)[0].strip()
 
-    quantity_pattern = r"(?:\d+(?:[./]\d+)?|\d+\s+\d+/\d+|[¼½¾⅐⅑⅒⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞])+"
+    quantity_pattern = rf"(?:\d+(?:[./]\d+)?|\d+\s+\d+/\d+|[{FRACTION_CHARS}])+"
     unit_pattern = (
         r"(?:cups?|c|teaspoons?|tsp\.?|tablespoons?|tbsp\.?|pounds?|lbs?\.?|"
         r"ounces?|oz\.?|grams?|g|kilograms?|kg|milliliters?|ml|liters?|l|"
@@ -810,6 +968,7 @@ def extract_recipe_from_url(recipe_url):
         structured_json_data = extract_recipe_from_structured_data(recipe_url, html_text)
 
         if structured_json_data:
+            normalize_extracted_ingredient_fields(structured_json_data)
             json_path = OUTPUT_FOLDER / f"{safe_filename(recipe_url)}.json"
             json_path.write_text(
                 json.dumps(structured_json_data, indent=2, ensure_ascii=False),
