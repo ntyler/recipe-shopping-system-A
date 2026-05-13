@@ -828,6 +828,12 @@ NORMALIZATION RULES:
 - Singularize grocery ingredient names when appropriate.
   - "eggs" -> "egg"
   - "lemons" -> "lemon"
+  - "limes" -> "lime"
+  - "onions" -> "onion"
+  - "tomatoes" -> "tomato"
+  - "potatoes" -> "potato"
+  - "carrots" -> "carrot"
+- Apply singularization before duplicate detection so singular and plural forms do not both appear.
 
 - Preserve branded or compound ingredient names exactly:
   - "cream of mushroom soup"
@@ -1203,7 +1209,24 @@ def normalize_ingredient_for_shopping_list(text):
         flags=re.IGNORECASE,
     )
 
-    return re.sub(r"\s+", " ", value).strip()
+    value = re.sub(r"\s+", " ", value).strip()
+    return singularize_shopping_ingredient(value)
+
+
+def singularize_shopping_ingredient(value):
+    normalized = normalize_ingredient_key(value)
+    singular_names = {
+        "eggs": "egg",
+        "lemons": "lemon",
+        "limes": "lime",
+        "onions": "onion",
+        "tomatoes": "tomato",
+        "potatoes": "potato",
+        "carrots": "carrot",
+        "cloves": "clove",
+    }
+
+    return singular_names.get(normalized, value)
 
 
 def normalize_alternative_shopping_ingredient(value):
