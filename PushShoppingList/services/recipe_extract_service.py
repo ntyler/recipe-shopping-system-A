@@ -1173,6 +1173,10 @@ def normalize_ingredient_for_shopping_list(text):
     value = re.sub(r"\s+", " ", value).strip()
     value = value.split(",", 1)[0].strip()
 
+    alternative_value = normalize_alternative_shopping_ingredient(value)
+    if alternative_value:
+        return alternative_value
+
     quantity_pattern = rf"(?:\d+(?:[./]\d+)?|\d+\s+\d+/\d+|[{FRACTION_CHARS}])+"
     unit_pattern = (
         r"(?:cups?|c|teaspoons?|tsp\.?|tablespoons?|tbsp\.?|pounds?|lbs?\.?|"
@@ -1200,6 +1204,59 @@ def normalize_ingredient_for_shopping_list(text):
     )
 
     return re.sub(r"\s+", " ", value).strip()
+
+
+def normalize_alternative_shopping_ingredient(value):
+    quantity_pattern = rf"(?:\d+(?:[./]\d+)?|\d+\s+\d+/\d+|[{FRACTION_CHARS}])+"
+    unit_pattern = (
+        r"(?:cups?|c|teaspoons?|tsp\.?|tablespoons?|tbsp\.?|pounds?|lbs?\.?|"
+        r"ounces?|oz\.?|grams?|g|kilograms?|kg|milliliters?|ml|liters?|l|"
+        r"pinch|pinches|dash|dashes|cloves?|sticks?)"
+    )
+    match = re.match(
+        rf"^(?:{quantity_pattern}(?:\s*(?:-|to)\s*{quantity_pattern})?\s+{unit_pattern}\s+)?"
+        rf"(?P<first>.+?)\s+or\s+"
+        rf"(?:{quantity_pattern}(?:\s*(?:-|to)\s*{quantity_pattern})?\s+{unit_pattern}\s+)?"
+        rf"(?P<second>.+)$",
+        str(value or "").strip(),
+        flags=re.IGNORECASE,
+    )
+
+    if not match:
+        return ""
+
+    first = strip_leading_amount(match.group("first"))
+    second = strip_leading_amount(match.group("second"))
+
+    if not first or not second:
+        return ""
+
+    return f"{first} OR {second}"
+
+
+def strip_leading_amount(value):
+    value = re.sub(r"\s+", " ", str(value or "").strip())
+    quantity_pattern = rf"(?:\d+(?:[./]\d+)?|\d+\s+\d+/\d+|[{FRACTION_CHARS}])+"
+    unit_pattern = (
+        r"(?:cups?|c|teaspoons?|tsp\.?|tablespoons?|tbsp\.?|pounds?|lbs?\.?|"
+        r"ounces?|oz\.?|grams?|g|kilograms?|kg|milliliters?|ml|liters?|l|"
+        r"pinch|pinches|dash|dashes|cloves?|sticks?)"
+    )
+
+    value = re.sub(
+        rf"^{quantity_pattern}(?:\s*(?:-|to)\s*{quantity_pattern})?\s+{unit_pattern}\b\s*",
+        "",
+        value,
+        flags=re.IGNORECASE,
+    )
+    value = re.sub(
+        rf"^{quantity_pattern}\s+",
+        "",
+        value,
+        flags=re.IGNORECASE,
+    )
+
+    return value.strip()
 
 
 def extract_recipe_from_url(recipe_url, progress_callback=None):

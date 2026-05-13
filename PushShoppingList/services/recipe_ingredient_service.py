@@ -4,6 +4,7 @@ from pathlib import Path
 from PushShoppingList.services.recipe_extract_service import (
     OUTPUT_FOLDER,
     extract_ingredients_from_result,
+    normalize_ingredient_for_shopping_list,
 )
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
 from PushShoppingList.services.shopping_list_service import load_items
@@ -125,7 +126,7 @@ def unique_ingredients(ingredients):
     seen = set()
 
     for ingredient in ingredients:
-        ingredient = str(ingredient or "").strip()
+        ingredient = normalize_ingredient_for_shopping_list(ingredient)
         key = ingredient_key(ingredient)
 
         if ingredient and key not in seen:

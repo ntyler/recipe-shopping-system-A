@@ -1,6 +1,8 @@
 import threading
 from pathlib import Path
 
+from PushShoppingList.services.recipe_extract_service import normalize_ingredient_for_shopping_list
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 SHOPPING_LIST_FILE = BASE_DIR / "shopping_list.txt"
 SHOPPING_LIST_LOCK = threading.RLock()
@@ -31,7 +33,7 @@ def add_items(new_items):
         items = load_items()
 
         for item in new_items:
-            item = str(item).strip()
+            item = normalize_ingredient_for_shopping_list(item)
 
             if item and item not in items:
                 items.append(item)
