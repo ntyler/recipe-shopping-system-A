@@ -86,6 +86,28 @@ STORE_SECTION_ORDER = {
     "MISC": 19,
 }
 FRACTION_CHARS = "\u00bc\u00bd\u00be\u2150\u2151\u2152\u2153\u2154\u2155\u2156\u2157\u2158\u2159\u215a\u215b\u215c\u215d\u215e"
+EQUIPMENT_INFERENCE_RULES = [
+    ("oven", "appliance", [r"\bpreheat\b", r"\boven\b", r"\bbake\b"]),
+    ("muffin tin", "cookware", [r"\bmuffin tins?\b", r"\bmuffin pans?\b", r"\bmuffin cups?\b"]),
+    ("baking sheet", "cookware", [r"\bbaking sheets?\b", r"\bsheet pans?\b"]),
+    ("mixing bowl", "prep", [r"\blarge bowl\b", r"\bmedium bowl\b", r"\bmixing bowl\b", r"\bin a bowl\b"]),
+    ("whisk", "utensil", [r"\bwhisk\b"]),
+    ("spatula", "utensil", [r"\bfold\b", r"\bspatula\b"]),
+    ("cookie scoop", "utensil", [r"\bcookie scoop\b", r"\bscoop batter\b"]),
+    ("wire rack", "prep", [r"\bwire rack\b"]),
+    ("pot", "cookware", [r"\bboil\b", r"\bpot\b", r"\bpasta water\b"]),
+    ("saucepan", "cookware", [r"\bsaucepan\b"]),
+    ("skillet", "cookware", [r"\bskillet\b", r"\bfrying pan\b"]),
+    ("knife", "prep", [r"\bcut\b", r"\bchop\b", r"\bslice\b", r"\bmince\b"]),
+    ("cutting board", "prep", [r"\bcut\b", r"\bchop\b", r"\bslice\b", r"\bmince\b"]),
+    ("rolling pin", "prep", [r"\broll(?:ed|ing)?\b", r"\brolling pin\b"]),
+    ("pasta machine", "prep", [r"\bpasta machine\b", r"\bpasta roller\b", r"\bsetting\b"]),
+    ("ravioli cutter", "prep", [r"\bravioli cutter\b", r"\bcut.*ravioli\b"]),
+]
+EQUIPMENT_PATTERNS_BY_NAME = {
+    name: patterns
+    for name, _category, patterns in EQUIPMENT_INFERENCE_RULES
+}
 
 client = None
 
@@ -143,13 +165,17 @@ def extract_recipe_from_structured_data(recipe_url, html_text):
         if not ingredients:
             continue
 
+        instructions = build_structured_instructions(recipe.get("recipeInstructions", []))
+        equipment = infer_equipment_from_instructions(instructions)
+        add_equipment_used_to_instructions(instructions, equipment)
+
         json_data = {
             "source_url": recipe_url,
             "recipe_title": recipe.get("name"),
             "servings": normalize_servings(recipe.get("recipeYield")),
             "ingredients": ingredients,
-            "equipment": [],
-            "instructions": build_structured_instructions(recipe.get("recipeInstructions", [])),
+            "equipment": equipment,
+            "instructions": instructions,
             "nutrition": build_structured_nutrition(recipe.get("nutrition", {})),
         }
 
@@ -386,6 +412,42 @@ def build_structured_instructions(raw_instructions):
             })
 
     return instructions
+
+
+def infer_equipment_from_instructions(instructions):
+    inferred = {}
+
+    for step in instructions or []:
+        instruction = step.get("instruction", "") if isinstance(step, dict) else str(step or "")
+        for equipment_name, category, patterns in EQUIPMENT_INFERENCE_RULES:
+            if any(re.search(pattern, instruction, flags=re.IGNORECASE) for pattern in patterns):
+                inferred[equipment_name] = {
+                    "name": equipment_name,
+                    "category": category,
+                }
+
+    return [
+        inferred[name]
+        for name in sorted(inferred)
+    ]
+
+
+def add_equipment_used_to_instructions(instructions, equipment):
+    equipment_names = [item["name"] for item in equipment if isinstance(item, dict)]
+
+    for step in instructions or []:
+        if not isinstance(step, dict):
+            continue
+
+        instruction = step.get("instruction", "")
+        used = []
+
+        for equipment_name in equipment_names:
+            patterns = EQUIPMENT_PATTERNS_BY_NAME.get(equipment_name, [])
+            if any(re.search(pattern, instruction, flags=re.IGNORECASE) for pattern in patterns):
+                used.append(equipment_name)
+
+        step["equipment_used"] = used
 
 
 def flatten_instruction_nodes(raw_instructions):
@@ -664,6 +726,8 @@ EQUIPMENT RULES
 ========================
 - Extract ALL equipment/tools required to complete the recipe.
 - You MUST infer equipment from the instructions when not explicitly listed.
+- Before returning JSON, re-read every instruction and verify equipment includes all tools implied by the steps.
+- Do not leave equipment empty when the instructions mention baking, boiling, mixing, whisking, cutting, rolling, draining, or cooling.
 
 - Common inference examples:
   - "preheat oven" = oven
@@ -819,6 +883,7 @@ def save_json_response(recipe_url, response_text):
     try:
         json_data = json.loads(cleaned)
         normalize_extracted_ingredient_fields(json_data)
+        normalize_extracted_equipment_fields(json_data)
 
         json_path.write_text(
             json.dumps(json_data, indent=2, ensure_ascii=False),
@@ -866,6 +931,20 @@ def normalize_extracted_ingredient_fields(json_data):
 
             if not current_ingredient or current_ingredient == normalize_ingredient_for_shopping_list(original_text):
                 item["ingredient"] = parsed["ingredient"]
+
+
+def normalize_extracted_equipment_fields(json_data):
+    instructions = json_data.get("instructions", [])
+
+    if not isinstance(instructions, list):
+        return
+
+    existing_equipment = json_data.get("equipment", [])
+
+    if not existing_equipment:
+        json_data["equipment"] = infer_equipment_from_instructions(instructions)
+
+    add_equipment_used_to_instructions(instructions, json_data.get("equipment", []))
 
 
 def extract_ingredients_from_result(json_data):
@@ -967,8 +1046,9 @@ def extract_recipe_from_url(recipe_url):
 
         structured_json_data = extract_recipe_from_structured_data(recipe_url, html_text)
 
-        if structured_json_data:
+        if structured_json_data and not os.getenv("OPENAI_API_KEY"):
             normalize_extracted_ingredient_fields(structured_json_data)
+            normalize_extracted_equipment_fields(structured_json_data)
             json_path = OUTPUT_FOLDER / f"{safe_filename(recipe_url)}.json"
             json_path.write_text(
                 json.dumps(structured_json_data, indent=2, ensure_ascii=False),
@@ -989,6 +1069,9 @@ def extract_recipe_from_url(recipe_url):
                 "raw": structured_json_data,
                 "extraction_method": "structured_data",
             }
+
+        if structured_json_data:
+            print("Structured recipe data found; using it only as a fallback because OPENAI_API_KEY is set.")
 
         if not os.getenv("OPENAI_API_KEY"):
             return {
