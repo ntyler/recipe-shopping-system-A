@@ -43,6 +43,12 @@
             </div>
         {% endfor %}
         </div>
+
+        <button type="button"
+                class="save-recipe-qty-btn"
+                onclick="saveAllRecipeQuantities(this)">
+            Save Qty
+        </button>
     {% else %}
         <div class="log-box">No current recipe URLs yet.</div>
     {% endif %}

@@ -1260,6 +1260,20 @@ body {
             box-shadow: 0 0 0 1px rgba(0, 204, 102, 0.35);
         }
 
+        .save-recipe-qty-btn {
+            width: 100%;
+            margin-top: 12px;
+            padding: 12px 14px;
+            background: #107C10;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .save-recipe-qty-btn:disabled {
+            cursor: wait;
+            opacity: 0.75;
+        }
+
         .recipe-quantity-update-overlay {
             position: fixed;
             top: 14px;

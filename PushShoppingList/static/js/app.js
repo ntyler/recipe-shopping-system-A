@@ -287,15 +287,15 @@ function bindRecipeQuantityInputs() {
         input.dataset.lastSavedValue = input.value || "1";
 
         input.addEventListener("input", () => {
-            queueRecipeQuantitySave(input, recipeQuantitySaveDelayMs);
+            normalizeRecipeQuantityInput(input);
         });
 
         input.addEventListener("change", () => {
-            saveRecipeQuantity(input);
+            normalizeRecipeQuantityInput(input);
         });
 
         input.addEventListener("blur", () => {
-            saveRecipeQuantity(input);
+            normalizeRecipeQuantityInput(input);
         });
     });
 
@@ -325,8 +325,12 @@ function bindRecipeQuantityInputs() {
         const step = parseInt(button.dataset.step || "0", 10);
         const currentValue = parseInt(input.value || "1", 10) || 1;
         input.value = Math.max(1, currentValue + step);
-        queueRecipeQuantitySave(input, recipeQuantitySaveDelayMs);
+        normalizeRecipeQuantityInput(input);
     });
+}
+
+function normalizeRecipeQuantityInput(input) {
+    input.value = Math.max(1, parseInt(input.value || "1", 10) || 1);
 }
 
 function queueRecipeQuantitySave(input, delayMs = recipeQuantitySaveDelayMs) {
@@ -344,7 +348,47 @@ function queueRecipeQuantitySave(input, delayMs = recipeQuantitySaveDelayMs) {
     recipeQuantitySaveTimers.set(input, timer);
 }
 
-async function saveRecipeQuantity(input) {
+async function saveAllRecipeQuantities(button) {
+    const inputs = [...document.querySelectorAll(".recipe-quantity-input")];
+
+    if (!inputs.length) {
+        return false;
+    }
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Saving Qty...";
+    }
+
+    try {
+        for (const input of inputs) {
+            await saveRecipeQuantity(input, {
+                force: true,
+                refresh: false,
+                message: false,
+            });
+        }
+
+        try {
+            await refreshStoreMarkup();
+        } catch (refreshErr) {
+            console.warn("Unable to refresh recipe quantities in the background.", refreshErr);
+        }
+
+        showRecipeQuantityUpdatedMessage("", "", "", "Recipe quantities updated.");
+    } catch (err) {
+        console.warn("Unable to save recipe quantities.", err);
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = "Save Qty";
+        }
+    }
+
+    return false;
+}
+
+async function saveRecipeQuantity(input, options = {}) {
     const queuedSave = recipeQuantitySaveTimers.get(input);
 
     if (queuedSave) {
@@ -356,7 +400,7 @@ async function saveRecipeQuantity(input) {
     const quantity = Math.max(1, parseInt(input.value || "1", 10) || 1);
     input.value = quantity;
 
-    if (input.dataset.lastSavedValue === String(quantity) && !input.dataset.savePending) {
+    if (!options.force && input.dataset.lastSavedValue === String(quantity) && !input.dataset.savePending) {
         return;
     }
 
@@ -384,13 +428,17 @@ async function saveRecipeQuantity(input) {
         input.classList.add("saved");
         updateRecipeQuantityDisplays(url, quantity, data);
 
-        try {
-            await refreshStoreMarkup();
-        } catch (refreshErr) {
-            console.warn("Unable to refresh recipe quantities in the background.", refreshErr);
+        if (options.refresh !== false) {
+            try {
+                await refreshStoreMarkup();
+            } catch (refreshErr) {
+                console.warn("Unable to refresh recipe quantities in the background.", refreshErr);
+            }
         }
 
-        showRecipeQuantityUpdatedMessage(url, quantity, input.dataset.recipeNumber || "");
+        if (options.message !== false) {
+            showRecipeQuantityUpdatedMessage(url, quantity, input.dataset.recipeNumber || "");
+        }
 
         setTimeout(() => {
             input.classList.remove("saved");
@@ -444,7 +492,7 @@ function updateRecipeQuantityDisplays(recipeUrl, multiplier, apiData = null) {
     });
 }
 
-function showRecipeQuantityUpdatedMessage(recipeUrl, quantity, recipeNumber = "") {
+function showRecipeQuantityUpdatedMessage(recipeUrl, quantity, recipeNumber = "", message = "") {
     let notice = document.getElementById("recipeQuantityUpdateOverlay");
 
     if (!notice) {
@@ -463,7 +511,7 @@ function showRecipeQuantityUpdatedMessage(recipeUrl, quantity, recipeNumber = ""
     }
 
     const recipeLabel = recipeNumber ? `Recipe ${recipeNumber} ` : "";
-    notice.textContent = `${recipeLabel}Qty updated to ${quantity}.`;
+    notice.textContent = message || `${recipeLabel}Qty updated to ${quantity}.`;
     notice.classList.remove("fading");
     notice.classList.add("visible");
 
