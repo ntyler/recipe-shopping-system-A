@@ -426,7 +426,9 @@ function buildRecipeQuantityProgressItems(inputs) {
     return inputs.map(input => {
         const row = input.closest(".recipe-row");
         const left = row ? row.querySelector(".recipe-left") : null;
-        const label = left ? " ".join(left.textContent.split()) : `Recipe ${input.dataset.recipeNumber || ""}`.trim();
+        const label = left
+            ? left.textContent.trim().split(/\s+/).join(" ")
+            : `Recipe ${input.dataset.recipeNumber || ""}`.trim();
         const previousQty = input.dataset.lastSavedValue || input.defaultValue || "1";
         const nextQty = String(Math.max(1, parseInt(input.value || "1", 10) || 1));
 
