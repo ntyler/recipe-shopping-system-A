@@ -15,8 +15,10 @@ from PushShoppingList.services.home_address_service import load_home_address
 from PushShoppingList.services.home_address_service import save_home_address
 from PushShoppingList.services.item_state_service import load_item_state
 from PushShoppingList.services.recipe_url_service import recipe_url_rows
+from PushShoppingList.services.recipe_url_service import save_recipe_urls
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
 from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
+from PushShoppingList.services.recipe_ingredient_service import save_recipe_ingredients
 from PushShoppingList.services.recipe_quantity_service import ingredient_key
 from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
 from PushShoppingList.services.recipe_extract_service import STORE_SECTION_ORDER
@@ -443,6 +445,8 @@ def index():
 @main_bp.route("/clear", methods=["POST"])
 def clear_list():
     save_items([])
+    save_recipe_urls([])
+    save_recipe_ingredients({})
 
     return redirect("/")
 
