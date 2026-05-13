@@ -389,7 +389,7 @@ async function saveRecipeQuantity(input) {
             console.warn("Unable to refresh recipe quantities in the background.", refreshErr);
         }
 
-        showRecipeQuantityUpdatedMessage(url, quantity);
+        showRecipeQuantityUpdatedMessage(url, quantity, input.dataset.recipeNumber || "");
 
         setTimeout(() => {
             input.classList.remove("saved");
@@ -442,22 +442,26 @@ function updateRecipeQuantityDisplays(recipeUrl, multiplier, apiData = null) {
     });
 }
 
-function showRecipeQuantityUpdatedMessage(recipeUrl, quantity) {
-    const selector = `.recipe-quantity-update-notice[data-recipe-url="${cssEscape(recipeUrl)}"]`;
-    const notice = document.querySelector(selector);
+function showRecipeQuantityUpdatedMessage(recipeUrl, quantity, recipeNumber = "") {
+    let notice = document.getElementById("recipeQuantityUpdateOverlay");
 
     if (!notice) {
-        return;
+        notice = document.createElement("div");
+        notice.id = "recipeQuantityUpdateOverlay";
+        notice.className = "recipe-quantity-update-overlay";
+        notice.setAttribute("aria-live", "polite");
+        document.body.appendChild(notice);
     }
 
-    const existingTimer = recipeQuantityNoticeTimers.get(recipeUrl);
+    const existingTimer = recipeQuantityNoticeTimers.get("global");
 
     if (existingTimer) {
         clearTimeout(existingTimer.fade);
         clearTimeout(existingTimer.clear);
     }
 
-    notice.textContent = `Quantities updated for Qty ${quantity}.`;
+    const recipeLabel = recipeNumber ? `Recipe ${recipeNumber} ` : "";
+    notice.textContent = `${recipeLabel}Qty updated to ${quantity}.`;
     notice.classList.remove("fading");
     notice.classList.add("visible");
 
@@ -469,10 +473,10 @@ function showRecipeQuantityUpdatedMessage(recipeUrl, quantity) {
     const clear = setTimeout(() => {
         notice.textContent = "";
         notice.classList.remove("fading");
-        recipeQuantityNoticeTimers.delete(recipeUrl);
+        recipeQuantityNoticeTimers.delete("global");
     }, 2200);
 
-    recipeQuantityNoticeTimers.set(recipeUrl, { fade, clear });
+    recipeQuantityNoticeTimers.set("global", { fade, clear });
 }
 
 function findScaledIngredient(apiData, ingredientName) {

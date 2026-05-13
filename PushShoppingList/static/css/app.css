@@ -1260,26 +1260,36 @@ body {
             box-shadow: 0 0 0 1px rgba(0, 204, 102, 0.35);
         }
 
-        .recipe-quantity-update-notice {
-            max-height: 0;
+        .recipe-quantity-update-overlay {
+            position: fixed;
+            top: 14px;
+            left: 50%;
+            z-index: 10000;
+            transform: translate(-50%, -12px);
             opacity: 0;
-            overflow: hidden;
-            margin: 0;
+            pointer-events: none;
+            min-width: min(420px, calc(100vw - 32px));
+            box-sizing: border-box;
+            padding: 11px 18px;
+            border-radius: 999px;
+            border: 1px solid rgba(0, 204, 102, 0.45);
+            background: rgba(14, 18, 18, 0.96);
             color: #00ff9d;
-            font-size: 14px;
+            box-shadow: 0 14px 44px rgba(0, 0, 0, 0.5);
+            font-size: 15px;
             font-weight: 700;
             text-align: center;
-            transition: opacity 0.45s ease, max-height 0.45s ease, margin 0.45s ease;
+            transition: opacity 0.35s ease, transform 0.35s ease;
         }
 
-        .recipe-quantity-update-notice.visible {
-            max-height: 28px;
+        .recipe-quantity-update-overlay.visible {
             opacity: 1;
-            margin: 8px 0 4px 0;
+            transform: translate(-50%, 0);
         }
 
-        .recipe-quantity-update-notice.fading {
+        .recipe-quantity-update-overlay.fading {
             opacity: 0;
+            transform: translate(-50%, -12px);
         }
 
         .remove-recipe-form { margin: 0; }

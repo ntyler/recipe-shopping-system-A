@@ -23,6 +23,7 @@
                            min="1"
                            step="1"
                            value="{{ recipe.quantity }}"
+                           data-recipe-number="{{ loop.index }}"
                            data-recipe-url="{{ recipe.url }}">
                     <button type="button"
                             class="recipe-quantity-step"
