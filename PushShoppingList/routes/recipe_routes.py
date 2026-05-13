@@ -12,6 +12,7 @@ from PushShoppingList.services.extraction_progress_service import is_current_job
 from PushShoppingList.services.extraction_progress_service import load_progress
 from PushShoppingList.services.extraction_progress_service import mark_url_done
 from PushShoppingList.services.extraction_progress_service import mark_url_failed
+from PushShoppingList.services.extraction_progress_service import mark_url_message
 from PushShoppingList.services.extraction_progress_service import mark_url_running
 from PushShoppingList.services.extraction_progress_service import new_job_id
 from PushShoppingList.services.extraction_progress_service import request_cancel
@@ -46,7 +47,16 @@ def extract_recipe_route():
             break
 
         mark_url_running(job_id, urls, index)
-        result = extract_recipe_from_url(url)
+        result = extract_recipe_from_url(
+            url,
+            progress_callback=lambda message, summary=None, idx=index: mark_url_message(
+                job_id,
+                urls,
+                idx,
+                message,
+                summary,
+            ),
+        )
 
         if is_cancel_requested(job_id):
             break
@@ -93,7 +103,16 @@ def api_extract_recipe_route():
     if not is_current_job(job_id):
         return jsonify({"ok": False, "cancelled": True, "error": "Extraction superseded."}), 409
 
-    result = extract_recipe_from_url(url)
+    result = extract_recipe_from_url(
+        url,
+        progress_callback=lambda message, summary=None: mark_url_message(
+            job_id,
+            urls,
+            index,
+            message,
+            summary,
+        ),
+    )
 
     if is_cancel_requested(job_id) or not is_current_job(job_id):
         return jsonify({"ok": False, "cancelled": True, "error": "Extraction cancelled."}), 409

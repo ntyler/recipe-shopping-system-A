@@ -98,6 +98,26 @@ def mark_url_running(job_id, urls, index):
     return save_progress(progress)
 
 
+def mark_url_message(job_id, urls, index, message, summary=None):
+    progress = ensure_job(job_id, urls)
+
+    if progress.get("job_id") != job_id or progress.get("cancel_requested"):
+        return progress
+
+    progress["active"] = True
+    progress["status"] = "running"
+    progress["current_index"] = index
+
+    if summary:
+        progress["summary"] = summary
+
+    if 0 <= index < len(progress["urls"]):
+        progress["urls"][index]["state"] = "running"
+        progress["urls"][index]["message"] = message
+
+    return save_progress(progress)
+
+
 def mark_url_done(job_id, urls, index, ingredients_count):
     progress = ensure_job(job_id, urls)
 

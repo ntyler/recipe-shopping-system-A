@@ -116,7 +116,7 @@ def get_openai_client():
     global client
 
     if client is None:
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), timeout=45)
 
     return client
 
@@ -510,13 +510,21 @@ def fetch_recipe_page(recipe_url):
         )
     }
 
-    response = requests.get(recipe_url, headers=headers, timeout=30)
-    response.raise_for_status()
-
     html_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_PAGE_HTML.html"
-    html_path.write_text(response.text, encoding="utf-8")
 
-    soup = BeautifulSoup(response.text, "html.parser")
+    try:
+        response = requests.get(recipe_url, headers=headers, timeout=(8, 15))
+        response.raise_for_status()
+        html_text = response.text
+        html_path.write_text(html_text, encoding="utf-8")
+    except Exception:
+        if html_path.exists() and os.getenv("DISABLE_RECIPE_HTML_CACHE_FALLBACK") != "1":
+            print(f"Live fetch failed; using cached HTML: {html_path}")
+            html_text = html_path.read_text(encoding="utf-8")
+        else:
+            raise
+
+    soup = BeautifulSoup(html_text, "html.parser")
 
     for tag in soup(["script", "style", "noscript", "svg"]):
         tag.decompose()
@@ -532,7 +540,7 @@ def fetch_recipe_page(recipe_url):
 
     print(f"Loaded webpage text: {len(page_text)} characters")
 
-    return response.text, page_text
+    return html_text, page_text
 
 
 def fetch_recipe_page_text(recipe_url):
@@ -968,6 +976,39 @@ def extract_ingredients_from_result(json_data):
     return ingredients
 
 
+def structured_recipe_data_is_usable(json_data):
+    if not isinstance(json_data, dict):
+        return False
+
+    return bool(json_data.get("ingredients")) and bool(json_data.get("instructions"))
+
+
+def save_extracted_recipe_json(recipe_url, json_data):
+    json_path = OUTPUT_FOLDER / f"{safe_filename(recipe_url)}.json"
+    json_path.write_text(
+        json.dumps(json_data, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    return json_path
+
+
+def build_extract_result(recipe_url, json_data, extraction_method):
+    ingredients = extract_ingredients_from_result(json_data)
+
+    return {
+        "ok": True,
+        "source_url": recipe_url,
+        "recipe_title": json_data.get("recipe_title"),
+        "servings": json_data.get("servings"),
+        "ingredients": ingredients,
+        "equipment": json_data.get("equipment", []),
+        "instructions": json_data.get("instructions", []),
+        "nutrition": json_data.get("nutrition", {}),
+        "raw": json_data,
+        "extraction_method": extraction_method,
+    }
+
+
 def normalize_ingredient_key(text):
     return re.sub(r"\s+", " ", str(text or "").strip().lower())
 
@@ -1018,7 +1059,7 @@ def normalize_ingredient_for_shopping_list(text):
     return re.sub(r"\s+", " ", value).strip()
 
 
-def extract_recipe_from_url(recipe_url):
+def extract_recipe_from_url(recipe_url, progress_callback=None):
     recipe_url = str(recipe_url or "").strip()
 
     if not recipe_url:
@@ -1029,12 +1070,24 @@ def extract_recipe_from_url(recipe_url):
         }
 
     try:
+        def report(message, summary=None):
+            if progress_callback:
+                progress_callback(message, summary)
+
         print("\n==================================================")
         print("Recipe 1/1")
         print(recipe_url)
         print("==================================================")
 
+        report(
+            "downloading webpage HTML...",
+            "Opening the recipe URL and saving the page HTML.",
+        )
         html_text, page_text = fetch_recipe_page(recipe_url)
+        report(
+            "HTML downloaded - reading recipe card data...",
+            "Reading structured recipe data from the webpage HTML.",
+        )
 
         if not page_text:
             return {
@@ -1046,32 +1099,21 @@ def extract_recipe_from_url(recipe_url):
 
         structured_json_data = extract_recipe_from_structured_data(recipe_url, html_text)
 
-        if structured_json_data and not os.getenv("OPENAI_API_KEY"):
+        force_openai = os.getenv("FORCE_OPENAI_RECIPE_EXTRACTION") == "1"
+
+        if structured_recipe_data_is_usable(structured_json_data) and not force_openai:
             normalize_extracted_ingredient_fields(structured_json_data)
             normalize_extracted_equipment_fields(structured_json_data)
-            json_path = OUTPUT_FOLDER / f"{safe_filename(recipe_url)}.json"
-            json_path.write_text(
-                json.dumps(structured_json_data, indent=2, ensure_ascii=False),
-                encoding="utf-8",
+            save_extracted_recipe_json(recipe_url, structured_json_data)
+            print("Structured recipe data found; using recipe card for fast extraction.")
+            report(
+                "recipe card found - extracted without OpenAI API fallback.",
+                "Recipe-card HTML was enough to extract ingredients and instructions.",
             )
-
-            ingredients = extract_ingredients_from_result(structured_json_data)
-
-            return {
-                "ok": True,
-                "source_url": recipe_url,
-                "recipe_title": structured_json_data.get("recipe_title"),
-                "servings": structured_json_data.get("servings"),
-                "ingredients": ingredients,
-                "equipment": structured_json_data.get("equipment", []),
-                "instructions": structured_json_data.get("instructions", []),
-                "nutrition": structured_json_data.get("nutrition", {}),
-                "raw": structured_json_data,
-                "extraction_method": "structured_data",
-            }
+            return build_extract_result(recipe_url, structured_json_data, "structured_data")
 
         if structured_json_data:
-            print("Structured recipe data found; using it only as a fallback because OPENAI_API_KEY is set.")
+            print("Structured recipe data found, but API extraction was forced.")
 
         if not os.getenv("OPENAI_API_KEY"):
             return {
@@ -1084,6 +1126,10 @@ def extract_recipe_from_url(recipe_url):
         prompt_text = build_prompt(recipe_url, page_text)
 
         print("Sending to OpenAI API...")
+        report(
+            "sending webpage content to OpenAI API...",
+            "No complete recipe card was found, so OpenAI is extracting from the page content.",
+        )
         response_text = send_prompt_to_openai(prompt_text)
 
         raw_api_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_API_RESPONSE.txt"
