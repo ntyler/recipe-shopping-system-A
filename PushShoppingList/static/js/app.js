@@ -10,6 +10,7 @@ let currentExtractAbortController = null;
 let currentExtractAbortControllers = [];
 let cancelExtractRequested = false;
 const recipeQuantitySaveTimers = new WeakMap();
+let recipeQuantityStepButtonsBound = false;
 
 function restoreScroll() {
     const scrollY = localStorage.getItem("scrollY");
@@ -276,6 +277,11 @@ function restoreItemCheckState() {
 
 function bindRecipeQuantityInputs() {
     document.querySelectorAll(".recipe-quantity-input").forEach(input => {
+        if (input.dataset.quantityBound === "1") {
+            return;
+        }
+
+        input.dataset.quantityBound = "1";
         input.dataset.lastSavedValue = input.value || "1";
 
         input.addEventListener("input", () => {
@@ -290,6 +296,12 @@ function bindRecipeQuantityInputs() {
             saveRecipeQuantity(input);
         });
     });
+
+    if (recipeQuantityStepButtonsBound) {
+        return;
+    }
+
+    recipeQuantityStepButtonsBound = true;
 
     document.addEventListener("click", event => {
         const button = event.target.closest(".recipe-quantity-step");
@@ -1008,6 +1020,7 @@ document.addEventListener("DOMContentLoaded", function () {
     restoreOpenStorePanels();
     restoreViewBehaviorSettings();
     restoreItemCheckState();
+    bindRecipeQuantityInputs();
     bindStoreButtons();
     bindSectionHeaderToggles();
     bindRecipeDetailToggles();
