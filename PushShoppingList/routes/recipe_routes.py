@@ -23,7 +23,7 @@ from PushShoppingList.services.recipe_ingredient_service import save_ingredients
 from PushShoppingList.services.recipe_url_service import add_recipe_urls
 from PushShoppingList.services.recipe_url_service import normalize_recipe_quantity
 from PushShoppingList.services.recipe_url_service import remove_recipe_url
-from PushShoppingList.services.recipe_url_service import save_recipe_url_quantity
+from PushShoppingList.services.recipe_quantity_service import update_recipe_quantity
 from PushShoppingList.services.shopping_list_service import add_items
 
 recipe_bp = Blueprint("recipe_bp", __name__)
@@ -170,13 +170,7 @@ def api_recipe_quantity_route():
     quantity = data.get("quantity", 1)
     quantity = normalize_recipe_quantity(quantity)
 
-    save_recipe_url_quantity(url, quantity)
-
-    return jsonify({
-        "ok": True,
-        "url": url,
-        "quantity": quantity,
-    })
+    return jsonify(update_recipe_quantity(url, quantity))
 
 
 @recipe_bp.route("/remove_recipe", methods=["POST"])

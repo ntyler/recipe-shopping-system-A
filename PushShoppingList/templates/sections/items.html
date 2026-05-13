@@ -255,16 +255,11 @@
                                         {% if recipe_item.quantity %}
                                             <span class="recipe-ingredient-quantity"
                                                   data-recipe-url="{{ recipe.url }}"
+                                                  data-ingredient-name="{{ recipe_item.name }}"
                                                   data-base-quantity="{{ recipe_item.base_quantity or "" }}"
                                                   data-unit="{{ recipe_item.unit or "" }}">
-                                                {{ recipe_item.quantity }} {{ recipe_item.unit or "" }}
+                                                {{ recipe_item.quantity_display or (recipe_item.quantity ~ " " ~ (recipe_item.unit or "")) }}
                                             </span>
-                                        {% endif %}
-
-                                        {% if recipe_item.url %}
-                                            <a class="source-link" href="{{ recipe_item.url }}" target="_blank">
-                                                (recipe {{ recipe.number }})
-                                            </a>
                                         {% endif %}
                                     </div>
                                 </div>

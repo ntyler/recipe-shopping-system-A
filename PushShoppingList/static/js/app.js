@@ -306,8 +306,9 @@ async function saveRecipeQuantity(input) {
             throw new Error("Unable to save recipe quantity.");
         }
 
+        const data = await response.json();
         input.classList.add("saved");
-        updateRecipeQuantityDisplays(url, quantity);
+        updateRecipeQuantityDisplays(url, quantity, data);
         setTimeout(() => {
             input.classList.remove("saved");
         }, 700);
@@ -316,13 +317,21 @@ async function saveRecipeQuantity(input) {
     }
 }
 
-function updateRecipeQuantityDisplays(recipeUrl, multiplier) {
+function updateRecipeQuantityDisplays(recipeUrl, multiplier, apiData = null) {
     document.querySelectorAll(`.recipe-servings-value[data-recipe-url="${cssEscape(recipeUrl)}"]`).forEach(element => {
         const baseServings = element.dataset.baseServings || "";
-        element.textContent = scaleServingsForDisplay(baseServings, multiplier);
+        element.textContent = (apiData && apiData.servings) || scaleServingsForDisplay(baseServings, multiplier);
     });
 
     document.querySelectorAll(`.recipe-ingredient-quantity[data-recipe-url="${cssEscape(recipeUrl)}"]`).forEach(element => {
+        const ingredientName = element.dataset.ingredientName || "";
+        const apiIngredient = findScaledIngredient(apiData, ingredientName);
+
+        if (apiIngredient && apiIngredient.display) {
+            element.textContent = apiIngredient.display;
+            return;
+        }
+
         const baseQuantity = element.dataset.baseQuantity || "";
         const unit = element.dataset.unit || "";
         const scaledQuantity = scaleQuantityForDisplay(baseQuantity, multiplier);
@@ -331,6 +340,29 @@ function updateRecipeQuantityDisplays(recipeUrl, multiplier) {
             element.textContent = `${scaledQuantity} ${unit}`.trim();
         }
     });
+}
+
+function findScaledIngredient(apiData, ingredientName) {
+    if (!apiData || !apiData.ingredients) {
+        return null;
+    }
+
+    const exact = apiData.ingredients[ingredientName];
+
+    if (exact) {
+        return exact;
+    }
+
+    const targetKey = normalizeFoodKey(ingredientName);
+    const matchedName = Object.keys(apiData.ingredients).find(name => {
+        return normalizeFoodKey(name) === targetKey;
+    });
+
+    return matchedName ? apiData.ingredients[matchedName] : null;
+}
+
+function normalizeFoodKey(value) {
+    return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 function scaleServingsForDisplay(servings, multiplier) {

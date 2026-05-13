@@ -16,6 +16,8 @@ from PushShoppingList.services.home_address_service import save_home_address
 from PushShoppingList.services.item_state_service import load_item_state
 from PushShoppingList.services.recipe_url_service import recipe_url_rows
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
+from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
+from PushShoppingList.services.recipe_quantity_service import ingredient_key
 from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
 from PushShoppingList.services.recipe_extract_service import STORE_SECTION_ORDER
 from PushShoppingList.services.shopping_list_service import load_items
@@ -94,11 +96,16 @@ def section_counts(items):
 
 def recipe_view_rows(recipe_urls):
     rows = []
+    recipe_ingredient_data = load_recipe_ingredients()
 
     for index, recipe in enumerate(recipe_urls, start=1):
         recipe_quantity = int(recipe.get("quantity") or 1)
         recipe_data = load_saved_recipe_output(recipe["url"])
-        sections = build_recipe_sections(recipe_data, recipe_quantity)
+        recipe_meta = recipe_ingredient_data.get(normalize_recipe_url_key(recipe["url"]), {})
+        use_scaled_meta = int(recipe_meta.get("quantity") or 1) == recipe_quantity
+        scaled_ingredients = recipe_meta.get("scaled_ingredients", {}) if use_scaled_meta else {}
+        scaled_servings = recipe_meta.get("scaled_servings") if use_scaled_meta else None
+        sections = build_recipe_sections(recipe_data, recipe_quantity, scaled_ingredients)
 
         rows.append({
             "number": index,
@@ -106,7 +113,7 @@ def recipe_view_rows(recipe_urls):
             "url": recipe["url"],
             "quantity": recipe_quantity,
             "base_servings": recipe_data.get("servings"),
-            "servings": scale_servings(recipe_data.get("servings"), recipe_quantity),
+            "servings": scaled_servings or scale_servings(recipe_data.get("servings"), recipe_quantity),
             "equipment_items": normalize_text_list(recipe_data.get("equipment", [])),
             "instruction_items": normalize_instruction_items(recipe_data.get("instructions", [])),
             "nutrition_items": normalize_nutrition_items(recipe_data.get("nutrition", {})),
@@ -134,8 +141,9 @@ def load_saved_recipe_output(recipe_url):
     return {}
 
 
-def build_recipe_sections(recipe_data, recipe_quantity=1):
+def build_recipe_sections(recipe_data, recipe_quantity=1, scaled_ingredients=None):
     sections = {section: [] for section in STORE_SECTION_ORDER.keys()}
+    scaled_ingredients = scaled_ingredients or {}
 
     for ingredient in recipe_data.get("ingredients", []) or []:
         if not isinstance(ingredient, dict):
@@ -149,11 +157,18 @@ def build_recipe_sections(recipe_data, recipe_quantity=1):
         if section not in sections:
             section = "MISC"
 
+        scaled_value = scaled_ingredients.get(name) or scaled_ingredients.get(ingredient_key(name)) or {}
+        scaled_quantity = scaled_value.get("quantity") if isinstance(scaled_value, dict) else None
+        scaled_unit = scaled_value.get("unit") if isinstance(scaled_value, dict) else None
+        scaled_display = scaled_value.get("display") if isinstance(scaled_value, dict) else None
+        fallback_quantity = scale_quantity(ingredient.get("quantity"), recipe_quantity)
+
         sections[section].append({
             "name": name,
-            "quantity": scale_quantity(ingredient.get("quantity"), recipe_quantity),
+            "quantity": scaled_quantity or fallback_quantity,
             "base_quantity": ingredient.get("quantity"),
-            "unit": ingredient.get("unit"),
+            "unit": scaled_unit if scaled_unit is not None else ingredient.get("unit"),
+            "quantity_display": scaled_display,
             "url": recipe_data.get("source_url"),
         })
 
