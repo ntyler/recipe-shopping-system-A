@@ -2084,11 +2084,11 @@ body {
 
             .recipe-row {
                 display: grid;
-                grid-template-columns: 1fr;
-                gap: 10px;
-                align-items: stretch;
-                margin-bottom: 18px;
-                padding-bottom: 16px;
+                grid-template-columns: minmax(0, 1fr) auto;
+                gap: 8px 10px;
+                align-items: center;
+                margin-bottom: 14px;
+                padding-bottom: 14px;
                 border-bottom: 1px solid #333;
             }
 
@@ -2099,6 +2099,7 @@ body {
             }
 
             .recipe-left {
+                grid-column: 1 / -1;
                 width: 100%;
                 min-width: 0;
                 line-height: 1.35;
@@ -2111,33 +2112,46 @@ body {
             }
 
             .recipe-quantity-control {
-                width: 100%;
+                grid-column: 1 / 2;
+                width: auto;
                 justify-content: flex-start;
-                gap: 8px;
+                gap: 6px;
             }
 
             .recipe-quantity-input {
-                flex: 1;
-                min-width: 72px;
-                max-width: 130px;
-                height: 42px;
-                font-size: 16px;
+                flex: 0 0 58px;
+                width: 58px;
+                min-width: 58px;
+                max-width: 58px;
+                height: 34px;
+                padding: 4px 6px;
+                font-size: 15px;
             }
 
             .recipe-quantity-step {
-                width: 42px;
-                height: 42px;
-                font-size: 22px;
+                width: 34px;
+                height: 34px;
+                font-size: 18px;
             }
 
             .remove-recipe-form {
-                width: 100%;
+                grid-column: 2 / 3;
+                width: auto;
+                margin: 0;
             }
 
             .remove-recipe-btn {
-                width: 100%;
-                padding: 10px 12px;
-                font-size: 15px;
+                width: auto;
+                min-width: 84px;
+                height: 34px;
+                margin: 0;
+                padding: 6px 12px;
+                font-size: 14px;
+            }
+
+            .save-recipe-qty-btn {
+                padding: 11px 14px;
+                font-size: 17px;
             }
         }
 

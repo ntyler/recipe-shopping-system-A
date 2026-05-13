@@ -301,6 +301,20 @@ def split_quantity_unit(text):
     )
 
     if not match:
+        unit_first_match = re.match(
+            rf"^(?P<unit>{unit_pattern})\s+(?P<ingredient>.+)$",
+            text,
+            flags=re.IGNORECASE,
+        )
+
+        if unit_first_match:
+            return (
+                "1",
+                unit_first_match.group("unit").strip(),
+                unit_first_match.group("ingredient").strip(),
+            )
+
+    if not match:
         return None, None, text
 
     unit = match.group("unit")
@@ -320,6 +334,12 @@ def remove_preparation_text(text, preparation):
 
     if "," in text:
         text = text.split(",", 1)[0]
+
+    for phrase in str(preparation or "").split(","):
+        phrase = phrase.strip()
+
+        if phrase:
+            text = re.sub(rf"\b{re.escape(phrase)}\b", " ", text, flags=re.IGNORECASE)
 
     return re.sub(r"\s+", " ", text).strip()
 
@@ -374,6 +394,12 @@ def classify_store_section(ingredient):
 
 def extract_preparation(original_text):
     text = clean_recipe_text(original_text)
+    usage_modifiers = [
+        "to taste",
+        "as desired",
+        "for garnish",
+        "for garnishing",
+    ]
 
     parenthetical_matches = [
         match.strip()
@@ -386,6 +412,16 @@ def extract_preparation(original_text):
 
     if "," in text:
         return clean_preparation_text(text.split(",", 1)[1].strip()) or None
+
+    lowered = text.lower()
+    matched_modifiers = [
+        modifier
+        for modifier in usage_modifiers
+        if re.search(rf"\b{re.escape(modifier)}\b", lowered)
+    ]
+
+    if matched_modifiers:
+        return clean_preparation_text(", ".join(matched_modifiers))
 
     return None
 
@@ -710,9 +746,10 @@ INGREDIENT RULES
 - If original_text has text after a comma or a non-metric parenthetical such as "(melted)", "(chopped)", "(divided)", or "(room temperature)", preparation must not be null.
 - The ingredient field must be the unique grocery item name only.
 - Do NOT include quantity, unit, package size, metric conversion, or preparation in the ingredient field.
-- Do NOT include words like "divided", "chopped", "melted", "shredded", "to taste", or "optional" in the ingredient field.
+- Do NOT include words like "divided", "chopped", "melted", "shredded", "to taste", "as desired", "for garnish", or "optional" in the ingredient field.
 - Put preparation words in preparation.
 - If an ingredient is optional, set optional = true.
+- "pinch" and "pinches" are measurement units. Put them in unit, not ingredient.
 
 - Preserve recipe usage modifiers in preparation:
   - "divided"
@@ -721,6 +758,9 @@ INGREDIENT RULES
   - "cold"
   - "drained"
   - "rinsed"
+  - "to taste"
+  - "as desired"
+  - "for garnish"
 
 INGREDIENT CONFIDENCE RULES:
 - Only extract ingredients that are explicitly present in the recipe.
@@ -772,6 +812,24 @@ Examples:
   -> unit = null
   -> ingredient = "salt"
   -> preparation = "to taste"
+
+- "Pinch ground nutmeg"
+  -> quantity = "1"
+  -> unit = "Pinch"
+  -> ingredient = "ground nutmeg"
+  -> preparation = null
+
+- "Parmesan and/or basil, for garnish"
+  -> quantity = null
+  -> unit = null
+  -> ingredient = "Parmesan and/or basil"
+  -> preparation = "for garnish"
+
+- "Homemade Tomato Sauce, or sauce as desired, for serving"
+  -> quantity = null
+  -> unit = null
+  -> ingredient = "Homemade Tomato Sauce"
+  -> preparation = "or sauce as desired, for serving"
 
 - "2 ounces cocoa butter or 1/4 cup vegetable oil"
   -> quantity = "2 ounces OR 1/4 cup"
