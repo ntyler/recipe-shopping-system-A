@@ -586,6 +586,7 @@ def fetch_recipe_page_with_browser(recipe_url):
             import undetected_chromedriver as uc
 
             options = uc.ChromeOptions()
+            options.page_load_strategy = "eager"
             options.add_argument("--headless=new")
             options.add_argument("--disable-gpu")
             options.add_argument("--no-sandbox")
@@ -597,6 +598,7 @@ def fetch_recipe_page_with_browser(recipe_url):
             from selenium.webdriver.chrome.options import Options
 
             options = Options()
+            options.page_load_strategy = "eager"
             options.add_argument("--headless=new")
             options.add_argument("--disable-gpu")
             options.add_argument("--no-sandbox")
@@ -604,8 +606,19 @@ def fetch_recipe_page_with_browser(recipe_url):
             options.add_argument("--window-size=1365,900")
             driver = webdriver.Chrome(options=options)
 
-        driver.set_page_load_timeout(25)
-        driver.get(recipe_url)
+        driver.set_page_load_timeout(18)
+
+        try:
+            driver.get(recipe_url)
+        except Exception:
+            html_text = driver.page_source or ""
+
+            if len(html_text) > 1000:
+                print("Browser fetch timed out after partial page load; using current HTML.")
+                return html_text
+
+            raise
+
         return driver.page_source or ""
     finally:
         if driver:

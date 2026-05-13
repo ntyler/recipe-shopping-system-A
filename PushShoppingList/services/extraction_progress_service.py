@@ -141,10 +141,31 @@ def mark_url_failed(job_id, urls, index, error):
 
     if 0 <= index < len(progress["urls"]):
         progress["urls"][index]["state"] = "failed"
-        progress["urls"][index]["message"] = f"failed - {error or 'unknown error'}"
+        progress["urls"][index]["message"] = f"failed - {friendly_error_message(error)}"
 
     progress["percent"] = progress_percent(completed_count(progress), progress["total"])
     return save_progress(progress)
+
+
+def friendly_error_message(error):
+    text = str(error or "unknown error").strip()
+
+    if "403 Forbidden" in text:
+        if "browser fallback failed" in text:
+            return "403 Forbidden. Browser fallback opened the page but could not read recipe HTML in time."
+        return "403 Forbidden. The website blocked the recipe download."
+
+    if "Timed out receiving message from renderer" in text:
+        return "Chrome timed out while loading the recipe page."
+
+    if "timeout" in text.lower() or "timed out" in text.lower():
+        return "Timed out while loading the recipe page."
+
+    if "Cannot connect to proxy" in text:
+        return "Network/proxy blocked the recipe page download."
+
+    single_line = " ".join(text.split())
+    return single_line[:220]
 
 
 def request_cancel(job_id=None):

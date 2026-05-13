@@ -8,6 +8,7 @@ from flask import request
 from flask import render_template
 
 from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
+from PushShoppingList.services.food_rules_service import shopping_item_food_rule_status
 from PushShoppingList.services.home_address_service import load_home_address
 from PushShoppingList.services.home_address_service import save_home_address
 from PushShoppingList.services.item_state_service import load_item_state
@@ -332,6 +333,7 @@ def index():
         recipe_view_rows=recipe_view_rows(recipe_urls),
         normalize=normalize,
         is_section_header=is_section_header,
+        food_rule_status=shopping_item_food_rule_status,
     )
 
 

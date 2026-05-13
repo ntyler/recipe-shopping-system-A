@@ -162,6 +162,24 @@ def annotate_product_food_rules(product):
     return annotated
 
 
+def shopping_item_food_rule_status(item_name):
+    text = str(item_name or "").lower()
+    rules = load_food_rules()
+    blocked_by = [
+        rule["label"]
+        for rule in rules["avoid"]
+        if any(term_matches(text, term) for term in rule["terms"])
+    ]
+    status = {
+        "ok": not blocked_by,
+        "needs_review": bool(blocked_by),
+        "missing_required": [],
+        "blocked_by": blocked_by,
+    }
+    status["marker"] = food_rule_marker(status)
+    return status
+
+
 def food_rule_marker(status):
     issues = []
 
