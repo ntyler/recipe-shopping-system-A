@@ -1,0 +1,123 @@
+{
+  "require": [
+    {
+      "label": "must be organic",
+      "terms": [
+        "organic"
+      ]
+    }
+  ],
+  "avoid": [
+    {
+      "label": "no citric acid",
+      "terms": [
+        "citric acid"
+      ]
+    },
+    {
+      "label": "no nitrates",
+      "terms": [
+        "nitrate",
+        "nitrates",
+        "sodium nitrate",
+        "potassium nitrate"
+      ]
+    },
+    {
+      "label": "no nitrites",
+      "terms": [
+        "nitrite",
+        "nitrites",
+        "sodium nitrite",
+        "potassium nitrite"
+      ]
+    },
+    {
+      "label": "no BHA",
+      "terms": [
+        "bha",
+        "butylated hydroxyanisole"
+      ]
+    },
+    {
+      "label": "no BHT",
+      "terms": [
+        "bht",
+        "butylated hydroxytoluene"
+      ]
+    },
+    {
+      "label": "no corn syrup or derivatives of corn syrup",
+      "terms": [
+        "corn syrup",
+        "high fructose corn syrup",
+        "hfcs",
+        "corn syrup solids",
+        "glucose syrup",
+        "fructose syrup"
+      ]
+    },
+    {
+      "label": "no red dye",
+      "terms": [
+        "red dye",
+        "red 40",
+        "red #40",
+        "fd&c red",
+        "allura red"
+      ]
+    },
+    {
+      "label": "no MSG",
+      "terms": [
+        "msg",
+        "monosodium glutamate"
+      ]
+    },
+    {
+      "label": "no sweeteners",
+      "terms": [
+        "aspartame",
+        "sucralose",
+        "saccharin",
+        "acesulfame potassium",
+        "acesulfame k",
+        "neotame",
+        "advantame",
+        "stevia",
+        "erythritol",
+        "xylitol",
+        "sorbitol",
+        "maltitol",
+        "monk fruit"
+      ]
+    },
+    {
+      "label": "no hydrogenated oils",
+      "terms": [
+        "hydrogenated oil",
+        "hydrogenated oils",
+        "partially hydrogenated"
+      ]
+    },
+    {
+      "label": "no potassium bromate",
+      "terms": [
+        "potassium bromate"
+      ]
+    },
+    {
+      "label": "no propyl paraben",
+      "terms": [
+        "propyl paraben",
+        "propylparaben"
+      ]
+    },
+    {
+      "label": "no titanium dioxide",
+      "terms": [
+        "titanium dioxide"
+      ]
+    }
+  ]
+}
