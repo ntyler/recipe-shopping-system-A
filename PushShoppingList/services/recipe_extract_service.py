@@ -33,6 +33,9 @@ INGREDIENT_STORE_SECTIONS = {
     "shrimp": "MEAT & SEAFOOD",
     "salmon": "MEAT & SEAFOOD",
     "egg": "DAIRY & EGGS",
+    "eggs": "DAIRY & EGGS",
+    "yolk": "DAIRY & EGGS",
+    "yolks": "DAIRY & EGGS",
     "milk": "DAIRY & EGGS",
     "butter": "DAIRY & EGGS",
     "yogurt": "DAIRY & EGGS",
@@ -42,10 +45,18 @@ INGREDIENT_STORE_SECTIONS = {
     "parmesan": "DAIRY & EGGS",
     "flour": "BAKING",
     "sugar": "BAKING",
+    "confectioners sugar": "BAKING",
+    "confectioners' sugar": "BAKING",
+    "powdered sugar": "BAKING",
     "yeast": "BAKING",
     "baking powder": "BAKING",
     "baking soda": "BAKING",
     "chocolate chips": "BAKING",
+    "chocolate": "BAKING",
+    "cocoa powder": "BAKING",
+    "dutch-processed cocoa powder": "BAKING",
+    "cocoa butter": "BAKING",
+    "corn syrup": "BAKING",
     "vanilla extract": "BAKING",
     "salt": "SPICES & SEASONINGS",
     "pepper": "SPICES & SEASONINGS",
@@ -55,7 +66,10 @@ INGREDIENT_STORE_SECTIONS = {
     "cumin": "SPICES & SEASONINGS",
     "oil": "OILS & VINEGARS",
     "vinegar": "OILS & VINEGARS",
+    "clarified butter": "DAIRY & EGGS",
     "pasta": "PASTA, RICE & GRAINS",
+    "pasta dough": "PASTA, RICE & GRAINS",
+    "fresh pasta dough": "PASTA, RICE & GRAINS",
     "rice": "PASTA, RICE & GRAINS",
     "oats": "PASTA, RICE & GRAINS",
     "quinoa": "PASTA, RICE & GRAINS",
@@ -312,6 +326,29 @@ def remove_preparation_text(text, preparation):
 
 def classify_store_section(ingredient):
     normalized = normalize_ingredient_key(ingredient)
+    normalized = normalized.replace("*", "")
+
+    priority_keywords = (
+        ("fresh pasta dough", "PASTA, RICE & GRAINS"),
+        ("pasta dough", "PASTA, RICE & GRAINS"),
+        ("cocoa butter", "BAKING"),
+        ("cocoa powder", "BAKING"),
+        ("dutch-processed cocoa powder", "BAKING"),
+        ("semisweet chocolate", "BAKING"),
+        ("chocolate", "BAKING"),
+        ("corn syrup", "BAKING"),
+        ("confectioners' sugar", "BAKING"),
+        ("confectioners sugar", "BAKING"),
+        ("powdered sugar", "BAKING"),
+        ("salt and pepper", "SPICES & SEASONINGS"),
+        ("tomato sauce", "SAUCES & CONDIMENTS"),
+        ("clarified butter", "DAIRY & EGGS"),
+        ("yolk", "DAIRY & EGGS"),
+    )
+
+    for keyword, section in priority_keywords:
+        if keyword in normalized:
+            return section
 
     for keyword, section in INGREDIENT_STORE_SECTIONS.items():
         if keyword in normalized:
