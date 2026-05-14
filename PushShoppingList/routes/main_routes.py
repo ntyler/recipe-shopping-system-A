@@ -3,6 +3,7 @@ import json
 import re
 from fractions import Fraction
 
+import requests
 from flask import Blueprint
 from flask import jsonify
 from flask import redirect
@@ -28,6 +29,60 @@ from PushShoppingList.services.shopping_list_service import save_items
 from PushShoppingList.services.store_settings_service import load_store_settings
 
 main_bp = Blueprint("main_bp", __name__)
+
+US_STATE_ABBREVIATIONS = {
+    "alabama": "AL",
+    "alaska": "AK",
+    "arizona": "AZ",
+    "arkansas": "AR",
+    "california": "CA",
+    "colorado": "CO",
+    "connecticut": "CT",
+    "delaware": "DE",
+    "district of columbia": "DC",
+    "florida": "FL",
+    "georgia": "GA",
+    "hawaii": "HI",
+    "idaho": "ID",
+    "illinois": "IL",
+    "indiana": "IN",
+    "iowa": "IA",
+    "kansas": "KS",
+    "kentucky": "KY",
+    "louisiana": "LA",
+    "maine": "ME",
+    "maryland": "MD",
+    "massachusetts": "MA",
+    "michigan": "MI",
+    "minnesota": "MN",
+    "mississippi": "MS",
+    "missouri": "MO",
+    "montana": "MT",
+    "nebraska": "NE",
+    "nevada": "NV",
+    "new hampshire": "NH",
+    "new jersey": "NJ",
+    "new mexico": "NM",
+    "new york": "NY",
+    "north carolina": "NC",
+    "north dakota": "ND",
+    "ohio": "OH",
+    "oklahoma": "OK",
+    "oregon": "OR",
+    "pennsylvania": "PA",
+    "rhode island": "RI",
+    "south carolina": "SC",
+    "south dakota": "SD",
+    "tennessee": "TN",
+    "texas": "TX",
+    "utah": "UT",
+    "vermont": "VT",
+    "virginia": "VA",
+    "washington": "WA",
+    "west virginia": "WV",
+    "wisconsin": "WI",
+    "wyoming": "WY",
+}
 
 
 DEFAULT_STORES = {
@@ -285,19 +340,32 @@ def sum_quantity_displays(values):
     if not parsed_values or any(value is None for value in parsed_values):
         return ""
 
-    units = {value["unit"] for value in parsed_values}
+    unit_order = []
+    grouped_values = {}
 
-    if len(units) != 1:
-        return ""
+    for value in parsed_values:
+        unit = value["unit"]
 
-    unit = next(iter(units))
-    low_total = sum(value["low"] for value in parsed_values)
-    high_values = [
-        value["high"]
-        for value in parsed_values
-        if value["high"] is not None
-    ]
-    high_total = sum(high_values) if high_values else None
+        if unit not in grouped_values:
+            unit_order.append(unit)
+            grouped_values[unit] = []
+
+        grouped_values[unit].append(value)
+
+    return " + ".join(
+        sum_parsed_quantity_group(grouped_values[unit], unit)
+        for unit in unit_order
+    )
+
+
+def sum_parsed_quantity_group(values, unit):
+    low_total = sum(value["low"] for value in values)
+    has_range = any(value["high"] is not None for value in values)
+    high_total = (
+        sum(value["high"] if value["high"] is not None else value["low"] for value in values)
+        if has_range
+        else None
+    )
 
     if high_total is not None and high_total != low_total:
         quantity_text = f"{format_fraction(low_total)} to {format_fraction(high_total)}"
@@ -339,14 +407,32 @@ def normalize_quantity_unit(unit):
     unit = str(unit or "").strip()
     unit_key = unit.lower()
     singular_units = {
+        "c": "cup",
+        "c.": "cup",
         "cups": "cup",
+        "tsp": "teaspoon",
+        "tsp.": "teaspoon",
         "teaspoons": "teaspoon",
+        "tbsp": "tablespoon",
+        "tbsp.": "tablespoon",
+        "tbs": "tablespoon",
+        "tbs.": "tablespoon",
         "tablespoons": "tablespoon",
+        "oz": "ounce",
+        "oz.": "ounce",
         "ounces": "ounce",
+        "lb": "pound",
+        "lb.": "pound",
+        "lbs": "pound",
+        "lbs.": "pound",
         "pounds": "pound",
+        "g": "g",
         "grams": "gram",
+        "kg": "kilogram",
         "kilograms": "kilogram",
+        "ml": "milliliter",
         "milliliters": "milliliter",
+        "l": "liter",
         "liters": "liter",
         "pinches": "pinch",
         "dashes": "dash",
@@ -783,6 +869,107 @@ def save_home_address_route():
         })
 
     return redirect("/#home-address-section")
+
+
+@main_bp.route("/api/reverse_geocode", methods=["POST"])
+def reverse_geocode_route():
+    data = request.get_json(silent=True) or {}
+
+    try:
+        latitude = float(data.get("latitude"))
+        longitude = float(data.get("longitude"))
+    except (TypeError, ValueError):
+        return jsonify({
+            "ok": False,
+            "error": "Latitude and longitude are required.",
+        }), 400
+
+    if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
+        return jsonify({
+            "ok": False,
+            "error": "Latitude or longitude is out of range.",
+        }), 400
+
+    try:
+        response = requests.get(
+            "https://nominatim.openstreetmap.org/reverse",
+            params={
+                "format": "jsonv2",
+                "lat": latitude,
+                "lon": longitude,
+                "addressdetails": 1,
+            },
+            headers={
+                "User-Agent": "PushShoppingList/1.0 local address lookup",
+            },
+            timeout=(5, 12),
+        )
+        response.raise_for_status()
+        payload = response.json()
+    except Exception as exc:
+        return jsonify({
+            "ok": False,
+            "error": f"Unable to look up address for this location: {exc}",
+        }), 502
+
+    address = payload.get("address") if isinstance(payload, dict) else {}
+    fields = reverse_geocode_address_fields(address or {})
+
+    return jsonify({
+        "ok": True,
+        "address": fields,
+        "display_name": payload.get("display_name", "") if isinstance(payload, dict) else "",
+    })
+
+
+def reverse_geocode_address_fields(address):
+    road = first_address_value(address, [
+        "road",
+        "pedestrian",
+        "footway",
+        "path",
+        "residential",
+        "neighbourhood",
+    ])
+    house_number = first_address_value(address, ["house_number"])
+    street = " ".join(part for part in [house_number, road] if part)
+    state = first_address_value(address, ["state_code"]) or abbreviate_us_state(
+        first_address_value(address, ["state"])
+    )
+
+    return {
+        "street": street,
+        "apartment": "",
+        "city": first_address_value(address, [
+            "city",
+            "town",
+            "village",
+            "municipality",
+            "hamlet",
+            "county",
+        ]),
+        "state": state,
+        "zip": first_address_value(address, ["postcode"]).split("-")[0],
+    }
+
+
+def first_address_value(address, keys):
+    for key in keys:
+        value = str(address.get(key, "") or "").strip()
+
+        if value:
+            return value
+
+    return ""
+
+
+def abbreviate_us_state(state):
+    state = str(state or "").strip()
+
+    if len(state) == 2:
+        return state.upper()
+
+    return US_STATE_ABBREVIATIONS.get(state.lower(), state)
 
 
 @main_bp.route("/save_item_qty", methods=["POST"])

@@ -590,13 +590,18 @@ body {
 
         .address-actions-grid {
             display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 10px;
             margin-top: 12px;
         }
 
         .address-save-btn {
             background: #0078D7;
+            margin-top: 0;
+        }
+
+        .location-address-btn {
+            background: #155da8;
             margin-top: 0;
         }
 

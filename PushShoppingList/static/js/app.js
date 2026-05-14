@@ -2630,6 +2630,16 @@ async function saveHomeAddress(event) {
 
     event.preventDefault();
 
+    try {
+        await saveHomeAddressForm(form);
+    } catch (err) {
+        // saveHomeAddressForm already logs this; keep the normal save path non-disruptive.
+    }
+
+    return false;
+}
+
+async function saveHomeAddressForm(form) {
     const saveButton = form.querySelector('button[name="action"][value="save"]');
     const formData = new FormData(form);
     formData.set("ajax", "1");
@@ -2665,15 +2675,15 @@ async function saveHomeAddress(event) {
         }
 
         updateHomeAddressSummaries(data.home_address.full_address || "");
+        return data;
     } catch (err) {
         console.warn("Unable to save address in the background.", err);
+        throw err;
     } finally {
         if (saveButton) {
             saveButton.disabled = false;
         }
     }
-
-    return false;
 }
 
 function updateHomeAddressSummaries(address) {
@@ -2687,6 +2697,98 @@ function updateHomeAddressSummaries(address) {
 
     if (collapsedSummary) {
         collapsedSummary.textContent = text || "No home address saved.";
+    }
+}
+
+async function useDeviceLocationForHomeAddress(button) {
+    const form = document.getElementById("homeAddressForm");
+
+    if (!form) {
+        return;
+    }
+
+    if (!navigator.geolocation) {
+        alert("This browser cannot use device location. Geolocation usually requires HTTPS or localhost.");
+        return;
+    }
+
+    const originalText = button ? button.textContent : "";
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Finding location...";
+    }
+
+    try {
+        const position = await getCurrentDevicePosition();
+
+        if (button) {
+            button.textContent = "Looking up address...";
+        }
+
+        const response = await fetch("/api/reverse_geocode", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "fetch",
+            },
+            body: JSON.stringify({
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+            }),
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to look up address for this location.");
+        }
+
+        fillHomeAddressForm(form, data.address || {});
+        updateHomeAddressSummaries(buildAddressSummaryFromForm(form));
+
+        if (button) {
+            button.textContent = "Saving address...";
+        }
+
+        await saveHomeAddressForm(form);
+        showRecipeQuantityUpdatedMessage("", "", "", "Home address updated from device location.");
+    } catch (err) {
+        console.warn("Unable to use device location.", err);
+        alert(err.message || "Unable to use device location.");
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = originalText || "Use My Location";
+        }
+    }
+}
+
+function getCurrentDevicePosition() {
+    return new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 60000,
+        });
+    });
+}
+
+function fillHomeAddressForm(form, address) {
+    setHomeAddressField(form, "address_street", address.street);
+    setHomeAddressField(form, "address_city", address.city);
+    setHomeAddressField(form, "address_state", address.state);
+    setHomeAddressField(form, "address_zip", address.zip);
+
+    if (address.apartment) {
+        setHomeAddressField(form, "address_apartment", address.apartment);
+    }
+}
+
+function setHomeAddressField(form, name, value) {
+    const input = form.querySelector(`[name="${name}"]`);
+
+    if (input && value !== undefined && value !== null) {
+        input.value = value;
     }
 }
 
