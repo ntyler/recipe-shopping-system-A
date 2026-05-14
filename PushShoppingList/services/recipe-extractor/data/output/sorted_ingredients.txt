@@ -4,6 +4,7 @@ lemon zest
 fresh basil
 garlic cloves
 yellow onion
+asparagus
 === DAIRY & EGGS ===
 egg
 yolks
@@ -16,6 +17,9 @@ plain yogurt
 butter
 clarified butter
 unsalted butter
+=== FROZEN ===
+frozen peas
+frozen raspberries
 === PASTA, RICE & GRAINS ===
 dried farfalle pasta
 Fresh Pasta Dough*
@@ -27,7 +31,6 @@ baking soda
 brown sugar
 confectioners' sugar
 granulated sugar
-Corn syrup
 vanilla extract
 mini chocolate chips
 white chocolate chips
@@ -39,18 +42,11 @@ Homemade Tomato Sauce
 === SPICES & SEASONINGS ===
 kosher salt
 Salt and pepper
-of red pepper flakes
 red pepper flakes
 cinnamon
 ground nutmeg
 nutmeg
-of nutmeg
 === OILS & VINEGARS ===
 olive oil
 === MISC ===
-asparagus
-bunch asparagus
-frozen peas
-frozen raspberries
-white wine
 white wine OR vegetable broth

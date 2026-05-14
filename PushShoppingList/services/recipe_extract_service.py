@@ -47,6 +47,9 @@ INGREDIENT_STORE_SECTIONS = {
     "fish": "MEAT & SEAFOOD",
     "shrimp": "MEAT & SEAFOOD",
     "salmon": "MEAT & SEAFOOD",
+    "frozen": "FROZEN",
+    "frozen peas": "FROZEN",
+    "frozen raspberries": "FROZEN",
     "egg": "DAIRY & EGGS",
     "eggs": "DAIRY & EGGS",
     "yolk": "DAIRY & EGGS",
@@ -58,6 +61,11 @@ INGREDIENT_STORE_SECTIONS = {
     "cheese": "DAIRY & EGGS",
     "ricotta": "DAIRY & EGGS",
     "parmesan": "DAIRY & EGGS",
+    "asparagus": "PRODUCE",
+    "lemon": "PRODUCE",
+    "garlic": "PRODUCE",
+    "onion": "PRODUCE",
+    "basil": "PRODUCE",
     "flour": "BAKING",
     "sugar": "BAKING",
     "confectioners sugar": "BAKING",
@@ -434,7 +442,10 @@ def extract_preparation(original_text):
     preparation_parts.extend(parenthetical_matches)
 
     if "," in text:
-        preparation_parts.append(text.split(",", 1)[1].strip())
+        comma_tail = text.split(",", 1)[1].strip()
+
+        if not comma_tail.lower().startswith("or "):
+            preparation_parts.append(comma_tail)
 
     if preparation_parts:
         return clean_preparation_text(", ".join(preparation_parts))
@@ -1471,26 +1482,58 @@ def merge_missing_upload_ingredients(recipe_url, json_data, upload_path, mime_ty
         return
 
     existing_keys = {
-        normalize_ingredient_key(
+        normalize_ingredient_key(normalize_ingredient_for_shopping_list(
             item.get("ingredient") or item.get("original_text") or ""
-        )
+        ))
         for item in json_data.get("ingredients", [])
         if isinstance(item, dict)
     }
+    existing_original_keys = {
+        normalize_ingredient_key(normalize_ingredient_for_shopping_list(
+            item.get("original_text") or item.get("ingredient") or ""
+        ))
+        for item in json_data.get("ingredients", [])
+        if isinstance(item, dict)
+    }
+    all_existing_keys = existing_keys | existing_original_keys
     missing_rows = []
 
     for row in build_structured_ingredients(raw_lines):
-        key = normalize_ingredient_key(row.get("ingredient") or row.get("original_text") or "")
+        key = normalize_ingredient_key(
+            normalize_ingredient_for_shopping_list(row.get("ingredient") or row.get("original_text") or "")
+        )
 
-        if not key or key in existing_keys:
+        if not key or ingredient_key_matches_existing(key, all_existing_keys):
             continue
 
         missing_rows.append(row)
-        existing_keys.add(key)
+        all_existing_keys.add(key)
 
     if missing_rows:
         json_data.setdefault("ingredients", []).extend(missing_rows)
         normalize_extracted_ingredient_fields(json_data)
+
+
+def ingredient_key_matches_existing(candidate_key, existing_keys):
+    if candidate_key in existing_keys:
+        return True
+
+    for existing_key in existing_keys:
+        if candidate_key in alternative_ingredient_key_parts(existing_key):
+            return True
+
+        if existing_key in alternative_ingredient_key_parts(candidate_key):
+            return True
+
+    return False
+
+
+def alternative_ingredient_key_parts(key):
+    return {
+        normalize_ingredient_key(part)
+        for part in re.split(r"\s+or\s+", str(key or ""), flags=re.IGNORECASE)
+        if normalize_ingredient_key(part)
+    }
 
 
 def audit_upload_ingredient_lines(recipe_url, upload_path, mime_type, filename, page_text=""):
@@ -1641,6 +1684,11 @@ def normalize_ingredient_for_shopping_list(text):
     )
     value = re.sub(r"\([^)]*\)", " ", value)
     value = re.sub(r"\s+", " ", value).strip()
+
+    alternative_value = normalize_alternative_shopping_ingredient(value)
+    if alternative_value:
+        return alternative_value
+
     value = value.split(",", 1)[0].strip()
 
     alternative_value = normalize_alternative_shopping_ingredient(value)
@@ -1674,7 +1722,15 @@ def normalize_ingredient_for_shopping_list(text):
     )
 
     value = re.sub(r"\s+", " ", value).strip()
+    value = canonicalize_shopping_ingredient(value)
     return singularize_shopping_ingredient(value)
+
+
+def canonicalize_shopping_ingredient(value):
+    value = re.sub(r"\s+", " ", str(value or "").strip())
+    value = re.sub(r"^of\s+", "", value, flags=re.IGNORECASE)
+    value = re.sub(r"^(?:bunch|bunches)\s+(?=\w)", "", value, flags=re.IGNORECASE)
+    return value.strip()
 
 
 def singularize_shopping_ingredient(value):
@@ -1694,6 +1750,7 @@ def singularize_shopping_ingredient(value):
 
 
 def normalize_alternative_shopping_ingredient(value):
+    value = re.sub(r",\s+or\s+", " or ", str(value or "").strip(), flags=re.IGNORECASE)
     quantity_pattern = rf"(?:\d+(?:[./]\d+)?|\d+\s+\d+/\d+|[{FRACTION_CHARS}])+"
     unit_pattern = (
         r"(?:cups?|c|teaspoons?|tsp\.?|tablespoons?|tbsp\.?|pounds?|lbs?\.?|"
@@ -1705,7 +1762,7 @@ def normalize_alternative_shopping_ingredient(value):
         rf"(?P<first>.+?)\s+or\s+"
         rf"(?:{quantity_pattern}(?:\s*(?:-|to)\s*{quantity_pattern})?\s+{unit_pattern}\s+)?"
         rf"(?P<second>.+)$",
-        str(value or "").strip(),
+        value,
         flags=re.IGNORECASE,
     )
 
