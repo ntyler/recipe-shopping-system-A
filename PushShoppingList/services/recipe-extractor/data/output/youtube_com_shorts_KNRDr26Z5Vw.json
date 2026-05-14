@@ -4,7 +4,7 @@
   "servings": null,
   "ingredients": [
     {
-      "section": null,
+      "section": "BAKING",
       "original_text": "110g self-raising flour",
       "quantity": "110",
       "unit": "g",
@@ -15,18 +15,18 @@
       "store_section_order": 7
     },
     {
-      "section": null,
+      "section": "DAIRY & EGGS",
       "original_text": "100g low fat or fat free Greek yoghurt",
       "quantity": "100",
       "unit": "g",
-      "ingredient": "low fat or fat free Greek yoghurt",
+      "ingredient": "low fat OR fat free Greek yoghurt",
       "preparation": null,
       "optional": false,
       "store_section": "DAIRY & EGGS",
       "store_section_order": 3
     },
     {
-      "section": null,
+      "section": "SPICES & SEASONINGS",
       "original_text": "1 tsp Italian herb seasoning",
       "quantity": "1",
       "unit": "tsp",
@@ -37,7 +37,7 @@
       "store_section_order": 12
     },
     {
-      "section": null,
+      "section": "SPICES & SEASONINGS",
       "original_text": "1 tsp garlic powder",
       "quantity": "1",
       "unit": "tsp",
@@ -48,7 +48,7 @@
       "store_section_order": 12
     },
     {
-      "section": null,
+      "section": "SPICES & SEASONINGS",
       "original_text": "1 tsp salt",
       "quantity": "1",
       "unit": "tsp",
@@ -59,18 +59,18 @@
       "store_section_order": 12
     },
     {
-      "section": null,
+      "section": "SPICES & SEASONINGS",
       "original_text": "7g nutritional yeast optional",
       "quantity": "7",
       "unit": "g",
       "ingredient": "nutritional yeast",
       "preparation": null,
       "optional": true,
-      "store_section": "DAIRY & EGGS",
-      "store_section_order": 3
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12
     },
     {
-      "section": null,
+      "section": "DAIRY & EGGS",
       "original_text": "3 light mozzarella cheese sticks sliced lengthways",
       "quantity": "3",
       "unit": null,
@@ -81,18 +81,18 @@
       "store_section_order": 3
     },
     {
-      "section": null,
+      "section": "SAUCES & CONDIMENTS",
       "original_text": "80g pizza sauce or marinara",
       "quantity": "80",
       "unit": "g",
-      "ingredient": "pizza sauce or marinara",
+      "ingredient": "pizza sauce OR marinara",
       "preparation": null,
       "optional": false,
       "store_section": "SAUCES & CONDIMENTS",
       "store_section_order": 9
     },
     {
-      "section": null,
+      "section": "DAIRY & EGGS",
       "original_text": "75g low fat grated cheddar",
       "quantity": "75",
       "unit": "g",
@@ -103,7 +103,7 @@
       "store_section_order": 3
     },
     {
-      "section": null,
+      "section": "DAIRY & EGGS",
       "original_text": "45g light mozzarella",
       "quantity": "45",
       "unit": "g",
@@ -114,13 +114,13 @@
       "store_section_order": 3
     },
     {
-      "section": null,
+      "section": "MEAT & SEAFOOD",
       "original_text": "30g pepperoni Regular or turkey works too",
       "quantity": "30",
       "unit": "g",
-      "ingredient": "pepperoni",
+      "ingredient": "pepperoni OR turkey",
       "preparation": null,
-      "optional": true,
+      "optional": false,
       "store_section": "MEAT & SEAFOOD",
       "store_section_order": 2
     }
@@ -147,7 +147,7 @@
     {
       "section": null,
       "step_number": 1,
-      "instruction": "Add the flour to a bowl first, then slowly mix in the Greek yoghurt until a dough forms. Add a little more flour if it’s too sticky.",
+      "instruction": "Add the flour to a bowl first, then slowly mix in the Greek yoghurt until a dough forms.",
       "temperature": null,
       "time": null,
       "equipment_used": []
