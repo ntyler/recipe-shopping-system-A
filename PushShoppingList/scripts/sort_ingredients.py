@@ -10,6 +10,7 @@ from PushShoppingList.services.recipe_extract_service import (
     OUTPUT_FOLDER,
     STORE_SECTION_ORDER,
     classify_store_section,
+    ingredient_key_matches_existing,
     normalize_ingredient_for_shopping_list,
     normalize_ingredient_key,
 )
@@ -134,7 +135,7 @@ def load_ingredient_list():
 
 def unique_shopping_ingredients(items):
     unique_items = []
-    seen = set()
+    seen_keys = []
 
     for item in items:
         if is_section_header(item):
@@ -143,11 +144,35 @@ def unique_shopping_ingredients(items):
         cleaned = normalize_ingredient_for_shopping_list(item)
         key = normalize_ingredient_key(cleaned)
 
-        if cleaned and key not in seen:
+        if not cleaned:
+            continue
+
+        replacement_index = alternative_replacement_index(key, seen_keys)
+
+        if replacement_index is not None:
+            seen_keys[replacement_index] = key
+            unique_items[replacement_index] = cleaned
+        elif not ingredient_key_matches_existing(key, set(seen_keys)):
             unique_items.append(cleaned)
-            seen.add(key)
+            seen_keys.append(key)
 
     return unique_items
+
+
+def alternative_replacement_index(candidate_key, existing_keys):
+    if " or " not in candidate_key:
+        return None
+
+    candidate_parts = set(candidate_key.split(" or "))
+
+    for index, existing_key in enumerate(existing_keys):
+        if " or " in existing_key:
+            continue
+
+        if existing_key in candidate_parts:
+            return index
+
+    return None
 
 
 def remove_empty_sections(items):
