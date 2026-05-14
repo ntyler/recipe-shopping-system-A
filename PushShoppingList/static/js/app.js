@@ -2855,6 +2855,7 @@ async function loadHomeAddressOptions(form, _button = null, fallbackOptions = []
 function buildHomeAddressPayload(form) {
     return {
         address_street: homeAddressFieldValue(form, "address_street"),
+        address_apartment: homeAddressFieldValue(form, "address_apartment"),
         address_city: homeAddressFieldValue(form, "address_city"),
         address_state: homeAddressFieldValue(form, "address_state"),
         address_zip: homeAddressFieldValue(form, "address_zip"),
@@ -2898,12 +2899,12 @@ function renderHomeAddressOptions(options) {
         button.type = "button";
         button.className = "address-option-btn";
         button.textContent = option.display_name || formatHomeAddressOptionLabel(option.address || {});
-        button.addEventListener("click", () => applyHomeAddressOption(option.address || {}, button));
+        button.addEventListener("click", () => applyHomeAddressOption(option, button));
         list.appendChild(button);
     });
 }
 
-async function applyHomeAddressOption(address, button) {
+async function applyHomeAddressOption(option, button) {
     const form = document.getElementById("homeAddressForm");
 
     if (!form) {
@@ -2918,7 +2919,9 @@ async function applyHomeAddressOption(address, button) {
     }
 
     try {
-        fillHomeAddressForm(form, address);
+        const completedAddress = await completeHomeAddressOption(form, option || {});
+
+        fillHomeAddressForm(form, completedAddress);
         updateHomeAddressSummaries(buildAddressSummaryFromForm(form));
         await saveHomeAddressForm(form);
         showRecipeQuantityUpdatedMessage("", "", "", "Home address updated.");
@@ -2930,6 +2933,35 @@ async function applyHomeAddressOption(address, button) {
             button.disabled = false;
             button.textContent = originalText;
         }
+    }
+}
+
+async function completeHomeAddressOption(form, option) {
+    const fallbackAddress = option.address || {};
+
+    try {
+        const response = await fetch("/api/complete_address", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "fetch",
+            },
+            body: JSON.stringify({
+                display_name: option.display_name || "",
+                address: fallbackAddress,
+                current_address: buildHomeAddressPayload(form),
+            }),
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to complete address.");
+        }
+
+        return data.address || fallbackAddress;
+    } catch (err) {
+        console.warn("Unable to complete address; using selected fields.", err);
+        return fallbackAddress;
     }
 }
 

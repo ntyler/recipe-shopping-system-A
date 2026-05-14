@@ -103,6 +103,36 @@ http://100.x.y.z:5000
 http://10.x.y.z:5000
 ```
 
+## HTTPS / Secure Page Access
+
+Phone GPS/geolocation requires a secure browser origin. `http://<ip>:5000` will show as **Not Secure**, so mobile browsers may block `Use My Location`.
+
+Quick test with Flask's temporary self-signed certificate:
+
+```powershell
+.\start_app_https_adhoc.bat
+```
+
+Then open:
+
+```text
+https://<computer-ip>:5000
+```
+
+Your browser will warn because the certificate is self-signed. For the most reliable phone experience, use one of these:
+
+- A trusted local certificate, then start with:
+
+```powershell
+$env:SHOPPING_APP_SSL_CERT="C:\path\to\cert.pem"
+$env:SHOPPING_APP_SSL_KEY="C:\path\to\key.pem"
+py -3.11 app.py
+```
+
+- A trusted HTTPS tunnel such as Cloudflare Tunnel or ngrok pointed at `http://127.0.0.1:5000`.
+
+Do not expose this app publicly unless you add authentication or keep the tunnel private.
+
 If the phone cannot connect:
 
 - Confirm both devices are online in the mesh/VPN app.

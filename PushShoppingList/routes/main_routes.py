@@ -1,9 +1,11 @@
 import html
 import json
+import os
 import re
 from fractions import Fraction
 
 import requests
+from openai import OpenAI
 from flask import Blueprint
 from flask import jsonify
 from flask import redirect
@@ -29,6 +31,7 @@ from PushShoppingList.services.shopping_list_service import save_items
 from PushShoppingList.services.store_settings_service import load_store_settings
 
 main_bp = Blueprint("main_bp", __name__)
+address_openai_client = None
 
 US_STATE_ABBREVIATIONS = {
     "alabama": "AL",
@@ -963,6 +966,40 @@ def address_options_route():
     })
 
 
+@main_bp.route("/api/complete_address", methods=["POST"])
+def complete_address_route():
+    data = request.get_json(silent=True) or {}
+    candidate_address = normalize_address_form_fields(data.get("address") or {})
+    current_address = normalize_address_form_fields(data.get("current_address") or {})
+    display_name = str(data.get("display_name") or "").strip()
+    completed_address = complete_address_fields_locally(
+        candidate_address,
+        current_address,
+        display_name,
+    )
+    completion_source = "local"
+
+    if os.getenv("OPENAI_API_KEY") and address_needs_completion(completed_address):
+        openai_address = complete_address_fields_with_openai(
+            candidate_address,
+            current_address,
+            display_name,
+        )
+
+        if openai_address:
+            completed_address = merge_completed_address_fields(
+                openai_address,
+                completed_address,
+            )
+            completion_source = "openai"
+
+    return jsonify({
+        "ok": True,
+        "address": completed_address,
+        "source": completion_source,
+    })
+
+
 def build_address_options_query(data):
     query = str(data.get("query", "") or "").strip()
 
@@ -1001,6 +1038,220 @@ def normalize_address_options(results):
         })
 
     return options
+
+
+def normalize_address_form_fields(data):
+    if not isinstance(data, dict):
+        data = {}
+
+    return {
+        "street": str(data.get("street") or data.get("address_street") or "").strip(),
+        "apartment": str(data.get("apartment") or data.get("address_apartment") or "").strip(),
+        "city": str(data.get("city") or data.get("address_city") or "").strip(),
+        "state": abbreviate_us_state(data.get("state") or data.get("address_state") or ""),
+        "zip": str(data.get("zip") or data.get("address_zip") or "").strip(),
+    }
+
+
+def complete_address_fields_locally(candidate_address, current_address, display_name):
+    parsed_address = parse_display_name_address(display_name)
+
+    return {
+        "street": best_street_value(
+            candidate_address.get("street"),
+            parsed_address.get("street"),
+            current_address.get("street"),
+        ),
+        "apartment": first_address_value_from_dicts(
+            [candidate_address, current_address, parsed_address],
+            "apartment",
+        ),
+        "city": first_address_value_from_dicts(
+            [candidate_address, parsed_address, current_address],
+            "city",
+        ),
+        "state": abbreviate_us_state(first_address_value_from_dicts(
+            [candidate_address, parsed_address, current_address],
+            "state",
+        )),
+        "zip": first_address_value_from_dicts(
+            [candidate_address, parsed_address, current_address],
+            "zip",
+        ).split("-")[0],
+    }
+
+
+def parse_display_name_address(display_name):
+    parts = [
+        part.strip()
+        for part in str(display_name or "").split(",")
+        if part.strip()
+    ]
+    parsed = {
+        "street": "",
+        "apartment": "",
+        "city": "",
+        "state": "",
+        "zip": "",
+    }
+
+    for part in parts:
+        zip_match = re.search(r"\b\d{5}(?:-\d{4})?\b", part)
+        if zip_match and not parsed["zip"]:
+            parsed["zip"] = zip_match.group(0).split("-")[0]
+
+        state = abbreviate_us_state(part)
+        if state != part or re.fullmatch(r"[A-Z]{2}", state):
+            parsed["state"] = parsed["state"] or state
+
+    if parts:
+        parsed["street"] = parts[0]
+
+    for part in parts[1:]:
+        lowered = part.lower()
+
+        if lowered in {"united states", "usa", "us"}:
+            continue
+
+        if lowered.endswith(" county"):
+            continue
+
+        if parsed["zip"] and parsed["zip"] in part:
+            continue
+
+        if parsed["state"] and part.upper() == parsed["state"]:
+            continue
+
+        if abbreviate_us_state(part) == parsed["state"]:
+            continue
+
+        parsed["city"] = parsed["city"] or part
+
+    return parsed
+
+
+def first_address_value_from_dicts(dicts, key):
+    for data in dicts:
+        value = str((data or {}).get(key, "") or "").strip()
+
+        if value:
+            return value
+
+    return ""
+
+
+def best_street_value(*values):
+    cleaned_values = [
+        str(value or "").strip()
+        for value in values
+        if str(value or "").strip()
+    ]
+
+    if not cleaned_values:
+        return ""
+
+    return max(cleaned_values, key=street_value_score)
+
+
+def street_value_score(value):
+    value = str(value or "")
+    return (
+        100 if re.search(r"\d", value) else 0,
+        len(value.split()),
+        len(value),
+    )
+
+
+def address_needs_completion(address):
+    street = str(address.get("street") or "")
+
+    return (
+        not street
+        or not re.search(r"\d", street)
+        or not address.get("city")
+        or not address.get("state")
+        or not address.get("zip")
+    )
+
+
+def complete_address_fields_with_openai(candidate_address, current_address, display_name):
+    global address_openai_client
+
+    if address_openai_client is None:
+        address_openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), timeout=20)
+
+    prompt = f"""
+Extract the most complete US mailing address fields from the data below.
+
+Rules:
+- Return only JSON.
+- Use only information present in the candidate, display text, or current form fields.
+- Do not invent a house number.
+- Preserve the current apartment/unit when the candidate does not include one.
+- Prefer a full street address with house number over a road-only value.
+- Use a two-letter US state abbreviation when possible.
+- Unknown fields should be empty strings.
+
+Candidate address fields:
+{json.dumps(candidate_address, ensure_ascii=False)}
+
+Candidate display text:
+{display_name}
+
+Current form fields:
+{json.dumps(current_address, ensure_ascii=False)}
+
+Output shape:
+{{
+  "street": "",
+  "apartment": "",
+  "city": "",
+  "state": "",
+  "zip": ""
+}}
+"""
+
+    try:
+        response = address_openai_client.chat.completions.create(
+            model=os.getenv("OPENAI_ADDRESS_MODEL", "gpt-4o-mini"),
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You extract structured US mailing address fields and return only JSON.",
+                },
+                {
+                    "role": "user",
+                    "content": prompt,
+                },
+            ],
+            response_format={"type": "json_object"},
+            temperature=0,
+        )
+        data = json.loads(clean_json_response(response.choices[0].message.content))
+    except Exception as exc:
+        print(f"OpenAI address completion failed; using local address fields: {exc}")
+        return {}
+
+    return normalize_address_form_fields(data)
+
+
+def merge_completed_address_fields(primary, fallback):
+    return {
+        key: str(primary.get(key) or fallback.get(key) or "").strip()
+        for key in ["street", "apartment", "city", "state", "zip"]
+    }
+
+
+def clean_json_response(text):
+    text = str(text or "").strip()
+    text = text.replace("```json", "").replace("```", "").strip()
+    start = text.find("{")
+    end = text.rfind("}")
+
+    if start != -1 and end != -1 and end > start:
+        return text[start:end + 1]
+
+    return text
 
 
 def reverse_geocode_address_fields(address):
