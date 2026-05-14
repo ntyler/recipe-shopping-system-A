@@ -28,8 +28,16 @@ RAW_FOLDER.mkdir(parents=True, exist_ok=True)
 LOG_FOLDER.mkdir(parents=True, exist_ok=True)
 UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 
-MODEL = "gpt-4o-mini"
+MODEL = os.getenv("OPENAI_RECIPE_MODEL", "gpt-4o-mini")
 MAX_PAGE_TEXT_CHARS = 35000
+OPENAI_FILE_INPUT_MIME_TYPES = {
+    "application/pdf",
+    "application/msword",
+    "application/rtf",
+    "application/vnd.oasis.opendocument.text",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "text/rtf",
+}
 INGREDIENT_STORE_SECTIONS = {
     "produce": "PRODUCE",
     "beef": "MEAT & SEAFOOD",
@@ -1143,6 +1151,38 @@ def send_image_prompt_to_openai(prompt_text, image_path, mime_type):
     return response.choices[0].message.content
 
 
+def send_file_prompt_to_openai(prompt_text, file_path, mime_type, filename):
+    file_bytes = file_path.read_bytes()
+    file_data = base64.b64encode(file_bytes).decode("ascii")
+
+    response = get_openai_client().chat.completions.create(
+        model=MODEL,
+        messages=[
+            {
+                "role": "system",
+                "content": "You extract recipe ingredients from recipe photos and documents and return only valid JSON.",
+            },
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "file",
+                        "file": {
+                            "filename": filename,
+                            "file_data": f"data:{mime_type};base64,{file_data}",
+                        },
+                    },
+                    {"type": "text", "text": prompt_text},
+                ],
+            },
+        ],
+        response_format={"type": "json_object"},
+        temperature=0,
+    )
+
+    return response.choices[0].message.content
+
+
 def save_json_response(recipe_url, response_text):
     cleaned = clean_json_response(response_text)
 
@@ -1266,6 +1306,7 @@ def extract_recipe_from_upload(file_storage):
         or mimetypes.guess_type(str(upload_path))[0]
         or "application/octet-stream"
     )
+    mime_type = normalize_upload_mime_type(mime_type, filename, upload_path)
 
     try:
         if mime_type.startswith("image/"):
@@ -1275,17 +1316,9 @@ def extract_recipe_from_upload(file_storage):
             page_text = upload_path.read_text(encoding="utf-8", errors="ignore")
             prompt_text = build_prompt(recipe_url, page_text[:MAX_PAGE_TEXT_CHARS])
             response_text = send_prompt_to_openai(prompt_text)
-        elif mime_type == "application/pdf" or upload_path.suffix.lower() == ".pdf":
-            page_text = extract_text_from_pdf(upload_path)
-
-            if not page_text.strip():
-                return {
-                    "ok": False,
-                    "error": "No selectable text found in that PDF. Try uploading a photo of the recipe page instead.",
-                }
-
-            prompt_text = build_prompt(recipe_url, page_text[:MAX_PAGE_TEXT_CHARS])
-            response_text = send_prompt_to_openai(prompt_text)
+        elif upload_can_use_openai_file_input(mime_type, filename, upload_path):
+            prompt_text = build_upload_prompt(recipe_url, filename)
+            response_text = send_file_prompt_to_openai(prompt_text, upload_path, mime_type, filename)
         else:
             page_text = extract_text_from_generic_document(upload_path)
 
@@ -1318,6 +1351,24 @@ def extract_recipe_from_upload(file_storage):
             "ok": False,
             "error": f"Upload extraction failed: {exc}",
         }
+
+
+def upload_can_use_openai_file_input(mime_type, filename, upload_path):
+    suffix = Path(filename or upload_path.name).suffix.lower()
+
+    if mime_type in OPENAI_FILE_INPUT_MIME_TYPES:
+        return True
+
+    return suffix in {".pdf", ".doc", ".docx", ".rtf", ".odt"}
+
+
+def normalize_upload_mime_type(mime_type, filename, upload_path):
+    guessed_type = mimetypes.guess_type(filename or str(upload_path))[0]
+
+    if not mime_type or mime_type == "application/octet-stream":
+        return guessed_type or "application/octet-stream"
+
+    return mime_type
 
 
 def build_upload_prompt(recipe_url, filename):
