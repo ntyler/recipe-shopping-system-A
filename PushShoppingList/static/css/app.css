@@ -1459,7 +1459,10 @@ body {
             font-weight: 700;
         }
 
-        .recipe-edit-ingredients-section .recipe-edit-section-header {
+        .recipe-edit-ingredients-section .recipe-edit-section-header,
+        .recipe-edit-equipment-section .recipe-edit-section-header,
+        .recipe-edit-instructions-section .recipe-edit-section-header,
+        .recipe-edit-nutrition-section .recipe-edit-section-header {
             position: sticky;
             top: 66px;
             z-index: 4;
@@ -1562,13 +1565,15 @@ body {
         }
 
         .recipe-edit-equipment,
-        .recipe-edit-instructions {
+        .recipe-edit-instructions,
+        .recipe-edit-nutrition {
             display: grid;
             gap: 8px;
             margin-top: 10px;
         }
 
-        .recipe-edit-equipment {
+        .recipe-edit-equipment,
+        .recipe-edit-nutrition {
             gap: 0;
             border: 1px solid #2f3638;
             border-radius: 8px;
@@ -1576,8 +1581,11 @@ body {
             background: #151919;
         }
 
-        .recipe-edit-equipment::before {
+        .recipe-edit-equipment::before,
+        .recipe-edit-nutrition::before {
             content: "Equipment";
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 50px;
             padding: 10px 14px 8px;
             border-bottom: 1px solid #2f3638;
             color: #cbd5d1;
@@ -1585,6 +1593,11 @@ body {
             font-weight: 800;
             letter-spacing: 0.04em;
             text-transform: uppercase;
+        }
+
+        .recipe-edit-nutrition::before {
+            content: "Label / Value";
+            grid-template-columns: minmax(180px, 0.8fr) minmax(220px, 1fr) 50px;
         }
 
         .recipe-edit-ingredient-row {
@@ -1649,7 +1662,27 @@ body {
         }
 
         .recipe-edit-nutrition-row {
-            grid-template-columns: minmax(160px, 0.8fr) minmax(180px, 1fr) auto;
+            grid-template-columns: minmax(180px, 0.8fr) minmax(220px, 1fr) 50px;
+            gap: 10px;
+            align-items: center;
+            margin-top: 0;
+            padding: 8px 12px;
+            border-bottom: 1px solid #2f3638;
+            background: transparent;
+        }
+
+        .recipe-edit-nutrition-row:last-child {
+            border-bottom: 0;
+        }
+
+        .recipe-edit-nutrition-row input {
+            height: 36px;
+            border-color: transparent;
+            background: #191d1e;
+        }
+
+        .recipe-edit-nutrition-row .recipe-edit-remove-row {
+            justify-self: end;
         }
 
         .recipe-edit-text-row {
@@ -3038,7 +3071,10 @@ body {
                 padding: 14px 18px 12px;
             }
 
-            .recipe-edit-ingredients-section .recipe-edit-section-header {
+            .recipe-edit-ingredients-section .recipe-edit-section-header,
+            .recipe-edit-equipment-section .recipe-edit-section-header,
+            .recipe-edit-instructions-section .recipe-edit-section-header,
+            .recipe-edit-nutrition-section .recipe-edit-section-header {
                 top: 56px;
                 margin: 0 -14px 12px;
                 padding: 10px 18px;
