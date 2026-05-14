@@ -1341,6 +1341,15 @@ def extract_recipe_from_upload(file_storage):
             }
 
         json_data["source_url"] = recipe_url
+        title = determine_upload_recipe_title(
+            recipe_url,
+            upload_path,
+            mime_type,
+            filename,
+            page_text,
+        )
+        if title:
+            json_data["recipe_title"] = title
         merge_missing_upload_ingredients(
             recipe_url,
             json_data,
@@ -1393,6 +1402,60 @@ If the upload is a grocery package, handwritten note, printed recipe card, cookb
 screenshot, or recipe photo, use only the visible text. Do not invent hidden ingredients.
 """,
     )
+
+
+def determine_upload_recipe_title(recipe_url, upload_path, mime_type, filename, page_text=""):
+    prompt_text = build_upload_title_prompt(recipe_url, filename)
+
+    try:
+        if mime_type.startswith("image/"):
+            response_text = send_image_prompt_to_openai(prompt_text, upload_path, mime_type)
+        elif upload_can_use_openai_file_input(mime_type, filename, upload_path):
+            response_text = send_file_prompt_to_openai(prompt_text, upload_path, mime_type, filename)
+        elif page_text.strip():
+            response_text = send_prompt_to_openai(
+                build_upload_title_prompt(recipe_url, filename, page_text[:MAX_PAGE_TEXT_CHARS])
+            )
+        else:
+            return ""
+
+        data = json.loads(clean_json_response(response_text))
+    except Exception as exc:
+        raw_error_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_TITLE_ERROR.txt"
+        raw_error_path.write_text(str(exc), encoding="utf-8")
+        return ""
+
+    return normalize_recipe_title(data.get("recipe_title") or data.get("title") or "")
+
+
+def build_upload_title_prompt(recipe_url, filename, page_text=""):
+    visible_text = f"\nReadable text:\n{page_text}\n" if page_text else ""
+
+    return f"""
+This recipe was uploaded as {filename}.
+
+Read the entire uploaded document and determine the primary recipe title/name.
+
+Rules:
+- Use the title printed in the document when one is visible.
+- Do not use the upload filename, random id, URL, or file extension as the title.
+- If the document contains multiple recipes, choose the title that best matches the main ingredient list and instructions being extracted.
+- Return null if no recipe title is visible or strongly implied.
+{visible_text}
+Return ONLY valid JSON in this shape:
+{{
+  "recipe_title": "Recipe title or null"
+}}
+"""
+
+
+def normalize_recipe_title(value):
+    title = re.sub(r"\s+", " ", str(value or "").strip())
+
+    if not title or title.lower() in {"none", "null", "unknown", "untitled"}:
+        return ""
+
+    return title
 
 
 def merge_missing_upload_ingredients(recipe_url, json_data, upload_path, mime_type, filename, page_text=""):

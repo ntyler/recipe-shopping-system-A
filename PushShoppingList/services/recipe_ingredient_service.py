@@ -45,6 +45,7 @@ def save_ingredients_for_recipe(url, ingredients):
     data[normalize_recipe_url_key(url)] = {
         "url": url,
         "quantity": existing.get("quantity", 1),
+        "name": existing.get("name"),
         "scaled_servings": existing.get("scaled_servings"),
         "scaled_ingredients": existing.get("scaled_ingredients", {}),
         "ingredients": unique_ingredients(ingredients),

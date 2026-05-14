@@ -73,6 +73,8 @@ def extract_recipe_route():
             ingredients = result.get("ingredients", [])
             add_items(ingredients)
             save_ingredients_for_recipe(url, ingredients)
+            if result.get("recipe_title"):
+                save_recipe_url_name(url, result.get("recipe_title"))
             add_recipe_urls([url])
             extracted_any = True
             mark_url_done(job_id, urls, index, len(ingredients))
@@ -108,6 +110,8 @@ def upload_recipe_media_route():
         ingredients = result.get("ingredients", [])
         add_items(ingredients)
         save_ingredients_for_recipe(recipe_url, ingredients)
+        if result.get("recipe_title"):
+            save_recipe_url_name(recipe_url, result.get("recipe_title"))
         add_recipe_urls([recipe_url])
         sort_ingredients()
 
@@ -165,6 +169,8 @@ def api_extract_recipe_route():
     ingredients = result.get("ingredients", [])
     add_items(ingredients)
     save_ingredients_for_recipe(url, ingredients)
+    if result.get("recipe_title"):
+        save_recipe_url_name(url, result.get("recipe_title"))
     add_recipe_urls([url])
     progress = mark_url_done(job_id, urls, index, len(ingredients))
     finish_batch_if_ready(job_id, progress)
