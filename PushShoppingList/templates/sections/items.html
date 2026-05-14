@@ -258,87 +258,96 @@
                 </div>
 
                 {% if recipe["sections"] %}
-                    <div class="store-section-header">INGREDIENTS</div>
+                    <div class="recipe-divider"></div>
 
-                    {% for section_name, section_items in recipe["sections"].items() %}
-                        <div class="store-section-header collapsible-header"
-                             data-collapse-scope="recipe-section"
-                             data-collapse-key="recipe-section|{{ recipe.url }}|{{ section_name }}">
-                            <span class="header-title">
-                                {{ section_name }}
-                                <span class="header-count">({{ section_items|length }})</span>
-                            </span>
-                            <span class="header-toggle-icon">Hide ^</span>
-                        </div>
+                    <button type="button"
+                            class="detail-toggle"
+                            data-detail-key="ingredients|{{ recipe.url }}">
+                        <span>Ingredients</span>
+                        <span class="detail-toggle-icon">Show v</span>
+                    </button>
 
-                        {% for recipe_item in section_items %}
-                            {% set display_name = recipe_item.display_name or recipe_item.name %}
-                            {% set item_key = normalize(display_name) %}
-                            {% set state = item_state.get(item_key, {}) %}
-                            {% set food_status = food_rule_status(display_name) %}
-
-                            <div class="row" data-key="{{ item_key }}">
-                                <div class="item">
-                                    <div class="item-main-line">
-                                        <input type="checkbox" class="item-check">
-                                        <span class="item-text">{{ display_name }}</span>
-                                        {% if food_status.needs_review %}
-                                            <span class="food-rule-marker" title="{{ food_status.marker }}">Food Review</span>
-                                        {% endif %}
-                                    </div>
-
-                                    <div class="source-line item-qty-line">
-                                        {% if state.get('manual_qty') %}
-                                            {{ state.get('manual_qty') }}
-                                        {% elif recipe_item.quantity %}
-                                            <span class="recipe-ingredient-scaled-quantity"
-                                                  data-recipe-url="{{ recipe.url }}"
-                                                  data-ingredient-name="{{ recipe_item.name }}"
-                                                  data-base-quantity="{{ recipe_item.base_quantity or "" }}"
-                                                  data-unit="{{ recipe_item.unit or "" }}">
-                                                {% if recipe.quantity > 1 %}
-                                                    {{ recipe_item.quantity_display or (recipe_item.scaled_quantity ~ " " ~ (recipe_item.unit or "")) }}
-                                                {% else %}
-                                                    {{ recipe_item.base_display or (recipe_item.quantity ~ " " ~ (recipe_item.unit or "")) }}
-                                                {% endif %}
-                                            </span>
-                                        {% endif %}
-                                    </div>
-                                </div>
-
-                                <div class="item-actions">
-                                    {% for store_key in enabled_stores %}
-                                        {% set store = available_stores.get(store_key) %}
-                                        {% if store %}
-                                            <button type="button"
-                                                    class="store-btn {% if state.get('store') == store_key %}active{% endif %}"
-                                                    data-store="{{ store_key }}"
-                                                    data-store-url="{{ store.url }}"
-                                                    data-item-key="{{ item_key }}">
-                                                {{ store.label }}
-                                            </button>
-                                        {% endif %}
-                                    {% endfor %}
-
-                                    <form method="POST" action="/find_products" class="product-search-form" onsubmit="saveScroll()">
-                                        <input type="hidden" name="item" value="{{ display_name }}">
-                                        <button type="submit" class="product-search-btn">Products</button>
-                                    </form>
-
-                                    <button type="button"
-                                            class="edit-qty-btn"
-                                            data-item-key="{{ item_key }}"
-                                            data-item-name="{{ display_name }}"
-                                            data-current-qty="{{ recipe_item.quantity_display or recipe_item.base_display or '' }}"
-                                            data-recipe-qty-sources='{{ [{"label": "Recipe " ~ recipe.number ~ " Qty", "ingredient": recipe_item.name or display_name, "default_quantity": recipe_item.base_display or "", "default_quantity_value": recipe_item.base_quantity or "", "default_unit": recipe_item.unit or "", "recipe_number": recipe.number, "recipe_quantity": recipe.quantity, "url": recipe.url, "quantity": recipe_item.quantity_display or recipe_item.base_display or ""}]|tojson }}'
-                                            data-manual-qty="{{ state.get('manual_qty', '') }}"
-                                            onclick="openItemQtyEditor(this)">
-                                        EDIT
-                                    </button>
-                                </div>
+                    <div class="detail-content collapsed" data-detail-content="ingredients|{{ recipe.url }}">
+                        {% for section_name, section_items in recipe["sections"].items() %}
+                            <div class="store-section-header collapsible-header"
+                                 data-collapse-scope="recipe-section"
+                                 data-collapse-key="recipe-section|{{ recipe.url }}|{{ section_name }}">
+                                <span class="header-title">
+                                    {{ section_name }}
+                                    <span class="header-count">({{ section_items|length }})</span>
+                                </span>
+                                <span class="header-toggle-icon">Hide ^</span>
                             </div>
+
+                            {% for recipe_item in section_items %}
+                                {% set display_name = recipe_item.display_name or recipe_item.name %}
+                                {% set item_key = normalize(display_name) %}
+                                {% set state = item_state.get(item_key, {}) %}
+                                {% set food_status = food_rule_status(display_name) %}
+
+                                <div class="row" data-key="{{ item_key }}">
+                                    <div class="item">
+                                        <div class="item-main-line">
+                                            <input type="checkbox" class="item-check">
+                                            <span class="item-text">{{ display_name }}</span>
+                                            {% if food_status.needs_review %}
+                                                <span class="food-rule-marker" title="{{ food_status.marker }}">Food Review</span>
+                                            {% endif %}
+                                        </div>
+
+                                        <div class="source-line item-qty-line">
+                                            {% if state.get('manual_qty') %}
+                                                {{ state.get('manual_qty') }}
+                                            {% elif recipe_item.quantity %}
+                                                <span class="recipe-ingredient-scaled-quantity"
+                                                      data-recipe-url="{{ recipe.url }}"
+                                                      data-ingredient-name="{{ recipe_item.name }}"
+                                                      data-base-quantity="{{ recipe_item.base_quantity or "" }}"
+                                                      data-unit="{{ recipe_item.unit or "" }}">
+                                                    {% if recipe.quantity > 1 %}
+                                                        {{ recipe_item.quantity_display or (recipe_item.scaled_quantity ~ " " ~ (recipe_item.unit or "")) }}
+                                                    {% else %}
+                                                        {{ recipe_item.base_display or (recipe_item.quantity ~ " " ~ (recipe_item.unit or "")) }}
+                                                    {% endif %}
+                                                </span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+
+                                    <div class="item-actions">
+                                        {% for store_key in enabled_stores %}
+                                            {% set store = available_stores.get(store_key) %}
+                                            {% if store %}
+                                                <button type="button"
+                                                        class="store-btn {% if state.get('store') == store_key %}active{% endif %}"
+                                                        data-store="{{ store_key }}"
+                                                        data-store-url="{{ store.url }}"
+                                                        data-item-key="{{ item_key }}">
+                                                    {{ store.label }}
+                                                </button>
+                                            {% endif %}
+                                        {% endfor %}
+
+                                        <form method="POST" action="/find_products" class="product-search-form" onsubmit="saveScroll()">
+                                            <input type="hidden" name="item" value="{{ display_name }}">
+                                            <button type="submit" class="product-search-btn">Products</button>
+                                        </form>
+
+                                        <button type="button"
+                                                class="edit-qty-btn"
+                                                data-item-key="{{ item_key }}"
+                                                data-item-name="{{ display_name }}"
+                                                data-current-qty="{{ recipe_item.quantity_display or recipe_item.base_display or '' }}"
+                                                data-recipe-qty-sources='{{ [{"label": "Recipe " ~ recipe.number ~ " Qty", "ingredient": recipe_item.name or display_name, "default_quantity": recipe_item.base_display or "", "default_quantity_value": recipe_item.base_quantity or "", "default_unit": recipe_item.unit or "", "recipe_number": recipe.number, "recipe_quantity": recipe.quantity, "url": recipe.url, "quantity": recipe_item.quantity_display or recipe_item.base_display or ""}]|tojson }}'
+                                                data-manual-qty="{{ state.get('manual_qty', '') }}"
+                                                onclick="openItemQtyEditor(this)">
+                                            EDIT
+                                        </button>
+                                    </div>
+                                </div>
+                            {% endfor %}
                         {% endfor %}
-                    {% endfor %}
+                    </div>
                 {% else %}
                     <div class="source-line">No ingredients found for this recipe.</div>
                 {% endif %}

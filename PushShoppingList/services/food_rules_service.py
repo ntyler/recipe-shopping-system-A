@@ -87,6 +87,10 @@ DEFAULT_FOOD_RULES = {
             "label": "no titanium dioxide",
             "terms": ["titanium dioxide"],
         },
+        {
+            "label": "no chocolate liquor",
+            "terms": ["chocolate liquor"],
+        },
     ],
 }
 

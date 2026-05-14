@@ -1,27 +1,44 @@
 <div class="app-card" id="home-address-section">
-    <h2>Home Address</h2>
-    <p class="helper-text">
-        This address is used by <strong>find_nearest_stores.py</strong> and saved into
-        <strong>PushShoppingList/shopping_stores_Results.json</strong>.
-    </p>
+    <button type="button"
+            class="card-collapse-toggle"
+            data-collapse-toggle="home-address"
+            aria-expanded="false"
+            onclick="toggleCardCollapse('home-address')">
+        <span>Home Address</span>
+        <span class="card-collapse-icon" data-collapse-icon="home-address">Show v</span>
+    </button>
 
-    <form id="homeAddressForm" method="POST" action="/save_home_address" onsubmit="return saveHomeAddress(event);">
-        <div class="address-grid">
-            <input name="address_street" value="{{ home_address.street }}" placeholder="Street, e.g. 5905 Arlo Drive">
-            <input name="address_apartment" value="{{ home_address.apartment }}" placeholder="Apartment, e.g. Apt 2213">
-            <input name="address_city" value="{{ home_address.city }}" placeholder="City, e.g. Indianapolis">
-            <input name="address_state" value="{{ home_address.state }}" placeholder="State, e.g. IN">
-            <input name="address_zip" value="{{ home_address.zip }}" placeholder="ZIP">
-        </div>
+    <div class="card-collapse-content home-address-content collapsed"
+         data-collapse-content="home-address"
+         data-collapse-default="collapsed">
+        <p class="helper-text">
+            This address is used by <strong>find_nearest_stores.py</strong> and saved into
+            <strong>PushShoppingList/shopping_stores_Results.json</strong>.
+        </p>
 
-        <div class="address-summary-box">
-            <span class="store-detail-label">Current full address</span>
-            <span id="homeAddressSummary">{{ home_address.full_address }}</span>
-        </div>
+        <form id="homeAddressForm" method="POST" action="/save_home_address" onsubmit="return saveHomeAddress(event);">
+            <div class="address-grid">
+                <input name="address_street" value="{{ home_address.street }}" placeholder="Street, e.g. 5905 Arlo Drive">
+                <input name="address_apartment" value="{{ home_address.apartment }}" placeholder="Apartment, e.g. Apt 2213">
+                <input name="address_city" value="{{ home_address.city }}" placeholder="City, e.g. Indianapolis">
+                <input name="address_state" value="{{ home_address.state }}" placeholder="State, e.g. IN">
+                <input name="address_zip" value="{{ home_address.zip }}" placeholder="ZIP">
+            </div>
 
-        <div class="address-actions-grid">
-            <button type="submit" name="action" value="save" class="address-save-btn">Save Address</button>
-            <button type="submit" name="action" value="run_find_nearest" class="nearest-stores-btn">Run Find Nearest Stores</button>
-        </div>
-    </form>
+            <div class="address-summary-box">
+                <span class="store-detail-label">Current full address</span>
+                <span id="homeAddressSummary">{{ home_address.full_address }}</span>
+            </div>
+
+            <div class="address-actions-grid">
+                <button type="submit" name="action" value="save" class="address-save-btn">Save Address</button>
+                <button type="submit" name="action" value="run_find_nearest" class="nearest-stores-btn">Run Find Nearest Stores</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="home-address-collapsed-summary">
+        <span class="store-detail-label">Current full address</span>
+        <span id="homeAddressCollapsedSummary">{{ home_address.full_address or "No home address saved." }}</span>
+    </div>
 </div>

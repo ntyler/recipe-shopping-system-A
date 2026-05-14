@@ -229,6 +229,7 @@ function setRecipeFileLoadingSummary(message) {
 function toggleCardCollapse(key) {
     const content = document.querySelector(`[data-collapse-content="${key}"]`);
     const icon = document.querySelector(`[data-collapse-icon="${key}"]`);
+    const toggle = document.querySelector(`[data-collapse-toggle="${key}"]`);
 
     if (!content) {
         return;
@@ -240,6 +241,21 @@ function toggleCardCollapse(key) {
     if (icon) {
         icon.textContent = isCollapsed ? "Show v" : "Hide ^";
     }
+
+    if (toggle) {
+        toggle.setAttribute("aria-expanded", isCollapsed ? "false" : "true");
+    }
+}
+
+function cardCollapseDefaultIsCollapsed(content) {
+    const mobileDefault = content.dataset.collapseMobileDefault;
+    const defaultState = content.dataset.collapseDefault || "collapsed";
+
+    if (mobileDefault && window.matchMedia && window.matchMedia("(max-width: 700px)").matches) {
+        return mobileDefault === "collapsed";
+    }
+
+    return defaultState === "collapsed";
 }
 
 function toggleStorePanel(panelId) {
@@ -263,13 +279,20 @@ function restoreCardCollapseState() {
     document.querySelectorAll("[data-collapse-content]").forEach(content => {
         const key = content.dataset.collapseContent;
         const icon = document.querySelector(`[data-collapse-icon="${key}"]`);
+        const toggle = document.querySelector(`[data-collapse-toggle="${key}"]`);
         const savedState = localStorage.getItem(`card-collapse:${key}`);
-        const shouldCollapse = savedState !== "expanded";
+        const shouldCollapse = savedState
+            ? savedState === "collapsed"
+            : cardCollapseDefaultIsCollapsed(content);
 
         content.classList.toggle("collapsed", shouldCollapse);
 
         if (icon) {
             icon.textContent = shouldCollapse ? "Show v" : "Hide ^";
+        }
+
+        if (toggle) {
+            toggle.setAttribute("aria-expanded", shouldCollapse ? "false" : "true");
         }
     });
 }
@@ -343,6 +366,14 @@ function showView(viewName) {
     });
 
     localStorage.setItem("shopping-view", viewName);
+    updateViewSwitcherStickyOffset();
+}
+
+function updateViewSwitcherStickyOffset() {
+    const switcher = document.getElementById("viewSwitcherSticky");
+    const height = switcher ? Math.ceil(switcher.getBoundingClientRect().height) : 0;
+
+    document.documentElement.style.setProperty("--view-switcher-sticky-offset", `${height}px`);
 }
 
 function saveOpenStoreUrlsSetting() {
@@ -518,6 +549,7 @@ async function saveRecipeName(input) {
         }
 
         input.dataset.lastSavedValue = name;
+        updateRecipeLogSummaryName(input.dataset.recipeUrl || "", data.name || name);
         input.classList.add("saved");
         showRecipeQuantityUpdatedMessage("", "", "", "Recipe name updated.");
 
@@ -531,6 +563,18 @@ async function saveRecipeName(input) {
         input.disabled = false;
         delete input.dataset.savePending;
     }
+}
+
+function updateRecipeLogSummaryName(recipeUrl, name) {
+    if (!recipeUrl || !name) {
+        return;
+    }
+
+    const selector = `.recipe-url-summary-name[data-recipe-url="${cssEscape(recipeUrl)}"]`;
+
+    document.querySelectorAll(selector).forEach(link => {
+        link.textContent = name;
+    });
 }
 
 function normalizeRecipeQuantityInput(input) {
@@ -2586,14 +2630,11 @@ async function saveHomeAddress(event) {
 
     event.preventDefault();
 
-    const summary = document.getElementById("homeAddressSummary");
     const saveButton = form.querySelector('button[name="action"][value="save"]');
     const formData = new FormData(form);
     formData.set("ajax", "1");
 
-    if (summary) {
-        summary.textContent = buildAddressSummaryFromForm(form);
-    }
+    updateHomeAddressSummaries(buildAddressSummaryFromForm(form));
 
     if (saveButton) {
         saveButton.disabled = true;
@@ -2623,9 +2664,7 @@ async function saveHomeAddress(event) {
             throw new Error(data.error || "Unable to save address.");
         }
 
-        if (summary) {
-            summary.textContent = data.home_address.full_address || "";
-        }
+        updateHomeAddressSummaries(data.home_address.full_address || "");
     } catch (err) {
         console.warn("Unable to save address in the background.", err);
     } finally {
@@ -2635,6 +2674,20 @@ async function saveHomeAddress(event) {
     }
 
     return false;
+}
+
+function updateHomeAddressSummaries(address) {
+    const text = address || "";
+    const summary = document.getElementById("homeAddressSummary");
+    const collapsedSummary = document.getElementById("homeAddressCollapsedSummary");
+
+    if (summary) {
+        summary.textContent = text;
+    }
+
+    if (collapsedSummary) {
+        collapsedSummary.textContent = text || "No home address saved.";
+    }
 }
 
 async function saveStoreOptions(event) {
@@ -2768,6 +2821,7 @@ async function refreshStoreMarkup() {
     bindSectionHeaderToggles();
     bindRecipeDetailToggles();
     bindRecipeTaskChecks();
+    updateViewSwitcherStickyOffset();
     window.scrollTo(scrollX, scrollY);
 }
 
@@ -2813,10 +2867,12 @@ document.addEventListener("DOMContentLoaded", function () {
     bindRecipeDetailToggles();
     bindRecipeTaskChecks();
     updateRecipeEditStickyOffsets();
+    updateViewSwitcherStickyOffset();
     startExtractionProgressPolling();
 });
 
 window.addEventListener("resize", updateRecipeEditStickyOffsets);
+window.addEventListener("resize", updateViewSwitcherStickyOffset);
 
 async function startRecipeExtraction(event) {
     event.preventDefault();

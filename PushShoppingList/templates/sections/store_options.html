@@ -1,12 +1,14 @@
 <div class="app-card" id="storeOptionsSection">
     <button type="button"
             class="card-collapse-toggle"
+            data-collapse-toggle="store-options"
+            aria-expanded="false"
             onclick="toggleCardCollapse('store-options')">
         <span>Store Options</span>
         <span class="card-collapse-icon" data-collapse-icon="store-options">Show v</span>
     </button>
 
-    <div class="card-collapse-content collapsed" data-collapse-content="store-options">
+    <div class="card-collapse-content store-options-content collapsed" data-collapse-content="store-options">
         <p class="helper-text">
             This is your editable store list. Check stores to show buttons next to each item.
         </p>
@@ -136,6 +138,17 @@
 
                 <button type="submit" class="store-save-btn">Add Store</button>
             </form>
+        </div>
+    </div>
+
+    <div class="store-options-collapsed-summary" aria-label="Active stores">
+        <span class="store-detail-label">Active stores</span>
+        <div class="active-store-list">
+            {% for store_key in enabled_stores if store_key in available_stores %}
+                <span class="active-store-pill">{{ available_stores[store_key].label }}</span>
+            {% else %}
+                <span class="active-store-empty">No active stores selected.</span>
+            {% endfor %}
         </div>
     </div>
 </div>

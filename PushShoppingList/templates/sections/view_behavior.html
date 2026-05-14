@@ -3,23 +3,6 @@
     <p class="helper-text">Choose how the list is displayed, how buttons behave, and manage resets.</p>
 
     <div class="view-control-section">
-        <div class="view-control-title">Display View</div>
-        <div class="view-toggle-box view-control-row">
-            <button type="button" id="sectionViewBtn" class="view-toggle-btn" onclick="showView('section')">
-                Section View
-            </button>
-
-            <button type="button" id="storeViewBtn" class="view-toggle-btn" onclick="showView('store')">
-                Store View
-            </button>
-
-            <button type="button" id="recipeViewBtn" class="view-toggle-btn" onclick="showView('recipe')">
-                Recipe View
-            </button>
-        </div>
-    </div>
-
-    <div class="view-control-section">
         <div class="view-control-title">Button Behavior</div>
         <div class="view-control-row">
             <label class="behavior-toggle">
@@ -78,5 +61,22 @@
                 <button class="reset-stores-btn view-action-btn" type="submit">Reset Stores</button>
             </form>
         </div>
+    </div>
+</div>
+
+<div id="viewSwitcherSticky" class="view-switcher-sticky" aria-label="Display View">
+    <div class="view-control-title">Display View</div>
+    <div class="view-toggle-box view-control-row">
+        <button type="button" id="sectionViewBtn" class="view-toggle-btn" onclick="showView('section')">
+            Section View
+        </button>
+
+        <button type="button" id="storeViewBtn" class="view-toggle-btn" onclick="showView('store')">
+            Store View
+        </button>
+
+        <button type="button" id="recipeViewBtn" class="view-toggle-btn" onclick="showView('recipe')">
+            Recipe View
+        </button>
     </div>
 </div>

@@ -1,32 +1,109 @@
 <div id="currentRecipeUrlLogCard" class="app-card">
-    <h2>Current Recipe URL Log</h2>
+    <button type="button"
+            class="card-collapse-toggle recipe-url-log-toggle"
+            data-collapse-toggle="recipe-url-log"
+            aria-expanded="true"
+            onclick="toggleCardCollapse('recipe-url-log')">
+        <span>Current Recipe URL Log</span>
+        <span class="card-collapse-icon" data-collapse-icon="recipe-url-log">Hide ^</span>
+    </button>
+
+    <div class="card-collapse-content recipe-url-log-content"
+         id="recipeUrlLogContent"
+         data-collapse-content="recipe-url-log"
+         data-collapse-default="expanded"
+         data-collapse-mobile-default="collapsed">
+        {% if current_urls %}
+            <div class="log-box">
+                <div class="recipe-log-header">
+                    <span>Recipe</span>
+                    <span>Name</span>
+                    <span>Type</span>
+                    <span>Qty</span>
+                    <span></span>
+                    <span></span>
+                </div>
+            {% for recipe in current_urls %}
+                <div class="recipe-row">
+                    <a class="recipe-label recipe-url-link"
+                       href="{{ recipe.url }}"
+                       target="_blank"
+                       rel="noopener noreferrer">Recipe {{ loop.index }}</a>
+
+                    <div class="recipe-name-cell">
+                        <input type="text"
+                               class="recipe-name-input"
+                               value="{{ recipe.name }}"
+                               data-recipe-url="{{ recipe.url }}"
+                               aria-label="Recipe {{ loop.index }} name">
+                        {% if recipe.food_rule_status.needs_review %}
+                            <button type="button"
+                                    class="food-rule-marker recipe-log-food-warning recipe-log-food-review-btn"
+                                    data-recipe-url="{{ recipe.url }}"
+                                    title="{{ recipe.food_rule_status.marker }}"
+                                    aria-label="Food Review: {{ recipe.food_rule_status.count }} item{% if recipe.food_rule_status.count != 1 %}s{% endif %} need review"
+                                    onclick="openRecipeEditor(this, { scrollToFoodReview: true })">
+                                Food Review ({{ recipe.food_rule_status.count }})
+                            </button>
+                        {% endif %}
+                    </div>
+
+                    <span class="recipe-type-pill recipe-type-{{ recipe.type|lower }}">{{ recipe.type }}</span>
+
+                    <div class="recipe-quantity-control">
+                        <span>Qty</span>
+                        <input type="number"
+                               class="recipe-quantity-input"
+                               min="1"
+                               step="1"
+                               value="{{ recipe.quantity }}"
+                               data-recipe-number="{{ loop.index }}"
+                               data-recipe-url="{{ recipe.url }}">
+                    </div>
+
+                    <div class="recipe-row-actions">
+                        <button type="button"
+                                class="edit-recipe-btn"
+                                data-recipe-url="{{ recipe.url }}"
+                                onclick="openRecipeEditor(this)">
+                            Edit
+                        </button>
+                    </div>
+
+                    <form method="POST"
+                          action="{{ url_for('recipe_bp.remove_recipe_route') }}"
+                          class="remove-recipe-form"
+                          onsubmit="saveScroll(); return confirm('Remove this recipe URL?');">
+                        <input type="hidden" name="url" value="{{ recipe.url }}">
+                        <button type="submit" class="remove-recipe-btn" aria-label="Remove recipe">X</button>
+                    </form>
+                </div>
+            {% endfor %}
+            </div>
+
+            <button type="button"
+                    class="save-recipe-qty-btn"
+                    onclick="saveAllRecipeQuantities(this)">
+                Save Qty
+            </button>
+        {% else %}
+            <div class="log-box">No current recipe URLs yet.</div>
+        {% endif %}
+    </div>
 
     {% if current_urls %}
-        <div class="log-box">
-            <div class="recipe-log-header">
-                <span>Recipe</span>
-                <span>Name</span>
-                <span>Type</span>
-                <span>Qty</span>
-                <span></span>
-                <span></span>
-            </div>
-        {% for recipe in current_urls %}
-            <div class="recipe-row">
-                <a class="recipe-label recipe-url-link"
-                   href="{{ recipe.url }}"
-                   target="_blank"
-                   rel="noopener noreferrer">Recipe {{ loop.index }}</a>
-
-                <div class="recipe-name-cell">
-                    <input type="text"
-                           class="recipe-name-input"
-                           value="{{ recipe.name }}"
-                           data-recipe-url="{{ recipe.url }}"
-                           aria-label="Recipe {{ loop.index }} name">
+        <div class="recipe-url-collapsed-summary" aria-label="Current recipe URL summary">
+            {% for recipe in current_urls %}
+                <div class="recipe-url-summary-row">
+                    <span class="recipe-url-summary-number">Recipe {{ loop.index }}</span>
+                    <a class="recipe-url-summary-name"
+                       href="{{ recipe.url }}"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       data-recipe-url="{{ recipe.url }}">{{ recipe.name }}</a>
                     {% if recipe.food_rule_status.needs_review %}
                         <button type="button"
-                                class="food-rule-marker recipe-log-food-warning recipe-log-food-review-btn"
+                                class="food-rule-marker recipe-log-food-review-btn recipe-url-summary-food-review"
                                 data-recipe-url="{{ recipe.url }}"
                                 title="{{ recipe.food_rule_status.marker }}"
                                 aria-label="Food Review: {{ recipe.food_rule_status.count }} item{% if recipe.food_rule_status.count != 1 %}s{% endif %} need review"
@@ -35,47 +112,8 @@
                         </button>
                     {% endif %}
                 </div>
-
-                <span class="recipe-type-pill recipe-type-{{ recipe.type|lower }}">{{ recipe.type }}</span>
-
-                <div class="recipe-quantity-control">
-                    <span>Qty</span>
-                    <input type="number"
-                           class="recipe-quantity-input"
-                           min="1"
-                           step="1"
-                           value="{{ recipe.quantity }}"
-                           data-recipe-number="{{ loop.index }}"
-                           data-recipe-url="{{ recipe.url }}">
-                </div>
-
-                <div class="recipe-row-actions">
-                    <button type="button"
-                            class="edit-recipe-btn"
-                            data-recipe-url="{{ recipe.url }}"
-                            onclick="openRecipeEditor(this)">
-                        Edit
-                    </button>
-                </div>
-
-                <form method="POST"
-                      action="{{ url_for('recipe_bp.remove_recipe_route') }}"
-                      class="remove-recipe-form"
-                      onsubmit="saveScroll(); return confirm('Remove this recipe URL?');">
-                    <input type="hidden" name="url" value="{{ recipe.url }}">
-                    <button type="submit" class="remove-recipe-btn" aria-label="Remove recipe">X</button>
-                </form>
-            </div>
-        {% endfor %}
+            {% endfor %}
         </div>
-
-        <button type="button"
-                class="save-recipe-qty-btn"
-                onclick="saveAllRecipeQuantities(this)">
-            Save Qty
-        </button>
-    {% else %}
-        <div class="log-box">No current recipe URLs yet.</div>
     {% endif %}
 </div>
 

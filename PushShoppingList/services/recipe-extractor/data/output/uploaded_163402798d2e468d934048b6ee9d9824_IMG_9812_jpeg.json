@@ -1,0 +1,331 @@
+{
+  "source_url": "uploaded://163402798d2e468d934048b6ee9d9824_IMG_9812_jpeg",
+  "recipe_title": "20-MINUTE VEGETARIAN BURRITO BOWLS",
+  "servings": "4 servings",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "8 ounces mushrooms, finely diced",
+      "quantity": "8",
+      "unit": "ounces",
+      "ingredient": "mushrooms",
+      "preparation": "finely diced",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1
+    },
+    {
+      "section": null,
+      "original_text": "Dash soy sauce or vegan Worcestershire, optional",
+      "quantity": "1",
+      "unit": "Dash",
+      "ingredient": "soy sauce OR vegan Worcestershire",
+      "preparation": "optional",
+      "optional": true,
+      "store_section": "SAUCES & CONDIMENTS",
+      "store_section_order": 9
+    },
+    {
+      "section": null,
+      "original_text": "2 teaspoons neutral oil",
+      "quantity": "2",
+      "unit": "teaspoons",
+      "ingredient": "neutral oil",
+      "preparation": null,
+      "optional": false,
+      "store_section": "OILS & VINEGARS",
+      "store_section_order": 13
+    },
+    {
+      "section": null,
+      "original_text": "1 15-ounce can black beans, drained and rinsed",
+      "quantity": "15",
+      "unit": "ounce",
+      "ingredient": "black beans",
+      "preparation": "drained and rinsed",
+      "optional": false,
+      "store_section": "CANNED",
+      "store_section_order": 8
+    },
+    {
+      "section": null,
+      "original_text": "2 teaspoons ground cumin",
+      "quantity": "2",
+      "unit": "teaspoons",
+      "ingredient": "ground cumin",
+      "preparation": null,
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12
+    },
+    {
+      "section": null,
+      "original_text": "1 teaspoon onion powder",
+      "quantity": "1",
+      "unit": "teaspoon",
+      "ingredient": "onion powder",
+      "preparation": null,
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12
+    },
+    {
+      "section": null,
+      "original_text": "1 teaspoon garlic powder",
+      "quantity": "1",
+      "unit": "teaspoon",
+      "ingredient": "garlic powder",
+      "preparation": null,
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12
+    },
+    {
+      "section": null,
+      "original_text": "1 teaspoon chili powder",
+      "quantity": "1",
+      "unit": "teaspoon",
+      "ingredient": "chili powder",
+      "preparation": null,
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12
+    },
+    {
+      "section": null,
+      "original_text": "½ teaspoon paprika",
+      "quantity": "1/2",
+      "unit": "teaspoon",
+      "ingredient": "paprika",
+      "preparation": null,
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12
+    },
+    {
+      "section": null,
+      "original_text": "½ teaspoon dried oregano",
+      "quantity": "1/2",
+      "unit": "teaspoon",
+      "ingredient": "dried oregano",
+      "preparation": null,
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12
+    },
+    {
+      "section": null,
+      "original_text": "freshly ground black pepper, to taste",
+      "quantity": null,
+      "unit": null,
+      "ingredient": "black pepper",
+      "preparation": "to taste",
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12
+    },
+    {
+      "section": null,
+      "original_text": "1 teaspoon kosher salt, more to taste",
+      "quantity": "1",
+      "unit": "teaspoon",
+      "ingredient": "kosher salt",
+      "preparation": "more to taste",
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12
+    },
+    {
+      "section": null,
+      "original_text": "1 cup frozen corn",
+      "quantity": "1",
+      "unit": "cup",
+      "ingredient": "frozen corn",
+      "preparation": null,
+      "optional": false,
+      "store_section": "FROZEN",
+      "store_section_order": 4
+    },
+    {
+      "section": "Bowl Ingredients",
+      "original_text": "Cilantro Lime Rice, or another grain of choice",
+      "quantity": null,
+      "unit": null,
+      "ingredient": "Cilantro Lime Rice OR another grain of choice",
+      "preparation": null,
+      "optional": true,
+      "store_section": "DRY GOODS",
+      "store_section_order": 5
+    },
+    {
+      "section": "Bowl Ingredients",
+      "original_text": "Romaine lettuce, chopped",
+      "quantity": null,
+      "unit": null,
+      "ingredient": "Romaine lettuce",
+      "preparation": "chopped",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1
+    },
+    {
+      "section": "Bowl Ingredients",
+      "original_text": "Pico de Gallo, or diced tomatoes / onion as desired",
+      "quantity": null,
+      "unit": null,
+      "ingredient": "Pico de Gallo OR diced tomatoes / onion",
+      "preparation": "as desired",
+      "optional": true,
+      "store_section": "PRODUCE",
+      "store_section_order": 1
+    },
+    {
+      "section": "Bowl Ingredients",
+      "original_text": "Tortilla strips or chips",
+      "quantity": null,
+      "unit": null,
+      "ingredient": "Tortilla strips OR chips",
+      "preparation": null,
+      "optional": true,
+      "store_section": "SNACKS",
+      "store_section_order": 10
+    },
+    {
+      "section": "Bowl Ingredients",
+      "original_text": "Avocado, slices or diced",
+      "quantity": null,
+      "unit": null,
+      "ingredient": "Avocado",
+      "preparation": "slices or diced",
+      "optional": true,
+      "store_section": "PRODUCE",
+      "store_section_order": 1
+    },
+    {
+      "section": "Bowl Ingredients",
+      "original_text": "Sour cream",
+      "quantity": null,
+      "unit": null,
+      "ingredient": "Sour cream",
+      "preparation": null,
+      "optional": true,
+      "store_section": "DAIRY & EGGS",
+      "store_section_order": 3
+    },
+    {
+      "section": "Bowl Ingredients",
+      "original_text": "Cilantro Lime Sauce",
+      "quantity": null,
+      "unit": null,
+      "ingredient": "Cilantro Lime Sauce",
+      "preparation": null,
+      "optional": true,
+      "store_section": "SAUCES & CONDIMENTS",
+      "store_section_order": 9
+    },
+    {
+      "section": "Bowl Ingredients",
+      "original_text": "Creamy Jalapeno Sauce",
+      "quantity": null,
+      "unit": null,
+      "ingredient": "Creamy Jalapeno Sauce",
+      "preparation": null,
+      "optional": true,
+      "store_section": "SAUCES & CONDIMENTS",
+      "store_section_order": 9
+    },
+    {
+      "section": "Bowl Ingredients",
+      "original_text": "Salsa",
+      "quantity": null,
+      "unit": null,
+      "ingredient": "Salsa",
+      "preparation": null,
+      "optional": true,
+      "store_section": "SAUCES & CONDIMENTS",
+      "store_section_order": 9
+    },
+    {
+      "section": "Bowl Ingredients",
+      "original_text": "Shredded cheese",
+      "quantity": null,
+      "unit": null,
+      "ingredient": "Shredded cheese",
+      "preparation": null,
+      "optional": true,
+      "store_section": "DAIRY & EGGS",
+      "store_section_order": 3
+    }
+  ],
+  "equipment": [
+    {
+      "name": "skillet",
+      "category": "cookware"
+    }
+  ],
+  "instructions": [
+    {
+      "section": "Cilantro Lime Rice",
+      "step_number": 1,
+      "instruction": "If making cilantro lime rice, begin preparing it (or another rice/grain) before starting the filling.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": []
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "Heat a large skillet over medium-high heat. Add finely diced mushrooms to the warm skillet - dry - and allow their liquid to release, stirring occasionally, for about 6-8 minutes.",
+      "temperature": "medium-high",
+      "time": "6-8 minutes",
+      "equipment_used": [
+        "skillet"
+      ]
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "Once most of the liquid has evaporated, add a dash of soy sauce or Worcestershire if using, then add in the oil. Stir in the black beans and spices until coated, then stir in the frozen corn. Cook for 3-5 minutes until heated through.",
+      "temperature": null,
+      "time": "3-5 minutes",
+      "equipment_used": []
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "Assemble each bowl with rice, filling, pico de gallo, lettuce, tortilla strips, and avocado as desired.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": []
+    },
+    {
+      "section": null,
+      "step_number": 5,
+      "instruction": "Top with sour cream, salsa, or another dip like guacamole or avocado sauce.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": []
+    }
+  ],
+  "nutrition": {
+    "serving_basis": null,
+    "calories": null,
+    "carbohydrates": null,
+    "protein": null,
+    "fat": null,
+    "saturated_fat": null,
+    "polyunsaturated_fat": null,
+    "monounsaturated_fat": null,
+    "trans_fat": null,
+    "cholesterol": null,
+    "sodium": null,
+    "potassium": null,
+    "fiber": null,
+    "sugar": null,
+    "vitamin_a": null,
+    "vitamin_c": null,
+    "calcium": null,
+    "iron": null,
+    "other": []
+  }
+}
