@@ -32,11 +32,6 @@ MODEL = os.getenv("OPENAI_RECIPE_MODEL", "gpt-4o-mini")
 MAX_PAGE_TEXT_CHARS = 35000
 OPENAI_FILE_INPUT_MIME_TYPES = {
     "application/pdf",
-    "application/msword",
-    "application/rtf",
-    "application/vnd.oasis.opendocument.text",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "text/rtf",
 }
 INGREDIENT_STORE_SECTIONS = {
     "produce": "PRODUCE",
@@ -1388,7 +1383,7 @@ def upload_can_use_openai_file_input(mime_type, filename, upload_path):
     if mime_type in OPENAI_FILE_INPUT_MIME_TYPES:
         return True
 
-    return suffix in {".pdf", ".doc", ".docx", ".rtf", ".odt"}
+    return suffix == ".pdf"
 
 
 def normalize_upload_mime_type(mime_type, filename, upload_path):
