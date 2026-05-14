@@ -37,7 +37,19 @@
                         onclick="useDeviceLocationForHomeAddress(this)">
                     Use My Location
                 </button>
+                <button type="button"
+                        class="address-options-btn"
+                        onclick="findHomeAddressOptions(this)">
+                    Find Address Options
+                </button>
                 <button type="submit" name="action" value="run_find_nearest" class="nearest-stores-btn">Run Find Nearest Stores</button>
+            </div>
+
+            <div id="homeAddressOptionsPanel"
+                 class="address-options-panel"
+                 hidden>
+                <span class="store-detail-label">Possible addresses</span>
+                <div id="homeAddressOptionsList" class="address-options-list"></div>
             </div>
         </form>
     </div>

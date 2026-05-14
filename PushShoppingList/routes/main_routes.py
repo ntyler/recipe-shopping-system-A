@@ -922,6 +922,87 @@ def reverse_geocode_route():
     })
 
 
+@main_bp.route("/api/address_options", methods=["POST"])
+def address_options_route():
+    data = request.get_json(silent=True) or {}
+    query = build_address_options_query(data)
+
+    if not query:
+        return jsonify({
+            "ok": False,
+            "error": "Enter at least part of an address before searching.",
+        }), 400
+
+    try:
+        response = requests.get(
+            "https://nominatim.openstreetmap.org/search",
+            params={
+                "format": "jsonv2",
+                "q": query,
+                "addressdetails": 1,
+                "countrycodes": "us",
+                "limit": 8,
+            },
+            headers={
+                "User-Agent": "PushShoppingList/1.0 local address lookup",
+            },
+            timeout=(5, 12),
+        )
+        response.raise_for_status()
+        payload = response.json()
+    except Exception as exc:
+        return jsonify({
+            "ok": False,
+            "error": f"Unable to search address options: {exc}",
+        }), 502
+
+    return jsonify({
+        "ok": True,
+        "query": query,
+        "options": normalize_address_options(payload if isinstance(payload, list) else []),
+    })
+
+
+def build_address_options_query(data):
+    query = str(data.get("query", "") or "").strip()
+
+    if query:
+        return query
+
+    street = str(data.get("street") or data.get("address_street") or "").strip()
+    city = str(data.get("city") or data.get("address_city") or "").strip()
+    state = str(data.get("state") or data.get("address_state") or "").strip()
+    zip_code = str(data.get("zip") or data.get("address_zip") or "").strip()
+
+    return ", ".join(part for part in [street, city, state, zip_code] if part)
+
+
+def normalize_address_options(results):
+    options = []
+    seen = set()
+
+    for result in results:
+        if not isinstance(result, dict):
+            continue
+
+        display_name = str(result.get("display_name") or "").strip()
+        key = normalize(display_name)
+
+        if not display_name or key in seen:
+            continue
+
+        seen.add(key)
+        address = result.get("address") if isinstance(result.get("address"), dict) else {}
+        options.append({
+            "display_name": display_name,
+            "address": reverse_geocode_address_fields(address),
+            "latitude": result.get("lat"),
+            "longitude": result.get("lon"),
+        })
+
+    return options
+
+
 def reverse_geocode_address_fields(address):
     road = first_address_value(address, [
         "road",

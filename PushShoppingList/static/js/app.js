@@ -2747,11 +2747,14 @@ async function useDeviceLocationForHomeAddress(button) {
         updateHomeAddressSummaries(buildAddressSummaryFromForm(form));
 
         if (button) {
-            button.textContent = "Saving address...";
+            button.textContent = "Finding options...";
         }
 
-        await saveHomeAddressForm(form);
-        showRecipeQuantityUpdatedMessage("", "", "", "Home address updated from device location.");
+        await loadHomeAddressOptions(form, null, data.display_name ? [{
+            display_name: data.display_name,
+            address: data.address || {},
+        }] : []);
+        showRecipeQuantityUpdatedMessage("", "", "", "Location found. Choose an address option or save.");
     } catch (err) {
         console.warn("Unable to use device location.", err);
         alert(err.message || "Unable to use device location.");
@@ -2761,6 +2764,132 @@ async function useDeviceLocationForHomeAddress(button) {
             button.textContent = originalText || "Use My Location";
         }
     }
+}
+
+async function findHomeAddressOptions(button) {
+    const form = document.getElementById("homeAddressForm");
+
+    if (!form) {
+        return;
+    }
+
+    const originalText = button ? button.textContent : "";
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Finding options...";
+    }
+
+    try {
+        await loadHomeAddressOptions(form);
+    } catch (err) {
+        console.warn("Unable to find address options.", err);
+        alert(err.message || "Unable to find address options.");
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = originalText || "Find Address Options";
+        }
+    }
+}
+
+async function loadHomeAddressOptions(form, _button = null, fallbackOptions = []) {
+    const response = await fetch("/api/address_options", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-Requested-With": "fetch",
+        },
+        body: JSON.stringify(buildHomeAddressPayload(form)),
+    });
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+        throw new Error((data && data.error) || "Unable to find address options.");
+    }
+
+    const options = data.options && data.options.length ? data.options : fallbackOptions;
+    renderHomeAddressOptions(options);
+}
+
+function buildHomeAddressPayload(form) {
+    return {
+        address_street: homeAddressFieldValue(form, "address_street"),
+        address_city: homeAddressFieldValue(form, "address_city"),
+        address_state: homeAddressFieldValue(form, "address_state"),
+        address_zip: homeAddressFieldValue(form, "address_zip"),
+    };
+}
+
+function homeAddressFieldValue(form, name) {
+    const input = form.querySelector(`[name="${name}"]`);
+    return input ? input.value.trim() : "";
+}
+
+function renderHomeAddressOptions(options) {
+    const panel = document.getElementById("homeAddressOptionsPanel");
+    const list = document.getElementById("homeAddressOptionsList");
+
+    if (!panel || !list) {
+        return;
+    }
+
+    list.innerHTML = "";
+    panel.hidden = false;
+
+    if (!options.length) {
+        const empty = document.createElement("div");
+        empty.className = "address-option-empty";
+        empty.textContent = "No address options found. Try adding a house number or ZIP.";
+        list.appendChild(empty);
+        return;
+    }
+
+    options.forEach(option => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "address-option-btn";
+        button.textContent = option.display_name || formatHomeAddressOptionLabel(option.address || {});
+        button.addEventListener("click", () => applyHomeAddressOption(option.address || {}, button));
+        list.appendChild(button);
+    });
+}
+
+async function applyHomeAddressOption(address, button) {
+    const form = document.getElementById("homeAddressForm");
+
+    if (!form) {
+        return;
+    }
+
+    const originalText = button ? button.textContent : "";
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Saving this address...";
+    }
+
+    try {
+        fillHomeAddressForm(form, address);
+        updateHomeAddressSummaries(buildAddressSummaryFromForm(form));
+        await saveHomeAddressForm(form);
+        showRecipeQuantityUpdatedMessage("", "", "", "Home address updated.");
+    } catch (err) {
+        console.warn("Unable to save selected address.", err);
+        alert(err.message || "Unable to save selected address.");
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = originalText;
+        }
+    }
+}
+
+function formatHomeAddressOptionLabel(address) {
+    return [
+        address.street,
+        [address.city, address.state, address.zip].filter(Boolean).join(", "),
+    ].filter(Boolean).join(", ");
 }
 
 function getCurrentDevicePosition() {
