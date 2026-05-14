@@ -20,7 +20,7 @@
       "quantity": null,
       "unit": null,
       "ingredient": "pancetta",
-      "preparation": "crispy",
+      "preparation": "added",
       "optional": false,
       "store_section": "MEAT & SEAFOOD",
       "store_section_order": 2
@@ -31,7 +31,7 @@
       "quantity": null,
       "unit": null,
       "ingredient": "garlic",
-      "preparation": null,
+      "preparation": "added",
       "optional": false,
       "store_section": "PRODUCE",
       "store_section_order": 1
@@ -53,7 +53,7 @@
       "quantity": null,
       "unit": null,
       "ingredient": "rosemary",
-      "preparation": null,
+      "preparation": "fresh",
       "optional": false,
       "store_section": "PRODUCE",
       "store_section_order": 1
@@ -63,22 +63,22 @@
       "original_text": "dry pasta",
       "quantity": null,
       "unit": null,
-      "ingredient": "pasta",
+      "ingredient": "dry pasta",
       "preparation": null,
       "optional": false,
       "store_section": "PASTA, RICE & GRAINS",
       "store_section_order": 6
     },
     {
-      "section": "SAUCES & CONDIMENTS",
+      "section": "CANNED",
       "original_text": "beef broth",
       "quantity": null,
       "unit": null,
       "ingredient": "beef broth",
       "preparation": null,
       "optional": false,
-      "store_section": "SAUCES & CONDIMENTS",
-      "store_section_order": 9
+      "store_section": "CANNED",
+      "store_section_order": 8
     },
     {
       "section": "DAIRY & EGGS",
@@ -108,21 +108,10 @@
       "quantity": null,
       "unit": null,
       "ingredient": "Gruyere",
-      "preparation": "top layer",
+      "preparation": "fresh",
       "optional": false,
       "store_section": "DAIRY & EGGS",
       "store_section_order": 3
-    },
-    {
-      "section": "SAUCES & CONDIMENTS",
-      "original_text": "white wine",
-      "quantity": null,
-      "unit": null,
-      "ingredient": "white wine",
-      "preparation": "a touch",
-      "optional": false,
-      "store_section": "SAUCES & CONDIMENTS",
-      "store_section_order": 9
     }
   ],
   "equipment": [
@@ -137,6 +126,10 @@
     {
       "name": "cutting board",
       "category": "prep"
+    },
+    {
+      "name": "spoon",
+      "category": "utensil"
     }
   ],
   "instructions": [
