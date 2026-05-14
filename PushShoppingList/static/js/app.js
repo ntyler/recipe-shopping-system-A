@@ -1000,7 +1000,13 @@ function addRecipeInstructionRow(value = "", stepNumber = null) {
         return;
     }
 
-    const nextStepNumber = stepNumber || nextRecipeInstructionNumber();
+    const instruction = typeof value === "object" && value !== null
+        ? (value.instruction || value.text || "")
+        : value;
+    const sourceStepNumber = typeof value === "object" && value !== null
+        ? (value.step_number || value.stepNumber || stepNumber)
+        : stepNumber;
+    const nextStepNumber = sourceStepNumber || nextRecipeInstructionNumber();
     const row = document.createElement("div");
     row.className = "recipe-edit-text-row recipe-edit-instruction-row";
     row.innerHTML = `
@@ -1010,7 +1016,7 @@ function addRecipeInstructionRow(value = "", stepNumber = null) {
         </label>
         <label class="recipe-edit-step-text">
             <span>Instructions</span>
-            <textarea data-field="text" rows="3">${escapeHtml(value || "")}</textarea>
+            <textarea data-field="text" rows="3">${escapeHtml(instruction || "")}</textarea>
         </label>
         <button type="button" class="recipe-edit-remove-row" aria-label="Remove step" onclick="removeRecipeEditRow(this)">X</button>
     `;
@@ -1019,7 +1025,7 @@ function addRecipeInstructionRow(value = "", stepNumber = null) {
 
 function nextRecipeInstructionNumber() {
     const stepNumbers = [...document.querySelectorAll("#recipeEditInstructions [data-field='step_number']")]
-        .map(input => parseInt(input.value || "0", 10) || 0);
+        .map(input => parseFloat(input.value || "0") || 0);
 
     return Math.max(0, ...stepNumbers) + 1;
 }
@@ -1096,8 +1102,10 @@ async function saveRecipeEditor(event) {
         updateRecipeSaveProgressItem(0, "done", "Saved");
         updateRecipeSaveProgressItem(1, "done", "Updated");
         updateRecipeSaveProgressItem(2, "running", "Refreshing...");
-        closeRecipeEditor();
         await refreshStoreMarkup();
+        if (data.recipe) {
+            populateRecipeEditor(data.recipe, data.recipe.source_url || payload.recipe.source_url || payload.original_url);
+        }
         updateRecipeSaveProgressItem(2, "done", "Refreshed");
         setRecipeSaveProgressSummary("Recipe saved and page values refreshed.");
         showRecipeQuantityUpdatedMessage("", "", "", "Recipe updated.");
@@ -1134,7 +1142,9 @@ function normalizeRecipeEditorSnapshot(recipe) {
             optional: Boolean(item.optional),
         })),
         equipment: (recipe.equipment || []).map(value => String(value || "").trim()).filter(Boolean),
-        instructions: (recipe.instructions || []).map(value => String(value || "").trim()).filter(Boolean),
+        instructions: (recipe.instructions || [])
+            .map((value, index) => normalizeRecipeInstructionSnapshot(value, index))
+            .filter(item => item.instruction),
         nutrition: (recipe.nutrition || []).map(item => ({
             key: String(item.key || "").trim(),
             value: String(item.value || "").trim(),
@@ -1190,6 +1200,20 @@ function buildRecipeSaveProgressItems(recipe) {
             detail: "Refreshing Items, Store View, and Recipe View with updated source values.",
         },
     ];
+}
+
+function normalizeRecipeInstructionSnapshot(value, index = 0) {
+    if (typeof value === "object" && value !== null) {
+        return {
+            step_number: String(value.step_number || value.stepNumber || index + 1).trim(),
+            instruction: String(value.instruction || value.text || "").trim(),
+        };
+    }
+
+    return {
+        step_number: String(index + 1),
+        instruction: String(value || "").trim(),
+    };
 }
 
 function changedRecipeIngredientLines(previousIngredients, nextIngredients) {
@@ -1369,7 +1393,10 @@ function collectRecipeInstructionRows() {
         })
         .filter(item => item.text)
         .sort((a, b) => (a.stepNumber - b.stepNumber) || (a.originalIndex - b.originalIndex))
-        .map(item => item.text);
+        .map(item => ({
+            step_number: item.stepNumber,
+            instruction: item.text,
+        }));
 }
 
 function collectRecipeTextRows(selector) {

@@ -85,7 +85,7 @@ def save_editable_recipe(original_url, payload):
         "servings": str(payload.get("servings") or "").strip(),
         "ingredients": sanitize_ingredients(payload.get("ingredients", [])),
         "equipment": sanitize_text_list(payload.get("equipment", [])),
-        "instructions": sanitize_text_list(payload.get("instructions", [])),
+        "instructions": sanitize_instruction_list(payload.get("instructions", [])),
         "nutrition": sanitize_nutrition(payload.get("nutrition", [])),
     }
 
@@ -228,19 +228,30 @@ def normalize_text_rows(value):
 
 def normalize_instruction_rows(value):
     if not isinstance(value, list):
-        return normalize_text_rows(value)
+        return [
+            {
+                "step_number": index,
+                "instruction": text,
+            }
+            for index, text in enumerate(normalize_text_rows(value), start=1)
+        ]
 
     rows = []
-    for item in value:
+    for index, item in enumerate(value, start=1):
         if isinstance(item, dict):
             text = str(item.get("instruction") or item.get("text") or "").strip()
+            step_number = normalize_step_number(item.get("step_number"), index)
         else:
             text = str(item or "").strip()
+            step_number = index
 
         if text:
-            rows.append(text)
+            rows.append({
+                "step_number": step_number,
+                "instruction": text,
+            })
 
-    return rows
+    return sorted(rows, key=lambda item: item["step_number"])
 
 
 def normalize_nutrition_rows(nutrition):
@@ -311,6 +322,52 @@ def sanitize_text_list(value):
         for item in value
         if str(item or "").strip()
     ]
+
+
+def sanitize_instruction_list(value):
+    if isinstance(value, str):
+        value = value.splitlines()
+
+    if not isinstance(value, list):
+        return []
+
+    instructions = []
+    for index, item in enumerate(value, start=1):
+        if isinstance(item, dict):
+            text = str(item.get("instruction") or item.get("text") or "").strip()
+            step_number = normalize_step_number(item.get("step_number"), index)
+        else:
+            text = str(item or "").strip()
+            step_number = index
+
+        if not text:
+            continue
+
+        instructions.append({
+            "section": None,
+            "step_number": step_number,
+            "instruction": text,
+            "temperature": None,
+            "time": None,
+            "equipment_used": [],
+        })
+
+    return sorted(instructions, key=lambda item: item["step_number"])
+
+
+def normalize_step_number(value, fallback):
+    try:
+        step_number = float(value)
+    except (TypeError, ValueError):
+        return fallback
+
+    if step_number <= 0:
+        return fallback
+
+    if step_number.is_integer():
+        return int(step_number)
+
+    return step_number
 
 
 def sanitize_nutrition(value):
