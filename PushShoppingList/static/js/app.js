@@ -826,7 +826,7 @@ function populateRecipeEditor(recipe, originalUrl) {
     }
 
     if (nutritionWrap) {
-        nutritionWrap.innerHTML = "";
+        nutritionWrap.innerHTML = recipeNutritionHeaderHtml();
         (recipe.nutrition || []).forEach(item => addRecipeNutritionRow(item));
         if (!recipe.nutrition || !recipe.nutrition.length) {
             addRecipeNutritionRow();
@@ -1041,16 +1041,24 @@ function addRecipeNutritionRow(item = {}) {
     row.className = "recipe-edit-nutrition-row";
     row.innerHTML = `
         <label>
-            <span>Label</span>
-            <input type="text" data-field="key" value="${escapeAttribute(item.key || "")}">
+            <input type="text" data-field="key" aria-label="Nutrition label" value="${escapeAttribute(item.key || "")}">
         </label>
         <label>
-            <span>Value</span>
-            <input type="text" data-field="value" value="${escapeAttribute(item.value || "")}">
+            <input type="text" data-field="value" aria-label="Nutrition value" value="${escapeAttribute(item.value || "")}">
         </label>
         <button type="button" class="recipe-edit-remove-row" aria-label="Remove nutrition" onclick="removeRecipeEditRow(this)">X</button>
     `;
     wrap.appendChild(row);
+}
+
+function recipeNutritionHeaderHtml() {
+    return `
+        <div class="recipe-edit-nutrition-header" aria-hidden="true">
+            <span>Label</span>
+            <span>Value</span>
+            <span></span>
+        </div>
+    `;
 }
 
 function removeRecipeEditRow(button) {
