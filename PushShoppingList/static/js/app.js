@@ -806,7 +806,7 @@ function populateRecipeEditor(recipe, originalUrl) {
 
     if (instructionWrap) {
         instructionWrap.innerHTML = "";
-        (recipe.instructions || []).forEach(item => addRecipeInstructionRow(item));
+        (recipe.instructions || []).forEach((item, index) => addRecipeInstructionRow(item, index + 1));
         if (!recipe.instructions || !recipe.instructions.length) {
             addRecipeInstructionRow();
         }
@@ -980,23 +980,35 @@ function addRecipeEquipmentRow(value = "") {
     wrap.appendChild(row);
 }
 
-function addRecipeInstructionRow(value = "") {
+function addRecipeInstructionRow(value = "", stepNumber = null) {
     const wrap = document.getElementById("recipeEditInstructions");
 
     if (!wrap) {
         return;
     }
 
+    const nextStepNumber = stepNumber || nextRecipeInstructionNumber();
     const row = document.createElement("div");
     row.className = "recipe-edit-text-row recipe-edit-instruction-row";
     row.innerHTML = `
-        <label>
-            <span>Step</span>
+        <label class="recipe-edit-step-number">
+            <span>Step #</span>
+            <input type="number" min="1" step="1" data-field="step_number" value="${escapeAttribute(nextStepNumber)}">
+        </label>
+        <label class="recipe-edit-step-text">
+            <span>Instructions</span>
             <textarea data-field="text" rows="3">${escapeHtml(value || "")}</textarea>
         </label>
         <button type="button" class="recipe-edit-remove-row" aria-label="Remove step" onclick="removeRecipeEditRow(this)">X</button>
     `;
     wrap.appendChild(row);
+}
+
+function nextRecipeInstructionNumber() {
+    const stepNumbers = [...document.querySelectorAll("#recipeEditInstructions [data-field='step_number']")]
+        .map(input => parseInt(input.value || "0", 10) || 0);
+
+    return Math.max(0, ...stepNumbers) + 1;
 }
 
 function addRecipeNutritionRow(item = {}) {
@@ -1094,7 +1106,7 @@ function collectRecipeEditorPayload() {
             servings: document.getElementById("recipeEditServings").value.trim(),
             ingredients: collectRecipeIngredientRows(),
             equipment: collectRecipeTextRows("#recipeEditEquipment .recipe-edit-text-row"),
-            instructions: collectRecipeTextRows("#recipeEditInstructions .recipe-edit-text-row"),
+            instructions: collectRecipeInstructionRows(),
             nutrition: collectRecipeNutritionRows(),
         },
     };
@@ -1110,6 +1122,24 @@ function collectRecipeNutritionRows() {
     return [...document.querySelectorAll("#recipeEditNutrition .recipe-edit-nutrition-row")]
         .map(row => fieldValuesFromRow(row))
         .filter(item => item.key || item.value);
+}
+
+function collectRecipeInstructionRows() {
+    return [...document.querySelectorAll("#recipeEditInstructions .recipe-edit-instruction-row")]
+        .map((row, index) => {
+            const textInput = row.querySelector('[data-field="text"]');
+            const stepInput = row.querySelector('[data-field="step_number"]');
+            const stepNumber = Math.max(1, parseInt(stepInput ? stepInput.value : "", 10) || index + 1);
+
+            return {
+                text: textInput ? textInput.value.trim() : "",
+                stepNumber,
+                originalIndex: index,
+            };
+        })
+        .filter(item => item.text)
+        .sort((a, b) => (a.stepNumber - b.stepNumber) || (a.originalIndex - b.originalIndex))
+        .map(item => item.text);
 }
 
 function collectRecipeTextRows(selector) {

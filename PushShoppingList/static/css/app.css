@@ -1717,7 +1717,16 @@ body {
         }
 
         .recipe-edit-instruction-row {
+            grid-template-columns: 96px minmax(0, 1fr) 50px;
             align-items: start;
+        }
+
+        .recipe-edit-step-number input {
+            text-align: center;
+        }
+
+        .recipe-edit-step-text {
+            min-width: 0;
         }
 
         .recipe-edit-instruction-row .recipe-edit-remove-row {
