@@ -1819,6 +1819,10 @@ body {
             display: flex;
         }
 
+        .recipe-save-progress-backdrop {
+            z-index: 12000;
+        }
+
         .recipe-qty-progress-card {
             width: min(720px, 100%);
             max-height: 88vh;

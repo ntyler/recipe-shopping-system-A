@@ -731,6 +731,7 @@ function escapeAttribute(value) {
 
 let recipeEditStoreSections = [];
 let recipeEditFoodRules = { require: [], avoid: [] };
+let recipeEditOriginalSnapshot = null;
 
 async function openRecipeEditor(button) {
     const url = button ? button.dataset.recipeUrl || "" : "";
@@ -776,6 +777,18 @@ function closeRecipeEditor() {
 }
 
 function populateRecipeEditor(recipe, originalUrl) {
+    recipeEditOriginalSnapshot = normalizeRecipeEditorSnapshot({
+        display_name: recipe.display_name || "",
+        recipe_title: recipe.recipe_title || "",
+        source_url: recipe.source_url || originalUrl,
+        quantity: recipe.quantity || "1",
+        servings: recipe.servings || "",
+        ingredients: recipe.ingredients || [],
+        equipment: recipe.equipment || [],
+        instructions: recipe.instructions || [],
+        nutrition: recipe.nutrition || [],
+    });
+
     setValue("recipeEditOriginalUrl", originalUrl);
     setValue("recipeEditDisplayName", recipe.display_name || "");
     setValue("recipeEditTitleInput", recipe.recipe_title || "");
@@ -1063,6 +1076,10 @@ async function saveRecipeEditor(event) {
 
     try {
         const payload = collectRecipeEditorPayload();
+        const progressItems = buildRecipeSaveProgressItems(payload.recipe);
+        showRecipeSaveProgressOverlay(progressItems);
+        updateRecipeSaveProgressItem(0, "running", "Saving...");
+
         const response = await fetch("/api/recipe", {
             method: "POST",
             headers: {
@@ -1076,12 +1093,19 @@ async function saveRecipeEditor(event) {
             throw new Error((data && data.error) || "Unable to save recipe.");
         }
 
+        updateRecipeSaveProgressItem(0, "done", "Saved");
+        updateRecipeSaveProgressItem(1, "done", "Updated");
+        updateRecipeSaveProgressItem(2, "running", "Refreshing...");
         closeRecipeEditor();
         await refreshStoreMarkup();
+        updateRecipeSaveProgressItem(2, "done", "Refreshed");
+        setRecipeSaveProgressSummary("Recipe saved and page values refreshed.");
         showRecipeQuantityUpdatedMessage("", "", "", "Recipe updated.");
     } catch (err) {
         console.warn("Unable to save recipe.", err);
         setRecipeEditStatus("Unable to save recipe.", true);
+        setRecipeSaveProgressSummary("Unable to save recipe.");
+        updateRecipeSaveProgressFailed();
     } finally {
         if (saveButton) {
             saveButton.disabled = false;
@@ -1090,6 +1114,212 @@ async function saveRecipeEditor(event) {
     }
 
     return false;
+}
+
+function normalizeRecipeEditorSnapshot(recipe) {
+    return {
+        display_name: String(recipe.display_name || "").trim(),
+        recipe_title: String(recipe.recipe_title || "").trim(),
+        source_url: String(recipe.source_url || "").trim(),
+        quantity: String(Math.max(1, parseInt(recipe.quantity || "1", 10) || 1)),
+        servings: String(recipe.servings || "").trim(),
+        ingredients: (recipe.ingredients || []).map(item => ({
+            ingredient: String(item.ingredient || "").trim(),
+            quantity: String(item.quantity || "").trim(),
+            unit: String(item.unit || "").trim(),
+            original_text: String(item.original_text || "").trim(),
+            preparation: String(item.preparation || "").trim(),
+            section: String(item.section || "").trim(),
+            store_section: String(item.store_section || "").trim(),
+            optional: Boolean(item.optional),
+        })),
+        equipment: (recipe.equipment || []).map(value => String(value || "").trim()).filter(Boolean),
+        instructions: (recipe.instructions || []).map(value => String(value || "").trim()).filter(Boolean),
+        nutrition: (recipe.nutrition || []).map(item => ({
+            key: String(item.key || "").trim(),
+            value: String(item.value || "").trim(),
+        })),
+    };
+}
+
+function buildRecipeSaveProgressItems(recipe) {
+    const next = normalizeRecipeEditorSnapshot(recipe);
+    const previous = recipeEditOriginalSnapshot || normalizeRecipeEditorSnapshot({});
+    const detailLines = [];
+
+    [
+        ["Display name", "display_name"],
+        ["Recipe title", "recipe_title"],
+        ["Source URL", "source_url"],
+        ["Quantity", "quantity"],
+        ["Servings", "servings"],
+    ].forEach(([label, key]) => {
+        if (previous[key] !== next[key]) {
+            detailLines.push(`${label}: ${previous[key] || "(blank)"} -> ${next[key] || "(blank)"}`);
+        }
+    });
+
+    const ingredientLines = changedRecipeIngredientLines(previous.ingredients, next.ingredients);
+    if (ingredientLines.length) {
+        detailLines.push(...ingredientLines);
+    } else if (previous.ingredients.length !== next.ingredients.length) {
+        detailLines.push(`Ingredients: ${previous.ingredients.length} -> ${next.ingredients.length}`);
+    }
+
+    [
+        ["Equipment", previous.equipment.length, next.equipment.length],
+        ["Instructions", previous.instructions.length, next.instructions.length],
+        ["Nutrition", previous.nutrition.length, next.nutrition.length],
+    ].forEach(([label, beforeCount, afterCount]) => {
+        if (beforeCount !== afterCount) {
+            detailLines.push(`${label}: ${beforeCount} -> ${afterCount}`);
+        }
+    });
+
+    return [
+        {
+            label: "Recipe file and saved values",
+            detail: detailLines.length ? detailLines.slice(0, 8).join("; ") : "Saving current recipe values.",
+        },
+        {
+            label: "Source Recipe Qty values",
+            detail: "Recalculating ingredient quantities from the saved recipe numbers.",
+        },
+        {
+            label: "Visible page sections",
+            detail: "Refreshing Items, Store View, and Recipe View with updated source values.",
+        },
+    ];
+}
+
+function changedRecipeIngredientLines(previousIngredients, nextIngredients) {
+    const lines = [];
+    const previousByName = new Map(previousIngredients.map(item => [normalizeFoodKey(item.ingredient), item]));
+
+    nextIngredients.forEach((item, index) => {
+        const name = item.ingredient || `Ingredient ${index + 1}`;
+        const previous = previousByName.get(normalizeFoodKey(item.ingredient));
+
+        if (!previous) {
+            lines.push(`Added ${name}: ${formatRecipeIngredientAmount(item) || "(no qty)"}`);
+            return;
+        }
+
+        const amountChanged = previous.quantity !== item.quantity || previous.unit !== item.unit;
+        const sectionChanged = previous.store_section !== item.store_section;
+        const detailsChanged = [
+            "original_text",
+            "preparation",
+            "section",
+            "optional",
+        ].some(key => previous[key] !== item[key]);
+
+        if (amountChanged) {
+            lines.push(`${name}: ${formatRecipeIngredientAmount(previous) || "(blank)"} -> ${formatRecipeIngredientAmount(item) || "(blank)"}`);
+        } else if (sectionChanged) {
+            lines.push(`${name} store section: ${previous.store_section || "(blank)"} -> ${item.store_section || "(blank)"}`);
+        } else if (detailsChanged) {
+            lines.push(`${name}: ingredient details updated`);
+        }
+    });
+
+    const nextNames = new Set(nextIngredients.map(item => normalizeFoodKey(item.ingredient)));
+    previousIngredients.forEach(item => {
+        if (!nextNames.has(normalizeFoodKey(item.ingredient))) {
+            lines.push(`Removed ${item.ingredient || "ingredient"}`);
+        }
+    });
+
+    return lines;
+}
+
+function formatRecipeIngredientAmount(item) {
+    return `${item.quantity || ""} ${item.unit || ""}`.trim();
+}
+
+function showRecipeSaveProgressOverlay(items) {
+    let overlay = document.getElementById("recipeSaveProgressOverlay");
+
+    if (!overlay) {
+        overlay = document.createElement("div");
+        overlay.id = "recipeSaveProgressOverlay";
+        overlay.className = "recipe-qty-progress-backdrop recipe-save-progress-backdrop";
+        overlay.innerHTML = `
+            <div class="recipe-qty-progress-card" role="dialog" aria-modal="true" aria-labelledby="recipeSaveProgressTitle">
+                <div class="recipe-qty-progress-header">
+                    <h2 id="recipeSaveProgressTitle">Saving Recipe</h2>
+                    <button type="button" class="recipe-qty-progress-close" onclick="hideRecipeSaveProgressOverlay()">Hide</button>
+                </div>
+                <div id="recipeSaveProgressSummary" class="recipe-qty-progress-summary">Starting recipe save...</div>
+                <div id="recipeSaveProgressList" class="recipe-qty-progress-list"></div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+    }
+
+    const list = overlay.querySelector("#recipeSaveProgressList");
+    if (list) {
+        list.innerHTML = items.map((item, index) => `
+            <div class="recipe-qty-progress-row" data-recipe-save-progress-index="${index}">
+                <div class="recipe-qty-progress-main">
+                    <div class="recipe-qty-progress-name">${escapeHtml(item.label)}</div>
+                    <div class="recipe-qty-progress-qty">${escapeHtml(item.detail)}</div>
+                </div>
+                <div class="recipe-qty-progress-status waiting">Waiting</div>
+            </div>
+        `).join("");
+    }
+
+    setRecipeSaveProgressSummary("Starting recipe save...");
+    overlay.classList.add("open");
+    overlay.setAttribute("aria-hidden", "false");
+}
+
+function hideRecipeSaveProgressOverlay() {
+    const overlay = document.getElementById("recipeSaveProgressOverlay");
+
+    if (overlay) {
+        overlay.classList.remove("open");
+        overlay.setAttribute("aria-hidden", "true");
+    }
+}
+
+function setRecipeSaveProgressSummary(message) {
+    const summary = document.getElementById("recipeSaveProgressSummary");
+
+    if (summary) {
+        summary.textContent = message;
+    }
+}
+
+function updateRecipeSaveProgressItem(index, state, message) {
+    const row = document.querySelector(`.recipe-qty-progress-row[data-recipe-save-progress-index="${index}"]`);
+
+    if (!row) {
+        return;
+    }
+
+    const status = row.querySelector(".recipe-qty-progress-status");
+    row.classList.remove("waiting", "running", "done", "failed");
+    row.classList.add(state);
+
+    if (status) {
+        status.className = `recipe-qty-progress-status ${state}`;
+        status.textContent = message;
+    }
+}
+
+function updateRecipeSaveProgressFailed() {
+    const rows = document.querySelectorAll("#recipeSaveProgressList .recipe-qty-progress-row");
+    const runningRow = [...rows].find(row => row.classList.contains("running"));
+    const targetRow = runningRow || [...rows].find(row => row.classList.contains("waiting"));
+
+    if (!targetRow) {
+        return;
+    }
+
+    const index = targetRow.dataset.recipeSaveProgressIndex;
+    updateRecipeSaveProgressItem(index, "failed", "Failed");
 }
 
 function collectRecipeEditorPayload() {
