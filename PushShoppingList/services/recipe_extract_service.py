@@ -32,6 +32,7 @@ UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 
 MODEL = os.getenv("OPENAI_RECIPE_MODEL", "gpt-4o-mini")
 MAX_PAGE_TEXT_CHARS = 35000
+MAX_SOCIAL_VIDEO_PROMPT_CHARS = 12000
 OPENAI_FILE_INPUT_MIME_TYPES = {
     "application/pdf",
 }
@@ -315,7 +316,7 @@ def split_quantity_unit(text):
     )
 
     match = re.match(
-        rf"^(?P<quantity>{quantity_pattern})(?:\s+(?P<unit>{unit_pattern}))?\s+(?P<ingredient>.+)$",
+        rf"^(?P<quantity>{quantity_pattern})(?:\s*(?P<unit>{unit_pattern}))?\s+(?P<ingredient>.+)$",
         text,
         flags=re.IGNORECASE,
     )
@@ -384,6 +385,14 @@ def classify_store_section(ingredient):
         ("tomato sauce", "SAUCES & CONDIMENTS"),
         ("clarified butter", "DAIRY & EGGS"),
         ("yolk", "DAIRY & EGGS"),
+        ("greek yoghurt", "DAIRY & EGGS"),
+        ("greek yogurt", "DAIRY & EGGS"),
+        ("mozzarella", "DAIRY & EGGS"),
+        ("cheddar", "DAIRY & EGGS"),
+        ("pepperoni", "MEAT & SEAFOOD"),
+        ("garlic powder", "SPICES & SEASONINGS"),
+        ("onion powder", "SPICES & SEASONINGS"),
+        ("italian herb seasoning", "SPICES & SEASONINGS"),
     )
 
     for keyword, section in priority_keywords:
@@ -420,13 +429,23 @@ def extract_preparation(original_text):
         "for garnish",
         "for garnishing",
         "for serving",
+        "sliced lengthways",
+        "sliced lengthwise",
+        "sliced",
+        "chopped",
+        "diced",
+        "minced",
     ]
     lowered = text.lower()
-    matched_modifiers = [
-        modifier
-        for modifier in usage_modifiers
-        if re.search(rf"\b{re.escape(modifier)}\b", lowered)
-    ]
+    matched_modifiers = []
+    for modifier in sorted(usage_modifiers, key=len, reverse=True):
+        if not re.search(rf"\b{re.escape(modifier)}\b", lowered):
+            continue
+
+        if any(modifier in existing for existing in matched_modifiers):
+            continue
+
+        matched_modifiers.append(modifier)
 
     parenthetical_matches = [
         match.strip()
@@ -701,7 +720,10 @@ def extract_recipe_from_social_video_url(recipe_url, progress_callback=None):
             "Looking for title, caption, description, and transcript text.",
         )
 
-    html_text, page_text = fetch_social_video_text(recipe_url)
+    html_text, page_text = fetch_social_video_text(
+        recipe_url,
+        progress_callback=progress_callback,
+    )
 
     if not has_meaningful_social_video_text(page_text):
         return {
@@ -710,6 +732,19 @@ def extract_recipe_from_social_video_url(recipe_url, progress_callback=None):
             "error": "No public caption, description, or transcript text was found for that video URL.",
             "ingredients": [],
         }
+
+    local_json_data = extract_recipe_from_social_video_text(recipe_url, page_text)
+
+    if structured_recipe_data_is_usable(local_json_data):
+        save_extracted_recipe_json(recipe_url, local_json_data)
+
+        if progress_callback:
+            progress_callback(
+                "recipe text parsed without OpenAI API fallback.",
+                "The public video description included ingredient and cooking-step sections.",
+            )
+
+        return build_extract_result(recipe_url, local_json_data, "social_video_text")
 
     if not os.getenv("OPENAI_API_KEY"):
         return {
@@ -725,7 +760,9 @@ def extract_recipe_from_social_video_url(recipe_url, progress_callback=None):
             "ChatGPT is extracting recipe details from the public video text.",
         )
 
-    response_text = send_prompt_to_openai(build_social_video_prompt(recipe_url, page_text))
+    response_text = send_prompt_to_openai(
+        build_social_video_prompt(recipe_url, page_text[:MAX_SOCIAL_VIDEO_PROMPT_CHARS])
+    )
     raw_api_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_SOCIAL_API_RESPONSE.txt"
     raw_api_path.write_text(response_text, encoding="utf-8")
 
@@ -756,7 +793,13 @@ def extract_recipe_from_social_video_url(recipe_url, progress_callback=None):
     return result
 
 
-def fetch_social_video_text(recipe_url):
+def fetch_social_video_text(recipe_url, progress_callback=None):
+    raw_page_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_SOCIAL_TEXT.txt"
+    cached_page_text = load_cached_social_video_text(raw_page_path)
+
+    if has_meaningful_social_video_text(cached_page_text):
+        return "", cached_page_text
+
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -766,34 +809,407 @@ def fetch_social_video_text(recipe_url):
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
     }
-    response = requests.get(recipe_url, headers=headers, timeout=(8, 15))
-    response.raise_for_status()
-    html_text = response.text
+    html_text = ""
+    page_text = ""
+    direct_error = None
 
-    html_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_SOCIAL_HTML.html"
-    html_path.write_text(html_text, encoding="utf-8")
+    try:
+        response = requests.get(recipe_url, headers=headers, timeout=(5, 10))
+        response.raise_for_status()
+        html_text = response.text
+    except Exception as exc:
+        if has_meaningful_social_video_text(cached_page_text):
+            return "", cached_page_text
+        direct_error = exc
+    else:
+        html_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_SOCIAL_HTML.html"
+        html_path.write_text(html_text, encoding="utf-8")
+        page_text = build_social_video_page_text(recipe_url, html_text)
 
+        if has_meaningful_social_video_text(page_text):
+            raw_page_path.write_text(page_text, encoding="utf-8")
+            return html_text, page_text
+
+    instagram_result = fetch_instagram_embed_text(
+        recipe_url,
+        headers=headers,
+        progress_callback=progress_callback,
+    )
+
+    if instagram_result and has_meaningful_social_video_text(instagram_result[1]):
+        html_text, page_text = instagram_result
+        raw_page_path.write_text(page_text, encoding="utf-8")
+        return html_text, page_text
+
+    browser_result = fetch_social_video_text_with_browser(
+        recipe_url,
+        progress_callback=progress_callback,
+    )
+
+    if browser_result and has_meaningful_social_video_text(browser_result[1]):
+        html_text, page_text = browser_result
+        raw_page_path.write_text(page_text, encoding="utf-8")
+        return html_text, page_text
+
+    if direct_error:
+        raise direct_error
+
+    raw_page_path.write_text(page_text, encoding="utf-8")
+    return html_text, page_text
+
+
+def build_social_video_page_text(recipe_url, html_text, include_visible_text=False):
     metadata = extract_social_metadata(html_text)
+
     try:
         transcript = extract_youtube_transcript(recipe_url, html_text)
     except Exception as exc:
         transcript = ""
         transcript_error_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_TRANSCRIPT_ERROR.txt"
         transcript_error_path.write_text(str(exc), encoding="utf-8")
+
     parts = [
         f"Title: {metadata.get('title')}" if metadata.get("title") else "",
         f"Description: {metadata.get('description')}" if metadata.get("description") else "",
         f"Transcript: {transcript}" if transcript else "",
     ]
+
+    if include_visible_text:
+        visible_text = extract_visible_social_page_text(html_text)
+
+        if visible_text:
+            parts.append(f"Visible text: {visible_text}")
+
     page_text = "\n\n".join(part for part in parts if part).strip()
 
     if len(page_text) > MAX_PAGE_TEXT_CHARS:
         page_text = page_text[:MAX_PAGE_TEXT_CHARS]
 
-    raw_page_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_SOCIAL_TEXT.txt"
-    raw_page_path.write_text(page_text, encoding="utf-8")
+    return page_text
+
+
+def fetch_instagram_embed_text(recipe_url, headers=None, progress_callback=None):
+    embed_url = instagram_embed_url(recipe_url)
+
+    if not embed_url:
+        return None
+
+    if progress_callback:
+        progress_callback(
+            "opening Instagram embed page...",
+            "Trying Instagram's public embed page for caption text.",
+        )
+
+    try:
+        response = requests.get(embed_url, headers=headers or {}, timeout=(5, 10))
+        response.raise_for_status()
+    except Exception:
+        return None
+
+    html_text = response.text
+
+    if not html_text:
+        return None
+
+    html_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_INSTAGRAM_EMBED_HTML.html"
+    html_path.write_text(html_text, encoding="utf-8")
+    page_text = build_social_video_page_text(
+        recipe_url,
+        html_text,
+        include_visible_text=True,
+    )
 
     return html_text, page_text
+
+
+def instagram_embed_url(recipe_url):
+    parsed = urlparse(str(recipe_url or ""))
+    host = parsed.netloc.lower()
+
+    if "instagram.com" not in host:
+        return None
+
+    parts = [part for part in parsed.path.split("/") if part]
+
+    if len(parts) < 2 or parts[0] not in {"p", "reel", "tv"}:
+        return None
+
+    return f"https://www.instagram.com/{parts[0]}/{parts[1]}/embed/captioned/"
+
+
+def fetch_social_video_text_with_browser(recipe_url, progress_callback=None):
+    if os.getenv("DISABLE_BROWSER_RECIPE_FETCH") == "1":
+        return None
+
+    if progress_callback:
+        progress_callback(
+            "opening video page in browser...",
+            "The public video page is being opened like a normal webpage to read rendered text.",
+        )
+
+    for target_url in social_browser_candidate_urls(recipe_url):
+        try:
+            html_text = fetch_recipe_page_with_browser(target_url)
+        except Exception:
+            continue
+
+        if not html_text:
+            continue
+
+        suffix = (
+            "INSTAGRAM_EMBED_BROWSER_HTML"
+            if target_url != recipe_url and instagram_embed_url(recipe_url) == target_url
+            else "SOCIAL_BROWSER_HTML"
+        )
+        html_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_{suffix}.html"
+        html_path.write_text(html_text, encoding="utf-8")
+        page_text = build_social_video_page_text(
+            recipe_url,
+            html_text,
+            include_visible_text=True,
+        )
+
+        if has_meaningful_social_video_text(page_text):
+            return html_text, page_text
+
+    return None
+
+
+def social_browser_candidate_urls(recipe_url):
+    urls = [recipe_url]
+    embed_url = instagram_embed_url(recipe_url)
+
+    if embed_url and embed_url not in urls:
+        urls.append(embed_url)
+
+    return urls
+
+
+def extract_visible_social_page_text(html_text):
+    soup = BeautifulSoup(html_text or "", "html.parser")
+
+    for tag in soup(["script", "style", "noscript", "svg"]):
+        tag.decompose()
+
+    page_text = soup.get_text(" ", strip=True)
+    page_text = re.sub(r"\s+", " ", page_text).strip()
+
+    if len(page_text) > MAX_SOCIAL_VIDEO_PROMPT_CHARS:
+        page_text = page_text[:MAX_SOCIAL_VIDEO_PROMPT_CHARS]
+
+    return page_text
+
+
+def load_cached_social_video_text(raw_page_path):
+    try:
+        return raw_page_path.read_text(encoding="utf-8")
+    except Exception:
+        return ""
+
+
+def extract_recipe_from_social_video_text(recipe_url, page_text):
+    title = extract_social_text_label(page_text, "title")
+    plain_text = social_video_plain_text(page_text)
+    ingredient_lines = extract_social_ingredient_lines(plain_text)
+    instruction_lines = extract_social_instruction_lines(plain_text)
+
+    if not ingredient_lines:
+        return None
+
+    ingredients = build_structured_ingredients(ingredient_lines)
+    instructions = build_social_video_instructions(instruction_lines)
+
+    if not ingredients:
+        return None
+
+    equipment = infer_equipment_from_instructions(instructions)
+    add_equipment_used_to_instructions(instructions, equipment)
+
+    return {
+        "source_url": recipe_url,
+        "recipe_title": title,
+        "servings": None,
+        "ingredients": ingredients,
+        "equipment": equipment,
+        "instructions": instructions,
+        "nutrition": empty_nutrition(),
+    }
+
+
+def social_video_plain_text(page_text):
+    text = str(page_text or "")
+    text = re.sub(r"(?im)^\s*(title|description|transcript):\s*", "", text)
+    text = re.sub(r"\s+", " ", clean_recipe_text(text))
+    return text.strip()
+
+
+def extract_social_text_label(page_text, label):
+    pattern = rf"(?ims)^\s*{re.escape(label)}:\s*(.+?)(?=^\s*(?:title|description|transcript):|\Z)"
+    match = re.search(pattern, str(page_text or ""))
+
+    if not match:
+        return None
+
+    value = clean_recipe_text(match.group(1))
+    return value or None
+
+
+def extract_social_ingredient_lines(text):
+    match = re.search(
+        r"\bingredients?\b(?P<section>.+?)(?=\b(?:cooking\s+steps?|directions?|instructions?|method|macros?|nutrition|credit|ps\b|end\s+of)\b|$)",
+        text,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+
+    if not match:
+        return []
+
+    section = clean_social_ingredient_section(match.group("section"))
+    starts = [
+        found.start()
+        for found in re.finditer(
+            social_ingredient_start_pattern(),
+            section,
+            flags=re.IGNORECASE,
+        )
+    ]
+
+    if not starts:
+        return split_social_ingredient_lines(section)
+
+    lines = []
+    for index, start in enumerate(starts):
+        end = starts[index + 1] if index + 1 < len(starts) else len(section)
+        line = clean_social_ingredient_line(section[start:end])
+
+        if line:
+            lines.append(line)
+
+    return lines
+
+
+def clean_social_ingredient_section(section):
+    section = re.sub(r"(?:â¸»|⸻|[•·|]+)", " ", str(section or ""))
+    section = re.sub(
+        r"\bIf using\b.+?\b(?:baking powder|baking soda|yeast)\b",
+        " ",
+        section,
+        flags=re.IGNORECASE,
+    )
+    section = re.sub(r"\bIf using\b.+?(?=\s+\d|\s+[{}]|$)".format(FRACTION_CHARS), " ", section, flags=re.IGNORECASE)
+    return re.sub(r"\s+", " ", section).strip(" :-")
+
+
+def social_ingredient_start_pattern():
+    quantity_pattern = rf"(?:\d+\s+\d+/\d+|\d+(?:[./]\d+)?|[{FRACTION_CHARS}])"
+    unit_pattern = (
+        r"cups?|c|teaspoons?|tsp\.?|tablespoons?|tbsp\.?|pounds?|lbs?\.?|"
+        r"ounces?|oz\.?|grams?|g|kilograms?|kg|milliliters?|ml|liters?|l|"
+        r"pinch|pinches|dash|dashes|cloves?|sticks?"
+    )
+    return rf"(?<!\w){quantity_pattern}(?:\s*(?:-|to)\s*{quantity_pattern})?\s*(?:{unit_pattern})?\b"
+
+
+def split_social_ingredient_lines(section):
+    return [
+        clean_social_ingredient_line(line)
+        for line in re.split(r"[\n;]+", section)
+        if clean_social_ingredient_line(line)
+    ]
+
+
+def clean_social_ingredient_line(line):
+    value = clean_recipe_text(line)
+    value = re.sub(r"(?:â¸»|⸻)", " ", value)
+    value = re.sub(r"\bregular or\s+(.+?)\s+works too\b", r"or \1", value, flags=re.IGNORECASE)
+    value = re.sub(r"\boptional\b", " optional", value, flags=re.IGNORECASE)
+    value = re.sub(r"\s+", " ", value).strip(" ,.;:-")
+
+    if not value or len(value) > 160:
+        return ""
+
+    return value
+
+
+def extract_social_instruction_lines(text):
+    match = re.search(
+        r"\b(?:cooking\s+steps?|directions?|instructions?|method)\b(?P<section>.+?)(?=\b(?:macros?|nutrition|credit|ps\b|end\s+of)\b|$)",
+        text,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+
+    if not match:
+        return []
+
+    section = re.sub(r"(?:â¸»|⸻)", " ", match.group("section"))
+    section = re.sub(r"\s+", " ", section).strip(" :-")
+    matches = list(re.finditer(r"(?:^|\s)(\d+)\.\s+", section))
+
+    if not matches:
+        return [
+            clean_recipe_text(line)
+            for line in re.split(r"[\n;]+", section)
+            if clean_recipe_text(line)
+        ]
+
+    lines = []
+    for index, found in enumerate(matches):
+        start = found.end()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(section)
+        instruction = clean_recipe_text(section[start:end])
+
+        if instruction:
+            lines.append(instruction)
+
+    return lines
+
+
+def build_social_video_instructions(instruction_lines):
+    return [
+        {
+            "section": None,
+            "step_number": index,
+            "instruction": instruction,
+            "temperature": extract_instruction_temperature(instruction),
+            "time": extract_instruction_time(instruction),
+            "equipment_used": [],
+        }
+        for index, instruction in enumerate(instruction_lines, start=1)
+    ]
+
+
+def extract_instruction_temperature(instruction):
+    match = re.search(r"\b\d{2,3}\s*(?:Â°|°)?\s*[CF]\b", instruction, flags=re.IGNORECASE)
+    return match.group(0) if match else None
+
+
+def extract_instruction_time(instruction):
+    match = re.search(r"\b\d+(?:\s*(?:-|to)\s*\d+)?\s*(?:minutes?|mins?|hours?|hrs?)\b", instruction, flags=re.IGNORECASE)
+    return match.group(0) if match else None
+
+
+def empty_nutrition():
+    return {
+        "serving_basis": None,
+        "calories": None,
+        "carbohydrates": None,
+        "protein": None,
+        "fat": None,
+        "saturated_fat": None,
+        "polyunsaturated_fat": None,
+        "monounsaturated_fat": None,
+        "trans_fat": None,
+        "cholesterol": None,
+        "sodium": None,
+        "potassium": None,
+        "fiber": None,
+        "sugar": None,
+        "vitamin_a": None,
+        "vitamin_c": None,
+        "calcium": None,
+        "iron": None,
+        "other": [],
+    }
 
 
 def has_meaningful_social_video_text(page_text):
@@ -1988,6 +2404,7 @@ def normalize_ingredient_for_shopping_list(text):
         .replace("â…›", "⅛")
     )
     value = re.sub(r"\([^)]*\)", " ", value)
+    value = re.sub(r"\boptional\b", " ", value, flags=re.IGNORECASE)
     value = re.sub(r"\s+", " ", value).strip()
 
     alternative_value = normalize_alternative_shopping_ingredient(value)

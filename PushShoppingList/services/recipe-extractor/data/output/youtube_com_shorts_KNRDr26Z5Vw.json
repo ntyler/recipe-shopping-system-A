@@ -4,7 +4,7 @@
   "servings": null,
   "ingredients": [
     {
-      "section": "BAKING",
+      "section": null,
       "original_text": "110g self-raising flour",
       "quantity": "110",
       "unit": "g",
@@ -15,7 +15,7 @@
       "store_section_order": 7
     },
     {
-      "section": "DAIRY & EGGS",
+      "section": null,
       "original_text": "100g low fat or fat free Greek yoghurt",
       "quantity": "100",
       "unit": "g",
@@ -26,7 +26,7 @@
       "store_section_order": 3
     },
     {
-      "section": "SPICES & SEASONINGS",
+      "section": null,
       "original_text": "1 tsp Italian herb seasoning",
       "quantity": "1",
       "unit": "tsp",
@@ -37,7 +37,7 @@
       "store_section_order": 12
     },
     {
-      "section": "SPICES & SEASONINGS",
+      "section": null,
       "original_text": "1 tsp garlic powder",
       "quantity": "1",
       "unit": "tsp",
@@ -48,7 +48,7 @@
       "store_section_order": 12
     },
     {
-      "section": "SPICES & SEASONINGS",
+      "section": null,
       "original_text": "1 tsp salt",
       "quantity": "1",
       "unit": "tsp",
@@ -59,18 +59,18 @@
       "store_section_order": 12
     },
     {
-      "section": "SPICES & SEASONINGS",
+      "section": null,
       "original_text": "7g nutritional yeast optional",
       "quantity": "7",
       "unit": "g",
       "ingredient": "nutritional yeast",
       "preparation": null,
       "optional": true,
-      "store_section": "SPICES & SEASONINGS",
-      "store_section_order": 12
+      "store_section": "BAKING",
+      "store_section_order": 7
     },
     {
-      "section": "DAIRY & EGGS",
+      "section": null,
       "original_text": "3 light mozzarella cheese sticks sliced lengthways",
       "quantity": "3",
       "unit": null,
@@ -81,7 +81,7 @@
       "store_section_order": 3
     },
     {
-      "section": "SAUCES & CONDIMENTS",
+      "section": null,
       "original_text": "80g pizza sauce or marinara",
       "quantity": "80",
       "unit": "g",
@@ -92,7 +92,7 @@
       "store_section_order": 9
     },
     {
-      "section": "DAIRY & EGGS",
+      "section": null,
       "original_text": "75g low fat grated cheddar",
       "quantity": "75",
       "unit": "g",
@@ -103,7 +103,7 @@
       "store_section_order": 3
     },
     {
-      "section": "DAIRY & EGGS",
+      "section": null,
       "original_text": "45g light mozzarella",
       "quantity": "45",
       "unit": "g",
@@ -114,8 +114,8 @@
       "store_section_order": 3
     },
     {
-      "section": "MEAT & SEAFOOD",
-      "original_text": "30g pepperoni Regular or turkey works too",
+      "section": null,
+      "original_text": "30g pepperoni or turkey",
       "quantity": "30",
       "unit": "g",
       "ingredient": "pepperoni OR turkey",
@@ -127,27 +127,31 @@
   ],
   "equipment": [
     {
-      "name": "mixing bowl",
+      "name": "cutting board",
       "category": "prep"
     },
     {
-      "name": "rolling pin",
-      "category": "utensil"
-    },
-    {
-      "name": "baking sheet",
-      "category": "cookware"
+      "name": "knife",
+      "category": "prep"
     },
     {
       "name": "oven",
       "category": "appliance"
+    },
+    {
+      "name": "rolling pin",
+      "category": "prep"
+    },
+    {
+      "name": "spatula",
+      "category": "utensil"
     }
   ],
   "instructions": [
     {
       "section": null,
       "step_number": 1,
-      "instruction": "Add the flour to a bowl first, then slowly mix in the Greek yoghurt until a dough forms.",
+      "instruction": "Add the flour to a bowl first, then slowly mix in the Greek yoghurt until a dough forms. Add a little more flour if it’s too sticky.",
       "temperature": null,
       "time": null,
       "equipment_used": []
@@ -168,7 +172,9 @@
       "instruction": "Place the mozzarella sticks around the edge, fold the dough over them and press to seal to make the stuffed crust.",
       "temperature": null,
       "time": null,
-      "equipment_used": []
+      "equipment_used": [
+        "spatula"
+      ]
     },
     {
       "section": null,
@@ -202,14 +208,17 @@
       "instruction": "Let it cool slightly, slice it up and demolish it.",
       "temperature": null,
       "time": null,
-      "equipment_used": []
+      "equipment_used": [
+        "cutting board",
+        "knife"
+      ]
     }
   ],
   "nutrition": {
-    "serving_basis": "full recipe",
-    "calories": "883 kcal",
+    "serving_basis": null,
+    "calories": null,
     "carbohydrates": null,
-    "protein": "81 g",
+    "protein": null,
     "fat": null,
     "saturated_fat": null,
     "polyunsaturated_fat": null,
