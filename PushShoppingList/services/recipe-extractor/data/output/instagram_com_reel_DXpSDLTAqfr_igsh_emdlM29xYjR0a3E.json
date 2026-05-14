@@ -8,11 +8,11 @@
       "original_text": null,
       "quantity": null,
       "unit": null,
-      "ingredient": null,
+      "ingredient": "pasta",
       "preparation": null,
       "optional": false,
-      "store_section": null,
-      "store_section_order": null
+      "store_section": "PASTA, RICE & GRAINS",
+      "store_section_order": 6
     }
   ],
   "equipment": [],

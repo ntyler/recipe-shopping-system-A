@@ -715,8 +715,30 @@ def is_social_video_url(recipe_url):
     )
 
 
-def extract_recipe_from_social_video_url(recipe_url, progress_callback=None):
+def canonical_social_video_url(recipe_url):
     recipe_url = str(recipe_url or "").strip()
+    parsed = urlparse(recipe_url)
+    host = parsed.netloc.lower()
+
+    if not parsed.scheme or not parsed.netloc:
+        return recipe_url
+
+    parts = [part for part in parsed.path.split("/") if part]
+
+    if "instagram.com" in host and len(parts) >= 2 and parts[0].lower() in {"reel", "reels"}:
+        return f"https://www.instagram.com/reel/{parts[1]}/"
+
+    if "youtube.com" in host and len(parts) >= 2 and parts[0].lower() == "shorts":
+        return f"https://www.youtube.com/shorts/{parts[1]}"
+
+    if "youtu.be" in host and parts:
+        return f"https://youtu.be/{parts[0]}"
+
+    return recipe_url
+
+
+def extract_recipe_from_social_video_url(recipe_url, progress_callback=None):
+    recipe_url = canonical_social_video_url(recipe_url)
 
     if progress_callback:
         progress_callback(
@@ -798,10 +820,11 @@ def extract_recipe_from_social_video_url(recipe_url, progress_callback=None):
 
 
 def fetch_social_video_text(recipe_url, progress_callback=None):
+    recipe_url = canonical_social_video_url(recipe_url)
     raw_page_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_SOCIAL_TEXT.txt"
     cached_page_text = load_cached_social_video_text(raw_page_path)
 
-    if has_meaningful_social_video_text(cached_page_text):
+    if social_video_text_is_ready_for_extraction(recipe_url, cached_page_text):
         return "", cached_page_text
 
     headers = {
@@ -830,7 +853,7 @@ def fetch_social_video_text(recipe_url, progress_callback=None):
         html_path.write_text(html_text, encoding="utf-8")
         page_text = build_social_video_page_text(recipe_url, html_text)
 
-        if has_meaningful_social_video_text(page_text):
+        if social_video_text_is_ready_for_extraction(recipe_url, page_text):
             raw_page_path.write_text(page_text, encoding="utf-8")
             return html_text, page_text
 
@@ -840,7 +863,7 @@ def fetch_social_video_text(recipe_url, progress_callback=None):
         progress_callback=progress_callback,
     )
 
-    if instagram_result and has_meaningful_social_video_text(instagram_result[1]):
+    if instagram_result and social_video_text_is_ready_for_extraction(recipe_url, instagram_result[1]):
         html_text, page_text = instagram_result
         raw_page_path.write_text(page_text, encoding="utf-8")
         return html_text, page_text
@@ -860,7 +883,7 @@ def fetch_social_video_text(recipe_url, progress_callback=None):
         progress_callback=progress_callback,
     )
 
-    if browser_result and has_meaningful_social_video_text(browser_result[1]):
+    if browser_result and social_video_text_is_ready_for_extraction(recipe_url, browser_result[1]):
         html_text, page_text = browser_result
         raw_page_path.write_text(page_text, encoding="utf-8")
         return html_text, page_text
@@ -870,6 +893,17 @@ def fetch_social_video_text(recipe_url, progress_callback=None):
 
     raw_page_path.write_text(page_text, encoding="utf-8")
     return html_text, page_text
+
+
+def social_video_text_is_ready_for_extraction(recipe_url, page_text):
+    if not has_meaningful_social_video_text(page_text):
+        return False
+
+    if re.search(r"\btranscript\s*:", str(page_text or ""), flags=re.IGNORECASE):
+        return True
+
+    local_json_data = extract_recipe_from_social_video_text(recipe_url, page_text)
+    return structured_recipe_data_is_usable(local_json_data)
 
 
 def build_social_video_page_text(recipe_url, html_text, include_visible_text=False):

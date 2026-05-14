@@ -2,16 +2,20 @@
 lemon
 lemon zest
 fresh basil
+garlic
 garlic cloves
+onion
 yellow onion
 asparagus
 === MEAT & SEAFOOD ===
+beef broth
 pepperoni OR turkey
 === DAIRY & EGGS ===
 egg
 yolks
 ricotta
 whole milk ricotta
+Parmesan
 Parmesan and/or basil
 parmesan cheese*
 light mozzarella cheese sticks
@@ -29,6 +33,7 @@ frozen raspberries
 === PASTA, RICE & GRAINS ===
 dried farfalle pasta
 Fresh Pasta Dough*
+pasta
 reserved pasta water
 === BAKING ===
 all-purpose flour
@@ -62,5 +67,9 @@ Italian herb seasoning
 === OILS & VINEGARS ===
 olive oil
 === MISC ===
+Gruyere
+pancetta
 red dye
+rosemary
+thyme
 white wine OR vegetable broth

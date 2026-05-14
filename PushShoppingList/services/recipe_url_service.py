@@ -183,12 +183,25 @@ def normalize_recipe_url_key(url):
         return url.rstrip("/")
 
     normalized_path = parsed.path.rstrip("/")
+    normalized_query = parsed.query
+    host = parsed.netloc.lower()
+    path_parts = [part for part in parsed.path.split("/") if part]
+
+    if "instagram.com" in host and len(path_parts) >= 2 and path_parts[0].lower() in {"reel", "reels"}:
+        normalized_path = f"/reel/{path_parts[1]}"
+        normalized_query = ""
+    elif "youtube.com" in host and len(path_parts) >= 2 and path_parts[0].lower() == "shorts":
+        normalized_path = f"/shorts/{path_parts[1]}"
+        normalized_query = ""
+    elif "youtu.be" in host and path_parts:
+        normalized_path = f"/{path_parts[0]}"
+        normalized_query = ""
 
     return urlunparse((
         parsed.scheme.lower(),
-        parsed.netloc.lower(),
+        host,
         normalized_path,
         "",
-        parsed.query,
+        normalized_query,
         "",
     ))
