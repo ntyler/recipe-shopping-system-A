@@ -945,6 +945,16 @@ body {
             margin-bottom: 6px;
         }
 
+        .recipe-instruction-list {
+            padding-left: 0;
+            list-style: none;
+            counter-reset: recipe-instruction-step;
+        }
+
+        .recipe-instruction-list > li {
+            counter-increment: recipe-instruction-step;
+        }
+
         .recipe-task-row {
             display: flex;
             align-items: flex-start;
@@ -952,11 +962,30 @@ body {
             margin-bottom: 8px;
         }
 
+        .recipe-instruction-task-row {
+            display: grid;
+            grid-template-columns: 3ch 28px minmax(0, 1fr);
+            gap: 8px;
+        }
+
+        .recipe-instruction-task-row::before {
+            content: counter(recipe-instruction-step) ".";
+            color: #aaa;
+            font-weight: 700;
+            line-height: 1.45;
+            padding-top: 1px;
+            text-align: right;
+        }
+
         .recipe-task-check {
             margin-top: 3px;
             transform: scale(1.15);
             cursor: pointer;
             flex: 0 0 auto;
+        }
+
+        .recipe-instruction-task-row .recipe-task-check {
+            justify-self: center;
         }
 
         .recipe-task-text.done {

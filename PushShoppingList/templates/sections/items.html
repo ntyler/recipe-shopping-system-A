@@ -216,10 +216,10 @@
 
                 <div class="detail-content collapsed" data-detail-content="instructions|{{ recipe.url }}">
                     {% if recipe.instruction_items %}
-                        <ol class="recipe-detail-list">
+                        <ol class="recipe-detail-list recipe-instruction-list">
                             {% for instruction in recipe.instruction_items %}
                                 <li>
-                                    <div class="recipe-task-row">
+                                    <div class="recipe-task-row recipe-instruction-task-row">
                                         <input type="checkbox"
                                                class="recipe-task-check"
                                                data-task-key="instruction|{{ recipe.url }}|{{ loop.index }}">
