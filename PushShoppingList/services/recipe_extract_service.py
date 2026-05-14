@@ -24,15 +24,19 @@ OUTPUT_FOLDER = EXTRACTOR_FOLDER / "data" / "output"
 RAW_FOLDER = EXTRACTOR_FOLDER / "data" / "raw"
 LOG_FOLDER = EXTRACTOR_FOLDER / "data" / "logs"
 UPLOAD_FOLDER = EXTRACTOR_FOLDER / "data" / "uploads"
+VIDEO_FOLDER = EXTRACTOR_FOLDER / "data" / "video"
 
 OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
 RAW_FOLDER.mkdir(parents=True, exist_ok=True)
 LOG_FOLDER.mkdir(parents=True, exist_ok=True)
 UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
+VIDEO_FOLDER.mkdir(parents=True, exist_ok=True)
 
 MODEL = os.getenv("OPENAI_RECIPE_MODEL", "gpt-4o-mini")
 MAX_PAGE_TEXT_CHARS = 35000
 MAX_SOCIAL_VIDEO_PROMPT_CHARS = 12000
+MAX_VIDEO_TRANSCRIPTION_SECONDS = int(os.getenv("MAX_VIDEO_TRANSCRIPTION_SECONDS", "180"))
+MAX_VIDEO_AUDIO_BYTES = int(os.getenv("MAX_VIDEO_AUDIO_BYTES", str(24 * 1024 * 1024)))
 OPENAI_FILE_INPUT_MIME_TYPES = {
     "application/pdf",
 }
@@ -841,6 +845,16 @@ def fetch_social_video_text(recipe_url, progress_callback=None):
         raw_page_path.write_text(page_text, encoding="utf-8")
         return html_text, page_text
 
+    downloader_result = fetch_social_video_text_with_downloader(
+        recipe_url,
+        progress_callback=progress_callback,
+    )
+
+    if downloader_result and has_meaningful_social_video_text(downloader_result[1]):
+        html_text, page_text = downloader_result
+        raw_page_path.write_text(page_text, encoding="utf-8")
+        return html_text, page_text
+
     browser_result = fetch_social_video_text_with_browser(
         recipe_url,
         progress_callback=progress_callback,
@@ -983,6 +997,341 @@ def social_browser_candidate_urls(recipe_url):
         urls.append(embed_url)
 
     return urls
+
+
+def fetch_social_video_text_with_downloader(recipe_url, progress_callback=None):
+    if os.getenv("DISABLE_VIDEO_DOWNLOADER") == "1":
+        return None
+
+    try:
+        import yt_dlp
+    except Exception as exc:
+        write_social_downloader_error(recipe_url, f"yt-dlp is not installed: {exc}")
+        return None
+
+    if progress_callback:
+        progress_callback(
+            "checking video metadata with yt-dlp...",
+            "Trying video captions, description, and audio when the public page text is unavailable.",
+        )
+
+    try:
+        with yt_dlp.YoutubeDL(build_ytdlp_options(recipe_url, download=False)) as ydl:
+            info = ydl.extract_info(recipe_url, download=False)
+    except Exception as exc:
+        write_social_downloader_error(recipe_url, exc)
+        return None
+
+    if not isinstance(info, dict):
+        return None
+
+    page_text = build_ytdlp_page_text(recipe_url, info)
+
+    if has_meaningful_social_video_text(page_text):
+        local_json_data = extract_recipe_from_social_video_text(recipe_url, page_text)
+
+        if structured_recipe_data_is_usable(local_json_data):
+            raw_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_YTDLP_TEXT.txt"
+            raw_path.write_text(page_text, encoding="utf-8")
+            return "", page_text
+
+        transcript = transcribe_social_video_audio(
+            recipe_url,
+            info,
+            progress_callback=progress_callback,
+        )
+
+        if transcript:
+            page_text = append_social_transcript_text(page_text, transcript)
+
+        raw_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_YTDLP_TEXT.txt"
+        raw_path.write_text(page_text, encoding="utf-8")
+        return "", page_text
+
+    transcript = transcribe_social_video_audio(recipe_url, info, progress_callback=progress_callback)
+
+    if not transcript:
+        return None
+
+    parts = [
+        f"Title: {clean_recipe_text(info.get('title'))}" if info.get("title") else "",
+        f"Description: {clean_recipe_text(info.get('description'))}" if info.get("description") else "",
+        f"Transcript: {transcript}",
+    ]
+    page_text = "\n\n".join(part for part in parts if part).strip()
+
+    if len(page_text) > MAX_PAGE_TEXT_CHARS:
+        page_text = page_text[:MAX_PAGE_TEXT_CHARS]
+
+    raw_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_YTDLP_TRANSCRIBED_TEXT.txt"
+    raw_path.write_text(page_text, encoding="utf-8")
+    return "", page_text
+
+
+def append_social_transcript_text(page_text, transcript):
+    transcript = clean_recipe_text(transcript)
+
+    if not transcript:
+        return page_text
+
+    if "Transcript:" in str(page_text or ""):
+        return page_text
+
+    combined = f"{page_text}\n\nTranscript: {transcript}".strip()
+
+    if len(combined) > MAX_PAGE_TEXT_CHARS:
+        combined = combined[:MAX_PAGE_TEXT_CHARS]
+
+    return combined
+
+
+def build_ytdlp_options(recipe_url, download=False):
+    options = {
+        "quiet": True,
+        "no_warnings": True,
+        "noplaylist": True,
+        "socket_timeout": 15,
+        "retries": 1,
+        "fragment_retries": 1,
+        "skip_download": not download,
+    }
+    cookie_file = os.getenv("YTDLP_COOKIES_FILE")
+    cookies_from_browser = os.getenv("YTDLP_COOKIES_FROM_BROWSER")
+
+    if cookie_file:
+        options["cookiefile"] = cookie_file
+
+    if cookies_from_browser:
+        options["cookiesfrombrowser"] = tuple(
+            part.strip()
+            for part in cookies_from_browser.split(",")
+            if part.strip()
+        )
+
+    if download:
+        options.update({
+            "format": "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
+            "outtmpl": str(VIDEO_FOLDER / f"{safe_filename(recipe_url)}.%(ext)s"),
+        })
+
+    return options
+
+
+def build_ytdlp_page_text(recipe_url, info):
+    parts = []
+    title = clean_recipe_text(info.get("title"))
+    description = clean_recipe_text(info.get("description"))
+    subtitle_text = extract_ytdlp_subtitle_text(recipe_url, info)
+
+    if title:
+        parts.append(f"Title: {title}")
+
+    if description:
+        parts.append(f"Description: {description}")
+
+    if subtitle_text:
+        parts.append(f"Transcript: {subtitle_text}")
+
+    page_text = "\n\n".join(parts).strip()
+
+    if len(page_text) > MAX_PAGE_TEXT_CHARS:
+        page_text = page_text[:MAX_PAGE_TEXT_CHARS]
+
+    return page_text
+
+
+def extract_ytdlp_subtitle_text(recipe_url, info):
+    tracks = info.get("subtitles") or {}
+    automatic_tracks = info.get("automatic_captions") or {}
+    track = choose_ytdlp_subtitle_track(tracks) or choose_ytdlp_subtitle_track(automatic_tracks)
+
+    if not track:
+        return ""
+
+    for candidate in track:
+        if not isinstance(candidate, dict):
+            continue
+
+        subtitle_url = candidate.get("url")
+
+        if not subtitle_url:
+            continue
+
+        try:
+            response = requests.get(subtitle_url, timeout=(5, 12))
+            response.raise_for_status()
+        except Exception:
+            continue
+
+        text = parse_subtitle_text(response.text, candidate.get("ext"))
+
+        if text:
+            raw_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_YTDLP_SUBTITLES.txt"
+            raw_path.write_text(text, encoding="utf-8")
+            return text
+
+    return ""
+
+
+def choose_ytdlp_subtitle_track(tracks):
+    if not isinstance(tracks, dict) or not tracks:
+        return None
+
+    preferred_keys = [
+        key
+        for key in tracks
+        if str(key).lower().startswith("en")
+    ]
+    key = preferred_keys[0] if preferred_keys else next(iter(tracks))
+    track = tracks.get(key)
+
+    return track if isinstance(track, list) else None
+
+
+def parse_subtitle_text(raw_text, ext=None):
+    text = str(raw_text or "")
+
+    if str(ext or "").lower() == "json3":
+        try:
+            payload = json.loads(text)
+        except Exception:
+            payload = {}
+
+        events = payload.get("events", []) if isinstance(payload, dict) else []
+        lines = []
+
+        for event in events:
+            for segment in event.get("segs", []) if isinstance(event, dict) else []:
+                value = segment.get("utf8") if isinstance(segment, dict) else ""
+
+                if value:
+                    lines.append(value)
+
+        return clean_recipe_text(" ".join(lines))
+
+    lines = []
+
+    for line in text.splitlines():
+        line = line.strip()
+
+        if not line or line.upper() == "WEBVTT":
+            continue
+
+        if re.match(r"^\d+$", line):
+            continue
+
+        if "-->" in line:
+            continue
+
+        if line.startswith(("NOTE", "STYLE", "Kind:", "Language:")):
+            continue
+
+        line = re.sub(r"<[^>]+>", " ", line)
+        lines.append(line)
+
+    return clean_recipe_text(" ".join(lines))
+
+
+def transcribe_social_video_audio(recipe_url, info, progress_callback=None):
+    if not os.getenv("OPENAI_API_KEY"):
+        return ""
+
+    duration = info.get("duration")
+
+    try:
+        duration_seconds = float(duration or 0)
+    except (TypeError, ValueError):
+        duration_seconds = 0
+
+    if duration_seconds and duration_seconds > MAX_VIDEO_TRANSCRIPTION_SECONDS:
+        write_social_downloader_error(
+            recipe_url,
+            f"Skipping transcription because video is {duration_seconds} seconds.",
+        )
+        return ""
+
+    if progress_callback:
+        progress_callback(
+            "downloading video audio for transcription...",
+            "No usable caption text was found, so the video audio is being transcribed.",
+        )
+
+    audio_path = download_social_video_audio(recipe_url)
+
+    if not audio_path:
+        return ""
+
+    try:
+        if audio_path.stat().st_size > MAX_VIDEO_AUDIO_BYTES:
+            write_social_downloader_error(
+                recipe_url,
+                f"Skipping transcription because audio is {audio_path.stat().st_size} bytes.",
+            )
+            return ""
+
+        transcript = send_audio_transcription_to_openai(audio_path)
+    except Exception as exc:
+        write_social_downloader_error(recipe_url, exc)
+        return ""
+
+    transcript = clean_recipe_text(transcript)
+
+    if transcript:
+        raw_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_AUDIO_TRANSCRIPT.txt"
+        raw_path.write_text(transcript, encoding="utf-8")
+
+    return transcript
+
+
+def download_social_video_audio(recipe_url):
+    try:
+        import yt_dlp
+    except Exception as exc:
+        write_social_downloader_error(recipe_url, f"yt-dlp is not installed: {exc}")
+        return None
+
+    before = set(VIDEO_FOLDER.glob(f"{safe_filename(recipe_url)}.*"))
+
+    try:
+        with yt_dlp.YoutubeDL(build_ytdlp_options(recipe_url, download=True)) as ydl:
+            ydl.extract_info(recipe_url, download=True)
+    except Exception as exc:
+        write_social_downloader_error(recipe_url, exc)
+        return None
+
+    candidates = [
+        path
+        for path in VIDEO_FOLDER.glob(f"{safe_filename(recipe_url)}.*")
+        if path not in before and path.suffix.lower() in {".mp3", ".m4a", ".wav", ".webm", ".mp4"}
+    ]
+
+    if not candidates:
+        candidates = [
+            path
+            for path in VIDEO_FOLDER.glob(f"{safe_filename(recipe_url)}.*")
+            if path.suffix.lower() in {".mp3", ".m4a", ".wav", ".webm", ".mp4"}
+        ]
+
+    if not candidates:
+        return None
+
+    return max(candidates, key=lambda path: path.stat().st_mtime)
+
+
+def send_audio_transcription_to_openai(audio_path):
+    with audio_path.open("rb") as audio_file:
+        response = get_openai_client().audio.transcriptions.create(
+            model=os.getenv("OPENAI_TRANSCRIPTION_MODEL", "whisper-1"),
+            file=audio_file,
+            response_format="text",
+        )
+
+    return str(response or "")
+
+
+def write_social_downloader_error(recipe_url, error):
+    error_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_YTDLP_ERROR.txt"
+    error_path.write_text(str(error), encoding="utf-8")
 
 
 def extract_visible_social_page_text(html_text):

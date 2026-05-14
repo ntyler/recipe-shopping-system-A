@@ -3,7 +3,6 @@ lemon
 lemon zest
 fresh basil
 garlic cloves
-garlic powder
 yellow onion
 asparagus
 === MEAT & SEAFOOD ===
@@ -21,6 +20,9 @@ plain yogurt
 butter
 clarified butter
 unsalted butter
+light mozzarella
+low fat grated cheddar
+low fat OR fat free Greek yoghurt
 === FROZEN ===
 frozen peas
 frozen raspberries
@@ -55,12 +57,10 @@ red pepper flakes
 cinnamon
 ground nutmeg
 nutmeg
+garlic powder
+Italian herb seasoning
 === OILS & VINEGARS ===
 olive oil
 === MISC ===
-Italian herb seasoning
-light mozzarella
-low fat grated cheddar
-low fat OR fat free Greek yoghurt
 red dye
 white wine OR vegetable broth
