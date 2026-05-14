@@ -2707,8 +2707,16 @@ async function useDeviceLocationForHomeAddress(button) {
         return;
     }
 
+    if (!locationOriginCanUseDeviceLocation()) {
+        showHomeAddressMessage(
+            "Device GPS is blocked because this page is open as Not Secure. Use Find Address Options, or open the app through HTTPS to allow device location.",
+            "warning"
+        );
+        return;
+    }
+
     if (!navigator.geolocation) {
-        alert("This browser cannot use device location. Geolocation usually requires HTTPS or localhost.");
+        showHomeAddressMessage("This browser cannot use device location.", "warning");
         return;
     }
 
@@ -2757,13 +2765,37 @@ async function useDeviceLocationForHomeAddress(button) {
         showRecipeQuantityUpdatedMessage("", "", "", "Location found. Choose an address option or save.");
     } catch (err) {
         console.warn("Unable to use device location.", err);
-        alert(err.message || "Unable to use device location.");
+        showHomeAddressMessage(friendlyGeolocationError(err), "warning");
     } finally {
         if (button) {
             button.disabled = false;
             button.textContent = originalText || "Use My Location";
         }
     }
+}
+
+function locationOriginCanUseDeviceLocation() {
+    return Boolean(
+        window.isSecureContext
+        || window.location.hostname === "localhost"
+        || window.location.hostname === "127.0.0.1"
+    );
+}
+
+function friendlyGeolocationError(err) {
+    if (err && err.code === 1) {
+        return "Device location permission was denied or blocked by the browser. If this page says Not Secure, use Find Address Options or open the app through HTTPS.";
+    }
+
+    if (err && err.code === 2) {
+        return "The browser could not determine this device location. Try Find Address Options instead.";
+    }
+
+    if (err && err.code === 3) {
+        return "Device location timed out. Try again, or use Find Address Options.";
+    }
+
+    return (err && err.message) || "Unable to use device location.";
 }
 
 async function findHomeAddressOptions(button) {
@@ -2791,6 +2823,14 @@ async function findHomeAddressOptions(button) {
             button.textContent = originalText || "Find Address Options";
         }
     }
+}
+
+function showHomeAddressMessage(message, tone = "") {
+    renderHomeAddressOptions([{
+        display_name: message,
+        message: true,
+        tone: tone,
+    }]);
 }
 
 async function loadHomeAddressOptions(form, _button = null, fallbackOptions = []) {
@@ -2846,6 +2886,14 @@ function renderHomeAddressOptions(options) {
     }
 
     options.forEach(option => {
+        if (option.message) {
+            const message = document.createElement("div");
+            message.className = `address-option-message ${option.tone || ""}`.trim();
+            message.textContent = option.display_name || "";
+            list.appendChild(message);
+            return;
+        }
+
         const button = document.createElement("button");
         button.type = "button";
         button.className = "address-option-btn";

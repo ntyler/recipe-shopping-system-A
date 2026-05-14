@@ -674,6 +674,22 @@ body {
             text-align: center;
         }
 
+        .address-option-message {
+            padding: 10px 12px;
+            border: 1px solid #444;
+            border-radius: 8px;
+            background: #202425;
+            color: #ddd;
+            text-align: left;
+        }
+
+        .address-option-message.warning {
+            border-color: #d97706;
+            background: #3a250e;
+            color: #ffd166;
+            font-weight: 700;
+        }
+
         .home-address-collapsed-summary {
             display: none;
             margin-top: 12px;
