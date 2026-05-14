@@ -1006,7 +1006,7 @@ function addRecipeInstructionRow(value = "", stepNumber = null) {
     row.innerHTML = `
         <label class="recipe-edit-step-number">
             <span>Step #</span>
-            <input type="number" min="1" step="1" data-field="step_number" value="${escapeAttribute(nextStepNumber)}">
+            <input type="number" min="1" step="0.1" data-field="step_number" value="${escapeAttribute(nextStepNumber)}">
         </label>
         <label class="recipe-edit-step-text">
             <span>Instructions</span>
@@ -1359,7 +1359,7 @@ function collectRecipeInstructionRows() {
         .map((row, index) => {
             const textInput = row.querySelector('[data-field="text"]');
             const stepInput = row.querySelector('[data-field="step_number"]');
-            const stepNumber = Math.max(1, parseInt(stepInput ? stepInput.value : "", 10) || index + 1);
+            const stepNumber = Math.max(1, parseFloat(stepInput ? stepInput.value : "") || index + 1);
 
             return {
                 text: textInput ? textInput.value.trim() : "",
