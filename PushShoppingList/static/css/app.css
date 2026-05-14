@@ -1146,6 +1146,10 @@ body {
             white-space: nowrap;
         }
 
+        .food-rule-marker[hidden] {
+            display: none;
+        }
+
         .item-check {
             transform: scale(1.2);
             cursor: pointer;
@@ -1253,6 +1257,13 @@ body {
             margin-bottom: 0;
         }
 
+        .recipe-name-cell {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+        }
+
         .recipe-name-input {
             width: 100%;
             min-width: 160px;
@@ -1276,6 +1287,10 @@ body {
         .recipe-name-input.saved {
             border-color: #00cc66;
             box-shadow: 0 0 0 1px rgba(0, 204, 102, 0.35);
+        }
+
+        .recipe-log-food-warning {
+            flex: 0 0 auto;
         }
 
         .recipe-type-pill {
@@ -2844,9 +2859,17 @@ body {
                 padding: 4px 12px;
             }
 
-            .recipe-name-input {
+            .recipe-name-cell {
                 grid-column: 1 / -1;
                 grid-row: 2;
+                min-width: 0;
+                align-items: flex-start;
+                flex-direction: column;
+                gap: 6px;
+            }
+
+            .recipe-name-input {
+                width: 100%;
                 min-width: 0;
                 padding: 4px 0;
                 border-color: transparent;

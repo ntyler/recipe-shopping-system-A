@@ -18,11 +18,19 @@
                    target="_blank"
                    rel="noopener noreferrer">Recipe {{ loop.index }}</a>
 
-                <input type="text"
-                       class="recipe-name-input"
-                       value="{{ recipe.name }}"
-                       data-recipe-url="{{ recipe.url }}"
-                       aria-label="Recipe {{ loop.index }} name">
+                <div class="recipe-name-cell">
+                    <input type="text"
+                           class="recipe-name-input"
+                           value="{{ recipe.name }}"
+                           data-recipe-url="{{ recipe.url }}"
+                           aria-label="Recipe {{ loop.index }} name">
+                    {% if recipe.food_rule_status.needs_review %}
+                        <span class="food-rule-marker recipe-log-food-warning"
+                              title="{{ recipe.food_rule_status.marker }}">
+                            Food Review
+                        </span>
+                    {% endif %}
+                </div>
 
                 <span class="recipe-type-pill recipe-type-{{ recipe.type|lower }}">{{ recipe.type }}</span>
 

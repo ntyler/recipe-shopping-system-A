@@ -126,6 +126,60 @@ def recipe_view_rows(recipe_urls):
     return rows
 
 
+def recipe_url_log_rows(recipe_urls):
+    rows = []
+
+    for recipe in recipe_urls:
+        recipe_data = load_saved_recipe_output(recipe["url"])
+        rows.append({
+            **recipe,
+            "food_rule_status": recipe_food_rule_status(recipe_data),
+        })
+
+    return rows
+
+
+def recipe_food_rule_status(recipe_data):
+    flagged_items = []
+
+    for ingredient in recipe_data.get("ingredients", []) or []:
+        if isinstance(ingredient, dict):
+            name = str(ingredient.get("ingredient") or ingredient.get("original_text") or "").strip()
+            text = " ".join([
+                str(ingredient.get("ingredient") or ""),
+                str(ingredient.get("original_text") or ""),
+                str(ingredient.get("preparation") or ""),
+            ])
+        else:
+            name = str(ingredient or "").strip()
+            text = name
+
+        if not text.strip():
+            continue
+
+        status = shopping_item_food_rule_status(text)
+        if not status.get("needs_review"):
+            continue
+
+        issue_text = status.get("marker", "").replace("Food rule review: ", "")
+        label = name or "Ingredient"
+        flagged_items.append(f"{label}: {issue_text}" if issue_text else label)
+
+    seen = set()
+    unique_items = []
+    for item in flagged_items:
+        key = item.lower()
+        if key not in seen:
+            unique_items.append(item)
+            seen.add(key)
+
+    return {
+        "needs_review": bool(unique_items),
+        "marker": "Food rule review: " + "; ".join(unique_items) if unique_items else "",
+        "count": len(unique_items),
+    }
+
+
 def recipe_quantity_lookup(recipe_rows):
     quantities = {}
 
@@ -646,6 +700,7 @@ def index():
     items = load_items()
     store_settings = load_store_settings()
     recipe_urls = recipe_url_rows()
+    recipe_log_rows = recipe_url_log_rows(recipe_urls)
     item_state = load_item_state()
     recipe_rows = recipe_view_rows(recipe_urls)
     recipe_item_quantities = recipe_quantity_lookup(recipe_rows)
@@ -660,7 +715,7 @@ def index():
         message="",
         raw_items="\n".join(items),
         items=items,
-        current_urls=recipe_urls,
+        current_urls=recipe_log_rows,
         home_address=load_home_address(),
         available_stores=store_settings["stores"],
         enabled_stores=store_settings["enabled_stores"],
