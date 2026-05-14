@@ -945,9 +945,13 @@ body {
             margin-bottom: 6px;
         }
 
+        .recipe-equipment-list,
         .recipe-instruction-list {
             padding-left: 0;
             list-style: none;
+        }
+
+        .recipe-instruction-list {
             counter-reset: recipe-instruction-step;
         }
 
@@ -968,6 +972,20 @@ body {
             gap: 8px;
         }
 
+        .recipe-equipment-task-row {
+            display: grid;
+            grid-template-columns: 3ch 28px minmax(0, 1fr);
+            gap: 8px;
+        }
+
+        .recipe-equipment-task-row::before {
+            content: "\2022";
+            color: #ddd;
+            line-height: 1.45;
+            padding-top: 1px;
+            text-align: right;
+        }
+
         .recipe-instruction-task-row::before {
             content: counter(recipe-instruction-step) ".";
             color: #aaa;
@@ -984,6 +1002,7 @@ body {
             flex: 0 0 auto;
         }
 
+        .recipe-equipment-task-row .recipe-task-check,
         .recipe-instruction-task-row .recipe-task-check {
             justify-self: center;
         }
@@ -3275,6 +3294,58 @@ body {
 
             .recipe-edit-instruction-row .recipe-edit-remove-row {
                 width: 58px;
+            }
+
+            .recipe-instruction-task-row {
+                position: relative;
+                display: block;
+                min-height: 68px;
+                padding-left: 58px;
+            }
+
+            .recipe-instruction-task-row::before {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 44px;
+                text-align: center;
+            }
+
+            .recipe-instruction-task-row .recipe-task-check {
+                position: absolute;
+                top: 38px;
+                left: 11px;
+                margin: 0;
+            }
+
+            .recipe-instruction-task-row .recipe-task-text {
+                display: block;
+            }
+
+            .recipe-equipment-task-row {
+                position: relative;
+                display: block;
+                min-height: 68px;
+                padding-left: 58px;
+            }
+
+            .recipe-equipment-task-row::before {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 44px;
+                text-align: center;
+            }
+
+            .recipe-equipment-task-row .recipe-task-check {
+                position: absolute;
+                top: 38px;
+                left: 11px;
+                margin: 0;
+            }
+
+            .recipe-equipment-task-row .recipe-task-text {
+                display: block;
             }
 
             .recipe-edit-actions {

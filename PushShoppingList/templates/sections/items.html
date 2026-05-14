@@ -188,10 +188,10 @@
 
                 <div class="detail-content collapsed" data-detail-content="equipment|{{ recipe.url }}">
                     {% if recipe.equipment_items %}
-                        <ul class="recipe-detail-list">
+                        <ul class="recipe-detail-list recipe-equipment-list">
                             {% for equipment_item in recipe.equipment_items %}
                                 <li>
-                                    <div class="recipe-task-row">
+                                    <div class="recipe-task-row recipe-equipment-task-row">
                                         <input type="checkbox"
                                                class="recipe-task-check"
                                                data-task-key="equipment|{{ recipe.url }}|{{ loop.index }}">
