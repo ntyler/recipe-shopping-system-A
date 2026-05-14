@@ -811,7 +811,7 @@ function populateRecipeEditor(recipe, originalUrl) {
     }
 
     if (equipmentWrap) {
-        equipmentWrap.innerHTML = "";
+        equipmentWrap.innerHTML = recipeEquipmentHeaderHtml();
         (recipe.equipment || []).forEach(item => addRecipeEquipmentRow(item));
         if (!recipe.equipment || !recipe.equipment.length) {
             addRecipeEquipmentRow();
@@ -819,7 +819,7 @@ function populateRecipeEditor(recipe, originalUrl) {
     }
 
     if (instructionWrap) {
-        instructionWrap.innerHTML = "";
+        instructionWrap.innerHTML = recipeInstructionsHeaderHtml();
         (recipe.instructions || []).forEach((item, index) => addRecipeInstructionRow(item, index + 1));
         if (!recipe.instructions || !recipe.instructions.length) {
             addRecipeInstructionRow();
@@ -838,7 +838,7 @@ function populateRecipeEditor(recipe, originalUrl) {
 }
 
 function updateRecipeEditStickyOffsets() {
-    document.querySelectorAll(".recipe-edit-equipment-section, .recipe-edit-nutrition-section")
+    document.querySelectorAll(".recipe-edit-equipment-section, .recipe-edit-instructions-section, .recipe-edit-nutrition-section")
         .forEach(section => {
             const sectionHeader = section.querySelector(".recipe-edit-section-header");
 
@@ -1011,6 +1011,15 @@ function addRecipeEquipmentRow(value = "") {
     wrap.appendChild(row);
 }
 
+function recipeEquipmentHeaderHtml() {
+    return `
+        <div class="recipe-edit-equipment-header" aria-hidden="true">
+            <span>Equipment</span>
+            <span></span>
+        </div>
+    `;
+}
+
 function addRecipeInstructionRow(value = "", stepNumber = null) {
     const wrap = document.getElementById("recipeEditInstructions");
 
@@ -1029,16 +1038,26 @@ function addRecipeInstructionRow(value = "", stepNumber = null) {
     row.className = "recipe-edit-text-row recipe-edit-instruction-row";
     row.innerHTML = `
         <label class="recipe-edit-step-number">
-            <span>Step #</span>
+            <span class="sr-only">Step #</span>
             <input type="number" min="1" step="0.1" data-field="step_number" value="${escapeAttribute(nextStepNumber)}">
         </label>
         <label class="recipe-edit-step-text">
-            <span>Instructions</span>
+            <span class="sr-only">Instructions</span>
             <textarea data-field="text" rows="3">${escapeHtml(instruction || "")}</textarea>
         </label>
         <button type="button" class="recipe-edit-remove-row" aria-label="Remove step" onclick="removeRecipeEditRow(this)">X</button>
     `;
     wrap.appendChild(row);
+}
+
+function recipeInstructionsHeaderHtml() {
+    return `
+        <div class="recipe-edit-instructions-header" aria-hidden="true">
+            <span>Step #</span>
+            <span>Instructions</span>
+            <span></span>
+        </div>
+    `;
 }
 
 function nextRecipeInstructionNumber() {

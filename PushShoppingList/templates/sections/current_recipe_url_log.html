@@ -125,7 +125,12 @@
                     <h3>Equipment</h3>
                     <button type="button" onclick="addRecipeEquipmentRow()">Add Equipment</button>
                 </div>
-                <div id="recipeEditEquipment" class="recipe-edit-equipment"></div>
+                <div id="recipeEditEquipment" class="recipe-edit-equipment">
+                    <div class="recipe-edit-equipment-header" aria-hidden="true">
+                        <span>Equipment</span>
+                        <span></span>
+                    </div>
+                </div>
             </section>
 
             <section class="recipe-edit-section recipe-edit-instructions-section">
@@ -133,7 +138,13 @@
                     <h3>Instructions</h3>
                     <button type="button" onclick="addRecipeInstructionRow()">Add Instructions</button>
                 </div>
-                <div id="recipeEditInstructions" class="recipe-edit-instructions"></div>
+                <div id="recipeEditInstructions" class="recipe-edit-instructions">
+                    <div class="recipe-edit-instructions-header" aria-hidden="true">
+                        <span>Step #</span>
+                        <span>Instructions</span>
+                        <span></span>
+                    </div>
+                </div>
             </section>
 
             <section class="recipe-edit-section recipe-edit-nutrition-section">
