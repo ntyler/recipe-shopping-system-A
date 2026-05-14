@@ -1,4 +1,4 @@
-<div class="app-card">
+<div id="currentRecipeUrlLogCard" class="app-card">
     <h2>Current Recipe URL Log</h2>
 
     {% if current_urls %}
@@ -25,10 +25,13 @@
                            data-recipe-url="{{ recipe.url }}"
                            aria-label="Recipe {{ loop.index }} name">
                     {% if recipe.food_rule_status.needs_review %}
-                        <span class="food-rule-marker recipe-log-food-warning"
-                              title="{{ recipe.food_rule_status.marker }}">
+                        <button type="button"
+                                class="food-rule-marker recipe-log-food-warning recipe-log-food-review-btn"
+                                data-recipe-url="{{ recipe.url }}"
+                                title="{{ recipe.food_rule_status.marker }}"
+                                onclick="openRecipeEditor(this, { scrollToFoodReview: true })">
                             Food Review
-                        </span>
+                        </button>
                     {% endif %}
                 </div>
 

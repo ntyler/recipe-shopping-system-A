@@ -19,6 +19,7 @@ from PushShoppingList.services.extraction_progress_service import request_cancel
 from PushShoppingList.services.extraction_progress_service import start_progress
 from PushShoppingList.services.recipe_extract_service import extract_recipe_from_upload
 from PushShoppingList.services.recipe_extract_service import extract_recipe_from_url
+from PushShoppingList.services.food_review_alternative_service import suggest_food_review_alternatives
 from PushShoppingList.services.recipe_edit_service import load_editable_recipe
 from PushShoppingList.services.recipe_edit_service import save_editable_recipe
 from PushShoppingList.services.recipe_ingredient_service import remove_recipe_and_unused_ingredients
@@ -258,6 +259,15 @@ def api_recipe_route():
         return jsonify({"ok": False, "error": "Recipe URL is required."}), 400
 
     result = save_editable_recipe(original_url, data.get("recipe", {}))
+    status = 200 if result.get("ok") else 400
+
+    return jsonify(result), status
+
+
+@recipe_bp.route("/api/food_review_alternatives", methods=["POST"])
+def api_food_review_alternatives_route():
+    data = request.get_json(silent=True) or {}
+    result = suggest_food_review_alternatives(data)
     status = 200 if result.get("ok") else 400
 
     return jsonify(result), status

@@ -732,10 +732,13 @@ function escapeAttribute(value) {
 let recipeEditStoreSections = [];
 let recipeEditFoodRules = { require: [], avoid: [] };
 let recipeEditOriginalSnapshot = null;
+let activeFoodReviewRow = null;
+let activeFoodReviewAlternatives = [];
 
-async function openRecipeEditor(button) {
+async function openRecipeEditor(button, options = {}) {
     const url = button ? button.dataset.recipeUrl || "" : "";
     const modal = document.getElementById("recipeEditModal");
+    const shouldScrollToFoodReview = options === true || Boolean(options.scrollToFoodReview);
 
     if (!url || !modal) {
         return;
@@ -761,6 +764,10 @@ async function openRecipeEditor(button) {
         populateRecipeEditor(data.recipe, url);
         requestAnimationFrame(updateRecipeEditStickyOffsets);
         setRecipeEditStatus("");
+        if (shouldScrollToFoodReview) {
+            await waitForNextPaint();
+            scrollRecipeEditorToFoodReview();
+        }
     } catch (err) {
         console.warn("Unable to open recipe editor.", err);
         setRecipeEditStatus("Unable to load recipe.", true);
@@ -872,6 +879,264 @@ function setRecipeEditStatus(message, isError = false) {
     status.classList.toggle("error", Boolean(isError));
 }
 
+function scrollRecipeEditorToFoodReview() {
+    const marker = document.querySelector("#recipeEditIngredients .recipe-edit-food-warning:not([hidden])");
+
+    if (!marker) {
+        return false;
+    }
+
+    const row = marker.closest(".recipe-edit-ingredient-row") || marker;
+    document.querySelectorAll(".recipe-edit-review-target").forEach(element => {
+        element.classList.remove("recipe-edit-review-target");
+    });
+    row.classList.add("recipe-edit-review-target");
+    row.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+        inline: "nearest",
+    });
+
+    const ingredientInput = row.querySelector('[data-field="ingredient"]');
+    if (ingredientInput) {
+        setTimeout(() => {
+            try {
+                ingredientInput.focus({ preventScroll: true });
+            } catch (err) {
+                ingredientInput.focus();
+            }
+        }, 250);
+    }
+
+    setTimeout(() => row.classList.remove("recipe-edit-review-target"), 2400);
+    return true;
+}
+
+async function openFoodReviewAlternatives(marker) {
+    const row = marker ? marker.closest(".recipe-edit-ingredient-row") : null;
+
+    if (!row) {
+        return false;
+    }
+
+    activeFoodReviewRow = row;
+    activeFoodReviewAlternatives = [];
+    showFoodReviewAlternativesModal();
+    renderFoodReviewAlternativesLoading(row);
+
+    try {
+        const response = await fetch("/api/food_review_alternatives", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(foodReviewPayloadFromRow(row)),
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to load alternatives.");
+        }
+
+        activeFoodReviewAlternatives = data.alternatives || [];
+        renderFoodReviewAlternatives(data);
+    } catch (err) {
+        console.warn("Unable to load food review alternatives.", err);
+        renderFoodReviewAlternativesError(err.message || "Unable to load alternatives.");
+    }
+
+    return false;
+}
+
+function openFoodReviewAlternativesFromKey(event, marker) {
+    if (!event || (event.key !== "Enter" && event.key !== " ")) {
+        return;
+    }
+
+    event.preventDefault();
+    openFoodReviewAlternatives(marker);
+}
+
+function foodReviewPayloadFromRow(row) {
+    const payload = fieldValuesFromRow(row);
+    const marker = row.querySelector(".recipe-edit-food-warning");
+
+    if (marker && marker.dataset.blockedBy) {
+        try {
+            payload.blocked_by = JSON.parse(marker.dataset.blockedBy);
+        } catch (err) {
+            payload.blocked_by = [];
+        }
+    }
+
+    return payload;
+}
+
+function showFoodReviewAlternativesModal() {
+    let modal = document.getElementById("foodReviewAlternativesModal");
+
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "foodReviewAlternativesModal";
+        modal.className = "food-review-alt-backdrop";
+        modal.setAttribute("aria-hidden", "true");
+        modal.innerHTML = `
+            <div class="food-review-alt-dialog" role="dialog" aria-modal="true" aria-labelledby="foodReviewAltTitle">
+                <div class="food-review-alt-header">
+                    <div>
+                        <h2 id="foodReviewAltTitle">Food Review Alternatives</h2>
+                        <div id="foodReviewAltSubtitle" class="food-review-alt-subtitle"></div>
+                    </div>
+                    <button type="button" class="food-review-alt-close" onclick="closeFoodReviewAlternatives()">Close</button>
+                </div>
+                <div id="foodReviewAltContent" class="food-review-alt-content"></div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+}
+
+function closeFoodReviewAlternatives() {
+    const modal = document.getElementById("foodReviewAlternativesModal");
+
+    if (modal) {
+        modal.classList.remove("open");
+        modal.setAttribute("aria-hidden", "true");
+    }
+}
+
+function renderFoodReviewAlternativesLoading(row) {
+    const subtitle = document.getElementById("foodReviewAltSubtitle");
+    const content = document.getElementById("foodReviewAltContent");
+    const payload = foodReviewPayloadFromRow(row);
+
+    if (subtitle) {
+        subtitle.textContent = payload.ingredient || payload.original_text || "Ingredient";
+    }
+
+    if (content) {
+        content.innerHTML = `
+            <div class="food-review-alt-state">
+                Asking ChatGPT for practical swaps...
+            </div>
+        `;
+    }
+}
+
+function renderFoodReviewAlternatives(data) {
+    const subtitle = document.getElementById("foodReviewAltSubtitle");
+    const content = document.getElementById("foodReviewAltContent");
+    const review = data.review || {};
+    const alternatives = data.alternatives || [];
+
+    if (subtitle) {
+        const issues = (review.blocked_by || []).join("; ");
+        subtitle.textContent = issues
+            ? `${review.ingredient || review.original_text || "Ingredient"} - ${issues}`
+            : (review.ingredient || review.original_text || "Ingredient");
+    }
+
+    if (!content) {
+        return;
+    }
+
+    if (!alternatives.length) {
+        content.innerHTML = `
+            <div class="food-review-alt-state">
+                No alternatives came back for this ingredient.
+            </div>
+        `;
+        return;
+    }
+
+    content.innerHTML = alternatives.map((item, index) => `
+        <div class="food-review-alt-card">
+            <div class="food-review-alt-card-main">
+                <div class="food-review-alt-name">${escapeHtml(item.ingredient)}</div>
+                <div class="food-review-alt-meta">${escapeHtml(formatFoodReviewAmount(item))}</div>
+                <div class="food-review-alt-reason">${escapeHtml(item.reason || "Suggested as a recipe-compatible replacement.")}</div>
+                ${item.adjustment ? `<div class="food-review-alt-adjustment">${escapeHtml(item.adjustment)}</div>` : ""}
+            </div>
+            <div class="food-review-alt-card-actions">
+                <span class="food-review-alt-confidence ${escapeAttribute(item.confidence || "medium")}">${escapeHtml(item.confidence || "medium")}</span>
+                <button type="button" onclick="applyFoodReviewAlternative(${index})">Use</button>
+            </div>
+        </div>
+    `).join("");
+}
+
+function renderFoodReviewAlternativesError(message) {
+    const subtitle = document.getElementById("foodReviewAltSubtitle");
+    const content = document.getElementById("foodReviewAltContent");
+
+    if (subtitle) {
+        subtitle.textContent = "Could not load alternatives";
+    }
+
+    if (content) {
+        content.innerHTML = `
+            <div class="food-review-alt-state error">
+                ${escapeHtml(message)}
+            </div>
+        `;
+    }
+}
+
+function formatFoodReviewAmount(item) {
+    const amount = `${item.quantity || ""} ${item.unit || ""}`.trim();
+    return amount || "Amount depends on recipe taste and texture.";
+}
+
+function applyFoodReviewAlternative(index) {
+    const alternative = activeFoodReviewAlternatives[index];
+    const row = activeFoodReviewRow;
+
+    if (!alternative || !row) {
+        return;
+    }
+
+    setRowFieldValue(row, "ingredient", alternative.ingredient || "");
+    setRowFieldValue(row, "quantity", alternative.quantity || "");
+    setRowFieldValue(row, "unit", alternative.unit || "");
+    setRowFieldValue(
+        row,
+        "original_text",
+        `${alternative.quantity || ""} ${alternative.unit || ""} ${alternative.ingredient || ""}`.trim()
+    );
+    updateRecipeIngredientFoodRuleWarning(row);
+    markRecipeIngredientReviewed(row);
+    closeFoodReviewAlternatives();
+    showRecipeQuantityUpdatedMessage("", "", "", "Alternative filled in. Save Recipe to keep it.");
+}
+
+function markRecipeIngredientReviewed(row) {
+    const marker = row ? row.querySelector(".recipe-edit-food-warning") : null;
+
+    if (!row || !marker) {
+        return;
+    }
+
+    row.dataset.foodReviewState = "reviewed";
+    marker.hidden = false;
+    marker.textContent = "Reviewed";
+    marker.title = "Reviewed with a ChatGPT alternative.";
+    marker.dataset.blockedBy = "[]";
+    marker.tabIndex = 0;
+    marker.classList.add("reviewed");
+}
+
+function setRowFieldValue(row, field, value) {
+    const input = row.querySelector(`[data-field="${field}"]`);
+
+    if (input) {
+        input.value = value;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+}
+
 function addRecipeIngredientRow(item = {}) {
     const wrap = document.getElementById("recipeEditIngredients");
 
@@ -883,9 +1148,14 @@ function addRecipeIngredientRow(item = {}) {
     row.className = "recipe-edit-ingredient-row";
     row.innerHTML = `
         <label>
+            <span class="recipe-edit-food-warning food-rule-marker"
+                  role="button"
+                  tabindex="0"
+                  onclick="openFoodReviewAlternatives(this)"
+                  onkeydown="openFoodReviewAlternativesFromKey(event, this)"
+                  hidden>Food Review</span>
             <span>Ingredient</span>
             <input type="text" data-field="ingredient" value="${escapeAttribute(item.ingredient || "")}">
-            <span class="recipe-edit-food-warning food-rule-marker" hidden>Food Review</span>
         </label>
         <label>
             <span>Qty</span>
@@ -944,9 +1214,33 @@ function updateRecipeIngredientFoodRuleWarning(row) {
         preparationInput ? preparationInput.value : "",
     ].join(" ").toLowerCase();
     const blockedBy = recipeFoodRuleIssues(text);
+    const isReviewed = row.dataset.foodReviewState === "reviewed";
 
-    marker.hidden = blockedBy.length === 0;
-    marker.title = blockedBy.length ? `Food rule review: ${blockedBy.join("; ")}` : "";
+    marker.classList.toggle("reviewed", blockedBy.length === 0 && isReviewed);
+
+    if (blockedBy.length) {
+        marker.hidden = false;
+        marker.textContent = "Food Review";
+        marker.title = `Food rule review: ${blockedBy.join("; ")}`;
+        marker.dataset.blockedBy = JSON.stringify(blockedBy);
+        marker.tabIndex = 0;
+        return;
+    }
+
+    if (isReviewed) {
+        marker.hidden = false;
+        marker.textContent = "Reviewed";
+        marker.title = "Reviewed with a ChatGPT alternative.";
+        marker.dataset.blockedBy = "[]";
+        marker.tabIndex = 0;
+        return;
+    }
+
+    marker.hidden = true;
+    marker.textContent = "Food Review";
+    marker.title = "";
+    marker.dataset.blockedBy = JSON.stringify(blockedBy);
+    marker.tabIndex = -1;
 }
 
 function recipeFoodRuleIssues(text) {
@@ -2460,6 +2754,7 @@ async function refreshStoreMarkup() {
     const html = await response.text();
     const nextPage = new DOMParser().parseFromString(html, "text/html");
     replaceSectionFromPage(nextPage, "#storeOptionsSection");
+    replaceSectionFromPage(nextPage, "#currentRecipeUrlLogCard");
     replaceSectionFromPage(nextPage, "#sectionView");
     replaceSectionFromPage(nextPage, "#storeView");
     replaceSectionFromPage(nextPage, "#recipeView");

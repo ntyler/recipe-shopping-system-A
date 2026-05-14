@@ -1353,6 +1353,21 @@ body {
             flex: 0 0 auto;
         }
 
+        .recipe-log-food-review-btn {
+            width: auto;
+            margin: 0;
+            font-family: inherit;
+            cursor: pointer;
+        }
+
+        .recipe-log-food-review-btn:hover,
+        .recipe-log-food-review-btn:focus {
+            border-color: #fbbf24;
+            background: #7c3a00;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.28);
+        }
+
         .recipe-type-pill {
             justify-self: start;
             min-width: 48px;
@@ -1682,6 +1697,33 @@ body {
         .recipe-edit-food-warning {
             align-self: flex-start;
             margin-top: 2px;
+            cursor: pointer;
+        }
+
+        .recipe-edit-review-target {
+            border-color: #fbbf24;
+            box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.35);
+        }
+
+        .recipe-edit-food-warning:hover,
+        .recipe-edit-food-warning:focus {
+            border-color: #fbbf24;
+            background: #7c3a00;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.28);
+        }
+
+        .recipe-edit-food-warning.reviewed {
+            border-color: #047857;
+            background: #064e3b;
+            color: #86efac;
+        }
+
+        .recipe-edit-food-warning.reviewed:hover,
+        .recipe-edit-food-warning.reviewed:focus {
+            border-color: #10b981;
+            background: #065f46;
+            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.28);
         }
 
         .recipe-edit-ingredient-row label:nth-child(2) {
@@ -1843,6 +1885,167 @@ body {
 
         .recipe-edit-save {
             background: #107C10;
+            font-weight: 800;
+        }
+
+        .food-review-alt-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 12000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+            background: rgba(0, 0, 0, 0.72);
+            box-sizing: border-box;
+        }
+
+        .food-review-alt-backdrop.open {
+            display: flex;
+        }
+
+        .food-review-alt-dialog {
+            width: min(780px, 100%);
+            max-height: min(86vh, 760px);
+            overflow: auto;
+            border: 1px solid #59544a;
+            border-radius: 10px;
+            background: #111414;
+            color: #fff;
+            box-shadow: 0 22px 70px rgba(0, 0, 0, 0.62);
+        }
+
+        .food-review-alt-header {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 18px 20px 16px;
+            border-bottom: 1px solid #333;
+            background: rgba(17, 20, 20, 0.96);
+        }
+
+        .food-review-alt-header h2 {
+            margin: 0;
+            text-align: left;
+            font-size: 22px;
+        }
+
+        .food-review-alt-subtitle {
+            margin-top: 6px;
+            color: #ffd166;
+            font-size: 13px;
+            font-weight: 700;
+            line-height: 1.35;
+        }
+
+        .food-review-alt-close {
+            width: auto;
+            min-width: 92px;
+            margin: 0;
+            padding: 9px 14px;
+            background: #333;
+            font-size: 14px;
+        }
+
+        .food-review-alt-content {
+            display: grid;
+            gap: 10px;
+            padding: 16px 20px 20px;
+        }
+
+        .food-review-alt-state {
+            padding: 18px;
+            border: 1px solid #2f3638;
+            border-radius: 8px;
+            background: #151919;
+            color: #dbeafe;
+            font-weight: 800;
+            text-align: center;
+        }
+
+        .food-review-alt-state.error {
+            border-color: #7f1d1d;
+            background: #2a1111;
+            color: #fecaca;
+        }
+
+        .food-review-alt-card {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 116px;
+            gap: 14px;
+            align-items: center;
+            padding: 14px;
+            border: 1px solid #2f3638;
+            border-radius: 8px;
+            background: #151919;
+        }
+
+        .food-review-alt-name {
+            color: #fff;
+            font-size: 17px;
+            font-weight: 800;
+        }
+
+        .food-review-alt-meta {
+            margin-top: 4px;
+            color: #cbd5d1;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .food-review-alt-reason,
+        .food-review-alt-adjustment {
+            margin-top: 7px;
+            color: #b8c0c0;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .food-review-alt-adjustment {
+            color: #e5d08f;
+        }
+
+        .food-review-alt-card-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: stretch;
+        }
+
+        .food-review-alt-confidence {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 24px;
+            padding: 3px 8px;
+            border: 1px solid #3f4b4d;
+            border-radius: 999px;
+            color: #cbd5d1;
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .food-review-alt-confidence.high {
+            border-color: #047857;
+            color: #86efac;
+        }
+
+        .food-review-alt-confidence.low {
+            border-color: #854d0e;
+            color: #fde68a;
+        }
+
+        .food-review-alt-card-actions button {
+            width: 100%;
+            margin: 0;
+            padding: 9px 12px;
+            background: #155da8;
+            font-size: 14px;
             font-weight: 800;
         }
 
