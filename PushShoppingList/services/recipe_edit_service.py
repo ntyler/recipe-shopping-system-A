@@ -17,6 +17,7 @@ from PushShoppingList.services.recipe_url_service import recipe_url_type
 from PushShoppingList.services.recipe_url_service import save_recipe_urls
 from PushShoppingList.services.recipe_url_service import save_recipe_url_name
 from PushShoppingList.services.recipe_url_service import save_recipe_url_quantity
+from PushShoppingList.services.recipe_quantity_service import update_recipe_quantity
 
 
 NUTRITION_FIELDS = [
@@ -102,6 +103,7 @@ def save_editable_recipe(original_url, payload):
     save_recipe_url_quantity(source_url, quantity)
     save_recipe_url_name(source_url, display_name)
     update_recipe_ingredient_record(source_url, quantity, recipe_data)
+    update_recipe_quantity(source_url, quantity)
 
     return load_editable_recipe(source_url)
 
