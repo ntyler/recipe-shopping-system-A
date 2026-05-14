@@ -1,0 +1,63 @@
+{
+  "source_url": "uploaded://223a0820c235454c875298a094fab0f8_image_jpg",
+  "recipe_title": null,
+  "servings": null,
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "10g Plant-Based Protein",
+      "quantity": "10",
+      "unit": "g",
+      "ingredient": "Plant-Based Protein",
+      "preparation": null,
+      "optional": false,
+      "store_section": null,
+      "store_section_order": null
+    },
+    {
+      "section": null,
+      "original_text": "Pumpkin Seeds",
+      "quantity": null,
+      "unit": null,
+      "ingredient": "Pumpkin Seeds",
+      "preparation": null,
+      "optional": false,
+      "store_section": null,
+      "store_section_order": null
+    },
+    {
+      "section": null,
+      "original_text": "Salt",
+      "quantity": null,
+      "unit": null,
+      "ingredient": "Salt",
+      "preparation": null,
+      "optional": false,
+      "store_section": null,
+      "store_section_order": null
+    }
+  ],
+  "equipment": [],
+  "instructions": [],
+  "nutrition": {
+    "serving_basis": "per serving",
+    "calories": "190",
+    "carbohydrates": "19 g",
+    "protein": "10 g",
+    "fat": "1 g",
+    "saturated_fat": "0.5 g",
+    "polyunsaturated_fat": null,
+    "monounsaturated_fat": null,
+    "trans_fat": null,
+    "cholesterol": null,
+    "sodium": "1220 mg",
+    "potassium": "170 mg",
+    "fiber": "8 g",
+    "sugar": "0 g",
+    "vitamin_a": null,
+    "vitamin_c": null,
+    "calcium": "0 mg",
+    "iron": "2.7 mg",
+    "other": []
+  }
+}

@@ -2,7 +2,7 @@
 lemon
 lemon zest
 fresh basil
-garlic cloves
+garlic
 yellow onion
 === DAIRY & EGGS ===
 egg
