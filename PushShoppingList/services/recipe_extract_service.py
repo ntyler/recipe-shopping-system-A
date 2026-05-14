@@ -8,6 +8,8 @@ import uuid
 import zipfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from urllib.parse import unquote
+from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -676,6 +678,266 @@ def fetch_recipe_page(recipe_url, progress_callback=None):
     print(f"Loaded webpage text: {len(page_text)} characters")
 
     return html_text, page_text
+
+
+def is_social_video_url(recipe_url):
+    host = urlparse(str(recipe_url or "")).netloc.lower()
+    return any(
+        domain in host
+        for domain in (
+            "youtube.com",
+            "youtu.be",
+            "instagram.com",
+        )
+    )
+
+
+def extract_recipe_from_social_video_url(recipe_url, progress_callback=None):
+    recipe_url = str(recipe_url or "").strip()
+
+    if progress_callback:
+        progress_callback(
+            "reading social/video recipe text...",
+            "Looking for title, caption, description, and transcript text.",
+        )
+
+    html_text, page_text = fetch_social_video_text(recipe_url)
+
+    if not page_text:
+        return {
+            "ok": False,
+            "source_url": recipe_url,
+            "error": "No public caption, description, or transcript text was found for that video URL.",
+            "ingredients": [],
+        }
+
+    if not os.getenv("OPENAI_API_KEY"):
+        return {
+            "ok": False,
+            "source_url": recipe_url,
+            "error": "Missing OPENAI_API_KEY environment variable.",
+            "ingredients": [],
+        }
+
+    if progress_callback:
+        progress_callback(
+            "sending video text to OpenAI API...",
+            "ChatGPT is extracting recipe details from the public video text.",
+        )
+
+    response_text = send_prompt_to_openai(build_social_video_prompt(recipe_url, page_text))
+    raw_api_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_SOCIAL_API_RESPONSE.txt"
+    raw_api_path.write_text(response_text, encoding="utf-8")
+
+    success, json_data = save_json_response(recipe_url, response_text)
+
+    if not success or not json_data:
+        return {
+            "ok": False,
+            "source_url": recipe_url,
+            "error": "Invalid JSON returned by OpenAI.",
+            "ingredients": [],
+        }
+
+    json_data["source_url"] = recipe_url
+    save_extracted_recipe_json(recipe_url, json_data)
+    return build_extract_result(recipe_url, json_data, "social_video")
+
+
+def fetch_social_video_text(recipe_url):
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/147.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
+    response = requests.get(recipe_url, headers=headers, timeout=(8, 15))
+    response.raise_for_status()
+    html_text = response.text
+
+    html_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_SOCIAL_HTML.html"
+    html_path.write_text(html_text, encoding="utf-8")
+
+    metadata = extract_social_metadata(html_text)
+    try:
+        transcript = extract_youtube_transcript(recipe_url, html_text)
+    except Exception as exc:
+        transcript = ""
+        transcript_error_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_TRANSCRIPT_ERROR.txt"
+        transcript_error_path.write_text(str(exc), encoding="utf-8")
+    parts = [
+        f"Title: {metadata.get('title')}" if metadata.get("title") else "",
+        f"Description: {metadata.get('description')}" if metadata.get("description") else "",
+        f"Transcript: {transcript}" if transcript else "",
+    ]
+    page_text = "\n\n".join(part for part in parts if part).strip()
+
+    if len(page_text) > MAX_PAGE_TEXT_CHARS:
+        page_text = page_text[:MAX_PAGE_TEXT_CHARS]
+
+    raw_page_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_SOCIAL_TEXT.txt"
+    raw_page_path.write_text(page_text, encoding="utf-8")
+
+    return html_text, page_text
+
+
+def extract_social_metadata(html_text):
+    soup = BeautifulSoup(html_text or "", "html.parser")
+
+    def meta_content(*selectors):
+        for selector in selectors:
+            tag = soup.select_one(selector)
+            value = tag.get("content") if tag else ""
+
+            if value:
+                return clean_recipe_text(value)
+
+        return ""
+
+    title = meta_content(
+        'meta[property="og:title"]',
+        'meta[name="twitter:title"]',
+        'meta[name="title"]',
+    )
+
+    if not title and soup.title and soup.title.string:
+        title = clean_recipe_text(soup.title.string)
+
+    description = meta_content(
+        'meta[property="og:description"]',
+        'meta[name="twitter:description"]',
+        'meta[name="description"]',
+    )
+
+    player_response = extract_youtube_player_response(html_text)
+
+    if isinstance(player_response, dict) and player_response:
+        video_details = player_response.get("videoDetails") or {}
+        microformat = (
+            player_response.get("microformat", {})
+            .get("playerMicroformatRenderer", {})
+        )
+
+        youtube_title = clean_recipe_text(video_details.get("title") or "")
+        microformat_title = youtube_json_text(microformat.get("title"))
+        if youtube_title:
+            title = youtube_title
+        elif microformat_title:
+            title = microformat_title
+
+        description_candidates = [
+            description,
+            clean_recipe_text(video_details.get("shortDescription") or ""),
+            youtube_json_text(microformat.get("description")),
+        ]
+        description = max(description_candidates, key=lambda value: len(value or ""))
+
+    return {
+        "title": title,
+        "description": description,
+    }
+
+
+def youtube_json_text(value):
+    if isinstance(value, str):
+        return clean_recipe_text(value)
+
+    if not isinstance(value, dict):
+        return ""
+
+    if value.get("simpleText"):
+        return clean_recipe_text(value.get("simpleText"))
+
+    runs = value.get("runs")
+    if isinstance(runs, list):
+        return clean_recipe_text(
+            "".join(str(run.get("text") or "") for run in runs if isinstance(run, dict))
+        )
+
+    return ""
+
+
+def extract_youtube_transcript(recipe_url, html_text):
+    host = urlparse(recipe_url).netloc.lower()
+
+    if "youtube.com" not in host and "youtu.be" not in host:
+        return ""
+
+    player_response = extract_youtube_player_response(html_text)
+    caption_tracks = (
+        player_response.get("captions", {})
+        .get("playerCaptionsTracklistRenderer", {})
+        .get("captionTracks", [])
+        if isinstance(player_response, dict)
+        else []
+    )
+
+    if not caption_tracks:
+        return ""
+
+    preferred_track = next(
+        (
+            track
+            for track in caption_tracks
+            if str(track.get("languageCode") or "").lower().startswith("en")
+        ),
+        caption_tracks[0],
+    )
+    base_url = preferred_track.get("baseUrl")
+
+    if not base_url:
+        return ""
+
+    transcript_url = unquote(base_url)
+    response = requests.get(transcript_url, timeout=(8, 15))
+    response.raise_for_status()
+
+    root = ET.fromstring(response.text)
+    text_parts = [
+        clean_recipe_text("".join(node.itertext()))
+        for node in root.findall(".//text")
+    ]
+
+    return " ".join(part for part in text_parts if part)
+
+
+def extract_youtube_player_response(html_text):
+    patterns = [
+        r"ytInitialPlayerResponse\s*=\s*(\{.+?\});",
+        r'"ytInitialPlayerResponse"\s*:\s*(\{.+?\})\s*,\s*"',
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, html_text or "", flags=re.DOTALL)
+
+        if not match:
+            continue
+
+        try:
+            return json.loads(match.group(1))
+        except Exception:
+            continue
+
+    return {}
+
+
+def build_social_video_prompt(recipe_url, page_text):
+    return build_prompt(
+        recipe_url,
+        f"""
+This content came from a social/video recipe URL.
+
+Extract the recipe from the public title, caption, description, and transcript text below.
+If exact ingredient quantities are not present, leave quantity/unit null rather than guessing.
+Ignore comments, hashtags, creator bio text, channel promotions, subscribe reminders, and unrelated social media text.
+
+Social/video text:
+{page_text}
+""",
+    )
 
 
 def is_forbidden_response(exc):
@@ -1817,6 +2079,9 @@ def extract_recipe_from_url(recipe_url, progress_callback=None):
         print("Recipe 1/1")
         print(recipe_url)
         print("==================================================")
+
+        if is_social_video_url(recipe_url):
+            return extract_recipe_from_social_video_url(recipe_url, progress_callback=report)
 
         report(
             "downloading webpage HTML...",

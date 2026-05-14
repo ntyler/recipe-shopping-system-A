@@ -1,0 +1,52 @@
+{
+  "source_url": "https://www.youtube.com/shorts/KNRDr26Z5Vw",
+  "recipe_title": "High protein pepperoni pizza review",
+  "servings": null,
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "High protein. Stuffed crust.",
+      "quantity": null,
+      "unit": null,
+      "ingredient": "High protein stuffed crust",
+      "preparation": null,
+      "optional": false,
+      "store_section": null,
+      "store_section_order": null
+    },
+    {
+      "section": null,
+      "original_text": "pepperoni",
+      "quantity": null,
+      "unit": null,
+      "ingredient": "pepperoni",
+      "preparation": null,
+      "optional": false,
+      "store_section": null,
+      "store_section_order": null
+    }
+  ],
+  "equipment": [],
+  "instructions": [],
+  "nutrition": {
+    "serving_basis": null,
+    "calories": null,
+    "carbohydrates": null,
+    "protein": null,
+    "fat": null,
+    "saturated_fat": null,
+    "polyunsaturated_fat": null,
+    "monounsaturated_fat": null,
+    "trans_fat": null,
+    "cholesterol": null,
+    "sodium": null,
+    "potassium": null,
+    "fiber": null,
+    "sugar": null,
+    "vitamin_a": null,
+    "vitamin_c": null,
+    "calcium": null,
+    "iron": null,
+    "other": []
+  }
+}
