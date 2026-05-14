@@ -5,34 +5,211 @@
   "ingredients": [
     {
       "section": null,
-      "original_text": "High protein. Stuffed crust.",
-      "quantity": null,
-      "unit": null,
-      "ingredient": "High protein stuffed crust",
+      "original_text": "110g self-raising flour",
+      "quantity": "110",
+      "unit": "g",
+      "ingredient": "self-raising flour",
       "preparation": null,
       "optional": false,
-      "store_section": null,
-      "store_section_order": null
+      "store_section": "BAKING",
+      "store_section_order": 7
     },
     {
       "section": null,
-      "original_text": "pepperoni",
-      "quantity": null,
-      "unit": null,
-      "ingredient": "pepperoni",
+      "original_text": "100g low fat or fat free Greek yoghurt",
+      "quantity": "100",
+      "unit": "g",
+      "ingredient": "low fat or fat free Greek yoghurt",
       "preparation": null,
       "optional": false,
-      "store_section": null,
-      "store_section_order": null
+      "store_section": "DAIRY & EGGS",
+      "store_section_order": 3
+    },
+    {
+      "section": null,
+      "original_text": "1 tsp Italian herb seasoning",
+      "quantity": "1",
+      "unit": "tsp",
+      "ingredient": "Italian herb seasoning",
+      "preparation": null,
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12
+    },
+    {
+      "section": null,
+      "original_text": "1 tsp garlic powder",
+      "quantity": "1",
+      "unit": "tsp",
+      "ingredient": "garlic powder",
+      "preparation": null,
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12
+    },
+    {
+      "section": null,
+      "original_text": "1 tsp salt",
+      "quantity": "1",
+      "unit": "tsp",
+      "ingredient": "salt",
+      "preparation": null,
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12
+    },
+    {
+      "section": null,
+      "original_text": "7g nutritional yeast optional",
+      "quantity": "7",
+      "unit": "g",
+      "ingredient": "nutritional yeast",
+      "preparation": null,
+      "optional": true,
+      "store_section": "DAIRY & EGGS",
+      "store_section_order": 3
+    },
+    {
+      "section": null,
+      "original_text": "3 light mozzarella cheese sticks sliced lengthways",
+      "quantity": "3",
+      "unit": null,
+      "ingredient": "light mozzarella cheese sticks",
+      "preparation": "sliced lengthways",
+      "optional": false,
+      "store_section": "DAIRY & EGGS",
+      "store_section_order": 3
+    },
+    {
+      "section": null,
+      "original_text": "80g pizza sauce or marinara",
+      "quantity": "80",
+      "unit": "g",
+      "ingredient": "pizza sauce or marinara",
+      "preparation": null,
+      "optional": false,
+      "store_section": "SAUCES & CONDIMENTS",
+      "store_section_order": 9
+    },
+    {
+      "section": null,
+      "original_text": "75g low fat grated cheddar",
+      "quantity": "75",
+      "unit": "g",
+      "ingredient": "low fat grated cheddar",
+      "preparation": null,
+      "optional": false,
+      "store_section": "DAIRY & EGGS",
+      "store_section_order": 3
+    },
+    {
+      "section": null,
+      "original_text": "45g light mozzarella",
+      "quantity": "45",
+      "unit": "g",
+      "ingredient": "light mozzarella",
+      "preparation": null,
+      "optional": false,
+      "store_section": "DAIRY & EGGS",
+      "store_section_order": 3
+    },
+    {
+      "section": null,
+      "original_text": "30g pepperoni Regular or turkey works too",
+      "quantity": "30",
+      "unit": "g",
+      "ingredient": "pepperoni",
+      "preparation": null,
+      "optional": true,
+      "store_section": "MEAT & SEAFOOD",
+      "store_section_order": 2
     }
   ],
-  "equipment": [],
-  "instructions": [],
+  "equipment": [
+    {
+      "name": "mixing bowl",
+      "category": "prep"
+    },
+    {
+      "name": "rolling pin",
+      "category": "utensil"
+    },
+    {
+      "name": "baking sheet",
+      "category": "cookware"
+    },
+    {
+      "name": "oven",
+      "category": "appliance"
+    }
+  ],
+  "instructions": [
+    {
+      "section": null,
+      "step_number": 1,
+      "instruction": "Add the flour to a bowl first, then slowly mix in the Greek yoghurt until a dough forms. Add a little more flour if it’s too sticky.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": []
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "Lightly flour a surface and rolling pin. Roll the dough out gently as thin and wide as you can without it breaking.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [
+        "rolling pin"
+      ]
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "Place the mozzarella sticks around the edge, fold the dough over them and press to seal to make the stuffed crust.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": []
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "Spread the pizza sauce over the base.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": []
+    },
+    {
+      "section": null,
+      "step_number": 5,
+      "instruction": "Add the grated cheeses and pepperoni.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": []
+    },
+    {
+      "section": null,
+      "step_number": 6,
+      "instruction": "Bake at 200°C for 15 to 20 minutes until golden and cooked through.",
+      "temperature": "200°C",
+      "time": "15 to 20 minutes",
+      "equipment_used": [
+        "oven"
+      ]
+    },
+    {
+      "section": null,
+      "step_number": 7,
+      "instruction": "Let it cool slightly, slice it up and demolish it.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": []
+    }
+  ],
   "nutrition": {
-    "serving_basis": null,
-    "calories": null,
+    "serving_basis": "full recipe",
+    "calories": "883 kcal",
     "carbohydrates": null,
-    "protein": null,
+    "protein": "81 g",
     "fat": null,
     "saturated_fat": null,
     "polyunsaturated_fat": null,
