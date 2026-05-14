@@ -1307,6 +1307,7 @@ def extract_recipe_from_upload(file_storage):
         or "application/octet-stream"
     )
     mime_type = normalize_upload_mime_type(mime_type, filename, upload_path)
+    page_text = ""
 
     try:
         if mime_type.startswith("image/"):
@@ -1340,6 +1341,14 @@ def extract_recipe_from_upload(file_storage):
             }
 
         json_data["source_url"] = recipe_url
+        merge_missing_upload_ingredients(
+            recipe_url,
+            json_data,
+            upload_path,
+            mime_type,
+            filename,
+            page_text,
+        )
         save_extracted_recipe_json(recipe_url, json_data)
 
         return build_extract_result(recipe_url, json_data, "upload")
@@ -1384,6 +1393,95 @@ If the upload is a grocery package, handwritten note, printed recipe card, cookb
 screenshot, or recipe photo, use only the visible text. Do not invent hidden ingredients.
 """,
     )
+
+
+def merge_missing_upload_ingredients(recipe_url, json_data, upload_path, mime_type, filename, page_text=""):
+    raw_lines = audit_upload_ingredient_lines(
+        recipe_url,
+        upload_path,
+        mime_type,
+        filename,
+        page_text,
+    )
+
+    if not raw_lines:
+        return
+
+    existing_keys = {
+        normalize_ingredient_key(
+            item.get("ingredient") or item.get("original_text") or ""
+        )
+        for item in json_data.get("ingredients", [])
+        if isinstance(item, dict)
+    }
+    missing_rows = []
+
+    for row in build_structured_ingredients(raw_lines):
+        key = normalize_ingredient_key(row.get("ingredient") or row.get("original_text") or "")
+
+        if not key or key in existing_keys:
+            continue
+
+        missing_rows.append(row)
+        existing_keys.add(key)
+
+    if missing_rows:
+        json_data.setdefault("ingredients", []).extend(missing_rows)
+        normalize_extracted_ingredient_fields(json_data)
+
+
+def audit_upload_ingredient_lines(recipe_url, upload_path, mime_type, filename, page_text=""):
+    prompt_text = build_upload_ingredient_audit_prompt(recipe_url, filename)
+
+    try:
+        if mime_type.startswith("image/"):
+            response_text = send_image_prompt_to_openai(prompt_text, upload_path, mime_type)
+        elif upload_can_use_openai_file_input(mime_type, filename, upload_path):
+            response_text = send_file_prompt_to_openai(prompt_text, upload_path, mime_type, filename)
+        elif page_text.strip():
+            response_text = send_prompt_to_openai(
+                build_upload_ingredient_audit_prompt(recipe_url, filename, page_text[:MAX_PAGE_TEXT_CHARS])
+            )
+        else:
+            return []
+
+        data = json.loads(clean_json_response(response_text))
+    except Exception as exc:
+        raw_error_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_INGREDIENT_AUDIT_ERROR.txt"
+        raw_error_path.write_text(str(exc), encoding="utf-8")
+        return []
+
+    ingredients = data.get("ingredients", [])
+
+    if not isinstance(ingredients, list):
+        return []
+
+    return [
+        str(item or "").strip()
+        for item in ingredients
+        if str(item or "").strip()
+    ]
+
+
+def build_upload_ingredient_audit_prompt(recipe_url, filename, page_text=""):
+    visible_text = f"\nReadable text:\n{page_text}\n" if page_text else ""
+
+    return f"""
+This recipe was uploaded as {filename}.
+
+Audit the uploaded recipe for visible ingredient lines only. Return every visible ingredient line exactly as written,
+including ingredients that may need food-rule review such as corn syrup, food dyes, preservatives, or artificial ingredients.
+
+Do not skip ingredients because they are unhealthy, optional, repeated, unusual, or visually separated from the main list.
+Do not infer ingredients from instructions. Use only visible ingredient list lines.
+{visible_text}
+Return ONLY valid JSON in this shape:
+{{
+  "ingredients": [
+    "1 cup Corn syrup"
+  ]
+}}
+"""
 
 
 def extract_text_from_pdf(upload_path):
