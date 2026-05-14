@@ -972,7 +972,7 @@ function addRecipeEquipmentRow(value = "") {
     row.className = "recipe-edit-text-row recipe-edit-equipment-row";
     row.innerHTML = `
         <label>
-            <span>Equipment</span>
+            <span class="sr-only">Equipment</span>
             <input type="text" data-field="text" value="${escapeAttribute(value || "")}">
         </label>
         <button type="button" class="recipe-edit-remove-row" aria-label="Remove equipment" onclick="removeRecipeEditRow(this)">X</button>
