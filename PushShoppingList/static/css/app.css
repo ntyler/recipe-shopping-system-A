@@ -1577,16 +1577,25 @@ body {
             gap: 0;
             border: 1px solid #2f3638;
             border-radius: 8px;
-            overflow: hidden;
             background: #151919;
+        }
+
+        .recipe-edit-equipment,
+        .recipe-edit-nutrition {
+            overflow: visible;
         }
 
         .recipe-edit-equipment::before {
             content: "Equipment";
+            position: sticky;
+            top: var(--recipe-edit-table-sticky-top, 123px);
+            z-index: 3;
             display: grid;
             grid-template-columns: minmax(0, 1fr) 50px;
             padding: 10px 14px 8px;
             border-bottom: 1px solid #2f3638;
+            border-radius: 8px 8px 0 0;
+            background: #151919;
             color: #cbd5d1;
             font-size: 12px;
             font-weight: 800;
@@ -1595,10 +1604,15 @@ body {
         }
 
         .recipe-edit-nutrition-header {
+            position: sticky;
+            top: var(--recipe-edit-table-sticky-top, 123px);
+            z-index: 3;
             display: grid;
             grid-template-columns: minmax(180px, 0.8fr) minmax(220px, 1fr) 50px;
             padding: 10px 14px 8px;
             border-bottom: 1px solid #2f3638;
+            border-radius: 8px 8px 0 0;
+            background: #151919;
             color: #cbd5d1;
             font-size: 12px;
             font-weight: 800;
@@ -3163,16 +3177,24 @@ body {
 
             .recipe-edit-grid,
             .recipe-edit-ingredient-row,
-            .recipe-edit-text-row,
-            .recipe-edit-nutrition-row {
+            .recipe-edit-text-row {
                 grid-template-columns: 1fr;
             }
 
             .recipe-edit-nutrition-header {
-                grid-template-columns: 1fr;
+                top: var(--recipe-edit-table-sticky-top, 108px);
+                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 58px;
             }
 
-            .recipe-edit-nutrition-header span:nth-child(n+2) {
+            .recipe-edit-nutrition-row {
+                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 58px;
+            }
+
+            .recipe-edit-equipment::before {
+                top: var(--recipe-edit-table-sticky-top, 108px);
+            }
+
+            .recipe-edit-nutrition-header span:nth-child(3) {
                 display: none;
             }
 

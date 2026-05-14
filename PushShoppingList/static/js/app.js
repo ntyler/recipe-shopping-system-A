@@ -759,6 +759,7 @@ async function openRecipeEditor(button) {
         recipeEditStoreSections = data.store_sections || [];
         recipeEditFoodRules = data.food_rules || { require: [], avoid: [] };
         populateRecipeEditor(data.recipe, url);
+        requestAnimationFrame(updateRecipeEditStickyOffsets);
         setRecipeEditStatus("");
     } catch (err) {
         console.warn("Unable to open recipe editor.", err);
@@ -832,6 +833,23 @@ function populateRecipeEditor(recipe, originalUrl) {
             addRecipeNutritionRow();
         }
     }
+
+    updateRecipeEditStickyOffsets();
+}
+
+function updateRecipeEditStickyOffsets() {
+    document.querySelectorAll(".recipe-edit-equipment-section, .recipe-edit-nutrition-section")
+        .forEach(section => {
+            const sectionHeader = section.querySelector(".recipe-edit-section-header");
+
+            if (!sectionHeader) {
+                return;
+            }
+
+            const stickyTop = parseFloat(getComputedStyle(sectionHeader).top) || 0;
+            const tableTop = stickyTop + sectionHeader.offsetHeight;
+            section.style.setProperty("--recipe-edit-table-sticky-top", `${Math.ceil(tableTop)}px`);
+        });
 }
 
 function setValue(id, value) {
@@ -2480,8 +2498,11 @@ document.addEventListener("DOMContentLoaded", function () {
     bindSectionHeaderToggles();
     bindRecipeDetailToggles();
     bindRecipeTaskChecks();
+    updateRecipeEditStickyOffsets();
     startExtractionProgressPolling();
 });
+
+window.addEventListener("resize", updateRecipeEditStickyOffsets);
 
 async function startRecipeExtraction(event) {
     event.preventDefault();
