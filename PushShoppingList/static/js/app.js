@@ -730,6 +730,7 @@ function escapeAttribute(value) {
 }
 
 let recipeEditStoreSections = [];
+let recipeEditFoodRules = { require: [], avoid: [] };
 
 async function openRecipeEditor(button) {
     const url = button ? button.dataset.recipeUrl || "" : "";
@@ -755,6 +756,7 @@ async function openRecipeEditor(button) {
         }
 
         recipeEditStoreSections = data.store_sections || [];
+        recipeEditFoodRules = data.food_rules || { require: [], avoid: [] };
         populateRecipeEditor(data.recipe, url);
         setRecipeEditStatus("");
     } catch (err) {
@@ -780,10 +782,10 @@ function populateRecipeEditor(recipe, originalUrl) {
     setValue("recipeEditSourceUrl", recipe.source_url || originalUrl);
     setValue("recipeEditQuantity", recipe.quantity || "1");
     setValue("recipeEditServings", recipe.servings || "");
-    setValue("recipeEditEquipment", (recipe.equipment || []).join("\n"));
-    setValue("recipeEditInstructions", (recipe.instructions || []).join("\n"));
 
     const ingredientWrap = document.getElementById("recipeEditIngredients");
+    const equipmentWrap = document.getElementById("recipeEditEquipment");
+    const instructionWrap = document.getElementById("recipeEditInstructions");
     const nutritionWrap = document.getElementById("recipeEditNutrition");
 
     if (ingredientWrap) {
@@ -791,6 +793,22 @@ function populateRecipeEditor(recipe, originalUrl) {
         (recipe.ingredients || []).forEach(item => addRecipeIngredientRow(item));
         if (!recipe.ingredients || !recipe.ingredients.length) {
             addRecipeIngredientRow();
+        }
+    }
+
+    if (equipmentWrap) {
+        equipmentWrap.innerHTML = "";
+        (recipe.equipment || []).forEach(item => addRecipeEquipmentRow(item));
+        if (!recipe.equipment || !recipe.equipment.length) {
+            addRecipeEquipmentRow();
+        }
+    }
+
+    if (instructionWrap) {
+        instructionWrap.innerHTML = "";
+        (recipe.instructions || []).forEach(item => addRecipeInstructionRow(item));
+        if (!recipe.instructions || !recipe.instructions.length) {
+            addRecipeInstructionRow();
         }
     }
 
@@ -836,6 +854,7 @@ function addRecipeIngredientRow(item = {}) {
         <label>
             <span>Ingredient</span>
             <input type="text" data-field="ingredient" value="${escapeAttribute(item.ingredient || "")}">
+            <span class="recipe-edit-food-warning food-rule-marker" hidden>Food Review</span>
         </label>
         <label>
             <span>Qty</span>
@@ -868,6 +887,67 @@ function addRecipeIngredientRow(item = {}) {
         <button type="button" class="recipe-edit-remove-row" aria-label="Remove ingredient" onclick="removeRecipeEditRow(this)">X</button>
     `;
     wrap.appendChild(row);
+    bindRecipeIngredientFoodRuleWarning(row);
+    updateRecipeIngredientFoodRuleWarning(row);
+}
+
+function bindRecipeIngredientFoodRuleWarning(row) {
+    row.querySelectorAll('[data-field="ingredient"], [data-field="original_text"], [data-field="preparation"]').forEach(input => {
+        input.addEventListener("input", () => updateRecipeIngredientFoodRuleWarning(row));
+    });
+}
+
+function updateRecipeIngredientFoodRuleWarning(row) {
+    const marker = row.querySelector(".recipe-edit-food-warning");
+
+    if (!marker) {
+        return;
+    }
+
+    const ingredientInput = row.querySelector('[data-field="ingredient"]');
+    const originalTextInput = row.querySelector('[data-field="original_text"]');
+    const preparationInput = row.querySelector('[data-field="preparation"]');
+    const text = [
+        ingredientInput ? ingredientInput.value : "",
+        originalTextInput ? originalTextInput.value : "",
+        preparationInput ? preparationInput.value : "",
+    ].join(" ").toLowerCase();
+    const blockedBy = recipeFoodRuleIssues(text);
+
+    marker.hidden = blockedBy.length === 0;
+    marker.title = blockedBy.length ? `Food rule review: ${blockedBy.join("; ")}` : "";
+}
+
+function recipeFoodRuleIssues(text) {
+    const rules = recipeEditFoodRules && Array.isArray(recipeEditFoodRules.avoid)
+        ? recipeEditFoodRules.avoid
+        : [];
+
+    return rules
+        .filter(rule => {
+            const terms = Array.isArray(rule.terms) ? rule.terms : [];
+            return terms.some(term => recipeFoodRuleTermMatches(text, term));
+        })
+        .map(rule => rule.label)
+        .filter(Boolean);
+}
+
+function recipeFoodRuleTermMatches(text, term) {
+    const value = String(term || "").trim().toLowerCase();
+
+    if (!value) {
+        return false;
+    }
+
+    if (/^[a-z0-9]+$/.test(value)) {
+        return new RegExp(`\\b${escapeRegExp(value)}\\b`).test(text);
+    }
+
+    return text.includes(value);
+}
+
+function escapeRegExp(value) {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function recipeStoreSectionOptions(selected) {
@@ -879,6 +959,44 @@ function recipeStoreSectionOptions(selected) {
         const isSelected = value.toUpperCase() === selectedValue ? " selected" : "";
         return `<option value="${escapeAttribute(value)}"${isSelected}>${escapeHtml(value)}</option>`;
     }).join("");
+}
+
+function addRecipeEquipmentRow(value = "") {
+    const wrap = document.getElementById("recipeEditEquipment");
+
+    if (!wrap) {
+        return;
+    }
+
+    const row = document.createElement("div");
+    row.className = "recipe-edit-text-row recipe-edit-equipment-row";
+    row.innerHTML = `
+        <label>
+            <span>Equipment</span>
+            <input type="text" data-field="text" value="${escapeAttribute(value || "")}">
+        </label>
+        <button type="button" class="recipe-edit-remove-row" aria-label="Remove equipment" onclick="removeRecipeEditRow(this)">X</button>
+    `;
+    wrap.appendChild(row);
+}
+
+function addRecipeInstructionRow(value = "") {
+    const wrap = document.getElementById("recipeEditInstructions");
+
+    if (!wrap) {
+        return;
+    }
+
+    const row = document.createElement("div");
+    row.className = "recipe-edit-text-row recipe-edit-instruction-row";
+    row.innerHTML = `
+        <label>
+            <span>Step</span>
+            <textarea data-field="text" rows="3">${escapeHtml(value || "")}</textarea>
+        </label>
+        <button type="button" class="recipe-edit-remove-row" aria-label="Remove step" onclick="removeRecipeEditRow(this)">X</button>
+    `;
+    wrap.appendChild(row);
 }
 
 function addRecipeNutritionRow(item = {}) {
@@ -905,7 +1023,7 @@ function addRecipeNutritionRow(item = {}) {
 }
 
 function removeRecipeEditRow(button) {
-    const row = button ? button.closest(".recipe-edit-ingredient-row, .recipe-edit-nutrition-row") : null;
+    const row = button ? button.closest(".recipe-edit-ingredient-row, .recipe-edit-text-row, .recipe-edit-nutrition-row") : null;
 
     if (row) {
         row.remove();
@@ -975,8 +1093,8 @@ function collectRecipeEditorPayload() {
             quantity,
             servings: document.getElementById("recipeEditServings").value.trim(),
             ingredients: collectRecipeIngredientRows(),
-            equipment: textareaLines("recipeEditEquipment"),
-            instructions: textareaLines("recipeEditInstructions"),
+            equipment: collectRecipeTextRows("#recipeEditEquipment .recipe-edit-text-row"),
+            instructions: collectRecipeTextRows("#recipeEditInstructions .recipe-edit-text-row"),
             nutrition: collectRecipeNutritionRows(),
         },
     };
@@ -994,6 +1112,15 @@ function collectRecipeNutritionRows() {
         .filter(item => item.key || item.value);
 }
 
+function collectRecipeTextRows(selector) {
+    return [...document.querySelectorAll(selector)]
+        .map(row => {
+            const input = row.querySelector('[data-field="text"]');
+            return input ? input.value.trim() : "";
+        })
+        .filter(Boolean);
+}
+
 function fieldValuesFromRow(row) {
     const item = {};
 
@@ -1002,19 +1129,6 @@ function fieldValuesFromRow(row) {
     });
 
     return item;
-}
-
-function textareaLines(id) {
-    const input = document.getElementById(id);
-
-    if (!input) {
-        return [];
-    }
-
-    return input.value
-        .split(/\r?\n/)
-        .map(line => line.trim())
-        .filter(Boolean);
 }
 
 async function saveRecipeQuantity(input, options = {}) {

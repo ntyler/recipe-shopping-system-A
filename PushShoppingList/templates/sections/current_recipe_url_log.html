@@ -113,17 +113,19 @@
             </section>
 
             <section class="recipe-edit-section">
-                <label>
-                    <span>Equipment</span>
-                    <textarea id="recipeEditEquipment" rows="4"></textarea>
-                </label>
+                <div class="recipe-edit-section-header">
+                    <h3>Equipment</h3>
+                    <button type="button" onclick="addRecipeEquipmentRow()">Add Equipment</button>
+                </div>
+                <div id="recipeEditEquipment" class="recipe-edit-equipment"></div>
             </section>
 
             <section class="recipe-edit-section">
-                <label>
-                    <span>Instructions</span>
-                    <textarea id="recipeEditInstructions" rows="7"></textarea>
-                </label>
+                <div class="recipe-edit-section-header">
+                    <h3>Instructions</h3>
+                    <button type="button" onclick="addRecipeInstructionRow()">Add Step</button>
+                </div>
+                <div id="recipeEditInstructions" class="recipe-edit-instructions"></div>
             </section>
 
             <section class="recipe-edit-section">

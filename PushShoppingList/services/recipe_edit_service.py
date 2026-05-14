@@ -1,5 +1,6 @@
 import json
 
+from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
 from PushShoppingList.services.recipe_extract_service import STORE_SECTION_ORDER
 from PushShoppingList.services.recipe_extract_service import classify_store_section
@@ -59,6 +60,7 @@ def load_editable_recipe(url):
             "instructions": normalize_instruction_rows(recipe_data.get("instructions", [])),
             "nutrition": normalize_nutrition_rows(recipe_data.get("nutrition", {})),
         },
+        "food_rules": load_food_rules(),
         "store_sections": list(STORE_SECTION_ORDER.keys()),
     }
 

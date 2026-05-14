@@ -1515,6 +1515,13 @@ body {
             margin-top: 10px;
         }
 
+        .recipe-edit-equipment,
+        .recipe-edit-instructions {
+            display: grid;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
         .recipe-edit-ingredient-row {
             grid-template-columns: minmax(220px, 1.4fr) minmax(220px, 1.4fr) 88px 96px 130px 44px;
             margin-top: 0;
@@ -1527,6 +1534,11 @@ body {
         .recipe-edit-ingredient-row label:nth-child(1) {
             grid-column: 1 / 2;
             grid-row: 1;
+        }
+
+        .recipe-edit-food-warning {
+            align-self: flex-start;
+            margin-top: 2px;
         }
 
         .recipe-edit-ingredient-row label:nth-child(2) {
@@ -1573,6 +1585,25 @@ body {
 
         .recipe-edit-nutrition-row {
             grid-template-columns: minmax(160px, 0.8fr) minmax(180px, 1fr) auto;
+        }
+
+        .recipe-edit-text-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 44px;
+            gap: 10px;
+            align-items: end;
+            padding: 12px;
+            border: 1px solid #2f3638;
+            border-radius: 8px;
+            background: #151919;
+        }
+
+        .recipe-edit-instruction-row {
+            align-items: start;
+        }
+
+        .recipe-edit-instruction-row .recipe-edit-remove-row {
+            margin-top: 24px;
         }
 
         .recipe-edit-remove-row {
@@ -2895,6 +2926,7 @@ body {
 
             .recipe-edit-grid,
             .recipe-edit-ingredient-row,
+            .recipe-edit-text-row,
             .recipe-edit-nutrition-row {
                 grid-template-columns: 1fr;
             }
@@ -2910,6 +2942,14 @@ body {
             }
 
             .recipe-edit-ingredient-row .recipe-edit-remove-row {
+                width: 100%;
+            }
+
+            .recipe-edit-instruction-row .recipe-edit-remove-row {
+                margin-top: 0;
+            }
+
+            .recipe-edit-text-row .recipe-edit-remove-row {
                 width: 100%;
             }
 
