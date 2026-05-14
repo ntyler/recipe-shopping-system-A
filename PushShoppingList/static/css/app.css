@@ -3323,25 +3323,22 @@ body {
             }
 
             .recipe-equipment-task-row {
-                position: relative;
-                display: block;
-                min-height: 68px;
-                padding-left: 58px;
+                display: grid;
+                grid-template-columns: 28px minmax(0, 1fr);
+                gap: 8px;
+                min-height: 0;
+                padding-left: 0;
             }
 
             .recipe-equipment-task-row::before {
-                position: absolute;
-                top: 0;
-                left: 0;
-                width: 44px;
-                text-align: center;
+                content: none;
+                display: none;
             }
 
             .recipe-equipment-task-row .recipe-task-check {
-                position: absolute;
-                top: 38px;
-                left: 11px;
-                margin: 0;
+                position: static;
+                justify-self: center;
+                margin: 3px 0 0;
             }
 
             .recipe-equipment-task-row .recipe-task-text {
