@@ -34,6 +34,8 @@ from PushShoppingList.services.shopping_list_service import add_items
 
 recipe_bp = Blueprint("recipe_bp", __name__)
 
+NO_INGREDIENTS_ERROR = "No ingredients were found for this recipe URL."
+
 
 @recipe_bp.route("/extract_recipe", methods=["POST"])
 def extract_recipe_route():
@@ -69,8 +71,9 @@ def extract_recipe_route():
         if is_cancel_requested(job_id):
             break
 
-        if result.get("ok"):
-            ingredients = result.get("ingredients", [])
+        ingredients = result.get("ingredients", [])
+
+        if result.get("ok") and ingredients:
             add_items(ingredients)
             save_ingredients_for_recipe(url, ingredients)
             if result.get("recipe_title"):
@@ -79,7 +82,7 @@ def extract_recipe_route():
             extracted_any = True
             mark_url_done(job_id, urls, index, len(ingredients))
         else:
-            mark_url_failed(job_id, urls, index, result.get("error"))
+            mark_url_failed(job_id, urls, index, result.get("error") or NO_INGREDIENTS_ERROR)
 
     if extracted_any:
         sort_ingredients()
@@ -105,7 +108,7 @@ def upload_recipe_media_route():
 
     result = extract_recipe_from_upload(uploaded_file)
 
-    if result.get("ok"):
+    if result.get("ok") and result.get("ingredients"):
         recipe_url = result.get("source_url")
         ingredients = result.get("ingredients", [])
         add_items(ingredients)
@@ -114,6 +117,12 @@ def upload_recipe_media_route():
             save_recipe_url_name(recipe_url, result.get("recipe_title"))
         add_recipe_urls([recipe_url])
         sort_ingredients()
+    elif result.get("ok"):
+        result = {
+            **result,
+            "ok": False,
+            "error": NO_INGREDIENTS_ERROR,
+        }
 
     if wants_json:
         status = 200 if result.get("ok") else 400
@@ -160,13 +169,21 @@ def api_extract_recipe_route():
     if is_cancel_requested(job_id) or not is_current_job(job_id):
         return jsonify({"ok": False, "cancelled": True, "error": "Extraction cancelled."}), 409
 
-    if not result.get("ok"):
-        progress = mark_url_failed(job_id, urls, index, result.get("error"))
+    ingredients = result.get("ingredients", [])
+
+    if not result.get("ok") or not ingredients:
+        if result.get("ok"):
+            result = {
+                **result,
+                "ok": False,
+                "error": NO_INGREDIENTS_ERROR,
+            }
+
+        progress = mark_url_failed(job_id, urls, index, result.get("error") or NO_INGREDIENTS_ERROR)
         finish_batch_if_ready(job_id, progress)
 
         return jsonify(result), 400
 
-    ingredients = result.get("ingredients", [])
     add_items(ingredients)
     save_ingredients_for_recipe(url, ingredients)
     if result.get("recipe_title"):

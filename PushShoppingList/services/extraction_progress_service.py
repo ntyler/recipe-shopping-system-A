@@ -272,9 +272,16 @@ def batch_is_finished(progress):
 
 def batch_has_success(progress):
     return any(
-        item.get("state") == "done"
+        item.get("state") == "done" and ingredients_count(item) > 0
         for item in progress.get("urls", [])
     )
+
+
+def ingredients_count(item):
+    try:
+        return int(item.get("ingredients_count") or 0)
+    except (TypeError, ValueError):
+        return 0
 
 
 def send_ntfy(title, message):

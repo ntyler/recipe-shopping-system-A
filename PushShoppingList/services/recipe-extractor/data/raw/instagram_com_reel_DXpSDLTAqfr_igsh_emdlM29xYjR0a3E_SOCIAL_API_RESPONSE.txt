@@ -15,22 +15,8 @@
       "store_section_order": null
     }
   ],
-  "equipment": [
-    {
-      "name": null,
-      "category": null
-    }
-  ],
-  "instructions": [
-    {
-      "section": null,
-      "step_number": null,
-      "instruction": null,
-      "temperature": null,
-      "time": null,
-      "equipment_used": []
-    }
-  ],
+  "equipment": [],
+  "instructions": [],
   "nutrition": {
     "serving_basis": null,
     "calories": null,
@@ -50,11 +36,6 @@
     "vitamin_c": null,
     "calcium": null,
     "iron": null,
-    "other": [
-      {
-        "name": null,
-        "value": null
-      }
-    ]
+    "other": []
   }
 }

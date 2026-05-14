@@ -703,7 +703,7 @@ def extract_recipe_from_social_video_url(recipe_url, progress_callback=None):
 
     html_text, page_text = fetch_social_video_text(recipe_url)
 
-    if not page_text:
+    if not has_meaningful_social_video_text(page_text):
         return {
             "ok": False,
             "source_url": recipe_url,
@@ -740,8 +740,20 @@ def extract_recipe_from_social_video_url(recipe_url, progress_callback=None):
         }
 
     json_data["source_url"] = recipe_url
+    result = build_extract_result(recipe_url, json_data, "social_video")
+
+    if not result.get("ingredients"):
+        return {
+            "ok": False,
+            "source_url": recipe_url,
+            "error": "No ingredients were found in the public title, caption, description, or transcript text.",
+            "ingredients": [],
+            "raw": json_data,
+            "extraction_method": "social_video",
+        }
+
     save_extracted_recipe_json(recipe_url, json_data)
-    return build_extract_result(recipe_url, json_data, "social_video")
+    return result
 
 
 def fetch_social_video_text(recipe_url):
@@ -782,6 +794,42 @@ def fetch_social_video_text(recipe_url):
     raw_page_path.write_text(page_text, encoding="utf-8")
 
     return html_text, page_text
+
+
+def has_meaningful_social_video_text(page_text):
+    text = clean_recipe_text(page_text)
+
+    if not text:
+        return False
+
+    generic_values = {
+        "instagram",
+        "instagram photo",
+        "instagram reel",
+        "watch this instagram reel",
+    }
+    meaningful_lines = []
+
+    for line in str(page_text or "").splitlines():
+        value = clean_recipe_text(line)
+
+        if not value:
+            continue
+
+        content = re.sub(
+            r"^(title|description|transcript):\s*",
+            "",
+            value,
+            flags=re.IGNORECASE,
+        ).strip()
+
+        if content.lower() in generic_values:
+            continue
+
+        meaningful_lines.append(content)
+
+    meaningful_text = " ".join(meaningful_lines).strip()
+    return len(meaningful_text) >= 40
 
 
 def extract_social_metadata(html_text):
