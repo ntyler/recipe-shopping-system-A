@@ -1,4 +1,5 @@
 import time
+from urllib.parse import quote
 
 import keychain
 import paramiko
@@ -16,6 +17,11 @@ BAT_FILE = rf"{REPO_DIR}\start_app.bat"
 
 APP_URL = "https://desktop-in7s09s.tail906b20.ts.net/"
 ENSURE_FUNNEL = True
+OPEN_TAILSCALE_FIRST = True
+
+# Create this iOS Shortcut with Tailscale's built-in "Connect" action.
+# If you leave this blank, the script will just open the Tailscale app.
+TAILSCALE_CONNECT_SHORTCUT = "Connect Tailscale"
 
 
 if not PASSWORD:
@@ -25,6 +31,27 @@ if not PASSWORD:
 def open_in_safari(url):
     nsurl = NSURL.URLWithString_(url)
     UIApplication.sharedApplication().openURL_(nsurl)
+
+
+def open_ios_url(url):
+    nsurl = NSURL.URLWithString_(url)
+    UIApplication.sharedApplication().openURL_(nsurl)
+
+
+def open_tailscale_connect():
+    if TAILSCALE_CONNECT_SHORTCUT:
+        shortcut_url = (
+            "shortcuts://run-shortcut?name="
+            + quote(TAILSCALE_CONNECT_SHORTCUT)
+        )
+        print(f"Running Shortcut: {TAILSCALE_CONNECT_SHORTCUT}")
+        open_ios_url(shortcut_url)
+    else:
+        print("Opening Tailscale app...")
+        open_ios_url("tailscale://")
+
+    print("Make sure Tailscale says Connected, then return to Pythonista.")
+    input("Press Enter here after Tailscale is connected...")
 
 
 def wait_for_app(url, seconds=30):
@@ -66,6 +93,9 @@ ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
 try:
+    if OPEN_TAILSCALE_FIRST:
+        open_tailscale_connect()
+
     print("Connecting to Windows PC over Tailscale...")
 
     ssh.connect(
