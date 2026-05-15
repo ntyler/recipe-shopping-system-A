@@ -1436,7 +1436,11 @@ body {
             background: #181818;
         }
 
-        .recipe-url-log-content.collapsed + .recipe-url-collapsed-summary {
+        #currentRecipeUrlLogCard .recipe-url-collapsed-summary {
+            display: none;
+        }
+
+        #currentRecipeUrlLogCard .recipe-url-log-content.collapsed + .recipe-url-collapsed-summary {
             display: grid;
             gap: 8px;
         }
