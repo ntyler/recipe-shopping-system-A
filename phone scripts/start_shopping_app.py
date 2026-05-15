@@ -8,7 +8,13 @@ import requests
 from objc_util import UIApplication, NSURL
 
 
-SSH_HOST = "desktop-in7s09s"  # Use direct Tailscale device hostname for SSH
+SSH_HOSTS = [
+    "100.112.145.109",
+    "desktop-in7s09s.tail906b20.ts.net",
+    "desktop-in7s09s",
+]
+SSH_PORT = 22
+SSH_TIMEOUT = 8
 USERNAME = "Tyler"
 PASSWORD = keychain.get_password("windows_ssh", "Tyler")
 
@@ -74,6 +80,14 @@ def wait_for_app(url, seconds=30):
     return False
 
 
+def app_is_online(url):
+    try:
+        response = requests.get(url, timeout=3)
+        return response.status_code < 500
+    except Exception:
+        return False
+
+
 def run_ssh_command(ssh, command):
     stdin, stdout, stderr = ssh.exec_command(command)
     exit_code = stdout.channel.recv_exit_status()
@@ -89,25 +103,53 @@ def run_ssh_command(ssh, command):
     return exit_code
 
 
-ssh = paramiko.SSHClient()
-ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+def connect_ssh():
+    last_error = None
+
+    for host in SSH_HOSTS:
+        ssh_client = paramiko.SSHClient()
+        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        try:
+            print(f"Trying SSH host: {host}")
+            ssh_client.connect(
+                host,
+                port=SSH_PORT,
+                username=USERNAME,
+                password=PASSWORD,
+                timeout=SSH_TIMEOUT,
+                banner_timeout=SSH_TIMEOUT,
+                auth_timeout=SSH_TIMEOUT,
+                look_for_keys=False,
+                allow_agent=False,
+            )
+            print(f"SSH connected: {host}")
+            return ssh_client
+        except Exception as exc:
+            last_error = exc
+            print(f"SSH failed for {host}: {exc}")
+            try:
+                ssh_client.close()
+            except Exception:
+                pass
+
+    raise Exception(f"Could not connect to Windows SSH. Last error: {last_error}")
+
+
+ssh = None
 
 try:
+    if app_is_online(APP_URL):
+        print("Shopping app is already online")
+        print(f"Opening Safari: {APP_URL}")
+        open_in_safari(APP_URL)
+        raise SystemExit
+
     if OPEN_TAILSCALE_FIRST:
         open_tailscale_connect()
 
     print("Connecting to Windows PC over Tailscale...")
-
-    ssh.connect(
-        SSH_HOST,
-        username=USERNAME,
-        password=PASSWORD,
-        timeout=10,
-        look_for_keys=False,
-        allow_agent=False,
-    )
-
-    print("SSH connected")
+    ssh = connect_ssh()
     print("Launching Flask app...")
 
     launch_command = f'cmd /c start "" /D "{REPO_DIR}" "{BAT_FILE}"'
@@ -128,9 +170,10 @@ except Exception as exc:
     print(f"EXCEPTION: {exc}")
 
 finally:
-    try:
-        ssh.close()
-    except Exception:
-        pass
+    if ssh:
+        try:
+            ssh.close()
+        except Exception:
+            pass
 
     print("SSH closed")
