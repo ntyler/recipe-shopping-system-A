@@ -7,7 +7,7 @@ import requests
 from objc_util import UIApplication, NSURL
 
 
-SSH_HOST = "desktop-in7s09s.tail906b20.ts.net"
+SSH_HOST = "desktop-in7s09s"  # Use direct Tailscale device hostname for SSH
 USERNAME = "Tyler"
 PASSWORD = keychain.get_password("windows_ssh", "Tyler")
 
