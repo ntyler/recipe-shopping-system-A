@@ -33,6 +33,7 @@ TAILSCALE_CONNECT_SHORTCUT = "Connect Tailscale"
 if not PASSWORD:
     raise Exception("Password not found in keychain")
 
+open_in_safari(APP_URL)
 
 def open_in_safari(url):
     nsurl = NSURL.URLWithString_(url)
@@ -118,8 +119,6 @@ def connect_ssh():
                 username=USERNAME,
                 password=PASSWORD,
                 timeout=SSH_TIMEOUT,
-                banner_timeout=SSH_TIMEOUT,
-                auth_timeout=SSH_TIMEOUT,
                 look_for_keys=False,
                 allow_agent=False,
             )
