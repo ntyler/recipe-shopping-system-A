@@ -610,11 +610,6 @@ body {
             margin-top: 0;
         }
 
-        .phone-address-drop-btn {
-            background: #475569;
-            margin-top: 0;
-        }
-
         .nearest-stores-btn {
             background: #0f766e;
             margin-top: 0;
@@ -645,120 +640,6 @@ body {
 
         .address-options-panel[hidden] {
             display: none;
-        }
-
-        .phone-address-drop-panel {
-            margin-top: 12px;
-            background: #181b1c;
-            border: 1px solid #333;
-            border-radius: 10px;
-            padding: 12px 14px;
-            color: #ddd;
-            font-size: 14px;
-            line-height: 1.45;
-        }
-
-        .phone-address-drop-panel[hidden] {
-            display: none;
-        }
-
-        .phone-address-drop-status {
-            margin-top: 8px;
-            padding: 10px 12px;
-            border: 1px solid #444;
-            border-radius: 8px;
-            background: #202425;
-            color: #ddd;
-            font-weight: 700;
-        }
-
-        .phone-address-drop-status.success {
-            border-color: #00cc66;
-            background: #143126;
-            color: #8cffbd;
-        }
-
-        .phone-address-drop-status.warning {
-            border-color: #d97706;
-            background: #3a250e;
-            color: #ffd166;
-        }
-
-        .phone-address-drop-url-row {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) 110px;
-            gap: 10px;
-            margin-top: 10px;
-        }
-
-        .phone-address-drop-url-row input {
-            width: 100%;
-            box-sizing: border-box;
-            background: #202425;
-            color: #fff;
-            border: 1px solid #555;
-            border-radius: 8px;
-            padding: 11px 12px;
-            font-size: 14px;
-            outline: none;
-        }
-
-        .phone-address-drop-url-row button {
-            margin: 0;
-            background: #155da8;
-            font-size: 15px;
-            font-weight: 700;
-            padding: 0 12px;
-        }
-
-        .phone-address-drop-hint {
-            margin-top: 8px;
-            color: #aaa;
-            font-size: 13px;
-            line-height: 1.35;
-        }
-
-        .phone-address-drop-hint.warning {
-            color: #ffd166;
-            font-weight: 700;
-        }
-
-        .phone-address-drop-steps {
-            margin-top: 10px;
-            padding: 10px 12px;
-            border: 1px solid #333;
-            border-radius: 8px;
-            background: #151819;
-            color: #bbb;
-            font-size: 13px;
-            line-height: 1.4;
-        }
-
-        .phone-address-drop-steps strong {
-            color: #e8e8e8;
-        }
-
-        .phone-address-drop-steps ol {
-            margin: 8px 0 0 20px;
-            padding: 0;
-        }
-
-        .phone-address-drop-steps li {
-            margin-bottom: 5px;
-        }
-
-        .phone-address-drop-example {
-            margin-top: 8px;
-            color: #aaa;
-            overflow-wrap: anywhere;
-        }
-
-        .phone-address-drop-example code {
-            color: #e8e8e8;
-            background: #202425;
-            border: 1px solid #333;
-            border-radius: 5px;
-            padding: 2px 5px;
         }
 
         .address-options-list {
@@ -3488,14 +3369,6 @@ body {
             .address-grid,
             .address-actions-grid {
                 grid-template-columns: 1fr;
-            }
-
-            .phone-address-drop-url-row {
-                grid-template-columns: 1fr;
-            }
-
-            .phone-address-drop-url-row button {
-                min-height: 44px;
             }
 
             .actions-grid {
