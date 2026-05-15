@@ -4,7 +4,7 @@ import requests
 
 SSH_HOST = "desktop-in7s09s.tail906b20.ts.net"
 USERNAME = "Tyler"
-PASSWORD = "3208"  # Replace with actual password
+PASSWORD = "your_password_here"  # Replace with actual password
 
 REPO_DIR = r"D:\GitHub\recipe-shopping-system-A"
 BAT_FILE = rf"{REPO_DIR}\start_app.bat"
