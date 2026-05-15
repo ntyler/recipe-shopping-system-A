@@ -42,7 +42,35 @@
                         onclick="findHomeAddressOptions(this)">
                     Find Address Options
                 </button>
+                <button type="button"
+                        class="phone-address-drop-btn"
+                        onclick="startPhoneAddressDrop(this)">
+                    Phone Address Drop
+                </button>
                 <button type="submit" name="action" value="run_find_nearest" class="nearest-stores-btn">Run Find Nearest Stores</button>
+            </div>
+
+            <div id="phoneAddressDropPanel"
+                 class="phone-address-drop-panel"
+                 hidden>
+                <span class="store-detail-label">Phone Address Drop</span>
+                <div id="phoneAddressDropStatus" class="phone-address-drop-status"></div>
+                <div class="phone-address-drop-url-row">
+                    <input id="phoneAddressDropUrl" readonly value="">
+                    <button type="button" onclick="copyPhoneAddressDropUrl(this)">Copy</button>
+                </div>
+                <div id="phoneAddressDropHint" class="phone-address-drop-hint"></div>
+                <div class="phone-address-drop-steps">
+                    <strong>How to use it on iPhone</strong>
+                    <ol>
+                        <li>Tap <strong>Copy</strong> on this drop URL.</li>
+                        <li>Run an iPhone Shortcut that gets your current location and POSTs it to the URL in your clipboard.</li>
+                        <li>Come back here. This page fills and saves the address when the shortcut finishes.</li>
+                    </ol>
+                    <div class="phone-address-drop-example">
+                        Shortcut JSON body: <code>{"latitude": 39.0, "longitude": -86.0}</code>
+                    </div>
+                </div>
             </div>
 
             <div id="homeAddressOptionsPanel"
