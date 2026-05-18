@@ -566,7 +566,7 @@ body {
 
         .address-grid {
             display: grid;
-            grid-template-columns: minmax(160px, 1.2fr) minmax(120px, 0.8fr) minmax(150px, 1fr) 80px 100px;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
             gap: 10px;
             margin-top: 12px;
         }
@@ -605,11 +605,6 @@ body {
             margin-top: 0;
         }
 
-        .address-options-btn {
-            background: #5f4b8b;
-            margin-top: 0;
-        }
-
         .nearest-stores-btn {
             background: #0f766e;
             margin-top: 0;
@@ -625,69 +620,6 @@ body {
             font-size: 14px;
             line-height: 1.45;
             text-align: center;
-        }
-
-        .address-options-panel {
-            margin-top: 12px;
-            background: #181b1c;
-            border: 1px solid #333;
-            border-radius: 10px;
-            padding: 12px 14px;
-            color: #ddd;
-            font-size: 14px;
-            line-height: 1.45;
-        }
-
-        .address-options-panel[hidden] {
-            display: none;
-        }
-
-        .address-options-list {
-            display: grid;
-            gap: 8px;
-            margin-top: 10px;
-        }
-
-        .address-option-btn {
-            width: 100%;
-            margin: 0;
-            padding: 10px 12px;
-            border: 1px solid #444;
-            border-radius: 8px;
-            background: #202425;
-            color: #e8e8e8;
-            font-size: 14px;
-            font-weight: 700;
-            line-height: 1.35;
-            text-align: left;
-        }
-
-        .address-option-btn:hover,
-        .address-option-btn:focus {
-            border-color: #00cc66;
-            background: #25302b;
-            outline: none;
-        }
-
-        .address-option-empty {
-            color: #aaa;
-            text-align: center;
-        }
-
-        .address-option-message {
-            padding: 10px 12px;
-            border: 1px solid #444;
-            border-radius: 8px;
-            background: #202425;
-            color: #ddd;
-            text-align: left;
-        }
-
-        .address-option-message.warning {
-            border-color: #d97706;
-            background: #3a250e;
-            color: #ffd166;
-            font-weight: 700;
         }
 
         .home-address-collapsed-summary {

@@ -10,8 +10,10 @@ from objc_util import UIApplication, NSURL
 
 SSH_HOSTS = [
     "100.112.145.109",
-    "desktop-in7s09s.tail906b20.ts.net",
-    "desktop-in7s09s",
+    # Nord Meshnet on this PC is 100.92.43.216, but Windows currently
+    # classifies NordLynx as Public while the OpenSSH firewall rule is Private.
+    # Add it here only after allowing SSH on the NordLynx network.
+    # "100.92.43.216",
 ]
 SSH_PORT = 22
 SSH_TIMEOUT = 8
@@ -32,8 +34,6 @@ TAILSCALE_CONNECT_SHORTCUT = "Connect Tailscale"
 
 if not PASSWORD:
     raise Exception("Password not found in keychain")
-
-open_in_safari(APP_URL)
 
 def open_in_safari(url):
     nsurl = NSURL.URLWithString_(url)

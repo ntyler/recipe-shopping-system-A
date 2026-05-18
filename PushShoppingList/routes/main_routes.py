@@ -1070,6 +1070,7 @@ def normalize_address_form_fields(data):
             "address2",
         ),
         "city": address_field_value(data, "city", "address_city"),
+        "county": address_field_value(data, "county", "address_county"),
         "state": abbreviate_us_state(address_field_value(data, "state", "address_state")),
         "zip": address_field_value(
             data,
@@ -1080,6 +1081,7 @@ def normalize_address_form_fields(data):
             "postal_code",
             "postcode",
         ),
+        "country": address_field_value(data, "country", "address_country"),
     }
 
 
@@ -1120,6 +1122,10 @@ def complete_address_fields_locally(candidate_address, current_address, display_
             [candidate_address, parsed_address, current_address],
             "city",
         ),
+        "county": first_address_value_from_dicts(
+            [candidate_address, parsed_address, current_address],
+            "county",
+        ),
         "state": abbreviate_us_state(first_address_value_from_dicts(
             [candidate_address, parsed_address, current_address],
             "state",
@@ -1128,6 +1134,10 @@ def complete_address_fields_locally(candidate_address, current_address, display_
             [candidate_address, parsed_address, current_address],
             "zip",
         ).split("-")[0],
+        "country": first_address_value_from_dicts(
+            [candidate_address, parsed_address, current_address],
+            "country",
+        ),
     }
 
 
@@ -1141,8 +1151,10 @@ def parse_display_name_address(display_name):
         "street": "",
         "apartment": "",
         "city": "",
+        "county": "",
         "state": "",
         "zip": "",
+        "country": "",
     }
 
     for part in parts:
@@ -1162,9 +1174,11 @@ def parse_display_name_address(display_name):
         lowered = part.lower()
 
         if lowered in {"united states", "usa", "us"}:
+            parsed["country"] = parsed["country"] or part
             continue
 
         if lowered.endswith(" county"):
+            parsed["county"] = parsed["county"] or part
             continue
 
         if parsed["zip"] and parsed["zip"] in part:
@@ -1257,8 +1271,10 @@ Output shape:
   "street": "",
   "apartment": "",
   "city": "",
+  "county": "",
   "state": "",
-  "zip": ""
+  "zip": "",
+  "country": ""
 }}
 """
 
@@ -1289,7 +1305,7 @@ Output shape:
 def merge_completed_address_fields(primary, fallback):
     return {
         key: str(primary.get(key) or fallback.get(key) or "").strip()
-        for key in ["street", "apartment", "city", "state", "zip"]
+        for key in ["street", "apartment", "city", "county", "state", "zip", "country"]
     }
 
 
@@ -1331,8 +1347,10 @@ def reverse_geocode_address_fields(address):
             "hamlet",
             "county",
         ]),
+        "county": first_address_value(address, ["county"]),
         "state": state,
         "zip": first_address_value(address, ["postcode"]).split("-")[0],
+        "country": first_address_value(address, ["country"]),
     }
 
 

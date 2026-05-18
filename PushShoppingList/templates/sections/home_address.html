@@ -21,8 +21,10 @@
                 <input name="address_street" value="{{ home_address.street }}" placeholder="Street, e.g. 5905 Arlo Drive">
                 <input name="address_apartment" value="{{ home_address.apartment }}" placeholder="Apartment, e.g. Apt 2213">
                 <input name="address_city" value="{{ home_address.city }}" placeholder="City, e.g. Indianapolis">
+                <input name="address_county" value="{{ home_address.county }}" placeholder="County, e.g. Marion County">
                 <input name="address_state" value="{{ home_address.state }}" placeholder="State, e.g. IN">
                 <input name="address_zip" value="{{ home_address.zip }}" placeholder="ZIP">
+                <input name="address_country" value="{{ home_address.country }}" placeholder="Country, e.g. United States">
             </div>
 
             <div class="address-summary-box">
@@ -37,19 +39,7 @@
                         onclick="useDeviceLocationForHomeAddress(this)">
                     Use My Location
                 </button>
-                <button type="button"
-                        class="address-options-btn"
-                        onclick="findHomeAddressOptions(this)">
-                    Find Address Options
-                </button>
                 <button type="submit" name="action" value="run_find_nearest" class="nearest-stores-btn">Run Find Nearest Stores</button>
-            </div>
-
-            <div id="homeAddressOptionsPanel"
-                 class="address-options-panel"
-                 hidden>
-                <span class="store-detail-label">Possible addresses</span>
-                <div id="homeAddressOptionsList" class="address-options-list"></div>
             </div>
         </form>
     </div>

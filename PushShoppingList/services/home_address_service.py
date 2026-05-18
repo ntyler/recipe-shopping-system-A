@@ -9,8 +9,10 @@ DEFAULT_HOME_ADDRESS = {
     "street": "5905 Arlo Drive",
     "apartment": "Apt 2213",
     "city": "Indianapolis",
+    "county": "Marion County",
     "state": "IN",
     "zip": "46237",
+    "country": "United States",
 }
 
 HOME_ADDRESS_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -39,8 +41,10 @@ def save_home_address(form_data):
         "street": str(form_data.get("address_street", "") or "").strip(),
         "apartment": str(form_data.get("address_apartment", "") or "").strip(),
         "city": str(form_data.get("address_city", "") or "").strip(),
+        "county": str(form_data.get("address_county", "") or "").strip(),
         "state": str(form_data.get("address_state", "") or "").strip(),
         "zip": str(form_data.get("address_zip", "") or "").strip(),
+        "country": str(form_data.get("address_country", "") or "").strip(),
     }
 
     HOME_ADDRESS_FILE.write_text(
@@ -62,6 +66,7 @@ def build_full_address(data):
         part
         for part in [
             str(data.get("city", "") or "").strip(),
+            str(data.get("county", "") or "").strip(),
             " ".join(
                 part
                 for part in [
@@ -74,4 +79,12 @@ def build_full_address(data):
         if part
     )
 
-    return ", ".join(part for part in [street_line, city_line] if part)
+    return ", ".join(
+        part
+        for part in [
+            street_line,
+            city_line,
+            str(data.get("country", "") or "").strip(),
+        ]
+        if part
+    )
