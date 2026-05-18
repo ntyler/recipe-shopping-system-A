@@ -965,6 +965,10 @@ body {
             position: sticky;
             top: var(--view-switcher-sticky-offset, 0px);
             z-index: 20;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
             background: #1b1b1b;
             color: #00cc66;
             font-weight: bold;
@@ -975,14 +979,37 @@ body {
             border-radius: 12px 12px 0 0;
         }
 
-        .recipe-view-title a {
+        .recipe-view-title-main {
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+
+        .recipe-view-title-actions {
+            display: inline-flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+            flex: 0 0 auto;
+        }
+
+        .recipe-view-food-review-btn {
+            margin: 0;
+            font-size: 12px;
+        }
+
+        .recipe-view-title a:not(.recipe-view-pdf-btn) {
             color: #ddd;
             text-decoration: none;
         }
 
-        .recipe-view-title a:hover {
+        .recipe-view-title a:not(.recipe-view-pdf-btn):hover {
             color: #00cc66;
             text-decoration: underline;
+        }
+
+        .recipe-view-pdf-btn {
+            flex: 0 0 auto;
+            color: #ccfbf1 !important;
         }
 
         .recipe-meta {

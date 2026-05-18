@@ -174,6 +174,8 @@ def recipe_view_rows(recipe_urls):
             "name": recipe_data.get("recipe_title") or recipe["name"],
             "url": recipe["url"],
             "quantity": recipe_quantity,
+            "archive_pdf_available": recipe_archive_pdf_exists(recipe["url"]),
+            "food_rule_status": recipe_food_rule_status(recipe_data),
             "base_servings": recipe_data.get("servings"),
             "scaled_servings": scaled_servings or scale_servings(recipe_data.get("servings"), recipe_quantity),
             "equipment_items": normalize_text_list(recipe_data.get("equipment", [])),
