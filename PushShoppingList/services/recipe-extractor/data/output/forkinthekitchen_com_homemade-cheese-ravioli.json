@@ -6,7 +6,7 @@
     {
       "section": null,
       "original_text": "1 pound Fresh Pasta Dough* (or store-bought fresh pasta sheets)",
-      "quantity": "2",
+      "quantity": "1",
       "unit": "pound",
       "ingredient": "Fresh Pasta Dough*",
       "preparation": "or store-bought fresh pasta sheets",
@@ -53,7 +53,7 @@
       "quantity": "2",
       "unit": "teaspoons",
       "ingredient": "fresh basil",
-      "preparation": null,
+      "preparation": "chopped",
       "optional": false,
       "store_section": "PRODUCE",
       "store_section_order": 1
@@ -86,7 +86,7 @@
       "quantity": null,
       "unit": null,
       "ingredient": "Homemade Tomato Sauce",
-      "preparation": "as desired, for serving, or sauce as desired, for serving)",
+      "preparation": "for serving, as desired, or sauce as desired, for serving)",
       "optional": false,
       "store_section": "SAUCES & CONDIMENTS",
       "store_section_order": 9
@@ -104,16 +104,46 @@
     }
   ],
   "equipment": [
-    "baking sheet",
-    "cookie scoop",
-    "cutting board",
-    "knife",
-    "mixing bowl",
-    "pasta machine",
-    "pot",
-    "ravioli cutter",
-    "rolling pin",
-    "spatula"
+    {
+      "name": "baking sheet",
+      "category": "cookware"
+    },
+    {
+      "name": "cookie scoop",
+      "category": "utensil"
+    },
+    {
+      "name": "cutting board",
+      "category": "prep"
+    },
+    {
+      "name": "knife",
+      "category": "prep"
+    },
+    {
+      "name": "mixing bowl",
+      "category": "prep"
+    },
+    {
+      "name": "pasta machine",
+      "category": "prep"
+    },
+    {
+      "name": "pot",
+      "category": "cookware"
+    },
+    {
+      "name": "ravioli cutter",
+      "category": "prep"
+    },
+    {
+      "name": "rolling pin",
+      "category": "prep"
+    },
+    {
+      "name": "spatula",
+      "category": "utensil"
+    }
   ],
   "instructions": [
     {
@@ -122,7 +152,9 @@
       "instruction": "Make the fresh pasta dough and let it rest as directed. Prepare a baking sheet by sprinkling semolina across it and set aside (we'll use it later on once the ravioli is formed).",
       "temperature": null,
       "time": null,
-      "equipment_used": []
+      "equipment_used": [
+        "baking sheet"
+      ]
     },
     {
       "section": null,
@@ -130,7 +162,9 @@
       "instruction": "Make the filling: In a bowl, combine the ricotta, parmesan cheese, lemon zest, basil, nutmeg, salt, pepper. Taste test to adjust any levels according to your taste. Set aside or in the fridge if not using right away.",
       "temperature": null,
       "time": null,
-      "equipment_used": []
+      "equipment_used": [
+        "mixing bowl"
+      ]
     },
     {
       "section": null,
@@ -138,7 +172,9 @@
       "instruction": "Bring a large pot of salted water to a boil, because this will take a while, I like to start it before or while forming the pasta so it's ready once the ravioli is formed.",
       "temperature": null,
       "time": null,
-      "equipment_used": []
+      "equipment_used": [
+        "pot"
+      ]
     },
     {
       "section": null,
@@ -146,7 +182,12 @@
       "instruction": "Roll out the dough: Take approximately ¼ of the fresh dough ball (either cut it into sections or tear off a portion). Using your hands, form it into a rectangle shape, just thick enough to fit into the largest setting on your pasta machine (use a pasta machine for best results, but a rolling pin will work, too). Roll it out on the largest setting, adjusting and folding it into a rectangular shape again as needed. Each time you roll it out, it will expand in the shape it was before rolling, so making it a uniform rectangle as much as possible to help you later on.",
       "temperature": null,
       "time": null,
-      "equipment_used": []
+      "equipment_used": [
+        "cutting board",
+        "knife",
+        "pasta machine",
+        "rolling pin"
+      ]
     },
     {
       "section": null,
@@ -154,7 +195,10 @@
       "instruction": "Once you've gone through the largest setting and have a solid 'rectangle shape', thread the dough through each smaller setting, getting thinner each time, until you've reached your desired thickness. I like to go with the second to last thinnest setting, however, if you're really brave you can go as thin as possible. Place the rolled pasta sheet on a semolina-dusted countertop to prevent sticking.",
       "temperature": null,
       "time": null,
-      "equipment_used": []
+      "equipment_used": [
+        "pasta machine",
+        "rolling pin"
+      ]
     },
     {
       "section": null,
@@ -162,7 +206,10 @@
       "instruction": "On one half of the rolled-out dough section, place approximately 1 ½ teaspoons of the filling spaced about 1 ½ inches apart. You want to place it on one half because the other side of the dough will be folded over to create the ravioli pockets. I find that a small cookie scoop to place the filling gives the perfect equal amount for each pocket.",
       "temperature": null,
       "time": null,
-      "equipment_used": []
+      "equipment_used": [
+        "cookie scoop",
+        "rolling pin"
+      ]
     },
     {
       "section": null,
@@ -170,7 +217,9 @@
       "instruction": "With the filling spaced on the entire length of your pasta sheet, fold over the other half of the dough on top of the filling. You may want to use your finger dipped in water and run it along the pasta edges before folding to help the dough stick if it seems dry.",
       "temperature": null,
       "time": null,
-      "equipment_used": []
+      "equipment_used": [
+        "spatula"
+      ]
     },
     {
       "section": null,
@@ -178,7 +227,12 @@
       "instruction": "Gently press around each filling to create the beginning of each pocket. Use a pizza cutter or pasta wheel to cut between each pocket. Press the edges down as needed, or use a fork to make sure they are fully pressed together. Place the pockets on your prepared baking sheet and continue forming ravioli with the remaining pasta sheets.",
       "temperature": null,
       "time": null,
-      "equipment_used": []
+      "equipment_used": [
+        "baking sheet",
+        "cutting board",
+        "knife",
+        "ravioli cutter"
+      ]
     },
     {
       "section": null,
@@ -186,7 +240,10 @@
       "instruction": "Once the water is at a rolling boil, add the ravioli pockets in batches. Be sure not to overcrowd the pan. The ravioli pockets will take approximately 2-4 minutes to cook to al dente, depending on their size. You'll know they're ready when they float. Remove them from the pasta water and place them directly into your sauce. Continue until all ravioli pockets are cooked.",
       "temperature": null,
       "time": null,
-      "equipment_used": []
+      "equipment_used": [
+        "pot",
+        "rolling pin"
+      ]
     },
     {
       "section": null,
@@ -204,9 +261,18 @@
     "protein": "17 g",
     "fat": "40 g",
     "saturated_fat": "16 g",
+    "polyunsaturated_fat": null,
+    "monounsaturated_fat": null,
+    "trans_fat": null,
     "cholesterol": "37 mg",
     "sodium": "649 mg",
+    "potassium": null,
     "fiber": "3 g",
-    "sugar": "0.2 g"
+    "sugar": "0.2 g",
+    "vitamin_a": null,
+    "vitamin_c": null,
+    "calcium": null,
+    "iron": null,
+    "other": []
   }
 }

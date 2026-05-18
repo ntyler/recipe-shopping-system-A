@@ -1,0 +1,312 @@
+{
+  "source_url": "https://www.forkinthekitchen.com/vegetarian-spinach-ricotta-lasagna/",
+  "recipe_title": "Homemade Vegetarian Lasagna with Spinach Ricotta",
+  "servings": "6",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "9 ounces no-boil lasagna noodles",
+      "quantity": "9",
+      "unit": "ounces",
+      "ingredient": "no-boil lasagna noodles",
+      "preparation": null,
+      "optional": false,
+      "store_section": "OILS & VINEGARS",
+      "store_section_order": 13
+    },
+    {
+      "section": null,
+      "original_text": "1 batch fresh pasta dough",
+      "quantity": "1",
+      "unit": null,
+      "ingredient": "batch fresh pasta dough",
+      "preparation": null,
+      "optional": false,
+      "store_section": "PASTA, RICE & GRAINS",
+      "store_section_order": 6
+    },
+    {
+      "section": null,
+      "original_text": "1 Tablespoon unsalted butter or olive oil",
+      "quantity": "1",
+      "unit": "Tablespoon",
+      "ingredient": "unsalted butter OR olive oil",
+      "preparation": null,
+      "optional": false,
+      "store_section": "DAIRY & EGGS",
+      "store_section_order": 3
+    },
+    {
+      "section": null,
+      "original_text": "3 Tablespoons shallot (finely chopped (1 medium bulb))",
+      "quantity": "3",
+      "unit": "Tablespoons",
+      "ingredient": "shallot )",
+      "preparation": "chopped",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19
+    },
+    {
+      "section": null,
+      "original_text": "4 cloves garlic (minced)",
+      "quantity": "4",
+      "unit": "cloves",
+      "ingredient": "garlic",
+      "preparation": "minced",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1
+    },
+    {
+      "section": null,
+      "original_text": "Pinch red pepper flakes",
+      "quantity": "1",
+      "unit": "Pinch",
+      "ingredient": "red pepper flakes",
+      "preparation": null,
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12
+    },
+    {
+      "section": null,
+      "original_text": "8 ounces baby spinach (roughly chopped)",
+      "quantity": "8",
+      "unit": "ounces",
+      "ingredient": "baby spinach",
+      "preparation": "chopped, roughly chopped",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1
+    },
+    {
+      "section": null,
+      "original_text": "15 ounces whole milk ricotta cheese",
+      "quantity": "15",
+      "unit": "ounces",
+      "ingredient": "whole milk ricotta cheese",
+      "preparation": null,
+      "optional": false,
+      "store_section": "DAIRY & EGGS",
+      "store_section_order": 3
+    },
+    {
+      "section": null,
+      "original_text": "¾ cup shredded parmesan cheese* (divided)",
+      "quantity": "¾",
+      "unit": "cup",
+      "ingredient": "shredded parmesan cheese*",
+      "preparation": "divided",
+      "optional": false,
+      "store_section": "DAIRY & EGGS",
+      "store_section_order": 3
+    },
+    {
+      "section": null,
+      "original_text": "1 ½ cups shredded mozzarella cheese (divided)",
+      "quantity": "1",
+      "unit": null,
+      "ingredient": "shredded mozzarella cheese",
+      "preparation": "divided",
+      "optional": false,
+      "store_section": "DAIRY & EGGS",
+      "store_section_order": 3
+    },
+    {
+      "section": null,
+      "original_text": "½ teaspoon fine sea salt",
+      "quantity": "½",
+      "unit": "teaspoon",
+      "ingredient": "fine sea salt",
+      "preparation": null,
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12
+    },
+    {
+      "section": null,
+      "original_text": "Freshly ground black pepper (to taste)",
+      "quantity": null,
+      "unit": null,
+      "ingredient": "Freshly ground black pepper",
+      "preparation": "to taste",
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12
+    },
+    {
+      "section": null,
+      "original_text": "Pinch ground nutmeg",
+      "quantity": "1",
+      "unit": "Pinch",
+      "ingredient": "ground nutmeg",
+      "preparation": null,
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12
+    },
+    {
+      "section": null,
+      "original_text": "1  egg (slightly beaten)",
+      "quantity": "1",
+      "unit": null,
+      "ingredient": "egg",
+      "preparation": "slightly beaten",
+      "optional": false,
+      "store_section": "DAIRY & EGGS",
+      "store_section_order": 3
+    },
+    {
+      "section": null,
+      "original_text": "2 ¼ cups Homemade Tomato Sauce (or jarred marinara; more as desired)",
+      "quantity": "2",
+      "unit": null,
+      "ingredient": "Homemade Tomato Sauce",
+      "preparation": "as desired, or jarred marinara; more as desired",
+      "optional": false,
+      "store_section": "SAUCES & CONDIMENTS",
+      "store_section_order": 9
+    }
+  ],
+  "equipment": [
+    {
+      "name": "cutting board",
+      "category": "prep"
+    },
+    {
+      "name": "knife",
+      "category": "prep"
+    },
+    {
+      "name": "mixing bowl",
+      "category": "prep"
+    },
+    {
+      "name": "oven",
+      "category": "appliance"
+    },
+    {
+      "name": "pasta machine",
+      "category": "prep"
+    },
+    {
+      "name": "pot",
+      "category": "cookware"
+    },
+    {
+      "name": "rolling pin",
+      "category": "prep"
+    },
+    {
+      "name": "skillet",
+      "category": "cookware"
+    }
+  ],
+  "instructions": [
+    {
+      "section": null,
+      "step_number": 1,
+      "instruction": "Fresh pasta sheets: roll pasta dough into sheets to the second to thinnest setting, and cut them to fit the size of your pan. Bring a large stockpot full of salted water to a boil; par-cook the noodles for approximately 30 seconds, until they float. Transfer directly to an ice bath, then remove, and set them to dry on a tea towel or paper towels until ready to assemble.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [
+        "cutting board",
+        "knife",
+        "pasta machine",
+        "pot",
+        "rolling pin"
+      ]
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "If using no-boil (oven-ready) dried lasagna noodles, there's no prep needed!",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [
+        "oven",
+        "pot"
+      ]
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "Preheat oven to 375°F. Grease an 8x8 or 9x9 baking dish (glass or ceramic) with softened butter or cooking spray. Set aside.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [
+        "oven"
+      ]
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "Spinach Mixture: In a large skillet, melt butter over medium-high heat. Add chopped shallot and let cook for 2-3 minutes. Add garlic and continue to cook for 1-2 minutes. Season with red pepper flakes, salt, and pepper to taste. Add chopped spinach to skillet, stir to coat, and remove from heat as spinach wilts. Transfer to a fine-mesh strainer and press to release all liquid from the spinach. Set aside to drain and cool.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [
+        "skillet"
+      ]
+    },
+    {
+      "section": null,
+      "step_number": 5,
+      "instruction": "Ricotta Filling: Meanwhile, in a medium bowl stir together ricotta, ½ cup parmesan cheese, ¾ cup mozzarella cheese, fine sea salt, black pepper, nutmeg. Taste test to check for salt and spice levels, then stir in the egg. Once the spinach has drained and cooled, stir it into the ricotta mixture.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [
+        "mixing bowl"
+      ]
+    },
+    {
+      "section": null,
+      "step_number": 6,
+      "instruction": "Assembly: Spread ¼ cup of tomato sauce across the bottom of the prepared baking dish. Place the first layer of lasagna sheets on the sauce and top with approximately ⅓ of the ricotta mixture (for a three-layer lasagna). Then sprinkle on an additional ¼ cup shredded mozzarella and ½ cup tomato sauce.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": []
+    },
+    {
+      "section": null,
+      "step_number": 7,
+      "instruction": "Continue with two more full layers: pasta, ricotta, mozzarella, and sauce. Once the three layers of ricotta are set, top with a final layer of pasta and tomato sauce. Sprinkle the remaining mozzarella cheese (~1/3 cup) and remaining parmesan (~1/4 cup) on top.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": []
+    },
+    {
+      "section": null,
+      "step_number": 8,
+      "instruction": "Bake: Cover the pan with foil and bake for 25 minutes. Remove foil and continue baking for 20-30 additional minutes, until golden brown and bubbly around the edges. Let sit for 10-15 minutes, then cut slices and serve. Garnish with additional parmesan cheese and fresh basil as desired.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [
+        "cutting board",
+        "knife",
+        "oven"
+      ]
+    }
+  ],
+  "nutrition": {
+    "serving_basis": "per serving",
+    "calories": "311 kcal",
+    "carbohydrates": "11 g",
+    "protein": "22 g",
+    "fat": "21 g",
+    "saturated_fat": "12 g",
+    "polyunsaturated_fat": null,
+    "monounsaturated_fat": null,
+    "trans_fat": "1 g",
+    "cholesterol": "97 mg",
+    "sodium": "1152 mg",
+    "potassium": null,
+    "fiber": "2 g",
+    "sugar": "5 g",
+    "vitamin_a": null,
+    "vitamin_c": null,
+    "calcium": null,
+    "iron": null,
+    "other": []
+  }
+}

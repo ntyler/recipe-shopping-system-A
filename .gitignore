@@ -9,3 +9,6 @@ PushShoppingList/services/recipe-extractor/data/recipe_ingredients.json
 PushShoppingList/services/recipe-extractor/data/home_address.json
 PushShoppingList/services/recipe-extractor/data/store_settings.json
 PushShoppingList/services/recipe-extractor/data/shopping_item_state.json
+PushShoppingList/services/recipe-extractor/data/pdf/
+PushShoppingList/services/recipe-extractor/data/logs/
+PushShoppingList/services/recipe-extractor/data/raw/*_PDF_ERROR.txt

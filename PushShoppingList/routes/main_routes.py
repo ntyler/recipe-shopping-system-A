@@ -26,6 +26,7 @@ from PushShoppingList.services.recipe_ingredient_service import save_recipe_ingr
 from PushShoppingList.services.recipe_quantity_service import ingredient_key
 from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
 from PushShoppingList.services.recipe_extract_service import STORE_SECTION_ORDER
+from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_exists
 from PushShoppingList.services.shopping_list_service import load_items
 from PushShoppingList.services.shopping_list_service import save_items
 from PushShoppingList.services.store_settings_service import load_store_settings
@@ -192,6 +193,7 @@ def recipe_url_log_rows(recipe_urls):
         rows.append({
             **recipe,
             "food_rule_status": recipe_food_rule_status(recipe_data),
+            "archive_pdf_available": recipe_archive_pdf_exists(recipe["url"]),
         })
 
     return rows

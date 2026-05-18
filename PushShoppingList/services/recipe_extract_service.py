@@ -4,6 +4,8 @@ import re
 import html
 import base64
 import mimetypes
+import shutil
+import time
 import uuid
 import zipfile
 import xml.etree.ElementTree as ET
@@ -25,12 +27,14 @@ RAW_FOLDER = EXTRACTOR_FOLDER / "data" / "raw"
 LOG_FOLDER = EXTRACTOR_FOLDER / "data" / "logs"
 UPLOAD_FOLDER = EXTRACTOR_FOLDER / "data" / "uploads"
 VIDEO_FOLDER = EXTRACTOR_FOLDER / "data" / "video"
+PDF_FOLDER = EXTRACTOR_FOLDER / "data" / "pdf"
 
 OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
 RAW_FOLDER.mkdir(parents=True, exist_ok=True)
 LOG_FOLDER.mkdir(parents=True, exist_ok=True)
 UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 VIDEO_FOLDER.mkdir(parents=True, exist_ok=True)
+PDF_FOLDER.mkdir(parents=True, exist_ok=True)
 
 MODEL = os.getenv("OPENAI_RECIPE_MODEL", "gpt-4o-mini")
 MAX_PAGE_TEXT_CHARS = 35000
@@ -165,6 +169,14 @@ def safe_filename(text):
     text = re.sub(r"www\.", "", text)
     text = re.sub(r"[^a-zA-Z0-9_-]+", "_", text)
     return text.strip("_")[:120] or "recipe"
+
+
+def recipe_archive_pdf_path(recipe_url):
+    return PDF_FOLDER / f"{safe_filename(recipe_url)}.pdf"
+
+
+def recipe_archive_pdf_exists(recipe_url):
+    return recipe_archive_pdf_path(recipe_url).exists()
 
 
 def clean_json_response(text):
@@ -678,6 +690,13 @@ def fetch_recipe_page(recipe_url, progress_callback=None):
         else:
             raise
 
+    archive_recipe_page_pdf(
+        recipe_url,
+        html_text,
+        html_path,
+        progress_callback=progress_callback,
+    )
+
     if progress_callback:
         progress_callback(
             "HTML downloaded - reading recipe card data...",
@@ -748,6 +767,12 @@ def extract_recipe_from_social_video_url(recipe_url, progress_callback=None):
 
     html_text, page_text = fetch_social_video_text(
         recipe_url,
+        progress_callback=progress_callback,
+    )
+
+    archive_social_video_text_pdf(
+        recipe_url,
+        page_text,
         progress_callback=progress_callback,
     )
 
@@ -1792,10 +1817,8 @@ def is_forbidden_response(exc):
     return response is not None and response.status_code == 403
 
 
-def fetch_recipe_page_with_browser(recipe_url):
-    driver = None
-
-    try:
+def create_headless_chrome_driver(window_size="1365,900", prefer_undetected=True):
+    if prefer_undetected:
         try:
             import undetected_chromedriver as uc
 
@@ -1805,21 +1828,414 @@ def fetch_recipe_page_with_browser(recipe_url):
             options.add_argument("--disable-gpu")
             options.add_argument("--no-sandbox")
             options.add_argument("--disable-dev-shm-usage")
-            options.add_argument("--window-size=1365,900")
-            driver = uc.Chrome(options=options, use_subprocess=True)
+            options.add_argument(f"--window-size={window_size}")
+            return uc.Chrome(options=options, use_subprocess=True)
         except Exception:
-            from selenium import webdriver
-            from selenium.webdriver.chrome.options import Options
+            pass
 
-            options = Options()
-            options.page_load_strategy = "eager"
-            options.add_argument("--headless=new")
-            options.add_argument("--disable-gpu")
-            options.add_argument("--no-sandbox")
-            options.add_argument("--disable-dev-shm-usage")
-            options.add_argument("--window-size=1365,900")
-            driver = webdriver.Chrome(options=options)
+    from selenium import webdriver
+    from selenium.webdriver.chrome.options import Options
 
+    options = Options()
+    options.page_load_strategy = "eager"
+    options.add_argument("--headless=new")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument(f"--window-size={window_size}")
+    return webdriver.Chrome(options=options)
+
+
+def wait_for_browser_document(driver, timeout_seconds=8):
+    deadline = time.monotonic() + timeout_seconds
+
+    while time.monotonic() < deadline:
+        try:
+            ready_state = driver.execute_script("return document.readyState")
+            if ready_state in {"interactive", "complete"}:
+                return
+        except Exception:
+            pass
+
+        time.sleep(0.25)
+
+
+def prepare_page_for_pdf_print(driver):
+    wait_for_browser_document(driver)
+
+    try:
+        driver.execute_script(
+            """
+            window.scrollTo(0, document.body.scrollHeight);
+            """
+        )
+        time.sleep(0.8)
+        driver.execute_script("window.scrollTo(0, 0);")
+        time.sleep(0.4)
+    except Exception:
+        pass
+
+
+def write_pdf_source_html(recipe_url, html_text):
+    base_tag = f'<base href="{html.escape(str(recipe_url or ""), quote=True)}">'
+    source_html = str(html_text or "")
+
+    if not re.search(r"<base\b", source_html, flags=re.IGNORECASE):
+        if re.search(r"<head[^>]*>", source_html, flags=re.IGNORECASE):
+            source_html = re.sub(
+                r"(<head[^>]*>)",
+                lambda match: f"{match.group(1)}\n{base_tag}",
+                source_html,
+                count=1,
+                flags=re.IGNORECASE,
+            )
+        else:
+            source_html = f"{base_tag}\n{source_html}"
+
+    source_path = LOG_FOLDER / f"{safe_filename(recipe_url)}_PDF_SOURCE.html"
+    source_path.write_text(source_html, encoding="utf-8")
+    return source_path
+
+
+def print_current_browser_page_to_pdf(driver, pdf_path):
+    driver.execute_cdp_cmd("Page.enable", {})
+    pdf_result = driver.execute_cdp_cmd(
+        "Page.printToPDF",
+        {
+            "printBackground": True,
+            "preferCSSPageSize": True,
+            "paperWidth": 8.5,
+            "paperHeight": 11,
+            "marginTop": 0.35,
+            "marginBottom": 0.35,
+            "marginLeft": 0.35,
+            "marginRight": 0.35,
+        },
+    )
+    pdf_bytes = base64.b64decode(pdf_result.get("data") or "")
+
+    if len(pdf_bytes) < 1000:
+        raise RuntimeError("Chrome returned an empty recipe PDF.")
+
+    pdf_path.write_bytes(pdf_bytes)
+
+
+def write_recipe_page_pdf(recipe_url, html_text, html_path, pdf_path):
+    driver = None
+    last_error = None
+    source_path = None
+
+    try:
+        driver = create_headless_chrome_driver(
+            window_size="1365,1400",
+            prefer_undetected=False,
+        )
+        driver.set_page_load_timeout(25)
+
+        html_text = html_text or (
+            html_path.read_text(encoding="utf-8") if html_path and html_path.exists() else ""
+        )
+        print_targets = []
+
+        if html_text:
+            source_path = write_pdf_source_html(recipe_url, html_text)
+            print_targets.append(source_path.resolve().as_uri())
+
+        if str(recipe_url or "").lower().startswith(("http://", "https://")):
+            print_targets.append(recipe_url)
+
+        if not print_targets:
+            raise RuntimeError("No recipe HTML was available to print.")
+
+        for target in print_targets:
+            try:
+                driver.get(target)
+                prepare_page_for_pdf_print(driver)
+                print_current_browser_page_to_pdf(driver, pdf_path)
+                remove_temporary_pdf_source(source_path)
+                return pdf_path
+            except Exception as exc:
+                last_error = exc
+
+        raise RuntimeError(f"Could not print recipe PDF: {last_error}") from last_error
+    finally:
+        if driver:
+            try:
+                driver.quit()
+            except Exception:
+                pass
+
+
+def remove_temporary_pdf_source(source_path):
+    if not source_path:
+        return
+
+    try:
+        source_path.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
+def archive_recipe_page_pdf(recipe_url, html_text, html_path, progress_callback=None):
+    if os.getenv("DISABLE_RECIPE_PDF_ARCHIVE") == "1":
+        return None
+
+    pdf_path = recipe_archive_pdf_path(recipe_url)
+
+    if progress_callback:
+        progress_callback(
+            "saving recipe page PDF archive...",
+            "Converting the downloaded webpage into a PDF for long-term review.",
+        )
+
+    try:
+        saved_path = write_recipe_page_pdf(recipe_url, html_text, html_path, pdf_path)
+        print(f"Saved recipe PDF archive: {saved_path}")
+        return saved_path
+    except Exception as exc:
+        error_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_PDF_ERROR.txt"
+        error_path.write_text(str(exc), encoding="utf-8")
+        print(f"Recipe PDF archive failed: {exc}")
+
+        if progress_callback:
+            progress_callback(
+                "PDF archive failed - continuing ingredient extraction...",
+                "Ingredients can still be extracted; the PDF error was saved with the raw extraction files.",
+            )
+
+    return None
+
+
+def archive_uploaded_recipe_pdf(recipe_url, upload_path, mime_type, filename, page_text="", recipe_title=""):
+    if os.getenv("DISABLE_RECIPE_PDF_ARCHIVE") == "1":
+        return None
+
+    pdf_path = recipe_archive_pdf_path(recipe_url)
+    suffix = upload_file_suffix(filename, upload_path)
+
+    try:
+        if mime_type == "application/pdf" or suffix == ".pdf":
+            shutil.copyfile(upload_path, pdf_path)
+            print(f"Saved uploaded recipe PDF archive: {pdf_path}")
+            return pdf_path
+
+        if mime_type.startswith("image/"):
+            html_text = build_upload_image_pdf_html(upload_path, mime_type, filename, recipe_title)
+        elif suffix in {".html", ".htm"}:
+            html_text = upload_path.read_text(encoding="utf-8", errors="ignore")
+        else:
+            text = page_text or extract_text_from_generic_document(upload_path, filename)
+            if not text.strip():
+                return None
+            html_text = build_upload_text_pdf_html(text, filename, recipe_title)
+
+        saved_path = write_recipe_page_pdf(recipe_url, html_text, None, pdf_path)
+        print(f"Saved uploaded recipe PDF archive: {saved_path}")
+        return saved_path
+    except Exception as exc:
+        error_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_PDF_ERROR.txt"
+        error_path.write_text(str(exc), encoding="utf-8")
+        print(f"Uploaded recipe PDF archive failed: {exc}")
+
+    return None
+
+
+def archive_social_video_text_pdf(recipe_url, page_text, progress_callback=None):
+    if os.getenv("DISABLE_RECIPE_PDF_ARCHIVE") == "1":
+        return None
+
+    page_text = str(page_text or "").strip()
+
+    if not page_text:
+        return None
+
+    pdf_path = recipe_archive_pdf_path(recipe_url)
+
+    if progress_callback:
+        progress_callback(
+            "saving video text PDF archive...",
+            "Creating a PDF from the video caption, transcript, or audio transcription text.",
+        )
+
+    try:
+        title = extract_social_text_label(page_text, "title") or "Video Recipe Text"
+        html_text = build_video_text_pdf_html(recipe_url, page_text, title)
+        saved_path = write_recipe_page_pdf(recipe_url, html_text, None, pdf_path)
+        print(f"Saved video text PDF archive: {saved_path}")
+        return saved_path
+    except Exception as exc:
+        error_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_PDF_ERROR.txt"
+        error_path.write_text(str(exc), encoding="utf-8")
+        print(f"Video text PDF archive failed: {exc}")
+
+        if progress_callback:
+            progress_callback(
+                "video PDF archive failed - continuing ingredient extraction...",
+                "Ingredients can still be extracted; the video PDF error was saved with the raw extraction files.",
+            )
+
+    return None
+
+
+def build_video_text_pdf_html(recipe_url, page_text, recipe_title=""):
+    title = html.escape(recipe_title or "Video Recipe Text")
+    source_url = html.escape(str(recipe_url or ""))
+    body_html = format_labeled_text_for_pdf(page_text)
+
+    return f"""
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>{title}</title>
+    <style>
+        body {{
+            margin: 0;
+            padding: 32px;
+            font-family: Arial, sans-serif;
+            color: #111;
+            background: #fff;
+            line-height: 1.45;
+        }}
+        h1 {{
+            margin: 0 0 8px 0;
+            font-size: 24px;
+        }}
+        .source {{
+            margin: 0 0 22px 0;
+            color: #555;
+            font-size: 12px;
+            overflow-wrap: anywhere;
+        }}
+        h2 {{
+            margin: 18px 0 8px 0;
+            font-size: 16px;
+        }}
+        pre {{
+            margin: 0;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            font: inherit;
+        }}
+    </style>
+</head>
+<body>
+    <h1>{title}</h1>
+    <div class="source">Source: {source_url}</div>
+    {body_html}
+</body>
+</html>
+"""
+
+
+def format_labeled_text_for_pdf(page_text):
+    sections = split_labeled_social_text(page_text)
+
+    if not sections:
+        return f"<pre>{html.escape(str(page_text or '').strip())}</pre>"
+
+    return "\n".join(
+        f"<h2>{html.escape(label)}</h2><pre>{html.escape(text)}</pre>"
+        for label, text in sections
+        if text
+    )
+
+
+def split_labeled_social_text(page_text):
+    pattern = r"(?ims)^\s*(title|description|transcript|visible text):\s*(.*?)(?=^\s*(?:title|description|transcript|visible text):|\Z)"
+    sections = []
+
+    for match in re.finditer(pattern, str(page_text or "")):
+        label = clean_recipe_text(match.group(1)).title()
+        text = clean_recipe_text(match.group(2))
+
+        if text:
+            sections.append((label, text))
+
+    return sections
+
+
+def build_upload_image_pdf_html(upload_path, mime_type, filename, recipe_title=""):
+    image_data = base64.b64encode(upload_path.read_bytes()).decode("ascii")
+    title = html.escape(recipe_title or filename or "Uploaded Recipe")
+
+    return f"""
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>{title}</title>
+    <style>
+        body {{
+            margin: 0;
+            padding: 24px;
+            font-family: Arial, sans-serif;
+            color: #111;
+            background: #fff;
+        }}
+        h1 {{
+            margin: 0 0 16px 0;
+            font-size: 22px;
+        }}
+        img {{
+            max-width: 100%;
+            height: auto;
+            display: block;
+        }}
+    </style>
+</head>
+<body>
+    <h1>{title}</h1>
+    <img src="data:{html.escape(mime_type)};base64,{image_data}" alt="{title}">
+</body>
+</html>
+"""
+
+
+def build_upload_text_pdf_html(page_text, filename, recipe_title=""):
+    title = html.escape(recipe_title or filename or "Uploaded Recipe")
+    text = html.escape(str(page_text or "").strip())
+
+    return f"""
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>{title}</title>
+    <style>
+        body {{
+            margin: 0;
+            padding: 32px;
+            font-family: Arial, sans-serif;
+            color: #111;
+            background: #fff;
+            line-height: 1.45;
+        }}
+        h1 {{
+            margin: 0 0 18px 0;
+            font-size: 24px;
+        }}
+        pre {{
+            margin: 0;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            font: inherit;
+        }}
+    </style>
+</head>
+<body>
+    <h1>{title}</h1>
+    <pre>{text}</pre>
+</body>
+</html>
+"""
+
+
+def fetch_recipe_page_with_browser(recipe_url):
+    driver = None
+
+    try:
+        driver = create_headless_chrome_driver()
         driver.set_page_load_timeout(18)
 
         try:
@@ -2422,13 +2838,14 @@ def extract_recipe_from_upload(file_storage):
         or "application/octet-stream"
     )
     mime_type = normalize_upload_mime_type(mime_type, filename, upload_path)
+    upload_suffix = upload_file_suffix(filename, upload_path)
     page_text = ""
 
     try:
         if mime_type.startswith("image/"):
             prompt_text = build_upload_prompt(recipe_url, filename)
             response_text = send_image_prompt_to_openai(prompt_text, upload_path, mime_type)
-        elif mime_type.startswith("text/") or upload_path.suffix.lower() in {".txt", ".md"}:
+        elif mime_type.startswith("text/") or upload_suffix in {".txt", ".md"}:
             page_text = upload_path.read_text(encoding="utf-8", errors="ignore")
             prompt_text = build_prompt(recipe_url, page_text[:MAX_PAGE_TEXT_CHARS])
             response_text = send_prompt_to_openai(prompt_text)
@@ -2436,7 +2853,7 @@ def extract_recipe_from_upload(file_storage):
             prompt_text = build_upload_prompt(recipe_url, filename)
             response_text = send_file_prompt_to_openai(prompt_text, upload_path, mime_type, filename)
         else:
-            page_text = extract_text_from_generic_document(upload_path)
+            page_text = extract_text_from_generic_document(upload_path, filename)
 
             if not page_text.strip():
                 return {
@@ -2473,6 +2890,14 @@ def extract_recipe_from_upload(file_storage):
             filename,
             page_text,
         )
+        archive_uploaded_recipe_pdf(
+            recipe_url,
+            upload_path,
+            mime_type,
+            filename,
+            page_text=page_text,
+            recipe_title=json_data.get("recipe_title") or "",
+        )
         save_extracted_recipe_json(recipe_url, json_data)
 
         return build_extract_result(recipe_url, json_data, "upload")
@@ -2487,12 +2912,16 @@ def extract_recipe_from_upload(file_storage):
 
 
 def upload_can_use_openai_file_input(mime_type, filename, upload_path):
-    suffix = Path(filename or upload_path.name).suffix.lower()
+    suffix = upload_file_suffix(filename, upload_path)
 
     if mime_type in OPENAI_FILE_INPUT_MIME_TYPES:
         return True
 
     return suffix == ".pdf"
+
+
+def upload_file_suffix(filename, upload_path):
+    return Path(filename or "").suffix.lower() or upload_path.suffix.lower()
 
 
 def normalize_upload_mime_type(mime_type, filename, upload_path):
@@ -2709,8 +3138,8 @@ def extract_text_from_pdf(upload_path):
     return "\n".join(page_text)
 
 
-def extract_text_from_generic_document(upload_path):
-    suffix = upload_path.suffix.lower()
+def extract_text_from_generic_document(upload_path, filename=None):
+    suffix = upload_file_suffix(filename, upload_path)
 
     if suffix == ".docx":
         return extract_text_from_docx(upload_path)

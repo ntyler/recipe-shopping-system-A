@@ -1416,6 +1416,17 @@ body {
             cursor: pointer;
         }
 
+        .recipe-url-summary-actions {
+            display: inline-flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .recipe-url-summary-pdf {
+            flex: 0 0 auto;
+        }
+
         .recipe-label {
             color: #00cc66;
             font-weight: bold;
@@ -1429,7 +1440,7 @@ body {
         .recipe-log-header,
         .recipe-row {
             display: grid;
-            grid-template-columns: 96px minmax(260px, 1fr) 80px 130px 96px 44px;
+            grid-template-columns: 96px minmax(220px, 1fr) 80px 130px 150px 44px;
             align-items: center;
             margin-bottom: 8px;
             gap: 10px;
@@ -1553,6 +1564,32 @@ body {
             align-items: center;
             gap: 8px;
             justify-content: flex-start;
+        }
+
+        .recipe-archive-pdf-btn {
+            width: auto;
+            min-width: 44px;
+            height: 32px;
+            margin: 0;
+            padding: 0 10px;
+            border-radius: 6px;
+            background: #134e4a;
+            color: #ccfbf1;
+            font-size: 13px;
+            font-weight: 800;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            white-space: nowrap;
+        }
+
+        .recipe-archive-pdf-btn:hover,
+        .recipe-archive-pdf-btn:focus {
+            background: #0f766e;
+            color: #fff;
+            outline: none;
         }
 
         .edit-recipe-btn {
@@ -3434,14 +3471,20 @@ body {
                 align-items: start;
             }
 
-            .recipe-url-summary-food-review {
+            .recipe-url-summary-actions {
                 grid-column: 2 / 3;
+                justify-self: start;
+                justify-content: flex-start;
+                flex-wrap: wrap;
+            }
+
+            .recipe-url-summary-food-review {
                 justify-self: start;
             }
 
             .recipe-row {
                 display: grid;
-                grid-template-columns: minmax(0, 1fr) minmax(90px, 104px) 44px;
+                grid-template-columns: minmax(0, 1fr) minmax(130px, 154px) 44px;
                 gap: 10px 10px;
                 align-items: center;
                 margin-bottom: 16px;
@@ -3519,6 +3562,13 @@ body {
                 flex-wrap: nowrap;
             }
 
+            .recipe-archive-pdf-btn {
+                flex: 0 0 44px;
+                min-width: 44px;
+                height: 32px;
+                padding: 0 8px;
+            }
+
             .remove-recipe-form {
                 grid-column: 3 / 4;
                 grid-row: 3;
@@ -3528,7 +3578,8 @@ body {
             }
 
             .edit-recipe-btn {
-                width: 100%;
+                width: auto;
+                flex: 1 1 auto;
                 min-width: 0;
                 height: 32px;
                 margin: 0;

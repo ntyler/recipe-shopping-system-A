@@ -56,6 +56,7 @@ Optional recipe-fetch controls:
 ```powershell
 $env:DISABLE_BROWSER_RECIPE_FETCH="1"
 $env:DISABLE_RECIPE_HTML_CACHE_FALLBACK="1"
+$env:DISABLE_RECIPE_PDF_ARCHIVE="1"
 $env:FORCE_OPENAI_RECIPE_EXTRACTION="1"
 ```
 
@@ -63,6 +64,7 @@ Notes:
 
 - Leave `DISABLE_BROWSER_RECIPE_FETCH` unset unless you do not want Selenium/Chrome fallback.
 - Leave `DISABLE_RECIPE_HTML_CACHE_FALLBACK` unset if you want the app to reuse cached recipe HTML when a live page fails.
+- Leave `DISABLE_RECIPE_PDF_ARCHIVE` unset if you want each extracted recipe page saved as a PDF for later review.
 - Set `FORCE_OPENAI_RECIPE_EXTRACTION=1` only when you want the OpenAI extractor used even if recipe-card HTML already has enough structured data.
 
 On Windows, you can make variables persistent with:
@@ -256,6 +258,7 @@ Common files:
 - `shopping_item_state.json`: checked items, selected stores, and manual item quantities
 - `store_settings.json`: store list and enabled stores
 - `extract_progress.json`: current extraction progress for the overlay
+- `pdf/*.pdf`: archived recipe PDFs created during extraction, including webpage PDFs, upload PDFs, and video caption/transcript PDFs
 - `output/*.json`: extracted recipe JSON output
 - `output/sorted_ingredients.txt`: sorted shopping-list text
 

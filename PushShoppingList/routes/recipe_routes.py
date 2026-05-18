@@ -1,7 +1,9 @@
 from flask import Blueprint
+from flask import abort
 from flask import jsonify
 from flask import redirect
 from flask import request
+from flask import send_file
 
 from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
 from PushShoppingList.services.extraction_progress_service import batch_has_success
@@ -19,6 +21,7 @@ from PushShoppingList.services.extraction_progress_service import request_cancel
 from PushShoppingList.services.extraction_progress_service import start_progress
 from PushShoppingList.services.recipe_extract_service import extract_recipe_from_upload
 from PushShoppingList.services.recipe_extract_service import extract_recipe_from_url
+from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_path
 from PushShoppingList.services.food_review_alternative_service import suggest_food_review_alternatives
 from PushShoppingList.services.recipe_edit_service import load_editable_recipe
 from PushShoppingList.services.recipe_edit_service import save_editable_recipe
@@ -285,6 +288,26 @@ def api_recipe_route():
     status = 200 if result.get("ok") else 400
 
     return jsonify(result), status
+
+
+@recipe_bp.route("/recipe_archive_pdf", methods=["GET"])
+def recipe_archive_pdf_route():
+    url = str(request.args.get("url", "") or "").strip()
+
+    if not url:
+        abort(404)
+
+    pdf_path = recipe_archive_pdf_path(url)
+
+    if not pdf_path.exists():
+        abort(404)
+
+    return send_file(
+        pdf_path,
+        mimetype="application/pdf",
+        as_attachment=False,
+        download_name=pdf_path.name,
+    )
 
 
 @recipe_bp.route("/api/food_review_alternatives", methods=["POST"])
