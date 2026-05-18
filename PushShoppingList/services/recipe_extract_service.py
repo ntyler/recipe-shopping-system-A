@@ -151,6 +151,38 @@ EQUIPMENT_PATTERNS_BY_NAME = {
     name: patterns
     for name, _category, patterns in EQUIPMENT_INFERENCE_RULES
 }
+PDF_PRINT_FIX_CSS = """
+@media print {
+  html,
+  body {
+    height: auto !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    padding-top: 0 !important;
+    transform: none !important;
+  }
+
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  [style*="position: fixed"],
+  [style*="position:fixed"],
+  [style*="position: sticky"],
+  [style*="position:sticky"],
+  .fixed,
+  .sticky,
+  .sticky-header,
+  .site-header,
+  .site-header-wrapper,
+  .mob-menu-header-holder {
+    position: static !important;
+    top: auto !important;
+    transform: none !important;
+  }
+}
+"""
 
 client = None
 
@@ -1864,6 +1896,42 @@ def prepare_page_for_pdf_print(driver):
     wait_for_browser_document(driver)
 
     try:
+        driver.execute_cdp_cmd("Emulation.setEmulatedMedia", {"media": "print"})
+    except Exception:
+        pass
+
+    try:
+        driver.execute_script(
+            """
+            const existing = document.getElementById("shopping-app-pdf-print-fix");
+            if (!existing) {
+                const style = document.createElement("style");
+                style.id = "shopping-app-pdf-print-fix";
+                style.textContent = arguments[0];
+                document.head.appendChild(style);
+            }
+
+            for (const element of document.querySelectorAll("*")) {
+                const position = window.getComputedStyle(element).position;
+                if (position === "fixed" || position === "sticky") {
+                    element.style.setProperty("position", "static", "important");
+                    element.style.setProperty("top", "auto", "important");
+                    element.style.setProperty("bottom", "auto", "important");
+                    element.style.setProperty("transform", "none", "important");
+                }
+            }
+
+            document.documentElement.style.setProperty("scroll-padding-top", "0", "important");
+            document.body.style.setProperty("padding-top", "0", "important");
+            window.scrollTo(0, 0);
+            """,
+            PDF_PRINT_FIX_CSS,
+        )
+        time.sleep(0.4)
+    except Exception:
+        pass
+
+    try:
         driver.execute_script(
             """
             window.scrollTo(0, document.body.scrollHeight);
@@ -1878,23 +1946,55 @@ def prepare_page_for_pdf_print(driver):
 
 def write_pdf_source_html(recipe_url, html_text):
     base_tag = f'<base href="{html.escape(str(recipe_url or ""), quote=True)}">'
-    source_html = str(html_text or "")
+    print_fix_tag = f'<style id="shopping-app-pdf-print-fix">{PDF_PRINT_FIX_CSS}</style>'
+    source_html = sanitize_html_for_pdf_source(html_text)
+    head_inserts = "\n".join([base_tag, print_fix_tag])
 
     if not re.search(r"<base\b", source_html, flags=re.IGNORECASE):
         if re.search(r"<head[^>]*>", source_html, flags=re.IGNORECASE):
             source_html = re.sub(
                 r"(<head[^>]*>)",
-                lambda match: f"{match.group(1)}\n{base_tag}",
+                lambda match: f"{match.group(1)}\n{head_inserts}",
                 source_html,
                 count=1,
                 flags=re.IGNORECASE,
             )
         else:
-            source_html = f"{base_tag}\n{source_html}"
+            source_html = f"{head_inserts}\n{source_html}"
+    elif "shopping-app-pdf-print-fix" not in source_html:
+        if re.search(r"<head[^>]*>", source_html, flags=re.IGNORECASE):
+            source_html = re.sub(
+                r"(<head[^>]*>)",
+                lambda match: f"{match.group(1)}\n{print_fix_tag}",
+                source_html,
+                count=1,
+                flags=re.IGNORECASE,
+            )
+        else:
+            source_html = f"{print_fix_tag}\n{source_html}"
 
     source_path = LOG_FOLDER / f"{safe_filename(recipe_url)}_PDF_SOURCE.html"
     source_path.write_text(source_html, encoding="utf-8")
     return source_path
+
+
+def sanitize_html_for_pdf_source(html_text):
+    source_html = str(html_text or "")
+
+    try:
+        soup = BeautifulSoup(source_html, "html.parser")
+
+        for tag in soup(["script", "iframe"]):
+            tag.decompose()
+
+        for tag in soup.find_all(True):
+            for attr_name in list(tag.attrs):
+                if str(attr_name).lower().startswith("on"):
+                    del tag.attrs[attr_name]
+
+        return str(soup)
+    except Exception:
+        return source_html
 
 
 def print_current_browser_page_to_pdf(driver, pdf_path):
@@ -1903,13 +2003,15 @@ def print_current_browser_page_to_pdf(driver, pdf_path):
         "Page.printToPDF",
         {
             "printBackground": True,
-            "preferCSSPageSize": True,
+            "displayHeaderFooter": False,
+            "preferCSSPageSize": False,
             "paperWidth": 8.5,
             "paperHeight": 11,
-            "marginTop": 0.35,
-            "marginBottom": 0.35,
-            "marginLeft": 0.35,
-            "marginRight": 0.35,
+            "marginTop": 0.65,
+            "marginBottom": 0.45,
+            "marginLeft": 0.45,
+            "marginRight": 0.45,
+            "scale": 0.92,
         },
     )
     pdf_bytes = base64.b64decode(pdf_result.get("data") or "")
@@ -1930,7 +2032,7 @@ def write_recipe_page_pdf(recipe_url, html_text, html_path, pdf_path):
             window_size="1365,1400",
             prefer_undetected=False,
         )
-        driver.set_page_load_timeout(25)
+        driver.set_page_load_timeout(45)
 
         html_text = html_text or (
             html_path.read_text(encoding="utf-8") if html_path and html_path.exists() else ""
@@ -1940,8 +2042,7 @@ def write_recipe_page_pdf(recipe_url, html_text, html_path, pdf_path):
         if html_text:
             source_path = write_pdf_source_html(recipe_url, html_text)
             print_targets.append(source_path.resolve().as_uri())
-
-        if str(recipe_url or "").lower().startswith(("http://", "https://")):
+        elif str(recipe_url or "").lower().startswith(("http://", "https://")):
             print_targets.append(recipe_url)
 
         if not print_targets:
@@ -1949,11 +2050,20 @@ def write_recipe_page_pdf(recipe_url, html_text, html_path, pdf_path):
 
         for target in print_targets:
             try:
-                driver.get(target)
+                try:
+                    driver.get(target)
+                except Exception:
+                    if len(driver.page_source or "") < 1000:
+                        raise
+
+                    print("PDF page load timed out after partial load; printing current page.")
+
                 prepare_page_for_pdf_print(driver)
                 print_current_browser_page_to_pdf(driver, pdf_path)
                 remove_temporary_pdf_source(source_path)
                 return pdf_path
+            except PermissionError:
+                raise
             except Exception as exc:
                 last_error = exc
 
