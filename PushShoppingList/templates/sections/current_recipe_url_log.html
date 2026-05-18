@@ -110,14 +110,6 @@
                        rel="noopener noreferrer"
                        data-recipe-url="{{ recipe.url }}">{{ recipe.name }}</a>
                     <div class="recipe-url-summary-actions">
-                        {% if recipe.archive_pdf_available %}
-                            <a class="recipe-archive-pdf-btn recipe-url-summary-pdf"
-                               href="{{ url_for('recipe_bp.recipe_archive_pdf_route', url=recipe.url) }}"
-                               target="_blank"
-                               rel="noopener noreferrer">
-                                PDF
-                            </a>
-                        {% endif %}
                         {% if recipe.food_rule_status.needs_review %}
                             <button type="button"
                                     class="food-rule-marker recipe-log-food-review-btn recipe-url-summary-food-review"
@@ -127,6 +119,14 @@
                                     onclick="openRecipeEditor(this, { scrollToFoodReview: true })">
                                 Food Review ({{ recipe.food_rule_status.count }})
                             </button>
+                        {% endif %}
+                        {% if recipe.archive_pdf_available %}
+                            <a class="recipe-archive-pdf-btn recipe-url-summary-pdf"
+                               href="{{ url_for('recipe_bp.recipe_archive_pdf_route', url=recipe.url) }}"
+                               target="_blank"
+                               rel="noopener noreferrer">
+                                PDF
+                            </a>
                         {% endif %}
                     </div>
                 </div>

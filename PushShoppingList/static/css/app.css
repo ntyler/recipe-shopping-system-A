@@ -1379,7 +1379,7 @@ body {
 
         .recipe-url-summary-row {
             display: grid;
-            grid-template-columns: 96px minmax(0, 1fr) auto;
+            grid-template-columns: 96px minmax(0, 1fr) 176px;
             gap: 10px;
             align-items: center;
             padding-bottom: 8px;
@@ -1421,6 +1421,8 @@ body {
             align-items: center;
             justify-content: flex-end;
             gap: 8px;
+            justify-self: end;
+            width: 176px;
         }
 
         .recipe-url-summary-pdf {
@@ -3476,6 +3478,7 @@ body {
                 justify-self: start;
                 justify-content: flex-start;
                 flex-wrap: wrap;
+                width: 100%;
             }
 
             .recipe-url-summary-food-review {
