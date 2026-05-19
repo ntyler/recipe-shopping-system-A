@@ -50,6 +50,21 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertFalse(viable)
         self.assertIn("Missing required food preference: must be organic", skip_reasons)
 
+    def test_chatgpt_mismatch_is_not_selectable(self):
+        item = candidate("Organic Lemon")
+        item["chatgpt_analysis"] = {
+            "status": "done",
+            "is_product_page": True,
+            "is_correct_product": False,
+            "ingredient_match_confidence": 0.1,
+            "confidence": 0.9,
+        }
+
+        _, _, skip_reasons, viable = score_candidate("lemon", item)
+
+        self.assertFalse(viable)
+        self.assertIn("ChatGPT analysis says the loaded page does not match the shopping item.", skip_reasons)
+
     def test_or_ingredients_are_searched_as_separate_terms(self):
         stores = {
             "aldi": {

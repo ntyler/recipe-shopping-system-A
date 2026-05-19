@@ -19,10 +19,13 @@ from urllib.parse import urlunparse
 
 import requests
 from bs4 import BeautifulSoup
+from openai import OpenAI
 
 from PushShoppingList.services.food_rules_service import annotate_product_food_rules
+from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.home_address_service import load_home_address
 from PushShoppingList.services.item_state_service import save_item_store
+from PushShoppingList.services.rules_display_service import load_rules_display
 from PushShoppingList.services.shopping_list_service import load_items
 from PushShoppingList.services.store_settings_service import load_store_settings
 
@@ -79,6 +82,9 @@ TOKEN_ALIASES = {
 }
 DETAIL_REQUIRED = os.getenv("PRODUCT_REQUIRE_DETAIL_PAGE", "1") != "0"
 BROWSER_SEARCH_MODE = os.getenv("PRODUCT_SEARCH_BROWSER_MODE", "always").strip().lower()
+PRODUCT_ANALYSIS_MODEL = os.getenv("OPENAI_PRODUCT_ANALYSIS_MODEL", os.getenv("OPENAI_RECIPE_MODEL", "gpt-4o-mini"))
+PRODUCT_ANALYSIS_CLIENT = None
+PRODUCT_AI_ANALYSIS_LOCK = threading.BoundedSemaphore(2)
 
 
 def product_candidate_limit():
@@ -137,6 +143,52 @@ def product_detail_limit():
         configured = 8
 
     return max(1, min(16, configured))
+
+
+def product_ai_analysis_limit():
+    try:
+        configured = int(os.getenv("PRODUCT_AI_ANALYSIS_LIMIT_PER_STORE", "1"))
+    except (TypeError, ValueError):
+        configured = 1
+
+    return max(0, min(4, configured))
+
+
+def product_ai_html_chars():
+    try:
+        configured = int(os.getenv("PRODUCT_AI_HTML_CHARS", "45000"))
+    except (TypeError, ValueError):
+        configured = 45000
+
+    return max(8000, min(100000, configured))
+
+
+def product_ai_text_chars():
+    try:
+        configured = int(os.getenv("PRODUCT_AI_TEXT_CHARS", "20000"))
+    except (TypeError, ValueError):
+        configured = 20000
+
+    return max(4000, min(50000, configured))
+
+
+def product_ai_analysis_enabled():
+    if os.getenv("DISABLE_PRODUCT_CHATGPT_ANALYSIS") == "1":
+        return False
+
+    return bool(os.getenv("OPENAI_API_KEY"))
+
+
+def get_product_analysis_client():
+    global PRODUCT_ANALYSIS_CLIENT
+
+    if not product_ai_analysis_enabled():
+        return None
+
+    if PRODUCT_ANALYSIS_CLIENT is None:
+        PRODUCT_ANALYSIS_CLIENT = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), timeout=45)
+
+    return PRODUCT_ANALYSIS_CLIENT
 
 
 def new_product_job_id():
@@ -996,6 +1048,10 @@ def enrich_product_candidates_from_pages(
         candidate.get("id")
         for candidate in detail_candidates[:limit]
     }
+    analysis_ids = {
+        candidate.get("id")
+        for candidate in detail_candidates[:product_ai_analysis_limit()]
+    }
     total = min(len(detail_candidates), limit)
     evaluated = 0
 
@@ -1012,15 +1068,25 @@ def enrich_product_candidates_from_pages(
             continue
 
         evaluated += 1
+        use_chatgpt_analysis = candidate.get("id") in analysis_ids
         if job_id and progress_index is not None:
+            action = (
+                "Opening fully loaded page for ChatGPT analysis"
+                if use_chatgpt_analysis
+                else "Opening full product page"
+            )
             mark_product_download(
                 job_id,
                 progress_index,
                 "running",
-                f"Opening full {store_name} product page {evaluated} of {total}: {candidate.get('product_name', ingredient)}",
+                f"{action} from {store_name} {evaluated} of {total}: {candidate.get('product_name', ingredient)}",
             )
 
-        enriched.append(enrich_product_candidate_from_page(candidate, ingredient))
+        enriched.append(enrich_product_candidate_from_page(
+            candidate,
+            ingredient,
+            use_chatgpt_analysis=use_chatgpt_analysis,
+        ))
 
     return enriched
 
@@ -1047,13 +1113,14 @@ def mark_detail_skipped(candidate, reason):
     return candidate
 
 
-def enrich_product_candidate_from_page(candidate, ingredient):
+def enrich_product_candidate_from_page(candidate, ingredient, use_chatgpt_analysis=False):
     product_url = candidate.get("product_url", "")
     fetch = fetch_product_page_html(
         product_url,
         candidate.get("product_name", ""),
         candidate.get("home_address", ""),
         candidate.get("home_location"),
+        prefer_browser=use_chatgpt_analysis,
     )
 
     candidate["detail_fetch"] = {
@@ -1073,10 +1140,14 @@ def enrich_product_candidate_from_page(candidate, ingredient):
 
     details = extract_product_details_from_html(html_text, fetch.get("final_url") or product_url, candidate)
     apply_product_details_to_candidate(candidate, details, fetch, ingredient)
+
+    if use_chatgpt_analysis:
+        apply_chatgpt_product_page_analysis(candidate, html_text, ingredient)
+
     return candidate
 
 
-def fetch_product_page_html(product_url, expected_name="", full_address="", home_location=None):
+def fetch_product_page_html(product_url, expected_name="", full_address="", home_location=None, prefer_browser=False):
     result = {
         "status": "failed",
         "method": "requests",
@@ -1085,6 +1156,17 @@ def fetch_product_page_html(product_url, expected_name="", full_address="", home
         "html": "",
         "error": "",
     }
+    browser_result = {}
+
+    if prefer_browser and os.getenv("DISABLE_BROWSER_PRODUCT_FETCH") != "1":
+        browser_result = fetch_product_page_html_with_browser(
+            product_url,
+            expected_name,
+            full_address=full_address,
+            home_location=home_location,
+        )
+        if browser_result.get("html"):
+            return browser_result
 
     try:
         response = requests.get(
@@ -1112,17 +1194,22 @@ def fetch_product_page_html(product_url, expected_name="", full_address="", home
 
         result["status"] = "done"
         result["method"] = "requests"
-        result["warning"] = "Page content looked sparse, and browser product fetch is disabled."
+        result["warning"] = (
+            "Browser full-page fetch is disabled."
+            if prefer_browser
+            else "Page content looked sparse, and browser product fetch is disabled."
+        )
         return result
 
-    browser_result = fetch_product_page_html_with_browser(
-        product_url,
-        expected_name,
-        full_address=full_address,
-        home_location=home_location,
-    )
-    if browser_result.get("html"):
-        return browser_result
+    if not prefer_browser:
+        browser_result = fetch_product_page_html_with_browser(
+            product_url,
+            expected_name,
+            full_address=full_address,
+            home_location=home_location,
+        )
+        if browser_result.get("html"):
+            return browser_result
 
     if result.get("html"):
         result["status"] = "done"
@@ -1355,6 +1442,327 @@ def apply_product_details_to_candidate(candidate, details, fetch, ingredient):
             candidate.get("skip_reasons", [])
             + ["Full product page content did not confirm a strong ingredient match."]
         )
+
+
+def apply_chatgpt_product_page_analysis(candidate, html_text, ingredient):
+    analysis = analyze_product_page_with_chatgpt(candidate, html_text, ingredient)
+    candidate["chatgpt_analysis"] = analysis
+
+    if analysis.get("status") != "done":
+        candidate["ranking_reasons"] = unique_texts(
+            candidate.get("ranking_reasons", [])
+            + [analysis.get("message") or "ChatGPT product page analysis was skipped."]
+        )
+        return candidate
+
+    for key in [
+        "brand",
+        "description",
+        "ingredients_text",
+        "category",
+        "size",
+        "package_size",
+        "unit_price",
+        "image_url",
+        "availability",
+    ]:
+        value = analysis.get(key)
+        if value not in (None, ""):
+            candidate[key] = value
+
+    if analysis.get("product_name"):
+        candidate["product_name"] = analysis["product_name"]
+
+    if analysis.get("price"):
+        candidate["price"] = analysis["price"]
+
+    if analysis.get("unit_price_value") is not None:
+        candidate["unit_price_value"] = analysis["unit_price_value"]
+
+    if analysis.get("unit_price_unit"):
+        candidate["unit_price_unit"] = analysis["unit_price_unit"]
+
+    if analysis.get("in_stock") is not None:
+        candidate["in_stock"] = analysis["in_stock"]
+
+    if analysis.get("is_organic") is not None:
+        candidate["is_organic"] = analysis["is_organic"]
+
+    if candidate.get("package_size") and not candidate.get("size"):
+        candidate["size"] = candidate["package_size"]
+
+    candidate["chatgpt_confidence"] = analysis.get("confidence")
+    candidate["chatgpt_ingredient_match_confidence"] = analysis.get("ingredient_match_confidence")
+    candidate["chatgpt_food_rules_ok"] = analysis.get("food_rules_ok")
+    candidate["chatgpt_is_correct_product"] = analysis.get("is_correct_product")
+    candidate["ranking_reasons"] = unique_texts(
+        candidate.get("ranking_reasons", [])
+        + [analysis.get("reason") or "ChatGPT analyzed the fully loaded product page against the saved rules."]
+    )
+
+    missing_required = analysis.get("missing_required", [])
+    blocked_by = analysis.get("blocked_by", [])
+    food_rules_ok = analysis.get("food_rules_ok")
+
+    if food_rules_ok is False and not missing_required and not blocked_by:
+        missing_required = ["ChatGPT could not confirm the required food preferences."]
+
+    if food_rules_ok is not None:
+        candidate["food_rule_status"] = {
+            "ok": bool(food_rules_ok) and not missing_required and not blocked_by,
+            "needs_review": bool(missing_required or blocked_by or not food_rules_ok),
+            "missing_required": missing_required,
+            "blocked_by": blocked_by,
+            "marker": food_rule_marker_text(missing_required, blocked_by),
+        }
+
+    if analysis.get("is_correct_product") is False:
+        candidate["skip_reasons"] = unique_texts(
+            candidate.get("skip_reasons", [])
+            + ["ChatGPT analysis says the fully loaded product page does not match this shopping item."]
+        )
+
+    candidate["id"] = product_candidate_id(
+        candidate.get("store_key"),
+        candidate.get("product_url"),
+        candidate.get("product_name"),
+        candidate.get("price"),
+    )
+    return candidate
+
+
+def analyze_product_page_with_chatgpt(candidate, html_text, ingredient):
+    client = get_product_analysis_client()
+
+    if not client:
+        return {
+            "status": "skipped",
+            "message": "ChatGPT product analysis skipped because OPENAI_API_KEY is not set.",
+        }
+
+    page_payload = product_page_ai_payload(html_text)
+    rules_payload = product_analysis_rules_payload()
+
+    try:
+        with PRODUCT_AI_ANALYSIS_LOCK:
+            response = client.chat.completions.create(
+                model=PRODUCT_ANALYSIS_MODEL,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You analyze grocery product pages for a shopping-list app. "
+                            "Use the user's saved rules strictly. Return only valid JSON."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": build_product_page_analysis_prompt(
+                            ingredient,
+                            candidate,
+                            rules_payload,
+                            page_payload,
+                        ),
+                    },
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.1,
+            )
+        data = json.loads(clean_json_response(response.choices[0].message.content))
+    except Exception as exc:
+        return {
+            "status": "failed",
+            "message": f"ChatGPT product analysis failed: {exc}",
+        }
+
+    analysis = normalize_chatgpt_product_analysis(data)
+    analysis["status"] = "done"
+    analysis["model"] = PRODUCT_ANALYSIS_MODEL
+    analysis["html_chars_sent"] = len(page_payload.get("html", ""))
+    analysis["visible_text_chars_sent"] = len(page_payload.get("visible_text", ""))
+    analysis["html_truncated"] = page_payload.get("html_truncated", False)
+    analysis["visible_text_truncated"] = page_payload.get("visible_text_truncated", False)
+    return analysis
+
+
+def product_page_ai_payload(html_text):
+    soup = BeautifulSoup(html_text or "", "html.parser")
+
+    for tag in soup(["script", "style", "noscript", "svg"]):
+        tag.decompose()
+
+    visible_text = clean_text(soup.get_text(" ", strip=True))
+    compact_html = re.sub(r"\s+", " ", str(soup)).strip()
+    max_html = product_ai_html_chars()
+    max_text = product_ai_text_chars()
+
+    return {
+        "visible_text": visible_text[:max_text],
+        "visible_text_truncated": len(visible_text) > max_text,
+        "html": compact_html[:max_html],
+        "html_truncated": len(compact_html) > max_html,
+    }
+
+
+def product_analysis_rules_payload():
+    try:
+        food_rules = load_food_rules()
+    except Exception:
+        food_rules = {"require": [], "avoid": []}
+
+    try:
+        rules_display = load_rules_display()
+        ranking_rules = rules_display.get("best_product_ranking", {}).get("rows", [])
+    except Exception:
+        ranking_rules = []
+
+    return {
+        "food_rules": food_rules,
+        "best_product_ranking": ranking_rules,
+    }
+
+
+def build_product_page_analysis_prompt(ingredient, candidate, rules_payload, page_payload):
+    extracted = {
+        "store": candidate.get("store_name", ""),
+        "candidate_name": candidate.get("product_name", ""),
+        "candidate_price": candidate.get("price", ""),
+        "candidate_size": product_size(candidate),
+        "candidate_url": candidate.get("product_url", ""),
+        "search_url": candidate.get("search_url", ""),
+        "local_food_rule_status": candidate.get("food_rule_status", {}),
+    }
+
+    return f"""
+Analyze this grocery product page for the shopping item:
+{ingredient}
+
+Candidate already extracted by the app:
+{json.dumps(extracted, ensure_ascii=False)}
+
+Saved food rules:
+{json.dumps(rules_payload.get("food_rules", {}), ensure_ascii=False)}
+
+Saved best-product ranking guidance:
+{json.dumps(rules_payload.get("best_product_ranking", []), ensure_ascii=False)}
+
+Rules for your analysis:
+- Decide whether this is a specific purchasable grocery product that matches the shopping item. If the shopping item contains OR/and-or alternatives, matching any one alternative is acceptable.
+- Apply required food rules strictly. If the fully loaded product page does not confirm a required trait, include that rule under missing_required.
+- Apply avoid rules strictly. If the product page ingredients, title, labels, or description include an avoided term, include that rule under blocked_by.
+- Do not call a product food_rules_ok if required rules are missing or avoid rules are present.
+- Prefer evidence from product name, labels, ingredients, nutrition, availability, and price. Do not use unrelated recommendations, ads, or footer text.
+
+Fully loaded product page visible text:
+{page_payload.get("visible_text", "")}
+
+Fully loaded product page HTML excerpt:
+{page_payload.get("html", "")}
+
+Return only JSON with this shape:
+{{
+  "is_product_page": true,
+  "is_correct_product": true,
+  "ingredient_match_confidence": 0.0,
+  "food_rules_ok": true,
+  "missing_required": [],
+  "blocked_by": [],
+  "product_name": "",
+  "brand": "",
+  "description": "",
+  "ingredients_text": "",
+  "category": "",
+  "price": "",
+  "size": "",
+  "package_size": "",
+  "unit_price": "",
+  "unit_price_value": null,
+  "unit_price_unit": "",
+  "availability": "",
+  "in_stock": null,
+  "is_organic": null,
+  "confidence": 0.0,
+  "reason": "",
+  "evidence": []
+}}
+"""
+
+
+def normalize_chatgpt_product_analysis(data):
+    data = data if isinstance(data, dict) else {}
+
+    return {
+        "is_product_page": bool_or_none(data.get("is_product_page")),
+        "is_correct_product": bool_or_none(data.get("is_correct_product")),
+        "ingredient_match_confidence": bounded_confidence(data.get("ingredient_match_confidence")),
+        "food_rules_ok": bool_or_none(data.get("food_rules_ok")),
+        "missing_required": clean_text_list(data.get("missing_required")),
+        "blocked_by": clean_text_list(data.get("blocked_by")),
+        "product_name": clean_text(data.get("product_name")),
+        "brand": clean_text(data.get("brand")),
+        "description": clean_text(data.get("description")),
+        "ingredients_text": clean_text(data.get("ingredients_text")),
+        "category": clean_text(data.get("category")),
+        "price": clean_text(data.get("price")),
+        "size": clean_text(data.get("size")),
+        "package_size": clean_text(data.get("package_size")),
+        "unit_price": clean_text(data.get("unit_price")),
+        "unit_price_value": safe_float(data.get("unit_price_value")),
+        "unit_price_unit": clean_text(data.get("unit_price_unit")),
+        "availability": clean_text(data.get("availability")),
+        "in_stock": bool_or_none(data.get("in_stock")),
+        "is_organic": bool_or_none(data.get("is_organic")),
+        "confidence": bounded_confidence(data.get("confidence")),
+        "reason": clean_text(data.get("reason")),
+        "evidence": clean_text_list(data.get("evidence")),
+    }
+
+
+def clean_json_response(text):
+    value = str(text or "").strip()
+    value = re.sub(r"^```(?:json)?", "", value, flags=re.IGNORECASE).strip()
+    value = re.sub(r"```$", "", value).strip()
+    return value
+
+
+def bool_or_none(value):
+    if isinstance(value, bool):
+        return value
+
+    text = str(value or "").strip().lower()
+    if text in {"true", "yes", "1"}:
+        return True
+    if text in {"false", "no", "0"}:
+        return False
+
+    return None
+
+
+def bounded_confidence(value):
+    number = safe_float(value)
+    if number is None:
+        return None
+
+    return round(max(0.0, min(1.0, number)), 3)
+
+
+def clean_text_list(value):
+    if isinstance(value, str):
+        parts = re.split(r"[,;\n]+", value)
+    elif isinstance(value, list):
+        parts = value
+    else:
+        parts = []
+
+    return unique_texts(parts)
+
+
+def food_rule_marker_text(missing_required, blocked_by):
+    issues = []
+    issues.extend(missing_required or [])
+    issues.extend(blocked_by or [])
+
+    return "Food rule review: " + "; ".join(issues) if issues else ""
 
 
 def best_product_mapping_for_candidate(soup, candidate):
@@ -2730,6 +3138,9 @@ def score_candidate(ingredient, candidate):
         "unit_price_unit": candidate.get("unit_price_unit", ""),
         "package_size": candidate.get("package_size", ""),
         "in_stock": candidate.get("in_stock"),
+        "chatgpt_analysis_status": (candidate.get("chatgpt_analysis") or {}).get("status", ""),
+        "chatgpt_confidence": candidate.get("chatgpt_confidence"),
+        "chatgpt_ingredient_match_confidence": candidate.get("chatgpt_ingredient_match_confidence"),
     }
     candidate["ranking_metadata"] = metadata
 
@@ -2765,6 +3176,35 @@ def score_candidate(ingredient, candidate):
         score -= 20
         viable = False
         skip_reasons.append("Full product details do not confirm enough ingredient terms.")
+
+    ai_analysis = candidate.get("chatgpt_analysis") or {}
+    if ai_analysis.get("status") == "done":
+        if ai_analysis.get("is_product_page") is False:
+            score -= 60
+            viable = False
+            skip_reasons.append("ChatGPT analysis says the loaded page is not a product page.")
+
+        if ai_analysis.get("is_correct_product") is False:
+            score -= 120
+            viable = False
+            skip_reasons.append("ChatGPT analysis says the loaded page does not match the shopping item.")
+        elif ai_analysis.get("is_correct_product") is True:
+            score += 24
+            reasons.append("ChatGPT confirmed the fully loaded page matches the shopping item.")
+
+        match_confidence = safe_float(ai_analysis.get("ingredient_match_confidence"))
+        if match_confidence is not None:
+            score += match_confidence * 16
+            reasons.append(f"ChatGPT ingredient-match confidence: {match_confidence:.2f}.")
+
+        analysis_confidence = safe_float(ai_analysis.get("confidence"))
+        if analysis_confidence is not None:
+            score += analysis_confidence * 10
+            reasons.append(f"ChatGPT page-analysis confidence: {analysis_confidence:.2f}.")
+    elif ai_analysis.get("status") == "failed":
+        skip_reasons.append(ai_analysis.get("message") or "ChatGPT product analysis failed.")
+    elif ai_analysis.get("status") == "skipped":
+        skip_reasons.append(ai_analysis.get("message") or "ChatGPT product analysis was skipped.")
 
     food_status = candidate.get("food_rule_status") or {}
     if food_status.get("blocked_by"):
