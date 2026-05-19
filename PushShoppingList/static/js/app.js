@@ -351,6 +351,7 @@ async function clearProductPicks(event) {
 
 async function openProductAlternatives(button) {
     const itemKey = button ? button.dataset.itemKey || "" : "";
+    const storeKey = button ? button.dataset.storeKey || "" : "";
 
     if (!itemKey) {
         return false;
@@ -360,10 +361,14 @@ async function openProductAlternatives(button) {
     modal.classList.add("open");
     modal.setAttribute("aria-hidden", "false");
     document.body.classList.add("modal-open");
-    renderProductAlternativesLoading(itemKey);
+    renderProductAlternativesLoading(itemKey, storeKey);
 
     try {
-        const response = await fetch(`/api/product_choice?item_key=${encodeURIComponent(itemKey)}`, {
+        const params = new URLSearchParams({ item_key: itemKey });
+        if (storeKey) {
+            params.set("store_key", storeKey);
+        }
+        const response = await fetch(`/api/product_choice?${params.toString()}`, {
             cache: "no-store",
         });
         const data = await response.json();
@@ -415,12 +420,12 @@ function closeProductAlternatives() {
     }
 }
 
-function renderProductAlternativesLoading(itemKey) {
+function renderProductAlternativesLoading(itemKey, storeKey = "") {
     const subtitle = document.getElementById("productAlternativesSubtitle");
     const content = document.getElementById("productAlternativesContent");
 
     if (subtitle) {
-        subtitle.textContent = itemKey;
+        subtitle.textContent = storeKey ? `${itemKey} at ${storeKey}` : itemKey;
     }
 
     if (content) {
@@ -433,9 +438,12 @@ function renderProductAlternatives(choice) {
     const content = document.getElementById("productAlternativesContent");
     const candidates = choice.candidates || [];
     const selectedId = choice.selected_product_id || "";
+    const storeName = choice.filtered_store_name || (choice.store_result ? choice.store_result.store_name : "") || "";
+    const storeKey = choice.filtered_store_key || "";
 
     if (subtitle) {
-        subtitle.textContent = choice.ingredient || choice.item_key || "";
+        const itemLabel = choice.ingredient || choice.item_key || "";
+        subtitle.textContent = storeName ? `${itemLabel} at ${storeName}` : itemLabel;
     }
 
     if (!content) {
@@ -450,19 +458,31 @@ function renderProductAlternatives(choice) {
     content.innerHTML = candidates.map(candidate => {
         const selected = candidate.id === selectedId;
         const selectable = candidate.viable !== false;
+        const size = candidate.size || candidate.package_size || "";
         const meta = [
             candidate.store_name,
             candidate.price || "Price unavailable",
+            size,
+            candidate.unit_price || "",
             selectable ? "" : "not selectable",
             candidate.confidence ? `confidence ${candidate.confidence}` : "",
             candidate.score !== undefined ? `score ${candidate.score}` : "",
         ].filter(Boolean).join(" | ");
-        const notes = [...(candidate.ranking_reasons || []), ...(candidate.skip_reasons || [])]
+        const notes = [
+            candidate.reason_selected || "",
+            ...(candidate.ranking_reasons || []),
+            ...(candidate.skip_reasons || [])
+        ]
+            .filter(Boolean)
             .slice(0, 3)
             .join(" ");
+        const imageHtml = candidate.image_url
+            ? `<img class="bulk-alt-image" src="${escapeAttribute(candidate.image_url)}" alt="">`
+            : "";
 
         return `
-            <div class="bulk-alt-option">
+            <div class="bulk-alt-option${candidate.image_url ? " has-image" : ""}">
+                ${imageHtml}
                 <div>
                     <div class="bulk-alt-name">
                         ${escapeHtml(candidate.product_name || "Unnamed product")}
@@ -481,6 +501,7 @@ function renderProductAlternatives(choice) {
                         class="bulk-alt-select-btn${selected ? " selected" : ""}${selectable ? "" : " unavailable"}"
                         data-item-key="${escapeAttribute(choice.item_key || "")}"
                         data-product-id="${escapeAttribute(candidate.id || "")}"
+                        data-store-key="${escapeAttribute(storeKey || candidate.store_key || "")}"
                         onclick="selectProductAlternative(this)"
                         ${(selected || !selectable) ? "disabled" : ""}>
                     ${selected ? "Selected" : (selectable ? "Select" : "Unavailable")}
@@ -501,6 +522,7 @@ function renderProductAlternativesError(message) {
 async function selectProductAlternative(button) {
     const itemKey = button ? button.dataset.itemKey || "" : "";
     const productId = button ? button.dataset.productId || "" : "";
+    const storeKey = button ? button.dataset.storeKey || "" : "";
 
     if (!itemKey || !productId) {
         return false;
@@ -518,6 +540,7 @@ async function selectProductAlternative(button) {
             body: JSON.stringify({
                 item_key: itemKey,
                 product_id: productId,
+                store_key: storeKey,
             }),
         });
         const data = await response.json();

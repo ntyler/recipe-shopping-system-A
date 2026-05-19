@@ -181,7 +181,8 @@ def api_product_choices_route():
 @product_bp.route("/api/product_choice")
 def api_product_choice_route():
     item_key = normalize_item_key(request.args.get("item_key", ""))
-    choice = product_choice_for_item(item_key)
+    store_key = str(request.args.get("store_key", "") or "").strip()
+    choice = product_choice_for_item(item_key, store_key=store_key)
 
     if not choice:
         return jsonify({
@@ -203,6 +204,7 @@ def api_select_product_choice_route():
     result = select_product_choice(
         data.get("item_key", ""),
         data.get("product_id", ""),
+        data.get("store_key", ""),
     )
     status = 200 if result.get("ok") else 404
 

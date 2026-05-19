@@ -52,6 +52,42 @@ UNIT_PRICE_PATTERN = re.compile(
     re.IGNORECASE,
 )
 DETAIL_REQUIRED = os.getenv("PRODUCT_REQUIRE_DETAIL_PAGE", "1") != "0"
+BROWSER_SEARCH_MODE = os.getenv("PRODUCT_SEARCH_BROWSER_MODE", "always").strip().lower()
+
+
+def product_candidate_limit():
+    try:
+        configured = int(os.getenv("PRODUCT_CANDIDATE_LIMIT_PER_STORE", "48"))
+    except (TypeError, ValueError):
+        configured = 48
+
+    return max(8, min(96, configured))
+
+
+def product_browser_wait_seconds():
+    try:
+        configured = float(os.getenv("PRODUCT_BROWSER_WAIT_SECONDS", "14"))
+    except (TypeError, ValueError):
+        configured = 14
+
+    return max(4, min(45, configured))
+
+
+def product_search_browser_enabled():
+    if os.getenv("DISABLE_BROWSER_PRODUCT_SEARCH") == "1":
+        return False
+
+    return BROWSER_SEARCH_MODE not in {"0", "off", "false", "disabled"}
+
+
+def should_open_store_search_page(has_request_candidates):
+    if not product_search_browser_enabled():
+        return False
+
+    if BROWSER_SEARCH_MODE in {"fallback", "if-needed", "if_needed"}:
+        return not has_request_candidates
+
+    return True
 
 
 def product_worker_count(total_downloads=None):
@@ -273,8 +309,52 @@ def product_choices_by_item():
     return load_product_choices().get("items", {})
 
 
-def product_choice_for_item(item_key):
-    return product_choices_by_item().get(normalize_item_key(item_key), {})
+def product_choice_for_item(item_key, store_key=None):
+    choice = product_choices_by_item().get(normalize_item_key(item_key), {})
+
+    if store_key and choice:
+        return product_choice_for_store(choice, store_key)
+
+    return choice
+
+
+def product_choice_for_store(choice, store_key):
+    store_key = str(store_key or "").strip()
+    filtered = dict(choice)
+    candidates = [
+        candidate
+        for candidate in choice.get("candidates", [])
+        if candidate.get("store_key") == store_key
+    ]
+    store_result = find_store_result(choice, store_key)
+    selected = (store_result or {}).get("best_product")
+    if not selected and (choice.get("selected_product") or {}).get("store_key") == store_key:
+        selected = choice.get("selected_product")
+
+    filtered["filtered_store_key"] = store_key
+    filtered["filtered_store_name"] = (store_result or {}).get("store_name", "") or (selected or {}).get("store_name", "")
+    filtered["store_result"] = store_result or {}
+    filtered["candidates"] = candidates
+    filtered["selected_product"] = selected
+    filtered["selected_product_id"] = (store_result or {}).get("best_product_id") or (selected or {}).get("id", "")
+    filtered["skip_reasons"] = (
+        [(store_result or {}).get("reason_skipped")]
+        if (store_result or {}).get("reason_skipped")
+        else filtered.get("skip_reasons", [])
+    )
+    return filtered
+
+
+def find_store_result(choice, store_key):
+    store_results = choice.get("store_results", {})
+    if isinstance(store_results, dict) and store_key in store_results:
+        return store_results.get(store_key)
+
+    for result in choice.get("store_results_list", []):
+        if result.get("store_key") == store_key:
+            return result
+
+    return None
 
 
 def grab_best_products(items=None, job_id=None):
@@ -375,8 +455,11 @@ def grab_best_products(items=None, job_id=None):
                             candidates_count=0,
                         )
                     result = {
+                        "index": download.get("index", 0),
                         "ingredient": download.get("ingredient", ""),
                         "store_key": download.get("store_key", ""),
+                        "store_name": download.get("store_name", ""),
+                        "search_url": download.get("search_url", ""),
                         "candidates": [],
                         "skip_reasons": [message],
                     }
@@ -467,8 +550,12 @@ def search_store_products_for_download(
         if job_id:
             mark_product_download(job_id, index, "skipped", message, candidates_count=0)
         return {
+            "index": index,
             "ingredient": ingredient,
             "store_key": store_key,
+            "store_name": store_name,
+            "search_url": search_url,
+            "store_location": store_locations.get(store_key, {}),
             "candidates": [],
             "skip_reasons": [message],
         }
@@ -495,6 +582,7 @@ def search_store_products_for_download(
         skip_reasons = [f"{store_name}: product search failed: {exc}"]
 
     if candidates:
+        candidates = prioritize_candidates_for_detail(ingredient, candidates)
         candidates = enrich_product_candidates_from_pages(
             candidates,
             ingredient,
@@ -539,8 +627,15 @@ def search_store_products_for_download(
         )
 
     return {
+        "index": index,
         "ingredient": ingredient,
         "store_key": store_key,
+        "store_name": store_name,
+        "search_url": search_url,
+        "store_location": store_locations.get(store_key, {}),
+        "store_location_name": (store_locations.get(store_key, {}) or {}).get("name", ""),
+        "store_location_address": (store_locations.get(store_key, {}) or {}).get("address", ""),
+        "store_location_distance_miles": (store_locations.get(store_key, {}) or {}).get("distance_miles"),
         "candidates": candidates,
         "skip_reasons": skip_reasons,
     }
@@ -549,12 +644,30 @@ def search_store_products_for_download(
 def build_product_choice_record_from_results(ingredient, store_results, full_address):
     candidates = []
     skip_reasons = []
+    store_results = sorted(
+        [
+            result
+            for result in store_results
+            if isinstance(result, dict)
+        ],
+        key=lambda item: item.get("index", 0),
+    )
 
     for result in store_results:
         candidates.extend(result.get("candidates", []))
         skip_reasons.extend(result.get("skip_reasons", []))
 
     candidates = rank_product_candidates(ingredient, candidates)
+    store_product_results_list = build_store_product_results(
+        ingredient,
+        store_results,
+        candidates,
+    )
+    store_product_results = {
+        result.get("store_key"): result
+        for result in store_product_results_list
+        if result.get("store_key")
+    }
     viable_candidates = [
         candidate
         for candidate in candidates
@@ -574,10 +687,120 @@ def build_product_choice_record_from_results(ingredient, store_results, full_add
         "selected_product_id": selected.get("id") if selected else "",
         "selected_product": selected,
         "manual_override": False,
+        "store_results": store_product_results,
+        "store_results_list": store_product_results_list,
         "candidates": candidates,
         "skip_reasons": unique_texts(skip_reasons),
         "updated_at": now,
     }
+
+
+def build_store_product_results(ingredient, raw_store_results, ranked_candidates):
+    records = []
+
+    for raw in raw_store_results:
+        store_key = raw.get("store_key", "")
+        store_name = raw.get("store_name") or store_key.title()
+        raw_ids = {
+            candidate.get("id")
+            for candidate in raw.get("candidates", [])
+            if candidate.get("id")
+        }
+        store_candidates = [
+            candidate
+            for candidate in ranked_candidates
+            if (
+                candidate.get("store_key") == store_key
+                and (not raw_ids or candidate.get("id") in raw_ids)
+            )
+        ]
+        viable_candidates = [
+            candidate
+            for candidate in store_candidates
+            if candidate.get("viable")
+        ]
+        best = viable_candidates[0] if viable_candidates else None
+
+        if best:
+            best["reason_selected"] = product_selection_reason(best, store_name)
+            best["selected_reason"] = best["reason_selected"]
+            skip_reason = ""
+        else:
+            skip_reason = store_skip_reason(store_name, raw, store_candidates)
+
+        record = {
+            "store_key": store_key,
+            "store_name": store_name,
+            "ingredient": ingredient,
+            "search_url": raw.get("search_url", ""),
+            "store_location": raw.get("store_location", {}),
+            "store_location_name": raw.get("store_location_name", ""),
+            "store_location_address": raw.get("store_location_address", ""),
+            "store_location_distance_miles": raw.get("store_location_distance_miles"),
+            "best_product_id": best.get("id") if best else "",
+            "best_product": best,
+            "best_product_match": best.get("product_name") if best else "",
+            "price": best.get("price") if best else "",
+            "size": product_size(best) if best else "",
+            "unit_price": best.get("unit_price", "") if best else "",
+            "product_url": best.get("product_url", "") if best else "",
+            "image_url": best.get("image_url", "") if best else "",
+            "reason_selected": best.get("reason_selected", "") if best else "",
+            "reason_skipped": skip_reason,
+            "skip_reason": skip_reason,
+            "candidate_count": len(store_candidates),
+            "valid_candidate_count": len(viable_candidates),
+            "alternative_products": store_candidates,
+            "alternatives": store_candidates,
+            "skip_reasons": unique_texts(raw.get("skip_reasons", [])),
+        }
+        records.append(record)
+
+    return records
+
+
+def product_selection_reason(candidate, store_name=""):
+    reasons = [
+        reason
+        for reason in candidate.get("ranking_reasons", [])
+        if reason
+    ][:4]
+
+    if reasons:
+        return "Selected as the best {store} match because {reasons}.".format(
+            store=store_name or "store",
+            reasons="; ".join(reasons),
+        )
+
+    return "Selected as the highest-ranked valid product match for this store."
+
+
+def store_skip_reason(store_name, raw_result, candidates):
+    reasons = []
+    reasons.extend(raw_result.get("skip_reasons", []))
+
+    for candidate in candidates:
+        reasons.extend(candidate.get("skip_reasons", []))
+
+    reason = unique_texts(reasons)
+    if reason:
+        text = reason[0]
+    elif candidates:
+        text = "Product cards were found, but none passed matching, availability, price, detail, or food-rule checks."
+    else:
+        text = "No visible product cards or direct product links were found."
+
+    if text.lower().startswith((store_name or "").lower()):
+        return text
+
+    return f"{store_name}: {text}" if store_name else text
+
+
+def product_size(candidate):
+    if not candidate:
+        return ""
+
+    return candidate.get("size") or candidate.get("package_size") or ""
 
 
 def build_product_choice_record(
@@ -618,6 +841,50 @@ def build_product_choice_record(
         }],
         full_address,
     )
+
+
+def prioritize_candidates_for_detail(ingredient, candidates):
+    return sorted(
+        candidates,
+        key=lambda candidate: pre_detail_candidate_score(ingredient, candidate),
+        reverse=True,
+    )
+
+
+def pre_detail_candidate_score(ingredient, candidate):
+    name = candidate.get("product_name", "")
+    text = " ".join([
+        name,
+        candidate.get("brand", ""),
+        candidate.get("description", ""),
+        candidate.get("card_text_excerpt", ""),
+        candidate.get("detail_text_excerpt", ""),
+    ])
+    ingredient_tokens = set(tokenize(ingredient))
+    text_tokens = set(tokenize(text))
+    name_tokens = set(tokenize(name))
+    normalized_ingredient = normalize_match_text(ingredient)
+    normalized_name = normalize_match_text(name)
+    score = 0
+
+    if normalized_ingredient and normalized_ingredient == normalized_name:
+        score += 80
+    elif normalized_ingredient and normalized_ingredient in normalized_name:
+        score += 55
+
+    score += len(ingredient_tokens & name_tokens) * 22
+    score += len(ingredient_tokens & text_tokens) * 10
+
+    if candidate.get("price"):
+        score += 8
+    if candidate.get("image_url"):
+        score += 3
+    if candidate_needs_product_detail(candidate):
+        score += 5
+    if "organic" in text.lower():
+        score += 4
+
+    return score
 
 
 def enrich_product_candidates_from_pages(
@@ -691,7 +958,12 @@ def mark_detail_skipped(candidate, reason):
 
 def enrich_product_candidate_from_page(candidate, ingredient):
     product_url = candidate.get("product_url", "")
-    fetch = fetch_product_page_html(product_url, candidate.get("product_name", ""))
+    fetch = fetch_product_page_html(
+        product_url,
+        candidate.get("product_name", ""),
+        candidate.get("home_address", ""),
+        candidate.get("home_location"),
+    )
 
     candidate["detail_fetch"] = {
         key: value
@@ -713,7 +985,7 @@ def enrich_product_candidate_from_page(candidate, ingredient):
     return candidate
 
 
-def fetch_product_page_html(product_url, expected_name=""):
+def fetch_product_page_html(product_url, expected_name="", full_address="", home_location=None):
     result = {
         "status": "failed",
         "method": "requests",
@@ -752,7 +1024,12 @@ def fetch_product_page_html(product_url, expected_name=""):
         result["warning"] = "Page content looked sparse, and browser product fetch is disabled."
         return result
 
-    browser_result = fetch_product_page_html_with_browser(product_url, expected_name)
+    browser_result = fetch_product_page_html_with_browser(
+        product_url,
+        expected_name,
+        full_address=full_address,
+        home_location=home_location,
+    )
     if browser_result.get("html"):
         return browser_result
 
@@ -765,7 +1042,7 @@ def fetch_product_page_html(product_url, expected_name=""):
     return result
 
 
-def fetch_product_page_html_with_browser(product_url, expected_name=""):
+def fetch_product_page_html_with_browser(product_url, expected_name="", full_address="", home_location=None):
     result = {
         "status": "failed",
         "method": "browser",
@@ -786,8 +1063,10 @@ def fetch_product_page_html_with_browser(product_url, expected_name=""):
                 prefer_undetected=True,
                 page_load_strategy="eager",
             )
+            configure_browser_home_location(driver, product_url, home_location)
             driver.get(product_url)
             wait_for_browser_document(driver, timeout_seconds=14)
+            handle_browser_popups_and_location(driver, full_address)
 
             try:
                 driver.execute_script(
@@ -862,6 +1141,7 @@ def extract_product_details_from_html(html_text, page_url, seed_candidate):
     ) if mapping else ""
     brand = extract_brand_from_mapping(mapping) if mapping else ""
     price = extract_price_from_mapping(mapping) if mapping else ""
+    image_url = extract_image_url_from_mapping(mapping) if mapping else ""
     canonical_url = canonical_product_url(soup, mapping, page_url)
     detail_text = clean_text(" ".join([
         mapped_name,
@@ -896,9 +1176,11 @@ def extract_product_details_from_html(html_text, page_url, seed_candidate):
         ) if mapping else "",
         "price": price,
         "package_size": package_size,
+        "size": package_size,
         "unit_price": unit_price.get("display", ""),
         "unit_price_value": unit_price.get("value"),
         "unit_price_unit": unit_price.get("unit", ""),
+        "image_url": urljoin(page_url, image_url) if image_url else "",
         "availability": availability.get("text", ""),
         "in_stock": availability.get("in_stock"),
         "product_url": canonical_url,
@@ -918,10 +1200,12 @@ def apply_product_details_to_candidate(candidate, details, fetch, ingredient):
         "category",
         "sku",
         "gtin",
+        "size",
         "package_size",
         "unit_price",
         "unit_price_value",
         "unit_price_unit",
+        "image_url",
         "availability",
         "in_stock",
         "detail_text_excerpt",
@@ -939,6 +1223,9 @@ def apply_product_details_to_candidate(candidate, details, fetch, ingredient):
 
     if details.get("product_url"):
         candidate["product_url"] = details["product_url"]
+
+    if candidate.get("package_size") and not candidate.get("size"):
+        candidate["size"] = candidate["package_size"]
 
     candidate["id"] = product_candidate_id(
         candidate.get("store_key"),
@@ -1162,6 +1449,9 @@ def search_store_products(
     if not search_url:
         return [], [f"{store_name}: no product search URL is configured."]
 
+    request_candidates = []
+    request_skip_reasons = []
+
     try:
         response = requests.get(
             search_url,
@@ -1170,42 +1460,667 @@ def search_store_products(
         )
         response.raise_for_status()
     except Exception as exc:
-        fallback = build_search_page_candidate(
+        request_skip_reasons.append(f"{store_name}: product search request failed: {exc}")
+        response = None
+    else:
+        request_candidates = parse_product_candidates_from_html(
+            response.text,
+            response.url,
             ingredient,
             store_key,
             store_name,
             search_url,
             full_address,
+            home_location,
             store_location,
-            f"Product page could not be fetched: {exc}",
         )
-        return [fallback], [f"{store_name}: product search failed: {exc}"]
 
-    candidates = parse_product_candidates_from_html(
-        response.text,
-        response.url,
-        ingredient,
-        store_key,
-        store_name,
-        search_url,
-        full_address,
-        home_location,
-        store_location,
-    )
+        if not request_candidates:
+            request_skip_reasons.append(f"{store_name}: no parseable product cards were found in the initial HTML.")
 
-    if candidates:
-        return candidates, []
+    if should_open_store_search_page(bool(request_candidates)):
+        browser_candidates, browser_skip_reasons = search_store_products_with_browser_agent(
+            ingredient,
+            store_key,
+            store,
+            search_url,
+            full_address,
+            home_location,
+            store_location,
+        )
+
+        if browser_candidates:
+            skip_reasons.extend(browser_skip_reasons)
+            return browser_candidates, unique_texts(skip_reasons)
+
+        skip_reasons.extend(browser_skip_reasons)
+
+    if request_candidates:
+        if skip_reasons:
+            for candidate in request_candidates:
+                candidate["ranking_reasons"] = unique_texts(
+                    candidate.get("ranking_reasons", [])
+                    + ["Used initial HTML product data because rendered-page extraction did not return visible cards."]
+                )
+        return request_candidates, unique_texts(skip_reasons)
+
+    skip_reasons.extend(request_skip_reasons)
 
     fallback = build_search_page_candidate(
         ingredient,
         store_key,
         store_name,
-        response.url or search_url,
+        (response.url if response else "") or search_url,
         full_address,
         store_location,
         "No product cards with prices could be parsed from this store page.",
     )
-    return [fallback], [f"{store_name}: no parseable product cards were found."]
+    return [fallback], unique_texts(skip_reasons + [f"{store_name}: no parseable product cards were found."])
+
+
+def search_store_products_with_browser_agent(
+    ingredient,
+    store_key,
+    store,
+    search_url,
+    full_address,
+    home_location,
+    store_location,
+):
+    store_name = store.get("label") or store_key.title()
+
+    with PRODUCT_BROWSER_FETCH_LOCK:
+        driver = None
+
+        try:
+            from PushShoppingList.services.recipe_extract_service import create_headless_chrome_driver
+            from PushShoppingList.services.recipe_extract_service import wait_for_browser_document
+
+            driver = create_headless_chrome_driver(
+                window_size="1440,1100",
+                prefer_undetected=True,
+                page_load_strategy="normal",
+            )
+            driver.set_page_load_timeout(product_browser_wait_seconds() + 8)
+            configure_browser_home_location(driver, search_url, home_location)
+
+            try:
+                driver.get(search_url)
+            except Exception:
+                if len(driver.page_source or "") < 800:
+                    raise
+
+            wait_for_browser_document(driver, timeout_seconds=product_browser_wait_seconds())
+            handle_browser_popups_and_location(driver, full_address)
+            for _ in range(3):
+                wait_for_rendered_product_cards(
+                    driver,
+                    timeout_seconds=max(3, product_browser_wait_seconds() / 3),
+                )
+                scroll_rendered_product_page(driver)
+                wait_for_browser_text_to_settle(driver, timeout_seconds=2)
+            handle_browser_popups_and_location(driver, full_address)
+
+            final_url = driver.current_url or search_url
+            visible_cards = extract_visible_product_cards_from_browser(driver)
+            visible_candidates = product_candidates_from_visible_cards(
+                visible_cards,
+                ingredient,
+                store_key,
+                store_name,
+                final_url,
+                search_url,
+                full_address,
+                home_location,
+                store_location,
+            )
+            rendered_html = driver.page_source or ""
+            rendered_candidates = parse_product_candidates_from_html(
+                rendered_html,
+                final_url,
+                ingredient,
+                store_key,
+                store_name,
+                search_url,
+                full_address,
+                home_location,
+                store_location,
+            )
+
+            candidates = dedupe_candidates(visible_candidates + rendered_candidates)
+            if candidates:
+                for candidate in candidates:
+                    candidate["ranking_reasons"] = unique_texts(
+                        candidate.get("ranking_reasons", [])
+                        + ["Store search page was opened in a browser using the saved home address context."]
+                    )
+                return candidates[:product_candidate_limit()], []
+
+            return [], [f"{store_name}: browser agent found no visible product cards on the rendered search page."]
+        except Exception as exc:
+            return [], [f"{store_name}: browser agent could not inspect rendered search page: {exc}"]
+        finally:
+            if driver is not None:
+                try:
+                    driver.quit()
+                except Exception:
+                    pass
+
+
+def configure_browser_home_location(driver, target_url, home_location):
+    if not home_location:
+        return
+
+    try:
+        parsed = urlparse(target_url)
+        origin = f"{parsed.scheme}://{parsed.netloc}"
+        driver.execute_cdp_cmd(
+            "Browser.grantPermissions",
+            {
+                "origin": origin,
+                "permissions": ["geolocation"],
+            },
+        )
+        driver.execute_cdp_cmd(
+            "Emulation.setGeolocationOverride",
+            {
+                "latitude": float(home_location.get("latitude")),
+                "longitude": float(home_location.get("longitude")),
+                "accuracy": 60,
+            },
+        )
+    except Exception:
+        pass
+
+
+def handle_browser_popups_and_location(driver, full_address):
+    for _ in range(3):
+        try:
+            clicked = driver.execute_script(
+                """
+                const patterns = [
+                    /accept all/i, /accept/i, /agree/i, /allow/i,
+                    /use current location/i, /use my location/i,
+                    /continue/i, /got it/i, /no thanks/i, /not now/i,
+                    /dismiss/i, /^close$/i
+                ];
+                const blocked = [/add to cart/i, /checkout/i, /sign in/i, /log in/i, /create account/i];
+
+                function visible(el) {
+                    const style = window.getComputedStyle(el);
+                    const rect = el.getBoundingClientRect();
+                    return style && style.visibility !== "hidden" &&
+                        style.display !== "none" &&
+                        rect.width > 0 &&
+                        rect.height > 0;
+                }
+
+                const controls = Array.from(document.querySelectorAll(
+                    'button, a, [role="button"], input[type="button"], input[type="submit"]'
+                ));
+
+                for (const control of controls) {
+                    if (!visible(control)) {
+                        continue;
+                    }
+
+                    const text = [
+                        control.innerText,
+                        control.value,
+                        control.getAttribute("aria-label"),
+                        control.getAttribute("title")
+                    ].filter(Boolean).join(" ").trim();
+
+                    if (!text || blocked.some(pattern => pattern.test(text))) {
+                        continue;
+                    }
+
+                    if (patterns.some(pattern => pattern.test(text))) {
+                        control.click();
+                        return text;
+                    }
+                }
+
+                return "";
+                """
+            )
+        except Exception:
+            clicked = ""
+
+        if clicked:
+            time.sleep(0.45)
+
+    fill_location_inputs(driver, full_address)
+
+
+def fill_location_inputs(driver, full_address):
+    zip_code = extract_zip_code(full_address)
+    if not full_address and not zip_code:
+        return
+
+    try:
+        driver.execute_script(
+            """
+            const zipCode = arguments[0] || "";
+            const fullAddress = arguments[1] || "";
+            const addressValue = zipCode || fullAddress;
+            const fullValue = fullAddress || zipCode;
+
+            function visible(el) {
+                const style = window.getComputedStyle(el);
+                const rect = el.getBoundingClientRect();
+                return style && style.visibility !== "hidden" &&
+                    style.display !== "none" &&
+                    !el.disabled &&
+                    !el.readOnly &&
+                    rect.width > 0 &&
+                    rect.height > 0;
+            }
+
+            function attrs(el) {
+                return [
+                    el.getAttribute("name"),
+                    el.getAttribute("id"),
+                    el.getAttribute("placeholder"),
+                    el.getAttribute("aria-label"),
+                    el.getAttribute("autocomplete")
+                ].filter(Boolean).join(" ").toLowerCase();
+            }
+
+            const inputs = Array.from(document.querySelectorAll('input, textarea'));
+            for (const input of inputs) {
+                if (!visible(input)) {
+                    continue;
+                }
+
+                const attrText = attrs(input);
+                const looksLocation = /(zip|postal|postcode|address|location|store)/i.test(attrText);
+                const looksSearch = /(search|query|keyword|product|item)/i.test(attrText);
+
+                if (!looksLocation || looksSearch) {
+                    continue;
+                }
+
+                input.focus();
+                input.value = /(address|location|store)/i.test(attrText) ? fullValue : addressValue;
+                input.dispatchEvent(new Event("input", { bubbles: true }));
+                input.dispatchEvent(new Event("change", { bubbles: true }));
+
+                const form = input.closest("form");
+                const submit = form
+                    ? form.querySelector('button[type="submit"], input[type="submit"], button')
+                    : null;
+
+                if (submit && visible(submit)) {
+                    submit.click();
+                } else {
+                    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+                }
+
+                return true;
+            }
+
+            return false;
+            """,
+            zip_code,
+            full_address,
+        )
+        time.sleep(0.8)
+    except Exception:
+        pass
+
+
+def wait_for_browser_text_to_settle(driver, timeout_seconds=3):
+    deadline = time.monotonic() + max(1, timeout_seconds)
+    last_length = -1
+    stable_seen = 0
+
+    while time.monotonic() < deadline:
+        try:
+            text_length = driver.execute_script(
+                "return (document.body && document.body.innerText || '').length"
+            )
+        except Exception:
+            text_length = 0
+
+        if text_length == last_length and text_length > 0:
+            stable_seen += 1
+            if stable_seen >= 2:
+                return
+        else:
+            stable_seen = 0
+            last_length = text_length
+
+        time.sleep(0.4)
+
+
+def wait_for_rendered_product_cards(driver, timeout_seconds=8):
+    deadline = time.monotonic() + max(2, timeout_seconds)
+
+    while time.monotonic() < deadline:
+        try:
+            count = driver.execute_script(
+                """
+                const pricePattern = /\\$\\s?\\d[\\d,]*(?:\\.\\d{2})?/;
+                const selectors = [
+                    '[data-testid*="product" i]',
+                    '[data-test*="product" i]',
+                    '[data-qa*="product" i]',
+                    '[class*="product" i]',
+                    'article',
+                    'li'
+                ].join(',');
+                return Array.from(document.querySelectorAll(selectors))
+                    .filter(el => pricePattern.test(el.innerText || el.textContent || ''))
+                    .length;
+                """
+            )
+        except Exception:
+            count = 0
+
+        if count:
+            return
+
+        time.sleep(0.5)
+
+
+def scroll_rendered_product_page(driver):
+    try:
+        for ratio in [0, 0.28, 0.58, 0.9, 1, 0]:
+            driver.execute_script(
+                "window.scrollTo(0, Math.floor((document.body.scrollHeight || 0) * arguments[0]));",
+                ratio,
+            )
+            time.sleep(0.35)
+    except Exception:
+        pass
+
+
+def extract_visible_product_cards_from_browser(driver):
+    try:
+        cards = driver.execute_script(
+            """
+            const limit = arguments[0] || 48;
+            const pricePattern = /\\$\\s?\\d[\\d,]*(?:\\.\\d{2})?/g;
+            const badLinePattern = /^(add|add to cart|sponsored|sale|save|pickup|delivery|shipping|in stock|out of stock|rating|stars?|reviews?|view details|quick view)$/i;
+
+            function visible(el) {
+                const style = window.getComputedStyle(el);
+                const rect = el.getBoundingClientRect();
+                return style &&
+                    style.visibility !== "hidden" &&
+                    style.display !== "none" &&
+                    parseFloat(style.opacity || "1") > 0.02 &&
+                    rect.width >= 60 &&
+                    rect.height >= 35;
+            }
+
+            function textOf(el) {
+                return String(el.innerText || el.textContent || "")
+                    .replace(/\\s+/g, " ")
+                    .trim();
+            }
+
+            function priceMatches(text) {
+                return String(text || "").match(pricePattern) || [];
+            }
+
+            function usefulNameLine(line) {
+                const value = String(line || "").replace(/\\s+/g, " ").trim();
+                if (!value || value.length < 3 || value.length > 180) {
+                    return "";
+                }
+                if (pricePattern.test(value)) {
+                    pricePattern.lastIndex = 0;
+                    return "";
+                }
+                pricePattern.lastIndex = 0;
+                if (badLinePattern.test(value)) {
+                    return "";
+                }
+                if (/^\\d+(?:\\.\\d+)?\\s*(ct|oz|lb|lbs|g|kg|ml|l|each|ea)$/i.test(value)) {
+                    return "";
+                }
+                return value;
+            }
+
+            function bestName(root) {
+                const targets = Array.from(root.querySelectorAll(
+                    '[data-testid*="title" i], [data-test*="title" i], [class*="title" i], [class*="name" i], a[href], img[alt]'
+                ));
+                const values = [];
+
+                for (const target of targets) {
+                    values.push(target.getAttribute("aria-label"));
+                    values.push(target.getAttribute("title"));
+                    values.push(target.getAttribute("alt"));
+                    values.push(target.innerText);
+                }
+
+                values.push(...String(root.innerText || "").split(/\\n+/));
+
+                for (const value of values) {
+                    const cleaned = usefulNameLine(value);
+                    if (cleaned) {
+                        return cleaned;
+                    }
+                }
+
+                return "";
+            }
+
+            function bestLink(root) {
+                const links = Array.from(root.querySelectorAll("a[href]"));
+                const preferred = links.find(link => {
+                    const text = textOf(link);
+                    const href = link.getAttribute("href") || "";
+                    return text.length > 2 || /product|p\\//i.test(href);
+                }) || links[0];
+                return preferred ? preferred.href : "";
+            }
+
+            function bestImage(root) {
+                const image = Array.from(root.querySelectorAll("img"))
+                    .find(img => visible(img) && (img.currentSrc || img.src || img.getAttribute("data-src")));
+                return image ? (image.currentSrc || image.src || image.getAttribute("data-src") || "") : "";
+            }
+
+            const selector = [
+                'article',
+                'li',
+                '[itemtype*="Product" i]',
+                '[data-testid*="product" i]',
+                '[data-test*="product" i]',
+                '[data-qa*="product" i]',
+                '[class*="product" i]',
+                '[class*="Product"]',
+                'section',
+                'div'
+            ].join(',');
+            const potential = Array.from(document.querySelectorAll(selector))
+                .filter(el => {
+                    if (!visible(el)) {
+                        return false;
+                    }
+                    const text = textOf(el);
+                    const prices = priceMatches(text);
+                    return text.length >= 15 &&
+                        text.length <= 1400 &&
+                        prices.length >= 1 &&
+                        prices.length <= 5 &&
+                        (el.querySelector("a[href]") || el.querySelector("img"));
+                })
+                .sort((a, b) => textOf(a).length - textOf(b).length);
+
+            const roots = [];
+            for (const el of potential) {
+                if (roots.some(root => root.contains(el) || el.contains(root))) {
+                    continue;
+                }
+                roots.push(el);
+                if (roots.length >= limit) {
+                    break;
+                }
+            }
+
+            return roots.map(root => {
+                const rawText = String(root.innerText || root.textContent || "");
+                const text = textOf(root);
+                const prices = priceMatches(text);
+                return {
+                    name: bestName(root),
+                    price: prices[0] || "",
+                    product_url: bestLink(root),
+                    image_url: bestImage(root),
+                    text: rawText.slice(0, 1600)
+                };
+            }).filter(card => card.name || card.product_url || card.price);
+            """,
+            product_candidate_limit(),
+        )
+    except Exception:
+        cards = []
+
+    return cards if isinstance(cards, list) else []
+
+
+def product_candidates_from_visible_cards(
+    cards,
+    ingredient,
+    store_key,
+    store_name,
+    page_url,
+    search_url,
+    full_address,
+    home_location,
+    store_location,
+):
+    candidates = []
+
+    for card in cards:
+        if not isinstance(card, dict):
+            continue
+
+        name = clean_text(card.get("name"))
+        price = normalize_price(card.get("price"))
+        product_url = clean_text(card.get("product_url"))
+        image_url = clean_text(card.get("image_url"))
+        raw_card_text = str(card.get("text") or "")
+        card_text = clean_text(raw_card_text)
+
+        ingredient_tokens = set(tokenize(ingredient))
+        name_tokens = set(tokenize(name))
+        needs_better_name = (
+            not name
+            or len(name) > 100
+            or PRICE_PATTERN.search(name)
+            or (ingredient_tokens and not (ingredient_tokens & name_tokens))
+        )
+
+        if needs_better_name:
+            better_name = best_visible_card_name(ingredient, raw_card_text)
+            if better_name:
+                name = better_name
+
+        if not name:
+            continue
+
+        candidate = build_candidate(
+            ingredient,
+            store_key,
+            store_name,
+            name,
+            price,
+            urljoin(page_url, product_url) if product_url else page_url,
+            search_url,
+            full_address,
+            home_location,
+            store_location,
+            source="browser-visible-card",
+            image_url=urljoin(page_url, image_url) if image_url else "",
+        )
+        package_size = extract_package_size(" ".join([name, card_text]))
+        unit_price = extract_unit_price(card_text)
+        if package_size:
+            candidate["package_size"] = package_size
+            candidate["size"] = package_size
+        if unit_price:
+            candidate["unit_price"] = unit_price.get("display", "")
+            candidate["unit_price_value"] = unit_price.get("value")
+            candidate["unit_price_unit"] = unit_price.get("unit", "")
+        if card_text:
+            candidate["card_text_excerpt"] = card_text[:900]
+            candidate["detail_text_excerpt"] = card_text[:900]
+
+        candidate["ranking_reasons"].append("Visible product card was extracted from the rendered store page.")
+        candidates.append(candidate)
+
+    return dedupe_candidates(candidates)[:product_candidate_limit()]
+
+
+def best_visible_card_name(ingredient, card_text):
+    ingredient_tokens = set(tokenize(ingredient))
+    text = str(card_text or "")
+    text = re.sub(
+        r"\bcurrent\s+price\s*:\s*\$\s*\d+(?:,\d{3})*(?:\.\d{2})?",
+        " | ",
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(r"\$\s*\d+\s+\d{2}\b", " | ", text)
+    text = re.sub(r"\$\s*\d+(?:,\d{3})*(?:\.\d{2})?", " | ", text)
+    text = PACKAGE_SIZE_PATTERN.sub(" | ", text)
+    text = re.sub(
+        r"\b(?:many in stock|in stock|out of stock|add|best seller|store choice|sponsored)\b",
+        " | ",
+        text,
+        flags=re.IGNORECASE,
+    )
+    lines = [
+        clean_text(line)
+        for line in re.split(r"[\n|]+", text)
+        if clean_text(line)
+    ]
+    candidates = []
+
+    for line in lines:
+        if len(line) > 180 or PRICE_PATTERN.search(line):
+            continue
+
+        for value in unique_texts([strip_leading_product_badges(line), line]):
+            lowered = value.lower()
+            if any(term in lowered for term in ["add to cart", "pickup", "delivery", "rating", "reviews"]):
+                continue
+
+            line_tokens = set(tokenize(value))
+            overlap = len(ingredient_tokens & line_tokens)
+            candidates.append((overlap, len(line_tokens), value))
+
+    if not candidates:
+        return ""
+
+    candidates.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    return candidates[0][2]
+
+
+def strip_leading_product_badges(value):
+    text = clean_text(value)
+    badge_pattern = re.compile(
+        r"^(?:(?:\d+%|organic|whole|low fat|fat free|skim|dairy free|vegan|vegetarian|"
+        r"gluten free|low carb|best seller|store choice|sponsored)\s+)+(.+)$",
+        re.IGNORECASE,
+    )
+    match = badge_pattern.match(text)
+
+    if not match:
+        return text
+
+    stripped = clean_text(match.group(1))
+
+    if len(tokenize(stripped)) >= 3:
+        return stripped
+
+    return text
 
 
 def parse_product_candidates_from_html(
@@ -1221,6 +2136,7 @@ def parse_product_candidates_from_html(
 ):
     soup = BeautifulSoup(html_text or "", "html.parser")
     candidates = []
+    limit = product_candidate_limit()
 
     for product in extract_json_ld_products(soup):
         candidate = product_candidate_from_mapping(
@@ -1238,7 +2154,7 @@ def parse_product_candidates_from_html(
         if candidate:
             candidates.append(candidate)
 
-    if len(candidates) < 8:
+    if len(candidates) < limit:
         for product in extract_embedded_product_mappings(soup):
             candidate = product_candidate_from_mapping(
                 product,
@@ -1254,10 +2170,10 @@ def parse_product_candidates_from_html(
             )
             if candidate:
                 candidates.append(candidate)
-                if len(candidates) >= 12:
+                if len(candidates) >= limit:
                     break
 
-    if len(candidates) < 8:
+    if len(candidates) < limit:
         candidates.extend(extract_anchor_product_candidates(
             soup,
             ingredient,
@@ -1270,7 +2186,7 @@ def parse_product_candidates_from_html(
             store_location,
         ))
 
-    return dedupe_candidates(candidates)[:12]
+    return dedupe_candidates(candidates)[:limit]
 
 
 def extract_json_ld_products(soup):
@@ -1286,6 +2202,7 @@ def extract_json_ld_products(soup):
 
 def extract_embedded_product_mappings(soup):
     products = []
+    limit = product_candidate_limit()
 
     for script in soup.find_all("script"):
         text = script.string or script.get_text("", strip=True)
@@ -1300,7 +2217,7 @@ def extract_embedded_product_mappings(soup):
         for payload in parse_json_payloads(text):
             products.extend(find_product_mappings(payload, require_product_type=False))
 
-        if len(products) >= 20:
+        if len(products) >= limit:
             break
 
     return products
@@ -1391,6 +2308,8 @@ def product_candidate_from_mapping(
     price = extract_price_from_mapping(product)
     product_url = extract_product_url_from_mapping(product)
     product_url = urljoin(page_url, str(product_url or page_url))
+    image_url = extract_image_url_from_mapping(product)
+    image_url = urljoin(page_url, str(image_url)) if image_url else ""
 
     if not name or len(name) > 180:
         return None
@@ -1407,6 +2326,7 @@ def product_candidate_from_mapping(
         home_location,
         store_location,
         source,
+        image_url=image_url,
     )
 
 
@@ -1430,6 +2350,36 @@ def extract_product_url_from_mapping(mapping):
                 return product_url
     elif isinstance(offers, dict):
         return extract_product_url_from_mapping(offers)
+
+    return ""
+
+
+def extract_image_url_from_mapping(mapping):
+    if not isinstance(mapping, dict):
+        return ""
+
+    image = mapping.get("image") or mapping.get("images") or mapping.get("thumbnail") or mapping.get("thumbnailUrl")
+
+    if isinstance(image, str):
+        return image
+
+    if isinstance(image, dict):
+        return (
+            image.get("url")
+            or image.get("contentUrl")
+            or image.get("@id")
+            or ""
+        )
+
+    if isinstance(image, list):
+        for item in image:
+            image_url = extract_image_url_from_mapping({"image": item})
+            if image_url:
+                return image_url
+
+    media = mapping.get("media") or mapping.get("primaryImage")
+    if isinstance(media, (dict, list, str)):
+        return extract_image_url_from_mapping({"image": media})
 
     return ""
 
@@ -1500,6 +2450,7 @@ def extract_anchor_product_candidates(
 ):
     candidates = []
     ingredient_tokens = set(tokenize(ingredient))
+    limit = product_candidate_limit()
 
     for anchor in soup.find_all("a", href=True):
         name = clean_text(anchor.get_text(" ", strip=True))
@@ -1532,7 +2483,7 @@ def extract_anchor_product_candidates(
             source="html-anchor",
         ))
 
-        if len(candidates) >= 10:
+        if len(candidates) >= limit:
             break
 
     return candidates
@@ -1579,6 +2530,7 @@ def build_candidate(
     home_location,
     store_location,
     source,
+    image_url="",
 ):
     store_location = store_location or {}
     candidate = {
@@ -1591,8 +2543,13 @@ def build_candidate(
         "store_location_distance_miles": store_location.get("distance_miles"),
         "store_locator_url": store_location.get("locator_url", ""),
         "home_address": full_address,
+        "home_location": home_location,
         "product_name": product_name,
         "price": price,
+        "size": "",
+        "package_size": "",
+        "unit_price": "",
+        "image_url": image_url,
         "product_url": product_url,
         "search_url": search_url,
         "source": source,
@@ -1777,9 +2734,10 @@ def score_candidate(ingredient, candidate):
     return score, reasons, skip_reasons, viable
 
 
-def select_product_choice(item_key, product_id):
+def select_product_choice(item_key, product_id, store_key=""):
     item_key = normalize_item_key(item_key)
     product_id = str(product_id or "").strip()
+    store_key = str(store_key or "").strip()
     state = load_product_choices()
     record = state.get("items", {}).get(item_key)
 
@@ -1790,7 +2748,12 @@ def select_product_choice(item_key, product_id):
         }
 
     selected = next(
-        (candidate for candidate in record.get("candidates", []) if candidate.get("id") == product_id),
+        (
+            candidate
+            for candidate in record.get("candidates", [])
+            if candidate.get("id") == product_id
+            and (not store_key or candidate.get("store_key") == store_key)
+        ),
         None,
     )
 
@@ -1806,9 +2769,51 @@ def select_product_choice(item_key, product_id):
             "error": "That product choice is saved as a reference, but it is not selectable.",
         }
 
+    selected["reason_selected"] = selected.get("reason_selected") or product_selection_reason(
+        selected,
+        selected.get("store_name", ""),
+    )
+
+    if store_key:
+        store_results = record.setdefault("store_results", {})
+        store_result = find_store_result(record, store_key) or {
+            "store_key": store_key,
+            "store_name": selected.get("store_name", ""),
+            "ingredient": record.get("ingredient", item_key),
+            "alternatives": [
+                candidate
+                for candidate in record.get("candidates", [])
+                if candidate.get("store_key") == store_key
+            ],
+            "alternative_products": [
+                candidate
+                for candidate in record.get("candidates", [])
+                if candidate.get("store_key") == store_key
+            ],
+        }
+        store_result.update({
+            "best_product_id": product_id,
+            "best_product": selected,
+            "best_product_match": selected.get("product_name", ""),
+            "price": selected.get("price", ""),
+            "size": product_size(selected),
+            "unit_price": selected.get("unit_price", ""),
+            "product_url": selected.get("product_url", ""),
+            "image_url": selected.get("image_url", ""),
+            "reason_selected": selected.get("reason_selected", ""),
+            "reason_skipped": "",
+            "skip_reason": "",
+        })
+        store_results[store_key] = store_result
+        record["store_results_list"] = upsert_store_result_list(
+            record.get("store_results_list", []),
+            store_result,
+        )
+
     record["selected_product_id"] = product_id
     record["selected_product"] = selected
     record["manual_override"] = True
+    record["manual_override_store_key"] = store_key
     record["updated_at"] = datetime.utcnow().isoformat(timespec="seconds") + "Z"
     save_product_choices(state)
     save_item_store(item_key, selected.get("store_key") or "")
@@ -1816,8 +2821,26 @@ def select_product_choice(item_key, product_id):
     return {
         "ok": True,
         "item_key": item_key,
-        "choice": record,
+        "choice": product_choice_for_store(record, store_key) if store_key else record,
     }
+
+
+def upsert_store_result_list(store_results_list, store_result):
+    output = []
+    replaced = False
+    store_key = store_result.get("store_key")
+
+    for item in store_results_list if isinstance(store_results_list, list) else []:
+        if item.get("store_key") == store_key:
+            output.append(store_result)
+            replaced = True
+        else:
+            output.append(item)
+
+    if not replaced:
+        output.append(store_result)
+
+    return output
 
 
 def build_product_search_url(store, ingredient):
@@ -2093,6 +3116,11 @@ def tokenize(text):
 
 def clean_text(value):
     return re.sub(r"\s+", " ", str(value or "").strip())
+
+
+def extract_zip_code(value):
+    match = re.search(r"\b\d{5}(?:-\d{4})?\b", str(value or ""))
+    return match.group(0) if match else ""
 
 
 def normalize_item_key(text):

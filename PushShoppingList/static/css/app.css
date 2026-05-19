@@ -3522,6 +3522,12 @@ body {
             font-weight: 800;
         }
 
+        .best-product-meta {
+            color: #cbd5e1;
+            font-weight: 700;
+            font-size: 12px;
+        }
+
         .best-product-skip {
             color: #fbbf24;
             overflow-wrap: anywhere;
@@ -3943,6 +3949,18 @@ body {
             align-items: center;
             padding: 8px;
             border-bottom: 1px solid #2a2a2a;
+        }
+
+        .bulk-alt-option.has-image {
+            grid-template-columns: 54px minmax(0, 1fr) 92px;
+        }
+
+        .bulk-alt-image {
+            width: 48px;
+            height: 48px;
+            object-fit: contain;
+            border-radius: 6px;
+            background: #111827;
         }
 
         .bulk-alt-option:last-child {
