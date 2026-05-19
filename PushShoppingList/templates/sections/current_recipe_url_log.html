@@ -119,9 +119,17 @@
                     <span>Recipe Title</span>
                     <input type="text" name="recipe_title" id="recipeEditTitleInput">
                 </label>
-                <label class="recipe-edit-wide">
+                <label class="recipe-edit-wide recipe-edit-source-url-field">
                     <span>Source URL</span>
-                    <input type="text" name="source_url" id="recipeEditSourceUrl">
+                    <div class="recipe-edit-source-url-control">
+                        <input type="text" name="source_url" id="recipeEditSourceUrl">
+                        <button type="button"
+                                id="recipeEditSourcePdfButton"
+                                class="recipe-edit-source-pdf-button"
+                                onclick="importSourceRecipe(this)">
+                            Import PDF
+                        </button>
+                    </div>
                 </label>
                 <label>
                     <span>Quantity</span>

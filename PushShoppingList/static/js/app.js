@@ -1579,7 +1579,7 @@ async function saveRecipeEditor(event) {
         if (shouldCreatePdf) {
             updateRecipeSaveProgressItem(pdfProgressIndex, "running", "Creating...");
             setRecipeEditStatus("Creating PDF...");
-            const pdfData = await createRecipePdfFromSavedRecipe(sourceUrl);
+            const pdfData = await createRecipePdfForSource(sourceUrl);
             recipeForEditor = {
                 ...(recipeForEditor || {}),
                 source_url: pdfData.url || sourceUrl,
@@ -1660,7 +1660,7 @@ async function createRecipeEditorPdf(button) {
         }
 
         setRecipeEditStatus("Creating PDF...");
-        const pdfData = await createRecipePdfFromSavedRecipe(sourceUrl);
+        const pdfData = await createRecipePdfForSource(sourceUrl);
 
         updateRecipeEditorPdfControls({
             source_url: pdfData.url || sourceUrl,
@@ -1680,6 +1680,117 @@ async function createRecipeEditorPdf(button) {
     }
 
     return false;
+}
+
+async function importSourceRecipe(button) {
+    const originalText = button ? button.textContent : "";
+    const sourceReference = recipeEditorSourceReferenceForImport();
+    const originalInput = document.getElementById("recipeEditOriginalUrl");
+    const originalUrl = originalInput ? originalInput.value.trim() : "";
+
+    if (!sourceReference) {
+        setRecipeEditStatus("Source URL or file path is required before importing.", true);
+        return false;
+    }
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Importing...";
+    }
+
+    try {
+        setRecipeEditStatus(
+            isLegitimateWebUrl(sourceReference)
+                ? "Importing recipe from URL..."
+                : "Importing recipe from document..."
+        );
+
+        const result = await importRecipeSource(sourceReference, originalUrl);
+        const importedUrl = result.source_url || originalUrl || sourceReference;
+
+        await refreshStoreMarkup();
+        showRecipeQuantityUpdatedMessage("", "", "", "Recipe imported.");
+
+        if (importedUrl) {
+            await openRecipeEditor({ dataset: { recipeUrl: importedUrl } });
+        } else {
+            setRecipeEditStatus("Recipe imported.");
+        }
+    } catch (err) {
+        console.warn("Unable to import source recipe.", err);
+        setRecipeEditStatus(err.message || "Unable to import recipe.", true);
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = originalText || "Import PDF";
+        }
+    }
+
+    return false;
+}
+
+function recipeEditorSourceReferenceForImport() {
+    const sourceInput = document.getElementById("recipeEditSourceUrl");
+
+    if (!sourceInput) {
+        return "";
+    }
+
+    return sourceInput.value.trim() || sourceInput.dataset.canonicalSourceUrl || "";
+}
+
+async function importRecipeSource(sourceReference, originalUrl) {
+    const response = await fetch("/api/import_recipe_source", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            source: sourceReference,
+            original_url: originalUrl,
+        }),
+    });
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+        throw new Error((data && data.error) || "Unable to import recipe.");
+    }
+
+    return data;
+}
+
+async function createRecipePdfForSource(sourceUrl) {
+    if (isLegitimateWebUrl(sourceUrl)) {
+        return createRecipePdfFromSourceUrl(sourceUrl);
+    }
+
+    return createRecipePdfFromSavedRecipe(sourceUrl);
+}
+
+function isLegitimateWebUrl(value) {
+    try {
+        const url = new URL(String(value || "").trim());
+        return ["http:", "https:"].includes(url.protocol) && Boolean(url.hostname);
+    } catch (err) {
+        return false;
+    }
+}
+
+async function createRecipePdfFromSourceUrl(sourceUrl) {
+    const pdfResponse = await fetch("/api/source_url_pdf", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ url: sourceUrl }),
+    });
+    const pdfData = await pdfResponse.json();
+
+    if (!pdfResponse.ok || !pdfData.ok) {
+        throw new Error((pdfData && pdfData.error) || "Unable to create PDF.");
+    }
+
+    return pdfData;
 }
 
 async function createRecipePdfFromSavedRecipe(sourceUrl) {

@@ -1,5 +1,6 @@
 import json
 import uuid
+from urllib.parse import urlparse
 
 from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
@@ -7,6 +8,7 @@ from PushShoppingList.services.recipe_extract_service import STORE_SECTION_ORDER
 from PushShoppingList.services.recipe_extract_service import build_video_text_pdf_html
 from PushShoppingList.services.recipe_extract_service import classify_store_section
 from PushShoppingList.services.recipe_extract_service import extract_ingredients_from_result
+from PushShoppingList.services.recipe_extract_service import fetch_recipe_page
 from PushShoppingList.services.recipe_extract_service import normalize_extracted_equipment_fields
 from PushShoppingList.services.recipe_extract_service import normalize_extracted_ingredient_fields
 from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_path
@@ -155,6 +157,40 @@ def create_editable_recipe_pdf(url):
         "pdf_path": str(saved_path),
         "pdf_available": True,
     }
+
+
+def create_source_url_pdf(url):
+    url = str(url or "").strip()
+
+    if not url:
+        return {"ok": False, "error": "Source URL is required."}
+
+    if not is_web_source_url(url):
+        return create_editable_recipe_pdf(url)
+
+    try:
+        fetch_recipe_page(url)
+    except Exception as exc:
+        return {
+            "ok": False,
+            "url": url,
+            "error": f"Webpage PDF creation failed: {exc}",
+        }
+
+    pdf_path = recipe_archive_pdf_path(url)
+
+    return {
+        "ok": pdf_path.exists(),
+        "url": url,
+        "pdf_path": str(pdf_path),
+        "pdf_available": pdf_path.exists(),
+        "error": None if pdf_path.exists() else "PDF file was not created.",
+    }
+
+
+def is_web_source_url(url):
+    parsed = urlparse(str(url or "").strip())
+    return parsed.scheme.lower() in {"http", "https"} and bool(parsed.netloc)
 
 
 def delete_editable_recipe_pdf(url):

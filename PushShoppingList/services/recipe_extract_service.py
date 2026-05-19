@@ -3731,13 +3731,13 @@ def save_extracted_recipe_json(recipe_url, json_data):
     return json_path
 
 
-def extract_recipe_from_upload(file_storage):
+def extract_recipe_from_upload(file_storage, source_url_override=None):
     filename = Path(file_storage.filename or "uploaded-recipe").name
     safe_name = f"{uuid.uuid4().hex}_{safe_filename(filename)}"
     upload_path = UPLOAD_FOLDER / safe_name
     file_storage.save(upload_path)
 
-    recipe_url = f"uploaded://{safe_name}"
+    recipe_url = str(source_url_override or "").strip() or f"uploaded://{safe_name}"
     mime_type = (
         file_storage.mimetype
         or mimetypes.guess_type(str(upload_path))[0]
