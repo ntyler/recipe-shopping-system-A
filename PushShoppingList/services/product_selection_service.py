@@ -7,6 +7,7 @@ import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from concurrent.futures import as_completed
 from datetime import datetime
 from pathlib import Path
@@ -170,6 +171,24 @@ def product_ai_text_chars():
         configured = 20000
 
     return max(4000, min(50000, configured))
+
+
+def product_ai_browser_wait_seconds():
+    try:
+        configured = float(os.getenv("PRODUCT_AI_BROWSER_WAIT_SECONDS", "6"))
+    except (TypeError, ValueError):
+        configured = 6
+
+    return max(2, min(15, configured))
+
+
+def product_search_timeout_seconds():
+    try:
+        configured = float(os.getenv("PRODUCT_SEARCH_TIMEOUT_SECONDS", "900"))
+    except (TypeError, ValueError):
+        configured = 900
+
+    return max(60, min(3600, configured))
 
 
 def product_ai_analysis_enabled():
@@ -496,6 +515,17 @@ def grab_best_products(items=None, job_id=None):
         ingredient: []
         for ingredient in ingredients
     }
+    expected_download_counts = {}
+    completed_download_counts = {}
+    saved_ingredients = set()
+    state = load_product_choices()
+    item_records = state.setdefault("items", {})
+    results_by_ingredient = {}
+
+    for download in downloads:
+        ingredient = download.get("ingredient", "")
+        if ingredient:
+            expected_download_counts[ingredient] = expected_download_counts.get(ingredient, 0) + 1
 
     if downloads:
         if job_id:
@@ -504,7 +534,8 @@ def grab_best_products(items=None, job_id=None):
                 f"Downloading product search pages with up to {max_workers} searches running at once.",
             )
 
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        executor = ThreadPoolExecutor(max_workers=max_workers)
+        try:
             futures = {
                 executor.submit(
                     search_store_products_for_download,
@@ -518,12 +549,43 @@ def grab_best_products(items=None, job_id=None):
                 for download in downloads
             }
 
-            for future in as_completed(futures):
-                download = futures[future]
-                try:
-                    result = future.result()
-                except Exception as exc:
-                    message = f"{download.get('store_name')}: product search failed: {exc}"
+            try:
+                completed_futures = as_completed(futures, timeout=product_search_timeout_seconds())
+                for future in completed_futures:
+                    download = futures[future]
+                    try:
+                        result = future.result()
+                    except Exception as exc:
+                        result = failed_product_download_result(download, exc, job_id=job_id)
+
+                    ingredient = result.get("ingredient", "")
+                    store_results_by_ingredient.setdefault(ingredient, []).append(result)
+                    completed_download_counts[ingredient] = completed_download_counts.get(ingredient, 0) + 1
+
+                    if (
+                        ingredient
+                        and ingredient not in saved_ingredients
+                        and completed_download_counts.get(ingredient, 0) >= expected_download_counts.get(ingredient, 0)
+                    ):
+                        record = save_product_record_for_ingredient(
+                            ingredient,
+                            store_results_by_ingredient.get(ingredient, []),
+                            full_address,
+                            state,
+                            item_records,
+                        )
+                        results_by_ingredient[ingredient] = record
+                        saved_ingredients.add(ingredient)
+            except FuturesTimeoutError:
+                for future, download in futures.items():
+                    if future.done():
+                        continue
+
+                    future.cancel()
+                    message = (
+                        f"{download.get('store_name')}: product search timed out after "
+                        f"{int(product_search_timeout_seconds())} seconds."
+                    )
                     if job_id:
                         mark_product_download(
                             job_id,
@@ -535,32 +597,33 @@ def grab_best_products(items=None, job_id=None):
                     result = {
                         "index": download.get("index", 0),
                         "ingredient": download.get("ingredient", ""),
+                        "search_term": download.get("search_term", ""),
                         "store_key": download.get("store_key", ""),
                         "store_name": download.get("store_name", ""),
                         "search_url": download.get("search_url", ""),
                         "candidates": [],
                         "skip_reasons": [message],
                     }
-                ingredient = result.get("ingredient", "")
-                store_results_by_ingredient.setdefault(ingredient, []).append(result)
+                    ingredient = result.get("ingredient", "")
+                    store_results_by_ingredient.setdefault(ingredient, []).append(result)
+                    completed_download_counts[ingredient] = completed_download_counts.get(ingredient, 0) + 1
+        finally:
+            executor.shutdown(wait=False, cancel_futures=True)
     elif job_id:
         update_product_progress_summary(job_id, "No enabled store search URLs are configured.")
 
-    state = load_product_choices()
-    item_records = state.setdefault("items", {})
     results = []
 
     for ingredient in ingredients:
-        record = build_product_choice_record_from_results(
-            ingredient,
-            store_results_by_ingredient.get(ingredient, []),
-            full_address,
-        )
-        item_records[record["item_key"]] = record
-        selected = record.get("selected_product")
-
-        if selected and selected.get("source") != "search-page-fallback":
-            save_item_store(record["item_key"], selected.get("store_key") or "")
+        record = results_by_ingredient.get(ingredient)
+        if not record:
+            record = save_product_record_for_ingredient(
+                ingredient,
+                store_results_by_ingredient.get(ingredient, []),
+                full_address,
+                state,
+                item_records,
+            )
 
         results.append(record)
 
@@ -584,6 +647,45 @@ def grab_best_products(items=None, job_id=None):
         "selected_count": sum(1 for item in results if item.get("selected_product")),
         "results": results,
     }
+
+
+def failed_product_download_result(download, exc, job_id=None):
+    message = f"{download.get('store_name')}: product search failed: {exc}"
+    if job_id:
+        mark_product_download(
+            job_id,
+            download.get("index", 0),
+            "failed",
+            message,
+            candidates_count=0,
+        )
+
+    return {
+        "index": download.get("index", 0),
+        "ingredient": download.get("ingredient", ""),
+        "search_term": download.get("search_term", ""),
+        "store_key": download.get("store_key", ""),
+        "store_name": download.get("store_name", ""),
+        "search_url": download.get("search_url", ""),
+        "candidates": [],
+        "skip_reasons": [message],
+    }
+
+
+def save_product_record_for_ingredient(ingredient, store_results, full_address, state, item_records):
+    record = build_product_choice_record_from_results(
+        ingredient,
+        store_results,
+        full_address,
+    )
+    item_records[record["item_key"]] = record
+    selected = record.get("selected_product")
+
+    if selected and selected.get("source") != "search-page-fallback":
+        save_item_store(record["item_key"], selected.get("store_key") or "")
+
+    save_product_choices(state)
+    return record
 
 
 def build_product_download_plan(ingredients, enabled_stores, stores):
@@ -1164,6 +1266,8 @@ def fetch_product_page_html(product_url, expected_name="", full_address="", home
             expected_name,
             full_address=full_address,
             home_location=home_location,
+            wait_seconds=product_ai_browser_wait_seconds(),
+            page_load_strategy="none",
         )
         if browser_result.get("html"):
             return browser_result
@@ -1220,7 +1324,14 @@ def fetch_product_page_html(product_url, expected_name="", full_address="", home
     return result
 
 
-def fetch_product_page_html_with_browser(product_url, expected_name="", full_address="", home_location=None):
+def fetch_product_page_html_with_browser(
+    product_url,
+    expected_name="",
+    full_address="",
+    home_location=None,
+    wait_seconds=None,
+    page_load_strategy="eager",
+):
     result = {
         "status": "failed",
         "method": "browser",
@@ -1229,28 +1340,33 @@ def fetch_product_page_html_with_browser(product_url, expected_name="", full_add
         "html": "",
         "error": "",
     }
+    wait_seconds = wait_seconds or product_browser_wait_seconds()
 
     with PRODUCT_BROWSER_FETCH_LOCK:
         driver = None
         try:
             from PushShoppingList.services.recipe_extract_service import create_headless_chrome_driver
-            from PushShoppingList.services.recipe_extract_service import wait_for_browser_document
 
             driver = create_headless_chrome_driver(
                 window_size="1365,1000",
                 prefer_undetected=True,
-                page_load_strategy="eager",
+                page_load_strategy=page_load_strategy,
             )
-            driver.set_page_load_timeout(product_browser_wait_seconds() + 8)
+            driver.set_page_load_timeout(max(4, min(wait_seconds + 3, product_browser_wait_seconds() + 8)))
+            driver.set_script_timeout(max(2, min(5, wait_seconds)))
             configure_browser_home_location(driver, product_url, home_location)
 
             try:
                 driver.get(product_url)
             except Exception:
+                try:
+                    driver.execute_script("window.stop && window.stop();")
+                except Exception:
+                    pass
                 if len(driver.page_source or "") < 800:
                     raise
 
-            wait_for_browser_document(driver, timeout_seconds=14)
+            wait_for_browser_body_text(driver, timeout_seconds=wait_seconds)
             handle_browser_popups_and_location(driver, full_address)
 
             try:
@@ -1283,6 +1399,25 @@ def fetch_product_page_html_with_browser(product_url, expected_name="", full_add
                     pass
 
     return result
+
+
+def wait_for_browser_body_text(driver, timeout_seconds=6):
+    deadline = time.monotonic() + max(1, timeout_seconds)
+
+    while time.monotonic() < deadline:
+        try:
+            text_length = driver.execute_script(
+                "return (document.body && document.body.innerText || '').length"
+            )
+        except Exception:
+            text_length = 0
+
+        if text_length >= 300:
+            return True
+
+        time.sleep(0.35)
+
+    return False
 
 
 def product_page_html_looks_useful(html_text, expected_name=""):
