@@ -12,6 +12,7 @@ from flask import jsonify
 from flask import redirect
 from flask import request
 from flask import render_template
+from flask import url_for
 
 from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
 from PushShoppingList.services.food_rules_service import shopping_item_food_rule_status
@@ -20,6 +21,7 @@ from PushShoppingList.services.home_address_service import save_home_address
 from PushShoppingList.services.item_state_service import load_item_state
 from PushShoppingList.services.item_state_service import save_item_manual_qty
 from PushShoppingList.services.recipe_url_service import recipe_url_rows
+from PushShoppingList.services.recipe_url_service import recipe_url_type
 from PushShoppingList.services.recipe_url_service import save_recipe_urls
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
 from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
@@ -28,6 +30,7 @@ from PushShoppingList.services.recipe_quantity_service import ingredient_key
 from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
 from PushShoppingList.services.recipe_extract_service import STORE_SECTION_ORDER
 from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_exists
+from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_path
 from PushShoppingList.services.shopping_list_service import load_items
 from PushShoppingList.services.shopping_list_service import save_items
 from PushShoppingList.services.store_settings_service import load_store_settings
@@ -181,6 +184,8 @@ def recipe_view_rows(recipe_urls):
             "number": index,
             "name": recipe_data.get("recipe_title") or recipe["name"],
             "url": recipe["url"],
+            "source_href": recipe_source_href(recipe["url"]),
+            "source_display_url": recipe_source_display_url(recipe["url"]),
             "quantity": recipe_quantity,
             "archive_pdf_available": recipe_archive_pdf_exists(recipe["url"]),
             "food_rule_status": recipe_food_rule_status(recipe_data),
@@ -202,11 +207,31 @@ def recipe_url_log_rows(recipe_urls):
         recipe_data = load_saved_recipe_output(recipe["url"])
         rows.append({
             **recipe,
+            "source_href": recipe_source_href(recipe["url"]),
+            "source_display_url": recipe_source_display_url(recipe["url"]),
             "food_rule_status": recipe_food_rule_status(recipe_data),
             "archive_pdf_available": recipe_archive_pdf_exists(recipe["url"]),
         })
 
     return rows
+
+
+def recipe_source_href(recipe_url):
+    if imported_recipe_uses_pdf_path(recipe_url):
+        return url_for("recipe_bp.recipe_archive_pdf_route", url=recipe_url)
+
+    return recipe_url
+
+
+def recipe_source_display_url(recipe_url):
+    if recipe_url_type(recipe_url) == "File":
+        return str(recipe_archive_pdf_path(recipe_url))
+
+    return recipe_url
+
+
+def imported_recipe_uses_pdf_path(recipe_url):
+    return recipe_url_type(recipe_url) == "File" and recipe_archive_pdf_exists(recipe_url)
 
 
 def recipe_food_rule_status(recipe_data):

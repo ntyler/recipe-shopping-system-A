@@ -161,9 +161,10 @@
                 <div class="recipe-view-title">
                     <div class="recipe-view-title-main">
                         Recipe {{ recipe.number }}:
-                        <a href="{{ recipe.url }}"
+                        <a href="{{ recipe.source_href }}"
                            target="_blank"
-                           rel="noopener noreferrer">{{ recipe.name }}</a>
+                           rel="noopener noreferrer"
+                           title="{{ recipe.source_display_url }}">{{ recipe.name }}</a>
                     </div>
                     <div class="recipe-view-title-actions">
                         {% if recipe.food_rule_status.needs_review %}

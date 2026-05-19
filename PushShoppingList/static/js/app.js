@@ -884,10 +884,16 @@ function populateRecipeEditor(recipe, originalUrl) {
     setValue("recipeEditOriginalUrl", originalUrl);
     setValue("recipeEditDisplayName", recipe.display_name || "");
     setValue("recipeEditTitleInput", recipe.recipe_title || "");
-    setValue("recipeEditSourceUrl", recipe.source_url || originalUrl);
+    setValue("recipeEditSourceUrl", recipe.source_display_url || recipe.source_url || originalUrl);
     setValue("recipeEditQuantity", recipe.quantity || "1");
     setValue("recipeEditServings", recipe.servings || "");
     updateRecipeEditorPdfControls(recipe);
+
+    const sourceInput = document.getElementById("recipeEditSourceUrl");
+    if (sourceInput) {
+        sourceInput.dataset.canonicalSourceUrl = recipe.source_url || originalUrl;
+        sourceInput.dataset.displaySourceUrl = recipe.source_display_url || "";
+    }
 
     const ingredientWrap = document.getElementById("recipeEditIngredients");
     const equipmentWrap = document.getElementById("recipeEditEquipment");
@@ -1978,13 +1984,14 @@ function updateRecipeSaveProgressFailed() {
 function collectRecipeEditorPayload() {
     const originalUrl = document.getElementById("recipeEditOriginalUrl").value || "";
     const quantity = Math.max(1, parseInt(document.getElementById("recipeEditQuantity").value || "1", 10) || 1);
+    const sourceUrl = recipeEditorSourceUrlForSave();
 
     return {
         original_url: originalUrl,
         recipe: {
             display_name: document.getElementById("recipeEditDisplayName").value.trim(),
             recipe_title: document.getElementById("recipeEditTitleInput").value.trim(),
-            source_url: document.getElementById("recipeEditSourceUrl").value.trim(),
+            source_url: sourceUrl,
             quantity,
             servings: document.getElementById("recipeEditServings").value.trim(),
             ingredients: collectRecipeIngredientRows(),
@@ -1993,6 +2000,24 @@ function collectRecipeEditorPayload() {
             nutrition: collectRecipeNutritionRows(),
         },
     };
+}
+
+function recipeEditorSourceUrlForSave() {
+    const sourceInput = document.getElementById("recipeEditSourceUrl");
+
+    if (!sourceInput) {
+        return "";
+    }
+
+    const currentValue = sourceInput.value.trim();
+    const displaySourceUrl = sourceInput.dataset.displaySourceUrl || "";
+    const canonicalSourceUrl = sourceInput.dataset.canonicalSourceUrl || "";
+
+    if (displaySourceUrl && canonicalSourceUrl && currentValue === displaySourceUrl) {
+        return canonicalSourceUrl;
+    }
+
+    return currentValue;
 }
 
 function collectRecipeIngredientRows() {

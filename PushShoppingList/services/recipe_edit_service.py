@@ -90,6 +90,7 @@ def load_editable_recipe(url):
         "ok": True,
         "recipe": {
             "source_url": recipe_data.get("source_url") or url,
+            "source_display_url": editable_recipe_source_display_url(recipe_data.get("source_url") or url),
             "type": recipe_url_type(url),
             "display_name": meta.get("name") or recipe_data.get("recipe_title") or "",
             "quantity": normalize_recipe_quantity(meta.get("quantity", 1)),
@@ -114,6 +115,13 @@ def editable_recipe_pdf_info(url):
         "path": str(pdf_path),
         "available": pdf_path.exists(),
     }
+
+
+def editable_recipe_source_display_url(url):
+    if recipe_url_type(url) == "File":
+        return str(recipe_archive_pdf_path(url))
+
+    return url
 
 
 def create_editable_recipe_pdf(url):
