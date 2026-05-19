@@ -159,7 +159,7 @@ try:
         print("Ensuring Tailscale Funnel is on...")
         run_ssh_command(
             ssh,
-            "tailscale funnel --bg --yes http://127.0.0.1:5001",
+            "tailscale funnel --bg --yes http://127.0.0.1:5055",
         )
 
     if wait_for_app(APP_URL):

@@ -340,11 +340,28 @@ def finish_product_progress(job_id, ok=True, summary=None):
         if job_id and progress.get("job_id") != job_id:
             return progress
 
+        downloads = progress.get("downloads", [])
         has_failed = any(
             item.get("state") == "failed"
-            for item in progress.get("downloads", [])
+            for item in downloads
         )
         ok = bool(ok) and not has_failed
+        unfinished_state = "skipped" if ok else "failed"
+        unfinished_message = (
+            "Product search ended before this download ran."
+            if ok
+            else "Product search stopped before this download completed."
+        )
+
+        for item in downloads:
+            if item.get("state") in PRODUCT_FINAL_STATES:
+                continue
+
+            item["state"] = unfinished_state
+            item["message"] = unfinished_message
+            item["updated_at"] = time.time()
+            item["finished_at"] = time.time()
+            item.setdefault("candidates_count", 0)
 
         progress["active"] = False
         progress["status"] = "complete" if ok else "failed"
