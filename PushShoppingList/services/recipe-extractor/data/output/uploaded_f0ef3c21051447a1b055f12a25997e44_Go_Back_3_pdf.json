@@ -27,7 +27,7 @@
     },
     {
       "section": null,
-      "original_text": "1/2 yellow onion, approx 1/2-3/4 cup, diced",
+      "original_text": "1/2 yellow onion diced",
       "quantity": "1/2",
       "unit": null,
       "ingredient": "yellow onion",
@@ -38,7 +38,7 @@
     },
     {
       "section": null,
-      "original_text": "3-4 garlic cloves, chopped",
+      "original_text": "3-4 garlic cloves chopped",
       "quantity": "3-4",
       "unit": null,
       "ingredient": "garlic cloves",
@@ -49,7 +49,7 @@
     },
     {
       "section": null,
-      "original_text": "Dash of red pepper flakes",
+      "original_text": "1 Dash red pepper flakes optional",
       "quantity": "1",
       "unit": "Dash",
       "ingredient": "red pepper flakes",
@@ -60,7 +60,7 @@
     },
     {
       "section": null,
-      "original_text": "Dash of nutmeg",
+      "original_text": "1 Dash nutmeg optional",
       "quantity": "1",
       "unit": "Dash",
       "ingredient": "nutmeg",
@@ -71,7 +71,7 @@
     },
     {
       "section": null,
-      "original_text": "1 lemon, zest and juice",
+      "original_text": "1 lemon lemon zest and juice",
       "quantity": "1",
       "unit": "lemon",
       "ingredient": "lemon",
@@ -82,8 +82,8 @@
     },
     {
       "section": null,
-      "original_text": "1/2 cup white wine, or vegetable broth",
-      "quantity": "1/2",
+      "original_text": "1/2 cup white wine OR vegetable broth optional",
+      "quantity": "1/2 cup",
       "unit": "cup",
       "ingredient": "white wine OR vegetable broth",
       "preparation": null,
@@ -93,7 +93,7 @@
     },
     {
       "section": null,
-      "original_text": "1 bunch asparagus, cut into bite-sized pieces",
+      "original_text": "1 asparagus cut into bite-sized pieces",
       "quantity": "1",
       "unit": null,
       "ingredient": "asparagus",
@@ -159,14 +159,14 @@
     },
     {
       "section": null,
-      "original_text": "1 cup Corn syrup",
+      "original_text": "1 cup Maple syrup",
       "quantity": "1",
       "unit": "cup",
-      "ingredient": "Corn syrup",
+      "ingredient": "Maple syrup",
       "preparation": null,
       "optional": false,
-      "store_section": "BAKING",
-      "store_section_order": 7
+      "store_section": "MISC",
+      "store_section_order": 19
     },
     {
       "section": null,
