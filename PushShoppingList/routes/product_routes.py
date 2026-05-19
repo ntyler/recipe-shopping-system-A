@@ -10,6 +10,7 @@ from PushShoppingList.services.food_rules_service import update_food_rules
 from PushShoppingList.services.home_address_service import save_home_address
 from PushShoppingList.services.product_selection_service import clear_product_choices
 from PushShoppingList.services.product_selection_service import grab_best_products
+from PushShoppingList.services.product_selection_service import load_product_progress
 from PushShoppingList.services.product_selection_service import normalize_item_key
 from PushShoppingList.services.product_selection_service import product_choice_for_item
 from PushShoppingList.services.product_selection_service import product_choices_by_item
@@ -102,7 +103,7 @@ def api_save_rules_display_section_route(section_key):
 
 @product_bp.route("/preview_grab_best_products", methods=["POST"])
 def preview_grab_best_products_route():
-    result = grab_best_products()
+    result = grab_best_products(job_id=request.form.get("job_id"))
 
     if wants_json_response():
         return jsonify(result)
@@ -115,7 +116,27 @@ def api_grab_best_products_route():
     data = request.get_json(silent=True) or {}
     items = data.get("items") if isinstance(data.get("items"), list) else None
 
-    return jsonify(grab_best_products(items=items))
+    return jsonify(grab_best_products(items=items, job_id=data.get("job_id")))
+
+
+@product_bp.route("/api/product_progress")
+def api_product_progress_route():
+    progress = load_product_progress()
+    job_id = request.args.get("job_id")
+
+    if job_id and progress.get("job_id") != job_id:
+        return jsonify({
+            "active": False,
+            "job_id": job_id,
+            "status": "idle",
+            "summary": "Waiting for product search to start.",
+            "total": 0,
+            "completed": 0,
+            "percent": 0,
+            "downloads": [],
+        })
+
+    return jsonify(progress)
 
 
 @product_bp.route("/find_products", methods=["POST"])
@@ -131,7 +152,7 @@ def find_products_route():
 
         return redirect("/")
 
-    result = grab_best_products(items=[item])
+    result = grab_best_products(items=[item], job_id=request.form.get("job_id"))
 
     if wants_json_response():
         return jsonify(result)

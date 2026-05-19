@@ -10,6 +10,8 @@ let lastRenderedExtractProgress = null;
 let currentExtractAbortController = null;
 let currentExtractAbortControllers = [];
 let cancelExtractRequested = false;
+let productProgressTimer = null;
+let activeProductJobId = null;
 const recipeQuantitySaveTimers = new WeakMap();
 const recipeQuantityNoticeTimers = new Map();
 const recipeQuantitySaveDelayMs = 2000;
@@ -121,19 +123,158 @@ function renderProductProgressRow(row, index) {
     `;
 }
 
+function newProductJobId() {
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function startProductProgressPolling(jobId) {
+    stopProductProgressPolling();
+    activeProductJobId = jobId;
+    pollProductProgress();
+    productProgressTimer = window.setInterval(pollProductProgress, 850);
+}
+
+function stopProductProgressPolling() {
+    if (productProgressTimer) {
+        window.clearInterval(productProgressTimer);
+        productProgressTimer = null;
+    }
+}
+
+async function pollProductProgress() {
+    if (!activeProductJobId) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/product_progress?job_id=${encodeURIComponent(activeProductJobId)}&t=${Date.now()}`, {
+            cache: "no-store",
+        });
+
+        if (!response.ok) {
+            return;
+        }
+
+        const progress = await response.json();
+
+        if (!progress || progress.job_id !== activeProductJobId) {
+            return;
+        }
+
+        renderProductDownloadProgress(progress);
+    } catch (err) {
+        // Product progress polling is best-effort; the POST still owns completion.
+    }
+}
+
+function renderProductDownloadProgress(progress) {
+    const statusElement = document.getElementById("productsStatusText");
+    const summaryElement = document.getElementById("productsSummary");
+    const bar = document.getElementById("productsProgressBar");
+    const list = document.getElementById("productsList");
+    const downloads = progress.downloads || [];
+    const completed = progress.completed || downloads.filter(item => {
+        return ["done", "failed", "skipped", "cancelled"].includes(item.state);
+    }).length;
+    const running = downloads.filter(item => item.state === "running").length;
+    const total = progress.total || downloads.length;
+
+    if (statusElement) {
+        statusElement.textContent = productDownloadStatusText(progress, completed, total);
+    }
+
+    if (summaryElement) {
+        const progressSummary = progress.summary || "Preparing product search.";
+        summaryElement.textContent = total
+            ? `${progressSummary} ${completed} of ${total} download(s) finished. ${running} active. Running up to ${progress.max_workers || 1} at once.`
+            : progressSummary;
+    }
+
+    if (bar) {
+        bar.style.width = `${Math.max(0, Math.min(100, progress.percent || 0))}%`;
+    }
+
+    if (list) {
+        list.innerHTML = downloads.map(renderProductDownloadRow).join("");
+    }
+}
+
+function productDownloadStatusText(progress, completed, total) {
+    if (!progress.active && progress.status === "complete") {
+        return "Product downloads complete.";
+    }
+
+    if (!progress.active && progress.status === "failed") {
+        return "Product downloads finished with errors.";
+    }
+
+    if (!total) {
+        return progress.summary || "Preparing product search...";
+    }
+
+    return `Downloading product searches ${completed} of ${total} complete...`;
+}
+
+function renderProductDownloadRow(row, index) {
+    const state = row.state || "waiting";
+    const done = state === "done";
+    const failed = state === "failed";
+    const skipped = state === "skipped";
+    const active = state === "running";
+    const textClasses = ["bulk-progress-text"];
+
+    if (done || skipped) {
+        textClasses.push("done");
+    } else if (active) {
+        textClasses.push("active");
+    }
+
+    const searchUrl = row.search_url || "";
+    const title = `${row.store_name || row.store_key || "Store"} - ${row.ingredient || ""}`;
+    const urlHtml = searchUrl
+        ? `<a class="${textClasses.join(" ")} product-download-link" href="${escapeAttribute(searchUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(title)}</a>`
+        : `<span class="${textClasses.join(" ")}">${escapeHtml(title)}</span>`;
+    const statusClass = failed ? "failed" : (active ? "running" : (done ? "done" : (skipped ? "skipped" : "waiting")));
+    const candidateText = row.candidates_count === null || row.candidates_count === undefined
+        ? ""
+        : `${row.candidates_count} candidate${Number(row.candidates_count) === 1 ? "" : "s"}`;
+
+    return `
+        <div class="bulk-progress-item product-download-row">
+            <input type="checkbox" class="bulk-progress-check" disabled ${done ? "checked" : ""}>
+            <div class="bulk-progress-main">
+                <div class="bulk-progress-title-line">
+                    <span class="bulk-progress-text">${index + 1}. </span>
+                    ${urlHtml}
+                </div>
+                <div class="bulk-skip-reason">${escapeHtml(row.message || "waiting...")}</div>
+            </div>
+            <div class="bulk-progress-meta">
+                <div class="bulk-product-name">${escapeHtml(row.ingredient || "")}</div>
+                <div class="bulk-product-status">${escapeHtml(row.store_name || row.store_key || "")}</div>
+                <div class="bulk-product-price">${escapeHtml(candidateText)}</div>
+            </div>
+            <span class="bulk-download-state ${statusClass}">${escapeHtml(state)}</span>
+        </div>
+    `;
+}
+
 async function grabBestProducts(event) {
     event.preventDefault();
     const form = event.currentTarget;
     const button = form ? form.querySelector("button") : null;
     const originalText = button ? button.textContent : "";
+    const jobId = newProductJobId();
+    activeProductJobId = jobId;
 
     showProductsOverlay();
     setProductsOverlayState(
-        "Finding best products...",
+        "Preparing product downloads...",
         "Using the saved Full Address to find nearby stores and search enabled store websites.",
-        15,
+        3,
         []
     );
+    startProductProgressPolling(jobId);
 
     if (button) {
         button.disabled = true;
@@ -143,6 +284,7 @@ async function grabBestProducts(event) {
     try {
         const formData = new FormData(form);
         formData.set("ajax", "1");
+        formData.set("job_id", jobId);
         const response = await fetch(form.action, {
             method: "POST",
             headers: {
@@ -156,15 +298,17 @@ async function grabBestProducts(event) {
             throw new Error((data && data.error) || "Unable to grab best products.");
         }
 
+        stopProductProgressPolling();
         setProductsOverlayState(
             "Best products saved.",
-            `${data.selected_count || 0} of ${data.count || 0} ingredient(s) have a selected product.`,
+            `${data.selected_count || 0} of ${data.count || 0} ingredient(s) have a selected product. ${data.download_count || 0} store search download(s) ran with up to ${data.max_workers || 1} in parallel.`,
             100,
             data.results || []
         );
         await refreshStoreMarkup({ cacheBust: true });
     } catch (err) {
         console.warn("Unable to grab best products.", err);
+        stopProductProgressPolling();
         setProductsOverlayState("Unable to grab best products.", err.message || "Product search failed.", 100, []);
     } finally {
         if (button) {

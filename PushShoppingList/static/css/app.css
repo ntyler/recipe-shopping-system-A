@@ -1836,7 +1836,7 @@ body {
             display: grid;
             grid-template-columns: minmax(150px, 0.85fr) minmax(0, 1.15fr) 44px;
             gap: 10px;
-            align-items: end;
+            align-items: start;
             padding: 10px;
             border: 1px solid #2d2d2d;
             border-radius: 8px;
@@ -3776,6 +3776,48 @@ body {
             line-height: 1.25;
         }
 
+        .product-download-row {
+            align-items: start;
+        }
+
+        .product-download-link {
+            overflow-wrap: anywhere;
+        }
+
+        .bulk-download-state {
+            align-self: center;
+            justify-self: end;
+            min-width: 72px;
+            border-radius: 999px;
+            padding: 4px 8px;
+            background: #2b2f35;
+            color: #ddd;
+            font-size: 12px;
+            font-weight: bold;
+            text-align: center;
+            text-transform: capitalize;
+        }
+
+        .bulk-download-state.running {
+            background: #0f3a5c;
+            color: #93c5fd;
+        }
+
+        .bulk-download-state.done {
+            background: #064e3b;
+            color: #6ee7b7;
+        }
+
+        .bulk-download-state.failed {
+            background: #7f1d1d;
+            color: #fecaca;
+        }
+
+        .bulk-download-state.skipped {
+            background: #4b5563;
+            color: #e5e7eb;
+        }
+
         .bulk-error {
             color: #ff8a8a;
         }
@@ -4174,6 +4216,11 @@ body {
             }
 
             .bulk-alt-toggle {
+                grid-column: 2 / 3;
+                justify-self: start;
+            }
+
+            .bulk-download-state {
                 grid-column: 2 / 3;
                 justify-self: start;
             }

@@ -1,7 +1,13 @@
 import hashlib
 import json
 import math
+import os
 import re
+import threading
+import time
+import uuid
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import as_completed
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import parse_qsl
@@ -23,6 +29,7 @@ from PushShoppingList.services.store_settings_service import load_store_settings
 
 BASE_DIR = Path(__file__).resolve().parent
 PRODUCT_CHOICES_FILE = BASE_DIR / "recipe-extractor" / "data" / "product_choices.json"
+PRODUCT_PROGRESS_FILE = BASE_DIR / "recipe-extractor" / "data" / "product_progress.json"
 PRODUCT_CHOICES_FILE.parent.mkdir(parents=True, exist_ok=True)
 
 REQUEST_HEADERS = {
@@ -30,6 +37,184 @@ REQUEST_HEADERS = {
     "Accept-Language": "en-US,en;q=0.9",
 }
 PRICE_PATTERN = re.compile(r"\$\s*\d+(?:,\d{3})*(?:\.\d{2})?")
+PRODUCT_PROGRESS_LOCK = threading.RLock()
+PRODUCT_FINAL_STATES = {"done", "failed", "skipped", "cancelled"}
+
+
+def product_worker_count(total_downloads=None):
+    try:
+        configured = int(os.getenv("PRODUCT_SEARCH_WORKERS", "6"))
+    except (TypeError, ValueError):
+        configured = 6
+
+    configured = max(1, min(16, configured))
+
+    if total_downloads:
+        return max(1, min(configured, int(total_downloads)))
+
+    return configured
+
+
+def new_product_job_id():
+    return uuid.uuid4().hex
+
+
+def default_product_progress():
+    return {
+        "active": False,
+        "job_id": None,
+        "status": "idle",
+        "summary": "No product search is running.",
+        "home_address": "",
+        "enabled_stores": [],
+        "max_workers": product_worker_count(),
+        "total": 0,
+        "completed": 0,
+        "percent": 0,
+        "downloads": [],
+        "updated_at": time.time(),
+    }
+
+
+def load_product_progress():
+    with PRODUCT_PROGRESS_LOCK:
+        if not PRODUCT_PROGRESS_FILE.exists():
+            return default_product_progress()
+
+        try:
+            progress = json.loads(PRODUCT_PROGRESS_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            return default_product_progress()
+
+        if not isinstance(progress, dict):
+            return default_product_progress()
+
+        progress.setdefault("downloads", [])
+        progress.setdefault("completed", completed_product_download_count(progress))
+        progress.setdefault("percent", product_progress_percent(progress.get("completed", 0), progress.get("total", 0)))
+        return progress
+
+
+def save_product_progress(progress):
+    with PRODUCT_PROGRESS_LOCK:
+        progress = progress if isinstance(progress, dict) else default_product_progress()
+        progress["updated_at"] = time.time()
+        progress["completed"] = completed_product_download_count(progress)
+        if progress.get("total"):
+            progress["percent"] = product_progress_percent(progress.get("completed", 0), progress.get("total", 0))
+        else:
+            progress["percent"] = 100 if progress.get("status") in {"complete", "failed"} else 0
+        PRODUCT_PROGRESS_FILE.write_text(
+            json.dumps(progress, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        return progress
+
+
+def start_product_progress(downloads, job_id=None, home_address="", enabled_stores=None, max_workers=None):
+    with PRODUCT_PROGRESS_LOCK:
+        job_id = job_id or new_product_job_id()
+        downloads = [dict(item) for item in downloads]
+        progress = {
+            "active": bool(downloads),
+            "job_id": job_id,
+            "status": "running" if downloads else "complete",
+            "summary": "Preparing product downloads." if downloads else "No product downloads were needed.",
+            "home_address": home_address or "",
+            "enabled_stores": enabled_stores or [],
+            "max_workers": max_workers or product_worker_count(len(downloads)),
+            "total": len(downloads),
+            "completed": 0,
+            "percent": 3 if downloads else 100,
+            "downloads": downloads,
+        }
+        return save_product_progress(progress)
+
+
+def update_product_progress_summary(job_id, summary, status=None):
+    with PRODUCT_PROGRESS_LOCK:
+        progress = load_product_progress()
+
+        if job_id and progress.get("job_id") != job_id:
+            return progress
+
+        progress["active"] = True
+        progress["status"] = status or progress.get("status") or "running"
+        progress["summary"] = summary
+        return save_product_progress(progress)
+
+
+def mark_product_download(job_id, index, state, message, candidates_count=None, selected_name=None):
+    with PRODUCT_PROGRESS_LOCK:
+        progress = load_product_progress()
+
+        if job_id and progress.get("job_id") != job_id:
+            return progress
+
+        downloads = progress.setdefault("downloads", [])
+        if 0 <= index < len(downloads):
+            item = downloads[index]
+            item["state"] = state
+            item["message"] = message
+            item["updated_at"] = time.time()
+
+            if state == "running" and not item.get("started_at"):
+                item["started_at"] = time.time()
+
+            if state in PRODUCT_FINAL_STATES:
+                item["finished_at"] = time.time()
+
+            if candidates_count is not None:
+                item["candidates_count"] = candidates_count
+
+            if selected_name:
+                item["selected_name"] = selected_name
+
+        progress["active"] = state == "running" or any(
+            item.get("state") in {"waiting", "running"}
+            for item in downloads
+        )
+        progress["status"] = "running" if progress["active"] else progress.get("status", "running")
+        return save_product_progress(progress)
+
+
+def finish_product_progress(job_id, ok=True, summary=None):
+    with PRODUCT_PROGRESS_LOCK:
+        progress = load_product_progress()
+
+        if job_id and progress.get("job_id") != job_id:
+            return progress
+
+        has_failed = any(
+            item.get("state") == "failed"
+            for item in progress.get("downloads", [])
+        )
+        ok = bool(ok) and not has_failed
+
+        progress["active"] = False
+        progress["status"] = "complete" if ok else "failed"
+        progress["summary"] = summary or (
+            "Product search complete. Refreshing shopping list..."
+            if ok
+            else "Product search finished with errors."
+        )
+        progress["percent"] = 100
+        return save_product_progress(progress)
+
+
+def completed_product_download_count(progress):
+    return sum(
+        1
+        for item in progress.get("downloads", [])
+        if item.get("state") in PRODUCT_FINAL_STATES
+    )
+
+
+def product_progress_percent(done_count, total):
+    if not total:
+        return 100 if done_count else 0
+
+    return max(3, min(100, round((done_count / total) * 100)))
 
 
 def load_product_choices():
@@ -70,7 +255,7 @@ def product_choice_for_item(item_key):
     return product_choices_by_item().get(normalize_item_key(item_key), {})
 
 
-def grab_best_products(items=None):
+def grab_best_products(items=None, job_id=None):
     shopping_items = items if items is not None else load_items()
     ingredients = [
         str(item or "").strip()
@@ -86,17 +271,36 @@ def grab_best_products(items=None):
     ]
     home_address = load_home_address()
     full_address = home_address.get("full_address", "")
+    downloads = build_product_download_plan(ingredients, enabled_stores, stores)
+    max_workers = product_worker_count(len(downloads))
+
+    if job_id:
+        start_product_progress(
+            downloads,
+            job_id=job_id,
+            home_address=full_address,
+            enabled_stores=enabled_stores,
+            max_workers=max_workers,
+        )
 
     if not ingredients:
+        if job_id:
+            finish_product_progress(job_id, ok=True, summary="No ingredients were available to search.")
+
         return {
             "ok": True,
             "home_address": full_address,
             "home_location": None,
             "enabled_stores": enabled_stores,
+            "download_count": 0,
+            "max_workers": max_workers,
             "count": 0,
             "selected_count": 0,
             "results": [],
         }
+
+    if job_id:
+        update_product_progress_summary(job_id, "Finding the nearest enabled store locations from the saved Full Address.")
 
     home_location = geocode_home_address(full_address)
     store_locations = {
@@ -108,19 +312,66 @@ def grab_best_products(items=None):
         )
         for store_key in enabled_stores
     }
+    store_results_by_ingredient = {
+        ingredient: []
+        for ingredient in ingredients
+    }
+
+    if downloads:
+        if job_id:
+            update_product_progress_summary(
+                job_id,
+                f"Downloading product search pages with up to {max_workers} searches running at once.",
+            )
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {
+                executor.submit(
+                    search_store_products_for_download,
+                    download,
+                    stores,
+                    full_address,
+                    home_location,
+                    store_locations,
+                    job_id,
+                ): download
+                for download in downloads
+            }
+
+            for future in as_completed(futures):
+                download = futures[future]
+                try:
+                    result = future.result()
+                except Exception as exc:
+                    message = f"{download.get('store_name')}: product search failed: {exc}"
+                    if job_id:
+                        mark_product_download(
+                            job_id,
+                            download.get("index", 0),
+                            "failed",
+                            message,
+                            candidates_count=0,
+                        )
+                    result = {
+                        "ingredient": download.get("ingredient", ""),
+                        "store_key": download.get("store_key", ""),
+                        "candidates": [],
+                        "skip_reasons": [message],
+                    }
+                ingredient = result.get("ingredient", "")
+                store_results_by_ingredient.setdefault(ingredient, []).append(result)
+    elif job_id:
+        update_product_progress_summary(job_id, "No enabled store search URLs are configured.")
 
     state = load_product_choices()
     item_records = state.setdefault("items", {})
     results = []
 
     for ingredient in ingredients:
-        record = build_product_choice_record(
+        record = build_product_choice_record_from_results(
             ingredient,
-            enabled_stores,
-            stores,
+            store_results_by_ingredient.get(ingredient, []),
             full_address,
-            home_location,
-            store_locations,
         )
         item_records[record["item_key"]] = record
         selected = record.get("selected_product")
@@ -132,14 +383,160 @@ def grab_best_products(items=None):
 
     save_product_choices(state)
 
+    if job_id:
+        finish_product_progress(
+            job_id,
+            ok=True,
+            summary=f"Product search complete. Saved {sum(1 for item in results if item.get('selected_product'))} best product pick(s).",
+        )
+
     return {
         "ok": True,
         "home_address": full_address,
         "home_location": home_location,
         "enabled_stores": enabled_stores,
+        "download_count": len(downloads),
+        "max_workers": max_workers,
         "count": len(results),
         "selected_count": sum(1 for item in results if item.get("selected_product")),
         "results": results,
+    }
+
+
+def build_product_download_plan(ingredients, enabled_stores, stores):
+    downloads = []
+
+    for ingredient in ingredients:
+        for store_key in enabled_stores:
+            store = stores.get(store_key, {})
+            store_name = store.get("label") or store_key.title()
+            search_url = build_product_search_url(store, ingredient)
+            downloads.append({
+                "index": len(downloads),
+                "ingredient": ingredient,
+                "store_key": store_key,
+                "store_name": store_name,
+                "search_url": search_url,
+                "state": "waiting",
+                "message": "Queued.",
+                "candidates_count": None,
+            })
+
+    return downloads
+
+
+def search_store_products_for_download(
+    download,
+    stores,
+    full_address,
+    home_location,
+    store_locations,
+    job_id=None,
+):
+    index = download.get("index", 0)
+    ingredient = download.get("ingredient", "")
+    store_key = download.get("store_key", "")
+    store = stores.get(store_key, {})
+    store_name = download.get("store_name") or store.get("label") or store_key.title()
+    search_url = download.get("search_url", "")
+
+    if not search_url:
+        message = f"{store_name}: no product search URL is configured."
+        if job_id:
+            mark_product_download(job_id, index, "skipped", message, candidates_count=0)
+        return {
+            "ingredient": ingredient,
+            "store_key": store_key,
+            "candidates": [],
+            "skip_reasons": [message],
+        }
+
+    if job_id:
+        mark_product_download(
+            job_id,
+            index,
+            "running",
+            f"Downloading {store_name} search results for {ingredient}...",
+        )
+
+    try:
+        candidates, skip_reasons = search_store_products(
+            ingredient,
+            store_key,
+            store,
+            full_address,
+            home_location,
+            store_locations.get(store_key, {}),
+        )
+    except Exception as exc:
+        candidates = []
+        skip_reasons = [f"{store_name}: product search failed: {exc}"]
+
+    direct_count = sum(
+        1
+        for candidate in candidates
+        if candidate.get("source") != "search-page-fallback"
+    )
+    failed = any("product search failed" in str(reason).lower() for reason in skip_reasons)
+
+    if direct_count:
+        state = "done"
+        message = f"Downloaded {direct_count} product candidate(s) from {store_name}."
+    elif failed:
+        state = "failed"
+        message = skip_reasons[0] if skip_reasons else f"{store_name}: product search failed."
+    else:
+        state = "done"
+        message = skip_reasons[0] if skip_reasons else f"{store_name}: no product candidates were found."
+
+    if job_id:
+        mark_product_download(
+            job_id,
+            index,
+            state,
+            message,
+            candidates_count=direct_count,
+        )
+
+    return {
+        "ingredient": ingredient,
+        "store_key": store_key,
+        "candidates": candidates,
+        "skip_reasons": skip_reasons,
+    }
+
+
+def build_product_choice_record_from_results(ingredient, store_results, full_address):
+    candidates = []
+    skip_reasons = []
+
+    for result in store_results:
+        candidates.extend(result.get("candidates", []))
+        skip_reasons.extend(result.get("skip_reasons", []))
+
+    candidates = rank_product_candidates(ingredient, candidates)
+    viable_candidates = [
+        candidate
+        for candidate in candidates
+        if candidate.get("viable")
+    ]
+    selected = viable_candidates[0] if viable_candidates else None
+
+    if not selected and not skip_reasons:
+        skip_reasons.append("No valid product candidates were found for the enabled stores.")
+
+    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+
+    return {
+        "item_key": normalize_item_key(ingredient),
+        "ingredient": ingredient,
+        "home_address": full_address,
+        "selected_product_id": selected.get("id") if selected else "",
+        "selected_product": selected,
+        "manual_override": False,
+        "candidates": candidates,
+        "skip_reasons": unique_texts(skip_reasons),
+        "updated_at": now,
     }
 
 
@@ -168,30 +565,14 @@ def build_product_choice_record(
         candidates.extend(store_candidates)
         skip_reasons.extend(store_skips)
 
-    candidates = rank_product_candidates(ingredient, candidates)
-    viable_candidates = [
-        candidate
-        for candidate in candidates
-        if candidate.get("viable")
-    ]
-    selected = viable_candidates[0] if viable_candidates else None
-
-    if not selected and not skip_reasons:
-        skip_reasons.append("No valid product candidates were found for the enabled stores.")
-
-    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
-
-    return {
-        "item_key": normalize_item_key(ingredient),
-        "ingredient": ingredient,
-        "home_address": full_address,
-        "selected_product_id": selected.get("id") if selected else "",
-        "selected_product": selected,
-        "manual_override": False,
-        "candidates": candidates,
-        "skip_reasons": unique_texts(skip_reasons),
-        "updated_at": now,
-    }
+    return build_product_choice_record_from_results(
+        ingredient,
+        [{
+            "candidates": candidates,
+            "skip_reasons": skip_reasons,
+        }],
+        full_address,
+    )
 
 
 def search_store_products(
