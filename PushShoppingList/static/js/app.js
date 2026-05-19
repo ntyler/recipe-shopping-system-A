@@ -865,8 +865,12 @@ function closeRecipeEditor() {
         document.body.classList.remove("modal-open");
     }
 
-    refreshStoreMarkup().catch(err => {
+    refreshStoreMarkup({
+        cacheBust: true,
+        requireRecipeLog: true,
+    }).catch(err => {
         console.warn("Unable to refresh after closing recipe editor.", err);
+        window.location.reload();
     });
 }
 
@@ -3119,10 +3123,16 @@ async function submitStoreForm(form) {
     }
 }
 
-async function refreshStoreMarkup() {
+async function refreshStoreMarkup(options = {}) {
     const scrollX = window.scrollX;
     const scrollY = window.scrollY;
-    const response = await fetch(window.location.href, {
+    const refreshUrl = new URL(window.location.href);
+
+    if (options.cacheBust) {
+        refreshUrl.searchParams.set("_refresh", String(Date.now()));
+    }
+
+    const response = await fetch(refreshUrl.toString(), {
         cache: "no-store",
     });
 
@@ -3134,10 +3144,15 @@ async function refreshStoreMarkup() {
     const nextPage = new DOMParser().parseFromString(html, "text/html");
     replaceSectionFromPage(nextPage, "#editItemsSection");
     replaceSectionFromPage(nextPage, "#storeOptionsSection");
-    replaceSectionFromPage(nextPage, "#currentRecipeUrlLogCard");
+    const recipeLogWasRefreshed = replaceSectionFromPage(nextPage, "#currentRecipeUrlLogCard");
     replaceSectionFromPage(nextPage, "#sectionView");
     replaceSectionFromPage(nextPage, "#storeView");
     replaceSectionFromPage(nextPage, "#recipeView");
+
+    if (options.requireRecipeLog && !recipeLogWasRefreshed) {
+        throw new Error("Recipe log refresh target was not found.");
+    }
+
     restoreCardCollapseState();
     restoreOpenStorePanels();
     restoreViewBehaviorSettings();
@@ -3158,7 +3173,10 @@ function replaceSectionFromPage(nextPage, selector) {
 
     if (currentSection && nextSection) {
         currentSection.replaceWith(nextSection);
+        return true;
     }
+
+    return false;
 }
 
 function buildAddressSummaryFromForm(form) {

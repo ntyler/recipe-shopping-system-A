@@ -4,7 +4,7 @@
     <title>Shopping List</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=app_css_version) }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/extraction_overlay_old.css') }}">
 </head>
 
@@ -28,7 +28,7 @@
 {% include "sections/view_behavior.html" %}
 {% include "sections/items.html" %}
 
-<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script src="{{ url_for('static', filename='js/app.js', v=app_js_version) }}"></script>
 
 </body>
 </html>

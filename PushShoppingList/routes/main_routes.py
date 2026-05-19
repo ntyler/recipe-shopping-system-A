@@ -7,6 +7,7 @@ from fractions import Fraction
 import requests
 from openai import OpenAI
 from flask import Blueprint
+from flask import current_app
 from flask import jsonify
 from flask import redirect
 from flask import request
@@ -33,6 +34,13 @@ from PushShoppingList.services.store_settings_service import load_store_settings
 
 main_bp = Blueprint("main_bp", __name__)
 address_openai_client = None
+
+
+def static_asset_version(filename):
+    try:
+        return int(os.path.getmtime(os.path.join(current_app.static_folder, filename)))
+    except OSError:
+        return 1
 
 US_STATE_ABBREVIATIONS = {
     "alabama": "AL",
@@ -828,6 +836,8 @@ def index():
         normalize=normalize,
         is_section_header=is_section_header,
         food_rule_status=shopping_item_food_rule_status,
+        app_css_version=static_asset_version("css/app.css"),
+        app_js_version=static_asset_version("js/app.js"),
     )
 
 
