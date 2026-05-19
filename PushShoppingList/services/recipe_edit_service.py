@@ -4,13 +4,19 @@ import uuid
 from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
 from PushShoppingList.services.recipe_extract_service import STORE_SECTION_ORDER
+from PushShoppingList.services.recipe_extract_service import build_video_text_pdf_html
 from PushShoppingList.services.recipe_extract_service import classify_store_section
 from PushShoppingList.services.recipe_extract_service import extract_ingredients_from_result
 from PushShoppingList.services.recipe_extract_service import normalize_extracted_equipment_fields
 from PushShoppingList.services.recipe_extract_service import normalize_extracted_ingredient_fields
+from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_path
 from PushShoppingList.services.recipe_extract_service import safe_filename
+from PushShoppingList.services.recipe_extract_service import write_recipe_page_pdf
 from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
+from PushShoppingList.services.recipe_ingredient_service import recipe_ingredients_for_key
+from PushShoppingList.services.recipe_ingredient_service import remove_unused_ingredients_from_shopping_list
 from PushShoppingList.services.recipe_ingredient_service import save_recipe_ingredients
+from PushShoppingList.services.shopping_list_service import add_items
 from PushShoppingList.services.recipe_url_service import load_recipe_urls
 from PushShoppingList.services.recipe_url_service import normalize_recipe_quantity
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
@@ -19,6 +25,7 @@ from PushShoppingList.services.recipe_url_service import save_recipe_urls
 from PushShoppingList.services.recipe_url_service import save_recipe_url_name
 from PushShoppingList.services.recipe_url_service import save_recipe_url_quantity
 from PushShoppingList.services.recipe_quantity_service import update_recipe_quantity
+from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
 
 
 NUTRITION_FIELDS = [
@@ -77,6 +84,7 @@ def load_editable_recipe(url):
     url = str(url or "").strip()
     recipe_data = load_recipe_output(url) or {"source_url": url}
     meta = load_recipe_ingredients().get(normalize_recipe_url_key(url), {})
+    pdf = editable_recipe_pdf_info(url)
 
     return {
         "ok": True,
@@ -91,9 +99,80 @@ def load_editable_recipe(url):
             "equipment": normalize_text_rows(recipe_data.get("equipment", [])),
             "instructions": normalize_instruction_rows(recipe_data.get("instructions", [])),
             "nutrition": normalize_nutrition_rows(recipe_data.get("nutrition", {})),
+            "pdf_path": pdf["path"],
+            "pdf_available": pdf["available"],
         },
         "food_rules": load_food_rules(),
         "store_sections": list(STORE_SECTION_ORDER.keys()),
+    }
+
+
+def editable_recipe_pdf_info(url):
+    pdf_path = recipe_archive_pdf_path(url)
+
+    return {
+        "path": str(pdf_path),
+        "available": pdf_path.exists(),
+    }
+
+
+def create_editable_recipe_pdf(url):
+    url = str(url or "").strip()
+
+    if not url:
+        return {"ok": False, "error": "Recipe URL is required."}
+
+    recipe_data = load_recipe_output(url)
+
+    if not recipe_data:
+        return {"ok": False, "error": "Recipe data was not found."}
+
+    title = (
+        recipe_data.get("recipe_title")
+        or load_recipe_ingredients().get(normalize_recipe_url_key(url), {}).get("name")
+        or "Recipe"
+    )
+    html_text = build_video_text_pdf_html(
+        url,
+        "",
+        title,
+        recipe_data=recipe_data,
+    )
+    pdf_path = recipe_archive_pdf_path(url)
+    saved_path = write_recipe_page_pdf(url, html_text, None, pdf_path)
+
+    return {
+        "ok": True,
+        "url": url,
+        "pdf_path": str(saved_path),
+        "pdf_available": True,
+    }
+
+
+def delete_editable_recipe_pdf(url):
+    url = str(url or "").strip()
+
+    if not url:
+        return {"ok": False, "error": "Recipe URL is required."}
+
+    pdf_path = recipe_archive_pdf_path(url)
+
+    try:
+        pdf_path.unlink(missing_ok=True)
+    except PermissionError:
+        return {
+            "ok": False,
+            "error": "Close the PDF before deleting it.",
+            "url": url,
+            "pdf_path": str(pdf_path),
+            "pdf_available": pdf_path.exists(),
+        }
+
+    return {
+        "ok": True,
+        "url": url,
+        "pdf_path": str(pdf_path),
+        "pdf_available": False,
     }
 
 
@@ -108,6 +187,11 @@ def save_editable_recipe(original_url, payload):
     if not source_url:
         source_url = original_url
 
+    previous_recipe_data = load_recipe_ingredients()
+    previous_ingredients = recipe_ingredients_for_key(
+        normalize_recipe_url_key(original_url),
+        previous_recipe_data,
+    )
     existing_data = load_recipe_output(original_url) or {"source_url": original_url}
     recipe_data = {
         **existing_data,
@@ -135,8 +219,22 @@ def save_editable_recipe(original_url, payload):
     save_recipe_url_name(source_url, display_name)
     update_recipe_ingredient_record(source_url, quantity, recipe_data)
     update_recipe_quantity(source_url, quantity)
+    sync_saved_recipe_with_shopping_list(recipe_data, previous_ingredients)
 
     return load_editable_recipe(source_url)
+
+
+def sync_saved_recipe_with_shopping_list(recipe_data, previous_ingredients):
+    ingredients = extract_ingredients_from_result(recipe_data)
+
+    if ingredients:
+        add_items(ingredients)
+
+    remove_unused_ingredients_from_shopping_list(
+        previous_ingredients,
+        load_recipe_ingredients(),
+    )
+    sort_ingredients()
 
 
 def load_recipe_output(url):
@@ -322,9 +420,7 @@ def sanitize_ingredients(value):
         if not name and not original_text:
             continue
 
-        store_section = str(item.get("store_section") or "").strip().upper()
-        if store_section not in STORE_SECTION_ORDER:
-            store_section = classify_store_section(name or original_text)
+        store_section = classify_store_section(name or original_text)
 
         ingredients.append({
             "section": nullable_string(item.get("section")),

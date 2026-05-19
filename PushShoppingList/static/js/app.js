@@ -864,6 +864,10 @@ function closeRecipeEditor() {
         modal.setAttribute("aria-hidden", "true");
         document.body.classList.remove("modal-open");
     }
+
+    refreshStoreMarkup().catch(err => {
+        console.warn("Unable to refresh after closing recipe editor.", err);
+    });
 }
 
 function populateRecipeEditor(recipe, originalUrl) {
@@ -885,6 +889,7 @@ function populateRecipeEditor(recipe, originalUrl) {
     setValue("recipeEditSourceUrl", recipe.source_url || originalUrl);
     setValue("recipeEditQuantity", recipe.quantity || "1");
     setValue("recipeEditServings", recipe.servings || "");
+    updateRecipeEditorPdfControls(recipe);
 
     const ingredientWrap = document.getElementById("recipeEditIngredients");
     const equipmentWrap = document.getElementById("recipeEditEquipment");
@@ -924,6 +929,32 @@ function populateRecipeEditor(recipe, originalUrl) {
     }
 
     updateRecipeEditStickyOffsets();
+}
+
+function updateRecipeEditorPdfControls(recipe) {
+    const pdfPathInput = document.getElementById("recipeEditPdfPath");
+    const pdfButton = document.getElementById("recipeEditPdfButton");
+    const deletePdfButton = document.getElementById("recipeEditDeletePdfButton");
+    const sourceUrl = recipe && recipe.source_url ? recipe.source_url : "";
+    const pdfPath = recipe && recipe.pdf_path ? recipe.pdf_path : "";
+    const hasPdf = Boolean(recipe && recipe.pdf_available && sourceUrl);
+
+    if (pdfPathInput) {
+        pdfPathInput.value = pdfPath;
+    }
+
+    if (pdfButton) {
+        pdfButton.hidden = !hasPdf;
+        pdfButton.href = hasPdf ? recipeArchivePdfUrl(sourceUrl) : "#";
+    }
+
+    if (deletePdfButton) {
+        deletePdfButton.hidden = !hasPdf;
+    }
+}
+
+function recipeArchivePdfUrl(sourceUrl) {
+    return `/recipe_archive_pdf?url=${encodeURIComponent(sourceUrl || "")}`;
 }
 
 function updateRecipeEditStickyOffsets() {
@@ -1539,6 +1570,136 @@ async function saveRecipeEditor(event) {
         if (saveButton) {
             saveButton.disabled = false;
             saveButton.textContent = "Save Recipe";
+        }
+    }
+
+    return false;
+}
+
+async function createRecipeEditorPdf(button) {
+    const originalText = button ? button.textContent : "";
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Creating...";
+    }
+
+    try {
+        setRecipeEditStatus("Saving recipe before PDF...");
+
+        const payload = collectRecipeEditorPayload();
+        const saveResponse = await fetch("/api/recipe", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+        });
+        const saveData = await saveResponse.json();
+
+        if (!saveResponse.ok || !saveData.ok) {
+            throw new Error((saveData && saveData.error) || "Unable to save recipe.");
+        }
+
+        const sourceUrl = (
+            saveData.recipe && saveData.recipe.source_url
+                ? saveData.recipe.source_url
+                : payload.recipe.source_url || payload.original_url
+        );
+
+        if (saveData.recipe) {
+            populateRecipeEditor(saveData.recipe, sourceUrl);
+        }
+
+        setRecipeEditStatus("Creating PDF...");
+
+        const pdfResponse = await fetch("/api/recipe_pdf", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ url: sourceUrl }),
+        });
+        const pdfData = await pdfResponse.json();
+
+        if (!pdfResponse.ok || !pdfData.ok) {
+            throw new Error((pdfData && pdfData.error) || "Unable to create PDF.");
+        }
+
+        updateRecipeEditorPdfControls({
+            source_url: pdfData.url || sourceUrl,
+            pdf_path: pdfData.pdf_path || "",
+            pdf_available: true,
+        });
+        setRecipeEditStatus("PDF created.");
+        showRecipeQuantityUpdatedMessage("", "", "", "Recipe PDF created.");
+    } catch (err) {
+        console.warn("Unable to create recipe PDF.", err);
+        setRecipeEditStatus("Unable to create PDF.", true);
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = originalText || "Create PDF";
+        }
+    }
+
+    return false;
+}
+
+async function deleteRecipeEditorPdf(button) {
+    const originalText = button ? button.textContent : "";
+    const sourceInput = document.getElementById("recipeEditSourceUrl");
+    const originalInput = document.getElementById("recipeEditOriginalUrl");
+    const sourceUrl = (
+        (sourceInput ? sourceInput.value.trim() : "")
+        || (originalInput ? originalInput.value.trim() : "")
+        || ""
+    );
+
+    if (!sourceUrl) {
+        setRecipeEditStatus("Recipe URL is required before deleting PDF.", true);
+        return false;
+    }
+
+    if (!confirm("Delete this recipe PDF?")) {
+        return false;
+    }
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "...";
+    }
+
+    try {
+        setRecipeEditStatus("Deleting PDF...");
+
+        const response = await fetch("/api/recipe_pdf/delete", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ url: sourceUrl }),
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to delete PDF.");
+        }
+
+        updateRecipeEditorPdfControls({
+            source_url: data.url || sourceUrl,
+            pdf_path: data.pdf_path || "",
+            pdf_available: false,
+        });
+        setRecipeEditStatus("PDF deleted.");
+        showRecipeQuantityUpdatedMessage("", "", "", "Recipe PDF deleted.");
+    } catch (err) {
+        console.warn("Unable to delete recipe PDF.", err);
+        setRecipeEditStatus(err.message || "Unable to delete PDF.", true);
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = originalText || "X";
         }
     }
 
@@ -2971,6 +3132,7 @@ async function refreshStoreMarkup() {
 
     const html = await response.text();
     const nextPage = new DOMParser().parseFromString(html, "text/html");
+    replaceSectionFromPage(nextPage, "#editItemsSection");
     replaceSectionFromPage(nextPage, "#storeOptionsSection");
     replaceSectionFromPage(nextPage, "#currentRecipeUrlLogCard");
     replaceSectionFromPage(nextPage, "#sectionView");

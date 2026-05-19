@@ -24,6 +24,8 @@ from PushShoppingList.services.recipe_extract_service import extract_recipe_from
 from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_path
 from PushShoppingList.services.food_review_alternative_service import suggest_food_review_alternatives
 from PushShoppingList.services.recipe_edit_service import create_new_recipe
+from PushShoppingList.services.recipe_edit_service import create_editable_recipe_pdf
+from PushShoppingList.services.recipe_edit_service import delete_editable_recipe_pdf
 from PushShoppingList.services.recipe_edit_service import load_editable_recipe
 from PushShoppingList.services.recipe_edit_service import save_editable_recipe
 from PushShoppingList.services.recipe_ingredient_service import remove_recipe_and_unused_ingredients
@@ -294,6 +296,26 @@ def api_recipe_route():
 @recipe_bp.route("/api/create_recipe", methods=["POST"])
 def api_create_recipe_route():
     return jsonify(create_new_recipe()), 201
+
+
+@recipe_bp.route("/api/recipe_pdf", methods=["POST"])
+def api_recipe_pdf_route():
+    data = request.get_json(silent=True) or {}
+    url = str(data.get("url", "") or "").strip()
+    result = create_editable_recipe_pdf(url)
+    status = 200 if result.get("ok") else 400
+
+    return jsonify(result), status
+
+
+@recipe_bp.route("/api/recipe_pdf/delete", methods=["POST"])
+def api_delete_recipe_pdf_route():
+    data = request.get_json(silent=True) or {}
+    url = str(data.get("url", "") or "").strip()
+    result = delete_editable_recipe_pdf(url)
+    status = 200 if result.get("ok") else 400
+
+    return jsonify(result), status
 
 
 @recipe_bp.route("/recipe_archive_pdf", methods=["GET"])

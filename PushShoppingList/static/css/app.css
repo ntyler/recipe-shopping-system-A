@@ -1395,20 +1395,17 @@ body {
             background: #181818;
         }
 
-        #currentRecipeUrlLogCard .recipe-url-collapsed-summary {
-            display: none;
-        }
-
-        #currentRecipeUrlLogCard .recipe-url-log-content.collapsed + .recipe-url-collapsed-summary {
+        #currentRecipeUrlLogCard .recipe-url-log-content > .recipe-url-collapsed-summary {
             display: grid;
             gap: 8px;
+            margin-top: 0;
         }
 
         .recipe-url-collapsed-actions {
             display: none;
         }
 
-        #currentRecipeUrlLogCard .recipe-url-log-content.collapsed ~ .recipe-url-collapsed-actions {
+        #currentRecipeUrlLogCard .recipe-url-log-content > .recipe-url-collapsed-actions {
             display: grid;
         }
 
@@ -1849,6 +1846,92 @@ body {
 
         .recipe-edit-wide {
             grid-column: 1 / -1;
+        }
+
+        .recipe-edit-pdf-panel {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 12px;
+            align-items: end;
+            margin-top: 12px;
+        }
+
+        .recipe-edit-pdf-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .recipe-edit-pdf-button,
+        .recipe-edit-create-pdf-button,
+        .recipe-edit-delete-pdf-button {
+            width: auto;
+            min-width: 96px;
+            height: 38px;
+            margin: 0;
+            padding: 0 14px;
+            border-radius: 6px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 800;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+        }
+
+        .recipe-edit-pdf-button {
+            background: #134e4a;
+            color: #ccfbf1;
+        }
+
+        .recipe-edit-pdf-button[hidden] {
+            display: none;
+        }
+
+        .recipe-edit-pdf-button:hover,
+        .recipe-edit-pdf-button:focus {
+            background: #0f766e;
+            color: #fff;
+            outline: none;
+        }
+
+        .recipe-edit-create-pdf-button {
+            background: #155da8;
+        }
+
+        .recipe-edit-delete-pdf-button {
+            min-width: 42px;
+            width: 42px;
+            padding: 0;
+            background: #a80000;
+        }
+
+        .recipe-edit-delete-pdf-button[hidden] {
+            display: none;
+        }
+
+        .recipe-edit-create-pdf-button:hover,
+        .recipe-edit-create-pdf-button:focus {
+            background: #1d74cf;
+            outline: none;
+        }
+
+        .recipe-edit-delete-pdf-button:hover,
+        .recipe-edit-delete-pdf-button:focus {
+            background: #c00000;
+            outline: none;
+        }
+
+        .recipe-edit-create-pdf-button:disabled {
+            cursor: wait;
+            opacity: 0.75;
+        }
+
+        .recipe-edit-delete-pdf-button:disabled {
+            cursor: wait;
+            opacity: 0.75;
         }
 
         .recipe-edit-section {
@@ -3752,6 +3835,24 @@ body {
             .recipe-edit-ingredient-row,
             .recipe-edit-text-row {
                 grid-template-columns: 1fr;
+            }
+
+            .recipe-edit-pdf-panel {
+                grid-template-columns: 1fr;
+            }
+
+            .recipe-edit-pdf-actions {
+                flex-wrap: wrap;
+            }
+
+            .recipe-edit-pdf-button,
+            .recipe-edit-create-pdf-button,
+            .recipe-edit-delete-pdf-button {
+                flex: 1 1 130px;
+            }
+
+            .recipe-edit-delete-pdf-button {
+                flex: 0 0 48px;
             }
 
             .recipe-edit-nutrition-header {

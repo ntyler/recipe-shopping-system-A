@@ -14,104 +14,6 @@
          data-collapse-default="expanded"
          data-collapse-mobile-default="collapsed">
         {% if current_urls %}
-            <div class="log-box">
-                <div class="recipe-log-header">
-                    <span>Recipe</span>
-                    <span>Name</span>
-                    <span>Type</span>
-                    <span>Qty</span>
-                    <span>Review</span>
-                    <span></span>
-                </div>
-            {% for recipe in current_urls %}
-                <div class="recipe-row">
-                    <a class="recipe-label recipe-url-link"
-                       href="{{ recipe.url }}"
-                       target="_blank"
-                       rel="noopener noreferrer">Recipe {{ loop.index }}</a>
-
-                    <div class="recipe-name-cell">
-                        <input type="text"
-                               class="recipe-name-input"
-                               value="{{ recipe.name }}"
-                               data-recipe-url="{{ recipe.url }}"
-                               aria-label="Recipe {{ loop.index }} name">
-                        {% if recipe.food_rule_status.needs_review %}
-                            <button type="button"
-                                    class="food-rule-marker recipe-log-food-warning recipe-log-food-review-btn"
-                                    data-recipe-url="{{ recipe.url }}"
-                                    title="{{ recipe.food_rule_status.marker }}"
-                                    aria-label="Food Review: {{ recipe.food_rule_status.count }} item{% if recipe.food_rule_status.count != 1 %}s{% endif %} need review"
-                                    onclick="openRecipeEditor(this, { scrollToFoodReview: true })">
-                                Food Review ({{ recipe.food_rule_status.count }})
-                            </button>
-                        {% endif %}
-                    </div>
-
-                    <span class="recipe-type-pill recipe-type-{{ recipe.type|lower }}">{{ recipe.type }}</span>
-
-                    <div class="recipe-quantity-control">
-                        <span>Qty</span>
-                        <input type="number"
-                               class="recipe-quantity-input"
-                               min="1"
-                               step="1"
-                               value="{{ recipe.quantity }}"
-                               data-recipe-number="{{ loop.index }}"
-                               data-recipe-url="{{ recipe.url }}">
-                    </div>
-
-                    <div class="recipe-row-actions">
-                        {% if recipe.archive_pdf_available %}
-                            <a class="recipe-archive-pdf-btn"
-                               href="{{ url_for('recipe_bp.recipe_archive_pdf_route', url=recipe.url) }}"
-                               target="_blank"
-                               rel="noopener noreferrer">
-                                PDF
-                            </a>
-                        {% endif %}
-                        <button type="button"
-                                class="edit-recipe-btn"
-                                data-recipe-url="{{ recipe.url }}"
-                                onclick="openRecipeEditor(this)">
-                            Edit
-                        </button>
-                    </div>
-
-                    <form method="POST"
-                          action="{{ url_for('recipe_bp.remove_recipe_route') }}"
-                          class="remove-recipe-form"
-                          onsubmit="saveScroll(); return confirm('Remove this recipe URL?');">
-                        <input type="hidden" name="url" value="{{ recipe.url }}">
-                        <button type="submit" class="remove-recipe-btn" aria-label="Remove recipe">X</button>
-                    </form>
-                </div>
-            {% endfor %}
-            </div>
-
-            <div class="recipe-log-action-row">
-                <button type="button"
-                        class="save-recipe-qty-btn"
-                        onclick="saveAllRecipeQuantities(this)">
-                    Save Qty
-                </button>
-                <button type="button"
-                        class="create-recipe-btn"
-                        onclick="createNewRecipe(this)">
-                    Create New Recipe
-                </button>
-            </div>
-        {% else %}
-            <div class="log-box">No current recipe URLs yet.</div>
-            <button type="button"
-                    class="create-recipe-btn create-recipe-empty-btn"
-                    onclick="createNewRecipe(this)">
-                Create New Recipe
-            </button>
-        {% endif %}
-    </div>
-
-    {% if current_urls %}
         <div class="recipe-url-collapsed-summary" aria-label="Current recipe URL summary">
             {% for recipe in current_urls %}
                 <div class="recipe-url-summary-row{% if loop.last %} recipe-url-summary-row-last{% endif %}">
@@ -182,7 +84,15 @@
                 Create New Recipe
             </button>
         </div>
-    {% endif %}
+        {% else %}
+            <div class="log-box">No current recipe URLs yet.</div>
+            <button type="button"
+                    class="create-recipe-btn create-recipe-empty-btn"
+                    onclick="createNewRecipe(this)">
+                Create New Recipe
+            </button>
+        {% endif %}
+    </div>
 </div>
 
 <div id="recipeEditModal"
@@ -220,6 +130,33 @@
                     <span>Servings</span>
                     <input type="text" name="servings" id="recipeEditServings">
                 </label>
+            </div>
+
+            <div class="recipe-edit-pdf-panel">
+                <label>
+                    <span>PDF Path</span>
+                    <input type="text" id="recipeEditPdfPath" readonly>
+                </label>
+                <div class="recipe-edit-pdf-actions">
+                    <a id="recipeEditPdfButton"
+                       class="recipe-edit-pdf-button"
+                       href="#"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       hidden>PDF</a>
+                    <button type="button"
+                            id="recipeEditCreatePdfButton"
+                            class="recipe-edit-create-pdf-button"
+                            onclick="createRecipeEditorPdf(this)">
+                        Create PDF
+                    </button>
+                    <button type="button"
+                            id="recipeEditDeletePdfButton"
+                            class="recipe-edit-delete-pdf-button"
+                            aria-label="Delete PDF"
+                            onclick="deleteRecipeEditorPdf(this)"
+                            hidden>X</button>
+                </div>
             </div>
 
             <section class="recipe-edit-section recipe-edit-ingredients-section">
