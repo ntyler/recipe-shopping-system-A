@@ -1862,16 +1862,8 @@ body {
             gap: 8px;
         }
 
-        .recipe-edit-source-url-control {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
-            gap: 10px;
-            align-items: center;
-        }
-
         .recipe-edit-pdf-button,
         .recipe-edit-create-pdf-button,
-        .recipe-edit-source-pdf-button,
         .recipe-edit-delete-pdf-button {
             width: auto;
             min-width: 96px;
@@ -1909,11 +1901,6 @@ body {
             background: #155da8;
         }
 
-        .recipe-edit-source-pdf-button {
-            min-width: 118px;
-            background: #155da8;
-        }
-
         .recipe-edit-delete-pdf-button {
             min-width: 42px;
             width: 42px;
@@ -1926,9 +1913,7 @@ body {
         }
 
         .recipe-edit-create-pdf-button:hover,
-        .recipe-edit-create-pdf-button:focus,
-        .recipe-edit-source-pdf-button:hover,
-        .recipe-edit-source-pdf-button:focus {
+        .recipe-edit-create-pdf-button:focus {
             background: #1d74cf;
             outline: none;
         }
@@ -1939,8 +1924,7 @@ body {
             outline: none;
         }
 
-        .recipe-edit-create-pdf-button:disabled,
-        .recipe-edit-source-pdf-button:disabled {
+        .recipe-edit-create-pdf-button:disabled {
             cursor: wait;
             opacity: 0.75;
         }
@@ -2480,11 +2464,6 @@ body {
 
         .recipe-save-progress-backdrop {
             z-index: 12000;
-        }
-
-        .recipe-import-loading-backdrop {
-            z-index: 13000;
-            background: rgba(0, 0, 0, 0.82);
         }
 
         .recipe-qty-progress-card {
@@ -3862,17 +3841,12 @@ body {
                 grid-template-columns: 1fr;
             }
 
-            .recipe-edit-source-url-control {
-                grid-template-columns: 1fr;
-            }
-
             .recipe-edit-pdf-actions {
                 flex-wrap: wrap;
             }
 
             .recipe-edit-pdf-button,
             .recipe-edit-create-pdf-button,
-            .recipe-edit-source-pdf-button,
             .recipe-edit-delete-pdf-button {
                 flex: 1 1 130px;
             }

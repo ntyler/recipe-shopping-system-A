@@ -1,15 +1,9 @@
-import mimetypes
-from pathlib import Path
-from urllib.parse import unquote
-from urllib.parse import urlparse
-
 from flask import Blueprint
 from flask import abort
 from flask import jsonify
 from flask import redirect
 from flask import request
 from flask import send_file
-from werkzeug.datastructures import FileStorage
 
 from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
 from PushShoppingList.services.extraction_progress_service import batch_has_success
@@ -142,114 +136,6 @@ def upload_recipe_media_route():
         return jsonify(result), status
 
     return redirect("/")
-
-
-@recipe_bp.route("/api/import_recipe_source", methods=["POST"])
-def api_import_recipe_source_route():
-    data = request.get_json(silent=True) or {}
-    source_reference = str(data.get("source") or data.get("url") or "").strip()
-    original_url = str(data.get("original_url") or "").strip()
-
-    if not source_reference:
-        return jsonify({"ok": False, "error": "Source URL or file path is required."}), 400
-
-    if source_reference_is_web_url(source_reference):
-        result = extract_recipe_from_url(source_reference)
-    else:
-        file_path = source_reference_file_path(source_reference, original_url)
-
-        if not file_path:
-            return jsonify({
-                "ok": False,
-                "error": "Could not find a local PDF, document, or image to import.",
-            }), 400
-
-        result = extract_recipe_from_file_path(
-            file_path,
-            source_url_override=source_import_target_url(source_reference, original_url),
-        )
-
-    result = persist_extracted_recipe_result(result)
-    status = 200 if result.get("ok") else 400
-
-    return jsonify(result), status
-
-
-def persist_extracted_recipe_result(result):
-    ingredients = result.get("ingredients", [])
-    recipe_url = result.get("source_url")
-
-    if result.get("ok") and ingredients and recipe_url:
-        add_items(ingredients)
-        save_ingredients_for_recipe(recipe_url, ingredients)
-        if result.get("recipe_title"):
-            save_recipe_url_name(recipe_url, result.get("recipe_title"))
-        add_recipe_urls([recipe_url])
-        sort_ingredients()
-        return result
-
-    if result.get("ok"):
-        return {
-            **result,
-            "ok": False,
-            "error": NO_INGREDIENTS_ERROR,
-        }
-
-    return result
-
-
-def source_reference_is_web_url(source_reference):
-    parsed = urlparse(str(source_reference or "").strip())
-    return parsed.scheme.lower() in {"http", "https"} and bool(parsed.netloc)
-
-
-def source_reference_file_path(source_reference, original_url=""):
-    source_reference = str(source_reference or "").strip().strip('"')
-
-    if source_reference.startswith(("uploaded://", "manual://")):
-        pdf_path = recipe_archive_pdf_path(source_reference)
-        return pdf_path if pdf_path.exists() else None
-
-    if source_reference.startswith("file://"):
-        parsed = urlparse(source_reference)
-        candidate = Path(unquote(parsed.path))
-    else:
-        candidate = Path(source_reference)
-
-    if candidate.exists() and candidate.is_file():
-        return candidate
-
-    if original_url:
-        pdf_path = recipe_archive_pdf_path(original_url)
-        if pdf_path.exists():
-            return pdf_path
-
-    return None
-
-
-def source_import_target_url(source_reference, original_url):
-    source_reference = str(source_reference or "").strip()
-    original_url = str(original_url or "").strip()
-
-    if original_url.startswith(("manual://", "uploaded://")):
-        return original_url
-
-    if source_reference.startswith(("manual://", "uploaded://")):
-        return source_reference
-
-    return None
-
-
-def extract_recipe_from_file_path(file_path, source_url_override=None):
-    mime_type = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
-
-    with file_path.open("rb") as stream:
-        uploaded_file = FileStorage(
-            stream=stream,
-            filename=file_path.name,
-            content_type=mime_type,
-        )
-        return extract_recipe_from_upload(uploaded_file, source_url_override=source_url_override)
 
 
 @recipe_bp.route("/api/extract_recipe", methods=["POST"])
