@@ -1404,6 +1404,14 @@ body {
             gap: 8px;
         }
 
+        .recipe-url-collapsed-actions {
+            display: none;
+        }
+
+        #currentRecipeUrlLogCard .recipe-url-log-content.collapsed ~ .recipe-url-collapsed-actions {
+            display: grid;
+        }
+
         .recipe-url-summary-row {
             display: grid;
             grid-template-columns: 96px minmax(0, 1fr) auto;

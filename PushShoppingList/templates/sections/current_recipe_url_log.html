@@ -169,18 +169,18 @@
                     </div>
                 </div>
             {% endfor %}
-            <div class="recipe-log-action-row recipe-url-summary-footer">
-                <button type="button"
-                        class="save-recipe-qty-btn recipe-url-summary-save-qty"
-                        onclick="saveAllRecipeQuantities(this)">
-                    Save Qty
-                </button>
-                <button type="button"
-                        class="create-recipe-btn recipe-url-summary-create"
-                        onclick="createNewRecipe(this)">
-                    Create New Recipe
-                </button>
-            </div>
+        </div>
+        <div class="recipe-log-action-row recipe-url-summary-footer recipe-url-collapsed-actions">
+            <button type="button"
+                    class="save-recipe-qty-btn recipe-url-summary-save-qty"
+                    onclick="saveAllRecipeQuantities(this)">
+                Save Qty
+            </button>
+            <button type="button"
+                    class="create-recipe-btn recipe-url-summary-create"
+                    onclick="createNewRecipe(this)">
+                Create New Recipe
+            </button>
         </div>
     {% endif %}
 </div>
