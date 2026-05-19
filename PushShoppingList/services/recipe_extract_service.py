@@ -3,6 +3,7 @@ import os
 import re
 import html
 import base64
+import io
 import mimetypes
 import shutil
 import time
@@ -44,6 +45,14 @@ MAX_VIDEO_AUDIO_BYTES = int(os.getenv("MAX_VIDEO_AUDIO_BYTES", str(24 * 1024 * 1
 OPENAI_FILE_INPUT_MIME_TYPES = {
     "application/pdf",
 }
+PDF_PAPER_WIDTH_IN = 8.5
+PDF_MARGIN_TOP_IN = 0.65
+PDF_MARGIN_BOTTOM_IN = 0.45
+PDF_MARGIN_LEFT_IN = 0.45
+PDF_MARGIN_RIGHT_IN = 0.45
+PDF_BASE_SCALE = 0.92
+PDF_MAX_CONTINUOUS_HEIGHT_IN = 200
+PDF_MIN_CONTINUOUS_SCALE = 0.1
 INGREDIENT_STORE_SECTIONS = {
     "produce": "PRODUCE",
     "beef": "MEAT & SEAFOOD",
@@ -802,12 +811,6 @@ def extract_recipe_from_social_video_url(recipe_url, progress_callback=None):
         progress_callback=progress_callback,
     )
 
-    archive_social_video_text_pdf(
-        recipe_url,
-        page_text,
-        progress_callback=progress_callback,
-    )
-
     if not has_meaningful_social_video_text(page_text):
         return {
             "ok": False,
@@ -819,6 +822,13 @@ def extract_recipe_from_social_video_url(recipe_url, progress_callback=None):
     local_json_data = extract_recipe_from_social_video_text(recipe_url, page_text)
 
     if structured_recipe_data_is_usable(local_json_data):
+        archive_social_video_text_pdf(
+            recipe_url,
+            page_text,
+            structured_recipe_data=local_json_data,
+            prefer_openai=True,
+            progress_callback=progress_callback,
+        )
         save_extracted_recipe_json(recipe_url, local_json_data)
 
         if progress_callback:
@@ -830,6 +840,12 @@ def extract_recipe_from_social_video_url(recipe_url, progress_callback=None):
         return build_extract_result(recipe_url, local_json_data, "social_video_text")
 
     if not os.getenv("OPENAI_API_KEY"):
+        archive_social_video_text_pdf(
+            recipe_url,
+            page_text,
+            structured_recipe_data=local_json_data,
+            progress_callback=progress_callback,
+        )
         return {
             "ok": False,
             "source_url": recipe_url,
@@ -852,6 +868,11 @@ def extract_recipe_from_social_video_url(recipe_url, progress_callback=None):
     success, json_data = save_json_response(recipe_url, response_text)
 
     if not success or not json_data:
+        archive_social_video_text_pdf(
+            recipe_url,
+            page_text,
+            progress_callback=progress_callback,
+        )
         return {
             "ok": False,
             "source_url": recipe_url,
@@ -860,6 +881,12 @@ def extract_recipe_from_social_video_url(recipe_url, progress_callback=None):
         }
 
     json_data["source_url"] = recipe_url
+    archive_social_video_text_pdf(
+        recipe_url,
+        page_text,
+        structured_recipe_data=json_data,
+        progress_callback=progress_callback,
+    )
     result = build_extract_result(recipe_url, json_data, "social_video")
 
     if not result.get("ingredients"):
@@ -1849,13 +1876,17 @@ def is_forbidden_response(exc):
     return response is not None and response.status_code == 403
 
 
-def create_headless_chrome_driver(window_size="1365,900", prefer_undetected=True):
+def create_headless_chrome_driver(
+    window_size="1365,900",
+    prefer_undetected=True,
+    page_load_strategy="eager",
+):
     if prefer_undetected:
         try:
             import undetected_chromedriver as uc
 
             options = uc.ChromeOptions()
-            options.page_load_strategy = "eager"
+            options.page_load_strategy = page_load_strategy
             options.add_argument("--headless=new")
             options.add_argument("--disable-gpu")
             options.add_argument("--no-sandbox")
@@ -1869,7 +1900,7 @@ def create_headless_chrome_driver(window_size="1365,900", prefer_undetected=True
     from selenium.webdriver.chrome.options import Options
 
     options = Options()
-    options.page_load_strategy = "eager"
+    options.page_load_strategy = page_load_strategy
     options.add_argument("--headless=new")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
@@ -1884,7 +1915,7 @@ def wait_for_browser_document(driver, timeout_seconds=8):
     while time.monotonic() < deadline:
         try:
             ready_state = driver.execute_script("return document.readyState")
-            if ready_state in {"interactive", "complete"}:
+            if ready_state == "complete":
                 return
         except Exception:
             pass
@@ -1893,10 +1924,10 @@ def wait_for_browser_document(driver, timeout_seconds=8):
 
 
 def prepare_page_for_pdf_print(driver):
-    wait_for_browser_document(driver)
+    wait_for_browser_document(driver, timeout_seconds=20)
 
     try:
-        driver.execute_cdp_cmd("Emulation.setEmulatedMedia", {"media": "print"})
+        driver.execute_cdp_cmd("Emulation.setEmulatedMedia", {"media": "screen"})
     except Exception:
         pass
 
@@ -1931,17 +1962,137 @@ def prepare_page_for_pdf_print(driver):
     except Exception:
         pass
 
+    promote_lazy_assets_in_browser(driver)
+    wait_for_pdf_page_stability(driver)
+
+    try:
+        driver.execute_script("window.scrollTo(0, 0);")
+        driver.execute_cdp_cmd("Emulation.setEmulatedMedia", {"media": "print"})
+        time.sleep(0.7)
+    except Exception:
+        pass
+
+
+def promote_lazy_assets_in_browser(driver):
     try:
         driver.execute_script(
             """
-            window.scrollTo(0, document.body.scrollHeight);
+            const imageAttrs = [
+                "data-src",
+                "data-lazy-src",
+                "data-original",
+                "data-pin-media",
+                "data-orig-file"
+            ];
+            const srcsetAttrs = ["data-srcset", "data-lazy-srcset"];
+
+            for (const img of document.querySelectorAll("img")) {
+                for (const attr of imageAttrs) {
+                    const value = img.getAttribute(attr);
+                    if (value && (!img.getAttribute("src") || img.getAttribute("src").startsWith("data:"))) {
+                        img.setAttribute("src", value);
+                        break;
+                    }
+                }
+
+                for (const attr of srcsetAttrs) {
+                    const value = img.getAttribute(attr);
+                    if (value && !img.getAttribute("srcset")) {
+                        img.setAttribute("srcset", value);
+                        break;
+                    }
+                }
+
+                img.setAttribute("loading", "eager");
+                img.setAttribute("decoding", "sync");
+            }
+
+            for (const source of document.querySelectorAll("source")) {
+                const srcset = source.getAttribute("data-srcset") || source.getAttribute("data-lazy-srcset");
+                if (srcset && !source.getAttribute("srcset")) {
+                    source.setAttribute("srcset", srcset);
+                }
+            }
             """
         )
-        time.sleep(0.8)
-        driver.execute_script("window.scrollTo(0, 0);")
-        time.sleep(0.4)
     except Exception:
         pass
+
+
+def wait_for_pdf_page_stability(driver, timeout_seconds=25):
+    try:
+        driver.set_script_timeout(timeout_seconds + 5)
+        driver.execute_async_script(
+            """
+            const done = arguments[arguments.length - 1];
+            const timeoutMs = arguments[0] * 1000;
+            const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+            const pageHeight = () => Math.max(
+                document.body ? document.body.scrollHeight : 0,
+                document.documentElement ? document.documentElement.scrollHeight : 0
+            );
+
+            (async () => {
+                const start = Date.now();
+                let lastHeight = 0;
+                let stableCount = 0;
+
+                while (Date.now() - start < timeoutMs) {
+                    const height = pageHeight();
+                    const step = Math.max(320, Math.floor(window.innerHeight * 0.75));
+
+                    for (let y = 0; y <= height; y += step) {
+                        window.scrollTo(0, y);
+                        await sleep(180);
+                    }
+
+                    if (document.fonts && document.fonts.ready) {
+                        await Promise.race([document.fonts.ready, sleep(2500)]);
+                    }
+
+                    const images = Array.from(document.images || []);
+                    await Promise.race([
+                        Promise.all(images.map((img) => {
+                            if (img.complete) {
+                                return Promise.resolve();
+                            }
+
+                            return new Promise((resolve) => {
+                                img.addEventListener("load", resolve, { once: true });
+                                img.addEventListener("error", resolve, { once: true });
+                            });
+                        })),
+                        sleep(5000)
+                    ]);
+
+                    const nextHeight = pageHeight();
+                    if (Math.abs(nextHeight - lastHeight) < 8) {
+                        stableCount += 1;
+                    } else {
+                        stableCount = 0;
+                    }
+
+                    lastHeight = nextHeight;
+
+                    if (stableCount >= 1) {
+                        break;
+                    }
+
+                    await sleep(350);
+                }
+
+                window.scrollTo(0, 0);
+                done({
+                    height: pageHeight(),
+                    images: (document.images || []).length,
+                    readyState: document.readyState
+                });
+            })().catch((error) => done({ error: String(error) }));
+            """,
+            timeout_seconds,
+        )
+    except Exception as exc:
+        print(f"PDF render wait skipped after timeout/error: {exc}")
 
 
 def write_pdf_source_html(recipe_url, html_text):
@@ -1992,34 +2143,186 @@ def sanitize_html_for_pdf_source(html_text):
                 if str(attr_name).lower().startswith("on"):
                     del tag.attrs[attr_name]
 
+        for img in soup.find_all("img"):
+            promote_lazy_tag_attribute(
+                img,
+                "src",
+                [
+                    "data-src",
+                    "data-lazy-src",
+                    "data-original",
+                    "data-pin-media",
+                    "data-orig-file",
+                ],
+            )
+            promote_lazy_tag_attribute(
+                img,
+                "srcset",
+                [
+                    "data-srcset",
+                    "data-lazy-srcset",
+                ],
+            )
+            img["loading"] = "eager"
+            img["decoding"] = "sync"
+
+        for source in soup.find_all("source"):
+            promote_lazy_tag_attribute(
+                source,
+                "srcset",
+                [
+                    "data-srcset",
+                    "data-lazy-srcset",
+                ],
+            )
+
         return str(soup)
     except Exception:
         return source_html
 
 
+def promote_lazy_tag_attribute(tag, target_attr, source_attrs):
+    current_value = str(tag.get(target_attr) or "").strip()
+
+    if current_value and not current_value.startswith("data:"):
+        return
+
+    for source_attr in source_attrs:
+        value = str(tag.get(source_attr) or "").strip()
+
+        if value:
+            tag[target_attr] = value
+            return
+
+
 def print_current_browser_page_to_pdf(driver, pdf_path):
     driver.execute_cdp_cmd("Page.enable", {})
-    pdf_result = driver.execute_cdp_cmd(
-        "Page.printToPDF",
-        {
-            "printBackground": True,
-            "displayHeaderFooter": False,
-            "preferCSSPageSize": False,
-            "paperWidth": 8.5,
-            "paperHeight": 11,
-            "marginTop": 0.65,
-            "marginBottom": 0.45,
-            "marginLeft": 0.45,
-            "marginRight": 0.45,
-            "scale": 0.92,
-        },
-    )
-    pdf_bytes = base64.b64decode(pdf_result.get("data") or "")
+    print_options = build_continuous_pdf_print_options(driver)
+    pdf_bytes = b""
+    page_count = None
 
-    if len(pdf_bytes) < 1000:
-        raise RuntimeError("Chrome returned an empty recipe PDF.")
+    for attempt_number in range(1, 5):
+        pdf_result = driver.execute_cdp_cmd(
+            "Page.printToPDF",
+            print_options,
+        )
+        pdf_bytes = base64.b64decode(pdf_result.get("data") or "")
+
+        if len(pdf_bytes) < 1000:
+            raise RuntimeError("Chrome returned an empty recipe PDF.")
+
+        page_count = count_pdf_pages_from_bytes(pdf_bytes)
+        if page_count is None or page_count <= 1:
+            break
+
+        if attempt_number == 4:
+            break
+
+        print_options = continuous_pdf_retry_options(print_options, page_count)
+        print(
+            "PDF continuous retry: "
+            f"pages={page_count} "
+            f"height={print_options['paperHeight']:.2f}in "
+            f"scale={print_options['scale']:.2f}"
+        )
 
     pdf_path.write_bytes(pdf_bytes)
+
+    if page_count and page_count > 1:
+        print(f"PDF continuous warning: saved {page_count} pages after retry limit.")
+
+
+def count_pdf_pages_from_bytes(pdf_bytes):
+    try:
+        from PyPDF2 import PdfReader
+
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+        return len(reader.pages)
+    except Exception:
+        return None
+
+
+def continuous_pdf_retry_options(print_options, page_count):
+    next_options = dict(print_options)
+    current_height = max(float(next_options.get("paperHeight") or 11), 11)
+    current_scale = max(float(next_options.get("scale") or PDF_BASE_SCALE), PDF_MIN_CONTINUOUS_SCALE)
+    needed_height = current_height * max(page_count, 1)
+
+    if needed_height <= PDF_MAX_CONTINUOUS_HEIGHT_IN:
+        next_options["paperHeight"] = min(PDF_MAX_CONTINUOUS_HEIGHT_IN, needed_height + 0.5)
+        return next_options
+
+    scale_ratio = PDF_MAX_CONTINUOUS_HEIGHT_IN / needed_height
+    next_options["paperHeight"] = PDF_MAX_CONTINUOUS_HEIGHT_IN
+    next_options["scale"] = max(
+        PDF_MIN_CONTINUOUS_SCALE,
+        min(PDF_BASE_SCALE, current_scale * scale_ratio * 0.98),
+    )
+    return next_options
+
+
+def build_continuous_pdf_print_options(driver):
+    metrics = measure_pdf_document(driver)
+    content_height_in = max(metrics.get("height_px", 0), 1) / 96
+    vertical_margins = PDF_MARGIN_TOP_IN + PDF_MARGIN_BOTTOM_IN
+    scale = PDF_BASE_SCALE
+    page_height = (content_height_in * scale) + vertical_margins + 0.25
+
+    if page_height > PDF_MAX_CONTINUOUS_HEIGHT_IN:
+        available_height = max(PDF_MAX_CONTINUOUS_HEIGHT_IN - vertical_margins - 0.25, 1)
+        scale = max(
+            PDF_MIN_CONTINUOUS_SCALE,
+            min(PDF_BASE_SCALE, available_height / content_height_in),
+        )
+        page_height = min(
+            PDF_MAX_CONTINUOUS_HEIGHT_IN,
+            (content_height_in * scale) + vertical_margins + 0.25,
+        )
+
+    page_height = max(11, page_height)
+    print(f"PDF continuous page: height={page_height:.2f}in scale={scale:.2f}")
+
+    return {
+        "printBackground": True,
+        "displayHeaderFooter": False,
+        "preferCSSPageSize": False,
+        "paperWidth": PDF_PAPER_WIDTH_IN,
+        "paperHeight": page_height,
+        "marginTop": PDF_MARGIN_TOP_IN,
+        "marginBottom": PDF_MARGIN_BOTTOM_IN,
+        "marginLeft": PDF_MARGIN_LEFT_IN,
+        "marginRight": PDF_MARGIN_RIGHT_IN,
+        "scale": scale,
+    }
+
+
+def measure_pdf_document(driver):
+    try:
+        metrics = driver.execute_script(
+            """
+            const body = document.body || {};
+            const doc = document.documentElement || {};
+            const height = Math.max(
+                body.scrollHeight || 0,
+                body.offsetHeight || 0,
+                doc.clientHeight || 0,
+                doc.scrollHeight || 0,
+                doc.offsetHeight || 0
+            );
+            const width = Math.max(
+                body.scrollWidth || 0,
+                body.offsetWidth || 0,
+                doc.clientWidth || 0,
+                doc.scrollWidth || 0,
+                doc.offsetWidth || 0
+            );
+            return { height_px: height, width_px: width };
+            """
+        )
+    except Exception:
+        return {"height_px": 11 * 96, "width_px": PDF_PAPER_WIDTH_IN * 96}
+
+    return metrics if isinstance(metrics, dict) else {"height_px": 11 * 96, "width_px": PDF_PAPER_WIDTH_IN * 96}
 
 
 def write_recipe_page_pdf(recipe_url, html_text, html_path, pdf_path):
@@ -2031,6 +2334,7 @@ def write_recipe_page_pdf(recipe_url, html_text, html_path, pdf_path):
         driver = create_headless_chrome_driver(
             window_size="1365,1400",
             prefer_undetected=False,
+            page_load_strategy="normal",
         )
         driver.set_page_load_timeout(45)
 
@@ -2150,7 +2454,13 @@ def archive_uploaded_recipe_pdf(recipe_url, upload_path, mime_type, filename, pa
     return None
 
 
-def archive_social_video_text_pdf(recipe_url, page_text, progress_callback=None):
+def archive_social_video_text_pdf(
+    recipe_url,
+    page_text,
+    structured_recipe_data=None,
+    prefer_openai=False,
+    progress_callback=None,
+):
     if os.getenv("DISABLE_RECIPE_PDF_ARCHIVE") == "1":
         return None
 
@@ -2163,20 +2473,32 @@ def archive_social_video_text_pdf(recipe_url, page_text, progress_callback=None)
 
     if progress_callback:
         progress_callback(
-            "saving video text PDF archive...",
-            "Creating a PDF from the video caption, transcript, or audio transcription text.",
+            "saving video recipe PDF archive...",
+            "Creating a recipe-style PDF from the video caption, transcript, or audio transcription text.",
         )
 
     try:
         title = extract_social_text_label(page_text, "title") or "Video Recipe Text"
-        html_text = build_video_text_pdf_html(recipe_url, page_text, title)
+        recipe_data = build_video_pdf_recipe_data(
+            recipe_url,
+            page_text,
+            structured_recipe_data=structured_recipe_data,
+            prefer_openai=prefer_openai,
+            progress_callback=progress_callback,
+        )
+        html_text = build_video_text_pdf_html(
+            recipe_url,
+            page_text,
+            title,
+            recipe_data=recipe_data,
+        )
         saved_path = write_recipe_page_pdf(recipe_url, html_text, None, pdf_path)
-        print(f"Saved video text PDF archive: {saved_path}")
+        print(f"Saved video recipe PDF archive: {saved_path}")
         return saved_path
     except Exception as exc:
         error_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_PDF_ERROR.txt"
         error_path.write_text(str(exc), encoding="utf-8")
-        print(f"Video text PDF archive failed: {exc}")
+        print(f"Video recipe PDF archive failed: {exc}")
 
         if progress_callback:
             progress_callback(
@@ -2187,10 +2509,141 @@ def archive_social_video_text_pdf(recipe_url, page_text, progress_callback=None)
     return None
 
 
-def build_video_text_pdf_html(recipe_url, page_text, recipe_title=""):
-    title = html.escape(recipe_title or "Video Recipe Text")
+def build_video_pdf_recipe_data(
+    recipe_url,
+    page_text,
+    structured_recipe_data=None,
+    prefer_openai=False,
+    progress_callback=None,
+):
+    if prefer_openai and os.getenv("OPENAI_API_KEY"):
+        api_data = extract_video_recipe_pdf_data_with_openai(
+            recipe_url,
+            page_text,
+            progress_callback=progress_callback,
+        )
+
+        if recipe_data_has_pdf_content(api_data):
+            return api_data
+
+    if recipe_data_has_pdf_content(structured_recipe_data):
+        normalize_extracted_ingredient_fields(structured_recipe_data)
+        normalize_extracted_equipment_fields(structured_recipe_data)
+        return structured_recipe_data
+
+    local_data = extract_recipe_from_social_video_text(recipe_url, page_text)
+
+    if recipe_data_has_pdf_content(local_data):
+        return local_data
+
+    if os.getenv("OPENAI_API_KEY"):
+        api_data = extract_video_recipe_pdf_data_with_openai(
+            recipe_url,
+            page_text,
+            progress_callback=progress_callback,
+        )
+
+        if recipe_data_has_pdf_content(api_data):
+            return api_data
+
+    return structured_recipe_data if isinstance(structured_recipe_data, dict) else None
+
+
+def extract_video_recipe_pdf_data_with_openai(recipe_url, page_text, progress_callback=None):
+    if progress_callback:
+        progress_callback(
+            "formatting video recipe PDF with OpenAI...",
+            "ChatGPT is turning the video text into recipe sections for the PDF.",
+        )
+
+    try:
+        response_text = send_video_recipe_pdf_prompt_to_openai(
+            build_video_recipe_pdf_prompt(
+                recipe_url,
+                page_text[:MAX_SOCIAL_VIDEO_PROMPT_CHARS],
+            )
+        )
+        raw_api_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_SOCIAL_PDF_API_RESPONSE.txt"
+        raw_api_path.write_text(response_text, encoding="utf-8")
+
+        json_data = json.loads(clean_json_response(response_text))
+        json_data["source_url"] = recipe_url
+        normalize_extracted_ingredient_fields(json_data)
+        normalize_extracted_equipment_fields(json_data)
+        return json_data
+    except Exception as exc:
+        error_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_SOCIAL_PDF_API_ERROR.txt"
+        error_path.write_text(str(exc), encoding="utf-8")
+        print(f"Video recipe PDF OpenAI formatting failed: {exc}")
+
+    return None
+
+
+def send_video_recipe_pdf_prompt_to_openai(prompt_text):
+    response = get_openai_client().chat.completions.create(
+        model=MODEL,
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You turn social/video cooking text into structured recipe JSON "
+                    "with ingredients, equipment, and instructions. Return only valid JSON."
+                ),
+            },
+            {
+                "role": "user",
+                "content": prompt_text,
+            },
+        ],
+        response_format={"type": "json_object"},
+        temperature=0,
+    )
+
+    return response.choices[0].message.content
+
+
+def build_video_recipe_pdf_prompt(recipe_url, page_text):
+    return build_prompt(
+        recipe_url,
+        f"""
+This content came from a social/video recipe URL.
+
+Create a clean recipe export from the public title, caption, description, and transcript text below.
+The PDF will be built from your JSON, so prioritize complete recipe sections:
+- recipe_title
+- servings when present
+- ingredients with quantity, unit, ingredient, and preparation split out
+- equipment inferred from the recipe actions
+- ordered instructions with temperatures, times, and equipment_used when present
+
+If the video text mentions an ingredient quantity in spoken instructions instead of a formal ingredient list, extract that quantity.
+If an exact quantity is not present, leave quantity and unit null rather than guessing.
+Ignore comments, hashtags, creator bio text, channel promotions, subscribe reminders, and unrelated social media text.
+
+Social/video text:
+{page_text}
+""",
+    )
+
+
+def recipe_data_has_pdf_content(recipe_data):
+    if not isinstance(recipe_data, dict):
+        return False
+
+    return any(
+        isinstance(recipe_data.get(key), list) and bool(recipe_data.get(key))
+        for key in ("ingredients", "equipment", "instructions")
+    )
+
+
+def build_video_text_pdf_html(recipe_url, page_text, recipe_title="", recipe_data=None):
+    title_value = video_recipe_pdf_title(recipe_data, recipe_title)
+    title = html.escape(title_value)
     source_url = html.escape(str(recipe_url or ""))
-    body_html = format_labeled_text_for_pdf(page_text)
+    body_html = format_video_recipe_data_for_pdf(recipe_data)
+
+    if not body_html:
+        body_html = format_labeled_text_for_pdf(page_text)
 
     return f"""
 <!doctype html>
@@ -2205,11 +2658,12 @@ def build_video_text_pdf_html(recipe_url, page_text, recipe_title=""):
             font-family: Arial, sans-serif;
             color: #111;
             background: #fff;
-            line-height: 1.45;
+            line-height: 1.42;
         }}
         h1 {{
-            margin: 0 0 8px 0;
-            font-size: 24px;
+            margin: 0 0 6px 0;
+            font-size: 28px;
+            line-height: 1.15;
         }}
         .source {{
             margin: 0 0 22px 0;
@@ -2218,8 +2672,71 @@ def build_video_text_pdf_html(recipe_url, page_text, recipe_title=""):
             overflow-wrap: anywhere;
         }}
         h2 {{
-            margin: 18px 0 8px 0;
-            font-size: 16px;
+            border-bottom: 1px solid #ddd;
+            margin: 24px 0 10px 0;
+            padding-bottom: 5px;
+            font-size: 18px;
+        }}
+        h3 {{
+            margin: 14px 0 6px 0;
+            font-size: 14px;
+            color: #333;
+        }}
+        .meta {{
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 0 0 18px 0;
+        }}
+        .meta span {{
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 12px;
+            color: #333;
+        }}
+        table {{
+            border-collapse: collapse;
+            width: 100%;
+        }}
+        th,
+        td {{
+            border-bottom: 1px solid #e4e4e4;
+            padding: 7px 8px;
+            text-align: left;
+            vertical-align: top;
+        }}
+        th {{
+            background: #f3f3f3;
+            color: #333;
+            font-size: 12px;
+            text-transform: uppercase;
+        }}
+        .amount-cell {{
+            width: 22%;
+            white-space: nowrap;
+        }}
+        .section-row td {{
+            background: #fafafa;
+            color: #333;
+            font-weight: 700;
+            padding-top: 10px;
+        }}
+        ul,
+        ol {{
+            margin: 0;
+            padding-left: 24px;
+        }}
+        li {{
+            margin: 0 0 8px 0;
+        }}
+        .equipment-list {{
+            padding-left: 20px;
+        }}
+        .equipment-category,
+        .step-meta {{
+            color: #666;
+            font-size: 12px;
         }}
         pre {{
             margin: 0;
@@ -2236,6 +2753,282 @@ def build_video_text_pdf_html(recipe_url, page_text, recipe_title=""):
 </body>
 </html>
 """
+
+
+def video_recipe_pdf_title(recipe_data, fallback_title=""):
+    if isinstance(recipe_data, dict):
+        title = clean_recipe_text(recipe_data.get("recipe_title") or "")
+
+        if title:
+            return title
+
+    return fallback_title or "Video Recipe"
+
+
+def format_video_recipe_data_for_pdf(recipe_data):
+    if not recipe_data_has_pdf_content(recipe_data):
+        return ""
+
+    sections = []
+    meta_html = format_video_recipe_meta_for_pdf(recipe_data)
+
+    if meta_html:
+        sections.append(meta_html)
+
+    ingredients_html = format_video_recipe_ingredients_for_pdf(recipe_data.get("ingredients", []))
+
+    if ingredients_html:
+        sections.append(f"<h2>Ingredients</h2>{ingredients_html}")
+
+    equipment_html = format_video_recipe_equipment_for_pdf(recipe_data.get("equipment", []))
+
+    if equipment_html:
+        sections.append(f"<h2>Equipment</h2>{equipment_html}")
+
+    instructions_html = format_video_recipe_instructions_for_pdf(recipe_data.get("instructions", []))
+
+    if instructions_html:
+        sections.append(f"<h2>Instructions</h2>{instructions_html}")
+
+    nutrition_html = format_video_recipe_nutrition_for_pdf(recipe_data.get("nutrition"))
+
+    if nutrition_html:
+        sections.append(f"<h2>Nutrition</h2>{nutrition_html}")
+
+    return "\n".join(sections)
+
+
+def format_video_recipe_meta_for_pdf(recipe_data):
+    items = []
+    servings = clean_recipe_text(recipe_data.get("servings") or "")
+
+    if servings:
+        items.append(f"<span>Servings: {html.escape(servings)}</span>")
+
+    return f"<div class=\"meta\">{''.join(items)}</div>" if items else ""
+
+
+def format_video_recipe_ingredients_for_pdf(ingredients):
+    if not isinstance(ingredients, list) or not ingredients:
+        return ""
+
+    rows = []
+    current_section = None
+
+    for item in ingredients:
+        if not isinstance(item, dict):
+            value = clean_recipe_text(item)
+            if value:
+                rows.append(
+                    "<tr>"
+                    "<td class=\"amount-cell\"></td>"
+                    f"<td>{html.escape(value)}</td>"
+                    "<td></td>"
+                    "</tr>"
+                )
+            continue
+
+        section = clean_recipe_text(item.get("section") or "")
+
+        if section and section != current_section:
+            rows.append(
+                "<tr class=\"section-row\">"
+                f"<td colspan=\"3\">{html.escape(section)}</td>"
+                "</tr>"
+            )
+            current_section = section
+
+        amount = format_video_ingredient_amount(item)
+        ingredient = clean_recipe_text(item.get("ingredient") or item.get("original_text") or "")
+        preparation = clean_recipe_text(item.get("preparation") or "")
+
+        if item.get("optional") and preparation:
+            preparation = f"{preparation}; optional"
+        elif item.get("optional"):
+            preparation = "optional"
+
+        if not ingredient and not amount and not preparation:
+            continue
+
+        rows.append(
+            "<tr>"
+            f"<td class=\"amount-cell\">{html.escape(amount)}</td>"
+            f"<td>{html.escape(ingredient)}</td>"
+            f"<td>{html.escape(preparation)}</td>"
+            "</tr>"
+        )
+
+    if not rows:
+        return ""
+
+    return (
+        "<table>"
+        "<thead><tr><th>Amount</th><th>Ingredient</th><th>Prep</th></tr></thead>"
+        f"<tbody>{''.join(rows)}</tbody>"
+        "</table>"
+    )
+
+
+def format_video_ingredient_amount(item):
+    quantity = clean_recipe_text(item.get("quantity") or "")
+    unit = clean_recipe_text(item.get("unit") or "")
+
+    if quantity and unit:
+        return f"{quantity} {unit}"
+
+    return quantity or unit
+
+
+def format_video_recipe_equipment_for_pdf(equipment):
+    if not isinstance(equipment, list) or not equipment:
+        return ""
+
+    items = []
+    seen = set()
+
+    for item in equipment:
+        if isinstance(item, dict):
+            name = clean_recipe_text(item.get("name") or "")
+            category = clean_recipe_text(item.get("category") or "")
+        else:
+            name = clean_recipe_text(item)
+            category = ""
+
+        key = name.lower()
+
+        if not name or key in seen:
+            continue
+
+        seen.add(key)
+        category_html = (
+            f" <span class=\"equipment-category\">({html.escape(category)})</span>"
+            if category
+            else ""
+        )
+        items.append(f"<li>{html.escape(name)}{category_html}</li>")
+
+    return f"<ul class=\"equipment-list\">{''.join(items)}</ul>" if items else ""
+
+
+def format_video_recipe_instructions_for_pdf(instructions):
+    if not isinstance(instructions, list) or not instructions:
+        return ""
+
+    parts = []
+    items = []
+    current_section = None
+
+    for fallback_number, item in enumerate(instructions, start=1):
+        if isinstance(item, dict):
+            section = clean_recipe_text(item.get("section") or "")
+            instruction = clean_recipe_text(item.get("instruction") or "")
+            metadata = format_video_instruction_metadata(item)
+        else:
+            section = ""
+            instruction = clean_recipe_text(item)
+            metadata = ""
+
+        if not instruction:
+            continue
+
+        if section and section != current_section:
+            if items:
+                parts.append(f"<ol>{''.join(items)}</ol>")
+                items = []
+            parts.append(f"<h3>{html.escape(section)}</h3>")
+            current_section = section
+
+        items.append(
+            "<li>"
+            f"{html.escape(instruction)}"
+            f"{metadata}"
+            "</li>"
+        )
+
+    if items:
+        parts.append(f"<ol>{''.join(items)}</ol>")
+
+    return "\n".join(parts)
+
+
+def format_video_instruction_metadata(item):
+    values = []
+    temperature = clean_recipe_text(item.get("temperature") or "")
+    time_value = clean_recipe_text(item.get("time") or "")
+    equipment_used = item.get("equipment_used") or []
+
+    if temperature:
+        values.append(f"Temp: {temperature}")
+
+    if time_value:
+        values.append(f"Time: {time_value}")
+
+    if isinstance(equipment_used, list):
+        equipment_text = ", ".join(
+            clean_recipe_text(value)
+            for value in equipment_used
+            if clean_recipe_text(value)
+        )
+
+        if equipment_text:
+            values.append(f"Uses: {equipment_text}")
+
+    if not values:
+        return ""
+
+    return f"<div class=\"step-meta\">{' | '.join(html.escape(value) for value in values)}</div>"
+
+
+def format_video_recipe_nutrition_for_pdf(nutrition):
+    if not isinstance(nutrition, dict):
+        return ""
+
+    labels = [
+        ("serving_basis", "Serving basis"),
+        ("calories", "Calories"),
+        ("carbohydrates", "Carbohydrates"),
+        ("protein", "Protein"),
+        ("fat", "Fat"),
+        ("saturated_fat", "Saturated fat"),
+        ("fiber", "Fiber"),
+        ("sugar", "Sugar"),
+        ("sodium", "Sodium"),
+    ]
+    rows = []
+
+    for key, label in labels:
+        value = clean_recipe_text(nutrition.get(key) or "")
+
+        if value:
+            rows.append(
+                "<tr>"
+                f"<td>{html.escape(label)}</td>"
+                f"<td>{html.escape(value)}</td>"
+                "</tr>"
+            )
+
+    other = nutrition.get("other") or []
+
+    if isinstance(other, list):
+        for item in other:
+            if not isinstance(item, dict):
+                continue
+
+            name = clean_recipe_text(item.get("name") or "")
+            value = clean_recipe_text(item.get("value") or "")
+
+            if name and value:
+                rows.append(
+                    "<tr>"
+                    f"<td>{html.escape(name)}</td>"
+                    f"<td>{html.escape(value)}</td>"
+                    "</tr>"
+                )
+
+    if not rows:
+        return ""
+
+    return f"<table><tbody>{''.join(rows)}</tbody></table>"
 
 
 def format_labeled_text_for_pdf(page_text):
