@@ -81,7 +81,15 @@ def recipe_url_rows():
 
 
 def recipe_url_type(url):
-    return "File" if str(url or "").strip().lower().startswith("uploaded://") else "URL"
+    value = str(url or "").strip().lower()
+
+    if value.startswith("uploaded://"):
+        return "File"
+
+    if value.startswith("manual://"):
+        return "Manual"
+
+    return "URL"
 
 
 def recipe_url_quantity(url):

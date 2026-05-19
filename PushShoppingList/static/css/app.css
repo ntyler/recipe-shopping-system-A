@@ -1406,14 +1406,15 @@ body {
 
         .recipe-url-summary-row {
             display: grid;
-            grid-template-columns: 96px minmax(0, 1fr) 176px;
+            grid-template-columns: 96px minmax(0, 1fr) auto;
             gap: 10px;
             align-items: center;
             padding-bottom: 8px;
             border-bottom: 1px solid #2d2d2d;
         }
 
-        .recipe-url-summary-row:last-child {
+        .recipe-url-summary-row:last-child,
+        .recipe-url-summary-row-last {
             padding-bottom: 0;
             border-bottom: none;
         }
@@ -1449,11 +1450,83 @@ body {
             justify-content: flex-end;
             gap: 8px;
             justify-self: end;
-            width: 176px;
+            width: auto;
         }
 
-        .recipe-url-summary-pdf {
+        .recipe-url-summary-quantity {
             flex: 0 0 auto;
+        }
+
+        .recipe-url-summary-edit {
+            flex: 0 0 auto;
+            width: auto;
+            height: 32px;
+            margin: 0;
+            padding: 6px 12px;
+        }
+
+        .recipe-url-summary-pdf,
+        .recipe-url-summary-remove-form {
+            flex: 0 0 auto;
+        }
+
+        .recipe-url-summary-remove {
+            width: 34px;
+            min-width: 34px;
+            height: 32px;
+            margin: 0;
+            padding: 0;
+        }
+
+        .recipe-url-summary-save-qty {
+            justify-self: end;
+            width: auto;
+            min-width: 120px;
+            margin-top: 4px;
+            padding: 9px 14px;
+            font-size: 14px;
+        }
+
+        .recipe-log-action-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(180px, 260px);
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .recipe-log-action-row .save-recipe-qty-btn {
+            margin-top: 0;
+        }
+
+        .create-recipe-btn {
+            width: 100%;
+            margin: 0;
+            padding: 12px 14px;
+            border-radius: 8px;
+            background: #155da8;
+            color: #fff;
+            font-size: 16px;
+            font-weight: 800;
+        }
+
+        .create-recipe-btn:hover,
+        .create-recipe-btn:focus {
+            background: #1d74cf;
+            outline: none;
+        }
+
+        .create-recipe-btn:disabled {
+            cursor: wait;
+            opacity: 0.75;
+        }
+
+        .create-recipe-empty-btn {
+            margin-top: 12px;
+        }
+
+        .recipe-type-manual {
+            color: #fef3c7;
+            background: #7c3a00;
         }
 
         .recipe-label {
@@ -3506,6 +3579,14 @@ body {
                 justify-content: flex-start;
                 flex-wrap: wrap;
                 width: 100%;
+            }
+
+            .recipe-url-summary-save-qty {
+                width: 100%;
+            }
+
+            .recipe-log-action-row {
+                grid-template-columns: 1fr;
             }
 
             .recipe-url-summary-food-review {

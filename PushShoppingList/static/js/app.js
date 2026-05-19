@@ -671,6 +671,44 @@ async function saveAllRecipeQuantities(button) {
     return false;
 }
 
+async function createNewRecipe(button) {
+    const originalText = button ? button.textContent : "";
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Creating...";
+    }
+
+    try {
+        const response = await fetch("/api/create_recipe", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({}),
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok || !data.url) {
+            throw new Error((data && data.error) || "Unable to create recipe.");
+        }
+
+        await refreshStoreMarkup();
+        showRecipeQuantityUpdatedMessage("", "", "", "New recipe created.");
+        openRecipeEditor({ dataset: { recipeUrl: data.url } });
+    } catch (err) {
+        console.warn("Unable to create recipe.", err);
+        alert("Unable to create recipe.");
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = originalText || "Create New Recipe";
+        }
+    }
+
+    return false;
+}
+
 function buildRecipeQuantityProgressItems(inputs) {
     return inputs.map(input => {
         const row = input.closest(".recipe-row");

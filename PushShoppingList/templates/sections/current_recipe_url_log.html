@@ -89,20 +89,32 @@
             {% endfor %}
             </div>
 
-            <button type="button"
-                    class="save-recipe-qty-btn"
-                    onclick="saveAllRecipeQuantities(this)">
-                Save Qty
-            </button>
+            <div class="recipe-log-action-row">
+                <button type="button"
+                        class="save-recipe-qty-btn"
+                        onclick="saveAllRecipeQuantities(this)">
+                    Save Qty
+                </button>
+                <button type="button"
+                        class="create-recipe-btn"
+                        onclick="createNewRecipe(this)">
+                    Create New Recipe
+                </button>
+            </div>
         {% else %}
             <div class="log-box">No current recipe URLs yet.</div>
+            <button type="button"
+                    class="create-recipe-btn create-recipe-empty-btn"
+                    onclick="createNewRecipe(this)">
+                Create New Recipe
+            </button>
         {% endif %}
     </div>
 
     {% if current_urls %}
         <div class="recipe-url-collapsed-summary" aria-label="Current recipe URL summary">
             {% for recipe in current_urls %}
-                <div class="recipe-url-summary-row">
+                <div class="recipe-url-summary-row{% if loop.last %} recipe-url-summary-row-last{% endif %}">
                     <span class="recipe-url-summary-number">Recipe {{ loop.index }}</span>
                     <a class="recipe-url-summary-name"
                        href="{{ recipe.url }}"
@@ -120,6 +132,23 @@
                                 Food Review ({{ recipe.food_rule_status.count }})
                             </button>
                         {% endif %}
+                        <div class="recipe-quantity-control recipe-url-summary-quantity">
+                            <span>Qty</span>
+                            <input type="number"
+                                   class="recipe-quantity-input"
+                                   min="1"
+                                   step="1"
+                                   value="{{ recipe.quantity }}"
+                                   data-recipe-number="{{ loop.index }}"
+                                   data-recipe-url="{{ recipe.url }}"
+                                   aria-label="Recipe {{ loop.index }} quantity">
+                        </div>
+                        <button type="button"
+                                class="edit-recipe-btn recipe-url-summary-edit"
+                                data-recipe-url="{{ recipe.url }}"
+                                onclick="openRecipeEditor(this)">
+                            Edit
+                        </button>
                         {% if recipe.archive_pdf_available %}
                             <a class="recipe-archive-pdf-btn recipe-url-summary-pdf"
                                href="{{ url_for('recipe_bp.recipe_archive_pdf_route', url=recipe.url) }}"
@@ -128,9 +157,30 @@
                                 PDF
                             </a>
                         {% endif %}
+                        <form method="POST"
+                              action="{{ url_for('recipe_bp.remove_recipe_route') }}"
+                              class="remove-recipe-form recipe-url-summary-remove-form"
+                              onsubmit="saveScroll(); return confirm('Remove this recipe URL?');">
+                            <input type="hidden" name="url" value="{{ recipe.url }}">
+                            <button type="submit"
+                                    class="remove-recipe-btn recipe-url-summary-remove"
+                                    aria-label="Remove recipe {{ loop.index }}">X</button>
+                        </form>
                     </div>
                 </div>
             {% endfor %}
+            <div class="recipe-log-action-row recipe-url-summary-footer">
+                <button type="button"
+                        class="save-recipe-qty-btn recipe-url-summary-save-qty"
+                        onclick="saveAllRecipeQuantities(this)">
+                    Save Qty
+                </button>
+                <button type="button"
+                        class="create-recipe-btn recipe-url-summary-create"
+                        onclick="createNewRecipe(this)">
+                    Create New Recipe
+                </button>
+            </div>
         </div>
     {% endif %}
 </div>

@@ -1,4 +1,5 @@
 import json
+import uuid
 
 from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
@@ -40,6 +41,36 @@ NUTRITION_FIELDS = [
     "calcium",
     "iron",
 ]
+
+
+def create_new_recipe():
+    source_url = f"manual://recipe/{uuid.uuid4().hex}"
+    recipe_data = {
+        "source_url": source_url,
+        "recipe_title": "New Recipe",
+        "servings": "",
+        "ingredients": [],
+        "equipment": [],
+        "instructions": [],
+        "nutrition": empty_recipe_nutrition(),
+    }
+
+    save_recipe_output(source_url, recipe_data)
+    save_recipe_urls(load_recipe_urls() + [source_url])
+    save_recipe_url_quantity(source_url, 1)
+    save_recipe_url_name(source_url, "New Recipe")
+    update_recipe_ingredient_record(source_url, 1, recipe_data)
+
+    result = load_editable_recipe(source_url)
+    result["url"] = source_url
+    return result
+
+
+def empty_recipe_nutrition():
+    return {
+        **{field: None for field in NUTRITION_FIELDS},
+        "other": [],
+    }
 
 
 def load_editable_recipe(url):
