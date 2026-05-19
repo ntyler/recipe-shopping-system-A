@@ -600,6 +600,403 @@ async function addFoodRestrictionsWithChatGPT(button) {
     return false;
 }
 
+let activeRulesEditorSection = "";
+
+function rulesEditorData() {
+    const script = document.getElementById("rulesEditorData");
+
+    if (!script) {
+        return {
+            home_address: {},
+            available_stores: [],
+            enabled_stores: [],
+            rules_display: {},
+            food_rules: { require: [], avoid: [] },
+        };
+    }
+
+    try {
+        return JSON.parse(script.textContent || "{}");
+    } catch (err) {
+        console.warn("Unable to parse rules editor data.", err);
+        return {
+            home_address: {},
+            available_stores: [],
+            enabled_stores: [],
+            rules_display: {},
+            food_rules: { require: [], avoid: [] },
+        };
+    }
+}
+
+function openRulesEditor(section) {
+    const modal = document.getElementById("rulesEditorModal");
+    const title = document.getElementById("rulesEditorTitle");
+    const fields = document.getElementById("rulesEditorFields");
+
+    if (!modal || !title || !fields) {
+        return false;
+    }
+
+    activeRulesEditorSection = section;
+    setRulesEditorStatus("");
+
+    const data = rulesEditorData();
+    const titles = {
+        home_stores: "Edit Home And Stores",
+        best_product_ranking: "Edit Best Product Ranking",
+        saved_product_choices: "Edit Saved Product Choices",
+        food_restrictions: "Edit Food Restriction Rules",
+    };
+
+    title.textContent = titles[section] || "Edit Rules";
+
+    if (section === "home_stores") {
+        renderRulesHomeStoresEditor(fields, data);
+    } else if (section === "food_restrictions") {
+        renderRulesFoodRestrictionsEditor(fields, data.food_rules || { require: [], avoid: [] });
+    } else {
+        const display = data.rules_display || {};
+        const rows = display[section] && Array.isArray(display[section].rows)
+            ? display[section].rows
+            : [];
+        renderRulesTextRowsEditor(fields, rows);
+    }
+
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+    return false;
+}
+
+function closeRulesEditor() {
+    const modal = document.getElementById("rulesEditorModal");
+
+    if (modal) {
+        modal.classList.remove("open");
+        modal.setAttribute("aria-hidden", "true");
+        document.body.classList.remove("modal-open");
+    }
+
+    activeRulesEditorSection = "";
+}
+
+function setRulesEditorStatus(message, isError = false) {
+    const status = document.getElementById("rulesEditorStatus");
+
+    if (status) {
+        status.textContent = message || "";
+        status.classList.toggle("error", Boolean(isError));
+    }
+}
+
+function renderRulesHomeStoresEditor(container, data) {
+    const address = data.home_address || {};
+    const stores = Array.isArray(data.available_stores) ? data.available_stores : [];
+    const enabledStores = new Set(Array.isArray(data.enabled_stores) ? data.enabled_stores : []);
+    const display = data.rules_display || {};
+    const section = display.home_stores || {};
+    const rows = Array.isArray(section.rows) ? section.rows : [];
+
+    container.innerHTML = `
+        <section class="rules-editor-section">
+            <h3>Home Address</h3>
+            <div class="rules-editor-address-grid">
+                ${rulesAddressInput("street", "Street", address.street)}
+                ${rulesAddressInput("apartment", "Apartment", address.apartment)}
+                ${rulesAddressInput("city", "City", address.city)}
+                ${rulesAddressInput("county", "County", address.county)}
+                ${rulesAddressInput("state", "State", address.state)}
+                ${rulesAddressInput("zip", "ZIP", address.zip)}
+                ${rulesAddressInput("country", "Country", address.country)}
+            </div>
+        </section>
+        <section class="rules-editor-section">
+            <h3>Enabled Stores</h3>
+            <div class="rules-editor-store-grid">
+                ${stores.map(store => `
+                    <label class="rules-editor-store-option">
+                        <input type="checkbox"
+                               data-rules-store-key="${escapeAttribute(store.key || "")}"
+                               ${enabledStores.has(store.key) ? "checked" : ""}>
+                        <span>${escapeHtml(store.label || store.key || "Store")}</span>
+                    </label>
+                `).join("")}
+            </div>
+        </section>
+        <section class="rules-editor-section">
+            <div class="rules-editor-section-heading">
+                <h3>Section Text</h3>
+            </div>
+            <div id="rulesEditorRows" class="rules-editor-row-list"></div>
+        </section>
+    `;
+
+    const rowsContainer = container.querySelector("#rulesEditorRows");
+    rows.forEach(row => addRulesTextRow(row, rowsContainer, false));
+}
+
+function rulesAddressInput(field, label, value) {
+    return `
+        <label>
+            <span>${escapeHtml(label)}</span>
+            <input type="text"
+                   data-rules-address-field="${escapeAttribute(field)}"
+                   value="${escapeAttribute(value || "")}">
+        </label>
+    `;
+}
+
+function renderRulesTextRowsEditor(container, rows) {
+    container.innerHTML = `
+        <section class="rules-editor-section">
+            <div class="rules-editor-section-heading">
+                <h3>Rules</h3>
+                <button type="button" class="rules-editor-small-btn" onclick="addRulesTextRow()">Add Rule</button>
+            </div>
+            <div id="rulesEditorRows" class="rules-editor-row-list"></div>
+        </section>
+    `;
+
+    rows.forEach(row => addRulesTextRow(row));
+}
+
+function addRulesTextRow(row = {}, container = null, removable = true) {
+    const rowsContainer = container || document.getElementById("rulesEditorRows");
+
+    if (!rowsContainer) {
+        return false;
+    }
+
+    const item = document.createElement("div");
+    item.className = "rules-editor-row";
+    item.dataset.rulesTextRow = "1";
+    item.innerHTML = `
+        <label>
+            <span>Label</span>
+            <input type="text"
+                   data-rules-row-key
+                   value="${escapeAttribute(row.key || "")}"
+                   hidden>
+            <input type="text"
+                   data-rules-row-label
+                   value="${escapeAttribute(row.label || "")}">
+        </label>
+        <label>
+            <span>Text</span>
+            <textarea rows="3" data-rules-row-value>${escapeHtml(row.value || "")}</textarea>
+        </label>
+        ${removable ? `
+            <button type="button"
+                    class="rules-editor-delete-btn"
+                    onclick="removeRulesEditorRow(this)"
+                    aria-label="Remove rule">
+                X
+            </button>
+        ` : ""}
+    `;
+    rowsContainer.appendChild(item);
+    return false;
+}
+
+function removeRulesEditorRow(button) {
+    const row = button ? button.closest(".rules-editor-row, .rules-editor-food-row") : null;
+
+    if (row) {
+        row.remove();
+    }
+
+    return false;
+}
+
+function renderRulesFoodRestrictionsEditor(container, foodRules) {
+    foodRules = foodRules || { require: [], avoid: [] };
+    container.innerHTML = `
+        <section class="rules-editor-section">
+            <div class="rules-editor-section-heading">
+                <h3>Required</h3>
+                <button type="button" class="rules-editor-small-btn" onclick="addRulesFoodRuleRow('require')">Add Required</button>
+            </div>
+            <div id="rulesFoodRequireRows" class="rules-editor-row-list" data-rules-food-list="require"></div>
+        </section>
+        <section class="rules-editor-section">
+            <div class="rules-editor-section-heading">
+                <h3>Avoid</h3>
+                <button type="button" class="rules-editor-small-btn" onclick="addRulesFoodRuleRow('avoid')">Add Avoid</button>
+            </div>
+            <div id="rulesFoodAvoidRows" class="rules-editor-row-list" data-rules-food-list="avoid"></div>
+        </section>
+    `;
+
+    (foodRules.require || []).forEach(rule => addRulesFoodRuleRow("require", rule));
+    (foodRules.avoid || []).forEach(rule => addRulesFoodRuleRow("avoid", rule));
+}
+
+function addRulesFoodRuleRow(section, rule = {}) {
+    const list = document.querySelector(`[data-rules-food-list="${section}"]`);
+
+    if (!list) {
+        return false;
+    }
+
+    const row = document.createElement("div");
+    row.className = "rules-editor-food-row";
+    row.dataset.rulesFoodRow = "1";
+    row.innerHTML = `
+        <label>
+            <span>Label</span>
+            <input type="text"
+                   data-rules-food-label
+                   value="${escapeAttribute(rule.label || "")}">
+        </label>
+        <label>
+            <span>Terms</span>
+            <textarea rows="2" data-rules-food-terms>${escapeHtml(Array.isArray(rule.terms) ? rule.terms.join(", ") : (rule.terms || ""))}</textarea>
+        </label>
+        <button type="button"
+                class="rules-editor-delete-btn"
+                onclick="removeRulesEditorRow(this)"
+                aria-label="Remove food rule">
+            X
+        </button>
+    `;
+    list.appendChild(row);
+    return false;
+}
+
+function collectRulesTextRows() {
+    return [...document.querySelectorAll("#rulesEditorRows [data-rules-text-row]")]
+        .map(row => {
+            const key = row.querySelector("[data-rules-row-key]");
+            const label = row.querySelector("[data-rules-row-label]");
+            const value = row.querySelector("[data-rules-row-value]");
+
+            return {
+                key: key ? key.value.trim() : "",
+                label: label ? label.value.trim() : "",
+                value: value ? value.value.trim() : "",
+            };
+        })
+        .filter(row => row.label || row.value);
+}
+
+function collectRulesHomeStoresPayload() {
+    const address = {};
+    document.querySelectorAll("[data-rules-address-field]").forEach(input => {
+        address[input.dataset.rulesAddressField] = input.value.trim();
+    });
+
+    const enabledStores = [...document.querySelectorAll("[data-rules-store-key]:checked")]
+        .map(input => input.dataset.rulesStoreKey)
+        .filter(Boolean);
+
+    return {
+        address,
+        enabled_stores: enabledStores,
+        rows: collectRulesTextRows(),
+    };
+}
+
+function collectRulesFoodRestrictions() {
+    const rules = {
+        require: [],
+        avoid: [],
+    };
+
+    document.querySelectorAll("[data-rules-food-list]").forEach(list => {
+        const section = list.dataset.rulesFoodList;
+
+        if (!rules[section]) {
+            return;
+        }
+
+        list.querySelectorAll("[data-rules-food-row]").forEach(row => {
+            const label = row.querySelector("[data-rules-food-label]");
+            const terms = row.querySelector("[data-rules-food-terms]");
+            const item = {
+                label: label ? label.value.trim() : "",
+                terms: splitFoodRestrictionTerms(terms ? terms.value : ""),
+            };
+
+            if (item.label && item.terms.length) {
+                rules[section].push(item);
+            }
+        });
+    });
+
+    return rules;
+}
+
+async function saveRulesEditor(event) {
+    event.preventDefault();
+    const button = event.currentTarget ? event.currentTarget.querySelector(".rules-editor-save") : null;
+    const originalText = button ? button.textContent : "";
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Saving...";
+    }
+
+    setRulesEditorStatus("Saving changes...");
+
+    try {
+        let response;
+
+        if (activeRulesEditorSection === "home_stores") {
+            response = await fetch("/api/rules_display/home_stores", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Requested-With": "fetch",
+                },
+                body: JSON.stringify(collectRulesHomeStoresPayload()),
+            });
+        } else if (activeRulesEditorSection === "food_restrictions") {
+            response = await fetch("/api/food_rules", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Requested-With": "fetch",
+                },
+                body: JSON.stringify({
+                    food_rules: collectRulesFoodRestrictions(),
+                }),
+            });
+        } else {
+            response = await fetch(`/api/rules_display/${encodeURIComponent(activeRulesEditorSection)}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Requested-With": "fetch",
+                },
+                body: JSON.stringify({
+                    rows: collectRulesTextRows(),
+                }),
+            });
+        }
+
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to save rules.");
+        }
+
+        closeRulesEditor();
+        await refreshStoreMarkup({ cacheBust: true });
+        showRecipeQuantityUpdatedMessage("", "", "", "Rules saved.");
+    } catch (err) {
+        console.warn("Unable to save rules.", err);
+        setRulesEditorStatus(err.message || "Unable to save rules.", true);
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = originalText || "Save Changes";
+        }
+    }
+
+    return false;
+}
+
 function openRecipeMediaUpload() {
     const input = document.getElementById("recipeMediaUploadInput");
 
@@ -4309,6 +4706,7 @@ async function refreshStoreMarkup(options = {}) {
     const html = await response.text();
     const nextPage = new DOMParser().parseFromString(html, "text/html");
     replaceSectionFromPage(nextPage, "#editItemsSection");
+    replaceSectionFromPage(nextPage, "#home-address-section");
     replaceSectionFromPage(nextPage, "#storeOptionsSection");
     const recipeLogWasRefreshed = replaceSectionFromPage(nextPage, "#currentRecipeUrlLogCard");
     replaceSectionFromPage(nextPage, "#foodRestrictionsCard");

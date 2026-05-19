@@ -14,7 +14,14 @@
          data-collapse-mobile-default="expanded">
         {% set required_rules = food_rules.require if food_rules else [] %}
         {% set avoid_rules = food_rules.avoid if food_rules else [] %}
+        {% set home_rule_rows = rules_display.home_stores.rows if rules_display and rules_display.home_stores else [] %}
+        {% set ranking_rule_rows = rules_display.best_product_ranking.rows if rules_display and rules_display.best_product_ranking else [] %}
+        {% set saved_choice_rule_rows = rules_display.saved_product_choices.rows if rules_display and rules_display.saved_product_choices else [] %}
         {% set enabled_store_labels = [] %}
+        {% set rules_editor_stores = [] %}
+        {% for store_key, store in available_stores.items() %}
+            {% set _ = rules_editor_stores.append({"key": store_key, "label": store.label}) %}
+        {% endfor %}
         {% for store_key in enabled_stores %}
             {% set store = available_stores.get(store_key) %}
             {% if store %}
@@ -24,7 +31,10 @@
 
         <div class="rules-grid">
             <section class="rules-group">
-                <h3>Home And Stores</h3>
+                <div class="rules-group-header">
+                    <h3>Home And Stores</h3>
+                    <button type="button" class="rules-edit-btn" onclick="openRulesEditor('home_stores')">Edit</button>
+                </div>
                 <ul class="rules-list">
                     <li>
                         <span class="rules-label">Home location</span>
@@ -34,71 +44,50 @@
                         <span class="rules-label">Enabled stores</span>
                         <span class="rules-value">{{ enabled_store_labels | join(", ") if enabled_store_labels else "No enabled stores." }}</span>
                     </li>
-                    <li>
-                        <span class="rules-label">Nearby store lookup</span>
-                        <span class="rules-value">Grab Best Products uses the Full Address to find the nearest available location for each enabled store.</span>
-                    </li>
-                    <li>
-                        <span class="rules-label">Search scope</span>
-                        <span class="rules-value">Only enabled store websites are searched for product candidates.</span>
-                    </li>
+                    {% for row in home_rule_rows %}
+                        <li>
+                            <span class="rules-label">{{ row.label }}</span>
+                            <span class="rules-value">{{ row.value }}</span>
+                        </li>
+                    {% endfor %}
                 </ul>
             </section>
 
             <section class="rules-group">
-                <h3>Best Product Ranking</h3>
+                <div class="rules-group-header">
+                    <h3>Best Product Ranking</h3>
+                    <button type="button" class="rules-edit-btn" onclick="openRulesEditor('best_product_ranking')">Edit</button>
+                </div>
                 <ul class="rules-list">
-                    <li>
-                        <span class="rules-label">Ingredient match</span>
-                        <span class="rules-value">Products score higher when their names match more ingredient terms.</span>
-                    </li>
-                    <li>
-                        <span class="rules-label">Food restrictions</span>
-                        <span class="rules-value">Avoid rules block a product. Required rules boost products that satisfy required terms.</span>
-                    </li>
-                    <li>
-                        <span class="rules-label">Price</span>
-                        <span class="rules-value">Visible prices are preferred. Missing prices lower confidence and are saved with a skip reason.</span>
-                    </li>
-                    <li>
-                        <span class="rules-label">Direct product URL</span>
-                        <span class="rules-value">Direct product pages are preferred over store search-result pages.</span>
-                    </li>
-                    <li>
-                        <span class="rules-label">Distance</span>
-                        <span class="rules-value">Closer nearest-store locations improve ranking when distance is available.</span>
-                    </li>
+                    {% for row in ranking_rule_rows %}
+                        <li>
+                            <span class="rules-label">{{ row.label }}</span>
+                            <span class="rules-value">{{ row.value }}</span>
+                        </li>
+                    {% endfor %}
                 </ul>
             </section>
 
             <section class="rules-group">
-                <h3>Saved Product Choices</h3>
+                <div class="rules-group-header">
+                    <h3>Saved Product Choices</h3>
+                    <button type="button" class="rules-edit-btn" onclick="openRulesEditor('saved_product_choices')">Edit</button>
+                </div>
                 <ul class="rules-list">
-                    <li>
-                        <span class="rules-label">Best product</span>
-                        <span class="rules-value">The top viable candidate is saved as the selected product for the ingredient.</span>
-                    </li>
-                    <li>
-                        <span class="rules-label">Alternatives</span>
-                        <span class="rules-value">All viable candidates are preserved so the Alternatives button can switch the selected product.</span>
-                    </li>
-                    <li>
-                        <span class="rules-label">Manual override</span>
-                        <span class="rules-value">Manual alternative selections persist across refreshes and sync through the backend JSON state.</span>
-                    </li>
-                    <li>
-                        <span class="rules-label">Fallback search pages</span>
-                        <span class="rules-value">Search-result fallback pages are kept as references, but they are not selectable as best products.</span>
-                    </li>
-                    <li>
-                        <span class="rules-label">No valid product</span>
-                        <span class="rules-value">When no viable candidate is found, skip reasons are saved and shown instead of a product pick.</span>
-                    </li>
+                    {% for row in saved_choice_rule_rows %}
+                        <li>
+                            <span class="rules-label">{{ row.label }}</span>
+                            <span class="rules-value">{{ row.value }}</span>
+                        </li>
+                    {% endfor %}
                 </ul>
             </section>
 
             <section class="rules-group">
-                <h3>Food Restriction Rules</h3>
+                <div class="rules-group-header">
+                    <h3>Food Restriction Rules</h3>
+                    <button type="button" class="rules-edit-btn" onclick="openRulesEditor('food_restrictions')">Edit</button>
+                </div>
                 <div class="rules-subgroup">
                     <div class="rules-subtitle">Required</div>
                     {% if required_rules %}
@@ -132,5 +121,34 @@
                 </div>
             </section>
         </div>
+    </div>
+
+    <script type="application/json" id="rulesEditorData">
+        {{ {
+            "home_address": home_address,
+            "available_stores": rules_editor_stores,
+            "enabled_stores": enabled_stores,
+            "rules_display": rules_display,
+            "food_rules": food_rules,
+        } | tojson }}
+    </script>
+</div>
+
+<div id="rulesEditorModal"
+     class="rules-editor-backdrop"
+     aria-hidden="true">
+    <div class="rules-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="rulesEditorTitle">
+        <form id="rulesEditorForm" onsubmit="return saveRulesEditor(event)">
+            <div class="rules-editor-header">
+                <h2 id="rulesEditorTitle">Edit Rules</h2>
+                <button type="button" class="rules-editor-close" onclick="closeRulesEditor()">Close</button>
+            </div>
+            <div id="rulesEditorStatus" class="rules-editor-status" aria-live="polite"></div>
+            <div id="rulesEditorFields" class="rules-editor-fields"></div>
+            <div class="rules-editor-actions">
+                <button type="button" class="rules-editor-cancel" onclick="closeRulesEditor()">Cancel</button>
+                <button type="submit" class="rules-editor-save">Save Changes</button>
+            </div>
+        </form>
     </div>
 </div>

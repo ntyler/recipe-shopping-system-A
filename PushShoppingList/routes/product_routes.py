@@ -7,12 +7,16 @@ from PushShoppingList.services.food_rules_service import annotate_product_food_r
 from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.food_rules_service import suggest_food_rules_from_prompt
 from PushShoppingList.services.food_rules_service import update_food_rules
+from PushShoppingList.services.home_address_service import save_home_address
 from PushShoppingList.services.product_selection_service import clear_product_choices
 from PushShoppingList.services.product_selection_service import grab_best_products
 from PushShoppingList.services.product_selection_service import normalize_item_key
 from PushShoppingList.services.product_selection_service import product_choice_for_item
 from PushShoppingList.services.product_selection_service import product_choices_by_item
 from PushShoppingList.services.product_selection_service import select_product_choice
+from PushShoppingList.services.rules_display_service import save_home_store_rule_text
+from PushShoppingList.services.rules_display_service import save_rules_display_section
+from PushShoppingList.services.store_settings_service import save_enabled_stores
 
 product_bp = Blueprint("product_bp", __name__)
 
@@ -57,6 +61,40 @@ def api_suggest_food_rules_route():
         data.get("prompt", ""),
         data.get("food_rules"),
     )
+    status = 200 if result.get("ok") else 400
+
+    return jsonify(result), status
+
+
+@product_bp.route("/api/rules_display/home_stores", methods=["POST"])
+def api_save_home_store_rules_route():
+    data = request.get_json(silent=True) or {}
+    address = data.get("address") if isinstance(data.get("address"), dict) else {}
+    enabled_stores = data.get("enabled_stores") if isinstance(data.get("enabled_stores"), list) else []
+    saved_address = save_home_address({
+        "address_street": address.get("street", ""),
+        "address_apartment": address.get("apartment", ""),
+        "address_city": address.get("city", ""),
+        "address_county": address.get("county", ""),
+        "address_state": address.get("state", ""),
+        "address_zip": address.get("zip", ""),
+        "address_country": address.get("country", ""),
+    })
+    store_settings = save_enabled_stores(enabled_stores)
+    section = save_home_store_rule_text(data.get("rows", []))
+
+    return jsonify({
+        "ok": True,
+        "home_address": saved_address,
+        "enabled_stores": store_settings["enabled_stores"],
+        "section": section,
+    })
+
+
+@product_bp.route("/api/rules_display/<section_key>", methods=["POST"])
+def api_save_rules_display_section_route(section_key):
+    data = request.get_json(silent=True) or {}
+    result = save_rules_display_section(section_key, data.get("rows", []))
     status = 200 if result.get("ok") else 400
 
     return jsonify(result), status

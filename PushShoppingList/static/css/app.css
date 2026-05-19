@@ -1562,11 +1562,31 @@ body {
             background: #181818;
         }
 
+        .rules-group-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
         .rules-group h3 {
-            margin: 0 0 10px 0;
+            margin: 0;
             color: #00ff99;
             font-size: 15px;
             letter-spacing: 0;
+        }
+
+        .rules-edit-btn,
+        .rules-editor-small-btn {
+            width: auto;
+            min-width: 0;
+            margin: 0;
+            padding: 7px 12px;
+            border-radius: 7px;
+            background: #155999;
+            font-size: 13px;
+            font-weight: 800;
         }
 
         .rules-list,
@@ -1645,6 +1665,219 @@ body {
             margin: 0;
             color: #aaa;
             font-size: 13px;
+        }
+
+        .rules-editor-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 11000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+            background: rgba(0, 0, 0, 0.78);
+        }
+
+        .rules-editor-backdrop.open {
+            display: flex;
+        }
+
+        .rules-editor-dialog {
+            width: min(940px, 96vw);
+            max-height: 92vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #8c826d;
+            border-radius: 8px;
+            background: #111;
+            color: #fff;
+            box-shadow: 0 18px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .rules-editor-dialog form {
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .rules-editor-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 16px 20px;
+            border-bottom: 1px solid #5d5648;
+            background: #151515;
+        }
+
+        .rules-editor-header h2 {
+            margin: 0;
+            font-size: 24px;
+            line-height: 1.1;
+        }
+
+        .rules-editor-close {
+            width: auto;
+            min-width: 100px;
+            margin: 0;
+            background: #2a2f31;
+        }
+
+        .rules-editor-status {
+            min-height: 20px;
+            padding: 10px 20px 0;
+            color: #7dd3fc;
+            font-weight: 800;
+        }
+
+        .rules-editor-status.error {
+            color: #ffb4b4;
+        }
+
+        .rules-editor-fields {
+            min-height: 0;
+            overflow-y: auto;
+            display: grid;
+            gap: 12px;
+            padding: 16px 20px;
+        }
+
+        .rules-editor-section {
+            display: grid;
+            gap: 10px;
+            padding: 12px;
+            border: 1px solid #3a3a3a;
+            border-radius: 8px;
+            background: #151717;
+        }
+
+        .rules-editor-section-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .rules-editor-section h3 {
+            margin: 0;
+            color: #00ff99;
+            font-size: 16px;
+        }
+
+        .rules-editor-address-grid,
+        .rules-editor-store-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .rules-editor-address-grid label,
+        .rules-editor-row label,
+        .rules-editor-food-row label {
+            display: grid;
+            gap: 6px;
+            min-width: 0;
+        }
+
+        .rules-editor-address-grid span,
+        .rules-editor-row span,
+        .rules-editor-food-row span {
+            color: #ddd;
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .rules-editor-address-grid input,
+        .rules-editor-row input,
+        .rules-editor-row textarea,
+        .rules-editor-food-row input,
+        .rules-editor-food-row textarea {
+            width: 100%;
+            min-width: 0;
+            margin: 0;
+            border: 1px solid #555;
+            border-radius: 6px;
+            background: #181818;
+            color: #fff;
+            font: inherit;
+        }
+
+        .rules-editor-row textarea,
+        .rules-editor-food-row textarea {
+            resize: vertical;
+        }
+
+        .rules-editor-store-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            background: #202425;
+            color: #ddd;
+            cursor: pointer;
+        }
+
+        .rules-editor-store-option input {
+            transform: scale(1.15);
+        }
+
+        .rules-editor-row-list {
+            display: grid;
+            gap: 10px;
+        }
+
+        .rules-editor-row,
+        .rules-editor-food-row {
+            display: grid;
+            grid-template-columns: minmax(150px, 0.85fr) minmax(0, 1.15fr) 44px;
+            gap: 10px;
+            align-items: end;
+            padding: 10px;
+            border: 1px solid #2d2d2d;
+            border-radius: 8px;
+            background: #111;
+        }
+
+        .rules-editor-row:not(:has(.rules-editor-delete-btn)) {
+            grid-template-columns: minmax(150px, 0.85fr) minmax(0, 1.15fr);
+        }
+
+        .rules-editor-delete-btn {
+            width: 44px;
+            min-width: 44px;
+            height: 44px;
+            margin: 0;
+            padding: 0;
+            border-radius: 7px;
+            background: #b00000;
+            font-size: 18px;
+            font-weight: 900;
+        }
+
+        .rules-editor-actions {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 10px;
+            padding: 14px 20px 18px;
+            border-top: 1px solid #5d5648;
+            background: #151515;
+        }
+
+        .rules-editor-actions button {
+            margin: 0;
+        }
+
+        .rules-editor-cancel {
+            background: #2a2f31;
+        }
+
+        .rules-editor-save {
+            background: #107C10;
         }
 
         .recipe-url-summary-row {
@@ -3993,6 +4226,40 @@ body {
             .rules-list li {
                 grid-template-columns: 1fr;
                 gap: 4px;
+            }
+
+            .rules-editor-dialog {
+                width: 100%;
+                max-height: 94vh;
+            }
+
+            .rules-editor-header {
+                padding: 14px;
+            }
+
+            .rules-editor-header h2 {
+                font-size: 22px;
+            }
+
+            .rules-editor-fields {
+                padding: 14px;
+            }
+
+            .rules-editor-address-grid,
+            .rules-editor-store-grid,
+            .rules-editor-row,
+            .rules-editor-food-row,
+            .rules-editor-row:not(:has(.rules-editor-delete-btn)) {
+                grid-template-columns: 1fr;
+            }
+
+            .rules-editor-delete-btn {
+                width: 100%;
+            }
+
+            .rules-editor-actions {
+                grid-template-columns: 1fr;
+                padding: 14px;
             }
 
             .food-restrictions-ai-row,

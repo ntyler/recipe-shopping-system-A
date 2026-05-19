@@ -36,6 +36,7 @@ from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_
 from PushShoppingList.services.recipe_extract_service import recipe_scaling_from_data
 from PushShoppingList.services.recipe_extract_service import scaling_multiplier_label
 from PushShoppingList.services.product_selection_service import product_choices_by_item
+from PushShoppingList.services.rules_display_service import load_rules_display
 from PushShoppingList.services.shopping_list_service import load_items
 from PushShoppingList.services.shopping_list_service import save_items
 from PushShoppingList.services.store_settings_service import load_store_settings
@@ -903,6 +904,7 @@ def index():
         normalize=normalize,
         is_section_header=is_section_header,
         food_rules=load_food_rules(),
+        rules_display=load_rules_display(),
         food_rule_status=shopping_item_food_rule_status,
         app_css_version=static_asset_version("css/app.css"),
         app_js_version=static_asset_version("js/app.js"),
