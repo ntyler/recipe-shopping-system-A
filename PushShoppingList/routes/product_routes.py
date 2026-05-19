@@ -5,6 +5,8 @@ from flask import request
 
 from PushShoppingList.services.food_rules_service import annotate_product_food_rules
 from PushShoppingList.services.food_rules_service import load_food_rules
+from PushShoppingList.services.food_rules_service import suggest_food_rules_from_prompt
+from PushShoppingList.services.food_rules_service import update_food_rules
 from PushShoppingList.services.product_selection_service import clear_product_choices
 from PushShoppingList.services.product_selection_service import grab_best_products
 from PushShoppingList.services.product_selection_service import normalize_item_key
@@ -27,6 +29,37 @@ def api_products():
         "food_rules": load_food_rules(),
         "products": annotated_products,
     })
+
+
+@product_bp.route("/api/food_rules")
+def api_food_rules_route():
+    return jsonify({
+        "ok": True,
+        "food_rules": load_food_rules(),
+    })
+
+
+@product_bp.route("/api/food_rules", methods=["POST"])
+def api_save_food_rules_route():
+    data = request.get_json(silent=True) or {}
+    rules = update_food_rules(data.get("food_rules", data))
+
+    return jsonify({
+        "ok": True,
+        "food_rules": rules,
+    })
+
+
+@product_bp.route("/api/food_rules/suggest", methods=["POST"])
+def api_suggest_food_rules_route():
+    data = request.get_json(silent=True) or {}
+    result = suggest_food_rules_from_prompt(
+        data.get("prompt", ""),
+        data.get("food_rules"),
+    )
+    status = 200 if result.get("ok") else 400
+
+    return jsonify(result), status
 
 
 @product_bp.route("/preview_grab_best_products", methods=["POST"])

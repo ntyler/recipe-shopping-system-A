@@ -393,6 +393,213 @@ async function selectProductAlternative(button) {
     return false;
 }
 
+function setFoodRestrictionsStatus(message, isError = false) {
+    const status = document.getElementById("foodRestrictionsStatus");
+
+    if (status) {
+        status.textContent = message || "";
+        status.classList.toggle("error", Boolean(isError));
+    }
+}
+
+function addFoodRuleRow(section, rule = {}) {
+    const list = document.querySelector(`[data-food-rules-list="${section}"]`);
+
+    if (!list) {
+        return false;
+    }
+
+    list.appendChild(buildFoodRuleRow(section, rule));
+    return false;
+}
+
+function buildFoodRuleRow(section, rule = {}) {
+    const row = document.createElement("div");
+    row.className = "food-restriction-edit-row";
+    row.dataset.foodRuleRow = "1";
+
+    const label = rule.label || "";
+    const terms = Array.isArray(rule.terms)
+        ? rule.terms.join(", ")
+        : (rule.terms || "");
+    const ariaLabel = section === "require"
+        ? "Remove required food rule"
+        : "Remove avoid food rule";
+
+    row.innerHTML = `
+        <label>
+            <span>Label</span>
+            <input type="text" data-food-rule-label value="${escapeAttribute(label)}">
+        </label>
+        <label>
+            <span>Terms</span>
+            <textarea rows="2" data-food-rule-terms>${escapeHtml(terms)}</textarea>
+        </label>
+        <button type="button"
+                class="food-restriction-delete-btn"
+                onclick="removeFoodRuleRow(this)"
+                aria-label="${escapeAttribute(ariaLabel)}">
+            X
+        </button>
+    `;
+
+    return row;
+}
+
+function removeFoodRuleRow(button) {
+    const row = button ? button.closest("[data-food-rule-row]") : null;
+
+    if (row) {
+        row.remove();
+        setFoodRestrictionsStatus("Unsaved changes.");
+    }
+
+    return false;
+}
+
+function collectFoodRestrictions() {
+    const rules = {
+        require: [],
+        avoid: [],
+    };
+
+    document.querySelectorAll("[data-food-rules-list]").forEach(list => {
+        const section = list.dataset.foodRulesList;
+
+        if (!rules[section]) {
+            return;
+        }
+
+        list.querySelectorAll("[data-food-rule-row]").forEach(row => {
+            const labelInput = row.querySelector("[data-food-rule-label]");
+            const termsInput = row.querySelector("[data-food-rule-terms]");
+            const label = labelInput ? labelInput.value.trim() : "";
+            const terms = splitFoodRestrictionTerms(termsInput ? termsInput.value : "");
+
+            if (label && terms.length) {
+                rules[section].push({ label, terms });
+            }
+        });
+    });
+
+    return rules;
+}
+
+function splitFoodRestrictionTerms(value) {
+    const seen = new Set();
+
+    return String(value || "")
+        .split(/[,;\n]+/)
+        .map(term => term.trim().toLowerCase().replace(/\s+/g, " "))
+        .filter(term => {
+            if (!term || seen.has(term)) {
+                return false;
+            }
+
+            seen.add(term);
+            return true;
+        });
+}
+
+async function saveFoodRestrictions(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = form ? form.querySelector(".food-restrictions-save-btn") : null;
+    const originalText = button ? button.textContent : "";
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Saving...";
+    }
+
+    setFoodRestrictionsStatus("Saving food restrictions...");
+
+    try {
+        const response = await fetch("/api/food_rules", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "fetch",
+            },
+            body: JSON.stringify({
+                food_rules: collectFoodRestrictions(),
+            }),
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to save food restrictions.");
+        }
+
+        await refreshStoreMarkup({ cacheBust: true });
+        showRecipeQuantityUpdatedMessage("", "", "", "Food restrictions saved.");
+    } catch (err) {
+        console.warn("Unable to save food restrictions.", err);
+        setFoodRestrictionsStatus(err.message || "Unable to save food restrictions.", true);
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = originalText || "Save Food Restrictions";
+        }
+    }
+
+    return false;
+}
+
+async function addFoodRestrictionsWithChatGPT(button) {
+    const promptInput = document.getElementById("foodRestrictionsPrompt");
+    const prompt = promptInput ? promptInput.value.trim() : "";
+    const originalText = button ? button.textContent : "";
+
+    if (!prompt) {
+        setFoodRestrictionsStatus("Enter a food restriction prompt.", true);
+        return false;
+    }
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Adding...";
+    }
+
+    setFoodRestrictionsStatus("Asking ChatGPT...");
+
+    try {
+        const response = await fetch("/api/food_rules/suggest", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "fetch",
+            },
+            body: JSON.stringify({
+                prompt,
+                food_rules: collectFoodRestrictions(),
+            }),
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to add food restrictions.");
+        }
+
+        if (promptInput) {
+            promptInput.value = "";
+        }
+
+        await refreshStoreMarkup({ cacheBust: true });
+        showRecipeQuantityUpdatedMessage("", "", "", "Food restrictions added.");
+    } catch (err) {
+        console.warn("Unable to add food restrictions with ChatGPT.", err);
+        setFoodRestrictionsStatus(err.message || "Unable to add food restrictions.", true);
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = originalText || "Add with ChatGPT";
+        }
+    }
+
+    return false;
+}
+
 function openRecipeMediaUpload() {
     const input = document.getElementById("recipeMediaUploadInput");
 
@@ -952,7 +1159,7 @@ async function saveAllRecipeQuantities(button) {
         });
 
     if (!inputs.length) {
-        showRecipeQuantityUpdatedMessage("", "", "", "No scaling multipliers changed.");
+        showRecipeQuantityUpdatedMessage("", "", "", "No recipe amounts changed.");
         return false;
     }
 
@@ -961,14 +1168,14 @@ async function saveAllRecipeQuantities(button) {
 
     if (button) {
         button.disabled = true;
-        button.textContent = "Saving Scaling...";
+        button.textContent = "Saving...";
     }
 
     let failedCount = 0;
 
     try {
         for (const [index, input] of inputs.entries()) {
-            updateRecipeQuantityProgressItem(index, "running", "Updating scaling multiplier...");
+            updateRecipeQuantityProgressItem(index, "running", "Updating recipe amount...");
 
             try {
                 await saveRecipeQuantity(input, {
@@ -991,26 +1198,26 @@ async function saveAllRecipeQuantities(button) {
             setRecipeQuantityProgressSummary(
                 failedCount
                     ? `Finished with ${failedCount} failed update(s).`
-                    : "All scaling multipliers updated."
+                    : "All recipe amounts updated."
             );
         } catch (refreshErr) {
-            console.warn("Unable to refresh recipe scaling multipliers in the background.", refreshErr);
-            setRecipeQuantityProgressSummary("Scaling multipliers saved, but the page refresh failed.");
+            console.warn("Unable to refresh recipe amounts in the background.", refreshErr);
+            setRecipeQuantityProgressSummary("Recipe amounts saved, but the page refresh failed.");
         }
 
         showRecipeQuantityUpdatedMessage(
             "",
             "",
             "",
-            failedCount ? "Some scaling multipliers failed." : "Scaling multipliers updated."
+            failedCount ? "Some recipe amounts failed." : "Recipe amounts updated."
         );
     } catch (err) {
-        console.warn("Unable to save recipe scaling multipliers.", err);
-        setRecipeQuantityProgressSummary("Unable to save scaling multipliers.");
+        console.warn("Unable to save recipe amounts.", err);
+        setRecipeQuantityProgressSummary("Unable to save recipe amounts.");
     } finally {
         if (button) {
             button.disabled = false;
-            button.textContent = "Save Scaling Multiplier";
+            button.textContent = "Save";
         }
     }
 
@@ -1083,10 +1290,10 @@ function showRecipeQuantityProgressOverlay(items) {
         overlay.innerHTML = `
             <div class="recipe-qty-progress-card" role="dialog" aria-modal="true" aria-labelledby="recipeQtyProgressTitle">
                 <div class="recipe-qty-progress-header">
-                    <h2 id="recipeQtyProgressTitle">Updating Scaling Multiplier</h2>
+                    <h2 id="recipeQtyProgressTitle">Updating Recipe Amounts</h2>
                     <button type="button" class="recipe-qty-progress-close" onclick="hideRecipeQuantityProgressOverlay()">Hide</button>
                 </div>
-                <div id="recipeQtyProgressSummary" class="recipe-qty-progress-summary">Starting scaling multiplier updates...</div>
+                <div id="recipeQtyProgressSummary" class="recipe-qty-progress-summary">Starting recipe amount updates...</div>
                 <div id="recipeQtyProgressList" class="recipe-qty-progress-list"></div>
             </div>
         `;
@@ -1099,14 +1306,14 @@ function showRecipeQuantityProgressOverlay(items) {
             <div class="recipe-qty-progress-row" data-progress-index="${index}">
                 <div class="recipe-qty-progress-main">
                     <div class="recipe-qty-progress-name">${escapeHtml(item.label)}</div>
-                    <div class="recipe-qty-progress-qty">Scaling Multiplier ${escapeHtml(item.previousQty)} -> ${escapeHtml(item.nextQty)}</div>
+                    <div class="recipe-qty-progress-qty">${escapeHtml(item.previousQty)} -> ${escapeHtml(item.nextQty)}</div>
                 </div>
                 <div class="recipe-qty-progress-status waiting">Waiting</div>
             </div>
         `).join("");
     }
 
-    setRecipeQuantityProgressSummary("Starting scaling multiplier updates...");
+    setRecipeQuantityProgressSummary("Starting recipe amount updates...");
     overlay.classList.add("open");
     overlay.setAttribute("aria-hidden", "false");
     document.body.classList.add("modal-open");
@@ -2619,7 +2826,7 @@ function buildRecipeSaveProgressItems(recipe) {
     });
 
     if (previous.scaling.selected_multiplier !== next.scaling.selected_multiplier) {
-        detailLines.push(`Scaling multiplier: ${previous.scaling.selected_multiplier || "1"}x -> ${next.scaling.selected_multiplier || "1"}x`);
+        detailLines.push(`Recipe amount: ${previous.scaling.selected_multiplier || "1"}x -> ${next.scaling.selected_multiplier || "1"}x`);
     }
 
     const ingredientLines = changedRecipeIngredientLines(previous.ingredients, next.ingredients);
@@ -2954,7 +3161,7 @@ async function saveRecipeQuantity(input, options = {}) {
                 url,
                 formatRecipeScaleMultiplierLabel(quantity),
                 input.dataset.recipeNumber || "",
-                `${input.dataset.recipeNumber ? `Recipe ${input.dataset.recipeNumber} ` : ""}Scaling multiplier updated to ${formatRecipeScaleMultiplierLabel(quantity)}.`
+                `${input.dataset.recipeNumber ? `Recipe ${input.dataset.recipeNumber} ` : ""}amount updated to ${formatRecipeScaleMultiplierLabel(quantity)}.`
             );
         }
 
@@ -3078,7 +3285,7 @@ function openItemQtyEditor(button) {
     if (titleNameDisplay) {
         titleNameDisplay.textContent = itemName ? itemName : "";
     }
-    currentDisplay.textContent = currentQty || "No scaling multiplier found.";
+    currentDisplay.textContent = currentQty || "No recipe amount found.";
     currentDisplay.classList.toggle("muted", !currentQty);
     renderItemQtySources(sourcesDisplay, button.dataset.recipeQtySources, button.dataset.itemKey || "");
 
@@ -3111,7 +3318,7 @@ function renderItemQtySources(container, sourcesJson, itemKey = "") {
 
     const header = document.createElement("div");
     header.className = "item-qty-source-header";
-    ["Recipe", "Default qty", "Unit", "Scaling Multiplier"].forEach(text => {
+    ["Recipe", "Default qty", "Unit", "Amount"].forEach(text => {
         const cell = document.createElement("span");
         cell.textContent = text;
         header.appendChild(cell);
@@ -3279,8 +3486,8 @@ async function saveItemModalRecipeQuantity(input) {
         normalizeRecipeQuantityInput(input);
         data = await saveRecipeQuantity(input, { throwOnError: true });
     } catch (err) {
-        console.warn("Unable to save scaling multiplier from item modal.", err);
-        alert("Unable to save scaling multiplier.");
+        console.warn("Unable to save recipe amount from item modal.", err);
+        alert("Unable to save recipe amount.");
         return;
     }
 
@@ -3309,7 +3516,7 @@ function syncOpenItemQtyEditor(itemKey) {
     }
 
     const currentQty = sourceButton.dataset.currentQty || "";
-    currentDisplay.textContent = currentQty || "No scaling multiplier found.";
+    currentDisplay.textContent = currentQty || "No recipe amount found.";
     currentDisplay.classList.toggle("muted", !currentQty);
     renderItemQtySources(sourcesDisplay, sourceButton.dataset.recipeQtySources, itemKey);
 }
@@ -4104,6 +4311,8 @@ async function refreshStoreMarkup(options = {}) {
     replaceSectionFromPage(nextPage, "#editItemsSection");
     replaceSectionFromPage(nextPage, "#storeOptionsSection");
     const recipeLogWasRefreshed = replaceSectionFromPage(nextPage, "#currentRecipeUrlLogCard");
+    replaceSectionFromPage(nextPage, "#foodRestrictionsCard");
+    replaceSectionFromPage(nextPage, "#rulesCard");
     replaceSectionFromPage(nextPage, "#sectionView");
     replaceSectionFromPage(nextPage, "#storeView");
     replaceSectionFromPage(nextPage, "#recipeView");

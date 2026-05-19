@@ -1413,6 +1413,69 @@ body {
             margin-top: 12px;
         }
 
+        .food-restrictions-editor {
+            display: grid;
+            gap: 12px;
+        }
+
+        .food-restrictions-ai {
+            display: grid;
+            gap: 8px;
+        }
+
+        .food-restrictions-ai > label,
+        .food-restriction-edit-row label span {
+            color: #ddd;
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .food-restrictions-ai-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 170px;
+            gap: 10px;
+            align-items: stretch;
+        }
+
+        .food-restrictions-ai textarea,
+        .food-restriction-edit-row input,
+        .food-restriction-edit-row textarea {
+            width: 100%;
+            min-width: 0;
+            margin: 0;
+            border: 1px solid #555;
+            border-radius: 6px;
+            background: #181818;
+            color: #fff;
+            font: inherit;
+        }
+
+        .food-restrictions-ai textarea,
+        .food-restriction-edit-row textarea {
+            resize: vertical;
+        }
+
+        .food-restrictions-ai-btn,
+        .food-restriction-small-btn {
+            width: auto;
+            min-width: 0;
+            margin: 0;
+            background: #155999;
+        }
+
+        .food-restrictions-status {
+            min-height: 18px;
+            color: #7dd3fc;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .food-restrictions-status.error {
+            color: #ffb4b4;
+        }
+
         .food-restrictions-grid {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1427,14 +1490,87 @@ body {
             background: #181818;
         }
 
+        .food-restriction-group-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
         .food-restriction-group h3 {
+            margin: 0;
+            color: #00ff99;
+            font-size: 15px;
+            letter-spacing: 0;
+        }
+
+        .food-restriction-edit-list {
+            display: grid;
+            gap: 8px;
+        }
+
+        .food-restriction-edit-row {
+            display: grid;
+            grid-template-columns: minmax(120px, 0.85fr) minmax(0, 1.15fr) 42px;
+            gap: 10px;
+            align-items: end;
+            padding: 10px;
+            border: 1px solid #2d2d2d;
+            border-radius: 8px;
+            background: #111;
+        }
+
+        .food-restriction-edit-row label {
+            display: grid;
+            gap: 6px;
+            min-width: 0;
+        }
+
+        .food-restriction-delete-btn {
+            width: 42px;
+            min-width: 42px;
+            height: 42px;
+            margin: 0;
+            padding: 0;
+            border-radius: 7px;
+            background: #b00000;
+            font-size: 18px;
+            font-weight: 900;
+        }
+
+        .food-restrictions-save-btn {
+            margin-top: 0;
+            background: #107C10;
+        }
+
+        #rulesCard .rules-content {
+            margin-top: 12px;
+        }
+
+        .rules-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .rules-group {
+            min-width: 0;
+            padding: 12px;
+            border: 1px solid #2d2d2d;
+            border-radius: 8px;
+            background: #181818;
+        }
+
+        .rules-group h3 {
             margin: 0 0 10px 0;
             color: #00ff99;
             font-size: 15px;
             letter-spacing: 0;
         }
 
-        .food-restriction-list {
+        .rules-list,
+        .rules-chip-list {
             display: grid;
             gap: 8px;
             margin: 0;
@@ -1442,34 +1578,70 @@ body {
             list-style: none;
         }
 
-        .food-restriction-list li {
+        .rules-list li {
             display: grid;
-            grid-template-columns: minmax(150px, 0.8fr) minmax(0, 1.2fr);
+            grid-template-columns: minmax(120px, 0.75fr) minmax(0, 1.25fr);
             gap: 10px;
             align-items: start;
             padding-bottom: 8px;
             border-bottom: 1px solid #2d2d2d;
         }
 
-        .food-restriction-list li:last-child {
+        .rules-list li:last-child {
             padding-bottom: 0;
             border-bottom: 0;
         }
 
-        .food-restriction-label {
+        .rules-label {
             color: #fff;
             font-weight: 800;
             overflow-wrap: anywhere;
         }
 
-        .food-restriction-terms {
-            color: #aaa;
+        .rules-value {
+            color: #cfcfcf;
             font-size: 13px;
             line-height: 1.35;
             overflow-wrap: anywhere;
         }
 
-        .food-restriction-empty {
+        .rules-subgroup + .rules-subgroup {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #2d2d2d;
+        }
+
+        .rules-subtitle {
+            margin-bottom: 8px;
+            color: #7dd3fc;
+            font-size: 12px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .rules-chip-list li {
+            display: grid;
+            gap: 4px;
+            padding: 8px;
+            border: 1px solid #2d2d2d;
+            border-radius: 7px;
+            background: #111;
+        }
+
+        .rules-chip-list span {
+            color: #fff;
+            font-weight: 800;
+            overflow-wrap: anywhere;
+        }
+
+        .rules-chip-list small {
+            color: #aaa;
+            line-height: 1.35;
+            overflow-wrap: anywhere;
+        }
+
+        .rules-empty {
             margin: 0;
             color: #aaa;
             font-size: 13px;
@@ -3814,9 +3986,22 @@ body {
                 grid-template-columns: 1fr;
             }
 
-            .food-restriction-list li {
+            .rules-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .rules-list li {
                 grid-template-columns: 1fr;
                 gap: 4px;
+            }
+
+            .food-restrictions-ai-row,
+            .food-restriction-edit-row {
+                grid-template-columns: 1fr;
+            }
+
+            .food-restriction-delete-btn {
+                width: 100%;
             }
 
             .recipe-url-summary-row {

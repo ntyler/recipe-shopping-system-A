@@ -4,7 +4,7 @@
             data-collapse-toggle="food-restrictions"
             aria-expanded="true"
             onclick="toggleCardCollapse('food-restrictions')">
-        <span>Food Rescrictions</span>
+        <span>Food Restrictions</span>
         <span class="card-collapse-icon" data-collapse-icon="food-restrictions">Hide ^</span>
     </button>
 
@@ -15,42 +15,95 @@
         {% set required_rules = food_rules.require if food_rules else [] %}
         {% set avoid_rules = food_rules.avoid if food_rules else [] %}
 
-        {% if required_rules or avoid_rules %}
+        <form id="foodRestrictionsEditor" class="food-restrictions-editor" onsubmit="return saveFoodRestrictions(event);">
+            <div class="food-restrictions-ai">
+                <label for="foodRestrictionsPrompt">ChatGPT Prompt</label>
+                <div class="food-restrictions-ai-row">
+                    <textarea id="foodRestrictionsPrompt"
+                              rows="2"
+                              placeholder="Add a food restriction"></textarea>
+                    <button type="button"
+                            class="food-restrictions-ai-btn"
+                            onclick="addFoodRestrictionsWithChatGPT(this)">
+                        Add with ChatGPT
+                    </button>
+                </div>
+                <div id="foodRestrictionsStatus" class="food-restrictions-status" aria-live="polite"></div>
+            </div>
+
             <div class="food-restrictions-grid">
                 <section class="food-restriction-group">
-                    <h3>Required</h3>
-                    {% if required_rules %}
-                        <ul class="food-restriction-list">
-                            {% for rule in required_rules %}
-                                <li>
-                                    <span class="food-restriction-label">{{ rule.label }}</span>
-                                    <span class="food-restriction-terms">{{ rule.terms | join(", ") }}</span>
-                                </li>
-                            {% endfor %}
-                        </ul>
-                    {% else %}
-                        <p class="food-restriction-empty">No required food rules.</p>
-                    {% endif %}
+                    <div class="food-restriction-group-header">
+                        <h3>Required</h3>
+                        <button type="button"
+                                class="food-restriction-small-btn"
+                                onclick="addFoodRuleRow('require')">
+                            Add Required
+                        </button>
+                    </div>
+                    <div id="foodRulesRequireRows"
+                         class="food-restriction-edit-list"
+                         data-food-rules-list="require">
+                        {% for rule in required_rules %}
+                            <div class="food-restriction-edit-row" data-food-rule-row>
+                                <label>
+                                    <span>Label</span>
+                                    <input type="text"
+                                           data-food-rule-label
+                                           value="{{ rule.label }}">
+                                </label>
+                                <label>
+                                    <span>Terms</span>
+                                    <textarea rows="2" data-food-rule-terms>{{ rule.terms | join(", ") }}</textarea>
+                                </label>
+                                <button type="button"
+                                        class="food-restriction-delete-btn"
+                                        onclick="removeFoodRuleRow(this)"
+                                        aria-label="Remove required food rule">
+                                    X
+                                </button>
+                            </div>
+                        {% endfor %}
+                    </div>
                 </section>
 
                 <section class="food-restriction-group">
-                    <h3>Avoid</h3>
-                    {% if avoid_rules %}
-                        <ul class="food-restriction-list">
-                            {% for rule in avoid_rules %}
-                                <li>
-                                    <span class="food-restriction-label">{{ rule.label }}</span>
-                                    <span class="food-restriction-terms">{{ rule.terms | join(", ") }}</span>
-                                </li>
-                            {% endfor %}
-                        </ul>
-                    {% else %}
-                        <p class="food-restriction-empty">No avoid food rules.</p>
-                    {% endif %}
+                    <div class="food-restriction-group-header">
+                        <h3>Avoid</h3>
+                        <button type="button"
+                                class="food-restriction-small-btn"
+                                onclick="addFoodRuleRow('avoid')">
+                            Add Avoid
+                        </button>
+                    </div>
+                    <div id="foodRulesAvoidRows"
+                         class="food-restriction-edit-list"
+                         data-food-rules-list="avoid">
+                        {% for rule in avoid_rules %}
+                            <div class="food-restriction-edit-row" data-food-rule-row>
+                                <label>
+                                    <span>Label</span>
+                                    <input type="text"
+                                           data-food-rule-label
+                                           value="{{ rule.label }}">
+                                </label>
+                                <label>
+                                    <span>Terms</span>
+                                    <textarea rows="2" data-food-rule-terms>{{ rule.terms | join(", ") }}</textarea>
+                                </label>
+                                <button type="button"
+                                        class="food-restriction-delete-btn"
+                                        onclick="removeFoodRuleRow(this)"
+                                        aria-label="Remove avoid food rule">
+                                    X
+                                </button>
+                            </div>
+                        {% endfor %}
+                    </div>
                 </section>
             </div>
-        {% else %}
-            <div class="log-box">No food restrictions are currently saved.</div>
-        {% endif %}
+
+            <button type="submit" class="food-restrictions-save-btn">Save Food Restrictions</button>
+        </form>
     </div>
 </div>

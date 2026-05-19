@@ -1,10 +1,15 @@
 import json
+import os
 import re
 from pathlib import Path
+
+from openai import OpenAI
 
 
 BASE_DIR = Path(__file__).resolve().parent
 FOOD_RULES_FILE = BASE_DIR / "recipe-extractor" / "data" / "food_rules.json"
+MODEL = os.getenv("OPENAI_FOOD_RULES_MODEL", os.getenv("OPENAI_RECIPE_MODEL", "gpt-4o-mini"))
+client = None
 
 DEFAULT_FOOD_RULES = {
     "require": [
@@ -97,6 +102,15 @@ DEFAULT_FOOD_RULES = {
 FOOD_RULES_FILE.parent.mkdir(parents=True, exist_ok=True)
 
 
+def get_openai_client():
+    global client
+
+    if client is None:
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), timeout=30)
+
+    return client
+
+
 def load_food_rules():
     if not FOOD_RULES_FILE.exists():
         save_food_rules(DEFAULT_FOOD_RULES)
@@ -110,17 +124,112 @@ def load_food_rules():
     if not isinstance(data, dict):
         return deepcopy_rules(DEFAULT_FOOD_RULES)
 
-    return {
-        "require": normalize_rule_list(data.get("require")),
-        "avoid": normalize_rule_list(data.get("avoid")),
-    }
+    return normalize_food_rules(data)
 
 
 def save_food_rules(rules):
+    normalized = normalize_food_rules(rules)
     FOOD_RULES_FILE.write_text(
-        json.dumps(rules, indent=2, ensure_ascii=False),
+        json.dumps(normalized, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
+    return normalized
+
+
+def update_food_rules(rules):
+    return save_food_rules(rules)
+
+
+def suggest_food_rules_from_prompt(prompt, current_rules=None):
+    prompt = str(prompt or "").strip()
+
+    if not prompt:
+        return {
+            "ok": False,
+            "error": "Enter a food restriction prompt.",
+        }
+
+    if not os.getenv("OPENAI_API_KEY"):
+        return {
+            "ok": False,
+            "error": "Missing OPENAI_API_KEY environment variable.",
+        }
+
+    current_rules = normalize_food_rules(current_rules) if current_rules is not None else load_food_rules()
+
+    try:
+        response = get_openai_client().chat.completions.create(
+            model=MODEL,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You convert food preference text into grocery product restriction rules. "
+                        "Return only valid JSON."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": build_food_rule_prompt(prompt, current_rules),
+                },
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.1,
+        )
+        data = json.loads(clean_json_response(response.choices[0].message.content))
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": f"Unable to add food restrictions with ChatGPT API: {exc}",
+        }
+
+    additions = normalize_food_rules(data)
+
+    if not additions["require"] and not additions["avoid"]:
+        return {
+            "ok": False,
+            "error": "ChatGPT did not return any usable food restriction rules.",
+        }
+
+    merged = merge_food_rules(current_rules, additions)
+    saved = save_food_rules(merged)
+
+    return {
+        "ok": True,
+        "food_rules": saved,
+        "added": additions,
+    }
+
+
+def build_food_rule_prompt(prompt, current_rules):
+    return f"""
+Add food restriction rules from this user request:
+{prompt}
+
+Existing rules:
+{json.dumps(current_rules, ensure_ascii=False)}
+
+Use this meaning:
+- require: product qualities that must be present, such as organic or gluten free.
+- avoid: ingredients, additives, or wording that should reject a product.
+
+Rules:
+- Create short labels, for example "no carrageenan" or "must be organic".
+- Terms must be lowercase product-label search terms.
+- Include common label variants and synonyms only when they are directly relevant.
+- Do not duplicate an existing rule.
+- Return ONLY valid JSON.
+
+Output shape:
+{{
+  "require": [
+    {{"label": "must be ...", "terms": ["..."]}}
+  ],
+  "avoid": [
+    {{"label": "no ...", "terms": ["...", "..."]}}
+  ]
+}}
+"""
 
 
 def product_matches_food_rules(product):
@@ -236,16 +345,85 @@ def normalize_rule_list(value):
             continue
 
         label = str(rule.get("label", "") or "").strip()
-        terms = [
-            str(term).strip().lower()
-            for term in rule.get("terms", [])
-            if str(term).strip()
-        ]
+        terms = normalize_rule_terms(rule.get("terms", []))
 
         if label and terms:
             normalized.append({"label": label, "terms": terms})
 
     return normalized
+
+
+def normalize_food_rules(rules):
+    rules = rules if isinstance(rules, dict) else {}
+    require_rules = rules.get("require", rules.get("required", rules.get("must_have")))
+    avoid_rules = rules.get("avoid", rules.get("avoids", rules.get("avoid_rules")))
+
+    return {
+        "require": normalize_rule_list(require_rules),
+        "avoid": normalize_rule_list(avoid_rules),
+    }
+
+
+def merge_food_rules(current_rules, additions):
+    merged = normalize_food_rules(current_rules)
+    additions = normalize_food_rules(additions)
+
+    for section in ("require", "avoid"):
+        for rule in additions[section]:
+            merge_food_rule(merged[section], rule)
+
+    return merged
+
+
+def merge_food_rule(existing_rules, incoming_rule):
+    incoming_label = normalize_rule_label(incoming_rule.get("label"))
+    incoming_terms = normalize_rule_terms(incoming_rule.get("terms"))
+
+    if not incoming_label or not incoming_terms:
+        return
+
+    for rule in existing_rules:
+        existing_label = normalize_rule_label(rule.get("label"))
+        existing_terms = set(normalize_rule_terms(rule.get("terms")))
+
+        if existing_label == incoming_label or existing_terms == set(incoming_terms):
+            rule["terms"] = sorted(existing_terms | set(incoming_terms))
+            return
+
+    existing_rules.append({
+        "label": incoming_rule["label"],
+        "terms": incoming_terms,
+    })
+
+
+def normalize_rule_label(value):
+    return " ".join(str(value or "").strip().lower().split())
+
+
+def normalize_rule_terms(value):
+    if isinstance(value, str):
+        parts = re.split(r"[,;\n]+", value)
+    elif isinstance(value, list):
+        parts = value
+    else:
+        parts = []
+
+    terms = []
+    seen = set()
+    for part in parts:
+        term = " ".join(str(part or "").strip().lower().split())
+        if term and term not in seen:
+            seen.add(term)
+            terms.append(term)
+
+    return terms
+
+
+def clean_json_response(text):
+    value = str(text or "").strip()
+    value = re.sub(r"^```(?:json)?", "", value, flags=re.IGNORECASE).strip()
+    value = re.sub(r"```$", "", value).strip()
+    return value
 
 
 def deepcopy_rules(rules):
