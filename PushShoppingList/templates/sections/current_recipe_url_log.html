@@ -36,11 +36,10 @@
                             </button>
                         {% endif %}
                         <div class="recipe-quantity-control recipe-url-summary-quantity">
-                            <span>Scaling Multiplier</span>
                             <select class="recipe-quantity-input recipe-scaling-select"
                                     data-recipe-number="{{ loop.index }}"
                                     data-recipe-url="{{ recipe.url }}"
-                                    aria-label="Recipe {{ loop.index }} scaling multiplier">
+                                    aria-label="Recipe {{ loop.index }} amount">
                                 {% for option in recipe.scaling_options %}
                                     <option value="{{ option.value }}"
                                             {% if option.selected %}selected{% endif %}>
@@ -80,7 +79,7 @@
             <button type="button"
                     class="save-recipe-qty-btn recipe-url-summary-save-qty"
                     onclick="saveAllRecipeQuantities(this)">
-                Save Scaling Multiplier
+                Save
             </button>
             <button type="button"
                     class="create-recipe-btn recipe-url-summary-create"
@@ -132,7 +131,7 @@
                     <input type="text" name="servings" id="recipeEditServings">
                 </label>
                 <label>
-                    <span>Scaling Multiplier</span>
+                    <span>Recipe Amount</span>
                     <select name="scaling_multiplier"
                             id="recipeEditScaleMultiplier"
                             onchange="applyRecipeScaleMultiplier(this)"></select>
