@@ -39,6 +39,19 @@ REQUEST_HEADERS = {
 PRICE_PATTERN = re.compile(r"\$\s*\d+(?:,\d{3})*(?:\.\d{2})?")
 PRODUCT_PROGRESS_LOCK = threading.RLock()
 PRODUCT_FINAL_STATES = {"done", "failed", "skipped", "cancelled"}
+PRODUCT_BROWSER_FETCH_LOCK = threading.BoundedSemaphore(1)
+PACKAGE_SIZE_PATTERN = re.compile(
+    r"(?<![\w.])(?:\d+\s*/\s*\d+|\d+(?:\.\d+)?)(?:\s*[-\u2013]\s*(?:\d+\s*/\s*\d+|\d+(?:\.\d+)?))?\s*"
+    r"(?:fl\s*oz|fluid\s*ounces?|ounces?|oz|pounds?|lbs?|lb|grams?|g|kilograms?|kg|milliliters?|ml|liters?|l|"
+    r"count|ct|pack|pk|each|ea)\b",
+    re.IGNORECASE,
+)
+UNIT_PRICE_PATTERN = re.compile(
+    r"\$\s*(\d+(?:\.\d{1,2})?)\s*(?:/|per)\s*"
+    r"(fl\s*oz|fluid\s*ounce|ounce|oz|pound|lb|gram|g|kg|count|ct|each|ea|piece|pc)\b",
+    re.IGNORECASE,
+)
+DETAIL_REQUIRED = os.getenv("PRODUCT_REQUIRE_DETAIL_PAGE", "1") != "0"
 
 
 def product_worker_count(total_downloads=None):
@@ -53,6 +66,15 @@ def product_worker_count(total_downloads=None):
         return max(1, min(configured, int(total_downloads)))
 
     return configured
+
+
+def product_detail_limit():
+    try:
+        configured = int(os.getenv("PRODUCT_DETAIL_LIMIT_PER_STORE", "8"))
+    except (TypeError, ValueError):
+        configured = 8
+
+    return max(1, min(16, configured))
 
 
 def new_product_job_id():
@@ -472,16 +494,34 @@ def search_store_products_for_download(
         candidates = []
         skip_reasons = [f"{store_name}: product search failed: {exc}"]
 
-    direct_count = sum(
+    if candidates:
+        candidates = enrich_product_candidates_from_pages(
+            candidates,
+            ingredient,
+            store_name,
+            job_id=job_id,
+            progress_index=index,
+        )
+
+    raw_direct_count = sum(
         1
         for candidate in candidates
         if candidate.get("source") != "search-page-fallback"
     )
+    direct_count = sum(
+        1
+        for candidate in candidates
+        if candidate.get("source") != "search-page-fallback" and candidate.get("detail_evaluated")
+    )
+    detail_failed_count = max(0, raw_direct_count - direct_count)
     failed = any("product search failed" in str(reason).lower() for reason in skip_reasons)
 
     if direct_count:
         state = "done"
-        message = f"Downloaded {direct_count} product candidate(s) from {store_name}."
+        message = f"Opened and evaluated {direct_count} full product page(s) from {store_name}."
+    elif detail_failed_count:
+        state = "failed"
+        message = f"Found {detail_failed_count} product link(s), but no full product page could be evaluated."
     elif failed:
         state = "failed"
         message = skip_reasons[0] if skip_reasons else f"{store_name}: product search failed."
@@ -562,6 +602,11 @@ def build_product_choice_record(
             home_location,
             store_location,
         )
+        store_candidates = enrich_product_candidates_from_pages(
+            store_candidates,
+            ingredient,
+            store.get("label") or store_key.title(),
+        )
         candidates.extend(store_candidates)
         skip_reasons.extend(store_skips)
 
@@ -573,6 +618,533 @@ def build_product_choice_record(
         }],
         full_address,
     )
+
+
+def enrich_product_candidates_from_pages(
+    candidates,
+    ingredient,
+    store_name,
+    job_id=None,
+    progress_index=None,
+):
+    enriched = []
+    detail_candidates = [
+        candidate
+        for candidate in candidates
+        if candidate_needs_product_detail(candidate)
+    ]
+    limit = product_detail_limit()
+    detail_ids = {
+        candidate.get("id")
+        for candidate in detail_candidates[:limit]
+    }
+    total = min(len(detail_candidates), limit)
+    evaluated = 0
+
+    for candidate in candidates:
+        if not candidate_needs_product_detail(candidate):
+            enriched.append(mark_detail_skipped(candidate, "No direct product page URL was available."))
+            continue
+
+        if candidate.get("id") not in detail_ids:
+            enriched.append(mark_detail_skipped(
+                candidate,
+                f"Full product page was not evaluated because the per-store detail limit is {limit}.",
+            ))
+            continue
+
+        evaluated += 1
+        if job_id and progress_index is not None:
+            mark_product_download(
+                job_id,
+                progress_index,
+                "running",
+                f"Opening full {store_name} product page {evaluated} of {total}: {candidate.get('product_name', ingredient)}",
+            )
+
+        enriched.append(enrich_product_candidate_from_page(candidate, ingredient))
+
+    return enriched
+
+
+def candidate_needs_product_detail(candidate):
+    if candidate.get("source") == "search-page-fallback":
+        return False
+
+    product_url = str(candidate.get("product_url") or "").strip()
+    search_url = str(candidate.get("search_url") or "").strip()
+
+    return product_url.startswith(("http://", "https://")) and product_url != search_url
+
+
+def mark_detail_skipped(candidate, reason):
+    candidate["detail_evaluated"] = False
+    candidate["detail_fetch"] = {
+        "status": "skipped",
+        "method": "",
+        "url": candidate.get("product_url", ""),
+        "reason": reason,
+    }
+    candidate["skip_reasons"] = unique_texts(candidate.get("skip_reasons", []) + [reason])
+    return candidate
+
+
+def enrich_product_candidate_from_page(candidate, ingredient):
+    product_url = candidate.get("product_url", "")
+    fetch = fetch_product_page_html(product_url, candidate.get("product_name", ""))
+
+    candidate["detail_fetch"] = {
+        key: value
+        for key, value in fetch.items()
+        if key != "html"
+    }
+
+    html_text = fetch.get("html") or ""
+    if not html_text:
+        candidate["detail_evaluated"] = False
+        candidate["skip_reasons"] = unique_texts(
+            candidate.get("skip_reasons", [])
+            + [f"Full product page could not be evaluated: {fetch.get('error') or 'empty page content'}"]
+        )
+        return candidate
+
+    details = extract_product_details_from_html(html_text, fetch.get("final_url") or product_url, candidate)
+    apply_product_details_to_candidate(candidate, details, fetch, ingredient)
+    return candidate
+
+
+def fetch_product_page_html(product_url, expected_name=""):
+    result = {
+        "status": "failed",
+        "method": "requests",
+        "url": product_url,
+        "final_url": product_url,
+        "html": "",
+        "error": "",
+    }
+
+    try:
+        response = requests.get(
+            product_url,
+            headers=REQUEST_HEADERS,
+            timeout=(5, 12),
+        )
+        response.raise_for_status()
+        result["final_url"] = response.url or product_url
+        result["html"] = response.text or ""
+        result["status"] = "done"
+    except Exception as exc:
+        result["error"] = str(exc)
+
+    if (
+        result.get("html")
+        and product_page_html_looks_useful(result["html"], expected_name)
+    ):
+        result["text_length"] = len(BeautifulSoup(result["html"], "html.parser").get_text(" ", strip=True))
+        return result
+
+    if os.getenv("DISABLE_BROWSER_PRODUCT_FETCH") == "1":
+        if not result.get("html"):
+            return result
+
+        result["status"] = "done"
+        result["method"] = "requests"
+        result["warning"] = "Page content looked sparse, and browser product fetch is disabled."
+        return result
+
+    browser_result = fetch_product_page_html_with_browser(product_url, expected_name)
+    if browser_result.get("html"):
+        return browser_result
+
+    if result.get("html"):
+        result["status"] = "done"
+        result["warning"] = browser_result.get("error") or "Browser fallback did not return page content."
+        return result
+
+    result["error"] = result.get("error") or browser_result.get("error") or "No page content was returned."
+    return result
+
+
+def fetch_product_page_html_with_browser(product_url, expected_name=""):
+    result = {
+        "status": "failed",
+        "method": "browser",
+        "url": product_url,
+        "final_url": product_url,
+        "html": "",
+        "error": "",
+    }
+
+    with PRODUCT_BROWSER_FETCH_LOCK:
+        driver = None
+        try:
+            from PushShoppingList.services.recipe_extract_service import create_headless_chrome_driver
+            from PushShoppingList.services.recipe_extract_service import wait_for_browser_document
+
+            driver = create_headless_chrome_driver(
+                window_size="1365,1000",
+                prefer_undetected=True,
+                page_load_strategy="eager",
+            )
+            driver.get(product_url)
+            wait_for_browser_document(driver, timeout_seconds=14)
+
+            try:
+                driver.execute_script(
+                    """
+                    window.scrollTo(0, Math.floor(document.body.scrollHeight * 0.35));
+                    setTimeout(() => window.scrollTo(0, Math.floor(document.body.scrollHeight * 0.7)), 350);
+                    setTimeout(() => window.scrollTo(0, 0), 700);
+                    """
+                )
+                time.sleep(1.2)
+            except Exception:
+                pass
+
+            html_text = driver.page_source or ""
+            result["final_url"] = driver.current_url or product_url
+            result["html"] = html_text
+            result["status"] = "done" if html_text else "failed"
+            result["text_length"] = len(BeautifulSoup(html_text, "html.parser").get_text(" ", strip=True))
+
+            if html_text and not product_page_html_looks_useful(html_text, expected_name):
+                result["warning"] = "Browser-loaded page content looked sparse."
+        except Exception as exc:
+            result["error"] = str(exc)
+        finally:
+            if driver is not None:
+                try:
+                    driver.quit()
+                except Exception:
+                    pass
+
+    return result
+
+
+def product_page_html_looks_useful(html_text, expected_name=""):
+    soup = BeautifulSoup(html_text or "", "html.parser")
+    page_text = clean_text(soup.get_text(" ", strip=True))
+
+    if len(page_text) < 300:
+        return False
+
+    lowered = page_text.lower()
+    expected_tokens = set(tokenize(expected_name))
+    matching_tokens = [
+        token
+        for token in expected_tokens
+        if token in lowered
+    ]
+
+    if expected_tokens and len(matching_tokens) >= max(1, min(2, len(expected_tokens))):
+        return True
+
+    return any(term in lowered for term in ["price", "ingredients", "nutrition", "in stock", "pickup", "product"])
+
+
+def extract_product_details_from_html(html_text, page_url, seed_candidate):
+    soup = BeautifulSoup(html_text or "", "html.parser")
+    mapping = best_product_mapping_for_candidate(soup, seed_candidate)
+    visible_text = clean_text(soup.get_text(" ", strip=True))
+    meta_description = meta_content(soup, "description", "og:description", "twitter:description")
+    meta_title = meta_content(soup, "og:title", "twitter:title")
+    title = clean_text(meta_title or (soup.title.get_text(" ", strip=True) if soup.title else ""))
+    mapped_name = clean_text(
+        mapping.get("name")
+        or mapping.get("title")
+        or mapping.get("productName")
+        or mapping.get("product_name")
+    ) if mapping else ""
+    mapped_description = clean_text(
+        mapping.get("description")
+        or mapping.get("shortDescription")
+        or mapping.get("longDescription")
+    ) if mapping else ""
+    brand = extract_brand_from_mapping(mapping) if mapping else ""
+    price = extract_price_from_mapping(mapping) if mapping else ""
+    canonical_url = canonical_product_url(soup, mapping, page_url)
+    detail_text = clean_text(" ".join([
+        mapped_name,
+        title,
+        brand,
+        mapped_description,
+        meta_description,
+        visible_text[:2500],
+    ]))
+    ingredients_text = extract_ingredients_text(visible_text)
+    package_size = extract_package_size(" ".join([mapped_name, title, visible_text[:1500]]))
+    unit_price = extract_unit_price(" ".join([visible_text[:2500], mapped_description]))
+    availability = extract_availability(mapping, visible_text)
+
+    if not price:
+        price_match = PRICE_PATTERN.search(visible_text)
+        if price_match:
+            price = price_match.group(0).replace(" ", "")
+
+    return {
+        "name": best_detail_name(mapped_name, title, seed_candidate.get("product_name", "")),
+        "brand": brand,
+        "description": mapped_description or meta_description,
+        "ingredients_text": ingredients_text,
+        "category": clean_text(mapping.get("category")) if mapping else "",
+        "sku": clean_text(mapping.get("sku")) if mapping else "",
+        "gtin": clean_text(
+            mapping.get("gtin")
+            or mapping.get("gtin12")
+            or mapping.get("gtin13")
+            or mapping.get("gtin14")
+        ) if mapping else "",
+        "price": price,
+        "package_size": package_size,
+        "unit_price": unit_price.get("display", ""),
+        "unit_price_value": unit_price.get("value"),
+        "unit_price_unit": unit_price.get("unit", ""),
+        "availability": availability.get("text", ""),
+        "in_stock": availability.get("in_stock"),
+        "product_url": canonical_url,
+        "detail_text_excerpt": detail_text[:2200],
+        "is_organic": "organic" in detail_text.lower(),
+    }
+
+
+def apply_product_details_to_candidate(candidate, details, fetch, ingredient):
+    candidate["detail_evaluated"] = True
+    candidate["detail_source"] = fetch.get("method", "")
+
+    for key in [
+        "brand",
+        "description",
+        "ingredients_text",
+        "category",
+        "sku",
+        "gtin",
+        "package_size",
+        "unit_price",
+        "unit_price_value",
+        "unit_price_unit",
+        "availability",
+        "in_stock",
+        "detail_text_excerpt",
+        "is_organic",
+    ]:
+        value = details.get(key)
+        if value not in (None, ""):
+            candidate[key] = value
+
+    if details.get("name"):
+        candidate["product_name"] = details["name"]
+
+    if details.get("price"):
+        candidate["price"] = details["price"]
+
+    if details.get("product_url"):
+        candidate["product_url"] = details["product_url"]
+
+    candidate["id"] = product_candidate_id(
+        candidate.get("store_key"),
+        candidate.get("product_url"),
+        candidate.get("product_name"),
+        candidate.get("price"),
+    )
+    candidate["ranking_reasons"] = unique_texts(
+        candidate.get("ranking_reasons", [])
+        + [f"Full product page evaluated with {fetch.get('method', 'requests')}."]
+    )
+
+    rule_text = " ".join([
+        candidate.get("product_name", ""),
+        candidate.get("brand", ""),
+        candidate.get("description", ""),
+        candidate.get("ingredients_text", ""),
+        candidate.get("detail_text_excerpt", ""),
+    ])
+    annotated = annotate_product_food_rules({
+        "name": candidate.get("product_name", ""),
+        "description": rule_text,
+    })
+    candidate["food_rule_status"] = annotated.get("food_rule_status", {})
+
+    if not product_matches_ingredient(ingredient, candidate):
+        candidate["skip_reasons"] = unique_texts(
+            candidate.get("skip_reasons", [])
+            + ["Full product page content did not confirm a strong ingredient match."]
+        )
+
+
+def best_product_mapping_for_candidate(soup, candidate):
+    mappings = []
+    mappings.extend(extract_json_ld_products(soup))
+    mappings.extend(extract_embedded_product_mappings(soup))
+
+    if not mappings:
+        return {}
+
+    candidate_name = str(candidate.get("product_name") or "").lower()
+    candidate_tokens = set(tokenize(candidate_name))
+
+    def mapping_score(mapping):
+        name = clean_text(
+            mapping.get("name")
+            or mapping.get("title")
+            or mapping.get("productName")
+            or mapping.get("product_name")
+        ).lower()
+        tokens = set(tokenize(name))
+        score = len(candidate_tokens & tokens) * 5
+
+        if candidate_name and candidate_name in name:
+            score += 20
+
+        if has_price_value(mapping):
+            score += 4
+
+        if mapping.get("description"):
+            score += 3
+
+        return score
+
+    return max(mappings, key=mapping_score)
+
+
+def meta_content(soup, *names):
+    for name in names:
+        tag = soup.find("meta", attrs={"name": name}) or soup.find("meta", attrs={"property": name})
+        if tag and tag.get("content"):
+            return clean_text(tag.get("content"))
+
+    return ""
+
+
+def canonical_product_url(soup, mapping, page_url):
+    mapped_url = extract_product_url_from_mapping(mapping or {})
+    if mapped_url:
+        return urljoin(page_url, str(mapped_url))
+
+    canonical = soup.find("link", rel=lambda value: value and "canonical" in value)
+    if canonical and canonical.get("href"):
+        return urljoin(page_url, canonical.get("href"))
+
+    return page_url
+
+
+def best_detail_name(mapped_name, title, fallback):
+    for value in [mapped_name, title, fallback]:
+        text = clean_text(value)
+        if text and len(text) <= 180:
+            return text
+
+    return clean_text(fallback)
+
+
+def extract_brand_from_mapping(mapping):
+    if not isinstance(mapping, dict):
+        return ""
+
+    brand = mapping.get("brand") or mapping.get("manufacturer")
+
+    if isinstance(brand, dict):
+        return clean_text(brand.get("name") or brand.get("brandName"))
+
+    if isinstance(brand, list):
+        names = [
+            extract_brand_from_mapping({"brand": item})
+            for item in brand
+        ]
+        return clean_text(" ".join(name for name in names if name))
+
+    return clean_text(brand)
+
+
+def extract_ingredients_text(visible_text):
+    match = re.search(
+        r"\bingredients?\b[:\s]+(.{20,900}?)(?:\bcontains\b|\bnutrition\b|\bdirections\b|\bwarnings\b|\babout\b|$)",
+        visible_text,
+        flags=re.IGNORECASE,
+    )
+
+    if not match:
+        return ""
+
+    return clean_text(match.group(1))[:800]
+
+
+def extract_package_size(text):
+    match = PACKAGE_SIZE_PATTERN.search(str(text or ""))
+    return clean_text(match.group(0)) if match else ""
+
+
+def extract_unit_price(text):
+    match = UNIT_PRICE_PATTERN.search(str(text or ""))
+
+    if not match:
+        return {}
+
+    value = safe_float(match.group(1))
+    unit = normalize_unit(match.group(2))
+
+    return {
+        "display": f"${value:.2f}/{unit}" if value is not None and unit else clean_text(match.group(0)),
+        "value": value,
+        "unit": unit,
+    }
+
+
+def extract_availability(mapping, visible_text):
+    text_parts = []
+
+    if isinstance(mapping, dict):
+        offers = mapping.get("offers") or mapping.get("offer")
+        if isinstance(offers, dict):
+            text_parts.append(str(offers.get("availability") or ""))
+            text_parts.append(str(offers.get("inventoryLevel") or ""))
+        elif isinstance(offers, list):
+            for offer in offers[:4]:
+                if isinstance(offer, dict):
+                    text_parts.append(str(offer.get("availability") or ""))
+                    text_parts.append(str(offer.get("inventoryLevel") or ""))
+
+    text_parts.append(str(visible_text or "")[:2500])
+    haystack = clean_text(" ".join(text_parts)).lower()
+
+    out_terms = [
+        "out of stock",
+        "currently unavailable",
+        "not available",
+        "unavailable",
+        "sold out",
+    ]
+    in_terms = [
+        "in stock",
+        "pickup available",
+        "available for pickup",
+        "available today",
+        "delivery available",
+        "add to cart",
+    ]
+
+    if any(term in haystack for term in out_terms):
+        return {"text": "Out of stock or unavailable", "in_stock": False}
+
+    if any(term in haystack for term in in_terms):
+        return {"text": "Available", "in_stock": True}
+
+    return {"text": "", "in_stock": None}
+
+
+def product_matches_ingredient(ingredient, candidate):
+    ingredient_tokens = set(tokenize(ingredient))
+    if not ingredient_tokens:
+        return True
+
+    text = " ".join([
+        candidate.get("product_name", ""),
+        candidate.get("brand", ""),
+        candidate.get("description", ""),
+        candidate.get("detail_text_excerpt", ""),
+    ]).lower()
+    overlap = len(ingredient_tokens & set(tokenize(text)))
+
+    return overlap >= max(1, min(len(ingredient_tokens), 2))
 
 
 def search_store_products(
@@ -1056,6 +1628,7 @@ def rank_product_candidates(ingredient, candidates):
         candidate["viable"] = bool(viable)
         ranked.append(candidate)
 
+    ranked = apply_relative_candidate_preferences(ranked)
     return sorted(ranked, key=lambda item: item.get("score", 0), reverse=True)
 
 
@@ -1074,17 +1647,68 @@ def score_candidate(ingredient, candidate):
         )
 
     product_name = candidate.get("product_name", "")
+    detail_text = " ".join([
+        product_name,
+        candidate.get("brand", ""),
+        candidate.get("description", ""),
+        candidate.get("ingredients_text", ""),
+        candidate.get("detail_text_excerpt", ""),
+    ])
+    normalized_ingredient = normalize_match_text(ingredient)
+    normalized_name = normalize_match_text(product_name)
     ingredient_tokens = set(tokenize(ingredient))
-    product_tokens = set(tokenize(product_name))
+    product_tokens = set(tokenize(detail_text))
+    name_tokens = set(tokenize(product_name))
     overlap = len(ingredient_tokens & product_tokens)
     token_ratio = overlap / max(1, len(ingredient_tokens))
+    name_overlap = len(ingredient_tokens & name_tokens)
+    name_token_ratio = name_overlap / max(1, len(ingredient_tokens))
+    exact_name_match = bool(normalized_ingredient and normalized_ingredient == normalized_name)
+    exact_phrase_match = bool(normalized_ingredient and normalized_ingredient in normalized_name)
 
-    score += token_ratio * 35
+    metadata = {
+        "exact_name_match": exact_name_match,
+        "exact_phrase_match": exact_phrase_match,
+        "ingredient_token_ratio": round(token_ratio, 3),
+        "name_token_ratio": round(name_token_ratio, 3),
+        "detail_evaluated": bool(candidate.get("detail_evaluated")),
+        "organic": bool(candidate.get("is_organic")),
+        "unit_price_value": candidate.get("unit_price_value"),
+        "unit_price_unit": candidate.get("unit_price_unit", ""),
+        "package_size": candidate.get("package_size", ""),
+        "in_stock": candidate.get("in_stock"),
+    }
+    candidate["ranking_metadata"] = metadata
+
+    if DETAIL_REQUIRED and not candidate.get("detail_evaluated"):
+        score -= 45
+        viable = False
+        skip_reasons.append("Full product page was not successfully evaluated.")
+    elif candidate.get("detail_evaluated"):
+        score += 15
+        reasons.append("Full product page was opened and evaluated.")
+
+    if exact_name_match:
+        score += 38
+        reasons.append("Exact product name match.")
+    elif exact_phrase_match:
+        score += 28
+        reasons.append("Product name contains the exact ingredient phrase.")
+    elif name_token_ratio >= 0.8:
+        score += 22
+        reasons.append("Product name matches most ingredient terms.")
+
+    score += token_ratio * 25
     if token_ratio:
         reasons.append(f"Matches {overlap} ingredient term(s).")
     else:
         score -= 25
         skip_reasons.append("Product name does not clearly match the ingredient.")
+
+    if ingredient_tokens and not exact_phrase_match and token_ratio < 0.5:
+        score -= 20
+        viable = False
+        skip_reasons.append("Full product details do not confirm enough ingredient terms.")
 
     food_status = candidate.get("food_rule_status") or {}
     if food_status.get("blocked_by"):
@@ -1098,12 +1722,40 @@ def score_candidate(ingredient, candidate):
         score -= 12 * len(food_status.get("missing_required", []))
         skip_reasons.append("Missing preference: " + "; ".join(food_status.get("missing_required", [])))
 
+    if candidate.get("is_organic"):
+        score += 18
+        reasons.append("Organic option.")
+
     if candidate.get("price"):
         score += 10
         reasons.append("Has a visible price.")
     else:
         score -= 8
         skip_reasons.append("Price was not visible in the parsed store page.")
+
+    if candidate.get("unit_price_value") is not None:
+        score += 8
+        reasons.append(f"Has unit value: {candidate.get('unit_price')}.")
+    else:
+        score -= 4
+        skip_reasons.append("Unit value was not available from the product page.")
+
+    if candidate.get("package_size"):
+        score += 6
+        reasons.append(f"Package size found: {candidate.get('package_size')}.")
+    else:
+        score -= 3
+        skip_reasons.append("Package size was not clear from the product page.")
+
+    if candidate.get("in_stock") is True:
+        score += 12
+        reasons.append("Nearby store page indicates availability.")
+    elif candidate.get("in_stock") is False:
+        score -= 60
+        viable = False
+        skip_reasons.append("Product page indicates the product is unavailable or out of stock.")
+    else:
+        skip_reasons.append("Nearby store inventory was not confirmed on the product page.")
 
     if candidate.get("product_url") and candidate.get("product_url") != candidate.get("search_url"):
         score += 8
@@ -1317,6 +1969,63 @@ def haversine_miles(lat1, lon1, lat2, lon2):
     return radius_miles * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
+def apply_relative_candidate_preferences(candidates):
+    groups = {}
+
+    for candidate in candidates:
+        if not candidate.get("viable"):
+            continue
+
+        unit = normalize_unit(candidate.get("unit_price_unit", ""))
+        value = candidate.get("unit_price_value")
+
+        if value is None or not unit:
+            continue
+
+        groups.setdefault(unit, []).append(candidate)
+
+    for unit_candidates in groups.values():
+        if len(unit_candidates) < 2:
+            continue
+
+        values = [
+            candidate.get("unit_price_value")
+            for candidate in unit_candidates
+            if isinstance(candidate.get("unit_price_value"), (int, float))
+        ]
+
+        if not values:
+            continue
+
+        best = min(values)
+        worst = max(values)
+        spread = max(0.01, worst - best)
+
+        for candidate in unit_candidates:
+            value = candidate.get("unit_price_value")
+            if not isinstance(value, (int, float)):
+                continue
+
+            if value == best:
+                candidate["score"] = round(candidate.get("score", 0) + 14, 2)
+                candidate["ranking_reasons"] = unique_texts(
+                    candidate.get("ranking_reasons", [])
+                    + ["Best unit value among comparable products."]
+                )
+            else:
+                value_score = max(0, 10 * ((worst - value) / spread))
+                candidate["score"] = round(candidate.get("score", 0) + value_score, 2)
+                candidate["ranking_reasons"] = unique_texts(
+                    candidate.get("ranking_reasons", [])
+                    + ["Unit value compared with alternatives."]
+                )
+
+    for candidate in candidates:
+        candidate["confidence"] = round(max(0.05, min(0.98, candidate.get("score", 0) / 120)), 2)
+
+    return candidates
+
+
 def dedupe_candidates(candidates):
     deduped = []
     seen = set()
@@ -1338,6 +2047,40 @@ def dedupe_candidates(candidates):
 def product_candidate_id(store_key, product_url, product_name, price):
     raw = "|".join(str(value or "") for value in [store_key, product_url, product_name, price])
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:16]
+
+
+def safe_float(value):
+    try:
+        return float(str(value or "").replace(",", "").strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def normalize_unit(value):
+    text = clean_text(value).lower().replace(".", "")
+    text = re.sub(r"\s+", " ", text)
+    aliases = {
+        "ounces": "oz",
+        "ounce": "oz",
+        "fluid ounce": "fl oz",
+        "fluid ounces": "fl oz",
+        "pounds": "lb",
+        "pound": "lb",
+        "lbs": "lb",
+        "grams": "g",
+        "gram": "g",
+        "kilogram": "kg",
+        "kilograms": "kg",
+        "count": "ct",
+        "each": "ea",
+        "piece": "ea",
+        "pc": "ea",
+    }
+    return aliases.get(text, text)
+
+
+def normalize_match_text(value):
+    return " ".join(tokenize(value))
 
 
 def tokenize(text):
