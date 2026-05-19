@@ -226,6 +226,112 @@ function setRecipeFileLoadingSummary(message) {
     }
 }
 
+function showRecipeImportLoadingOverlay(sourceReference, isWebSource) {
+    let overlay = document.getElementById("recipeImportLoadingOverlay");
+
+    if (!overlay) {
+        overlay = document.createElement("div");
+        overlay.id = "recipeImportLoadingOverlay";
+        overlay.className = "recipe-qty-progress-backdrop recipe-file-loading-backdrop";
+        overlay.setAttribute("aria-hidden", "true");
+        overlay.innerHTML = `
+            <div class="recipe-qty-progress-card" role="dialog" aria-modal="true" aria-labelledby="recipeImportLoadingTitle">
+                <div class="recipe-qty-progress-header">
+                    <h2 id="recipeImportLoadingTitle">Importing Recipe</h2>
+                    <button type="button" class="recipe-qty-progress-close" onclick="hideRecipeImportLoadingOverlay()">Hide</button>
+                </div>
+                <div id="recipeImportLoadingSummary" class="recipe-qty-progress-summary">Preparing import...</div>
+                <div id="recipeImportLoadingList" class="recipe-qty-progress-list"></div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+    }
+
+    const list = overlay.querySelector("#recipeImportLoadingList");
+    const sourceName = importSourceDisplayName(sourceReference);
+    const steps = isWebSource
+        ? [
+            ["load", "Download Webpage", sourceName],
+            ["extract", "Extract Ingredients", "Read recipe data from the webpage"],
+            ["save", "Save Recipe", "Update shopping list, recipe log, and PDF archive"],
+            ["refresh", "Refresh Page", "Show the imported recipe values"],
+        ]
+        : [
+            ["load", "Read Document", sourceName],
+            ["extract", "Extract Ingredients", "Read recipe data from the PDF, document, or image"],
+            ["save", "Save Recipe", "Update shopping list, recipe log, and PDF archive"],
+            ["refresh", "Refresh Page", "Show the imported recipe values"],
+        ];
+
+    list.innerHTML = steps.map(([key, name, detail]) => `
+        <div class="recipe-qty-progress-row" data-import-step="${key}">
+            <div class="recipe-qty-progress-main">
+                <div class="recipe-qty-progress-name">${escapeHtml(name)}</div>
+                <div class="recipe-qty-progress-qty">${escapeHtml(detail)}</div>
+            </div>
+            <div class="recipe-qty-progress-status waiting">Waiting</div>
+        </div>
+    `).join("");
+
+    setRecipeImportLoadingSummary(isWebSource
+        ? "Preparing to import from the recipe URL..."
+        : "Preparing to import from the selected PDF or document..."
+    );
+    overlay.classList.add("open");
+    overlay.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+}
+
+function hideRecipeImportLoadingOverlay() {
+    const overlay = document.getElementById("recipeImportLoadingOverlay");
+
+    if (overlay) {
+        overlay.classList.remove("open");
+        overlay.setAttribute("aria-hidden", "true");
+    }
+}
+
+function updateRecipeImportLoadingStep(stepKey, state, message) {
+    const row = document.querySelector(`[data-import-step="${stepKey}"]`);
+
+    if (!row) {
+        return;
+    }
+
+    const status = row.querySelector(".recipe-qty-progress-status");
+
+    if (status) {
+        status.className = `recipe-qty-progress-status ${state}`;
+        status.textContent = message;
+    }
+}
+
+function setRecipeImportLoadingSummary(message) {
+    const summary = document.getElementById("recipeImportLoadingSummary");
+
+    if (summary) {
+        summary.textContent = message;
+    }
+}
+
+function importSourceDisplayName(sourceReference) {
+    const value = String(sourceReference || "").trim();
+
+    if (!value) {
+        return "Source recipe";
+    }
+
+    if (isLegitimateWebUrl(value)) {
+        try {
+            return new URL(value).hostname || value;
+        } catch (err) {
+            return value;
+        }
+    }
+
+    return value.split(/[\\/]/).filter(Boolean).pop() || value;
+}
+
 function toggleCardCollapse(key) {
     const content = document.querySelector(`[data-collapse-content="${key}"]`);
     const icon = document.querySelector(`[data-collapse-icon="${key}"]`);
@@ -1698,17 +1804,42 @@ async function importSourceRecipe(button) {
         button.textContent = "Importing...";
     }
 
+    const isWebSource = isLegitimateWebUrl(sourceReference);
+    showRecipeImportLoadingOverlay(sourceReference, isWebSource);
+    await waitForNextPaint();
+
+    const extractTimer = setTimeout(() => {
+        updateRecipeImportLoadingStep("load", "done", isWebSource ? "Downloaded" : "Read");
+        updateRecipeImportLoadingStep("extract", "running", "Extracting...");
+        setRecipeImportLoadingSummary("Extracting ingredients, quantities, instructions, and sections...");
+    }, 900);
+    const saveTimer = setTimeout(() => {
+        updateRecipeImportLoadingStep("extract", "running", "Still extracting...");
+        setRecipeImportLoadingSummary("This can take a moment for larger PDFs or web pages.");
+    }, 4500);
+
     try {
         setRecipeEditStatus(
-            isLegitimateWebUrl(sourceReference)
+            isWebSource
                 ? "Importing recipe from URL..."
                 : "Importing recipe from document..."
         );
+        updateRecipeImportLoadingStep("load", "running", isWebSource ? "Downloading..." : "Reading...");
 
         const result = await importRecipeSource(sourceReference, originalUrl);
         const importedUrl = result.source_url || originalUrl || sourceReference;
 
+        clearTimeout(extractTimer);
+        clearTimeout(saveTimer);
+        updateRecipeImportLoadingStep("load", "done", isWebSource ? "Downloaded" : "Read");
+        updateRecipeImportLoadingStep("extract", "done", `${(result.ingredients || []).length} ingredients found`);
+        updateRecipeImportLoadingStep("save", "running", "Saving...");
+        setRecipeImportLoadingSummary("Saving ingredients and refreshing the recipe page...");
+        await waitForNextPaint();
+
         await refreshStoreMarkup();
+        updateRecipeImportLoadingStep("save", "done", "Saved");
+        updateRecipeImportLoadingStep("refresh", "running", "Refreshing...");
         showRecipeQuantityUpdatedMessage("", "", "", "Recipe imported.");
 
         if (importedUrl) {
@@ -1716,7 +1847,17 @@ async function importSourceRecipe(button) {
         } else {
             setRecipeEditStatus("Recipe imported.");
         }
+
+        updateRecipeImportLoadingStep("refresh", "done", "Refreshed");
+        setRecipeImportLoadingSummary("Recipe imported.");
+        setTimeout(hideRecipeImportLoadingOverlay, 700);
     } catch (err) {
+        clearTimeout(extractTimer);
+        clearTimeout(saveTimer);
+        updateRecipeImportLoadingStep("extract", "failed", "Failed");
+        updateRecipeImportLoadingStep("save", "failed", "Not saved");
+        updateRecipeImportLoadingStep("refresh", "failed", "Not refreshed");
+        setRecipeImportLoadingSummary(err.message || "Unable to import recipe.");
         console.warn("Unable to import source recipe.", err);
         setRecipeEditStatus(err.message || "Unable to import recipe.", true);
     } finally {
