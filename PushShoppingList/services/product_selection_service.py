@@ -51,6 +51,32 @@ UNIT_PRICE_PATTERN = re.compile(
     r"(fl\s*oz|fluid\s*ounce|ounce|oz|pound|lb|gram|g|kg|count|ct|each|ea|piece|pc)\b",
     re.IGNORECASE,
 )
+INGREDIENT_ALTERNATIVE_PATTERN = re.compile(r"\s+(?:and\s*/\s*or|and/or|or)\s+", re.IGNORECASE)
+GROCERY_QUERY_REPLACEMENTS = [
+    (re.compile(r"\byoghurt\b", re.IGNORECASE), "yogurt"),
+    (re.compile(r"\bself[-\s]+raising\b", re.IGNORECASE), "self rising"),
+]
+QUALIFIER_TOKENS = {
+    "fat",
+    "free",
+    "light",
+    "lite",
+    "low",
+    "lower",
+    "reduced",
+    "regular",
+    "nonfat",
+    "non",
+    "unsalted",
+    "salted",
+    "whole",
+    "skim",
+    "sugar",
+    "zero",
+}
+TOKEN_ALIASES = {
+    "yoghurt": "yogurt",
+}
 DETAIL_REQUIRED = os.getenv("PRODUCT_REQUIRE_DETAIL_PAGE", "1") != "0"
 BROWSER_SEARCH_MODE = os.getenv("PRODUCT_SEARCH_BROWSER_MODE", "always").strip().lower()
 
@@ -512,20 +538,22 @@ def build_product_download_plan(ingredients, enabled_stores, stores):
     downloads = []
 
     for ingredient in ingredients:
-        for store_key in enabled_stores:
-            store = stores.get(store_key, {})
-            store_name = store.get("label") or store_key.title()
-            search_url = build_product_search_url(store, ingredient)
-            downloads.append({
-                "index": len(downloads),
-                "ingredient": ingredient,
-                "store_key": store_key,
-                "store_name": store_name,
-                "search_url": search_url,
-                "state": "waiting",
-                "message": "Queued.",
-                "candidates_count": None,
-            })
+        for search_term in ingredient_search_terms(ingredient):
+            for store_key in enabled_stores:
+                store = stores.get(store_key, {})
+                store_name = store.get("label") or store_key.title()
+                search_url = build_product_search_url(store, search_term)
+                downloads.append({
+                    "index": len(downloads),
+                    "ingredient": ingredient,
+                    "search_term": search_term,
+                    "store_key": store_key,
+                    "store_name": store_name,
+                    "search_url": search_url,
+                    "state": "waiting",
+                    "message": "Queued.",
+                    "candidates_count": None,
+                })
 
     return downloads
 
@@ -544,6 +572,8 @@ def search_store_products_for_download(
     store = stores.get(store_key, {})
     store_name = download.get("store_name") or store.get("label") or store_key.title()
     search_url = download.get("search_url", "")
+    search_term = download.get("search_term") or ingredient
+    search_label = search_term if normalize_match_text(search_term) != normalize_match_text(ingredient) else ingredient
 
     if not search_url:
         message = f"{store_name}: no product search URL is configured."
@@ -565,7 +595,7 @@ def search_store_products_for_download(
             job_id,
             index,
             "running",
-            f"Downloading {store_name} search results for {ingredient}...",
+            f"Downloading {store_name} search results for {search_label}...",
         )
 
     try:
@@ -576,6 +606,8 @@ def search_store_products_for_download(
             full_address,
             home_location,
             store_locations.get(store_key, {}),
+            search_term=search_term,
+            search_url=search_url,
         )
     except Exception as exc:
         candidates = []
@@ -632,6 +664,7 @@ def search_store_products_for_download(
         "store_key": store_key,
         "store_name": store_name,
         "search_url": search_url,
+        "search_term": search_term,
         "store_location": store_locations.get(store_key, {}),
         "store_location_name": (store_locations.get(store_key, {}) or {}).get("name", ""),
         "store_location_address": (store_locations.get(store_key, {}) or {}).get("address", ""),
@@ -698,7 +731,7 @@ def build_product_choice_record_from_results(ingredient, store_results, full_add
 def build_store_product_results(ingredient, raw_store_results, ranked_candidates):
     records = []
 
-    for raw in raw_store_results:
+    for raw in group_raw_store_results_by_store(raw_store_results):
         store_key = raw.get("store_key", "")
         store_name = raw.get("store_name") or store_key.title()
         raw_ids = {
@@ -733,6 +766,8 @@ def build_store_product_results(ingredient, raw_store_results, ranked_candidates
             "store_name": store_name,
             "ingredient": ingredient,
             "search_url": raw.get("search_url", ""),
+            "search_urls": raw.get("search_urls", []),
+            "search_terms": raw.get("search_terms", []),
             "store_location": raw.get("store_location", {}),
             "store_location_name": raw.get("store_location_name", ""),
             "store_location_address": raw.get("store_location_address", ""),
@@ -757,6 +792,59 @@ def build_store_product_results(ingredient, raw_store_results, ranked_candidates
         records.append(record)
 
     return records
+
+
+def group_raw_store_results_by_store(raw_store_results):
+    grouped = {}
+    order = []
+
+    for raw in raw_store_results:
+        if not isinstance(raw, dict):
+            continue
+
+        store_key = raw.get("store_key", "")
+        key = store_key or f"__raw_{len(order)}"
+
+        if key not in grouped:
+            grouped[key] = {
+                "index": raw.get("index", len(order)),
+                "ingredient": raw.get("ingredient", ""),
+                "store_key": store_key,
+                "store_name": raw.get("store_name", ""),
+                "search_url": raw.get("search_url", ""),
+                "search_urls": [],
+                "search_terms": [],
+                "store_location": raw.get("store_location", {}),
+                "store_location_name": raw.get("store_location_name", ""),
+                "store_location_address": raw.get("store_location_address", ""),
+                "store_location_distance_miles": raw.get("store_location_distance_miles"),
+                "candidates": [],
+                "skip_reasons": [],
+            }
+            order.append(key)
+
+        record = grouped[key]
+        record["index"] = min(record.get("index", raw.get("index", 0)), raw.get("index", record.get("index", 0)))
+        record["candidates"].extend(raw.get("candidates", []))
+        record["skip_reasons"] = unique_texts(record.get("skip_reasons", []) + raw.get("skip_reasons", []))
+
+        if raw.get("search_url"):
+            record["search_urls"] = unique_texts(record.get("search_urls", []) + [raw.get("search_url")])
+            record["search_url"] = record.get("search_url") or raw.get("search_url", "")
+
+        if raw.get("search_term"):
+            record["search_terms"] = unique_texts(record.get("search_terms", []) + [raw.get("search_term")])
+
+        for key_name in [
+            "store_location",
+            "store_location_name",
+            "store_location_address",
+            "store_location_distance_miles",
+        ]:
+            if not record.get(key_name) and raw.get(key_name):
+                record[key_name] = raw.get(key_name)
+
+    return sorted(grouped.values(), key=lambda item: item.get("index", 0))
 
 
 def product_selection_reason(candidate, store_name=""):
@@ -860,10 +948,13 @@ def pre_detail_candidate_score(ingredient, candidate):
         candidate.get("card_text_excerpt", ""),
         candidate.get("detail_text_excerpt", ""),
     ])
-    ingredient_tokens = set(tokenize(ingredient))
+    match_candidate = dict(candidate)
+    match_candidate["description"] = text
+    match = best_ingredient_candidate_match(ingredient, match_candidate)
+    ingredient_tokens = match.get("ingredient_tokens", set())
     text_tokens = set(tokenize(text))
     name_tokens = set(tokenize(name))
-    normalized_ingredient = normalize_match_text(ingredient)
+    normalized_ingredient = normalize_match_text(match.get("ingredient", ingredient))
     normalized_name = normalize_match_text(name)
     score = 0
 
@@ -1063,8 +1154,15 @@ def fetch_product_page_html_with_browser(product_url, expected_name="", full_add
                 prefer_undetected=True,
                 page_load_strategy="eager",
             )
+            driver.set_page_load_timeout(product_browser_wait_seconds() + 8)
             configure_browser_home_location(driver, product_url, home_location)
-            driver.get(product_url)
+
+            try:
+                driver.get(product_url)
+            except Exception:
+                if len(driver.page_source or "") < 800:
+                    raise
+
             wait_for_browser_document(driver, timeout_seconds=14)
             handle_browser_popups_and_location(driver, full_address)
 
@@ -1244,6 +1342,7 @@ def apply_product_details_to_candidate(candidate, details, fetch, ingredient):
         candidate.get("description", ""),
         candidate.get("ingredients_text", ""),
         candidate.get("detail_text_excerpt", ""),
+        "organic" if candidate.get("is_organic") else "",
     ])
     annotated = annotate_product_food_rules({
         "name": candidate.get("product_name", ""),
@@ -1419,17 +1518,12 @@ def extract_availability(mapping, visible_text):
 
 
 def product_matches_ingredient(ingredient, candidate):
-    ingredient_tokens = set(tokenize(ingredient))
+    match = best_ingredient_candidate_match(ingredient, candidate)
+    ingredient_tokens = match.get("ingredient_tokens", set())
     if not ingredient_tokens:
         return True
 
-    text = " ".join([
-        candidate.get("product_name", ""),
-        candidate.get("brand", ""),
-        candidate.get("description", ""),
-        candidate.get("detail_text_excerpt", ""),
-    ]).lower()
-    overlap = len(ingredient_tokens & set(tokenize(text)))
+    overlap = match.get("overlap", 0)
 
     return overlap >= max(1, min(len(ingredient_tokens), 2))
 
@@ -1441,9 +1535,12 @@ def search_store_products(
     full_address,
     home_location,
     store_location,
+    search_term=None,
+    search_url=None,
 ):
     store_name = store.get("label") or store_key.title()
-    search_url = build_product_search_url(store, ingredient)
+    search_term = search_term or ingredient
+    search_url = search_url or build_product_search_url(store, search_term)
     skip_reasons = []
 
     if not search_url:
@@ -2611,21 +2708,20 @@ def score_candidate(ingredient, candidate):
         candidate.get("ingredients_text", ""),
         candidate.get("detail_text_excerpt", ""),
     ])
-    normalized_ingredient = normalize_match_text(ingredient)
-    normalized_name = normalize_match_text(product_name)
-    ingredient_tokens = set(tokenize(ingredient))
-    product_tokens = set(tokenize(detail_text))
-    name_tokens = set(tokenize(product_name))
-    overlap = len(ingredient_tokens & product_tokens)
-    token_ratio = overlap / max(1, len(ingredient_tokens))
-    name_overlap = len(ingredient_tokens & name_tokens)
-    name_token_ratio = name_overlap / max(1, len(ingredient_tokens))
-    exact_name_match = bool(normalized_ingredient and normalized_ingredient == normalized_name)
-    exact_phrase_match = bool(normalized_ingredient and normalized_ingredient in normalized_name)
+    match = best_ingredient_candidate_match(ingredient, candidate)
+    ingredient_tokens = match.get("ingredient_tokens", set())
+    overlap = match.get("overlap", 0)
+    token_ratio = match.get("token_ratio", 0)
+    name_overlap = match.get("name_overlap", 0)
+    name_token_ratio = match.get("name_token_ratio", 0)
+    exact_name_match = match.get("exact_name_match", False)
+    exact_phrase_match = match.get("exact_phrase_match", False)
+    matched_ingredient = match.get("ingredient", ingredient)
 
     metadata = {
         "exact_name_match": exact_name_match,
         "exact_phrase_match": exact_phrase_match,
+        "matched_ingredient": matched_ingredient,
         "ingredient_token_ratio": round(token_ratio, 3),
         "name_token_ratio": round(name_token_ratio, 3),
         "detail_evaluated": bool(candidate.get("detail_evaluated")),
@@ -2657,7 +2753,10 @@ def score_candidate(ingredient, candidate):
 
     score += token_ratio * 25
     if token_ratio:
-        reasons.append(f"Matches {overlap} ingredient term(s).")
+        if normalize_match_text(matched_ingredient) != normalize_match_text(ingredient):
+            reasons.append(f"Matches {overlap} term(s) from alternative '{matched_ingredient}'.")
+        else:
+            reasons.append(f"Matches {overlap} ingredient term(s).")
     else:
         score -= 25
         skip_reasons.append("Product name does not clearly match the ingredient.")
@@ -2672,12 +2771,13 @@ def score_candidate(ingredient, candidate):
         score -= 100
         viable = False
         skip_reasons.append("Blocked by food rules: " + "; ".join(food_status.get("blocked_by", [])))
-    elif not food_status.get("missing_required"):
+    if food_status.get("missing_required"):
+        score -= 100
+        viable = False
+        skip_reasons.append("Missing required food preference: " + "; ".join(food_status.get("missing_required", [])))
+    elif not food_status.get("blocked_by"):
         score += 20
         reasons.append("Matches required food preferences.")
-    else:
-        score -= 12 * len(food_status.get("missing_required", []))
-        skip_reasons.append("Missing preference: " + "; ".join(food_status.get("missing_required", [])))
 
     if candidate.get("is_organic"):
         score += 18
@@ -3102,13 +3202,145 @@ def normalize_unit(value):
     return aliases.get(text, text)
 
 
+def ingredient_search_terms(ingredient):
+    variants = ingredient_match_variants(ingredient)
+    terms = []
+    seen = set()
+
+    for variant in variants:
+        term = clean_ingredient_search_text(variant)
+        key = normalize_match_text(term)
+
+        if term and key not in seen:
+            seen.add(key)
+            terms.append(term)
+
+    fallback = clean_ingredient_search_text(ingredient)
+    if fallback and not terms:
+        terms.append(fallback)
+
+    return terms[:4] or [clean_text(ingredient)]
+
+
+def ingredient_match_variants(ingredient):
+    text = clean_ingredient_search_text(ingredient)
+    if not text:
+        return []
+
+    parts = [
+        clean_ingredient_search_text(part)
+        for part in INGREDIENT_ALTERNATIVE_PATTERN.split(text)
+        if clean_ingredient_search_text(part)
+    ]
+
+    if len(parts) <= 1:
+        return [text]
+
+    return unique_texts(expand_alternative_parts(parts))
+
+
+def expand_alternative_parts(parts):
+    if len(parts) != 2:
+        return parts
+
+    left, right = parts
+    left_tokens = tokenize(left)
+    right_tokens = tokenize(right)
+
+    if 0 < len(left_tokens) <= 2 and len(right_tokens) > len(left_tokens):
+        suffix_tokens = list(right_tokens)
+
+        while suffix_tokens and suffix_tokens[0] in QUALIFIER_TOKENS:
+            suffix_tokens.pop(0)
+
+        if suffix_tokens and not set(suffix_tokens) & set(left_tokens):
+            return [
+                " ".join(left_tokens + suffix_tokens),
+                right,
+            ]
+
+    return parts
+
+
+def clean_ingredient_search_text(value):
+    text = clean_text(value).replace("*", "")
+    text = re.sub(r"\s+", " ", text).strip(" ,;")
+
+    for pattern, replacement in GROCERY_QUERY_REPLACEMENTS:
+        text = pattern.sub(replacement, text)
+
+    return clean_text(text)
+
+
+def best_ingredient_candidate_match(ingredient, candidate):
+    product_name = candidate.get("product_name", "")
+    detail_text = " ".join([
+        product_name,
+        candidate.get("brand", ""),
+        candidate.get("description", ""),
+        candidate.get("ingredients_text", ""),
+        candidate.get("detail_text_excerpt", ""),
+    ])
+    normalized_name = normalize_match_text(product_name)
+    product_tokens = set(tokenize(detail_text))
+    name_tokens = set(tokenize(product_name))
+    best = None
+
+    for option in ingredient_match_variants(ingredient):
+        ingredient_tokens = set(tokenize(option))
+        normalized_ingredient = normalize_match_text(option)
+        overlap = len(ingredient_tokens & product_tokens)
+        name_overlap = len(ingredient_tokens & name_tokens)
+        token_ratio = overlap / max(1, len(ingredient_tokens))
+        name_token_ratio = name_overlap / max(1, len(ingredient_tokens))
+        exact_name_match = bool(normalized_ingredient and normalized_ingredient == normalized_name)
+        exact_phrase_match = bool(normalized_ingredient and normalized_ingredient in normalized_name)
+        rank = (
+            int(exact_name_match),
+            int(exact_phrase_match),
+            round(name_token_ratio, 4),
+            round(token_ratio, 4),
+            name_overlap,
+            overlap,
+        )
+        current = {
+            "ingredient": option,
+            "ingredient_tokens": ingredient_tokens,
+            "overlap": overlap,
+            "token_ratio": token_ratio,
+            "name_overlap": name_overlap,
+            "name_token_ratio": name_token_ratio,
+            "exact_name_match": exact_name_match,
+            "exact_phrase_match": exact_phrase_match,
+            "rank": rank,
+        }
+
+        if best is None or current["rank"] > best["rank"]:
+            best = current
+
+    if best:
+        return best
+
+    return {
+        "ingredient": ingredient,
+        "ingredient_tokens": set(tokenize(ingredient)),
+        "overlap": 0,
+        "token_ratio": 0,
+        "name_overlap": 0,
+        "name_token_ratio": 0,
+        "exact_name_match": False,
+        "exact_phrase_match": False,
+        "rank": (0, 0, 0, 0, 0, 0),
+    }
+
+
 def normalize_match_text(value):
     return " ".join(tokenize(value))
 
 
 def tokenize(text):
     return [
-        token
+        TOKEN_ALIASES.get(token, token)
         for token in re.findall(r"[a-z0-9]+", str(text or "").lower())
         if len(token) > 1 and token not in {"and", "or", "the", "with", "fresh", "whole"}
     ]

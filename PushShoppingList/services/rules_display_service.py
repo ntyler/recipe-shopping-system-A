@@ -31,7 +31,7 @@ DEFAULT_RULES_DISPLAY = {
             {
                 "key": "food_restrictions",
                 "label": "Food restrictions",
-                "value": "Avoid rules block a product. Required rules boost products that satisfy required terms.",
+                "value": "Avoid rules block a product. Required rules must be present for a product to be selectable.",
             },
             {
                 "key": "price",

@@ -8,6 +8,8 @@
       "original_text": "2 Tablespoons butter",
       "quantity": "2",
       "unit": "Tablespoons",
+      "base_quantity": "2",
+      "base_unit": "Tablespoons",
       "ingredient": "butter",
       "preparation": null,
       "optional": false,
@@ -19,6 +21,8 @@
       "original_text": "1 Tablespoon olive oil",
       "quantity": "1",
       "unit": "Tablespoon",
+      "base_quantity": "1",
+      "base_unit": "Tablespoon",
       "ingredient": "olive oil",
       "preparation": null,
       "optional": false,
@@ -30,6 +34,8 @@
       "original_text": "1/2 yellow onion, approx 1/2-3/4 cup, diced",
       "quantity": "1/2",
       "unit": null,
+      "base_quantity": "1/2",
+      "base_unit": null,
       "ingredient": "yellow onion",
       "preparation": "diced",
       "optional": false,
@@ -41,6 +47,8 @@
       "original_text": "3-4 garlic cloves, chopped",
       "quantity": "3-4",
       "unit": null,
+      "base_quantity": "3-4",
+      "base_unit": null,
       "ingredient": "garlic cloves",
       "preparation": "chopped",
       "optional": false,
@@ -52,6 +60,8 @@
       "original_text": "Dash of red pepper flakes",
       "quantity": "1",
       "unit": "Dash",
+      "base_quantity": "1",
+      "base_unit": "Dash",
       "ingredient": "red pepper flakes",
       "preparation": null,
       "optional": true,
@@ -63,6 +73,8 @@
       "original_text": "Dash of nutmeg",
       "quantity": "1",
       "unit": "Dash",
+      "base_quantity": "1",
+      "base_unit": "Dash",
       "ingredient": "nutmeg",
       "preparation": null,
       "optional": true,
@@ -74,6 +86,8 @@
       "original_text": "1 lemon, zest and juice",
       "quantity": "1",
       "unit": null,
+      "base_quantity": "1",
+      "base_unit": null,
       "ingredient": "lemon",
       "preparation": "zest and juice",
       "optional": false,
@@ -85,17 +99,21 @@
       "original_text": "1/2 cup white wine, or vegetable broth",
       "quantity": "1/2",
       "unit": "cup",
+      "base_quantity": "1/2",
+      "base_unit": "cup",
       "ingredient": "white wine OR vegetable broth",
       "preparation": null,
       "optional": false,
-      "store_section": "SAUCES & CONDIMENTS",
-      "store_section_order": 9
+      "store_section": "MISC",
+      "store_section_order": 19
     },
     {
       "section": null,
       "original_text": "1 bunch asparagus, cut into bite-sized pieces",
       "quantity": "1",
       "unit": null,
+      "base_quantity": "1",
+      "base_unit": null,
       "ingredient": "asparagus",
       "preparation": "cut into bite-sized pieces",
       "optional": false,
@@ -107,6 +125,8 @@
       "original_text": "1 cup frozen peas",
       "quantity": "1",
       "unit": "cup",
+      "base_quantity": "1",
+      "base_unit": "cup",
       "ingredient": "frozen peas",
       "preparation": null,
       "optional": false,
@@ -118,6 +138,8 @@
       "original_text": "1/2 pound dried farfalle pasta",
       "quantity": "1/2",
       "unit": "pound",
+      "base_quantity": "1/2",
+      "base_unit": "pound",
       "ingredient": "dried farfalle pasta",
       "preparation": null,
       "optional": false,
@@ -129,6 +151,8 @@
       "original_text": "15 ounces ricotta",
       "quantity": "15",
       "unit": "ounces",
+      "base_quantity": "15",
+      "base_unit": "ounces",
       "ingredient": "ricotta",
       "preparation": null,
       "optional": false,
@@ -140,17 +164,21 @@
       "original_text": "1/3 cup reserved pasta water",
       "quantity": "1/3",
       "unit": "cup",
+      "base_quantity": "1/3",
+      "base_unit": "cup",
       "ingredient": "reserved pasta water",
       "preparation": null,
       "optional": false,
-      "store_section": null,
-      "store_section_order": null
+      "store_section": "PASTA, RICE & GRAINS",
+      "store_section_order": 6
     },
     {
       "section": null,
       "original_text": "Salt and pepper",
       "quantity": null,
       "unit": null,
+      "base_quantity": null,
+      "base_unit": null,
       "ingredient": "Salt and pepper",
       "preparation": null,
       "optional": false,
@@ -159,20 +187,24 @@
     },
     {
       "section": null,
-      "original_text": "1 cup Corn syrup",
+      "original_text": "1 cup Maple syrup",
       "quantity": "1",
       "unit": "cup",
-      "ingredient": "Corn syrup",
+      "base_quantity": "1",
+      "base_unit": "cup",
+      "ingredient": "Maple syrup",
       "preparation": null,
       "optional": false,
-      "store_section": "BAKING",
-      "store_section_order": 7
+      "store_section": "MISC",
+      "store_section_order": 19
     },
     {
       "section": null,
       "original_text": "1 cup red dye",
       "quantity": "1",
       "unit": "cup",
+      "base_quantity": "1",
+      "base_unit": "cup",
       "ingredient": "red dye",
       "preparation": null,
       "optional": false,
@@ -181,30 +213,12 @@
     }
   ],
   "equipment": [
-    {
-      "name": "pot",
-      "category": "cookware"
-    },
-    {
-      "name": "saute pan",
-      "category": "cookware"
-    },
-    {
-      "name": "mixing bowl",
-      "category": "prep"
-    },
-    {
-      "name": "knife",
-      "category": "prep"
-    },
-    {
-      "name": "cutting board",
-      "category": "prep"
-    },
-    {
-      "name": "whisk",
-      "category": "utensil"
-    }
+    "pot",
+    "saute pan",
+    "mixing bowl",
+    "knife",
+    "cutting board",
+    "whisk"
   ],
   "instructions": [
     {
@@ -213,15 +227,13 @@
       "instruction": "Begin boiling a large stock pot of salted water.",
       "temperature": null,
       "time": null,
-      "equipment_used": [
-        "pot"
-      ]
+      "equipment_used": []
     },
     {
       "section": null,
       "step_number": 2,
       "instruction": "In a saute pan over medium heat, heat butter and olive oil.",
-      "temperature": "medium",
+      "temperature": null,
       "time": null,
       "equipment_used": []
     },
@@ -230,7 +242,7 @@
       "step_number": 3,
       "instruction": "Add diced onion and saute for 2-3 minutes.",
       "temperature": null,
-      "time": "2-3 minutes",
+      "time": null,
       "equipment_used": []
     },
     {
@@ -262,7 +274,7 @@
       "step_number": 7,
       "instruction": "Let simmer for 1-2 minutes.",
       "temperature": null,
-      "time": "1-2 minutes",
+      "time": null,
       "equipment_used": []
     },
     {
@@ -270,7 +282,7 @@
       "step_number": 8,
       "instruction": "Add asparagus and cook for 5-6 minutes.",
       "temperature": null,
-      "time": "5-6 minutes",
+      "time": null,
       "equipment_used": []
     },
     {
@@ -295,10 +307,7 @@
       "instruction": "In a medium sized bowl, whisk together ricotta and 1/3 cup reserved pasta water.",
       "temperature": null,
       "time": null,
-      "equipment_used": [
-        "pot",
-        "whisk"
-      ]
+      "equipment_used": []
     },
     {
       "section": null,
@@ -325,25 +334,28 @@
       "equipment_used": []
     }
   ],
-  "nutrition": {
-    "serving_basis": null,
-    "calories": null,
-    "carbohydrates": null,
-    "protein": null,
-    "fat": null,
-    "saturated_fat": null,
-    "polyunsaturated_fat": null,
-    "monounsaturated_fat": null,
-    "trans_fat": null,
-    "cholesterol": null,
-    "sodium": null,
-    "potassium": null,
-    "fiber": null,
-    "sugar": null,
-    "vitamin_a": null,
-    "vitamin_c": null,
-    "calcium": null,
-    "iron": null,
-    "other": []
+  "nutrition": {},
+  "scaling": {
+    "selected_multiplier": 1.0,
+    "base_multiplier": 1.0,
+    "base_servings": "4 -6 servings",
+    "available_multipliers": [
+      {
+        "label": "1/2x",
+        "value": 0.5
+      },
+      {
+        "label": "1x",
+        "value": 1.0
+      },
+      {
+        "label": "2x",
+        "value": 2.0
+      },
+      {
+        "label": "3x",
+        "value": 3.0
+      }
+    ]
   }
 }
