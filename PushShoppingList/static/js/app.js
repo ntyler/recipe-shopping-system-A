@@ -232,7 +232,7 @@ function showRecipeImportLoadingOverlay(sourceReference, isWebSource) {
     if (!overlay) {
         overlay = document.createElement("div");
         overlay.id = "recipeImportLoadingOverlay";
-        overlay.className = "recipe-qty-progress-backdrop recipe-file-loading-backdrop";
+        overlay.className = "recipe-qty-progress-backdrop recipe-file-loading-backdrop recipe-import-loading-backdrop";
         overlay.setAttribute("aria-hidden", "true");
         overlay.innerHTML = `
             <div class="recipe-qty-progress-card" role="dialog" aria-modal="true" aria-labelledby="recipeImportLoadingTitle">

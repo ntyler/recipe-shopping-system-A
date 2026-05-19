@@ -2482,6 +2482,11 @@ body {
             z-index: 12000;
         }
 
+        .recipe-import-loading-backdrop {
+            z-index: 13000;
+            background: rgba(0, 0, 0, 0.82);
+        }
+
         .recipe-qty-progress-card {
             width: min(720px, 100%);
             max-height: 88vh;
