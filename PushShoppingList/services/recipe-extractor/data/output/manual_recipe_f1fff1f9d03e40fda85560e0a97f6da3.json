@@ -1,0 +1,21 @@
+{
+  "source_url": "manual://recipe/f1fff1f9d03e40fda85560e0a97f6da3",
+  "recipe_title": "New Recipe",
+  "servings": "",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "",
+      "quantity": null,
+      "unit": null,
+      "ingredient": "Bread",
+      "preparation": null,
+      "optional": false,
+      "store_section": "BAKERY",
+      "store_section_order": 14
+    }
+  ],
+  "equipment": [],
+  "instructions": [],
+  "nutrition": {}
+}

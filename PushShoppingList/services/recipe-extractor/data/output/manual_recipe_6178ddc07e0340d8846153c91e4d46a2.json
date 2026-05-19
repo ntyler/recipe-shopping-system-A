@@ -1,0 +1,29 @@
+{
+  "source_url": "manual://recipe/6178ddc07e0340d8846153c91e4d46a2",
+  "recipe_title": "New Recipe",
+  "servings": "",
+  "ingredients": [],
+  "equipment": [],
+  "instructions": [],
+  "nutrition": {
+    "serving_basis": null,
+    "calories": null,
+    "carbohydrates": null,
+    "protein": null,
+    "fat": null,
+    "saturated_fat": null,
+    "polyunsaturated_fat": null,
+    "monounsaturated_fat": null,
+    "trans_fat": null,
+    "cholesterol": null,
+    "sodium": null,
+    "potassium": null,
+    "fiber": null,
+    "sugar": null,
+    "vitamin_a": null,
+    "vitamin_c": null,
+    "calcium": null,
+    "iron": null,
+    "other": []
+  }
+}

@@ -865,13 +865,7 @@ function closeRecipeEditor() {
         document.body.classList.remove("modal-open");
     }
 
-    refreshStoreMarkup({
-        cacheBust: true,
-        requireRecipeLog: true,
-    }).catch(err => {
-        console.warn("Unable to refresh after closing recipe editor.", err);
-        window.location.reload();
-    });
+    window.location.reload();
 }
 
 function populateRecipeEditor(recipe, originalUrl) {
@@ -1538,7 +1532,18 @@ async function saveRecipeEditor(event) {
 
     try {
         const payload = collectRecipeEditorPayload();
+        const shouldCreatePdf = shouldCreateRecipePdfOnSave();
         const progressItems = buildRecipeSaveProgressItems(payload.recipe);
+        let refreshProgressIndex = progressItems.length - 1;
+        let pdfProgressIndex = null;
+        if (shouldCreatePdf) {
+            pdfProgressIndex = refreshProgressIndex;
+            progressItems.splice(refreshProgressIndex, 0, {
+                label: "Recipe PDF",
+                detail: "Creating the PDF archive because this recipe does not have one yet.",
+            });
+            refreshProgressIndex += 1;
+        }
         showRecipeSaveProgressOverlay(progressItems);
         updateRecipeSaveProgressItem(0, "running", "Saving...");
 
@@ -1557,13 +1562,39 @@ async function saveRecipeEditor(event) {
 
         updateRecipeSaveProgressItem(0, "done", "Saved");
         updateRecipeSaveProgressItem(1, "done", "Updated");
-        updateRecipeSaveProgressItem(2, "running", "Refreshing...");
-        await refreshStoreMarkup();
-        if (data.recipe) {
-            populateRecipeEditor(data.recipe, data.recipe.source_url || payload.recipe.source_url || payload.original_url);
+
+        let recipeForEditor = data.recipe || null;
+        const sourceUrl = (
+            recipeForEditor && recipeForEditor.source_url
+                ? recipeForEditor.source_url
+                : payload.recipe.source_url || payload.original_url
+        );
+
+        if (shouldCreatePdf) {
+            updateRecipeSaveProgressItem(pdfProgressIndex, "running", "Creating...");
+            setRecipeEditStatus("Creating PDF...");
+            const pdfData = await createRecipePdfFromSavedRecipe(sourceUrl);
+            recipeForEditor = {
+                ...(recipeForEditor || {}),
+                source_url: pdfData.url || sourceUrl,
+                pdf_path: pdfData.pdf_path || "",
+                pdf_available: true,
+            };
+            updateRecipeSaveProgressItem(pdfProgressIndex, "done", "Created");
         }
-        updateRecipeSaveProgressItem(2, "done", "Refreshed");
-        setRecipeSaveProgressSummary("Recipe saved and page values refreshed.");
+
+        updateRecipeSaveProgressItem(refreshProgressIndex, "running", "Refreshing...");
+        await refreshStoreMarkup();
+        if (recipeForEditor) {
+            populateRecipeEditor(recipeForEditor, recipeForEditor.source_url || sourceUrl);
+        }
+        updateRecipeSaveProgressItem(refreshProgressIndex, "done", "Refreshed");
+        setRecipeSaveProgressSummary(
+            shouldCreatePdf
+                ? "Recipe saved, PDF created, and page values refreshed."
+                : "Recipe saved and page values refreshed."
+        );
+        setRecipeEditStatus("");
         showRecipeQuantityUpdatedMessage("", "", "", "Recipe updated.");
     } catch (err) {
         console.warn("Unable to save recipe.", err);
@@ -1578,6 +1609,13 @@ async function saveRecipeEditor(event) {
     }
 
     return false;
+}
+
+function shouldCreateRecipePdfOnSave() {
+    const pdfButton = document.getElementById("recipeEditPdfButton");
+    const createPdfButton = document.getElementById("recipeEditCreatePdfButton");
+
+    return Boolean(createPdfButton && !createPdfButton.hidden && pdfButton && pdfButton.hidden);
 }
 
 async function createRecipeEditorPdf(button) {
@@ -1616,19 +1654,7 @@ async function createRecipeEditorPdf(button) {
         }
 
         setRecipeEditStatus("Creating PDF...");
-
-        const pdfResponse = await fetch("/api/recipe_pdf", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ url: sourceUrl }),
-        });
-        const pdfData = await pdfResponse.json();
-
-        if (!pdfResponse.ok || !pdfData.ok) {
-            throw new Error((pdfData && pdfData.error) || "Unable to create PDF.");
-        }
+        const pdfData = await createRecipePdfFromSavedRecipe(sourceUrl);
 
         updateRecipeEditorPdfControls({
             source_url: pdfData.url || sourceUrl,
@@ -1648,6 +1674,23 @@ async function createRecipeEditorPdf(button) {
     }
 
     return false;
+}
+
+async function createRecipePdfFromSavedRecipe(sourceUrl) {
+    const pdfResponse = await fetch("/api/recipe_pdf", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ url: sourceUrl }),
+    });
+    const pdfData = await pdfResponse.json();
+
+    if (!pdfResponse.ok || !pdfData.ok) {
+        throw new Error((pdfData && pdfData.error) || "Unable to create PDF.");
+    }
+
+    return pdfData;
 }
 
 async function deleteRecipeEditorPdf(button) {
