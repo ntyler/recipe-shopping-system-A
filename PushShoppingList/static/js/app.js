@@ -57,6 +57,7 @@ function showProductsOverlay() {
 
     if (modal) {
         modal.style.display = "flex";
+        document.body.classList.add("modal-open");
     }
 }
 
@@ -65,7 +66,331 @@ function hideProductsOverlay() {
 
     if (modal) {
         modal.style.display = "none";
+        document.body.classList.remove("modal-open");
     }
+}
+
+function setProductsOverlayState(status, summary = "", percent = 0, rows = []) {
+    const statusElement = document.getElementById("productsStatusText");
+    const summaryElement = document.getElementById("productsSummary");
+    const bar = document.getElementById("productsProgressBar");
+    const list = document.getElementById("productsList");
+
+    if (statusElement) {
+        statusElement.textContent = status || "";
+    }
+
+    if (summaryElement) {
+        summaryElement.textContent = summary || "";
+    }
+
+    if (bar) {
+        bar.style.width = `${Math.max(0, Math.min(100, percent || 0))}%`;
+    }
+
+    if (list) {
+        list.innerHTML = rows.map(renderProductProgressRow).join("");
+    }
+}
+
+function renderProductProgressRow(row, index) {
+    const selected = row.selected_product || null;
+    const skip = (row.skip_reasons || [])[0] || "";
+
+    return `
+        <div class="bulk-progress-item">
+            <input type="checkbox" class="bulk-progress-check" disabled ${selected ? "checked" : ""}>
+            <div class="bulk-progress-main">
+                <div class="bulk-progress-title-line">
+                    <span class="bulk-progress-text">${index + 1}. ${escapeHtml(row.ingredient || "")}</span>
+                </div>
+                <div class="bulk-skip-reason">${escapeHtml(skip || (selected ? "selected" : "no valid product selected"))}</div>
+            </div>
+            <div class="bulk-progress-meta">
+                <div class="bulk-product-name">${escapeHtml(selected ? selected.product_name : "No product selected")}</div>
+                <div class="bulk-product-price">${escapeHtml(selected ? (selected.price || "Price unavailable") : "")}</div>
+                <div class="bulk-product-status">${escapeHtml(selected ? selected.store_name : "")}</div>
+            </div>
+            <button type="button"
+                    class="bulk-alt-toggle"
+                    data-item-key="${escapeAttribute(row.item_key || "")}"
+                    onclick="openProductAlternatives(this)">
+                Alternatives
+            </button>
+        </div>
+    `;
+}
+
+async function grabBestProducts(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = form ? form.querySelector("button") : null;
+    const originalText = button ? button.textContent : "";
+
+    showProductsOverlay();
+    setProductsOverlayState(
+        "Finding best products...",
+        "Using the saved Full Address to find nearby stores and search enabled store websites.",
+        15,
+        []
+    );
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Grabbing...";
+    }
+
+    try {
+        const formData = new FormData(form);
+        formData.set("ajax", "1");
+        const response = await fetch(form.action, {
+            method: "POST",
+            headers: {
+                "X-Requested-With": "fetch",
+            },
+            body: formData,
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to grab best products.");
+        }
+
+        setProductsOverlayState(
+            "Best products saved.",
+            `${data.selected_count || 0} of ${data.count || 0} ingredient(s) have a selected product.`,
+            100,
+            data.results || []
+        );
+        await refreshStoreMarkup({ cacheBust: true });
+    } catch (err) {
+        console.warn("Unable to grab best products.", err);
+        setProductsOverlayState("Unable to grab best products.", err.message || "Product search failed.", 100, []);
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = originalText || "Grab Best Products";
+        }
+    }
+
+    return false;
+}
+
+async function clearProductPicks(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+
+    try {
+        const formData = new FormData(form);
+        formData.set("ajax", "1");
+        const response = await fetch(form.action, {
+            method: "POST",
+            headers: {
+                "X-Requested-With": "fetch",
+            },
+            body: formData,
+        });
+
+        if (!response.ok) {
+            throw new Error("Unable to clear product picks.");
+        }
+
+        await refreshStoreMarkup({ cacheBust: true });
+        showRecipeQuantityUpdatedMessage("", "", "", "Product picks cleared.");
+    } catch (err) {
+        console.warn("Unable to clear product picks.", err);
+        alert("Unable to clear product picks.");
+    }
+
+    return false;
+}
+
+async function openProductAlternatives(button) {
+    const itemKey = button ? button.dataset.itemKey || "" : "";
+
+    if (!itemKey) {
+        return false;
+    }
+
+    const modal = ensureProductAlternativesModal();
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+    renderProductAlternativesLoading(itemKey);
+
+    try {
+        const response = await fetch(`/api/product_choice?item_key=${encodeURIComponent(itemKey)}`, {
+            cache: "no-store",
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "No alternatives were found.");
+        }
+
+        renderProductAlternatives(data.choice);
+    } catch (err) {
+        renderProductAlternativesError(err.message || "Unable to load alternatives.");
+    }
+
+    return false;
+}
+
+function ensureProductAlternativesModal() {
+    let modal = document.getElementById("productAlternativesModal");
+
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "productAlternativesModal";
+        modal.className = "bulk-alt-modal-backdrop";
+        modal.setAttribute("aria-hidden", "true");
+        modal.innerHTML = `
+            <div class="bulk-alt-modal" role="dialog" aria-modal="true" aria-labelledby="productAlternativesTitle">
+                <div class="bulk-alt-modal-header">
+                    <div style="width:72px;"></div>
+                    <h2 id="productAlternativesTitle" class="bulk-alt-modal-title">Product Alternatives</h2>
+                    <button type="button" class="product-close-btn" onclick="closeProductAlternatives()">Close</button>
+                </div>
+                <p id="productAlternativesSubtitle" class="bulk-alt-modal-subtitle"></p>
+                <div id="productAlternativesContent" class="bulk-choices open"></div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    return modal;
+}
+
+function closeProductAlternatives() {
+    const modal = document.getElementById("productAlternativesModal");
+
+    if (modal) {
+        modal.classList.remove("open");
+        modal.setAttribute("aria-hidden", "true");
+        document.body.classList.remove("modal-open");
+    }
+}
+
+function renderProductAlternativesLoading(itemKey) {
+    const subtitle = document.getElementById("productAlternativesSubtitle");
+    const content = document.getElementById("productAlternativesContent");
+
+    if (subtitle) {
+        subtitle.textContent = itemKey;
+    }
+
+    if (content) {
+        content.innerHTML = `<div class="bulk-review-note">Loading alternatives...</div>`;
+    }
+}
+
+function renderProductAlternatives(choice) {
+    const subtitle = document.getElementById("productAlternativesSubtitle");
+    const content = document.getElementById("productAlternativesContent");
+    const candidates = choice.candidates || [];
+    const selectedId = choice.selected_product_id || "";
+
+    if (subtitle) {
+        subtitle.textContent = choice.ingredient || choice.item_key || "";
+    }
+
+    if (!content) {
+        return;
+    }
+
+    if (!candidates.length) {
+        content.innerHTML = `<div class="bulk-review-note">No alternatives are saved for this ingredient.</div>`;
+        return;
+    }
+
+    content.innerHTML = candidates.map(candidate => {
+        const selected = candidate.id === selectedId;
+        const selectable = candidate.viable !== false;
+        const meta = [
+            candidate.store_name,
+            candidate.price || "Price unavailable",
+            selectable ? "" : "not selectable",
+            candidate.confidence ? `confidence ${candidate.confidence}` : "",
+            candidate.score !== undefined ? `score ${candidate.score}` : "",
+        ].filter(Boolean).join(" | ");
+        const notes = [...(candidate.ranking_reasons || []), ...(candidate.skip_reasons || [])]
+            .slice(0, 3)
+            .join(" ");
+
+        return `
+            <div class="bulk-alt-option">
+                <div>
+                    <div class="bulk-alt-name">
+                        ${escapeHtml(candidate.product_name || "Unnamed product")}
+                        ${selected ? `<span class="bulk-selected-badge" style="display:inline;">Selected</span>` : ""}
+                    </div>
+                    <a class="bulk-alt-link"
+                       href="${escapeAttribute(candidate.product_url || candidate.search_url || "#")}"
+                       target="_blank"
+                       rel="noopener noreferrer">
+                        ${escapeHtml(candidate.product_url || candidate.search_url || "")}
+                    </a>
+                    <div class="bulk-alt-meta">${escapeHtml(meta)}</div>
+                    <div class="bulk-alt-meta">${escapeHtml(notes)}</div>
+                </div>
+                <button type="button"
+                        class="bulk-alt-select-btn${selected ? " selected" : ""}${selectable ? "" : " unavailable"}"
+                        data-item-key="${escapeAttribute(choice.item_key || "")}"
+                        data-product-id="${escapeAttribute(candidate.id || "")}"
+                        onclick="selectProductAlternative(this)"
+                        ${(selected || !selectable) ? "disabled" : ""}>
+                    ${selected ? "Selected" : (selectable ? "Select" : "Unavailable")}
+                </button>
+            </div>
+        `;
+    }).join("");
+}
+
+function renderProductAlternativesError(message) {
+    const content = document.getElementById("productAlternativesContent");
+
+    if (content) {
+        content.innerHTML = `<div class="bulk-error">${escapeHtml(message || "Unable to load alternatives.")}</div>`;
+    }
+}
+
+async function selectProductAlternative(button) {
+    const itemKey = button ? button.dataset.itemKey || "" : "";
+    const productId = button ? button.dataset.productId || "" : "";
+
+    if (!itemKey || !productId) {
+        return false;
+    }
+
+    button.disabled = true;
+    button.textContent = "Saving...";
+
+    try {
+        const response = await fetch("/api/product_choice/select", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                item_key: itemKey,
+                product_id: productId,
+            }),
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to select product.");
+        }
+
+        renderProductAlternatives(data.choice);
+        await refreshStoreMarkup({ cacheBust: true });
+        showRecipeQuantityUpdatedMessage("", "", "", "Product choice updated.");
+    } catch (err) {
+        console.warn("Unable to select product alternative.", err);
+        alert("Unable to select product alternative.");
+    }
+
+    return false;
 }
 
 function openRecipeMediaUpload() {
@@ -478,11 +803,13 @@ function bindRecipeQuantityInputs() {
         }
 
         input.dataset.quantityBound = "1";
-        input.dataset.lastSavedValue = input.value || "1";
+        input.dataset.lastSavedValue = String(getRecipeMultiplierValue(input));
 
-        input.addEventListener("input", () => {
-            normalizeRecipeQuantityInput(input);
-        });
+        if (input.tagName !== "SELECT") {
+            input.addEventListener("input", () => {
+                normalizeRecipeQuantityInput(input);
+            });
+        }
 
         input.addEventListener("change", () => {
             normalizeRecipeQuantityInput(input);
@@ -578,7 +905,26 @@ function updateRecipeLogSummaryName(recipeUrl, name) {
 }
 
 function normalizeRecipeQuantityInput(input) {
-    input.value = Math.max(1, parseInt(input.value || "1", 10) || 1);
+    const multiplier = getRecipeMultiplierValue(input);
+    input.value = String(multiplier);
+    return multiplier;
+}
+
+function getRecipeMultiplierValue(input) {
+    return parseRecipeScaleMultiplier(input ? input.value : null) || 1;
+}
+
+function getRecipeMultiplierSavedValue(input) {
+    return parseRecipeScaleMultiplier(
+        input.dataset.lastSavedValue
+            || input.defaultValue
+            || input.getAttribute("value")
+            || "1"
+    ) || 1;
+}
+
+function recipeMultipliersMatch(left, right) {
+    return Math.abs((parseRecipeScaleMultiplier(left) || 1) - (parseRecipeScaleMultiplier(right) || 1)) < 0.000001;
 }
 
 function queueRecipeQuantitySave(input, delayMs = recipeQuantitySaveDelayMs) {
@@ -599,14 +945,14 @@ function queueRecipeQuantitySave(input, delayMs = recipeQuantitySaveDelayMs) {
 async function saveAllRecipeQuantities(button) {
     const inputs = [...document.querySelectorAll(".recipe-quantity-input")]
         .filter(input => {
-            const nextQty = String(Math.max(1, parseInt(input.value || "1", 10) || 1));
-            const savedQty = String(input.dataset.lastSavedValue || input.defaultValue || "1");
+            const nextQty = getRecipeMultiplierValue(input);
+            const savedQty = getRecipeMultiplierSavedValue(input);
 
-            return nextQty !== savedQty;
+            return !recipeMultipliersMatch(nextQty, savedQty);
         });
 
     if (!inputs.length) {
-        showRecipeQuantityUpdatedMessage("", "", "", "No recipe quantities changed.");
+        showRecipeQuantityUpdatedMessage("", "", "", "No scaling multipliers changed.");
         return false;
     }
 
@@ -615,14 +961,14 @@ async function saveAllRecipeQuantities(button) {
 
     if (button) {
         button.disabled = true;
-        button.textContent = "Saving Qty...";
+        button.textContent = "Saving Scaling...";
     }
 
     let failedCount = 0;
 
     try {
         for (const [index, input] of inputs.entries()) {
-            updateRecipeQuantityProgressItem(index, "running", "Updating quantities with API...");
+            updateRecipeQuantityProgressItem(index, "running", "Updating scaling multiplier...");
 
             try {
                 await saveRecipeQuantity(input, {
@@ -645,26 +991,26 @@ async function saveAllRecipeQuantities(button) {
             setRecipeQuantityProgressSummary(
                 failedCount
                     ? `Finished with ${failedCount} failed update(s).`
-                    : "All recipe quantities updated."
+                    : "All scaling multipliers updated."
             );
         } catch (refreshErr) {
-            console.warn("Unable to refresh recipe quantities in the background.", refreshErr);
-            setRecipeQuantityProgressSummary("Quantities saved, but the page refresh failed.");
+            console.warn("Unable to refresh recipe scaling multipliers in the background.", refreshErr);
+            setRecipeQuantityProgressSummary("Scaling multipliers saved, but the page refresh failed.");
         }
 
         showRecipeQuantityUpdatedMessage(
             "",
             "",
             "",
-            failedCount ? "Some recipe quantities failed." : "Recipe quantities updated."
+            failedCount ? "Some scaling multipliers failed." : "Scaling multipliers updated."
         );
     } catch (err) {
-        console.warn("Unable to save recipe quantities.", err);
-        setRecipeQuantityProgressSummary("Unable to save recipe quantities.");
+        console.warn("Unable to save recipe scaling multipliers.", err);
+        setRecipeQuantityProgressSummary("Unable to save scaling multipliers.");
     } finally {
         if (button) {
             button.disabled = false;
-            button.textContent = "Save Qty";
+            button.textContent = "Save Scaling Multiplier";
         }
     }
 
@@ -716,8 +1062,8 @@ function buildRecipeQuantityProgressItems(inputs) {
         const label = left
             ? left.textContent.trim().split(/\s+/).join(" ")
             : `Recipe ${input.dataset.recipeNumber || ""}`.trim();
-        const previousQty = input.dataset.lastSavedValue || input.defaultValue || "1";
-        const nextQty = String(Math.max(1, parseInt(input.value || "1", 10) || 1));
+        const previousQty = formatRecipeScaleMultiplierLabel(getRecipeMultiplierSavedValue(input));
+        const nextQty = formatRecipeScaleMultiplierLabel(getRecipeMultiplierValue(input));
 
         return {
             label,
@@ -737,10 +1083,10 @@ function showRecipeQuantityProgressOverlay(items) {
         overlay.innerHTML = `
             <div class="recipe-qty-progress-card" role="dialog" aria-modal="true" aria-labelledby="recipeQtyProgressTitle">
                 <div class="recipe-qty-progress-header">
-                    <h2 id="recipeQtyProgressTitle">Updating Recipe Qty</h2>
+                    <h2 id="recipeQtyProgressTitle">Updating Scaling Multiplier</h2>
                     <button type="button" class="recipe-qty-progress-close" onclick="hideRecipeQuantityProgressOverlay()">Hide</button>
                 </div>
-                <div id="recipeQtyProgressSummary" class="recipe-qty-progress-summary">Starting quantity updates...</div>
+                <div id="recipeQtyProgressSummary" class="recipe-qty-progress-summary">Starting scaling multiplier updates...</div>
                 <div id="recipeQtyProgressList" class="recipe-qty-progress-list"></div>
             </div>
         `;
@@ -753,14 +1099,14 @@ function showRecipeQuantityProgressOverlay(items) {
             <div class="recipe-qty-progress-row" data-progress-index="${index}">
                 <div class="recipe-qty-progress-main">
                     <div class="recipe-qty-progress-name">${escapeHtml(item.label)}</div>
-                    <div class="recipe-qty-progress-qty">Qty ${escapeHtml(item.previousQty)} -> ${escapeHtml(item.nextQty)}</div>
+                    <div class="recipe-qty-progress-qty">Scaling Multiplier ${escapeHtml(item.previousQty)} -> ${escapeHtml(item.nextQty)}</div>
                 </div>
                 <div class="recipe-qty-progress-status waiting">Waiting</div>
             </div>
         `).join("");
     }
 
-    setRecipeQuantityProgressSummary("Starting quantity updates...");
+    setRecipeQuantityProgressSummary("Starting scaling multiplier updates...");
     overlay.classList.add("open");
     overlay.setAttribute("aria-hidden", "false");
     document.body.classList.add("modal-open");
@@ -814,6 +1160,7 @@ function escapeAttribute(value) {
 let recipeEditStoreSections = [];
 let recipeEditFoodRules = { require: [], avoid: [] };
 let recipeEditOriginalSnapshot = null;
+let recipeEditScalingOptions = [];
 let activeFoodReviewRow = null;
 let activeFoodReviewAlternatives = [];
 
@@ -821,6 +1168,9 @@ async function openRecipeEditor(button, options = {}) {
     const url = button ? button.dataset.recipeUrl || "" : "";
     const modal = document.getElementById("recipeEditModal");
     const shouldScrollToFoodReview = options === true || Boolean(options.scrollToFoodReview);
+    const targetIngredient = options && typeof options === "object"
+        ? String(options.ingredient || options.scrollToIngredient || "").trim()
+        : "";
 
     if (!url || !modal) {
         return;
@@ -849,6 +1199,9 @@ async function openRecipeEditor(button, options = {}) {
         if (shouldScrollToFoodReview) {
             await waitForNextPaint();
             scrollRecipeEditorToFoodReview();
+        } else if (targetIngredient) {
+            await waitForNextPaint();
+            scrollRecipeEditorToIngredient(targetIngredient);
         }
     } catch (err) {
         console.warn("Unable to open recipe editor.", err);
@@ -875,6 +1228,7 @@ function populateRecipeEditor(recipe, originalUrl) {
         source_url: recipe.source_url || originalUrl,
         quantity: recipe.quantity || "1",
         servings: recipe.servings || "",
+        scaling: recipe.scaling || {},
         ingredients: recipe.ingredients || [],
         equipment: recipe.equipment || [],
         instructions: recipe.instructions || [],
@@ -887,6 +1241,7 @@ function populateRecipeEditor(recipe, originalUrl) {
     setValue("recipeEditSourceUrl", recipe.source_display_url || recipe.source_url || originalUrl);
     setValue("recipeEditQuantity", recipe.quantity || "1");
     setValue("recipeEditServings", recipe.servings || "");
+    populateRecipeScalingControls(recipe.scaling || {}, recipe.servings || "");
     updateRecipeEditorPdfControls(recipe);
 
     const sourceInput = document.getElementById("recipeEditSourceUrl");
@@ -996,6 +1351,197 @@ function setRecipeEditStatus(message, isError = false) {
     status.classList.toggle("error", Boolean(isError));
 }
 
+function populateRecipeScalingControls(scaling = {}, servings = "") {
+    const select = document.getElementById("recipeEditScaleMultiplier");
+
+    if (!select) {
+        return;
+    }
+
+    const options = normalizeRecipeScalingOptions(
+        scaling.available_multipliers
+            || scaling.multipliers
+            || scaling.scaling_multipliers
+            || []
+    );
+    const selectedMultiplier = parseRecipeScaleMultiplier(
+        scaling.selected_multiplier !== undefined
+            ? scaling.selected_multiplier
+            : scaling.scaling_multiplier
+    ) || 1;
+    const baseServings = String(scaling.base_servings || servings || "").trim();
+
+    recipeEditScalingOptions = options;
+    select.innerHTML = options
+        .map(option => {
+            const value = String(option.value);
+            const selected = Math.abs(option.value - selectedMultiplier) < 0.000001 ? " selected" : "";
+            return `<option value="${escapeAttribute(value)}"${selected}>${escapeHtml(option.label)}</option>`;
+        })
+        .join("");
+    select.dataset.baseServings = baseServings;
+
+    const servingsInput = document.getElementById("recipeEditServings");
+    if (servingsInput) {
+        servingsInput.dataset.baseServings = baseServings;
+    }
+}
+
+function normalizeRecipeScalingOptions(options) {
+    const normalized = new Map();
+
+    (Array.isArray(options) ? options : []).forEach(option => {
+        const rawValue = typeof option === "object" && option !== null
+            ? (option.value !== undefined ? option.value : option.multiplier)
+            : option;
+        const label = typeof option === "object" && option !== null
+            ? (option.label || option.text || option.name || "")
+            : "";
+        const multiplier = parseRecipeScaleMultiplier(rawValue) || parseRecipeScaleMultiplier(label);
+
+        if (!multiplier) {
+            return;
+        }
+
+        normalized.set(String(multiplier), {
+            label: formatRecipeScaleMultiplierLabel(multiplier),
+            value: multiplier,
+        });
+    });
+
+    if (!normalized.size) {
+        [
+            { label: "1/2x", value: 0.5 },
+            { label: "1x", value: 1 },
+            { label: "2x", value: 2 },
+            { label: "3x", value: 3 },
+        ].forEach(option => normalized.set(String(option.value), option));
+    }
+
+    if (!normalized.has("1")) {
+        normalized.set("1", { label: "1x", value: 1 });
+    }
+
+    return [...normalized.values()].sort((a, b) => a.value - b.value);
+}
+
+function parseRecipeScaleMultiplier(value) {
+    if (value === null || value === undefined) {
+        return null;
+    }
+
+    if (typeof value === "number") {
+        return value > 0 ? value : null;
+    }
+
+    let text = String(value || "").trim().toLowerCase().replace("×", "x");
+    const xMatch = text.match(/(\d+(?:\.\d+)?|\d+\s*\/\s*\d+)\s*x\b/);
+
+    if (xMatch) {
+        text = xMatch[1];
+    } else {
+        text = text.replace(/x$/, "").trim();
+    }
+
+    text = text.replace(/\s+/g, "");
+    const fractionMatch = text.match(/^(\d+)\/(\d+)$/);
+
+    if (fractionMatch) {
+        const denominator = Number(fractionMatch[2]);
+        return denominator ? Number(fractionMatch[1]) / denominator : null;
+    }
+
+    const multiplier = Number(text);
+    return Number.isFinite(multiplier) && multiplier > 0 ? multiplier : null;
+}
+
+function formatRecipeScaleMultiplierLabel(value) {
+    const multiplier = parseRecipeScaleMultiplier(value) || 1;
+
+    if (Math.abs(multiplier - 0.5) < 0.000001) {
+        return "1/2x";
+    }
+
+    if (Number.isInteger(multiplier)) {
+        return `${multiplier}x`;
+    }
+
+    return `${multiplier}x`;
+}
+
+function applyRecipeScaleMultiplier(select) {
+    const multiplier = parseRecipeScaleMultiplier(select ? select.value : null) || 1;
+    const servingsInput = document.getElementById("recipeEditServings");
+
+    if (servingsInput) {
+        const baseServings = (
+            select && select.dataset.baseServings
+                ? select.dataset.baseServings
+                : servingsInput.dataset.baseServings || servingsInput.value
+        );
+
+        if (!servingsInput.dataset.baseServings) {
+            servingsInput.dataset.baseServings = String(baseServings || "").trim();
+        }
+
+        servingsInput.value = scaleServingsForDisplay(baseServings, multiplier);
+    }
+
+    document.querySelectorAll("#recipeEditIngredients .recipe-edit-ingredient-row")
+        .forEach(row => applyRecipeScaleToIngredientRow(row, multiplier));
+}
+
+function applyRecipeScaleToIngredientRow(row, multiplier) {
+    const quantityInput = row.querySelector('[data-field="quantity"]');
+    const unitInput = row.querySelector('[data-field="unit"]');
+    const baseQuantityInput = row.querySelector('[data-field="base_quantity"]');
+    const baseUnitInput = row.querySelector('[data-field="base_unit"]');
+
+    if (quantityInput && baseQuantityInput) {
+        const baseQuantity = baseQuantityInput.value || quantityInput.value.trim();
+
+        if (!baseQuantityInput.value) {
+            baseQuantityInput.value = baseQuantity;
+        }
+
+        quantityInput.value = scaleQuantityForDisplay(baseQuantity, multiplier);
+    }
+
+    if (unitInput && baseUnitInput) {
+        const baseUnit = baseUnitInput.value || unitInput.value.trim();
+
+        if (!baseUnitInput.value) {
+            baseUnitInput.value = baseUnit;
+        }
+
+        unitInput.value = baseUnit;
+    }
+}
+
+function collectRecipeScalingPayload() {
+    const select = document.getElementById("recipeEditScaleMultiplier");
+    const servingsInput = document.getElementById("recipeEditServings");
+    const selectedMultiplier = parseRecipeScaleMultiplier(select ? select.value : null) || 1;
+    const baseServings = (
+        select && select.dataset.baseServings
+            ? select.dataset.baseServings
+            : servingsInput && servingsInput.dataset.baseServings
+                ? servingsInput.dataset.baseServings
+                : servingsInput
+                    ? servingsInput.value.trim()
+                    : ""
+    );
+
+    return {
+        selected_multiplier: selectedMultiplier,
+        base_multiplier: 1,
+        base_servings: baseServings,
+        available_multipliers: recipeEditScalingOptions.length
+            ? recipeEditScalingOptions
+            : normalizeRecipeScalingOptions([]),
+    };
+}
+
 function scrollRecipeEditorToFoodReview() {
     const marker = document.querySelector("#recipeEditIngredients .recipe-edit-food-warning:not([hidden])");
 
@@ -1027,6 +1573,70 @@ function scrollRecipeEditorToFoodReview() {
 
     setTimeout(() => row.classList.remove("recipe-edit-review-target"), 2400);
     return true;
+}
+
+function scrollRecipeEditorToIngredient(ingredientName) {
+    const targetKey = normalizeIngredientJumpKey(ingredientName);
+
+    if (!targetKey) {
+        return false;
+    }
+
+    const rows = [...document.querySelectorAll("#recipeEditIngredients .recipe-edit-ingredient-row")];
+    const row = rows.find(candidate => {
+        const ingredientInput = candidate.querySelector('[data-field="ingredient"]');
+        const originalTextInput = candidate.querySelector('[data-field="original_text"]');
+        const ingredientKey = normalizeIngredientJumpKey(ingredientInput ? ingredientInput.value : "");
+        const originalTextKey = normalizeIngredientJumpKey(originalTextInput ? originalTextInput.value : "");
+
+        return (
+            (ingredientKey && ingredientKey === targetKey)
+            || (originalTextKey && originalTextKey === targetKey)
+            || (ingredientKey && ingredientKey.includes(targetKey))
+            || (ingredientKey && targetKey.includes(ingredientKey))
+            || (originalTextKey && originalTextKey.includes(targetKey))
+        );
+    });
+
+    if (!row) {
+        setRecipeEditStatus(`Ingredient not found: ${ingredientName}`, true);
+        return false;
+    }
+
+    document.querySelectorAll(".recipe-edit-review-target").forEach(element => {
+        element.classList.remove("recipe-edit-review-target");
+    });
+    row.classList.add("recipe-edit-review-target");
+    row.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+        inline: "nearest",
+    });
+
+    const ingredientInput = row.querySelector('[data-field="ingredient"]');
+    if (ingredientInput) {
+        setTimeout(() => {
+            try {
+                ingredientInput.focus({ preventScroll: true });
+                ingredientInput.select();
+            } catch (err) {
+                ingredientInput.focus();
+            }
+        }, 250);
+    }
+
+    setTimeout(() => row.classList.remove("recipe-edit-review-target"), 3000);
+    return true;
+}
+
+function normalizeIngredientJumpKey(value) {
+    return String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/&/g, " and ")
+        .replace(/[^a-z0-9]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
 }
 
 async function openFoodReviewAlternatives(marker) {
@@ -1262,6 +1872,12 @@ function addRecipeIngredientRow(item = {}) {
     }
 
     const row = document.createElement("div");
+    const baseQuantity = item.base_quantity !== undefined && item.base_quantity !== null
+        ? item.base_quantity
+        : item.quantity || "";
+    const baseUnit = item.base_unit !== undefined && item.base_unit !== null
+        ? item.base_unit
+        : item.unit || "";
     row.className = "recipe-edit-ingredient-row";
     row.innerHTML = `
         <label>
@@ -1303,10 +1919,52 @@ function addRecipeIngredientRow(item = {}) {
             <input type="checkbox" data-field="optional" ${item.optional ? "checked" : ""}>
         </label>
         <button type="button" class="recipe-edit-remove-row" aria-label="Remove ingredient" onclick="removeRecipeEditRow(this)">X</button>
+        <input type="hidden" data-field="base_quantity" value="${escapeAttribute(baseQuantity || "")}">
+        <input type="hidden" data-field="base_unit" value="${escapeAttribute(baseUnit || "")}">
     `;
     wrap.appendChild(row);
+    bindRecipeIngredientBaseTracking(row);
     bindRecipeIngredientFoodRuleWarning(row);
     updateRecipeIngredientFoodRuleWarning(row);
+}
+
+function bindRecipeIngredientBaseTracking(row) {
+    const quantityInput = row.querySelector('[data-field="quantity"]');
+    const unitInput = row.querySelector('[data-field="unit"]');
+
+    if (quantityInput) {
+        quantityInput.addEventListener("input", () => updateRecipeIngredientBaseFromManualEdit(row));
+    }
+
+    if (unitInput) {
+        unitInput.addEventListener("input", () => updateRecipeIngredientBaseFromManualEdit(row));
+    }
+}
+
+function updateRecipeIngredientBaseFromManualEdit(row) {
+    const multiplier = currentRecipeEditScaleMultiplier();
+
+    if (Math.abs(multiplier - 1) > 0.000001) {
+        return;
+    }
+
+    const quantityInput = row.querySelector('[data-field="quantity"]');
+    const unitInput = row.querySelector('[data-field="unit"]');
+    const baseQuantityInput = row.querySelector('[data-field="base_quantity"]');
+    const baseUnitInput = row.querySelector('[data-field="base_unit"]');
+
+    if (quantityInput && baseQuantityInput) {
+        baseQuantityInput.value = quantityInput.value.trim();
+    }
+
+    if (unitInput && baseUnitInput) {
+        baseUnitInput.value = unitInput.value.trim();
+    }
+}
+
+function currentRecipeEditScaleMultiplier() {
+    const select = document.getElementById("recipeEditScaleMultiplier");
+    return parseRecipeScaleMultiplier(select ? select.value : null) || 1;
 }
 
 function bindRecipeIngredientFoodRuleWarning(row) {
@@ -1497,6 +2155,7 @@ function addRecipeNutritionRow(item = {}) {
         <button type="button" class="recipe-edit-remove-row" aria-label="Remove nutrition" onclick="removeRecipeEditRow(this)">X</button>
     `;
     wrap.appendChild(row);
+    return row;
 }
 
 function recipeNutritionHeaderHtml() {
@@ -1507,6 +2166,84 @@ function recipeNutritionHeaderHtml() {
             <span></span>
         </div>
     `;
+}
+
+async function estimateRecipeNutrition(button) {
+    const originalText = button ? button.textContent : "";
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Estimating...";
+    }
+
+    try {
+        setRecipeEditStatus("Estimating nutrition with ChatGPT...");
+        const payload = collectRecipeEditorPayload();
+        const response = await fetch("/api/recipe_nutrition_estimate", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to estimate nutrition.");
+        }
+
+        applyEstimatedNutritionRows(data.nutrition || []);
+        setRecipeEditStatus("Nutrition estimate added. Review values, then Save Recipe.");
+    } catch (err) {
+        console.warn("Unable to estimate nutrition.", err);
+        setRecipeEditStatus(err.message || "Unable to estimate nutrition.", true);
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = originalText || "Estimate per serving_basis";
+        }
+    }
+
+    return false;
+}
+
+function applyEstimatedNutritionRows(rows) {
+    (Array.isArray(rows) ? rows : []).forEach(item => {
+        if (!item || !item.key) {
+            return;
+        }
+
+        setRecipeNutritionRowValue(item.key, item.value || "");
+    });
+}
+
+function setRecipeNutritionRowValue(key, value) {
+    const normalizedKey = normalizeNutritionKey(key);
+    let row = [...document.querySelectorAll("#recipeEditNutrition .recipe-edit-nutrition-row")]
+        .find(candidate => {
+            const input = candidate.querySelector('[data-field="key"]');
+            return input && normalizeNutritionKey(input.value) === normalizedKey;
+        });
+
+    if (!row) {
+        row = addRecipeNutritionRow({ key, value: "" });
+    }
+
+    const keyInput = row.querySelector('[data-field="key"]');
+    const valueInput = row.querySelector('[data-field="value"]');
+
+    if (keyInput) {
+        keyInput.value = key;
+    }
+
+    if (valueInput) {
+        valueInput.value = value;
+        valueInput.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+}
+
+function normalizeNutritionKey(value) {
+    return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
 }
 
 function removeRecipeEditRow(button) {
@@ -1820,8 +2557,9 @@ function normalizeRecipeEditorSnapshot(recipe) {
         display_name: String(recipe.display_name || "").trim(),
         recipe_title: String(recipe.recipe_title || "").trim(),
         source_url: String(recipe.source_url || "").trim(),
-        quantity: String(Math.max(1, parseInt(recipe.quantity || "1", 10) || 1)),
+        quantity: String(parseRecipeScaleMultiplier(recipe.quantity || "1") || 1),
         servings: String(recipe.servings || "").trim(),
+        scaling: normalizeRecipeScalingSnapshot(recipe.scaling || {}),
         ingredients: (recipe.ingredients || []).map(item => ({
             ingredient: String(item.ingredient || "").trim(),
             quantity: String(item.quantity || "").trim(),
@@ -1843,6 +2581,26 @@ function normalizeRecipeEditorSnapshot(recipe) {
     };
 }
 
+function normalizeRecipeScalingSnapshot(scaling) {
+    const normalized = normalizeRecipeScalingOptions(
+        scaling.available_multipliers
+            || scaling.multipliers
+            || scaling.scaling_multipliers
+            || []
+    );
+    const selected = parseRecipeScaleMultiplier(
+        scaling.selected_multiplier !== undefined
+            ? scaling.selected_multiplier
+            : scaling.scaling_multiplier
+    ) || 1;
+
+    return {
+        selected_multiplier: String(selected),
+        base_servings: String(scaling.base_servings || "").trim(),
+        available_multipliers: normalized.map(option => `${option.label}:${option.value}`),
+    };
+}
+
 function buildRecipeSaveProgressItems(recipe) {
     const next = normalizeRecipeEditorSnapshot(recipe);
     const previous = recipeEditOriginalSnapshot || normalizeRecipeEditorSnapshot({});
@@ -1859,6 +2617,10 @@ function buildRecipeSaveProgressItems(recipe) {
             detailLines.push(`${label}: ${previous[key] || "(blank)"} -> ${next[key] || "(blank)"}`);
         }
     });
+
+    if (previous.scaling.selected_multiplier !== next.scaling.selected_multiplier) {
+        detailLines.push(`Scaling multiplier: ${previous.scaling.selected_multiplier || "1"}x -> ${next.scaling.selected_multiplier || "1"}x`);
+    }
 
     const ingredientLines = changedRecipeIngredientLines(previous.ingredients, next.ingredients);
     if (ingredientLines.length) {
@@ -2039,7 +2801,7 @@ function updateRecipeSaveProgressFailed() {
 
 function collectRecipeEditorPayload() {
     const originalUrl = document.getElementById("recipeEditOriginalUrl").value || "";
-    const quantity = Math.max(1, parseInt(document.getElementById("recipeEditQuantity").value || "1", 10) || 1);
+    const quantity = parseRecipeScaleMultiplier(document.getElementById("recipeEditQuantity").value || "1") || 1;
     const sourceUrl = recipeEditorSourceUrlForSave();
 
     return {
@@ -2050,6 +2812,7 @@ function collectRecipeEditorPayload() {
             source_url: sourceUrl,
             quantity,
             servings: document.getElementById("recipeEditServings").value.trim(),
+            scaling: collectRecipeScalingPayload(),
             ingredients: collectRecipeIngredientRows(),
             equipment: collectRecipeTextRows("#recipeEditEquipment .recipe-edit-text-row"),
             instructions: collectRecipeInstructionRows(),
@@ -2077,8 +2840,19 @@ function recipeEditorSourceUrlForSave() {
 }
 
 function collectRecipeIngredientRows() {
+    const selectedMultiplier = currentRecipeEditScaleMultiplier();
+
     return [...document.querySelectorAll("#recipeEditIngredients .recipe-edit-ingredient-row")]
-        .map(row => fieldValuesFromRow(row))
+        .map(row => {
+            const item = fieldValuesFromRow(row);
+
+            if (Math.abs(selectedMultiplier - 1) < 0.000001) {
+                item.base_quantity = item.quantity || "";
+                item.base_unit = item.unit || "";
+            }
+
+            return item;
+        })
         .filter(item => item.ingredient || item.original_text);
 }
 
@@ -2137,10 +2911,9 @@ async function saveRecipeQuantity(input, options = {}) {
     }
 
     const url = input.dataset.recipeUrl || "";
-    const quantity = Math.max(1, parseInt(input.value || "1", 10) || 1);
-    input.value = quantity;
+    const quantity = normalizeRecipeQuantityInput(input);
 
-    if (!options.force && input.dataset.lastSavedValue === String(quantity) && !input.dataset.savePending) {
+    if (!options.force && recipeMultipliersMatch(input.dataset.lastSavedValue, quantity) && !input.dataset.savePending) {
         return { skipped: true };
     }
 
@@ -2177,7 +2950,12 @@ async function saveRecipeQuantity(input, options = {}) {
         }
 
         if (options.message !== false) {
-            showRecipeQuantityUpdatedMessage(url, quantity, input.dataset.recipeNumber || "");
+            showRecipeQuantityUpdatedMessage(
+                url,
+                formatRecipeScaleMultiplierLabel(quantity),
+                input.dataset.recipeNumber || "",
+                `${input.dataset.recipeNumber ? `Recipe ${input.dataset.recipeNumber} ` : ""}Scaling multiplier updated to ${formatRecipeScaleMultiplierLabel(quantity)}.`
+            );
         }
 
         setTimeout(() => {
@@ -2206,16 +2984,18 @@ function setRecipeQuantityControlSaving(input, isSaving) {
     }
 
     control.classList.toggle("saving", isSaving);
-    control.querySelectorAll("button, input").forEach(element => {
+    control.querySelectorAll("button, input, select").forEach(element => {
         element.disabled = isSaving;
     });
 }
 
 function updateRecipeQuantityDisplays(recipeUrl, multiplier, apiData = null) {
+    const isScaled = !recipeMultipliersMatch(multiplier, 1);
+
     document.querySelectorAll(`.recipe-servings-scaled[data-recipe-url="${cssEscape(recipeUrl)}"]`).forEach(element => {
         const baseServings = element.dataset.baseServings || "";
         const scaledServings = (apiData && apiData.servings) || scaleServingsForDisplay(baseServings, multiplier);
-        element.textContent = multiplier > 1 && scaledServings ? ` -> ${scaledServings}` : "";
+        element.textContent = isScaled && scaledServings ? ` -> ${scaledServings}` : "";
     });
 
     document.querySelectorAll(`.recipe-ingredient-scaled-quantity[data-recipe-url="${cssEscape(recipeUrl)}"]`).forEach(element => {
@@ -2226,14 +3006,14 @@ function updateRecipeQuantityDisplays(recipeUrl, multiplier, apiData = null) {
         const baseDisplay = `${baseQuantity} ${unit}`.trim();
 
         if (apiIngredient && apiIngredient.display) {
-            element.textContent = multiplier > 1 ? apiIngredient.display : baseDisplay;
+            element.textContent = isScaled ? apiIngredient.display : baseDisplay;
             return;
         }
 
         const scaledQuantity = scaleQuantityForDisplay(baseQuantity, multiplier);
 
         if (scaledQuantity) {
-            element.textContent = multiplier > 1 ? `${scaledQuantity} ${unit}`.trim() : baseDisplay;
+            element.textContent = isScaled ? `${scaledQuantity} ${unit}`.trim() : baseDisplay;
         }
     });
 }
@@ -2298,7 +3078,7 @@ function openItemQtyEditor(button) {
     if (titleNameDisplay) {
         titleNameDisplay.textContent = itemName ? itemName : "";
     }
-    currentDisplay.textContent = currentQty || "No recipe quantity found.";
+    currentDisplay.textContent = currentQty || "No scaling multiplier found.";
     currentDisplay.classList.toggle("muted", !currentQty);
     renderItemQtySources(sourcesDisplay, button.dataset.recipeQtySources, button.dataset.itemKey || "");
 
@@ -2331,7 +3111,7 @@ function renderItemQtySources(container, sourcesJson, itemKey = "") {
 
     const header = document.createElement("div");
     header.className = "item-qty-source-header";
-    ["Recipe", "Default qty", "Unit", "Recipe Qty"].forEach(text => {
+    ["Recipe", "Default qty", "Unit", "Scaling Multiplier"].forEach(text => {
         const cell = document.createElement("span");
         cell.textContent = text;
         header.appendChild(cell);
@@ -2342,9 +3122,19 @@ function renderItemQtySources(container, sourcesJson, itemKey = "") {
         const row = document.createElement("div");
         row.className = "item-qty-source-row";
 
-        const label = document.createElement("span");
+        const label = document.createElement(source.url ? "button" : "span");
         label.className = "item-qty-source-label";
-        label.textContent = source.label || "Recipe qty";
+        label.textContent = source.label || "Recipe";
+        if (source.url) {
+            label.type = "button";
+            label.classList.add("item-qty-source-link");
+            label.title = source.ingredient
+                ? `Edit recipe and jump to ${source.ingredient}`
+                : "Edit recipe";
+            label.addEventListener("click", () => {
+                openRecipeEditorFromItemQtySource(source.url, source.ingredient || "");
+            });
+        }
 
         const defaultQuantity = document.createElement("div");
         defaultQuantity.className = "item-qty-source-default";
@@ -2384,16 +3174,12 @@ function renderItemQtySources(container, sourcesJson, itemKey = "") {
 
         defaultQuantity.append(defaultQuantityInput, defaultUnitInput);
 
-        const quantityInput = document.createElement("input");
-        quantityInput.className = "item-qty-source-value recipe-quantity-input";
-        quantityInput.type = "number";
-        quantityInput.min = "1";
-        quantityInput.step = "1";
-        quantityInput.value = source.recipe_quantity || 1;
-        quantityInput.placeholder = "1";
+        const quantityInput = document.createElement("select");
+        quantityInput.className = "item-qty-source-value recipe-quantity-input recipe-scaling-select";
+        populateItemQtyScalingOptions(quantityInput, source.scaling_options, source.recipe_quantity || 1);
         quantityInput.dataset.recipeUrl = source.url || "";
         quantityInput.dataset.recipeNumber = source.recipe_number || "";
-        quantityInput.dataset.lastSavedValue = String(source.recipe_quantity || 1);
+        quantityInput.dataset.lastSavedValue = String(parseRecipeScaleMultiplier(source.recipe_quantity) || 1);
         quantityInput.dataset.itemKey = itemKey;
         quantityInput.title = source.quantity ? `Ingredient qty: ${source.quantity}` : "";
 
@@ -2411,6 +3197,40 @@ function renderItemQtySources(container, sourcesJson, itemKey = "") {
         row.append(label, defaultQuantity, quantityInput);
         container.appendChild(row);
     });
+}
+
+function populateItemQtyScalingOptions(select, scalingOptions, selectedMultiplier) {
+    const selected = parseRecipeScaleMultiplier(selectedMultiplier) || 1;
+    const options = normalizeRecipeScalingOptions(scalingOptions || []);
+
+    if (!options.some(option => recipeMultipliersMatch(option.value, selected))) {
+        options.push({
+            label: formatRecipeScaleMultiplierLabel(selected),
+            value: selected,
+        });
+        options.sort((a, b) => a.value - b.value);
+    }
+
+    select.replaceChildren(...options.map(option => {
+        const element = document.createElement("option");
+        element.value = String(option.value);
+        element.textContent = option.label;
+        element.selected = recipeMultipliersMatch(option.value, selected);
+        return element;
+    }));
+}
+
+function openRecipeEditorFromItemQtySource(recipeUrl, ingredientName = "") {
+    if (!recipeUrl) {
+        return false;
+    }
+
+    closeItemQtyEditor();
+    openRecipeEditor(
+        { dataset: { recipeUrl } },
+        { scrollToIngredient: ingredientName }
+    );
+    return false;
 }
 
 async function saveItemModalDefaultQuantity(quantityInput, unitInput) {
@@ -2459,8 +3279,8 @@ async function saveItemModalRecipeQuantity(input) {
         normalizeRecipeQuantityInput(input);
         data = await saveRecipeQuantity(input, { throwOnError: true });
     } catch (err) {
-        console.warn("Unable to save recipe quantity from item modal.", err);
-        alert("Unable to save recipe quantity.");
+        console.warn("Unable to save scaling multiplier from item modal.", err);
+        alert("Unable to save scaling multiplier.");
         return;
     }
 
@@ -2489,7 +3309,7 @@ function syncOpenItemQtyEditor(itemKey) {
     }
 
     const currentQty = sourceButton.dataset.currentQty || "";
-    currentDisplay.textContent = currentQty || "No recipe quantity found.";
+    currentDisplay.textContent = currentQty || "No scaling multiplier found.";
     currentDisplay.classList.toggle("muted", !currentQty);
     renderItemQtySources(sourcesDisplay, sourceButton.dataset.recipeQtySources, itemKey);
 }
@@ -2601,7 +3421,7 @@ function scaleServingsForDisplay(servings, multiplier) {
 }
 
 function scaleQuantityForDisplay(quantity, multiplier) {
-    const value = String(quantity || "").trim();
+    const value = normalizeQuantityFractionText(quantity);
 
     if (!value || multiplier === 1) {
         return value;
@@ -2630,7 +3450,7 @@ function scaleQuantityPart(value, multiplier) {
 }
 
 function parseQuantityFraction(value) {
-    const text = String(value || "").trim();
+    const text = normalizeQuantityFractionText(value);
     let match = text.match(/^(\d+)\s+(\d+)\/(\d+)$/);
 
     if (match) {
@@ -2662,6 +3482,21 @@ function parseQuantityFraction(value) {
     }
 
     return null;
+}
+
+function normalizeQuantityFractionText(value) {
+    return String(value || "")
+        .trim()
+        .replace(/[–—]/g, "-")
+        .replace(/Â½|½|â…½/g, "1/2")
+        .replace(/Â¼|¼|â…¼/g, "1/4")
+        .replace(/Â¾|¾|â…¾/g, "3/4")
+        .replace(/⅓|â…“/g, "1/3")
+        .replace(/⅔|â…”/g, "2/3")
+        .replace(/⅛|â…›/g, "1/8")
+        .replace(/⅜|â…œ/g, "3/8")
+        .replace(/⅝|â…/g, "5/8")
+        .replace(/⅞|â…ž/g, "7/8");
 }
 
 function formatQuantityFraction(fraction) {

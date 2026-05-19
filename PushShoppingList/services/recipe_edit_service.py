@@ -1,16 +1,21 @@
 import json
+import os
 import uuid
 from urllib.parse import urlparse
 
 from PushShoppingList.services.food_rules_service import load_food_rules
+from PushShoppingList.services.recipe_extract_service import MODEL
 from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
 from PushShoppingList.services.recipe_extract_service import STORE_SECTION_ORDER
 from PushShoppingList.services.recipe_extract_service import build_video_text_pdf_html
 from PushShoppingList.services.recipe_extract_service import classify_store_section
+from PushShoppingList.services.recipe_extract_service import clean_json_response
 from PushShoppingList.services.recipe_extract_service import extract_ingredients_from_result
 from PushShoppingList.services.recipe_extract_service import fetch_recipe_page
+from PushShoppingList.services.recipe_extract_service import get_openai_client
 from PushShoppingList.services.recipe_extract_service import normalize_extracted_equipment_fields
 from PushShoppingList.services.recipe_extract_service import normalize_extracted_ingredient_fields
+from PushShoppingList.services.recipe_extract_service import normalize_recipe_scaling_metadata
 from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_path
 from PushShoppingList.services.recipe_extract_service import safe_filename
 from PushShoppingList.services.recipe_extract_service import write_recipe_page_pdf
@@ -50,6 +55,23 @@ NUTRITION_FIELDS = [
     "calcium",
     "iron",
 ]
+DEFAULT_MANUAL_NUTRITION_FIELDS = [
+    "serving_basis",
+    "calories",
+    "carbohydrates",
+    "protein",
+    "fat",
+    "saturated_fat",
+    "cholesterol",
+    "sodium",
+    "fiber",
+    "sugar",
+]
+NUTRITION_ESTIMATE_FIELDS = [
+    field
+    for field in DEFAULT_MANUAL_NUTRITION_FIELDS
+    if field != "serving_basis"
+]
 
 
 def create_new_recipe():
@@ -62,6 +84,7 @@ def create_new_recipe():
         "equipment": [],
         "instructions": [],
         "nutrition": empty_recipe_nutrition(),
+        "scaling": normalize_recipe_scaling_metadata(),
     }
 
     save_recipe_output(source_url, recipe_data)
@@ -77,7 +100,8 @@ def create_new_recipe():
 
 def empty_recipe_nutrition():
     return {
-        **{field: None for field in NUTRITION_FIELDS},
+        **{field: "" for field in DEFAULT_MANUAL_NUTRITION_FIELDS},
+        "serving_basis": "per serving",
         "other": [],
     }
 
@@ -87,6 +111,9 @@ def load_editable_recipe(url):
     recipe_data = load_recipe_output(url) or {"source_url": url}
     meta = load_recipe_ingredients().get(normalize_recipe_url_key(url), {})
     pdf = editable_recipe_pdf_info(url)
+    scaling = normalize_recipe_scaling_metadata(recipe_data.get("scaling"))
+    if recipe_data.get("servings") and not scaling.get("base_servings"):
+        scaling["base_servings"] = str(recipe_data.get("servings") or "").strip()
 
     return {
         "ok": True,
@@ -98,10 +125,14 @@ def load_editable_recipe(url):
             "quantity": normalize_recipe_quantity(meta.get("quantity", 1)),
             "recipe_title": recipe_data.get("recipe_title") or "",
             "servings": recipe_data.get("servings") or "",
+            "scaling": scaling,
             "ingredients": normalize_edit_ingredients(recipe_data.get("ingredients", [])),
             "equipment": normalize_text_rows(recipe_data.get("equipment", [])),
             "instructions": normalize_instruction_rows(recipe_data.get("instructions", [])),
-            "nutrition": normalize_nutrition_rows(recipe_data.get("nutrition", {})),
+            "nutrition": normalize_nutrition_rows(
+                recipe_data.get("nutrition", {}),
+                include_defaults=recipe_url_type(url) == "Manual",
+            ),
             "pdf_path": pdf["path"],
             "pdf_available": pdf["available"],
         },
@@ -242,11 +273,16 @@ def save_editable_recipe(original_url, payload):
         "source_url": source_url,
         "recipe_title": str(payload.get("recipe_title") or "").strip(),
         "servings": str(payload.get("servings") or "").strip(),
+        "scaling": normalize_recipe_scaling_metadata(
+            payload.get("scaling") or existing_data.get("scaling")
+        ),
         "ingredients": sanitize_ingredients(payload.get("ingredients", [])),
         "equipment": sanitize_text_list(payload.get("equipment", [])),
         "instructions": sanitize_instruction_list(payload.get("instructions", [])),
         "nutrition": sanitize_nutrition(payload.get("nutrition", [])),
     }
+    if recipe_data["servings"] and not recipe_data["scaling"].get("base_servings"):
+        recipe_data["scaling"]["base_servings"] = recipe_data["servings"]
 
     normalize_extracted_ingredient_fields(recipe_data)
     normalize_extracted_equipment_fields(recipe_data)
@@ -266,6 +302,190 @@ def save_editable_recipe(original_url, payload):
     sync_saved_recipe_with_shopping_list(recipe_data, previous_ingredients)
 
     return load_editable_recipe(source_url)
+
+
+def estimate_recipe_nutrition(payload):
+    payload = payload if isinstance(payload, dict) else {}
+
+    if not payload.get("ingredients"):
+        return {
+            "ok": False,
+            "error": "Add at least one ingredient before estimating nutrition.",
+        }
+
+    if not os.getenv("OPENAI_API_KEY"):
+        return {
+            "ok": False,
+            "error": "Missing OPENAI_API_KEY environment variable.",
+        }
+
+    serving_basis = recipe_nutrition_serving_basis(payload.get("nutrition"))
+    prompt = build_nutrition_estimate_prompt(payload, serving_basis)
+
+    try:
+        response = get_openai_client().chat.completions.create(
+            model=os.getenv("OPENAI_NUTRITION_MODEL", MODEL),
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You estimate recipe nutrition and return only valid JSON.",
+                },
+                {
+                    "role": "user",
+                    "content": prompt,
+                },
+            ],
+            response_format={"type": "json_object"},
+            temperature=0,
+        )
+        content = response.choices[0].message.content
+        data = json.loads(clean_json_response(content))
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": f"Nutrition estimate failed: {exc}",
+        }
+
+    if not isinstance(data, dict):
+        return {
+            "ok": False,
+            "error": "Nutrition estimate returned an unexpected response.",
+        }
+
+    nutrition = data.get("nutrition") if isinstance(data.get("nutrition"), dict) else data
+
+    rows = [{"key": "serving_basis", "value": serving_basis}]
+    for key in NUTRITION_ESTIMATE_FIELDS:
+        value = normalize_estimated_nutrition_value(key, nutrition.get(key))
+        rows.append({"key": key, "value": value})
+
+    return {
+        "ok": True,
+        "nutrition": rows,
+    }
+
+
+def recipe_nutrition_serving_basis(nutrition_rows):
+    if isinstance(nutrition_rows, dict):
+        return str(nutrition_rows.get("serving_basis") or "per serving").strip() or "per serving"
+
+    if isinstance(nutrition_rows, list):
+        for row in nutrition_rows:
+            if not isinstance(row, dict):
+                continue
+
+            key = str(row.get("key") or row.get("label") or "").strip().lower()
+            if key == "serving_basis":
+                return str(row.get("value") or "per serving").strip() or "per serving"
+
+    return "per serving"
+
+
+def build_nutrition_estimate_prompt(recipe, serving_basis):
+    recipe_payload = {
+        "title": str(recipe.get("recipe_title") or recipe.get("display_name") or "").strip(),
+        "servings": str(recipe.get("servings") or "").strip(),
+        "serving_basis": serving_basis,
+        "ingredients": nutrition_prompt_ingredients(recipe.get("ingredients", [])),
+        "equipment": sanitize_text_list(recipe.get("equipment", [])),
+        "instructions": nutrition_prompt_instructions(recipe.get("instructions", [])),
+    }
+
+    return f"""
+Estimate the nutrition values for this recipe.
+
+Return ONLY valid JSON with this exact shape:
+{{
+  "nutrition": {{
+    "calories": "659 kcal",
+    "carbohydrates": "57 g",
+    "protein": "17 g",
+    "fat": "40 g",
+    "saturated_fat": "16 g",
+    "cholesterol": "37 mg",
+    "sodium": "649 mg",
+    "fiber": "3 g",
+    "sugar": "0.2 g"
+  }}
+}}
+
+Rules:
+- Estimate values for the serving basis: {serving_basis}.
+- Use the recipe servings to divide the full recipe when servings are available.
+- Use the provided ingredient quantities, units, and preparation details.
+- Use common USDA-style approximations when exact brands are unknown.
+- Do not invent extra ingredients.
+- Return strings with units.
+- calories must use kcal.
+- carbohydrates, protein, fat, saturated_fat, fiber, and sugar must use g.
+- cholesterol and sodium must use mg.
+- If a value cannot be estimated, use an empty string.
+
+Recipe JSON:
+{json.dumps(recipe_payload, ensure_ascii=False, indent=2)}
+"""
+
+
+def nutrition_prompt_ingredients(ingredients):
+    if not isinstance(ingredients, list):
+        return []
+
+    rows = []
+    for item in ingredients:
+        if not isinstance(item, dict):
+            continue
+
+        rows.append({
+            "ingredient": str(item.get("ingredient") or "").strip(),
+            "quantity": str(item.get("quantity") or "").strip(),
+            "unit": str(item.get("unit") or "").strip(),
+            "preparation": str(item.get("preparation") or "").strip(),
+            "original_text": str(item.get("original_text") or "").strip(),
+        })
+
+    return [
+        row
+        for row in rows
+        if row["ingredient"] or row["original_text"]
+    ]
+
+
+def nutrition_prompt_instructions(instructions):
+    if not isinstance(instructions, list):
+        return []
+
+    rows = []
+    for item in instructions:
+        if isinstance(item, dict):
+            text = str(item.get("instruction") or item.get("text") or "").strip()
+        else:
+            text = str(item or "").strip()
+
+        if text:
+            rows.append(text)
+
+    return rows
+
+
+def normalize_estimated_nutrition_value(key, value):
+    if value is None:
+        return ""
+
+    if isinstance(value, dict):
+        amount = str(value.get("amount") or value.get("value") or "").strip()
+        unit = str(value.get("unit") or "").strip()
+        return f"{amount} {unit}".strip()
+
+    if isinstance(value, (int, float)):
+        if key == "calories":
+            return f"{value:g} kcal"
+
+        if key in {"cholesterol", "sodium"}:
+            return f"{value:g} mg"
+
+        return f"{value:g} g"
+
+    return str(value or "").strip()
 
 
 def sync_saved_recipe_with_shopping_list(recipe_data, previous_ingredients):
@@ -369,6 +589,8 @@ def normalize_edit_ingredients(ingredients):
             "original_text": item.get("original_text") or "",
             "quantity": item.get("quantity") or "",
             "unit": item.get("unit") or "",
+            "base_quantity": item.get("base_quantity") or item.get("quantity") or "",
+            "base_unit": item.get("base_unit") or item.get("unit") or "",
             "ingredient": item.get("ingredient") or "",
             "preparation": item.get("preparation") or "",
             "optional": bool(item.get("optional")),
@@ -427,15 +649,25 @@ def normalize_instruction_rows(value):
     return sorted(rows, key=lambda item: item["step_number"])
 
 
-def normalize_nutrition_rows(nutrition):
+def normalize_nutrition_rows(nutrition, include_defaults=False):
     if not isinstance(nutrition, dict):
         return []
 
-    rows = [
-        {"key": key, "value": str(nutrition.get(key) or "")}
-        for key in NUTRITION_FIELDS
-        if nutrition.get(key)
-    ]
+    rows = []
+    included = set()
+
+    if include_defaults:
+        for key in DEFAULT_MANUAL_NUTRITION_FIELDS:
+            fallback = "per serving" if key == "serving_basis" else ""
+            rows.append({"key": key, "value": str(nutrition.get(key) or fallback)})
+            included.add(key)
+
+    for key in NUTRITION_FIELDS:
+        if key in included or not nutrition.get(key):
+            continue
+
+        rows.append({"key": key, "value": str(nutrition.get(key) or "")})
+        included.add(key)
 
     other = nutrition.get("other", [])
     if isinstance(other, list):
@@ -465,12 +697,16 @@ def sanitize_ingredients(value):
             continue
 
         store_section = classify_store_section(name or original_text)
+        base_quantity = nullable_string(item.get("base_quantity"))
+        base_unit = nullable_string(item.get("base_unit"))
 
         ingredients.append({
             "section": nullable_string(item.get("section")),
             "original_text": original_text,
             "quantity": nullable_string(item.get("quantity")),
             "unit": nullable_string(item.get("unit")),
+            "base_quantity": base_quantity or nullable_string(item.get("quantity")),
+            "base_unit": base_unit or nullable_string(item.get("unit")),
             "ingredient": name or original_text,
             "preparation": nullable_string(item.get("preparation")),
             "optional": bool(item.get("optional")),

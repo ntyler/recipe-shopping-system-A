@@ -15,6 +15,7 @@ from flask import render_template
 from flask import url_for
 
 from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
+from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.food_rules_service import shopping_item_food_rule_status
 from PushShoppingList.services.home_address_service import load_home_address
 from PushShoppingList.services.home_address_service import save_home_address
@@ -24,6 +25,7 @@ from PushShoppingList.services.recipe_url_service import recipe_url_rows
 from PushShoppingList.services.recipe_url_service import recipe_url_type
 from PushShoppingList.services.recipe_url_service import save_recipe_urls
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
+from PushShoppingList.services.recipe_url_service import normalize_recipe_quantity
 from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
 from PushShoppingList.services.recipe_ingredient_service import save_recipe_ingredients
 from PushShoppingList.services.recipe_quantity_service import ingredient_key
@@ -31,6 +33,9 @@ from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
 from PushShoppingList.services.recipe_extract_service import STORE_SECTION_ORDER
 from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_exists
 from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_path
+from PushShoppingList.services.recipe_extract_service import recipe_scaling_from_data
+from PushShoppingList.services.recipe_extract_service import scaling_multiplier_label
+from PushShoppingList.services.product_selection_service import product_choices_by_item
 from PushShoppingList.services.shopping_list_service import load_items
 from PushShoppingList.services.shopping_list_service import save_items
 from PushShoppingList.services.store_settings_service import load_store_settings
@@ -172,10 +177,10 @@ def recipe_view_rows(recipe_urls):
     recipe_ingredient_data = load_recipe_ingredients()
 
     for index, recipe in enumerate(recipe_urls, start=1):
-        recipe_quantity = int(recipe.get("quantity") or 1)
+        recipe_quantity = normalize_recipe_quantity(recipe.get("quantity") or 1)
         recipe_data = load_saved_recipe_output(recipe["url"])
         recipe_meta = recipe_ingredient_data.get(normalize_recipe_url_key(recipe["url"]), {})
-        use_scaled_meta = int(recipe_meta.get("quantity") or 1) == recipe_quantity
+        use_scaled_meta = multipliers_match(recipe_meta.get("quantity", 1), recipe_quantity)
         scaled_ingredients = recipe_meta.get("scaled_ingredients", {}) if use_scaled_meta else {}
         scaled_servings = recipe_meta.get("scaled_servings") if use_scaled_meta else None
         sections = build_recipe_sections(recipe_data, recipe_quantity, scaled_ingredients)
@@ -187,6 +192,7 @@ def recipe_view_rows(recipe_urls):
             "source_href": recipe_source_href(recipe["url"]),
             "source_display_url": recipe_source_display_url(recipe["url"]),
             "quantity": recipe_quantity,
+            "scaling_options": recipe_log_scaling_options(recipe_data, recipe_quantity),
             "archive_pdf_available": recipe_archive_pdf_exists(recipe["url"]),
             "food_rule_status": recipe_food_rule_status(recipe_data),
             "base_servings": recipe_data.get("servings"),
@@ -205,8 +211,11 @@ def recipe_url_log_rows(recipe_urls):
 
     for recipe in recipe_urls:
         recipe_data = load_saved_recipe_output(recipe["url"])
+        recipe_quantity = normalize_recipe_quantity(recipe.get("quantity") or 1)
         rows.append({
             **recipe,
+            "quantity": recipe_quantity,
+            "scaling_options": recipe_log_scaling_options(recipe_data, recipe_quantity),
             "source_href": recipe_source_href(recipe["url"]),
             "source_display_url": recipe_source_display_url(recipe["url"]),
             "food_rule_status": recipe_food_rule_status(recipe_data),
@@ -214,6 +223,37 @@ def recipe_url_log_rows(recipe_urls):
         })
 
     return rows
+
+
+def recipe_log_scaling_options(recipe_data, selected_multiplier):
+    scaling = recipe_scaling_from_data(recipe_data, default_to_common=True)
+    options = scaling.get("available_multipliers", [])
+    selected_multiplier = normalize_recipe_quantity(selected_multiplier)
+    normalized_options = []
+    selected_found = False
+
+    for option in options:
+        value = normalize_recipe_quantity(option.get("value") if isinstance(option, dict) else option)
+        selected = multipliers_match(value, selected_multiplier)
+        selected_found = selected_found or selected
+        normalized_options.append({
+            "label": option.get("label") if isinstance(option, dict) and option.get("label") else scaling_multiplier_label(value),
+            "value": value,
+            "selected": selected,
+        })
+
+    if not selected_found:
+        normalized_options.append({
+            "label": scaling_multiplier_label(selected_multiplier),
+            "value": selected_multiplier,
+            "selected": True,
+        })
+
+    return sorted(normalized_options, key=lambda option: float(option["value"]))
+
+
+def multipliers_match(left, right):
+    return abs(float(normalize_recipe_quantity(left)) - float(normalize_recipe_quantity(right))) < 0.000001
 
 
 def recipe_source_href(recipe_url):
@@ -536,7 +576,7 @@ def build_recipe_sections(recipe_data, recipe_quantity=1, scaled_ingredients=Non
         if alternative:
             display_name = alternative["name"]
             base_display = alternative["base_display"]
-            quantity_display = alternative["scaled_display"] if recipe_quantity > 1 else alternative["base_display"]
+            quantity_display = alternative["scaled_display"] if not multipliers_match(recipe_quantity, 1) else alternative["base_display"]
 
         sections[section].append({
             "name": name,
@@ -829,6 +869,7 @@ def index():
     recipe_log_rows = recipe_url_log_rows(recipe_urls)
     item_state = load_item_state()
     recipe_rows = recipe_view_rows(recipe_urls)
+    product_choices = product_choices_by_item()
     recipe_item_quantities = recipe_quantity_lookup(recipe_rows)
     recipe_item_quantity_sources = recipe_quantity_sources_lookup(recipe_rows)
     item_quantities = apply_manual_item_quantities(
@@ -858,8 +899,10 @@ def index():
             store_settings["enabled_stores"],
         ),
         recipe_view_rows=recipe_rows,
+        product_choices=product_choices,
         normalize=normalize,
         is_section_header=is_section_header,
+        food_rules=load_food_rules(),
         food_rule_status=shopping_item_food_rule_status,
         app_css_version=static_asset_version("css/app.css"),
         app_js_version=static_asset_version("js/app.js"),

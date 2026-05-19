@@ -35,6 +35,7 @@
                         {% if item_quantities.get(item_key) %}
                             <div class="source-line item-qty-line">{{ item_quantities.get(item_key) }}</div>
                         {% endif %}
+                        {% include "sections/product_choice_line.html" %}
                     </div>
 
                     <div class="item-actions">
@@ -115,6 +116,7 @@
                             {% if item_quantities.get(item_key) %}
                                 <div class="source-line item-qty-line">{{ item_quantities.get(item_key) }}</div>
                             {% endif %}
+                            {% include "sections/product_choice_line.html" %}
                         </div>
 
                         <div class="item-actions">
@@ -199,7 +201,7 @@
                         <span class="recipe-servings-scaled"
                               data-recipe-url="{{ recipe.url }}"
                               data-base-servings="{{ recipe.base_servings or "" }}">
-                            {% if recipe.quantity > 1 and recipe.scaled_servings %}
+                            {% if recipe.quantity != 1 and recipe.scaled_servings %}
                                 -> {{ recipe.scaled_servings }}
                             {% endif %}
                         </span>
@@ -331,7 +333,7 @@
                                                       data-ingredient-name="{{ recipe_item.name }}"
                                                       data-base-quantity="{{ recipe_item.base_quantity or "" }}"
                                                       data-unit="{{ recipe_item.unit or "" }}">
-                                                    {% if recipe.quantity > 1 %}
+                                                    {% if recipe.quantity != 1 %}
                                                         {{ recipe_item.quantity_display or (recipe_item.scaled_quantity ~ " " ~ (recipe_item.unit or "")) }}
                                                     {% else %}
                                                         {{ recipe_item.base_display or (recipe_item.quantity ~ " " ~ (recipe_item.unit or "")) }}
@@ -339,6 +341,7 @@
                                                 </span>
                                             {% endif %}
                                         </div>
+                                        {% include "sections/product_choice_line.html" %}
                                     </div>
 
                                     <div class="item-actions">
@@ -365,7 +368,7 @@
                                                 data-item-key="{{ item_key }}"
                                                 data-item-name="{{ display_name }}"
                                                 data-current-qty="{{ recipe_item.quantity_display or recipe_item.base_display or '' }}"
-                                                data-recipe-qty-sources='{{ [{"label": "Recipe " ~ recipe.number ~ " Qty", "ingredient": recipe_item.name or display_name, "default_quantity": recipe_item.base_display or "", "default_quantity_value": recipe_item.base_quantity or "", "default_unit": recipe_item.unit or "", "recipe_number": recipe.number, "recipe_quantity": recipe.quantity, "url": recipe.url, "quantity": recipe_item.quantity_display or recipe_item.base_display or ""}]|tojson }}'
+                                                data-recipe-qty-sources='{{ [{"label": "Recipe " ~ recipe.number, "ingredient": recipe_item.name or display_name, "default_quantity": recipe_item.base_display or "", "default_quantity_value": recipe_item.base_quantity or "", "default_unit": recipe_item.unit or "", "recipe_number": recipe.number, "recipe_quantity": recipe.quantity, "scaling_options": recipe.scaling_options, "url": recipe.url, "quantity": recipe_item.quantity_display or recipe_item.base_display or ""}]|tojson }}'
                                                 data-manual-qty="{{ state.get('manual_qty', '') }}"
                                                 onclick="openItemQtyEditor(this)">
                                             EDIT

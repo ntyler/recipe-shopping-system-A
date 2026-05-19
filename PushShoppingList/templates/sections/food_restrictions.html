@@ -1,0 +1,56 @@
+<div id="foodRestrictionsCard" class="app-card">
+    <button type="button"
+            class="card-collapse-toggle food-restrictions-toggle"
+            data-collapse-toggle="food-restrictions"
+            aria-expanded="true"
+            onclick="toggleCardCollapse('food-restrictions')">
+        <span>Food Rescrictions</span>
+        <span class="card-collapse-icon" data-collapse-icon="food-restrictions">Hide ^</span>
+    </button>
+
+    <div class="card-collapse-content food-restrictions-content"
+         data-collapse-content="food-restrictions"
+         data-collapse-default="expanded"
+         data-collapse-mobile-default="expanded">
+        {% set required_rules = food_rules.require if food_rules else [] %}
+        {% set avoid_rules = food_rules.avoid if food_rules else [] %}
+
+        {% if required_rules or avoid_rules %}
+            <div class="food-restrictions-grid">
+                <section class="food-restriction-group">
+                    <h3>Required</h3>
+                    {% if required_rules %}
+                        <ul class="food-restriction-list">
+                            {% for rule in required_rules %}
+                                <li>
+                                    <span class="food-restriction-label">{{ rule.label }}</span>
+                                    <span class="food-restriction-terms">{{ rule.terms | join(", ") }}</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="food-restriction-empty">No required food rules.</p>
+                    {% endif %}
+                </section>
+
+                <section class="food-restriction-group">
+                    <h3>Avoid</h3>
+                    {% if avoid_rules %}
+                        <ul class="food-restriction-list">
+                            {% for rule in avoid_rules %}
+                                <li>
+                                    <span class="food-restriction-label">{{ rule.label }}</span>
+                                    <span class="food-restriction-terms">{{ rule.terms | join(", ") }}</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="food-restriction-empty">No avoid food rules.</p>
+                    {% endif %}
+                </section>
+            </div>
+        {% else %}
+            <div class="log-box">No food restrictions are currently saved.</div>
+        {% endif %}
+    </div>
+</div>

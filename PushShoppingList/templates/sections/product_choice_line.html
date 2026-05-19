@@ -1,0 +1,31 @@
+{% set product_choice = product_choices.get(item_key, {}) if product_choices else {} %}
+{% set selected_product = product_choice.get("selected_product") if product_choice else None %}
+{% if selected_product %}
+    <div class="source-line product-link-line best-product-line" data-product-item-key="{{ item_key }}">
+        <span class="best-product-store">{{ selected_product.get("store_name") }}</span>
+        <button type="button"
+                class="product-alternatives-btn"
+                data-item-key="{{ item_key }}"
+                onclick="openProductAlternatives(this)">
+            Alternatives
+        </button>
+        <a class="best-product-link"
+           href="{{ selected_product.get("product_url") or selected_product.get("search_url") }}"
+           target="_blank"
+           rel="noopener noreferrer">
+            {{ selected_product.get("product_name") }}
+        </a>
+        <span class="best-product-price">{{ selected_product.get("price") or "Price unavailable" }}</span>
+    </div>
+{% elif product_choice and product_choice.get("skip_reasons") %}
+    <div class="source-line product-link-line best-product-line product-skip-line" data-product-item-key="{{ item_key }}">
+        <span>No valid product selected.</span>
+        <button type="button"
+                class="product-alternatives-btn"
+                data-item-key="{{ item_key }}"
+                onclick="openProductAlternatives(this)">
+            Alternatives
+        </button>
+        <span class="best-product-skip">{{ product_choice.get("skip_reasons")[0] }}</span>
+    </div>
+{% endif %}

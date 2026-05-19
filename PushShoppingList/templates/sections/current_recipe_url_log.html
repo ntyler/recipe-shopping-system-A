@@ -36,15 +36,18 @@
                             </button>
                         {% endif %}
                         <div class="recipe-quantity-control recipe-url-summary-quantity">
-                            <span>Qty</span>
-                            <input type="number"
-                                   class="recipe-quantity-input"
-                                   min="1"
-                                   step="1"
-                                   value="{{ recipe.quantity }}"
-                                   data-recipe-number="{{ loop.index }}"
-                                   data-recipe-url="{{ recipe.url }}"
-                                   aria-label="Recipe {{ loop.index }} quantity">
+                            <span>Scaling Multiplier</span>
+                            <select class="recipe-quantity-input recipe-scaling-select"
+                                    data-recipe-number="{{ loop.index }}"
+                                    data-recipe-url="{{ recipe.url }}"
+                                    aria-label="Recipe {{ loop.index }} scaling multiplier">
+                                {% for option in recipe.scaling_options %}
+                                    <option value="{{ option.value }}"
+                                            {% if option.selected %}selected{% endif %}>
+                                        {{ option.label }}
+                                    </option>
+                                {% endfor %}
+                            </select>
                         </div>
                         <button type="button"
                                 class="edit-recipe-btn recipe-url-summary-edit"
@@ -77,7 +80,7 @@
             <button type="button"
                     class="save-recipe-qty-btn recipe-url-summary-save-qty"
                     onclick="saveAllRecipeQuantities(this)">
-                Save Qty
+                Save Scaling Multiplier
             </button>
             <button type="button"
                     class="create-recipe-btn recipe-url-summary-create"
@@ -107,6 +110,7 @@
             </div>
 
             <input type="hidden" name="original_url" id="recipeEditOriginalUrl">
+            <input type="hidden" name="quantity" id="recipeEditQuantity" value="1">
 
             <div id="recipeEditStatus" class="recipe-edit-status"></div>
 
@@ -124,12 +128,14 @@
                     <input type="text" name="source_url" id="recipeEditSourceUrl">
                 </label>
                 <label>
-                    <span>Quantity</span>
-                    <input type="number" min="1" step="1" name="quantity" id="recipeEditQuantity">
-                </label>
-                <label>
                     <span>Servings</span>
                     <input type="text" name="servings" id="recipeEditServings">
+                </label>
+                <label>
+                    <span>Scaling Multiplier</span>
+                    <select name="scaling_multiplier"
+                            id="recipeEditScaleMultiplier"
+                            onchange="applyRecipeScaleMultiplier(this)"></select>
                 </label>
             </div>
 
@@ -198,7 +204,14 @@
             <section class="recipe-edit-section recipe-edit-nutrition-section">
                 <div class="recipe-edit-section-header">
                     <h3>Nutrition</h3>
-                    <button type="button" onclick="addRecipeNutritionRow()">Add Nutrition</button>
+                    <div class="recipe-edit-section-actions">
+                        <button type="button"
+                                id="recipeEditEstimateNutritionButton"
+                                onclick="estimateRecipeNutrition(this)">
+                            Estimate per serving_basis
+                        </button>
+                        <button type="button" onclick="addRecipeNutritionRow()">Add Nutrition</button>
+                    </div>
                 </div>
                 <div id="recipeEditNutrition" class="recipe-edit-nutrition">
                     <div class="recipe-edit-nutrition-header" aria-hidden="true">

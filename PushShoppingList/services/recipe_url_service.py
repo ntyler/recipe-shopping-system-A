@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+from fractions import Fraction
 from threading import Lock
 from urllib.parse import urlparse
 from urllib.parse import urlunparse
@@ -164,12 +165,27 @@ def save_recipe_url_meta(meta):
 
 
 def normalize_recipe_quantity(quantity):
-    try:
-        value = int(quantity)
-    except (TypeError, ValueError):
-        value = 1
+    if isinstance(quantity, (int, float)):
+        value = float(quantity)
+        if value <= 0:
+            value = 1
+        return int(value) if value.is_integer() else value
 
-    return max(1, value)
+    text = str(quantity or "").strip().lower().replace("x", "")
+    text = text.replace("×", "").strip()
+
+    try:
+        if "/" in text:
+            value = float(Fraction(text.replace(" ", "")))
+        else:
+            value = float(text)
+    except (TypeError, ValueError, ZeroDivisionError):
+        value = 1.0
+
+    if value <= 0:
+        value = 1.0
+
+    return int(value) if value.is_integer() else value
 
 
 def recipe_url_name(url):

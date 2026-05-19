@@ -40,11 +40,11 @@
     <div class="view-control-section">
         <div class="view-control-title">Product Tools</div>
         <div class="view-control-row">
-            <form class="view-action-form" method="POST" action="/preview_grab_best_products" onsubmit="saveScroll();">
+            <form class="view-action-form" method="POST" action="/preview_grab_best_products" onsubmit="return grabBestProducts(event);">
                 <button type="submit" class="grab-products-btn view-action-btn">Grab Best Products</button>
             </form>
 
-            <form class="view-action-form" method="POST" action="/clear_product_picks" onsubmit="saveScroll();">
+            <form class="view-action-form" method="POST" action="/clear_product_picks" onsubmit="return clearProductPicks(event);">
                 <button type="submit" class="clear-products-btn view-action-btn">Clear Product Picks</button>
             </form>
         </div>

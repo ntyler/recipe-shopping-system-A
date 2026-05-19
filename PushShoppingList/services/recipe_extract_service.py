@@ -6,6 +6,7 @@ import base64
 import io
 import mimetypes
 import shutil
+import subprocess
 import time
 import uuid
 import zipfile
@@ -45,6 +46,20 @@ MAX_VIDEO_AUDIO_BYTES = int(os.getenv("MAX_VIDEO_AUDIO_BYTES", str(24 * 1024 * 1
 OPENAI_FILE_INPUT_MIME_TYPES = {
     "application/pdf",
 }
+WORD_DOCUMENT_MIME_TYPES = {
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
+WORD_DOCUMENT_SUFFIXES = {
+    ".doc",
+    ".docx",
+}
+DEFAULT_RECIPE_SCALING_MULTIPLIERS = (
+    {"label": "1/2x", "value": 0.5},
+    {"label": "1x", "value": 1},
+    {"label": "2x", "value": 2},
+    {"label": "3x", "value": 3},
+)
 PDF_PAPER_WIDTH_IN = 8.5
 PDF_MARGIN_TOP_IN = 0.65
 PDF_MARGIN_BOTTOM_IN = 0.45
@@ -238,6 +253,278 @@ def clean_json_response(text):
     return text.strip()
 
 
+def default_recipe_scaling_options():
+    return [dict(option) for option in DEFAULT_RECIPE_SCALING_MULTIPLIERS]
+
+
+def parse_scaling_multiplier(value):
+    if value is None:
+        return None
+
+    if isinstance(value, (int, float)):
+        multiplier = float(value)
+        return multiplier if multiplier > 0 else None
+
+    text = html.unescape(str(value or "")).strip().lower()
+    if not text:
+        return None
+
+    text = text.replace("×", "x")
+    x_match = re.search(r"(\d+(?:\.\d+)?|\d+\s*/\s*\d+)\s*x\b", text)
+
+    if x_match:
+        text = x_match.group(1)
+    else:
+        text = text.rstrip("x").strip()
+
+    text = re.sub(r"\s+", "", text)
+    fraction_match = re.fullmatch(r"(\d+)/(\d+)", text)
+
+    try:
+        if fraction_match:
+            denominator = float(fraction_match.group(2))
+            if denominator == 0:
+                return None
+            multiplier = float(fraction_match.group(1)) / denominator
+        else:
+            multiplier = float(text)
+    except ValueError:
+        return None
+
+    if multiplier <= 0:
+        return None
+
+    return multiplier
+
+
+def scaling_multiplier_label(value):
+    multiplier = parse_scaling_multiplier(value)
+
+    if multiplier is None:
+        return "1x"
+
+    if abs(multiplier - 0.5) < 0.000001:
+        return "1/2x"
+
+    if float(multiplier).is_integer():
+        return f"{int(multiplier)}x"
+
+    return f"{multiplier:g}x"
+
+
+def normalize_scaling_option(option):
+    if isinstance(option, dict):
+        raw_value = (
+            option.get("value")
+            if option.get("value") is not None
+            else option.get("multiplier")
+        )
+        label = str(
+            option.get("label")
+            or option.get("text")
+            or option.get("name")
+            or ""
+        ).strip()
+    else:
+        raw_value = option
+        label = ""
+
+    multiplier = parse_scaling_multiplier(raw_value)
+
+    if multiplier is None and label:
+        multiplier = parse_scaling_multiplier(label)
+
+    if multiplier is None:
+        return None
+
+    return {
+        "label": scaling_multiplier_label(multiplier),
+        "value": multiplier,
+    }
+
+
+def normalize_scaling_options(options, default_to_common=True):
+    normalized = {}
+
+    for option in options or []:
+        item = normalize_scaling_option(option)
+
+        if not item:
+            continue
+
+        key = f"{item['value']:.6g}"
+        normalized[key] = item
+
+    if not normalized and default_to_common:
+        return default_recipe_scaling_options()
+
+    if normalized and "1" not in normalized:
+        normalized["1"] = {"label": "1x", "value": 1}
+
+    return sorted(normalized.values(), key=lambda item: item["value"])
+
+
+def normalize_recipe_scaling_metadata(scaling=None, default_to_common=True):
+    if not isinstance(scaling, dict):
+        scaling = {}
+
+    options = (
+        scaling.get("available_multipliers")
+        or scaling.get("multipliers")
+        or scaling.get("scaling_multipliers")
+        or []
+    )
+    normalized_options = normalize_scaling_options(options, default_to_common=default_to_common)
+
+    if not normalized_options and not default_to_common:
+        return None
+
+    selected_multiplier = parse_scaling_multiplier(
+        scaling.get("selected_multiplier")
+        if scaling.get("selected_multiplier") is not None
+        else scaling.get("scaling_multiplier")
+    )
+    base_multiplier = parse_scaling_multiplier(scaling.get("base_multiplier")) or 1
+
+    option_values = [option["value"] for option in normalized_options]
+
+    if selected_multiplier is None:
+        selected_multiplier = 1 if 1 in option_values else (option_values[0] if option_values else 1)
+
+    if normalized_options and not any(abs(option["value"] - selected_multiplier) < 0.000001 for option in normalized_options):
+        normalized_options = sorted(
+            [
+                *normalized_options,
+                {
+                    "label": scaling_multiplier_label(selected_multiplier),
+                    "value": selected_multiplier,
+                },
+            ],
+            key=lambda item: item["value"],
+        )
+
+    return {
+        "selected_multiplier": selected_multiplier,
+        "base_multiplier": base_multiplier,
+        "base_servings": str(scaling.get("base_servings") or "").strip(),
+        "available_multipliers": normalized_options or default_recipe_scaling_options(),
+    }
+
+
+def recipe_scaling_from_data(json_data, default_to_common=True):
+    if not isinstance(json_data, dict):
+        return normalize_recipe_scaling_metadata(default_to_common=default_to_common)
+
+    scaling = json_data.get("scaling")
+
+    if isinstance(scaling, dict):
+        raw_scaling = dict(scaling)
+    else:
+        raw_scaling = {}
+
+    if json_data.get("scaling_multipliers") and not raw_scaling.get("available_multipliers"):
+        raw_scaling["available_multipliers"] = json_data.get("scaling_multipliers")
+
+    if json_data.get("scaling_multiplier") is not None and raw_scaling.get("selected_multiplier") is None:
+        raw_scaling["selected_multiplier"] = json_data.get("scaling_multiplier")
+
+    if json_data.get("servings") and not raw_scaling.get("base_servings"):
+        raw_scaling["base_servings"] = json_data.get("servings")
+
+    if not raw_scaling and not default_to_common:
+        return None
+
+    return normalize_recipe_scaling_metadata(raw_scaling, default_to_common=default_to_common)
+
+
+def extract_recipe_scaling_from_html(html_text):
+    html_text = str(html_text or "")
+
+    if not html_text.strip():
+        return None
+
+    soup = BeautifulSoup(html_text, "html.parser")
+    options = []
+    selected_multiplier = None
+
+    for element in soup.select("[data-multiplier]"):
+        multiplier = parse_scaling_multiplier(element.get("data-multiplier"))
+
+        if multiplier is None:
+            multiplier = parse_scaling_multiplier(element.get_text(" ", strip=True))
+
+        if multiplier is None:
+            multiplier = parse_scaling_multiplier(element.get("aria-label"))
+
+        if multiplier is None:
+            continue
+
+        options.append({
+            "label": scaling_multiplier_label(multiplier),
+            "value": multiplier,
+        })
+
+        classes = set(element.get("class") or [])
+        if (
+            "wprm-toggle-active" in classes
+            or "active" in classes
+            or str(element.get("aria-pressed") or "").lower() == "true"
+            or str(element.get("aria-selected") or "").lower() == "true"
+        ):
+            selected_multiplier = multiplier
+
+    if len(options) < 2:
+        page_text = soup.get_text(" ", strip=True)
+        multiplier_labels = re.findall(
+            r"(?<![\w/])(?:\d+\s*/\s*\d+|\d+(?:\.\d+)?)\s*[x×]\b",
+            page_text,
+            flags=re.IGNORECASE,
+        )
+        options.extend({"label": label, "value": label} for label in multiplier_labels)
+
+    normalized_options = normalize_scaling_options(options, default_to_common=False)
+
+    if len(normalized_options) < 2:
+        return None
+
+    return normalize_recipe_scaling_metadata(
+        {
+            "available_multipliers": normalized_options,
+            "selected_multiplier": selected_multiplier or 1,
+        },
+        default_to_common=False,
+    )
+
+
+def ensure_ingredient_base_quantities(json_data):
+    if not isinstance(json_data, dict):
+        return
+
+    for item in json_data.get("ingredients", []):
+        if not isinstance(item, dict):
+            continue
+
+        if item.get("base_quantity") in (None, "") and item.get("quantity") not in (None, ""):
+            item["base_quantity"] = item.get("quantity")
+
+        if item.get("base_unit") in (None, "") and item.get("unit") not in (None, ""):
+            item["base_unit"] = item.get("unit")
+
+
+def apply_recipe_scaling_metadata(json_data, html_text=None):
+    if not isinstance(json_data, dict):
+        return
+
+    html_scaling = extract_recipe_scaling_from_html(html_text) if html_text else None
+    scaling = html_scaling or recipe_scaling_from_data(json_data, default_to_common=True)
+
+    if json_data.get("servings") and not scaling.get("base_servings"):
+        scaling["base_servings"] = str(json_data.get("servings") or "").strip()
+
+    json_data["scaling"] = scaling
+    ensure_ingredient_base_quantities(json_data)
+
+
 def extract_recipe_from_structured_data(recipe_url, html_text):
     soup = BeautifulSoup(html_text, "html.parser")
 
@@ -270,6 +557,8 @@ def extract_recipe_from_structured_data(recipe_url, html_text):
             "instructions": instructions,
             "nutrition": build_structured_nutrition(recipe.get("nutrition", {})),
         }
+
+        apply_recipe_scaling_metadata(json_data, html_text)
 
         return json_data
 
@@ -3239,6 +3528,8 @@ IMPORTANT QUANTITY EXTRACTION RULES:
 - Preserve fractional values exactly as strings.
 - Preserve ranges exactly as strings.
 - Preserve package sizes.
+- Set base_quantity and base_unit to the ingredient quantity and unit at the recipe's default scale.
+- If the page has recipe scale controls, base_quantity and base_unit should be the 1x/default quantities.
 
 ALTERNATIVE INGREDIENT RULES:
 - If one ingredient line gives a choice using "or", keep it as ONE ingredient object when the alternatives are substitutes for each other.
@@ -3472,18 +3763,54 @@ NUTRITION RULES
 - If no nutrition information is found, return nutrition with all fields as null and other as [].
 
 ========================
+RECIPE SCALING RULES
+========================
+- If the page displays recipe scale controls such as "1/2x", "1x", "2x", or "3x", capture them.
+- Put the active/default value in scaling.selected_multiplier. This is usually 1.
+- Put every available option in scaling.available_multipliers.
+- Each scaling option must have:
+  - label: the visible label, such as "1/2x" or "2x"
+  - value: the numeric multiplier, such as 0.5 or 2
+- If the page does not show scale controls, use these default options: 1/2x, 1x, 2x, 3x.
+
+========================
 FINAL OUTPUT FORMAT
 ========================
 {{
   "source_url": "{recipe_url}",
   "recipe_title": null,
   "servings": null,
+  "scaling": {{
+    "selected_multiplier": 1,
+    "base_multiplier": 1,
+    "base_servings": null,
+    "available_multipliers": [
+      {{
+        "label": "1/2x",
+        "value": 0.5
+      }},
+      {{
+        "label": "1x",
+        "value": 1
+      }},
+      {{
+        "label": "2x",
+        "value": 2
+      }},
+      {{
+        "label": "3x",
+        "value": 3
+      }}
+    ]
+  }},
   "ingredients": [
     {{
       "section": null,
       "original_text": null,
       "quantity": null,
       "unit": null,
+      "base_quantity": null,
+      "base_unit": null,
       "ingredient": null,
       "preparation": null,
       "optional": false,
@@ -3620,7 +3947,7 @@ def send_file_prompt_to_openai(prompt_text, file_path, mime_type, filename):
     return response.choices[0].message.content
 
 
-def save_json_response(recipe_url, response_text):
+def save_json_response(recipe_url, response_text, html_text=None):
     cleaned = clean_json_response(response_text)
 
     base_name = safe_filename(recipe_url)
@@ -3631,6 +3958,7 @@ def save_json_response(recipe_url, response_text):
         json_data = json.loads(cleaned)
         normalize_extracted_ingredient_fields(json_data)
         normalize_extracted_equipment_fields(json_data)
+        apply_recipe_scaling_metadata(json_data, html_text)
 
         json_path.write_text(
             json.dumps(json_data, indent=2, ensure_ascii=False),
@@ -3658,6 +3986,12 @@ def normalize_extracted_ingredient_fields(json_data):
         original_text = item.get("original_text") or ""
 
         if not original_text:
+            if item.get("base_quantity") in (None, "") and item.get("quantity") not in (None, ""):
+                item["base_quantity"] = item.get("quantity")
+
+            if item.get("base_unit") in (None, "") and item.get("unit") not in (None, ""):
+                item["base_unit"] = item.get("unit")
+
             continue
 
         parsed = parse_structured_ingredient_line(original_text)
@@ -3678,6 +4012,12 @@ def normalize_extracted_ingredient_fields(json_data):
 
             if not current_ingredient or current_ingredient == normalize_ingredient_for_shopping_list(original_text):
                 item["ingredient"] = parsed["ingredient"]
+
+        if item.get("base_quantity") in (None, "") and item.get("quantity") not in (None, ""):
+            item["base_quantity"] = item.get("quantity")
+
+        if item.get("base_unit") in (None, "") and item.get("unit") not in (None, ""):
+            item["base_unit"] = item.get("unit")
 
 
 def normalize_extracted_equipment_fields(json_data):
@@ -3723,6 +4063,10 @@ def structured_recipe_data_is_usable(json_data):
 
 
 def save_extracted_recipe_json(recipe_url, json_data):
+    normalize_extracted_ingredient_fields(json_data)
+    normalize_extracted_equipment_fields(json_data)
+    apply_recipe_scaling_metadata(json_data)
+
     json_path = OUTPUT_FOLDER / f"{safe_filename(recipe_url)}.json"
     json_path.write_text(
         json.dumps(json_data, indent=2, ensure_ascii=False),
@@ -3748,16 +4092,43 @@ def extract_recipe_from_upload(file_storage):
     page_text = ""
 
     try:
-        if mime_type.startswith("image/"):
+        if upload_is_word_document(mime_type, filename, upload_path):
+            converted_pdf_path, page_text = convert_word_upload_to_pdf(
+                recipe_url,
+                upload_path,
+                filename,
+                page_text=page_text,
+            )
+            extraction_filename = f"{Path(filename).stem or 'uploaded-recipe'}.pdf"
+            prompt_text = build_upload_prompt(recipe_url, extraction_filename)
+            response_text = send_file_prompt_to_openai(
+                prompt_text,
+                converted_pdf_path,
+                "application/pdf",
+                extraction_filename,
+            )
+            upload_path_for_review = converted_pdf_path
+            mime_type_for_review = "application/pdf"
+            filename_for_review = extraction_filename
+        elif mime_type.startswith("image/"):
             prompt_text = build_upload_prompt(recipe_url, filename)
             response_text = send_image_prompt_to_openai(prompt_text, upload_path, mime_type)
+            upload_path_for_review = upload_path
+            mime_type_for_review = mime_type
+            filename_for_review = filename
         elif mime_type.startswith("text/") or upload_suffix in {".txt", ".md"}:
             page_text = upload_path.read_text(encoding="utf-8", errors="ignore")
             prompt_text = build_prompt(recipe_url, page_text[:MAX_PAGE_TEXT_CHARS])
             response_text = send_prompt_to_openai(prompt_text)
+            upload_path_for_review = upload_path
+            mime_type_for_review = mime_type
+            filename_for_review = filename
         elif upload_can_use_openai_file_input(mime_type, filename, upload_path):
             prompt_text = build_upload_prompt(recipe_url, filename)
             response_text = send_file_prompt_to_openai(prompt_text, upload_path, mime_type, filename)
+            upload_path_for_review = upload_path
+            mime_type_for_review = mime_type
+            filename_for_review = filename
         else:
             page_text = extract_text_from_generic_document(upload_path, filename)
 
@@ -3769,6 +4140,9 @@ def extract_recipe_from_upload(file_storage):
 
             prompt_text = build_prompt(recipe_url, page_text[:MAX_PAGE_TEXT_CHARS])
             response_text = send_prompt_to_openai(prompt_text)
+            upload_path_for_review = upload_path
+            mime_type_for_review = mime_type
+            filename_for_review = filename
 
         ok, json_data = save_json_response(recipe_url, response_text)
 
@@ -3781,9 +4155,9 @@ def extract_recipe_from_upload(file_storage):
         json_data["source_url"] = recipe_url
         title = determine_upload_recipe_title(
             recipe_url,
-            upload_path,
-            mime_type,
-            filename,
+            upload_path_for_review,
+            mime_type_for_review,
+            filename_for_review,
             page_text,
         )
         if title:
@@ -3791,16 +4165,16 @@ def extract_recipe_from_upload(file_storage):
         merge_missing_upload_ingredients(
             recipe_url,
             json_data,
-            upload_path,
-            mime_type,
-            filename,
+            upload_path_for_review,
+            mime_type_for_review,
+            filename_for_review,
             page_text,
         )
         archive_uploaded_recipe_pdf(
             recipe_url,
-            upload_path,
-            mime_type,
-            filename,
+            upload_path_for_review,
+            mime_type_for_review,
+            filename_for_review,
             page_text=page_text,
             recipe_title=json_data.get("recipe_title") or "",
         )
@@ -3824,6 +4198,136 @@ def upload_can_use_openai_file_input(mime_type, filename, upload_path):
         return True
 
     return suffix == ".pdf"
+
+
+def upload_is_word_document(mime_type, filename, upload_path):
+    suffix = upload_file_suffix(filename, upload_path)
+    normalized_mime_type = str(mime_type or "").split(";", 1)[0].strip().lower()
+
+    return suffix in WORD_DOCUMENT_SUFFIXES or normalized_mime_type in WORD_DOCUMENT_MIME_TYPES
+
+
+def convert_word_upload_to_pdf(recipe_url, upload_path, filename, page_text=""):
+    pdf_path = UPLOAD_FOLDER / f"{upload_path.name}_converted.pdf"
+    suffix = upload_file_suffix(filename, upload_path)
+
+    pdf_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if convert_word_upload_with_libreoffice(upload_path, filename, pdf_path):
+        return pdf_path, page_text
+
+    if convert_word_upload_with_microsoft_word(upload_path, filename, pdf_path):
+        return pdf_path, page_text
+
+    if not page_text.strip() and suffix == ".docx":
+        page_text = extract_text_from_generic_document(upload_path, filename)
+
+    if not page_text.strip():
+        raise RuntimeError(
+            "Could not convert that Word document to PDF. Install Microsoft Word or LibreOffice, "
+            "or upload a .docx file with readable text."
+        )
+
+    html_text = build_upload_text_pdf_html(
+        page_text,
+        filename,
+        recipe_title=Path(filename or "Uploaded Recipe").stem,
+    )
+    saved_path = write_recipe_page_pdf(recipe_url, html_text, None, pdf_path)
+    return saved_path, page_text
+
+
+def convert_word_upload_with_libreoffice(upload_path, filename, pdf_path):
+    converter = shutil.which("soffice") or shutil.which("libreoffice")
+
+    if not converter:
+        return False
+
+    source_path, cleanup_source = prepare_word_conversion_source(upload_path, filename)
+    expected_pdf_path = pdf_path.parent / f"{source_path.stem}.pdf"
+
+    try:
+        completed = subprocess.run(
+            [
+                converter,
+                "--headless",
+                "--convert-to",
+                "pdf",
+                "--outdir",
+                str(pdf_path.parent),
+                str(source_path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=90,
+            check=False,
+        )
+
+        if completed.returncode != 0 or not expected_pdf_path.exists():
+            return False
+
+        if expected_pdf_path.resolve() != pdf_path.resolve():
+            pdf_path.unlink(missing_ok=True)
+            expected_pdf_path.replace(pdf_path)
+
+        return pdf_path.exists() and pdf_path.stat().st_size > 0
+    except Exception:
+        return False
+    finally:
+        if cleanup_source:
+            source_path.unlink(missing_ok=True)
+
+
+def convert_word_upload_with_microsoft_word(upload_path, filename, pdf_path):
+    try:
+        import win32com.client
+    except Exception:
+        return False
+
+    source_path, cleanup_source = prepare_word_conversion_source(upload_path, filename)
+    word_app = None
+    document = None
+
+    try:
+        word_app = win32com.client.DispatchEx("Word.Application")
+        word_app.Visible = False
+        word_app.DisplayAlerts = 0
+        document = word_app.Documents.Open(str(source_path.resolve()), ReadOnly=True)
+
+        try:
+            document.SaveAs2(str(pdf_path.resolve()), FileFormat=17)
+        except AttributeError:
+            document.SaveAs(str(pdf_path.resolve()), FileFormat=17)
+
+        return pdf_path.exists() and pdf_path.stat().st_size > 0
+    except Exception:
+        return False
+    finally:
+        if document:
+            try:
+                document.Close(False)
+            except Exception:
+                pass
+
+        if word_app:
+            try:
+                word_app.Quit()
+            except Exception:
+                pass
+
+        if cleanup_source:
+            source_path.unlink(missing_ok=True)
+
+
+def prepare_word_conversion_source(upload_path, filename):
+    suffix = upload_file_suffix(filename, upload_path)
+
+    if upload_path.suffix.lower() == suffix:
+        return upload_path, False
+
+    source_path = upload_path.with_name(f"{upload_path.name}{suffix}")
+    shutil.copyfile(upload_path, source_path)
+    return source_path, True
 
 
 def upload_file_suffix(filename, upload_path):
@@ -4095,6 +4599,7 @@ def build_extract_result(recipe_url, json_data, extraction_method):
         "source_url": recipe_url,
         "recipe_title": json_data.get("recipe_title"),
         "servings": json_data.get("servings"),
+        "scaling": json_data.get("scaling"),
         "ingredients": ingredients,
         "equipment": json_data.get("equipment", []),
         "instructions": json_data.get("instructions", []),
@@ -4318,7 +4823,7 @@ def extract_recipe_from_url(recipe_url, progress_callback=None):
         raw_api_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_API_RESPONSE.txt"
         raw_api_path.write_text(response_text, encoding="utf-8")
 
-        success, json_data = save_json_response(recipe_url, response_text)
+        success, json_data = save_json_response(recipe_url, response_text, html_text=html_text)
 
         if not success or not json_data:
             return {
