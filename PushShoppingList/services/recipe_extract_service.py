@@ -2172,6 +2172,7 @@ def create_headless_chrome_driver(
     window_size="1365,900",
     prefer_undetected=True,
     page_load_strategy="eager",
+    headless=True,
 ):
     if prefer_undetected:
         try:
@@ -2179,11 +2180,14 @@ def create_headless_chrome_driver(
 
             options = uc.ChromeOptions()
             options.page_load_strategy = page_load_strategy
-            options.add_argument("--headless=new")
+            if headless:
+                options.add_argument("--headless=new")
             options.add_argument("--disable-gpu")
             options.add_argument("--no-sandbox")
             options.add_argument("--disable-dev-shm-usage")
             options.add_argument(f"--window-size={window_size}")
+            if not headless:
+                options.add_argument("--start-maximized")
             return uc.Chrome(options=options, use_subprocess=True)
         except Exception:
             pass
@@ -2193,11 +2197,14 @@ def create_headless_chrome_driver(
 
     options = Options()
     options.page_load_strategy = page_load_strategy
-    options.add_argument("--headless=new")
+    if headless:
+        options.add_argument("--headless=new")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument(f"--window-size={window_size}")
+    if not headless:
+        options.add_argument("--start-maximized")
     return webdriver.Chrome(options=options)
 
 

@@ -16,10 +16,10 @@ from PushShoppingList.services.product_selection_service import product_choice_f
 from PushShoppingList.services.product_selection_service import product_choices_by_item
 from PushShoppingList.services.product_selection_service import product_prompt_for_item
 from PushShoppingList.services.product_selection_service import select_product_choice
-from PushShoppingList.services.product_selection_service import test_grab_products
 from PushShoppingList.services.rules_display_service import save_home_store_rule_text
 from PushShoppingList.services.rules_display_service import save_rules_display_section
 from PushShoppingList.services.store_settings_service import save_enabled_stores
+from PushShoppingList.scripts.test_grab_aldi_eggs import test_grab_products
 
 product_bp = Blueprint("product_bp", __name__)
 

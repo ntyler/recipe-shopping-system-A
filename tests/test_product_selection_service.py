@@ -5,6 +5,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 import PushShoppingList.services.product_selection_service as product_service
+import PushShoppingList.scripts.test_grab_aldi_eggs as test_grab_script
 from PushShoppingList.services.product_selection_service import build_product_download_plan
 from PushShoppingList.services.product_selection_service import build_product_choice_record_from_results
 from PushShoppingList.services.product_selection_service import build_final_product_selection_prompt
@@ -283,7 +284,7 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("best|alternative|rejected", prompt)
 
     def test_test_grab_prompt_is_isolated_to_aldi_eggs(self):
-        prompt = product_service.build_test_grab_eggs_aldi_prompt(
+        prompt = test_grab_script.build_test_grab_eggs_aldi_prompt(
             "eggs",
             "Aldi",
             "5905 Arlo Drive Apt 2213\nIndianapolis, IN 46237\nUSA",
