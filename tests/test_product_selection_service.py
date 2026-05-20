@@ -253,6 +253,64 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("Organic Lemons 2 lb Bag", prompt)
         self.assertIn("ranking_status", prompt)
 
+    def test_rendered_html_prompt_uses_generic_browser_content(self):
+        prompt = product_service.build_rendered_html_product_agent_prompt(
+            "eggs",
+            "Aldi",
+            "5905 Arlo Drive, Indianapolis, IN 46237",
+            {"address": "Indianapolis, IN 46237", "distance_miles": 2.2},
+            {
+                "url": "https://example.com/search?q=eggs",
+                "path": "D:/tmp/rendered.html",
+                "prompt_html": "<article><a href='/eggs'>Large Eggs</a><span>$2.40</span></article>",
+                "prompt_html_length": 75,
+            },
+            [
+                {
+                    "name": "Large Eggs",
+                    "price": "$2.40",
+                    "product_url": "https://example.com/eggs",
+                    "text": "Large Eggs 12 ct $2.40",
+                    "raw_product_html_snippet": "<article>Large Eggs 12 ct $2.40</article>",
+                }
+            ],
+        )
+
+        self.assertIn("generic browser agent already opened", prompt)
+        self.assertIn("Do not browse, fetch, or infer from outside websites.", prompt)
+        self.assertIn("Visible product blocks extracted generically", prompt)
+        self.assertIn("Large Eggs", prompt)
+        self.assertIn("best|alternative|rejected", prompt)
+
+    def test_rendered_html_agent_response_normalizes_candidates(self):
+        data = {
+            "best_product": {"product_name": "Large Eggs", "product_url": "/eggs"},
+            "results": [
+                {
+                    "product_index": "1",
+                    "product_name": "Large Eggs",
+                    "product_url": "/eggs",
+                    "price": "$2.40",
+                    "confidence_score": 0.95,
+                    "in_stock": "yes",
+                },
+                {
+                    "product_name": "Liquid Egg Whites",
+                    "ranking_status": "rejected",
+                    "rejection_reason": "Not standard shell eggs.",
+                    "in_stock": "true",
+                },
+            ],
+        }
+
+        normalized = product_service.normalize_rendered_html_product_agent_response(data)
+
+        self.assertEqual(normalized["results"][0]["ranking_status"], "best")
+        self.assertEqual(normalized["results"][0]["product_index"], 1)
+        self.assertTrue(normalized["results"][0]["in_stock"])
+        self.assertEqual(normalized["results"][1]["ranking_status"], "rejected")
+        self.assertEqual(normalized["results"][1]["rejection_reason"], "Not standard shell eggs.")
+
     def test_egg_scoring_prefers_standard_shell_eggs(self):
         shell = candidate("Large White Eggs, 12 Count")
         shell["price"] = "$2.40"

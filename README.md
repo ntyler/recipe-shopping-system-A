@@ -140,11 +140,11 @@ The **Grab Best Products** button searches the activated stores near the saved F
 
 1. The Planner Agent builds item/store searches from the shopping list and saved Full Address.
 2. The Store Resolution Agent resolves the nearest pickup-oriented location for each activated store.
-3. Browser Worker Agents run in parallel with `ThreadPoolExecutor`, open the real grocery search/category pages with Selenium/undetected Chrome, apply the saved address context, select the nearest pickup-oriented store when the page exposes a store selector, and scroll until no new product cards appear.
-4. The Product Extraction/Normalization Agent saves the fully rendered page HTML under `data/raw/product_pages/`, plus readable `_TEXT.txt` and cleaned `_PROMPT_PREVIEW.html` snapshots for debugging. It captures every visible product card up to `PRODUCT_CANDIDATE_LIMIT_PER_STORE` and normalizes store name, store address, product name, brand, size/count, price, unit price, stock status, direct product URL, image URL, cleaned raw product-card HTML snippet, and embedded image Base64 where possible.
+3. Browser Worker Agents run in parallel with `ThreadPoolExecutor`, open the real grocery search/category pages with Selenium/undetected Chrome, apply the saved address context, select the nearest pickup-oriented store when the page exposes a store selector, and scroll until lazy-loaded product content stops changing.
+4. The Product Extraction/Normalization Agent uses a generic browser snapshot workflow instead of store-specific scraper scripts. It saves the fully rendered page HTML under `data/raw/product_pages/`, plus readable `_TEXT.txt`, cleaned `_PROMPT_PREVIEW.html`, and `_PRODUCTS.html` snapshots for debugging. It extracts visible product-related HTML/content with broad DOM heuristics, removes scripts/styles/tracking markup, and normalizes store name, store address, product name, brand, size/count, price, unit price, stock status, direct product URL, image URL, cleaned raw product-card HTML snippet, and embedded image Base64 where possible.
 5. Shortlisted candidates are opened on their full product detail pages for deeper evidence.
 6. The Validation Layer rejects irrelevant, unavailable, search-page-only, or rule-failing products while saving rejection reasons.
-7. The Ranking Agent sends the saved rules, a cleaned excerpt of the fully rendered Selenium HTML, and the extracted product-card HTML/data to ChatGPT when `OPENAI_API_KEY` is available. ChatGPT does not browse store websites; it ranks the supplied page/card data into best product, valid alternatives, and rejected products with rejection reasons and confidence scores.
+7. The Ranking Agent sends the saved rules, cleaned rendered product HTML, and generic product blocks to ChatGPT when `OPENAI_API_KEY` is available. ChatGPT does not browse store websites; it identifies product candidates and ranks the supplied page/card data into best product, valid alternatives, and rejected products with rejection reasons and confidence scores.
 8. Results are saved with the best product, valid alternatives, rejected products, rejection reasons, scoring metadata, manual selection metadata, and store/ingredient metadata.
 
 For eggs, the built-in ranking prefers standard shell egg cartons, 12-count or larger cartons, availability, nearby stores, and lower price per egg. It avoids unrelated egg products such as liquid eggs, egg whites only, boiled eggs, egg bites, and plant-based egg substitutes when possible.
@@ -331,6 +331,7 @@ Common files:
 - `raw/product_pages/*.html`: fully rendered Selenium grocery search pages saved for product-ranking review
 - `raw/product_pages/*_TEXT.txt`: readable visible text captured from the loaded grocery page
 - `raw/product_pages/*_PROMPT_PREVIEW.html`: cleaned rendered HTML excerpt used in the ChatGPT ranking prompt
+- `raw/product_pages/*_PRODUCTS.html`: generic visible product-related HTML extracted after scrolling
 - `raw/product_prompts/*.json`: full ChatGPT prompt payloads loaded on demand by the Prompt buttons
 - `pdf/*.pdf`: archived recipe PDFs created during extraction, including webpage PDFs, upload PDFs, and video caption/transcript PDFs
 - `output/*.json`: extracted recipe JSON output

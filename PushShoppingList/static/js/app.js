@@ -674,6 +674,9 @@ function productPromptEntries(candidate) {
     const storePrompt = candidate && candidate.chatgpt_store_ranking_agent
         ? candidate.chatgpt_store_ranking_agent.prompt
         : null;
+    const renderedHtmlPrompt = candidate && candidate.chatgpt_rendered_html_agent
+        ? candidate.chatgpt_rendered_html_agent.prompt
+        : null;
     const pagePrompt = candidate && candidate.chatgpt_analysis
         ? candidate.chatgpt_analysis.prompt
         : null;
@@ -687,6 +690,16 @@ function productPromptEntries(candidate) {
             prompt: hasPromptPayload(storePrompt) ? storePrompt : null,
             prompt_ref: hasPromptReference(storePrompt) ? storePrompt : null,
             prompt_kind: "store_product_ranking",
+            product_id: productId,
+        });
+    }
+
+    if (hasPromptData(renderedHtmlPrompt)) {
+        entries.push({
+            title: "Rendered HTML Product Reasoning Prompt",
+            prompt: hasPromptPayload(renderedHtmlPrompt) ? renderedHtmlPrompt : null,
+            prompt_ref: hasPromptReference(renderedHtmlPrompt) ? renderedHtmlPrompt : null,
+            prompt_kind: "rendered_html_product_reasoning",
             product_id: productId,
         });
     }
