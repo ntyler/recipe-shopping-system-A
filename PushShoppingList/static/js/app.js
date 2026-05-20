@@ -103,6 +103,7 @@ function renderProductProgressRow(row, index) {
         ? selected.product_url
         : "";
     const selectedName = selected ? (selected.product_name || "Unnamed product") : "No product selected";
+    const requestedQuantity = selected ? (selected.requested_quantity || row.quantity || "") : (row.quantity || "");
     const selectedHtml = productUrl
         ? `<a class="bulk-product-name" href="${escapeAttribute(productUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(selectedName)}</a>`
         : `<div class="bulk-product-name">${escapeHtml(selectedName)}</div>`;
@@ -118,6 +119,7 @@ function renderProductProgressRow(row, index) {
             </div>
             <div class="bulk-progress-meta">
                 ${selectedHtml}
+                ${requestedQuantity ? `<div class="bulk-product-status">${escapeHtml(`Need ${requestedQuantity}`)}</div>` : ""}
                 <div class="bulk-product-price">${escapeHtml(selected ? (selected.price || "Price unavailable") : "")}</div>
                 <div class="bulk-product-status">${escapeHtml(selected ? selected.store_name : "")}</div>
             </div>
@@ -243,6 +245,32 @@ function renderProductDownloadRow(row, index) {
     const candidateText = row.candidates_count === null || row.candidates_count === undefined
         ? ""
         : `${row.candidates_count} candidate${Number(row.candidates_count) === 1 ? "" : "s"}`;
+    const selected = row.selected_product || null;
+    const selectedUrl = selected && selected.product_url && selected.product_url !== selected.search_url
+        ? selected.product_url
+        : "";
+    const selectedName = selected ? (selected.product_name || row.selected_name || "") : "";
+    const selectedMeta = selected
+        ? [
+            selected.requested_quantity ? `need ${selected.requested_quantity}` : "",
+            selected.price || row.selected_price || "Price unavailable",
+            selected.size || "",
+            selected.unit_price || "",
+            row.selected_is_overall ? "picked" : "store best",
+        ].filter(Boolean).join(" | ")
+        : "";
+    const selectedHtml = selectedName
+        ? `
+            <div class="bulk-picked-product${row.selected_is_overall ? " overall" : ""}">
+                <span class="bulk-picked-label">${row.selected_is_overall ? "Picked" : "Best"}</span>
+                ${selectedUrl
+                    ? `<a class="bulk-picked-link" href="${escapeAttribute(selectedUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(selectedName)}</a>`
+                    : `<span class="bulk-picked-name">${escapeHtml(selectedName)}</span>`
+                }
+                <span class="bulk-picked-meta">${escapeHtml(selectedMeta)}</span>
+            </div>
+        `
+        : "";
 
     return `
         <div class="bulk-progress-item product-download-row">
@@ -253,11 +281,12 @@ function renderProductDownloadRow(row, index) {
                     ${urlHtml}
                 </div>
                 <div class="bulk-skip-reason">${escapeHtml(row.message || "waiting...")}</div>
+                ${selectedHtml}
             </div>
             <div class="bulk-progress-meta">
-                <div class="bulk-product-name">${escapeHtml(row.ingredient || "")}</div>
+                <div class="bulk-product-name">${escapeHtml(selectedName || row.ingredient || "")}</div>
                 <div class="bulk-product-status">${escapeHtml(row.store_name || row.store_key || "")}</div>
-                <div class="bulk-product-price">${escapeHtml(candidateText)}</div>
+                <div class="bulk-product-price">${escapeHtml(selected ? selected.price || candidateText : candidateText)}</div>
             </div>
             <span class="bulk-download-state ${statusClass}">${escapeHtml(state)}</span>
         </div>

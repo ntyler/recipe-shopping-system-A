@@ -1,6 +1,11 @@
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
+import PushShoppingList.services.product_selection_service as product_service
 from PushShoppingList.services.product_selection_service import build_product_download_plan
+from PushShoppingList.services.product_selection_service import build_final_product_selection_prompt
 from PushShoppingList.services.product_selection_service import candidate_has_direct_product_url
 from PushShoppingList.services.product_selection_service import home_address_geocode_queries
 from PushShoppingList.services.product_selection_service import ingredient_search_terms
@@ -135,6 +140,121 @@ class ProductSelectionServiceTest(unittest.TestCase):
         )
 
         self.assertIn("5905 Arlo Drive, Indianapolis, IN 46237, United States", queries)
+
+    def test_quantity_context_prefers_single_item_over_bulk_bag_for_one(self):
+        single = candidate("Lemon, large")
+        single["price"] = "$0.66"
+        single["package_size"] = ""
+        single["unit_price"] = ""
+        single["unit_price_value"] = None
+        single["unit_price_unit"] = ""
+        bulk = candidate("Lemons, 2 lb")
+        bulk["price"] = "$3.99"
+        bulk["package_size"] = "2 lb"
+        bulk["unit_price"] = ""
+        bulk["unit_price_value"] = None
+        bulk["unit_price_unit"] = ""
+
+        single_score, single_reasons, _, _ = score_candidate(
+            "lemon",
+            single,
+            quantity_context={"display": "1", "sources": []},
+        )
+        bulk_score, _, bulk_skip_reasons, _ = score_candidate(
+            "lemon",
+            bulk,
+            quantity_context={"display": "1", "sources": []},
+        )
+
+        self.assertGreater(single_score, bulk_score)
+        self.assertIn("Single-item product fits the small total quantity needed.", single_reasons)
+        self.assertIn("Bulk or weight-based package is likely more than the small count needed.", bulk_skip_reasons)
+
+        manual_score, manual_reasons, _, _ = score_candidate(
+            "lemon",
+            candidate("Lemon, large"),
+            quantity_context={"display": "1 lemon", "sources": []},
+        )
+        self.assertGreater(manual_score, bulk_score)
+        self.assertIn("Single-item product fits the small total quantity needed.", manual_reasons)
+
+    def test_final_prompt_includes_total_quantity(self):
+        prompt = build_final_product_selection_prompt(
+            "lemon",
+            [candidate("Lemon, large")],
+            "5905 Arlo Drive, Indianapolis, IN 46237",
+            quantity_context={
+                "display": "1",
+                "sources": [{"label": "Recipe 1", "quantity": "1"}],
+            },
+        )
+
+        self.assertIn("Total shopping-list quantity needed:\n1", prompt)
+        self.assertIn("least practical excess/waste", prompt)
+
+    def test_progress_rows_include_selected_product_details(self):
+        with TemporaryDirectory() as tmp_dir:
+            progress_file = Path(tmp_dir) / "product_progress.json"
+
+            with patch.object(product_service, "PRODUCT_PROGRESS_FILE", progress_file):
+                product_service.start_product_progress(
+                    [
+                        {"index": 0, "ingredient": "lemon", "store_key": "aldi", "store_name": "Aldi"},
+                        {"index": 1, "ingredient": "lemon", "store_key": "meijer", "store_name": "Meijer"},
+                    ],
+                    job_id="job-1",
+                    max_workers=2,
+                )
+                product_service.update_product_progress_picks(
+                    "job-1",
+                    "lemon",
+                    {
+                        "selected_product": {
+                            "id": "meijer-1",
+                            "product_name": "Organic Lemons 2 lb Bag",
+                            "store_key": "meijer",
+                            "store_name": "Meijer",
+                            "price": "$6.99",
+                            "product_url": "https://www.meijer.com/shopping/product/organic-lemons-2-lb-bag/60504952155.html",
+                        },
+                        "store_results_list": [
+                            {
+                                "store_key": "aldi",
+                                "best_product": {
+                                    "id": "aldi-1",
+                                    "product_name": "Lemons",
+                                    "store_key": "aldi",
+                                    "store_name": "Aldi",
+                                    "price": "$3.99",
+                                    "product_url": "https://www.aldi.us/product/lemons",
+                                },
+                            },
+                            {
+                                "store_key": "meijer",
+                                "best_product": {
+                                    "id": "meijer-1",
+                                    "product_name": "Organic Lemons 2 lb Bag",
+                                    "store_key": "meijer",
+                                    "store_name": "Meijer",
+                                    "price": "$6.99",
+                                    "product_url": "https://www.meijer.com/shopping/product/organic-lemons-2-lb-bag/60504952155.html",
+                                },
+                            },
+                        ],
+                    },
+                )
+
+                progress = product_service.load_product_progress()
+
+        self.assertEqual(progress["downloads"][0]["selected_name"], "Lemons")
+        self.assertFalse(progress["downloads"][0]["selected_is_overall"])
+        self.assertEqual(progress["downloads"][1]["selected_name"], "Organic Lemons 2 lb Bag")
+        self.assertEqual(progress["downloads"][1]["selected_price"], "$6.99")
+        self.assertTrue(progress["downloads"][1]["selected_is_overall"])
+        self.assertEqual(
+            progress["downloads"][1]["selected_product_url"],
+            "https://www.meijer.com/shopping/product/organic-lemons-2-lb-bag/60504952155.html",
+        )
 
 
 if __name__ == "__main__":

@@ -22,6 +22,7 @@ REPO_DIR = r"D:\GitHub\recipe-shopping-system-A"
 BAT_FILE = rf"{REPO_DIR}\start_app.bat"
 
 APP_URL = "https://desktop-in7s09s.tail906b20.ts.net/"
+LOCAL_APP_PORT = 5056
 ENSURE_FUNNEL = True
 OPEN_TAILSCALE_FIRST = True
 
@@ -159,7 +160,7 @@ try:
         print("Ensuring Tailscale Funnel is on...")
         run_ssh_command(
             ssh,
-            "tailscale funnel --bg --yes http://127.0.0.1:5055",
+            f"tailscale funnel --bg --yes http://127.0.0.1:{LOCAL_APP_PORT}",
         )
 
     if wait_for_app(APP_URL):

@@ -27,6 +27,9 @@
                     <span class="best-product-meta">Direct product link unavailable</span>
                 {% endif %}
                 <span class="best-product-price">{{ best_product.get("price") or "Price unavailable" }}</span>
+                {% if best_product.get("requested_quantity") %}
+                    <span class="best-product-meta">Need {{ best_product.get("requested_quantity") }}</span>
+                {% endif %}
                 {% if best_product.get("size") or best_product.get("package_size") %}
                     <span class="best-product-meta">{{ best_product.get("size") or best_product.get("package_size") }}</span>
                 {% endif %}
@@ -61,6 +64,9 @@
             <span class="best-product-meta">Direct product link unavailable</span>
         {% endif %}
         <span class="best-product-price">{{ selected_product.get("price") or "Price unavailable" }}</span>
+        {% if selected_product.get("requested_quantity") %}
+            <span class="best-product-meta">Need {{ selected_product.get("requested_quantity") }}</span>
+        {% endif %}
         {% if selected_product.get("size") or selected_product.get("package_size") %}
             <span class="best-product-meta">{{ selected_product.get("size") or selected_product.get("package_size") }}</span>
         {% endif %}

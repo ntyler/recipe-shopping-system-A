@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from concurrent.futures import as_completed
 from datetime import datetime
+from fractions import Fraction
 from pathlib import Path
 from urllib.parse import parse_qsl
 from urllib.parse import quote_plus
@@ -25,7 +26,15 @@ from openai import OpenAI
 from PushShoppingList.services.food_rules_service import annotate_product_food_rules
 from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.home_address_service import load_home_address
+from PushShoppingList.services.item_state_service import load_item_state
 from PushShoppingList.services.item_state_service import save_item_store
+from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
+from PushShoppingList.services.recipe_quantity_service import format_quantity_display
+from PushShoppingList.services.recipe_quantity_service import load_saved_recipe_output
+from PushShoppingList.services.recipe_quantity_service import scale_quantity
+from PushShoppingList.services.recipe_url_service import normalize_recipe_quantity
+from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
+from PushShoppingList.services.recipe_url_service import recipe_url_rows
 from PushShoppingList.services.rules_display_service import load_rules_display
 from PushShoppingList.services.shopping_list_service import load_items
 from PushShoppingList.services.store_settings_service import load_store_settings
@@ -136,6 +145,261 @@ def product_worker_count(total_downloads=None):
         return max(1, min(configured, int(total_downloads)))
 
     return configured
+
+
+def load_item_quantity_context(items=None):
+    item_keys = {
+        normalize_item_key(item)
+        for item in (items or load_items())
+        if str(item or "").strip() and not is_section_header(item)
+    }
+    quantity_values = {}
+    quantity_sources = {}
+    recipe_meta = load_recipe_ingredients()
+
+    for recipe in recipe_url_rows():
+        recipe_quantity = normalize_recipe_quantity(recipe.get("quantity") or 1)
+        recipe_data = load_saved_recipe_output(recipe.get("url", ""))
+        if not recipe_data:
+            continue
+
+        meta = recipe_meta.get(normalize_recipe_url_key(recipe.get("url", "")), {})
+        use_scaled_meta = quantities_match(meta.get("quantity", 1), recipe_quantity)
+        scaled_ingredients = meta.get("scaled_ingredients", {}) if use_scaled_meta else {}
+        recipe_label = recipe.get("name") or recipe_data.get("recipe_title") or "Recipe"
+
+        for ingredient in recipe_data.get("ingredients", []) or []:
+            if not isinstance(ingredient, dict):
+                continue
+
+            name = clean_text(ingredient.get("ingredient"))
+            if not name:
+                continue
+
+            item_key = normalize_item_key(name)
+            if item_keys and item_key not in item_keys:
+                continue
+
+            scaled_value = (
+                scaled_ingredients.get(name)
+                or scaled_ingredients.get(item_key)
+                or {}
+            )
+            scaled_quantity = scaled_value.get("quantity") if isinstance(scaled_value, dict) else None
+            scaled_unit = scaled_value.get("unit") if isinstance(scaled_value, dict) else None
+            display = clean_text(scaled_value.get("display") if isinstance(scaled_value, dict) else "")
+            unit = scaled_unit if scaled_unit is not None else ingredient.get("unit")
+
+            if not display:
+                display = format_quantity_display(
+                    scaled_quantity or scale_quantity(ingredient.get("quantity"), recipe_quantity),
+                    unit,
+                )
+
+            display = clean_text(display)
+            if not display:
+                continue
+
+            quantity_values.setdefault(item_key, []).append(display)
+            quantity_sources.setdefault(item_key, []).append({
+                "label": recipe_label,
+                "ingredient": name,
+                "quantity": display,
+                "recipe_quantity": recipe_quantity,
+                "url": recipe.get("url", ""),
+            })
+
+    for item_key, state in load_item_state().items():
+        normalized_key = normalize_item_key(item_key)
+        if item_keys and normalized_key not in item_keys:
+            continue
+
+        if not isinstance(state, dict):
+            continue
+
+        manual_qty = clean_text(state.get("manual_qty"))
+        if not manual_qty:
+            continue
+
+        quantity_values[normalized_key] = [manual_qty]
+        quantity_sources[normalized_key] = [{
+            "label": "Manual quantity",
+            "ingredient": item_key,
+            "quantity": manual_qty,
+            "manual": True,
+        }]
+
+    return {
+        item_key: {
+            "display": summarized,
+            "sources": quantity_sources.get(item_key, []),
+        }
+        for item_key, values in quantity_values.items()
+        for summarized in [summarize_quantity_values(values)]
+        if summarized
+    }
+
+
+def quantities_match(left, right):
+    left_value = safe_float(left)
+    right_value = safe_float(right)
+
+    if left_value is None or right_value is None:
+        return clean_text(left) == clean_text(right)
+
+    return abs(left_value - right_value) < 0.000001
+
+
+def summarize_quantity_values(values):
+    cleaned = [
+        clean_text(value)
+        for value in values
+        if clean_text(value)
+    ]
+
+    if not cleaned:
+        return ""
+
+    if len(cleaned) == 1:
+        return cleaned[0]
+
+    summed = sum_quantity_values(cleaned)
+    if summed:
+        return summed
+
+    return " + ".join(unique_texts(cleaned))
+
+
+def sum_quantity_values(values):
+    parsed_values = [
+        parse_display_quantity(value)
+        for value in values
+    ]
+
+    if not parsed_values or any(value is None for value in parsed_values):
+        return ""
+
+    grouped = {}
+    unit_order = []
+
+    for value in parsed_values:
+        unit = value.get("unit", "")
+        if unit not in grouped:
+            grouped[unit] = []
+            unit_order.append(unit)
+        grouped[unit].append(value)
+
+    return " + ".join(
+        format_quantity_range(
+            sum(value["low"] for value in grouped[unit]),
+            sum((value["high"] if value["high"] is not None else value["low"]) for value in grouped[unit])
+            if any(value["high"] is not None for value in grouped[unit])
+            else None,
+            unit,
+        )
+        for unit in unit_order
+    )
+
+
+def parse_display_quantity(value):
+    text = clean_quantity_text(value)
+
+    if not text or " OR " in text.upper():
+        return None
+
+    match = re.match(
+        r"^(?P<low>\d+(?:\s+\d+/\d+|/\d+)?)(?:\s*(?:-|to)\s*(?P<high>\d+(?:\s+\d+/\d+|/\d+)?))?(?:\s+(?P<unit>.+))?$",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    if not match:
+        return None
+
+    low = parse_fraction_number(match.group("low"))
+    high = parse_fraction_number(match.group("high")) if match.group("high") else None
+
+    if low is None or (match.group("high") and high is None):
+        return None
+
+    return {
+        "low": float(low),
+        "high": float(high) if high is not None else None,
+        "unit": normalize_unit(match.group("unit")),
+    }
+
+
+def clean_quantity_text(value):
+    text = clean_text(value)
+    text = text.replace("\u00c2\u00bc", "1/4").replace("\u00c2\u00bd", "1/2").replace("\u00c2\u00be", "3/4")
+    replacements = {
+        "\u00bc": "1/4",
+        "\u00bd": "1/2",
+        "\u00be": "3/4",
+        "\u215b": "1/8",
+        "\u2153": "1/3",
+        "\u2154": "2/3",
+    }
+    for source, target in replacements.items():
+        text = text.replace(source, target)
+    return text
+
+
+def parse_fraction_number(value):
+    text = clean_quantity_text(value)
+
+    mixed_match = re.match(r"^(\d+)\s+(\d+)/(\d+)$", text)
+    if mixed_match:
+        whole, numerator, denominator = mixed_match.groups()
+        return Fraction(int(whole), 1) + Fraction(int(numerator), int(denominator))
+
+    fraction_match = re.match(r"^(\d+)/(\d+)$", text)
+    if fraction_match:
+        numerator, denominator = fraction_match.groups()
+        return Fraction(int(numerator), int(denominator))
+
+    decimal_match = re.match(r"^\d+(?:\.\d+)?$", text)
+    if decimal_match:
+        return Fraction(text)
+
+    return None
+
+
+def format_quantity_range(low, high, unit):
+    if high is not None and abs(float(high) - float(low)) > 0.000001:
+        quantity = f"{format_quantity_number(low)} to {format_quantity_number(high)}"
+    else:
+        quantity = format_quantity_number(low)
+
+    return f"{quantity} {unit}".strip()
+
+
+def format_quantity_number(value):
+    number = Fraction(str(value)).limit_denominator(64)
+
+    if number.denominator == 1:
+        return str(number.numerator)
+
+    whole = number.numerator // number.denominator
+    remainder = number - whole
+
+    if whole:
+        return f"{whole} {remainder.numerator}/{remainder.denominator}"
+
+    return f"{remainder.numerator}/{remainder.denominator}"
+
+
+def apply_quantity_context_to_candidate(candidate, quantity_context):
+    quantity_context = quantity_context or {}
+    if not quantity_context.get("display"):
+        return candidate
+
+    candidate["requested_quantity"] = quantity_context.get("display", "")
+    candidate["requested_quantity_context"] = {
+        "display": quantity_context.get("display", ""),
+        "sources": quantity_context.get("sources", [])[:6],
+    }
+    return candidate
 
 
 def product_detail_limit():
@@ -372,6 +636,72 @@ def mark_product_download(job_id, index, state, message, candidates_count=None, 
         return save_product_progress(progress)
 
 
+def update_product_progress_picks(job_id, ingredient, record):
+    if not job_id or not record:
+        return None
+
+    with PRODUCT_PROGRESS_LOCK:
+        progress = load_product_progress()
+
+        if progress.get("job_id") != job_id:
+            return progress
+
+        selected = record.get("selected_product") or {}
+        selected_id = selected.get("id", "")
+        store_results = {
+            result.get("store_key"): result
+            for result in record.get("store_results_list", [])
+            if isinstance(result, dict) and result.get("store_key")
+        }
+
+        for item in progress.get("downloads", []):
+            if item.get("ingredient") != ingredient:
+                continue
+
+            store_result = store_results.get(item.get("store_key")) or {}
+            store_best = store_result.get("best_product") or {}
+            product = store_best or (
+                selected if selected and selected.get("store_key") == item.get("store_key") else {}
+            )
+
+            item["selected_product"] = compact_progress_product(product)
+            item["selected_name"] = product.get("product_name", "") if product else ""
+            item["selected_price"] = product.get("price", "") if product else ""
+            item["selected_product_url"] = product.get("product_url", "") if product else ""
+            item["selected_is_overall"] = bool(product and selected_id and product.get("id") == selected_id)
+            item["selection_reason"] = (
+                product.get("reason_selected")
+                or store_result.get("reason_selected")
+                or store_result.get("reason_skipped")
+                or ""
+            )
+
+        return save_product_progress(progress)
+
+
+def compact_progress_product(product):
+    if not product:
+        return None
+
+    return {
+        "id": product.get("id", ""),
+        "product_name": product.get("product_name", ""),
+        "store_name": product.get("store_name", ""),
+        "store_key": product.get("store_key", ""),
+        "price": product.get("price", ""),
+        "size": product_size(product),
+        "unit_price": product.get("unit_price", ""),
+        "requested_quantity": product.get("requested_quantity", ""),
+        "quantity_fit": product.get("quantity_fit", {}),
+        "product_url": product.get("product_url", ""),
+        "search_url": product.get("search_url", ""),
+        "confidence": product.get("confidence"),
+        "score": product.get("score"),
+        "reason_selected": product.get("reason_selected", ""),
+        "viable": product.get("viable"),
+    }
+
+
 def finish_product_progress(job_id, ok=True, summary=None):
     with PRODUCT_PROGRESS_LOCK:
         progress = load_product_progress()
@@ -526,7 +856,13 @@ def grab_best_products(items=None, job_id=None):
     ]
     home_address = load_home_address()
     full_address = home_address.get("full_address", "")
-    downloads = build_product_download_plan(ingredients, enabled_stores, stores)
+    quantity_context_by_item = load_item_quantity_context(ingredients)
+    downloads = build_product_download_plan(
+        ingredients,
+        enabled_stores,
+        stores,
+        quantity_context_by_item=quantity_context_by_item,
+    )
     max_workers = product_worker_count(len(downloads))
 
     if job_id:
@@ -629,6 +965,8 @@ def grab_best_products(items=None, job_id=None):
                             full_address,
                             state,
                             item_records,
+                            quantity_context=quantity_context_by_item.get(normalize_item_key(ingredient), {}),
+                            job_id=job_id,
                         )
                         results_by_ingredient[ingredient] = record
                         saved_ingredients.add(ingredient)
@@ -653,6 +991,8 @@ def grab_best_products(items=None, job_id=None):
                     result = {
                         "index": download.get("index", 0),
                         "ingredient": download.get("ingredient", ""),
+                        "quantity": (download.get("quantity_context") or {}).get("display", ""),
+                        "quantity_context": download.get("quantity_context") or {},
                         "search_term": download.get("search_term", ""),
                         "store_key": download.get("store_key", ""),
                         "store_name": download.get("store_name", ""),
@@ -679,6 +1019,8 @@ def grab_best_products(items=None, job_id=None):
                 full_address,
                 state,
                 item_records,
+                quantity_context=quantity_context_by_item.get(normalize_item_key(ingredient), {}),
+                job_id=job_id,
             )
 
         results.append(record)
@@ -719,6 +1061,8 @@ def failed_product_download_result(download, exc, job_id=None):
     return {
         "index": download.get("index", 0),
         "ingredient": download.get("ingredient", ""),
+        "quantity": (download.get("quantity_context") or {}).get("display", ""),
+        "quantity_context": download.get("quantity_context") or {},
         "search_term": download.get("search_term", ""),
         "store_key": download.get("store_key", ""),
         "store_name": download.get("store_name", ""),
@@ -728,11 +1072,20 @@ def failed_product_download_result(download, exc, job_id=None):
     }
 
 
-def save_product_record_for_ingredient(ingredient, store_results, full_address, state, item_records):
+def save_product_record_for_ingredient(
+    ingredient,
+    store_results,
+    full_address,
+    state,
+    item_records,
+    quantity_context=None,
+    job_id=None,
+):
     record = build_product_choice_record_from_results(
         ingredient,
         store_results,
         full_address,
+        quantity_context=quantity_context,
     )
     item_records[record["item_key"]] = record
     selected = record.get("selected_product")
@@ -741,13 +1094,16 @@ def save_product_record_for_ingredient(ingredient, store_results, full_address, 
         save_item_store(record["item_key"], selected.get("store_key") or "")
 
     save_product_choices(state)
+    update_product_progress_picks(job_id, ingredient, record)
     return record
 
 
-def build_product_download_plan(ingredients, enabled_stores, stores):
+def build_product_download_plan(ingredients, enabled_stores, stores, quantity_context_by_item=None):
+    quantity_context_by_item = quantity_context_by_item or {}
     downloads = []
 
     for ingredient in ingredients:
+        quantity_context = quantity_context_by_item.get(normalize_item_key(ingredient), {})
         for search_term in ingredient_search_terms(ingredient):
             for store_key in enabled_stores:
                 store = stores.get(store_key, {})
@@ -760,6 +1116,8 @@ def build_product_download_plan(ingredients, enabled_stores, stores):
                     "store_key": store_key,
                     "store_name": store_name,
                     "search_url": search_url,
+                    "quantity": quantity_context.get("display", ""),
+                    "quantity_context": quantity_context,
                     "state": "waiting",
                     "message": "Queued.",
                     "candidates_count": None,
@@ -783,6 +1141,7 @@ def search_store_products_for_download(
     store_name = download.get("store_name") or store.get("label") or store_key.title()
     search_url = download.get("search_url", "")
     search_term = download.get("search_term") or ingredient
+    quantity_context = download.get("quantity_context") or {}
     search_label = search_term if normalize_match_text(search_term) != normalize_match_text(ingredient) else ingredient
 
     if not search_url:
@@ -792,6 +1151,8 @@ def search_store_products_for_download(
         return {
             "index": index,
             "ingredient": ingredient,
+            "quantity": quantity_context.get("display", ""),
+            "quantity_context": quantity_context,
             "store_key": store_key,
             "store_name": store_name,
             "search_url": search_url,
@@ -824,6 +1185,10 @@ def search_store_products_for_download(
         skip_reasons = [f"{store_name}: product search failed: {exc}"]
 
     if candidates:
+        candidates = [
+            apply_quantity_context_to_candidate(candidate, quantity_context)
+            for candidate in candidates
+        ]
         candidates = prioritize_candidates_for_detail(ingredient, candidates)
         candidates = enrich_product_candidates_from_pages(
             candidates,
@@ -871,6 +1236,8 @@ def search_store_products_for_download(
     return {
         "index": index,
         "ingredient": ingredient,
+        "quantity": quantity_context.get("display", ""),
+        "quantity_context": quantity_context,
         "store_key": store_key,
         "store_name": store_name,
         "search_url": search_url,
@@ -884,9 +1251,10 @@ def search_store_products_for_download(
     }
 
 
-def build_product_choice_record_from_results(ingredient, store_results, full_address):
+def build_product_choice_record_from_results(ingredient, store_results, full_address, quantity_context=None):
     candidates = []
     skip_reasons = []
+    quantity_context = quantity_context or first_quantity_context(store_results)
     store_results = sorted(
         [
             result
@@ -900,11 +1268,16 @@ def build_product_choice_record_from_results(ingredient, store_results, full_add
         candidates.extend(result.get("candidates", []))
         skip_reasons.extend(result.get("skip_reasons", []))
 
-    candidates = rank_product_candidates(ingredient, candidates)
+    candidates = [
+        apply_quantity_context_to_candidate(candidate, quantity_context)
+        for candidate in candidates
+    ]
+    candidates = rank_product_candidates(ingredient, candidates, quantity_context=quantity_context)
     candidates = apply_chatgpt_final_product_selection(
         ingredient,
         candidates,
         full_address=full_address,
+        quantity_context=quantity_context,
     )
     store_product_results_list = build_store_product_results(
         ingredient,
@@ -932,6 +1305,8 @@ def build_product_choice_record_from_results(ingredient, store_results, full_add
     return {
         "item_key": normalize_item_key(ingredient),
         "ingredient": ingredient,
+        "quantity": quantity_context.get("display", ""),
+        "quantity_context": quantity_context,
         "home_address": full_address,
         "selected_product_id": selected.get("id") if selected else "",
         "selected_product": selected,
@@ -944,6 +1319,22 @@ def build_product_choice_record_from_results(ingredient, store_results, full_add
         "skip_reasons": unique_texts(skip_reasons),
         "updated_at": now,
     }
+
+
+def first_quantity_context(store_results):
+    for result in store_results:
+        if not isinstance(result, dict):
+            continue
+
+        quantity_context = result.get("quantity_context") or {}
+        if isinstance(quantity_context, dict) and quantity_context.get("display"):
+            return quantity_context
+
+        quantity = clean_text(result.get("quantity"))
+        if quantity:
+            return {"display": quantity, "sources": []}
+
+    return {}
 
 
 def build_store_product_results(ingredient, raw_store_results, ranked_candidates):
@@ -983,6 +1374,8 @@ def build_store_product_results(ingredient, raw_store_results, ranked_candidates
             "store_key": store_key,
             "store_name": store_name,
             "ingredient": ingredient,
+            "quantity": raw.get("quantity", ""),
+            "quantity_context": raw.get("quantity_context", {}),
             "search_url": raw.get("search_url", ""),
             "search_urls": raw.get("search_urls", []),
             "search_terms": raw.get("search_terms", []),
@@ -1027,6 +1420,8 @@ def group_raw_store_results_by_store(raw_store_results):
             grouped[key] = {
                 "index": raw.get("index", len(order)),
                 "ingredient": raw.get("ingredient", ""),
+                "quantity": raw.get("quantity", ""),
+                "quantity_context": raw.get("quantity_context", {}),
                 "store_key": store_key,
                 "store_name": raw.get("store_name", ""),
                 "search_url": raw.get("search_url", ""),
@@ -1043,6 +1438,10 @@ def group_raw_store_results_by_store(raw_store_results):
 
         record = grouped[key]
         record["index"] = min(record.get("index", raw.get("index", 0)), raw.get("index", record.get("index", 0)))
+        if not record.get("quantity") and raw.get("quantity"):
+            record["quantity"] = raw.get("quantity", "")
+        if not record.get("quantity_context") and raw.get("quantity_context"):
+            record["quantity_context"] = raw.get("quantity_context", {})
         record["candidates"].extend(raw.get("candidates", []))
         record["skip_reasons"] = unique_texts(record.get("skip_reasons", []) + raw.get("skip_reasons", []))
 
@@ -1922,6 +2321,7 @@ def build_product_page_analysis_prompt(ingredient, candidate, rules_payload, pag
         "candidate_name": candidate.get("product_name", ""),
         "candidate_price": candidate.get("price", ""),
         "candidate_size": product_size(candidate),
+        "requested_quantity": candidate.get("requested_quantity", ""),
         "candidate_url": candidate.get("product_url", ""),
         "search_url": candidate.get("search_url", ""),
         "local_food_rule_status": candidate.get("food_rule_status", {}),
@@ -1930,6 +2330,9 @@ def build_product_page_analysis_prompt(ingredient, candidate, rules_payload, pag
     return f"""
 Analyze this grocery product page for the shopping item:
 {ingredient}
+
+Total shopping-list quantity needed:
+{candidate.get("requested_quantity") or "Not specified"}
 
 Candidate already extracted by the app:
 {json.dumps(extracted, ensure_ascii=False)}
@@ -1942,6 +2345,7 @@ Saved best-product ranking guidance:
 
 Rules for your analysis:
 - Decide whether this is a specific purchasable grocery product that matches the shopping item. If the shopping item contains OR/and-or alternatives, matching any one alternative is acceptable.
+- Take the total shopping-list quantity into account when judging whether the package size is a good fit.
 - For a plain whole-food item such as lemon, onion, basil, asparagus, or egg, prefer the actual whole grocery item over juice, extract, drinks, desserts, mixes, prepared foods, cleaners, or scented products unless the shopping item asks for those forms.
 - Apply required food rules strictly. If the fully loaded product page does not confirm a required trait, include that rule under missing_required.
 - Apply avoid rules strictly. If the product page ingredients, title, labels, or description include an avoided term, include that rule under blocked_by.
@@ -3546,7 +3950,7 @@ def build_candidate(
     return candidate
 
 
-def rank_product_candidates(ingredient, candidates):
+def rank_product_candidates(ingredient, candidates, quantity_context=None):
     ranked = []
     seen = set()
 
@@ -3556,7 +3960,12 @@ def rank_product_candidates(ingredient, candidates):
             continue
 
         seen.add(key)
-        score, reasons, skip_reasons, viable = score_candidate(ingredient, candidate)
+        apply_quantity_context_to_candidate(candidate, quantity_context or {})
+        score, reasons, skip_reasons, viable = score_candidate(
+            ingredient,
+            candidate,
+            quantity_context=quantity_context,
+        )
         candidate["score"] = round(score, 2)
         candidate["confidence"] = round(max(0.05, min(0.98, score / 100)), 2)
         candidate["ranking_reasons"] = unique_texts(candidate.get("ranking_reasons", []) + reasons)
@@ -3568,7 +3977,7 @@ def rank_product_candidates(ingredient, candidates):
     return sorted(ranked, key=lambda item: item.get("score", 0), reverse=True)
 
 
-def apply_chatgpt_final_product_selection(ingredient, candidates, full_address=""):
+def apply_chatgpt_final_product_selection(ingredient, candidates, full_address="", quantity_context=None):
     if not product_final_selection_agent_enabled():
         return candidates
 
@@ -3585,6 +3994,7 @@ def apply_chatgpt_final_product_selection(ingredient, candidates, full_address="
         ingredient,
         sorted(agent_candidates, key=lambda item: item.get("score", 0), reverse=True),
         full_address=full_address,
+        quantity_context=quantity_context,
     )
 
     if selection.get("status") != "done":
@@ -3631,7 +4041,7 @@ def apply_chatgpt_final_product_selection(ingredient, candidates, full_address="
     return sorted(candidates, key=lambda item: item.get("score", 0), reverse=True)
 
 
-def choose_best_product_with_chatgpt(ingredient, candidates, full_address=""):
+def choose_best_product_with_chatgpt(ingredient, candidates, full_address="", quantity_context=None):
     client = get_product_analysis_client()
 
     if not client:
@@ -3650,6 +4060,7 @@ def choose_best_product_with_chatgpt(ingredient, candidates, full_address=""):
         ingredient,
         limited_candidates,
         full_address,
+        quantity_context=quantity_context,
     )
     prompt_payload = chatgpt_prompt_payload(
         "final-product-selection",
@@ -3685,8 +4096,9 @@ def choose_best_product_with_chatgpt(ingredient, candidates, full_address=""):
     return selection
 
 
-def build_final_product_selection_prompt(ingredient, candidates, full_address):
+def build_final_product_selection_prompt(ingredient, candidates, full_address, quantity_context=None):
     rules_payload = product_analysis_rules_payload()
+    quantity_context = quantity_context or {}
     candidate_payload = [
         final_product_candidate_payload(candidate)
         for candidate in candidates
@@ -3695,6 +4107,12 @@ def build_final_product_selection_prompt(ingredient, candidates, full_address):
     return f"""
 Choose the best grocery product for this shopping item:
 {ingredient}
+
+Total shopping-list quantity needed:
+{quantity_context.get("display") or "Not specified"}
+
+Quantity sources:
+{json.dumps(quantity_context.get("sources", []), ensure_ascii=False)}
 
 Current saved address:
 {full_address}
@@ -3711,6 +4129,8 @@ Candidate products from activated nearby stores:
 Selection rules:
 - Select exactly one selected_product_id only if it is a direct product URL, not a search page.
 - Match the shopping item as closely as possible. If the item contains OR/and-or alternatives, matching any one alternative is acceptable.
+- Take the total shopping-list quantity into account. Prefer a package or item count that covers the needed quantity with the least practical excess/waste.
+- If the needed quantity is a small unitless count (for example 1 lemon, 1 onion, 2 eggs), prefer an each/single item or the smallest count package over a bulk bag, multi-pack, or multi-pound package unless the bulk package is the only candidate that satisfies strict food rules.
 - For a plain whole-food item such as lemon, onion, basil, asparagus, or egg, prefer the actual whole grocery item over juice, extract, drinks, desserts, mixes, prepared foods, cleaners, or scented products unless the shopping item asks for those forms.
 - Required food rules are strict. If a candidate does not confirm a required trait, do not choose it.
 - Avoid rules are strict. Do not choose a candidate that contains avoided ingredients, labels, or terms.
@@ -3738,6 +4158,8 @@ def final_product_candidate_payload(candidate):
         "nearest_store_address": candidate.get("store_location_address", ""),
         "nearest_store_distance_miles": candidate.get("store_location_distance_miles"),
         "product_name": candidate.get("product_name", ""),
+        "requested_quantity": candidate.get("requested_quantity", ""),
+        "quantity_fit": candidate.get("quantity_fit", {}),
         "price": candidate.get("price", ""),
         "size": product_size(candidate),
         "unit_price": candidate.get("unit_price", ""),
@@ -3787,11 +4209,237 @@ def normalize_final_product_selection(data, allowed_ids):
     }
 
 
-def score_candidate(ingredient, candidate):
+def product_quantity_score(ingredient, candidate, quantity_context=None):
+    quantity_context = quantity_context or candidate.get("requested_quantity_context") or {}
+    requested = parse_display_quantity(quantity_context.get("display") or candidate.get("requested_quantity"))
+    metadata = {
+        "requested_quantity": quantity_context.get("display") or candidate.get("requested_quantity", ""),
+    }
+
+    if not requested:
+        return {"score": 0, "reasons": [], "skip_reasons": [], "metadata": metadata}
+
+    package = parse_candidate_package_quantity(candidate)
+    metadata["requested_low"] = requested.get("low")
+    metadata["requested_high"] = requested.get("high")
+    metadata["requested_unit"] = requested.get("unit", "")
+    metadata["package"] = package
+    reasons = [f"Total shopping-list quantity needed: {metadata['requested_quantity']}."]
+    skip_reasons = []
+    score = 0
+
+    requested_amount = requested.get("high") or requested.get("low")
+    requested_unit = normalize_unit(requested.get("unit", ""))
+    if requested_unit and requested_unit_matches_ingredient(ingredient, requested_unit):
+        requested_unit = ""
+        metadata["requested_unit_treated_as_count"] = True
+    package_amount = package.get("amount")
+    package_unit = normalize_unit(package.get("unit", ""))
+
+    if requested_amount and package_amount and units_compatible_for_quantity(requested_unit, package_unit):
+        comparable_requested = convert_quantity_amount(requested_amount, requested_unit, package_unit)
+        if comparable_requested:
+            ratio = package_amount / comparable_requested
+            metadata["coverage_ratio"] = round(ratio, 3)
+
+            if ratio < 0.95:
+                score -= 22
+                skip_reasons.append("Package appears smaller than the total quantity needed.")
+            elif ratio <= 1.35:
+                score += 28
+                reasons.append("Package size closely fits the total quantity needed.")
+            elif ratio <= 2.25:
+                score += 12
+                reasons.append("Package covers the total quantity with modest extra.")
+            elif ratio <= 4:
+                score -= 8
+                skip_reasons.append("Package is larger than needed for the total quantity.")
+            else:
+                score -= 24
+                skip_reasons.append("Package is much larger than the total quantity needed.")
+
+            return {"score": score, "reasons": reasons, "skip_reasons": skip_reasons, "metadata": metadata}
+
+    if requested_unit == "" and requested_amount:
+        whole_item_adjustment = unitless_whole_item_quantity_score(
+            ingredient,
+            candidate,
+            requested_amount,
+            package,
+        )
+        metadata.update(whole_item_adjustment.get("metadata", {}))
+        score += whole_item_adjustment.get("score", 0)
+        reasons.extend(whole_item_adjustment.get("reasons", []))
+        skip_reasons.extend(whole_item_adjustment.get("skip_reasons", []))
+
+    return {"score": score, "reasons": reasons, "skip_reasons": skip_reasons, "metadata": metadata}
+
+
+def unitless_whole_item_quantity_score(ingredient, candidate, requested_amount, package):
+    text = " ".join([
+        candidate.get("product_name", ""),
+        candidate.get("package_size", ""),
+        candidate.get("size", ""),
+    ]).lower()
+    package_unit = normalize_unit(package.get("unit", ""))
+    package_amount = package.get("amount")
+    metadata = {}
+
+    if package_amount and package_unit in {"ct", "ea", "pack", "pk"}:
+        ratio = package_amount / requested_amount
+        metadata["coverage_ratio"] = round(ratio, 3)
+        if ratio <= 1.25:
+            return {
+                "score": 28,
+                "reasons": ["Package count closely fits the total quantity needed."],
+                "skip_reasons": [],
+                "metadata": metadata,
+            }
+        if ratio <= 2.5:
+            return {
+                "score": 8,
+                "reasons": ["Package count covers the total quantity with modest extra."],
+                "skip_reasons": [],
+                "metadata": metadata,
+            }
+        return {
+            "score": -18,
+            "reasons": [],
+            "skip_reasons": ["Package count is much larger than the total quantity needed."],
+            "metadata": metadata,
+        }
+
+    if requested_amount <= 2 and looks_like_single_each_product(ingredient, candidate):
+        return {
+            "score": 30,
+            "reasons": ["Single-item product fits the small total quantity needed."],
+            "skip_reasons": [],
+            "metadata": metadata,
+        }
+
+    if requested_amount <= 2 and (
+        package_unit in {"lb", "oz", "g", "kg"}
+        or re.search(r"\b(?:bag|bulk|multi[-\s]?pack|pack|pound|lb)\b", text)
+    ):
+        return {
+            "score": -26,
+            "reasons": [],
+            "skip_reasons": ["Bulk or weight-based package is likely more than the small count needed."],
+            "metadata": metadata,
+        }
+
+    return {"score": 0, "reasons": [], "skip_reasons": [], "metadata": metadata}
+
+
+def parse_candidate_package_quantity(candidate):
+    text = " ".join([
+        candidate.get("package_size", ""),
+        candidate.get("size", ""),
+        candidate.get("product_name", ""),
+    ])
+    match = re.search(
+        r"(?<![\w.])(?P<amount>\d+(?:\.\d+)?|\d+\s+\d+/\d+|\d+/\d+)\s*"
+        r"(?P<unit>fl\s*oz|fluid\s*ounces?|ounces?|oz|pounds?|lbs?|lb|grams?|g|kilograms?|kg|"
+        r"count|ct|pack|pk|each|ea)\b",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    if not match:
+        return {}
+
+    amount = parse_fraction_number(match.group("amount"))
+    if amount is None:
+        return {}
+
+    return {
+        "amount": float(amount),
+        "unit": normalize_unit(match.group("unit")),
+        "display": clean_text(match.group(0)),
+    }
+
+
+def requested_unit_matches_ingredient(ingredient, unit):
+    unit_tokens = set(tokenize(unit))
+    ingredient_variants = ingredient_match_variants(ingredient)
+
+    if not unit_tokens:
+        return False
+
+    for variant in ingredient_variants:
+        variant_tokens = set(tokenize(variant))
+        if unit_tokens and unit_tokens.issubset(variant_tokens):
+            return True
+
+    return False
+
+
+def units_compatible_for_quantity(left_unit, right_unit):
+    left = normalize_unit(left_unit)
+    right = normalize_unit(right_unit)
+
+    if left == right:
+        return True
+
+    return quantity_unit_family(left) and quantity_unit_family(left) == quantity_unit_family(right)
+
+
+def quantity_unit_family(unit):
+    unit = normalize_unit(unit)
+    if unit in {"oz", "lb", "g", "kg"}:
+        return "weight"
+    if unit in {"fl oz", "ml", "l", "cup", "tablespoon", "teaspoon"}:
+        return "volume"
+    if unit in {"ct", "ea", "pack", "pk"}:
+        return "count"
+    return ""
+
+
+def convert_quantity_amount(amount, from_unit, to_unit):
+    from_unit = normalize_unit(from_unit)
+    to_unit = normalize_unit(to_unit)
+
+    if from_unit == to_unit:
+        return amount
+
+    to_grams = {"oz": 28.3495, "lb": 453.592, "g": 1, "kg": 1000}
+    to_ml = {"fl oz": 29.5735, "cup": 236.588, "tablespoon": 14.7868, "teaspoon": 4.92892, "ml": 1, "l": 1000}
+
+    if from_unit in to_grams and to_unit in to_grams:
+        return amount * to_grams[from_unit] / to_grams[to_unit]
+
+    if from_unit in to_ml and to_unit in to_ml:
+        return amount * to_ml[from_unit] / to_ml[to_unit]
+
+    return None
+
+
+def looks_like_single_each_product(ingredient, candidate):
+    name = normalize_match_text(candidate.get("product_name", ""))
+    ingredient_name = normalize_match_text(ingredient)
+
+    if not name or not ingredient_name:
+        return False
+
+    if re.search(r"\b(?:bag|pack|pk|ct|count|lb|oz|pound)\b", name):
+        return False
+
+    first_variant = normalize_match_text(ingredient_match_variants(ingredient)[0] if ingredient_match_variants(ingredient) else ingredient)
+    return (
+        name == first_variant
+        or name.startswith(first_variant + " ")
+        or name.endswith(" " + first_variant)
+        or re.search(rf"\b{re.escape(first_variant)}\b", name)
+    )
+
+
+def score_candidate(ingredient, candidate, quantity_context=None):
     score = 20.0
     reasons = []
     skip_reasons = []
     viable = True
+    quantity_context = quantity_context or candidate.get("requested_quantity_context") or {}
+    apply_quantity_context_to_candidate(candidate, quantity_context)
 
     if candidate.get("source") == "search-page-fallback":
         return (
@@ -3834,6 +4482,7 @@ def score_candidate(ingredient, candidate):
         "chatgpt_analysis_status": (candidate.get("chatgpt_analysis") or {}).get("status", ""),
         "chatgpt_confidence": candidate.get("chatgpt_confidence"),
         "chatgpt_ingredient_match_confidence": candidate.get("chatgpt_ingredient_match_confidence"),
+        "requested_quantity": quantity_context.get("display") or candidate.get("requested_quantity", ""),
     }
     candidate["ranking_metadata"] = metadata
 
@@ -3936,6 +4585,12 @@ def score_candidate(ingredient, candidate):
     else:
         score -= 3
         skip_reasons.append("Package size was not clear from the product page.")
+
+    quantity_adjustment = product_quantity_score(ingredient, candidate, quantity_context)
+    score += quantity_adjustment.get("score", 0)
+    candidate["quantity_fit"] = quantity_adjustment.get("metadata", {})
+    reasons.extend(quantity_adjustment.get("reasons", []))
+    skip_reasons.extend(quantity_adjustment.get("skip_reasons", []))
 
     if candidate.get("in_stock") is True:
         score += 12
@@ -4384,6 +5039,18 @@ def normalize_unit(value):
         "each": "ea",
         "piece": "ea",
         "pc": "ea",
+        "packs": "pack",
+        "pk": "pack",
+        "pks": "pack",
+        "cups": "cup",
+        "tablespoons": "tablespoon",
+        "tbsp": "tablespoon",
+        "teaspoons": "teaspoon",
+        "tsp": "teaspoon",
+        "milliliters": "ml",
+        "milliliter": "ml",
+        "liters": "l",
+        "liter": "l",
     }
     return aliases.get(text, text)
 
