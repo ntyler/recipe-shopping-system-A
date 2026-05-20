@@ -63,7 +63,7 @@ $env:FORCE_OPENAI_RECIPE_EXTRACTION="1"
 Optional app and product-lookup controls:
 
 ```powershell
-$env:SHOPPING_APP_PORT="5058"
+$env:SHOPPING_APP_PORT="5059"
 $env:PRODUCT_SEARCH_WORKERS="2"
 $env:PRODUCT_DETAIL_LIMIT_PER_STORE="4"
 $env:PRODUCT_AI_ANALYSIS_LIMIT_PER_STORE="2"
@@ -77,7 +77,7 @@ Notes:
 - Leave `DISABLE_RECIPE_HTML_CACHE_FALLBACK` unset if you want the app to reuse cached recipe HTML when a live page fails.
 - Leave `DISABLE_RECIPE_PDF_ARCHIVE` unset if you want each extracted recipe page saved as a PDF for later review.
 - Set `FORCE_OPENAI_RECIPE_EXTRACTION=1` only when you want the OpenAI extractor used even if recipe-card HTML already has enough structured data.
-- Leave `SHOPPING_APP_PORT` unset when running `py -3.11 app.py` directly and you want the default Flask port `5000`. The included `start_app.bat` currently sets `SHOPPING_APP_PORT=5058`.
+- Leave `SHOPPING_APP_PORT` unset when running `py -3.11 app.py` directly and you want the default Flask port `5000`. The included `start_app.bat` currently sets `SHOPPING_APP_PORT=5059`.
 - Product lookup uses `OPENAI_API_KEY` for fully loaded product-page analysis and final best-product selection. If no key is set, the app still parses product candidates but skips ChatGPT product analysis.
 
 On Windows, you can make variables persistent with:
@@ -111,10 +111,10 @@ Or use:
 .\start_app.bat
 ```
 
-The included launcher currently sets `SHOPPING_APP_PORT=5058`, so it opens:
+The included launcher currently sets `SHOPPING_APP_PORT=5059`, so it opens:
 
 ```text
-http://127.0.0.1:5058
+http://127.0.0.1:5059
 ```
 
 The app also listens on your LAN address, so another device on the same Wi-Fi can open:
@@ -123,12 +123,12 @@ The app also listens on your LAN address, so another device on the same Wi-Fi ca
 http://<computer-lan-ip>:5000
 ```
 
-If you use `start_app.bat`, replace `5000` with `5058`.
+If you use `start_app.bat`, replace `5000` with `5059`.
 
 Example from the current setup:
 
 ```text
-http://192.168.68.62:5058
+http://192.168.68.62:5059
 ```
 
 ## Best Product Lookup
@@ -169,7 +169,7 @@ port=int(os.getenv("SHOPPING_APP_PORT", "5000"))
 Use Tailscale Serve when you only want devices in your Tailscale tailnet to reach the app:
 
 ```powershell
-tailscale serve --bg http://127.0.0.1:5058
+tailscale serve --bg http://127.0.0.1:5059
 tailscale serve status
 ```
 
@@ -190,7 +190,7 @@ tailscale serve --https=443 off
 Use Tailscale Funnel when you want the Flask app reachable from outside your tailnet:
 
 ```powershell
-tailscale funnel --bg --yes http://127.0.0.1:5058
+tailscale funnel --bg --yes http://127.0.0.1:5059
 tailscale funnel status
 ```
 
@@ -224,22 +224,22 @@ Recommended setup:
 http://<computer-mesh-ip>:5000
 ```
 
-If you use the included launcher, use port `5058` instead:
+If you use the included launcher, use port `5059` instead:
 
 ```text
-http://<computer-mesh-ip>:5058
+http://<computer-mesh-ip>:5059
 ```
 
 Examples:
 
 ```text
-http://100.x.y.z:5058
-http://10.x.y.z:5058
+http://100.x.y.z:5059
+http://10.x.y.z:5059
 ```
 
 ## HTTPS / Secure Page Access
 
-Phone GPS/geolocation requires a secure browser origin. `http://<ip>:5000` or `http://<ip>:5058` will show as **Not Secure**, so mobile browsers may block `Use My Location`.
+Phone GPS/geolocation requires a secure browser origin. `http://<ip>:5000` or `http://<ip>:5059` will show as **Not Secure**, so mobile browsers may block `Use My Location`.
 
 Tailscale Serve and Tailscale Funnel provide HTTPS at:
 
@@ -251,14 +251,14 @@ Quick test with Flask's temporary self-signed certificate:
 
 ```powershell
 $env:SHOPPING_APP_SSL_ADHOC="1"
-$env:SHOPPING_APP_PORT="5058"
+$env:SHOPPING_APP_PORT="5059"
 py -3.11 app.py
 ```
 
 Then open:
 
 ```text
-https://<computer-ip>:5058
+https://<computer-ip>:5059
 ```
 
 Your browser will warn because the certificate is self-signed. For the most reliable phone experience, use one of these:
@@ -272,7 +272,7 @@ py -3.11 app.py
 ```
 
 - A trusted HTTPS tunnel such as Tailscale Funnel, Cloudflare Tunnel, or ngrok pointed at `http://127.0.0.1:5000`.
-- For the included `start_app.bat`, point the tunnel at `http://127.0.0.1:5058`.
+- For the included `start_app.bat`, point the tunnel at `http://127.0.0.1:5059`.
 
 Do not expose this app publicly unless you add authentication, keep the tunnel private, or only run public access temporarily.
 
@@ -280,7 +280,7 @@ If the phone cannot connect:
 
 - Confirm both devices are online in the mesh/VPN app.
 - Allow Python/Flask through Windows Firewall for private networks.
-- Make sure nothing else is already using the port you started Flask on, usually `5000` for direct runs or `5058` for `start_app.bat`.
+- Make sure nothing else is already using the port you started Flask on, usually `5000` for direct runs or `5059` for `start_app.bat`.
 - Use the mesh IP, not `127.0.0.1`; `127.0.0.1` only works on the same device.
 
 ## ntfy Notifications
