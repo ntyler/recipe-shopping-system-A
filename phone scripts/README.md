@@ -48,7 +48,7 @@ https://desktop-in7s09s.tail906b20.ts.net/
 Current local app port used by `start_app.bat` and `start_shopping_app.py`:
 
 ```text
-5081
+5082
 ```
 
 Turn off public access from PowerShell when you are done:
@@ -103,7 +103,7 @@ Follow these steps from top to bottom when setting up or debugging the phone lau
 Run this on the Windows PC from PowerShell:
 
 ```powershell
-curl.exe -sS --noproxy "*" --max-time 8 http://127.0.0.1:5081/ -o NUL -w "%{http_code}`n"
+curl.exe -sS --noproxy "*" --max-time 8 http://127.0.0.1:5082/ -o NUL -w "%{http_code}`n"
 ```
 
 Expected output:
@@ -132,7 +132,7 @@ or:
 Run this on the Windows PC:
 
 ```powershell
-curl.exe -sS --noproxy "*" --max-time 8 http://192.168.68.62:5081/ -o NUL -w "%{http_code}`n"
+curl.exe -sS --noproxy "*" --max-time 8 http://192.168.68.62:5082/ -o NUL -w "%{http_code}`n"
 ```
 
 Expected output:
@@ -225,7 +225,7 @@ Restart-Service sshd
 Run this on the Windows PC:
 
 ```powershell
-tailscale funnel --bg --yes http://127.0.0.1:5081
+tailscale funnel --bg --yes http://127.0.0.1:5082
 ```
 
 Expected output:
@@ -234,7 +234,7 @@ Expected output:
 Available on the internet:
 
 https://desktop-in7s09s.tail906b20.ts.net/
-|-- proxy http://127.0.0.1:5081
+|-- proxy http://127.0.0.1:5082
 
 Funnel started and running in the background.
 ```
@@ -259,7 +259,7 @@ Expected output:
 #     - https://desktop-in7s09s.tail906b20.ts.net
 
 https://desktop-in7s09s.tail906b20.ts.net (Funnel on)
-|-- / proxy http://127.0.0.1:5081
+|-- / proxy http://127.0.0.1:5082
 ```
 
 Next step:

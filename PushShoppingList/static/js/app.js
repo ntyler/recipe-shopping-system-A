@@ -105,6 +105,11 @@ function renderProductProgressRow(row, index) {
         : "";
     const selectedName = selected ? (selected.product_name || "Unnamed product") : "No product selected";
     const requestedQuantity = selected ? (selected.requested_quantity || row.quantity || "") : (row.quantity || "");
+    const rowSearchUrl = productSearchUrlForRow(row, selected);
+    const rowTitle = isTestGrab
+        ? `${selected ? selected.store_name || row.target_store || row.store_name || "Aldi" : row.target_store || row.store_name || "Aldi"} - ${row.ingredient || row.search_item || ""}`
+        : row.ingredient || "";
+    const titleHtml = productProgressTitleHtml(`${index + 1}. ${rowTitle}`, ["bulk-progress-text"], rowSearchUrl);
     const selectedHtml = productUrl
         ? `<a class="bulk-product-name bulk-product-name-link" href="${escapeAttribute(productUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(selectedName)}</a>`
         : `<div class="bulk-product-name">${escapeHtml(selectedName)}</div>`;
@@ -132,7 +137,7 @@ function renderProductProgressRow(row, index) {
             <input type="checkbox" class="bulk-progress-check" disabled ${selected ? "checked" : ""}>
             <div class="bulk-progress-main">
                 <div class="bulk-progress-title-line">
-                    <span class="bulk-progress-text">${index + 1}. ${escapeHtml(row.ingredient || "")}</span>
+                    ${titleHtml}
                 </div>
                 <div class="bulk-skip-reason">${escapeHtml(skip || (selected ? "selected" : "no valid product selected"))}</div>
             </div>
@@ -254,13 +259,13 @@ function renderProductDownloadRow(row, index) {
         textClasses.push("active");
     }
 
-    const title = `${row.store_name || row.store_key || "Store"} - ${row.ingredient || ""}`;
-    const urlHtml = `<span class="${textClasses.join(" ")}">${escapeHtml(title)}</span>`;
     const statusClass = failed ? "failed" : (active ? "running" : (done ? "done" : (skipped ? "skipped" : "waiting")));
     const candidateText = row.candidates_count === null || row.candidates_count === undefined
         ? ""
         : `${row.candidates_count} candidate${Number(row.candidates_count) === 1 ? "" : "s"}`;
     const selected = row.selected_product || null;
+    const title = `${row.store_name || row.store_key || "Store"} - ${row.ingredient || row.search_term || ""}`;
+    const urlHtml = productProgressTitleHtml(title, textClasses, productSearchUrlForRow(row, selected));
     const selectedUrl = selected && selected.product_url && selected.product_url !== selected.search_url
         ? selected.product_url
         : "";
@@ -322,6 +327,53 @@ function renderProductDownloadRow(row, index) {
             <span class="bulk-download-state ${statusClass}">${escapeHtml(state)}</span>
         </div>
     `;
+}
+
+function productProgressTitleHtml(title, classes, url) {
+    const className = (classes || ["bulk-progress-text"]).join(" ");
+
+    if (url) {
+        return `
+            <a class="${escapeAttribute(`${className} bulk-progress-title-link`)}"
+               href="${escapeAttribute(url)}"
+               target="_blank"
+               rel="noopener noreferrer"
+               title="${escapeAttribute(url)}">
+                ${escapeHtml(title)}
+            </a>
+        `;
+    }
+
+    return `<span class="${escapeAttribute(className)}">${escapeHtml(title)}</span>`;
+}
+
+function productSearchUrlForRow(row, selected = null) {
+    const sources = [
+        row ? row.search_url : "",
+        row ? row.source_page_url : "",
+        row ? row.rendered_page_url : "",
+        selected ? selected.search_url : "",
+        selected ? selected.source_page_url : "",
+        selected ? selected.rendered_page_url : "",
+    ];
+
+    for (const value of sources) {
+        if (value && value !== (selected ? selected.product_url : "")) {
+            return value;
+        }
+    }
+
+    const storeResults = row && Array.isArray(row.store_results_list) ? row.store_results_list : [];
+    for (const storeResult of storeResults) {
+        const value = storeResult
+            ? storeResult.search_url || storeResult.source_page_url || storeResult.rendered_page_url || ""
+            : "";
+        if (value) {
+            return value;
+        }
+    }
+
+    return "";
 }
 
 function testGrabAlternativesButtonHtml(row = {}) {
