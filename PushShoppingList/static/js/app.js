@@ -117,7 +117,7 @@ function renderProductProgressRow(row, index) {
         || (Array.isArray(row.candidates) && row.candidates.length)
     );
     const alternativesButtonHtml = isTestGrab
-        ? (hasSavedAlternatives ? testGrabAlternativesButtonHtml() : "")
+        ? (hasSavedAlternatives ? testGrabAlternativesButtonHtml(row) : "")
         : `
             <button type="button"
                     class="bulk-alt-toggle"
@@ -275,7 +275,7 @@ function renderProductDownloadRow(row, index) {
         || row.candidates_count
         || (Array.isArray(row.candidates) && row.candidates.length)
     );
-    const alternativesButtonHtml = row.test_grab && hasSavedAlternatives ? testGrabAlternativesButtonHtml() : "";
+    const alternativesButtonHtml = row.test_grab && hasSavedAlternatives ? testGrabAlternativesButtonHtml(row) : "";
     const selectedMeta = selected
         ? [
             selected.requested_quantity ? `need ${selected.requested_quantity}` : "",
@@ -324,11 +324,12 @@ function renderProductDownloadRow(row, index) {
     `;
 }
 
-function testGrabAlternativesButtonHtml() {
+function testGrabAlternativesButtonHtml(row = {}) {
+    const itemKey = row.item_key || row.ingredient || "test grab";
     return `
         <button type="button"
                 class="bulk-alt-toggle"
-                data-item-key="eggs"
+                data-item-key="${escapeAttribute(itemKey)}"
                 data-store-key="aldi"
                 onclick="openTestGrabAlternatives(this)">
             Alternatives
@@ -416,13 +417,27 @@ async function testGrabProducts(event) {
     const form = event.currentTarget;
     const button = form ? form.querySelector("button") : null;
     const originalText = button ? button.textContent : "";
+    const previousIngredient = localStorage.getItem("testGrabIngredient") || "eggs";
+    const ingredientInput = window.prompt("What ingredient should Test Grab search at ALDI?", previousIngredient);
+
+    if (ingredientInput === null) {
+        return false;
+    }
+
+    const ingredient = ingredientInput.trim();
+    if (!ingredient) {
+        alert("Enter an ingredient for Test Grab.");
+        return false;
+    }
+
+    localStorage.setItem("testGrabIngredient", ingredient);
     const jobId = newProductJobId();
     activeProductJobId = jobId;
 
     showProductsOverlay();
     setProductsOverlayState(
         "Preparing isolated Test Grab...",
-        "Testing ALDI eggs only, using the saved current Full Address.",
+        `Testing ALDI ${ingredient}, using the saved current Full Address.`,
         3,
         []
     );
@@ -438,6 +453,7 @@ async function testGrabProducts(event) {
         const formData = new FormData(form);
         formData.set("ajax", "1");
         formData.set("job_id", jobId);
+        formData.set("ingredient", ingredient);
         const response = await fetch(form.action, {
             method: "POST",
             headers: {
@@ -455,7 +471,7 @@ async function testGrabProducts(event) {
         stopProductProgressPolling();
         setProductsOverlayState(
             "Test Grab complete.",
-            `ALDI eggs test selected ${data.selected_count || 0} best product. Result saved to ${data.result_path || "test_grab_result.json"}.`,
+            `ALDI ${data.search_item || ingredient} test selected ${data.selected_count || 0} best product. Result saved to ${data.result_path || "test_grab_result.json"}.`,
             100,
             data.results || []
         );
@@ -544,11 +560,12 @@ async function openProductAlternatives(button) {
 }
 
 async function openTestGrabAlternatives(button) {
+    const itemLabel = button ? button.dataset.itemKey || "Test Grab" : "Test Grab";
     const modal = ensureProductAlternativesModal();
     modal.classList.add("open");
     modal.setAttribute("aria-hidden", "false");
     document.body.classList.add("modal-open");
-    renderProductAlternativesLoading("Test Grab eggs", "Aldi");
+    renderProductAlternativesLoading(itemLabel, "Aldi");
 
     try {
         const response = await fetch(`/api/test_grab_result?t=${Date.now()}`, {

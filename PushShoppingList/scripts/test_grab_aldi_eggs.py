@@ -42,8 +42,9 @@ TEST_GRAB_TARGET_PRODUCT = "Edible grocery eggs"
 TEST_GRAB_SEARCH_TERM = "eggs"
 
 
-def test_grab_products(job_id=None):
-    ingredient = TEST_GRAB_SEARCH_TERM
+def test_grab_products(job_id=None, ingredient=None):
+    ingredient = test_grab_search_term(ingredient)
+    target_product = test_grab_target_product(ingredient)
     home_address = load_home_address()
     full_address = home_address.get("full_address", "")
     store_settings = load_store_settings()
@@ -55,17 +56,19 @@ def test_grab_products(job_id=None):
             full_address,
             errors=[f"{TEST_GRAB_TARGET_STORE_NAME}: store is not configured."],
             job_id=job_id,
+            search_term=ingredient,
+            target_product=target_product,
         )
         save_test_grab_result(result)
         return result
 
     stores = {TEST_GRAB_TARGET_STORE_KEY: store}
-    search_url = build_product_search_url(store, TEST_GRAB_SEARCH_TERM)
+    search_url = build_product_search_url(store, ingredient)
     download = {
         "index": 0,
         "item_key": normalize_item_key(ingredient),
         "ingredient": ingredient,
-        "search_term": TEST_GRAB_SEARCH_TERM,
+        "search_term": ingredient,
         "store_key": TEST_GRAB_TARGET_STORE_KEY,
         "store_name": store.get("label") or TEST_GRAB_TARGET_STORE_NAME,
         "search_url": search_url,
@@ -111,7 +114,7 @@ def test_grab_products(job_id=None):
     if job_id:
         update_product_progress_summary(
             job_id,
-            "Test Grab: loading localized ALDI inventory with Selenium and searching eggs.",
+            f"Test Grab: loading localized ALDI inventory with Selenium and searching {ingredient}.",
         )
 
     result = search_store_products_for_download(
@@ -128,10 +131,14 @@ def test_grab_products(job_id=None):
     )
     for candidate in result.get("candidates", []):
         candidate["test_grab"] = True
-        candidate["allow_edible_egg_products"] = True
+        if is_egg_test_grab(ingredient):
+            candidate["allow_edible_egg_products"] = True
+            reason = "Isolated Test Grab accepts edible egg products as alternatives while ranking shell cartons first."
+        else:
+            reason = "Isolated Test Grab ranks edible grocery products matching the requested ingredient first."
         candidate["ranking_reasons"] = unique_texts(
             candidate.get("ranking_reasons", [])
-            + ["Isolated Test Grab accepts edible egg products as alternatives while ranking shell cartons first."]
+            + [reason]
         )
 
     record = build_product_choice_record_from_results(
@@ -141,7 +148,7 @@ def test_grab_products(job_id=None):
         quantity_context={},
     )
     record["test_grab"] = True
-    record["target_product"] = TEST_GRAB_TARGET_PRODUCT
+    record["target_product"] = target_product
     record["target_store"] = TEST_GRAB_TARGET_STORE_NAME
     record["agent_stages"] = [store_resolution_stage] + record.get("agent_stages", [])
     record = compact_product_value_for_storage(record)
@@ -156,6 +163,8 @@ def test_grab_products(job_id=None):
         home_location,
         store_location,
         job_id=job_id,
+        search_term=ingredient,
+        target_product=target_product,
     )
     save_test_grab_result(payload)
 
@@ -164,13 +173,30 @@ def test_grab_products(job_id=None):
             job_id,
             ok=not payload.get("errors"),
             summary=(
-                "Test Grab complete. ALDI eggs were ranked from verified localized inventory."
+                f"Test Grab complete. ALDI {ingredient} products were ranked from verified localized inventory."
                 if payload.get("best_product")
                 else "Test Grab finished without a verified best product."
             ),
         )
 
     return payload
+
+
+def test_grab_search_term(value=None):
+    term = clean_text(value or os.getenv("TEST_GRAB_INGREDIENT") or TEST_GRAB_SEARCH_TERM)
+    return term[:80].strip() or TEST_GRAB_SEARCH_TERM
+
+
+def test_grab_target_product(search_term):
+    if is_egg_test_grab(search_term):
+        return TEST_GRAB_TARGET_PRODUCT
+    return f"Edible grocery {search_term}"
+
+
+def is_egg_test_grab(search_term):
+    normalized = normalize_match_text(search_term or "")
+    tokens = normalized.replace("-", " ").split()
+    return normalized == "edible grocery eggs" or any(token in {"egg", "eggs"} for token in tokens)
 
 
 def test_grab_browser_visible():
@@ -228,8 +254,8 @@ def test_grab_choice_from_result(payload=None):
 
     return {
         "test_grab": True,
-        "item_key": record.get("item_key") or normalize_item_key(TEST_GRAB_SEARCH_TERM),
-        "ingredient": record.get("ingredient") or TEST_GRAB_SEARCH_TERM,
+        "item_key": record.get("item_key") or normalize_item_key(payload.get("search_item") or TEST_GRAB_SEARCH_TERM),
+        "ingredient": record.get("ingredient") or payload.get("search_item") or TEST_GRAB_SEARCH_TERM,
         "filtered_store_key": TEST_GRAB_TARGET_STORE_KEY,
         "filtered_store_name": TEST_GRAB_TARGET_STORE_NAME,
         "store_result": store_result,
@@ -346,10 +372,26 @@ def update_test_grab_store_result(record, selected):
     store_result["selected_at"] = selected.get("selected_at", "")
 
 
-def test_grab_failure_payload(full_address, errors=None, job_id=None):
+def test_grab_failure_payload(full_address, errors=None, job_id=None, search_term=None, target_product=None):
+    search_term = test_grab_search_term(search_term)
+    target_product = target_product or test_grab_target_product(search_term)
     if job_id:
+        download = {
+            "index": 0,
+            "item_key": normalize_item_key(search_term),
+            "ingredient": search_term,
+            "search_term": search_term,
+            "store_key": TEST_GRAB_TARGET_STORE_KEY,
+            "store_name": TEST_GRAB_TARGET_STORE_NAME,
+            "quantity": "",
+            "quantity_context": {},
+            "state": "failed",
+            "message": (errors or ["Test Grab failed."])[0],
+            "candidates_count": 0,
+            "test_grab": True,
+        }
         start_product_progress(
-            [],
+            [download],
             job_id=job_id,
             home_address=full_address,
             enabled_stores=[TEST_GRAB_TARGET_STORE_KEY],
@@ -363,7 +405,8 @@ def test_grab_failure_payload(full_address, errors=None, job_id=None):
         "job_id": job_id,
         "timestamp": datetime.utcnow().isoformat(timespec="seconds") + "Z",
         "home_address": full_address,
-        "target_product": TEST_GRAB_TARGET_PRODUCT,
+        "target_product": target_product,
+        "search_item": search_term,
         "target_store": TEST_GRAB_TARGET_STORE_NAME,
         "searched_store": {},
         "best_product": {},
@@ -381,9 +424,20 @@ def test_grab_failure_payload(full_address, errors=None, job_id=None):
     }
 
 
-def build_test_grab_response_payload(record, raw_result, full_address, home_location, store_location, job_id=None):
+def build_test_grab_response_payload(
+    record,
+    raw_result,
+    full_address,
+    home_location,
+    store_location,
+    job_id=None,
+    search_term=None,
+    target_product=None,
+):
     record = record if isinstance(record, dict) else {}
     raw_result = raw_result if isinstance(raw_result, dict) else {}
+    search_term = test_grab_search_term(search_term or record.get("ingredient"))
+    target_product = target_product or test_grab_target_product(search_term)
     candidates = record.get("candidates", []) if isinstance(record.get("candidates"), list) else []
     valid_products = [
         candidate
@@ -425,8 +479,8 @@ def build_test_grab_response_payload(record, raw_result, full_address, home_loca
         "timestamp": datetime.utcnow().isoformat(timespec="seconds") + "Z",
         "home_address": full_address,
         "home_location": home_location,
-        "target_product": TEST_GRAB_TARGET_PRODUCT,
-        "search_item": TEST_GRAB_SEARCH_TERM,
+        "target_product": target_product,
+        "search_item": search_term,
         "target_store": TEST_GRAB_TARGET_STORE_NAME,
         "searched_store": searched_store,
         "best_product": final_product_candidate_payload(selected) if selected else {},
@@ -547,6 +601,9 @@ def build_test_grab_eggs_aldi_prompt(
 ):
     store_location = store_location or {}
     rendered_page = rendered_page or {}
+    search_term = test_grab_search_term(ingredient)
+    target_product = test_grab_target_product(search_term)
+    egg_request = is_egg_test_grab(search_term)
     localization = rendered_page.get("localization", {}) if isinstance(rendered_page.get("localization"), dict) else {}
     product_blocks = [
         {
@@ -561,6 +618,43 @@ def build_test_grab_eggs_aldi_prompt(
         for index, card in enumerate(visible_cards or [], start=1)
         if isinstance(card, dict)
     ]
+    include_rules = (
+        "ONLY include edible grocery egg products such as chicken eggs, duck eggs, quail eggs, brown eggs, white eggs, "
+        "cage free eggs, free range eggs, pasture raised eggs, organic eggs, grocery egg cartons, liquid eggs, egg whites, "
+        "packaged hard boiled eggs, and refrigerated edible egg products."
+        if egg_request
+        else f"ONLY include edible grocery products that match or are a plausible direct alternative for {search_term}. "
+        "Include fresh, refrigerated, frozen, pantry, dairy, meat, produce, bakery, beverage, and other consumable grocery items when they match the request."
+    )
+    exclude_rules = (
+        "STRICTLY EXCLUDE Easter eggs, chocolate eggs, candy eggs, decorative eggs, plastic eggs, ceramic eggs, toy eggs, beauty products, slime eggs, pet toys, surprise eggs, bath bombs, seasonal novelty items, and non-food products. If a result is not edible food, reject it."
+        if egg_request
+        else "STRICTLY EXCLUDE decorative items, toys, beauty products, pet products, household products, bath products, craft products, seasonal novelty items, unrelated products, and non-food products. If a result is not edible food or is not a plausible match for the requested ingredient, reject it."
+    )
+    extraction_fields = (
+        "- egg type\n- package count\n- package size\n- price\n- price per egg if available"
+        if egg_request
+        else "- product category/type\n- package count\n- package size\n- price\n- unit price if available"
+    )
+    ranking_rules = (
+        "1. Best value per egg.\n"
+        "2. In-stock products first.\n"
+        "3. Larger count/value packs preferred.\n"
+        "4. Cage free preferred over conventional when value difference is reasonable.\n"
+        "5. Organic preferred only when competitively priced.\n"
+        "6. Avoid overpriced specialty products unless clearly premium.\n"
+        "7. Prefer pickup-eligible products.\n"
+        "8. Prefer reputable grocery brands."
+        if egg_request
+        else "1. Relevance to the requested ingredient first.\n"
+        "2. In-stock products first.\n"
+        "3. Best unit value when unit price or package size is available.\n"
+        "4. Preferred package size/value packs when practical.\n"
+        "5. Organic or premium products only when competitively priced or clearly requested.\n"
+        "6. Avoid overpriced specialty products unless clearly premium.\n"
+        "7. Prefer pickup-eligible products.\n"
+        "8. Prefer reputable grocery brands."
+    )
 
     return f"""
 You are a grocery product collection and product ranking agent.
@@ -595,7 +689,7 @@ USER LOCATION:
 {full_address}
 
 TARGET PRODUCT:
-Edible grocery eggs
+{target_product}
 
 STORE WORKFLOW:
 1. Detect the nearest ALDI store to the home address.
@@ -603,7 +697,7 @@ STORE WORKFLOW:
 3. Select the nearest valid store.
 4. Verify the localized store session is active.
 5. Confirm store name, full address, store ID if visible, distance from home, and pickup/delivery support if visible.
-6. ONLY AFTER localization: search for "eggs".
+6. ONLY AFTER localization: search for "{search_term}".
 
 VERIFIED STORE INFO FROM BROWSER AUTOMATION:
 {json.dumps({
@@ -640,20 +734,16 @@ LOCALIZATION VERIFICATION REQUIREMENTS:
 - If proof_of_store_selection is empty or verified is false, DO NOT continue. Return empty product objects/arrays and include a failure in errors.
 
 ONLY INCLUDE EDIBLE RESULTS:
-ONLY include edible grocery egg products such as chicken eggs, duck eggs, quail eggs, brown eggs, white eggs, cage free eggs, free range eggs, pasture raised eggs, organic eggs, grocery egg cartons, liquid eggs, egg whites, packaged hard boiled eggs, and refrigerated edible egg products.
+{include_rules}
 
-STRICTLY EXCLUDE Easter eggs, chocolate eggs, candy eggs, decorative eggs, plastic eggs, ceramic eggs, toy eggs, beauty products, slime eggs, pet toys, surprise eggs, bath bombs, seasonal novelty items, and non-food products. If a result is not edible food, reject it.
+{exclude_rules}
 
 FOR EVERY PRODUCT FOUND, EXTRACT WHEN VISIBLE:
 - store name
 - selected store address
 - product name
 - brand
-- egg type
-- package count
-- package size
-- price
-- price per egg if available
+{extraction_fields}
 - stock status
 - pickup availability if visible
 - product URL
@@ -661,14 +751,7 @@ FOR EVERY PRODUCT FOUND, EXTRACT WHEN VISIBLE:
 - product ID/SKU if visible
 
 PRODUCT RANKING RULES:
-1. Best value per egg.
-2. In-stock products first.
-3. Larger count/value packs preferred.
-4. Cage free preferred over conventional when value difference is reasonable.
-5. Organic preferred only when competitively priced.
-6. Avoid overpriced specialty products unless clearly premium.
-7. Prefer pickup-eligible products.
-8. Prefer reputable grocery brands.
+{ranking_rules}
 
 RETURN REQUIREMENTS:
 Return verified store info, best overall product, best value pick, best premium pick, all other edible alternatives, and rejected products with rejection_reason.
@@ -726,7 +809,10 @@ Return clean structured JSON only:
 
 
 def main():
-    result = test_grab_products(job_id=os.getenv("TEST_GRAB_JOB_ID") or None)
+    result = test_grab_products(
+        job_id=os.getenv("TEST_GRAB_JOB_ID") or None,
+        ingredient=os.getenv("TEST_GRAB_INGREDIENT") or None,
+    )
     print(json.dumps(result, indent=2, ensure_ascii=False))
     return 0 if result.get("ok") else 1
 

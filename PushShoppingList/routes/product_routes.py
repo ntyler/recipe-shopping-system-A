@@ -125,7 +125,10 @@ def api_grab_best_products_route():
 
 @product_bp.route("/test_grab_products", methods=["POST"])
 def test_grab_products_route():
-    result = test_grab_products(job_id=request.form.get("job_id"))
+    result = test_grab_products(
+        job_id=request.form.get("job_id"),
+        ingredient=request.form.get("ingredient") or request.form.get("search_term"),
+    )
 
     if wants_json_response():
         return jsonify(result)
@@ -136,7 +139,10 @@ def test_grab_products_route():
 @product_bp.route("/api/test_grab_products", methods=["POST"])
 def api_test_grab_products_route():
     data = request.get_json(silent=True) or {}
-    return jsonify(test_grab_products(job_id=data.get("job_id")))
+    return jsonify(test_grab_products(
+        job_id=data.get("job_id"),
+        ingredient=data.get("ingredient") or data.get("search_term"),
+    ))
 
 
 @product_bp.route("/api/test_grab_result")
