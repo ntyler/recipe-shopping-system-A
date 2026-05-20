@@ -22,7 +22,7 @@ REPO_DIR = r"D:\GitHub\recipe-shopping-system-A"
 BAT_FILE = rf"{REPO_DIR}\start_app.bat"
 
 APP_URL = "https://desktop-in7s09s.tail906b20.ts.net/"
-LOCAL_APP_PORT = 5056
+LOCAL_APP_PORT = 5057
 ENSURE_FUNNEL = True
 OPEN_TAILSCALE_FIRST = True
 

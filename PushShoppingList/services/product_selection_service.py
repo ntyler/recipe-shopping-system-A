@@ -990,6 +990,7 @@ def grab_best_products(items=None, job_id=None):
                         )
                     result = {
                         "index": download.get("index", 0),
+                        "item_key": download.get("item_key") or normalize_item_key(download.get("ingredient", "")),
                         "ingredient": download.get("ingredient", ""),
                         "quantity": (download.get("quantity_context") or {}).get("display", ""),
                         "quantity_context": download.get("quantity_context") or {},
@@ -1060,6 +1061,7 @@ def failed_product_download_result(download, exc, job_id=None):
 
     return {
         "index": download.get("index", 0),
+        "item_key": download.get("item_key") or normalize_item_key(download.get("ingredient", "")),
         "ingredient": download.get("ingredient", ""),
         "quantity": (download.get("quantity_context") or {}).get("display", ""),
         "quantity_context": download.get("quantity_context") or {},
@@ -1111,6 +1113,7 @@ def build_product_download_plan(ingredients, enabled_stores, stores, quantity_co
                 search_url = build_product_search_url(store, search_term)
                 downloads.append({
                     "index": len(downloads),
+                    "item_key": normalize_item_key(ingredient),
                     "ingredient": ingredient,
                     "search_term": search_term,
                     "store_key": store_key,
@@ -1150,6 +1153,7 @@ def search_store_products_for_download(
             mark_product_download(job_id, index, "skipped", message, candidates_count=0)
         return {
             "index": index,
+            "item_key": download.get("item_key") or normalize_item_key(ingredient),
             "ingredient": ingredient,
             "quantity": quantity_context.get("display", ""),
             "quantity_context": quantity_context,
@@ -1235,6 +1239,7 @@ def search_store_products_for_download(
 
     return {
         "index": index,
+        "item_key": download.get("item_key") or normalize_item_key(ingredient),
         "ingredient": ingredient,
         "quantity": quantity_context.get("display", ""),
         "quantity_context": quantity_context,
@@ -1373,6 +1378,7 @@ def build_store_product_results(ingredient, raw_store_results, ranked_candidates
         record = {
             "store_key": store_key,
             "store_name": store_name,
+            "item_key": raw.get("item_key") or normalize_item_key(ingredient),
             "ingredient": ingredient,
             "quantity": raw.get("quantity", ""),
             "quantity_context": raw.get("quantity_context", {}),
@@ -1419,6 +1425,7 @@ def group_raw_store_results_by_store(raw_store_results):
         if key not in grouped:
             grouped[key] = {
                 "index": raw.get("index", len(order)),
+                "item_key": raw.get("item_key") or normalize_item_key(raw.get("ingredient", "")),
                 "ingredient": raw.get("ingredient", ""),
                 "quantity": raw.get("quantity", ""),
                 "quantity_context": raw.get("quantity_context", {}),
@@ -1438,6 +1445,8 @@ def group_raw_store_results_by_store(raw_store_results):
 
         record = grouped[key]
         record["index"] = min(record.get("index", raw.get("index", 0)), raw.get("index", record.get("index", 0)))
+        if not record.get("item_key") and raw.get("item_key"):
+            record["item_key"] = raw.get("item_key", "")
         if not record.get("quantity") and raw.get("quantity"):
             record["quantity"] = raw.get("quantity", "")
         if not record.get("quantity_context") and raw.get("quantity_context"):

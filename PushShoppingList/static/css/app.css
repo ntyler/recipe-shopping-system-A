@@ -3769,6 +3769,17 @@ body {
             overflow-wrap: anywhere;
         }
 
+        .bulk-product-name-link {
+            color: #7dd3fc;
+            font-weight: 800;
+            text-decoration: none;
+        }
+
+        .bulk-product-name-link:hover {
+            color: #38bdf8;
+            text-decoration: underline;
+        }
+
         .bulk-product-price {
             color: #fff;
             font-size: 13px;
@@ -4004,6 +4015,13 @@ body {
 
         .bulk-prompt-btn:hover {
             background: #4b5563;
+        }
+
+        .bulk-row-prompt-btn {
+            align-self: flex-start;
+            margin-top: 2px;
+            padding: 4px 8px;
+            font-size: 11px;
         }
 
         .product-prompt-modal-backdrop {

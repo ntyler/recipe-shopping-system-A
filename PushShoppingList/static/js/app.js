@@ -105,8 +105,11 @@ function renderProductProgressRow(row, index) {
     const selectedName = selected ? (selected.product_name || "Unnamed product") : "No product selected";
     const requestedQuantity = selected ? (selected.requested_quantity || row.quantity || "") : (row.quantity || "");
     const selectedHtml = productUrl
-        ? `<a class="bulk-product-name" href="${escapeAttribute(productUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(selectedName)}</a>`
+        ? `<a class="bulk-product-name bulk-product-name-link" href="${escapeAttribute(productUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(selectedName)}</a>`
         : `<div class="bulk-product-name">${escapeHtml(selectedName)}</div>`;
+    const promptButtonHtml = selected
+        ? progressPromptButtonHtml(row, selected)
+        : "";
 
     return `
         <div class="bulk-progress-item">
@@ -122,6 +125,7 @@ function renderProductProgressRow(row, index) {
                 ${requestedQuantity ? `<div class="bulk-product-status">${escapeHtml(`Need ${requestedQuantity}`)}</div>` : ""}
                 <div class="bulk-product-price">${escapeHtml(selected ? (selected.price || "Price unavailable") : "")}</div>
                 <div class="bulk-product-status">${escapeHtml(selected ? selected.store_name : "")}</div>
+                ${promptButtonHtml}
             </div>
             <button type="button"
                     class="bulk-alt-toggle"
@@ -250,6 +254,9 @@ function renderProductDownloadRow(row, index) {
         ? selected.product_url
         : "";
     const selectedName = selected ? (selected.product_name || row.selected_name || "") : "";
+    const promptButtonHtml = selected
+        ? progressPromptButtonHtml(row, selected)
+        : "";
     const selectedMeta = selected
         ? [
             selected.requested_quantity ? `need ${selected.requested_quantity}` : "",
@@ -284,12 +291,30 @@ function renderProductDownloadRow(row, index) {
                 ${selectedHtml}
             </div>
             <div class="bulk-progress-meta">
-                <div class="bulk-product-name">${escapeHtml(selectedName || row.ingredient || "")}</div>
+                ${selectedName && selectedUrl
+                    ? `<a class="bulk-product-name bulk-product-name-link" href="${escapeAttribute(selectedUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(selectedName)}</a>`
+                    : `<div class="bulk-product-name">${escapeHtml(selectedName || row.ingredient || "")}</div>`
+                }
                 <div class="bulk-product-status">${escapeHtml(row.store_name || row.store_key || "")}</div>
                 <div class="bulk-product-price">${escapeHtml(selected ? selected.price || candidateText : candidateText)}</div>
+                ${promptButtonHtml}
             </div>
             <span class="bulk-download-state ${statusClass}">${escapeHtml(state)}</span>
         </div>
+    `;
+}
+
+function progressPromptButtonHtml(row, selected) {
+    return `
+        <button type="button"
+                class="bulk-prompt-btn bulk-row-prompt-btn"
+                data-item-key="${escapeAttribute(row.item_key || row.ingredient || "")}"
+                data-store-key="${escapeAttribute(row.store_key || selected.store_key || "")}"
+                data-product-id="${escapeAttribute(selected.id || row.selected_product_id || "")}"
+                data-product-name="${escapeAttribute(selected.product_name || row.selected_name || "")}"
+                onclick="openProductPromptForProgressRow(this)">
+            Prompt
+        </button>
     `;
 }
 
@@ -629,6 +654,87 @@ function openProductPromptForCandidate(button) {
 
     openProductPromptModal(entries, candidate ? candidate.product_name || "" : "");
     return false;
+}
+
+async function openProductPromptForProgressRow(button) {
+    const itemKey = button ? button.dataset.itemKey || "" : "";
+    const storeKey = button ? button.dataset.storeKey || "" : "";
+    const productId = button ? button.dataset.productId || "" : "";
+    const productName = button ? button.dataset.productName || "" : "";
+
+    if (!itemKey) {
+        openProductPromptModal(noProductPromptEntries("No ingredient key was available for this progress row."), productName);
+        return false;
+    }
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Loading...";
+    }
+
+    try {
+        const params = new URLSearchParams({ item_key: itemKey });
+        if (storeKey) {
+            params.set("store_key", storeKey);
+        }
+        const response = await fetch(`/api/product_choice?${params.toString()}`, {
+            headers: {
+                "X-Requested-With": "fetch",
+            },
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "No ChatGPT prompt was found for this product.");
+        }
+
+        const choice = data.choice || {};
+        const candidates = choice.candidates || [];
+        const candidate = candidates.find(item => item.id === productId)
+            || choice.selected_product
+            || {};
+        const entries = [];
+
+        if (hasPromptPayload(choice.chatgpt_final_selection_prompt)) {
+            entries.push({
+                title: "Final Selection Prompt",
+                prompt: choice.chatgpt_final_selection_prompt,
+            });
+        }
+
+        productPromptEntries(candidate).forEach(entry => entries.push(entry));
+
+        openProductPromptModal(
+            entries.length ? entries : noProductPromptEntries("No ChatGPT prompt was saved for this picked product yet."),
+            candidate.product_name || productName || choice.ingredient || itemKey
+        );
+    } catch (err) {
+        console.warn("Unable to load product prompt.", err);
+        openProductPromptModal(noProductPromptEntries(err.message || "Unable to load the ChatGPT prompt."), productName || itemKey);
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = "Prompt";
+        }
+    }
+
+    return false;
+}
+
+function noProductPromptEntries(message) {
+    return [
+        {
+            title: "ChatGPT Prompt",
+            prompt: {
+                messages: [
+                    {
+                        role: "status",
+                        content: message,
+                    },
+                ],
+            },
+        },
+    ];
 }
 
 function openProductPromptModal(entries, subtitle = "") {
