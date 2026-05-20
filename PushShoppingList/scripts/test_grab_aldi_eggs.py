@@ -202,6 +202,146 @@ def save_test_grab_result(payload):
     return payload
 
 
+def load_test_grab_result():
+    if not TEST_GRAB_RESULTS_FILE.exists():
+        return {}
+
+    try:
+        data = json.loads(TEST_GRAB_RESULTS_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+    return data if isinstance(data, dict) else {}
+
+
+def test_grab_choice_from_result(payload=None):
+    payload = payload if isinstance(payload, dict) else load_test_grab_result()
+    record = first_test_grab_record(payload)
+    candidates = record.get("candidates", []) if isinstance(record.get("candidates"), list) else []
+    selected = record.get("selected_product") if isinstance(record.get("selected_product"), dict) else {}
+    selected_id = record.get("selected_product_id") or selected.get("id", "")
+    store_result = first_store_result(record)
+
+    return {
+        "test_grab": True,
+        "item_key": record.get("item_key") or normalize_item_key(TEST_GRAB_SEARCH_TERM),
+        "ingredient": record.get("ingredient") or TEST_GRAB_SEARCH_TERM,
+        "filtered_store_key": TEST_GRAB_TARGET_STORE_KEY,
+        "filtered_store_name": TEST_GRAB_TARGET_STORE_NAME,
+        "store_result": store_result,
+        "selected_product": selected,
+        "selected_product_id": selected_id,
+        "candidates": candidates,
+        "valid_alternatives": [
+            candidate
+            for candidate in candidates
+            if isinstance(candidate, dict) and candidate.get("viable") is not False
+        ],
+        "rejected_products": [
+            candidate
+            for candidate in candidates
+            if isinstance(candidate, dict) and candidate.get("viable") is False
+        ],
+        "skip_reasons": payload.get("errors", []),
+        "result_path": str(TEST_GRAB_RESULTS_FILE),
+    }
+
+
+def select_test_grab_product(product_id):
+    product_id = str(product_id or "").strip()
+    payload = load_test_grab_result()
+    record = first_test_grab_record(payload)
+
+    if not payload or not record:
+        return {
+            "ok": False,
+            "error": "No Test Grab result is available yet.",
+        }
+
+    candidates = record.get("candidates", []) if isinstance(record.get("candidates"), list) else []
+    selected = next(
+        (
+            candidate
+            for candidate in candidates
+            if isinstance(candidate, dict) and candidate.get("id") == product_id
+        ),
+        None,
+    )
+
+    if not selected:
+        return {
+            "ok": False,
+            "error": "That Test Grab product was not found.",
+        }
+
+    if selected.get("viable") is False:
+        return {
+            "ok": False,
+            "error": "That Test Grab product is rejected and cannot be selected.",
+        }
+
+    selected_at = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    selected["selected_by_user"] = True
+    selected["selected_at"] = selected_at
+    selected["reason_selected"] = selected.get("reason_selected") or "Selected manually from Test Grab alternatives."
+
+    record["selected_product_id"] = product_id
+    record["selected_product"] = selected
+    record["manual_override"] = True
+    record["selected_by_user"] = True
+    record["selected_at"] = selected_at
+    record["updated_at"] = selected_at
+    update_test_grab_store_result(record, selected)
+
+    payload["best_product"] = final_product_candidate_payload(selected)
+    payload["selected_count"] = 1
+    payload["selected_by_user"] = True
+    payload["selected_at"] = selected_at
+    payload["alternatives"] = [
+        final_product_candidate_payload(candidate)
+        for candidate in candidates
+        if isinstance(candidate, dict)
+        and candidate.get("viable") is not False
+        and candidate.get("id") != product_id
+    ]
+    payload["results"] = [record]
+    save_test_grab_result(payload)
+
+    return {
+        "ok": True,
+        "choice": test_grab_choice_from_result(payload),
+        "result": payload,
+    }
+
+
+def first_test_grab_record(payload):
+    results = payload.get("results", []) if isinstance(payload, dict) else []
+    for record in results if isinstance(results, list) else []:
+        if isinstance(record, dict):
+            return record
+    return {}
+
+
+def update_test_grab_store_result(record, selected):
+    store_result = first_store_result(record)
+    if not store_result:
+        return
+
+    store_result["best_product_id"] = selected.get("id", "")
+    store_result["best_product"] = selected
+    store_result["best_product_match"] = selected.get("product_name", "")
+    store_result["price"] = selected.get("price", "")
+    store_result["size"] = selected.get("size") or selected.get("package_size", "")
+    store_result["unit_price"] = selected.get("unit_price", "")
+    store_result["product_url"] = selected.get("product_url", "")
+    store_result["image_url"] = selected.get("image_url", "")
+    store_result["reason_selected"] = selected.get("reason_selected", "")
+    store_result["reason_skipped"] = ""
+    store_result["skip_reason"] = ""
+    store_result["selected_by_user"] = True
+    store_result["selected_at"] = selected.get("selected_at", "")
+
+
 def test_grab_failure_payload(full_address, errors=None, job_id=None):
     if job_id:
         start_product_progress(

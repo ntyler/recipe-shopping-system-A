@@ -4151,6 +4151,16 @@ body {
             font-weight: bold;
         }
 
+        .bulk-alt-name-link {
+            color: #7dd3fc;
+            text-decoration: none;
+        }
+
+        .bulk-alt-name-link:hover {
+            color: #38bdf8;
+            text-decoration: underline;
+        }
+
         .bulk-alt-link {
             color: #7dd3fc;
             text-decoration: none;

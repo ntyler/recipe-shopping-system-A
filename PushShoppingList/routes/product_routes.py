@@ -19,6 +19,8 @@ from PushShoppingList.services.product_selection_service import select_product_c
 from PushShoppingList.services.rules_display_service import save_home_store_rule_text
 from PushShoppingList.services.rules_display_service import save_rules_display_section
 from PushShoppingList.services.store_settings_service import save_enabled_stores
+from PushShoppingList.scripts.test_grab_aldi_eggs import select_test_grab_product
+from PushShoppingList.scripts.test_grab_aldi_eggs import test_grab_choice_from_result
 from PushShoppingList.scripts.test_grab_aldi_eggs import test_grab_products
 
 product_bp = Blueprint("product_bp", __name__)
@@ -135,6 +137,32 @@ def test_grab_products_route():
 def api_test_grab_products_route():
     data = request.get_json(silent=True) or {}
     return jsonify(test_grab_products(job_id=data.get("job_id")))
+
+
+@product_bp.route("/api/test_grab_result")
+def api_test_grab_result_route():
+    choice = test_grab_choice_from_result()
+    has_result = bool(
+        choice.get("selected_product")
+        or choice.get("candidates")
+        or choice.get("skip_reasons")
+    )
+    status = 200 if has_result else 404
+
+    return jsonify({
+        "ok": has_result,
+        "choice": choice,
+        "error": "" if has_result else "No Test Grab result is available yet.",
+    }), status
+
+
+@product_bp.route("/api/test_grab_result/select", methods=["POST"])
+def api_select_test_grab_result_route():
+    data = request.get_json(silent=True) or {}
+    result = select_test_grab_product(data.get("product_id", ""))
+    status = 200 if result.get("ok") else 404
+
+    return jsonify(result), status
 
 
 @product_bp.route("/api/product_progress")

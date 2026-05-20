@@ -111,8 +111,13 @@ function renderProductProgressRow(row, index) {
     const promptButtonHtml = selected && !isTestGrab
         ? progressPromptButtonHtml(row, selected)
         : "";
+    const hasSavedAlternatives = Boolean(
+        selected
+        || row.candidates_count
+        || (Array.isArray(row.candidates) && row.candidates.length)
+    );
     const alternativesButtonHtml = isTestGrab
-        ? ""
+        ? (hasSavedAlternatives ? testGrabAlternativesButtonHtml() : "")
         : `
             <button type="button"
                     class="bulk-alt-toggle"
@@ -265,6 +270,12 @@ function renderProductDownloadRow(row, index) {
         : "";
     const selectedLabel = row.selected_is_overall ? "Picked" : "Store Pick";
     const selectedRole = row.selected_is_overall ? "picked" : "store pick";
+    const hasSavedAlternatives = Boolean(
+        selected
+        || row.candidates_count
+        || (Array.isArray(row.candidates) && row.candidates.length)
+    );
+    const alternativesButtonHtml = row.test_grab && hasSavedAlternatives ? testGrabAlternativesButtonHtml() : "";
     const selectedMeta = selected
         ? [
             selected.requested_quantity ? `need ${selected.requested_quantity}` : "",
@@ -306,9 +317,22 @@ function renderProductDownloadRow(row, index) {
                 <div class="bulk-product-status">${escapeHtml(row.store_name || row.store_key || "")}</div>
                 <div class="bulk-product-price">${escapeHtml(selected ? selected.price || candidateText : candidateText)}</div>
                 ${promptButtonHtml}
+                ${alternativesButtonHtml}
             </div>
             <span class="bulk-download-state ${statusClass}">${escapeHtml(state)}</span>
         </div>
+    `;
+}
+
+function testGrabAlternativesButtonHtml() {
+    return `
+        <button type="button"
+                class="bulk-alt-toggle"
+                data-item-key="eggs"
+                data-store-key="aldi"
+                onclick="openTestGrabAlternatives(this)">
+            Alternatives
+        </button>
     `;
 }
 
@@ -519,6 +543,31 @@ async function openProductAlternatives(button) {
     return false;
 }
 
+async function openTestGrabAlternatives(button) {
+    const modal = ensureProductAlternativesModal();
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+    renderProductAlternativesLoading("Test Grab eggs", "Aldi");
+
+    try {
+        const response = await fetch(`/api/test_grab_result?t=${Date.now()}`, {
+            cache: "no-store",
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "No Test Grab alternatives were found.");
+        }
+
+        renderProductAlternatives(data.choice);
+    } catch (err) {
+        renderProductAlternativesError(err.message || "Unable to load Test Grab alternatives.");
+    }
+
+    return false;
+}
+
 function ensureProductAlternativesModal() {
     let modal = document.getElementById("productAlternativesModal");
 
@@ -687,7 +736,11 @@ function renderProductCandidateOption(candidate, selectedId, itemKey, storeKey, 
                 </a>
             `
         : `<div class="bulk-alt-meta">Direct product link unavailable.</div>`;
-    const promptButtonHtml = productPromptEntries(candidate).length
+    const isTestGrabChoice = Boolean(activeProductPromptChoice && activeProductPromptChoice.test_grab);
+    const candidateNameHtml = productUrl
+        ? `<a class="bulk-alt-name-link" href="${escapeAttribute(productUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(candidate.product_name || "Unnamed product")}</a>`
+        : escapeHtml(candidate.product_name || "Unnamed product");
+    const promptButtonHtml = !isTestGrabChoice && productPromptEntries(candidate).length
         ? `
             <button type="button"
                     class="bulk-prompt-btn"
@@ -705,7 +758,7 @@ function renderProductCandidateOption(candidate, selectedId, itemKey, storeKey, 
             ${imageHtml}
             <div>
                 <div class="bulk-alt-name">
-                    ${escapeHtml(candidate.product_name || "Unnamed product")}
+                    ${candidateNameHtml}
                     ${selected ? `<span class="bulk-selected-badge" style="display:inline;">Selected</span>` : ""}
                 </div>
                 ${productLinkHtml}
@@ -1119,9 +1172,11 @@ async function selectProductAlternative(button) {
 
     button.disabled = true;
     button.textContent = "Saving...";
+    const isTestGrabSelection = Boolean(activeProductPromptChoice && activeProductPromptChoice.test_grab);
+    const endpoint = isTestGrabSelection ? "/api/test_grab_result/select" : "/api/product_choice/select";
 
     try {
-        const response = await fetch("/api/product_choice/select", {
+        const response = await fetch(endpoint, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -1139,8 +1194,18 @@ async function selectProductAlternative(button) {
         }
 
         renderProductAlternatives(data.choice);
-        await refreshStoreMarkup({ cacheBust: true });
-        showRecipeQuantityUpdatedMessage("", "", "", "Product choice updated.");
+        if (isTestGrabSelection) {
+            const result = data.result || {};
+            setProductsOverlayState(
+                "Test Grab product selected.",
+                `Selection saved to ${result.result_path || "test_grab_result.json"}.`,
+                100,
+                Array.isArray(result.results) ? result.results : []
+            );
+        } else {
+            await refreshStoreMarkup({ cacheBust: true });
+            showRecipeQuantityUpdatedMessage("", "", "", "Product choice updated.");
+        }
     } catch (err) {
         console.warn("Unable to select product alternative.", err);
         alert("Unable to select product alternative.");
