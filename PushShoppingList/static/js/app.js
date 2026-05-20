@@ -12,6 +12,7 @@ let currentExtractAbortControllers = [];
 let cancelExtractRequested = false;
 let productProgressTimer = null;
 let activeProductJobId = null;
+let activeProductPromptChoice = null;
 const recipeQuantitySaveTimers = new WeakMap();
 const recipeQuantityNoticeTimers = new Map();
 const recipeQuantitySaveDelayMs = 2000;
@@ -98,6 +99,13 @@ function setProductsOverlayState(status, summary = "", percent = 0, rows = []) {
 function renderProductProgressRow(row, index) {
     const selected = row.selected_product || null;
     const skip = (row.skip_reasons || [])[0] || "";
+    const productUrl = selected && selected.product_url && selected.product_url !== selected.search_url
+        ? selected.product_url
+        : "";
+    const selectedName = selected ? (selected.product_name || "Unnamed product") : "No product selected";
+    const selectedHtml = productUrl
+        ? `<a class="bulk-product-name" href="${escapeAttribute(productUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(selectedName)}</a>`
+        : `<div class="bulk-product-name">${escapeHtml(selectedName)}</div>`;
 
     return `
         <div class="bulk-progress-item">
@@ -109,7 +117,7 @@ function renderProductProgressRow(row, index) {
                 <div class="bulk-skip-reason">${escapeHtml(skip || (selected ? "selected" : "no valid product selected"))}</div>
             </div>
             <div class="bulk-progress-meta">
-                <div class="bulk-product-name">${escapeHtml(selected ? selected.product_name : "No product selected")}</div>
+                ${selectedHtml}
                 <div class="bulk-product-price">${escapeHtml(selected ? (selected.price || "Price unavailable") : "")}</div>
                 <div class="bulk-product-status">${escapeHtml(selected ? selected.store_name : "")}</div>
             </div>
@@ -229,11 +237,8 @@ function renderProductDownloadRow(row, index) {
         textClasses.push("active");
     }
 
-    const searchUrl = row.search_url || "";
     const title = `${row.store_name || row.store_key || "Store"} - ${row.ingredient || ""}`;
-    const urlHtml = searchUrl
-        ? `<a class="${textClasses.join(" ")} product-download-link" href="${escapeAttribute(searchUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(title)}</a>`
-        : `<span class="${textClasses.join(" ")}">${escapeHtml(title)}</span>`;
+    const urlHtml = `<span class="${textClasses.join(" ")}">${escapeHtml(title)}</span>`;
     const statusClass = failed ? "failed" : (active ? "running" : (done ? "done" : (skipped ? "skipped" : "waiting")));
     const candidateText = row.candidates_count === null || row.candidates_count === undefined
         ? ""
@@ -440,6 +445,7 @@ function renderProductAlternatives(choice) {
     const selectedId = choice.selected_product_id || "";
     const storeName = choice.filtered_store_name || (choice.store_result ? choice.store_result.store_name : "") || "";
     const storeKey = choice.filtered_store_key || "";
+    activeProductPromptChoice = choice;
 
     if (subtitle) {
         const itemLabel = choice.ingredient || choice.item_key || "";
@@ -455,7 +461,17 @@ function renderProductAlternatives(choice) {
         return;
     }
 
-    content.innerHTML = candidates.map(candidate => {
+    const finalPromptHtml = hasPromptPayload(choice.chatgpt_final_selection_prompt)
+        ? `
+            <div class="bulk-alt-prompt-row">
+                <button type="button" class="bulk-prompt-btn" onclick="openProductPromptFromChoice()">
+                    Final ChatGPT Prompt
+                </button>
+            </div>
+        `
+        : "";
+
+    content.innerHTML = finalPromptHtml + candidates.map(candidate => {
         const selected = candidate.id === selectedId;
         const selectable = candidate.viable !== false;
         const size = candidate.size || candidate.package_size || "";
@@ -479,6 +495,29 @@ function renderProductAlternatives(choice) {
         const imageHtml = candidate.image_url
             ? `<img class="bulk-alt-image" src="${escapeAttribute(candidate.image_url)}" alt="">`
             : "";
+        const productUrl = candidate.product_url && candidate.product_url !== candidate.search_url
+            ? candidate.product_url
+            : "";
+        const productLinkHtml = productUrl
+            ? `
+                    <a class="bulk-alt-link"
+                       href="${escapeAttribute(productUrl)}"
+                       target="_blank"
+                       rel="noopener noreferrer">
+                        ${escapeHtml(productUrl)}
+                    </a>
+                `
+            : `<div class="bulk-alt-meta">Direct product link unavailable.</div>`;
+        const promptButtonHtml = productPromptEntries(candidate).length
+            ? `
+                <button type="button"
+                        class="bulk-prompt-btn"
+                        data-product-id="${escapeAttribute(candidate.id || "")}"
+                        onclick="openProductPromptForCandidate(this)">
+                    Prompt
+                </button>
+            `
+            : "";
 
         return `
             <div class="bulk-alt-option${candidate.image_url ? " has-image" : ""}">
@@ -488,14 +527,10 @@ function renderProductAlternatives(choice) {
                         ${escapeHtml(candidate.product_name || "Unnamed product")}
                         ${selected ? `<span class="bulk-selected-badge" style="display:inline;">Selected</span>` : ""}
                     </div>
-                    <a class="bulk-alt-link"
-                       href="${escapeAttribute(candidate.product_url || candidate.search_url || "#")}"
-                       target="_blank"
-                       rel="noopener noreferrer">
-                        ${escapeHtml(candidate.product_url || candidate.search_url || "")}
-                    </a>
+                    ${productLinkHtml}
                     <div class="bulk-alt-meta">${escapeHtml(meta)}</div>
                     <div class="bulk-alt-meta">${escapeHtml(notes)}</div>
+                    ${promptButtonHtml}
                 </div>
                 <button type="button"
                         class="bulk-alt-select-btn${selected ? " selected" : ""}${selectable ? "" : " unavailable"}"
@@ -509,6 +544,159 @@ function renderProductAlternatives(choice) {
             </div>
         `;
     }).join("");
+}
+
+function productPromptEntries(candidate) {
+    const entries = [];
+
+    if (hasPromptPayload(candidate && candidate.chatgpt_analysis && candidate.chatgpt_analysis.prompt)) {
+        entries.push({
+            title: "Product Page Analysis Prompt",
+            prompt: candidate.chatgpt_analysis.prompt,
+        });
+    }
+
+    if (hasPromptPayload(candidate && candidate.final_selection_agent && candidate.final_selection_agent.prompt)) {
+        entries.push({
+            title: "Final Selection Prompt",
+            prompt: candidate.final_selection_agent.prompt,
+        });
+    }
+
+    return entries;
+}
+
+function hasPromptPayload(prompt) {
+    return !!(
+        prompt &&
+        Array.isArray(prompt.messages) &&
+        prompt.messages.some(message => message && message.content)
+    );
+}
+
+function openProductPromptFromChoice() {
+    if (!hasPromptPayload(activeProductPromptChoice && activeProductPromptChoice.chatgpt_final_selection_prompt)) {
+        return false;
+    }
+
+    openProductPromptModal([
+        {
+            title: "Final Selection Prompt",
+            prompt: activeProductPromptChoice.chatgpt_final_selection_prompt,
+        },
+    ]);
+    return false;
+}
+
+function openProductPromptForCandidate(button) {
+    const productId = button ? button.dataset.productId || "" : "";
+    const candidates = activeProductPromptChoice ? activeProductPromptChoice.candidates || [] : [];
+    const candidate = candidates.find(item => item.id === productId);
+    const entries = productPromptEntries(candidate || {});
+
+    if (!entries.length) {
+        return false;
+    }
+
+    openProductPromptModal(entries, candidate ? candidate.product_name || "" : "");
+    return false;
+}
+
+function openProductPromptModal(entries, subtitle = "") {
+    const modal = ensureProductPromptModal();
+    const title = document.getElementById("productPromptTitle");
+    const sub = document.getElementById("productPromptSubtitle");
+    const content = document.getElementById("productPromptContent");
+
+    if (title) {
+        title.textContent = "ChatGPT Prompt";
+    }
+
+    if (sub) {
+        sub.textContent = subtitle || "Full request sent by the product picker.";
+    }
+
+    if (content) {
+        content.textContent = entries.map(promptEntryToText).join("\n\n");
+    }
+
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+}
+
+function ensureProductPromptModal() {
+    let modal = document.getElementById("productPromptModal");
+
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "productPromptModal";
+        modal.className = "product-prompt-modal-backdrop";
+        modal.setAttribute("aria-hidden", "true");
+        modal.innerHTML = `
+            <div class="product-prompt-modal" role="dialog" aria-modal="true" aria-labelledby="productPromptTitle">
+                <div class="bulk-alt-modal-header">
+                    <button type="button" class="bulk-prompt-btn" onclick="copyProductPrompt()">Copy</button>
+                    <h2 id="productPromptTitle" class="bulk-alt-modal-title">ChatGPT Prompt</h2>
+                    <button type="button" class="product-close-btn" onclick="closeProductPromptModal()">Close</button>
+                </div>
+                <p id="productPromptSubtitle" class="bulk-alt-modal-subtitle"></p>
+                <pre id="productPromptContent" class="product-prompt-content"></pre>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    return modal;
+}
+
+function closeProductPromptModal() {
+    const modal = document.getElementById("productPromptModal");
+
+    if (modal) {
+        modal.classList.remove("open");
+        modal.setAttribute("aria-hidden", "true");
+    }
+
+    const alternativesModal = document.getElementById("productAlternativesModal");
+    if (!alternativesModal || !alternativesModal.classList.contains("open")) {
+        document.body.classList.remove("modal-open");
+    }
+}
+
+async function copyProductPrompt() {
+    const content = document.getElementById("productPromptContent");
+    const text = content ? content.textContent || "" : "";
+
+    if (!text || !navigator.clipboard) {
+        return false;
+    }
+
+    try {
+        await navigator.clipboard.writeText(text);
+    } catch (err) {
+        console.warn("Unable to copy product prompt.", err);
+    }
+
+    return false;
+}
+
+function promptEntryToText(entry) {
+    const prompt = entry.prompt || {};
+    const header = [
+        entry.title || "Prompt",
+        prompt.kind ? `kind: ${prompt.kind}` : "",
+        prompt.model ? `model: ${prompt.model}` : "",
+        prompt.temperature !== undefined ? `temperature: ${prompt.temperature}` : "",
+    ].filter(Boolean).join("\n");
+    const messages = (prompt.messages || []).map((message, index) => {
+        return [
+            `--- ${message.role || `message ${index + 1}`} ---`,
+            message.content || "",
+        ].join("\n");
+    }).join("\n\n");
+
+    return [header, messages].filter(Boolean).join("\n\n");
 }
 
 function renderProductAlternativesError(message) {

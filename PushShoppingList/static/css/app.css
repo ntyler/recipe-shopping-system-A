@@ -3934,6 +3934,77 @@ body {
             background: #444;
         }
 
+        .bulk-alt-prompt-row {
+            display: flex;
+            justify-content: flex-end;
+            padding: 0 8px 8px;
+            border-bottom: 1px solid #2a2a2a;
+        }
+
+        .bulk-prompt-btn {
+            width: auto;
+            margin-top: 0;
+            padding: 6px 9px;
+            border: 0;
+            border-radius: 6px;
+            background: #374151;
+            color: #e5e7eb;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .bulk-prompt-btn:hover {
+            background: #4b5563;
+        }
+
+        .product-prompt-modal-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 10001;
+            background: rgba(0,0,0,0.78);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+            box-sizing: border-box;
+        }
+
+        .product-prompt-modal-backdrop.open {
+            display: flex;
+        }
+
+        .product-prompt-modal {
+            width: min(980px, 95vw);
+            max-height: 86vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background: #151515;
+            border: 1px solid #777;
+            border-radius: 14px;
+            box-shadow: 0 18px 80px rgba(0,0,0,0.9);
+            padding: 18px;
+            box-sizing: border-box;
+        }
+
+        .product-prompt-content {
+            flex: 1 1 auto;
+            min-height: 260px;
+            max-height: calc(86vh - 140px);
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            margin: 0;
+            padding: 12px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            background: #050505;
+            color: #e5e7eb;
+            font-size: 12px;
+            line-height: 1.45;
+        }
+
         .bulk-choices {
             display: none !important;
         }

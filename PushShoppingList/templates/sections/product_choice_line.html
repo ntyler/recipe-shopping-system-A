@@ -14,12 +14,18 @@
                 Alternatives
             </button>
             {% if best_product %}
-                <a class="best-product-link"
-                   href="{{ best_product.get("product_url") or best_product.get("search_url") }}"
-                   target="_blank"
-                   rel="noopener noreferrer">
-                    {{ best_product.get("product_name") }}
-                </a>
+                {% set best_product_url = best_product.get("product_url") %}
+                {% if best_product_url and best_product_url != best_product.get("search_url") %}
+                    <a class="best-product-link"
+                       href="{{ best_product_url }}"
+                       target="_blank"
+                       rel="noopener noreferrer">
+                        {{ best_product.get("product_name") }}
+                    </a>
+                {% else %}
+                    <span class="best-product-link">{{ best_product.get("product_name") }}</span>
+                    <span class="best-product-meta">Direct product link unavailable</span>
+                {% endif %}
                 <span class="best-product-price">{{ best_product.get("price") or "Price unavailable" }}</span>
                 {% if best_product.get("size") or best_product.get("package_size") %}
                     <span class="best-product-meta">{{ best_product.get("size") or best_product.get("package_size") }}</span>
@@ -42,12 +48,18 @@
                 onclick="openProductAlternatives(this)">
             Alternatives
         </button>
-        <a class="best-product-link"
-           href="{{ selected_product.get("product_url") or selected_product.get("search_url") }}"
-           target="_blank"
-           rel="noopener noreferrer">
-            {{ selected_product.get("product_name") }}
-        </a>
+        {% set selected_product_url = selected_product.get("product_url") %}
+        {% if selected_product_url and selected_product_url != selected_product.get("search_url") %}
+            <a class="best-product-link"
+               href="{{ selected_product_url }}"
+               target="_blank"
+               rel="noopener noreferrer">
+                {{ selected_product.get("product_name") }}
+            </a>
+        {% else %}
+            <span class="best-product-link">{{ selected_product.get("product_name") }}</span>
+            <span class="best-product-meta">Direct product link unavailable</span>
+        {% endif %}
         <span class="best-product-price">{{ selected_product.get("price") or "Price unavailable" }}</span>
         {% if selected_product.get("size") or selected_product.get("package_size") %}
             <span class="best-product-meta">{{ selected_product.get("size") or selected_product.get("package_size") }}</span>
