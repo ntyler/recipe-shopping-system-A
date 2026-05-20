@@ -64,7 +64,7 @@ $env:FORCE_OPENAI_RECIPE_EXTRACTION="1"
 Optional app and product-lookup controls:
 
 ```powershell
-$env:SHOPPING_APP_PORT="5059"
+$env:SHOPPING_APP_PORT="5061"
 $env:PRODUCT_SEARCH_WORKERS="2"
 $env:PRODUCT_DETAIL_LIMIT_PER_STORE="4"
 $env:PRODUCT_AI_ANALYSIS_LIMIT_PER_STORE="2"
@@ -78,7 +78,7 @@ Notes:
 - Leave `DISABLE_RECIPE_HTML_CACHE_FALLBACK` unset if you want the app to reuse cached recipe HTML when a live page fails.
 - Leave `DISABLE_RECIPE_PDF_ARCHIVE` unset if you want each extracted recipe page saved as a PDF for later review.
 - Set `FORCE_OPENAI_RECIPE_EXTRACTION=1` only when you want the OpenAI extractor used even if recipe-card HTML already has enough structured data.
-- Leave `SHOPPING_APP_PORT` unset when running `py -3.11 app.py` directly and you want the default Flask port `5000`. The included `start_app.bat` currently sets `SHOPPING_APP_PORT=5059`.
+- Leave `SHOPPING_APP_PORT` unset when running `py -3.11 app.py` directly and you want the default Flask port `5000`. The included `start_app.bat` currently sets `SHOPPING_APP_PORT=5061`.
 - Product lookup uses `OPENAI_API_KEY` for fully loaded product-page analysis and final best-product selection. If no key is set, the app still parses product candidates but skips ChatGPT product analysis.
 - Product image embedding is enabled by default. Set `DISABLE_PRODUCT_IMAGE_EMBEDDING=1` to skip downloading images into `embedded_image_base64`.
 - Full Base64 image strings are stored on candidates but omitted from ChatGPT prompts by default to keep prompts usable. Set `PRODUCT_PROMPT_INCLUDE_EMBEDDED_IMAGES=1` only if you really want those large strings sent to the API.
@@ -114,10 +114,10 @@ Or use:
 .\start_app.bat
 ```
 
-The included launcher currently sets `SHOPPING_APP_PORT=5059`, so it opens:
+The included launcher currently sets `SHOPPING_APP_PORT=5061`, so it opens:
 
 ```text
-http://127.0.0.1:5059
+http://127.0.0.1:5061
 ```
 
 The app also listens on your LAN address, so another device on the same Wi-Fi can open:
@@ -126,12 +126,12 @@ The app also listens on your LAN address, so another device on the same Wi-Fi ca
 http://<computer-lan-ip>:5000
 ```
 
-If you use `start_app.bat`, replace `5000` with `5059`.
+If you use `start_app.bat`, replace `5000` with `5061`.
 
 Example from the current setup:
 
 ```text
-http://192.168.68.62:5059
+http://192.168.68.62:5061
 ```
 
 ## Best Product Lookup
@@ -141,7 +141,7 @@ The **Grab Best Products** button searches the activated stores near the saved F
 1. The Planner Agent builds item/store searches from the shopping list and saved Full Address.
 2. The Store Resolution Agent resolves the nearest pickup-oriented location for each activated store.
 3. Browser Worker Agents run in parallel with `ThreadPoolExecutor`, open the real grocery search/category pages with Selenium/undetected Chrome, apply the saved address context, select the nearest pickup-oriented store when the page exposes a store selector, and scroll until no new product cards appear.
-4. The Product Extraction/Normalization Agent saves the fully rendered page HTML under `data/raw/product_pages/`, captures every visible product card up to `PRODUCT_CANDIDATE_LIMIT_PER_STORE`, and normalizes store name, store address, product name, brand, size/count, price, unit price, stock status, direct product URL, image URL, cleaned raw product-card HTML snippet, and embedded image Base64 where possible.
+4. The Product Extraction/Normalization Agent saves the fully rendered page HTML under `data/raw/product_pages/`, plus readable `_TEXT.txt` and cleaned `_PROMPT_PREVIEW.html` snapshots for debugging. It captures every visible product card up to `PRODUCT_CANDIDATE_LIMIT_PER_STORE` and normalizes store name, store address, product name, brand, size/count, price, unit price, stock status, direct product URL, image URL, cleaned raw product-card HTML snippet, and embedded image Base64 where possible.
 5. Shortlisted candidates are opened on their full product detail pages for deeper evidence.
 6. The Validation Layer rejects irrelevant, unavailable, search-page-only, or rule-failing products while saving rejection reasons.
 7. The Ranking Agent sends the saved rules, a cleaned excerpt of the fully rendered Selenium HTML, and the extracted product-card HTML/data to ChatGPT when `OPENAI_API_KEY` is available. ChatGPT does not browse store websites; it ranks the supplied page/card data into best product, valid alternatives, and rejected products with rejection reasons and confidence scores.
@@ -156,7 +156,7 @@ The UI shows:
 - Each enabled store under each ingredient, with the store's best product price beside it.
 - Product names as direct links to product pages, not search pages, whenever a direct product URL is available.
 - An `Alternatives` button beside each store that shows valid alternatives and rejected products with reasons.
-- A `Prompt` button on store picks and picked products so you can inspect the extracted-card prompt sent to the ChatGPT API.
+- A `Prompt` button on store picks and picked products so you can inspect the extracted-card prompt sent to the ChatGPT API. Full prompts are stored under `raw/product_prompts/` and loaded only when requested.
 - Manual alternative selections persist as `selected_by_user` with `selected_at`.
 
 Product choice state is saved in:
@@ -180,7 +180,7 @@ port=int(os.getenv("SHOPPING_APP_PORT", "5000"))
 Use Tailscale Serve when you only want devices in your Tailscale tailnet to reach the app:
 
 ```powershell
-tailscale serve --bg http://127.0.0.1:5059
+tailscale serve --bg http://127.0.0.1:5061
 tailscale serve status
 ```
 
@@ -201,7 +201,7 @@ tailscale serve --https=443 off
 Use Tailscale Funnel when you want the Flask app reachable from outside your tailnet:
 
 ```powershell
-tailscale funnel --bg --yes http://127.0.0.1:5059
+tailscale funnel --bg --yes http://127.0.0.1:5061
 tailscale funnel status
 ```
 
@@ -235,22 +235,22 @@ Recommended setup:
 http://<computer-mesh-ip>:5000
 ```
 
-If you use the included launcher, use port `5059` instead:
+If you use the included launcher, use port `5061` instead:
 
 ```text
-http://<computer-mesh-ip>:5059
+http://<computer-mesh-ip>:5061
 ```
 
 Examples:
 
 ```text
-http://100.x.y.z:5059
-http://10.x.y.z:5059
+http://100.x.y.z:5061
+http://10.x.y.z:5061
 ```
 
 ## HTTPS / Secure Page Access
 
-Phone GPS/geolocation requires a secure browser origin. `http://<ip>:5000` or `http://<ip>:5059` will show as **Not Secure**, so mobile browsers may block `Use My Location`.
+Phone GPS/geolocation requires a secure browser origin. `http://<ip>:5000` or `http://<ip>:5061` will show as **Not Secure**, so mobile browsers may block `Use My Location`.
 
 Tailscale Serve and Tailscale Funnel provide HTTPS at:
 
@@ -262,14 +262,14 @@ Quick test with Flask's temporary self-signed certificate:
 
 ```powershell
 $env:SHOPPING_APP_SSL_ADHOC="1"
-$env:SHOPPING_APP_PORT="5059"
+$env:SHOPPING_APP_PORT="5061"
 py -3.11 app.py
 ```
 
 Then open:
 
 ```text
-https://<computer-ip>:5059
+https://<computer-ip>:5061
 ```
 
 Your browser will warn because the certificate is self-signed. For the most reliable phone experience, use one of these:
@@ -283,7 +283,7 @@ py -3.11 app.py
 ```
 
 - A trusted HTTPS tunnel such as Tailscale Funnel, Cloudflare Tunnel, or ngrok pointed at `http://127.0.0.1:5000`.
-- For the included `start_app.bat`, point the tunnel at `http://127.0.0.1:5059`.
+- For the included `start_app.bat`, point the tunnel at `http://127.0.0.1:5061`.
 
 Do not expose this app publicly unless you add authentication, keep the tunnel private, or only run public access temporarily.
 
@@ -291,7 +291,7 @@ If the phone cannot connect:
 
 - Confirm both devices are online in the mesh/VPN app.
 - Allow Python/Flask through Windows Firewall for private networks.
-- Make sure nothing else is already using the port you started Flask on, usually `5000` for direct runs or `5059` for `start_app.bat`.
+- Make sure nothing else is already using the port you started Flask on, usually `5000` for direct runs or `5061` for `start_app.bat`.
 - Use the mesh IP, not `127.0.0.1`; `127.0.0.1` only works on the same device.
 
 ## ntfy Notifications
@@ -325,10 +325,13 @@ Common files:
 - `shopping_item_state.json`: checked items, selected stores, and manual item quantities
 - `store_settings.json`: store list and enabled stores
 - `extract_progress.json`: current extraction progress for the overlay
-- `product_choices.json`: saved product candidates, per-store picks, overall picked products, direct product links, embedded image Base64 values, and ChatGPT prompt metadata
+- `product_choices.json`: saved product candidates, per-store picks, overall picked products, direct product links, embedded image placeholders, and ChatGPT prompt file references
 - `product_results.json`: dedicated hybrid shopping results with agent-stage architecture, best products, alternatives, rejected products, rejection reasons, and scoring metadata
 - `product_progress.json`: current Grab Best Products progress overlay state
 - `raw/product_pages/*.html`: fully rendered Selenium grocery search pages saved for product-ranking review
+- `raw/product_pages/*_TEXT.txt`: readable visible text captured from the loaded grocery page
+- `raw/product_pages/*_PROMPT_PREVIEW.html`: cleaned rendered HTML excerpt used in the ChatGPT ranking prompt
+- `raw/product_prompts/*.json`: full ChatGPT prompt payloads loaded on demand by the Prompt buttons
 - `pdf/*.pdf`: archived recipe PDFs created during extraction, including webpage PDFs, upload PDFs, and video caption/transcript PDFs
 - `output/*.json`: extracted recipe JSON output
 - `output/sorted_ingredients.txt`: sorted shopping-list text

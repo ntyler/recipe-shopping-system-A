@@ -524,7 +524,7 @@ function renderProductAlternatives(choice) {
         ? choice.rejected_products
         : candidates.filter(candidate => candidate && (candidate.viable === false || candidate.rejected === true));
 
-    const finalPromptHtml = hasPromptPayload(choice.chatgpt_final_selection_prompt)
+    const finalPromptHtml = hasPromptData(choice.chatgpt_final_selection_prompt)
         ? `
             <div class="bulk-alt-prompt-row">
                 <button type="button" class="bulk-prompt-btn" onclick="openProductPromptFromChoice()">
@@ -618,6 +618,8 @@ function renderProductCandidateOption(candidate, selectedId, itemKey, storeKey, 
         ? `
             <button type="button"
                     class="bulk-prompt-btn"
+                    data-item-key="${escapeAttribute(itemKey || "")}"
+                    data-store-key="${escapeAttribute(storeKey || candidate.store_key || "")}"
                     data-product-id="${escapeAttribute(candidate.id || "")}"
                     onclick="openProductPromptForCandidate(this)">
                 Prompt
@@ -668,25 +670,44 @@ function productCandidateImageSrc(candidate) {
 
 function productPromptEntries(candidate) {
     const entries = [];
+    const productId = candidate ? candidate.id || "" : "";
+    const storePrompt = candidate && candidate.chatgpt_store_ranking_agent
+        ? candidate.chatgpt_store_ranking_agent.prompt
+        : null;
+    const pagePrompt = candidate && candidate.chatgpt_analysis
+        ? candidate.chatgpt_analysis.prompt
+        : null;
+    const finalPrompt = candidate && candidate.final_selection_agent
+        ? candidate.final_selection_agent.prompt
+        : null;
 
-    if (hasPromptPayload(candidate && candidate.chatgpt_store_ranking_agent && candidate.chatgpt_store_ranking_agent.prompt)) {
+    if (hasPromptData(storePrompt)) {
         entries.push({
             title: "Store Product Ranking Prompt",
-            prompt: candidate.chatgpt_store_ranking_agent.prompt,
+            prompt: hasPromptPayload(storePrompt) ? storePrompt : null,
+            prompt_ref: hasPromptReference(storePrompt) ? storePrompt : null,
+            prompt_kind: "store_product_ranking",
+            product_id: productId,
         });
     }
 
-    if (hasPromptPayload(candidate && candidate.chatgpt_analysis && candidate.chatgpt_analysis.prompt)) {
+    if (hasPromptData(pagePrompt)) {
         entries.push({
             title: "Product Page Analysis Prompt",
-            prompt: candidate.chatgpt_analysis.prompt,
+            prompt: hasPromptPayload(pagePrompt) ? pagePrompt : null,
+            prompt_ref: hasPromptReference(pagePrompt) ? pagePrompt : null,
+            prompt_kind: "product_page_analysis",
+            product_id: productId,
         });
     }
 
-    if (hasPromptPayload(candidate && candidate.final_selection_agent && candidate.final_selection_agent.prompt)) {
+    if (hasPromptData(finalPrompt)) {
         entries.push({
             title: "Final Selection Prompt",
-            prompt: candidate.final_selection_agent.prompt,
+            prompt: hasPromptPayload(finalPrompt) ? finalPrompt : null,
+            prompt_ref: hasPromptReference(finalPrompt) ? finalPrompt : null,
+            prompt_kind: "final_selection",
+            product_id: productId,
         });
     }
 
@@ -701,25 +722,50 @@ function hasPromptPayload(prompt) {
     );
 }
 
-function openProductPromptFromChoice() {
-    if (!hasPromptPayload(activeProductPromptChoice && activeProductPromptChoice.chatgpt_final_selection_prompt)) {
+function hasPromptReference(prompt) {
+    return !!(
+        prompt &&
+        typeof prompt === "object" &&
+        prompt.prompt_path &&
+        !hasPromptPayload(prompt)
+    );
+}
+
+function hasPromptData(prompt) {
+    return hasPromptPayload(prompt) || hasPromptReference(prompt);
+}
+
+async function openProductPromptFromChoice() {
+    const prompt = activeProductPromptChoice && activeProductPromptChoice.chatgpt_final_selection_prompt;
+
+    if (!hasPromptData(prompt)) {
         return false;
     }
 
-    openProductPromptModal([
+    const entries = await resolveProductPromptEntries([
         {
             title: "Final Selection Prompt",
-            prompt: activeProductPromptChoice.chatgpt_final_selection_prompt,
+            prompt: hasPromptPayload(prompt) ? prompt : null,
+            prompt_ref: hasPromptReference(prompt) ? prompt : null,
+            prompt_kind: "choice_final_selection",
         },
-    ]);
+    ], activeProductPromptChoice ? activeProductPromptChoice.item_key || "" : "", activeProductPromptChoice ? activeProductPromptChoice.filtered_store_key || "" : "", "");
+    openProductPromptModal(entries);
     return false;
 }
 
-function openProductPromptForCandidate(button) {
+async function openProductPromptForCandidate(button) {
     const productId = button ? button.dataset.productId || "" : "";
+    const itemKey = button ? button.dataset.itemKey || "" : "";
+    const storeKey = button ? button.dataset.storeKey || "" : "";
     const candidates = activeProductPromptChoice ? activeProductPromptChoice.candidates || [] : [];
     const candidate = candidates.find(item => item.id === productId);
-    const entries = productPromptEntries(candidate || {});
+    const entries = await resolveProductPromptEntries(
+        productPromptEntries(candidate || {}),
+        itemKey || (activeProductPromptChoice ? activeProductPromptChoice.item_key || "" : ""),
+        storeKey || (activeProductPromptChoice ? activeProductPromptChoice.filtered_store_key || "" : ""),
+        productId
+    );
 
     if (!entries.length) {
         return false;
@@ -768,17 +814,21 @@ async function openProductPromptForProgressRow(button) {
             || {};
         const entries = [];
 
-        if (hasPromptPayload(choice.chatgpt_final_selection_prompt)) {
+        if (hasPromptData(choice.chatgpt_final_selection_prompt)) {
+            const prompt = choice.chatgpt_final_selection_prompt;
             entries.push({
                 title: "Final Selection Prompt",
-                prompt: choice.chatgpt_final_selection_prompt,
+                prompt: hasPromptPayload(prompt) ? prompt : null,
+                prompt_ref: hasPromptReference(prompt) ? prompt : null,
+                prompt_kind: "choice_final_selection",
             });
         }
 
         productPromptEntries(candidate).forEach(entry => entries.push(entry));
+        const resolvedEntries = await resolveProductPromptEntries(entries, itemKey, storeKey, candidate.id || productId);
 
         openProductPromptModal(
-            entries.length ? entries : noProductPromptEntries("No ChatGPT prompt was saved for this picked product yet."),
+            resolvedEntries.length ? resolvedEntries : noProductPromptEntries("No ChatGPT prompt was saved for this picked product yet."),
             candidate.product_name || productName || choice.ingredient || itemKey
         );
     } catch (err) {
@@ -792,6 +842,63 @@ async function openProductPromptForProgressRow(button) {
     }
 
     return false;
+}
+
+async function resolveProductPromptEntries(entries, itemKey, storeKey, productId) {
+    const rows = entries || [];
+
+    return Promise.all(rows.map(async entry => {
+        if (hasPromptPayload(entry.prompt)) {
+            return entry;
+        }
+
+        if (!entry.prompt_ref) {
+            return entry;
+        }
+
+        try {
+            const params = new URLSearchParams({
+                item_key: itemKey || "",
+                prompt_kind: entry.prompt_kind || "",
+            });
+            const resolvedProductId = entry.product_id || productId || "";
+            if (resolvedProductId) {
+                params.set("product_id", resolvedProductId);
+            }
+            if (storeKey) {
+                params.set("store_key", storeKey);
+            }
+            const response = await fetch(`/api/product_prompt?${params.toString()}`, {
+                cache: "no-store",
+                headers: {
+                    "X-Requested-With": "fetch",
+                },
+            });
+            const data = await response.json();
+
+            if (!response.ok || !data.ok || !hasPromptPayload(data.prompt)) {
+                throw new Error((data && data.error) || "Prompt file could not be loaded.");
+            }
+
+            return {
+                ...entry,
+                title: data.title || entry.title,
+                prompt: data.prompt,
+            };
+        } catch (err) {
+            return {
+                ...entry,
+                prompt: {
+                    messages: [
+                        {
+                            role: "status",
+                            content: err.message || "Prompt file could not be loaded.",
+                        },
+                    ],
+                },
+            };
+        }
+    }));
 }
 
 function noProductPromptEntries(message) {

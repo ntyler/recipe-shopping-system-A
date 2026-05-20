@@ -47,8 +47,10 @@ PRODUCT_CHOICES_FILE = BASE_DIR / "recipe-extractor" / "data" / "product_choices
 PRODUCT_RESULTS_FILE = BASE_DIR / "recipe-extractor" / "data" / "product_results.json"
 PRODUCT_PROGRESS_FILE = BASE_DIR / "recipe-extractor" / "data" / "product_progress.json"
 PRODUCT_RENDERED_HTML_DIR = BASE_DIR / "recipe-extractor" / "data" / "raw" / "product_pages"
+PRODUCT_PROMPTS_DIR = BASE_DIR / "recipe-extractor" / "data" / "raw" / "product_prompts"
 PRODUCT_CHOICES_FILE.parent.mkdir(parents=True, exist_ok=True)
 PRODUCT_RENDERED_HTML_DIR.mkdir(parents=True, exist_ok=True)
+PRODUCT_PROMPTS_DIR.mkdir(parents=True, exist_ok=True)
 
 REQUEST_HEADERS = {
     "User-Agent": "PushShoppingList/1.0 local product finder",
@@ -875,8 +877,142 @@ def load_product_choices():
     return data
 
 
-def product_results_payload(data):
+def compact_product_state_for_storage(data):
     data = data if isinstance(data, dict) else {"items": {}}
+    compacted = compact_product_value_for_storage(data)
+    if not isinstance(compacted, dict):
+        compacted = {"items": {}}
+    compacted.setdefault("items", {})
+    return compacted
+
+
+def compact_product_value_for_storage(value, key=""):
+    if key in {"prompt", "chatgpt_final_selection_prompt"} and is_chatgpt_prompt_payload(value):
+        return save_product_prompt_payload(value)
+
+    if key in {
+        "alternative_products",
+        "alternatives",
+        "valid_alternatives",
+        "valid_products",
+        "rejected_products",
+    } and isinstance(value, list):
+        return [
+            compact_product_candidate_reference(item)
+            for item in value
+        ]
+
+    if key == "rendered_page_html_excerpt":
+        return ""
+
+    if key == "embedded_image_base64":
+        return embedded_image_prompt_placeholder(value) if value else ""
+
+    if key in {"raw_product_html_snippet", "card_text_excerpt", "detail_text_excerpt"}:
+        return clean_text(str(value or ""))[:4500]
+
+    if isinstance(value, dict):
+        compacted = {}
+        for child_key, child_value in value.items():
+            compacted[child_key] = compact_product_value_for_storage(child_value, child_key)
+        return compacted
+
+    if isinstance(value, list):
+        return [
+            compact_product_value_for_storage(item, key)
+            for item in value
+        ]
+
+    return value
+
+
+def compact_product_candidate_reference(candidate):
+    if not isinstance(candidate, dict):
+        return candidate
+
+    return {
+        "id": candidate.get("id", ""),
+        "product_name": candidate.get("product_name", ""),
+        "store_key": candidate.get("store_key", ""),
+        "store_name": candidate.get("store_name", ""),
+        "price": candidate.get("price", ""),
+        "size": product_size(candidate),
+        "unit_price": candidate.get("unit_price", ""),
+        "product_url": candidate.get("product_url", ""),
+        "image_url": candidate.get("image_url", ""),
+        "viable": candidate.get("viable"),
+        "ranking_status": candidate.get("ranking_status", ""),
+        "rejection_reason": candidate.get("rejection_reason", ""),
+        "rejection_reasons": candidate.get("rejection_reasons", [])[:3],
+        "confidence": candidate.get("confidence"),
+        "confidence_score": candidate.get("confidence_score"),
+        "score": candidate.get("score"),
+    }
+
+
+def is_chatgpt_prompt_payload(value):
+    return bool(
+        isinstance(value, dict)
+        and isinstance(value.get("messages"), list)
+        and any(isinstance(message, dict) and message.get("content") for message in value.get("messages", []))
+    )
+
+
+def save_product_prompt_payload(prompt_payload):
+    if not is_chatgpt_prompt_payload(prompt_payload):
+        return {}
+
+    payload_text = json.dumps(prompt_payload, indent=2, ensure_ascii=False)
+    digest = hashlib.sha1(payload_text.encode("utf-8", errors="ignore")).hexdigest()[:16]
+    kind = normalize_item_key(prompt_payload.get("kind", "chatgpt_prompt")) or "chatgpt_prompt"
+    path = PRODUCT_PROMPTS_DIR / f"{kind}_{digest}.json"
+
+    try:
+        if not path.exists():
+            path.write_text(payload_text, encoding="utf-8")
+        saved_path = str(path)
+    except Exception:
+        saved_path = ""
+
+    return {
+        "kind": prompt_payload.get("kind", ""),
+        "model": prompt_payload.get("model", ""),
+        "temperature": prompt_payload.get("temperature"),
+        "prompt_path": saved_path,
+        "prompt_chars": len(payload_text),
+        "messages": [],
+    }
+
+
+def read_product_prompt_payload_from_ref(prompt_ref):
+    if is_chatgpt_prompt_payload(prompt_ref):
+        return prompt_ref
+
+    if not isinstance(prompt_ref, dict):
+        return {}
+
+    prompt_path = str(prompt_ref.get("prompt_path") or "").strip()
+    if not prompt_path:
+        return {}
+
+    try:
+        path = Path(prompt_path).resolve()
+        prompt_root = PRODUCT_PROMPTS_DIR.resolve()
+        if path != prompt_root and prompt_root not in path.parents:
+            return {}
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+    return data if is_chatgpt_prompt_payload(data) else {}
+
+
+def prompt_ref_has_payload(prompt_ref):
+    return bool(is_chatgpt_prompt_payload(prompt_ref) or read_product_prompt_payload_from_ref(prompt_ref))
+
+
+def product_results_payload(data):
+    data = compact_product_state_for_storage(data)
     items = data.get("items", {}) if isinstance(data.get("items"), dict) else {}
     return {
         "schema": "hybrid-agentic-shopping-results/v1",
@@ -896,8 +1032,7 @@ def save_product_results(data):
 
 
 def save_product_choices(data):
-    data = data if isinstance(data, dict) else {"items": {}}
-    data.setdefault("items", {})
+    data = compact_product_state_for_storage(data)
     PRODUCT_CHOICES_FILE.write_text(
         json.dumps(data, indent=2, ensure_ascii=False),
         encoding="utf-8",
@@ -1075,6 +1210,86 @@ def product_choice_for_store(choice, store_key):
         else filtered.get("skip_reasons", [])
     )
     return filtered
+
+
+def product_prompt_for_item(item_key, store_key="", product_id="", prompt_kind=""):
+    choice = product_choice_for_item(item_key, store_key=store_key)
+
+    if not choice:
+        return {
+            "ok": False,
+            "error": "No product choices are saved for that ingredient.",
+        }
+
+    product_id = str(product_id or "").strip()
+    prompt_kind = normalize_item_key(prompt_kind)
+    candidate = {}
+    if product_id:
+        candidate = next(
+            (
+                item
+                for item in choice.get("candidates", [])
+                if isinstance(item, dict) and item.get("id") == product_id
+            ),
+            {},
+        )
+    if not candidate:
+        candidate = choice.get("selected_product") or {}
+
+    prompt_ref = product_prompt_ref_for_choice(choice, candidate, prompt_kind)
+    prompt_payload = read_product_prompt_payload_from_ref(prompt_ref)
+
+    if not prompt_payload:
+        return {
+            "ok": False,
+            "error": "No saved ChatGPT prompt was found for that product.",
+        }
+
+    return {
+        "ok": True,
+        "prompt": prompt_payload,
+        "prompt_kind": prompt_kind,
+        "title": product_prompt_title(prompt_kind),
+        "product_id": candidate.get("id", ""),
+        "item_key": normalize_item_key(item_key),
+    }
+
+
+def product_prompt_ref_for_choice(choice, candidate, prompt_kind):
+    prompt_candidates = []
+
+    if prompt_kind in {"choice_final_selection", "final_selection", ""}:
+        prompt_candidates.append(choice.get("chatgpt_final_selection_prompt"))
+        prompt_candidates.append(choice.get("chatgpt_final_selection_prompt_ref"))
+
+    if candidate:
+        if prompt_kind in {"store_product_ranking", "store_ranking", ""}:
+            prompt_candidates.append((candidate.get("chatgpt_store_ranking_agent") or {}).get("prompt"))
+            prompt_candidates.append((candidate.get("chatgpt_store_ranking_agent") or {}).get("prompt_ref"))
+        if prompt_kind in {"product_page_analysis", "page_analysis", ""}:
+            prompt_candidates.append((candidate.get("chatgpt_analysis") or {}).get("prompt"))
+            prompt_candidates.append((candidate.get("chatgpt_analysis") or {}).get("prompt_ref"))
+        if prompt_kind in {"final_selection", ""}:
+            prompt_candidates.append((candidate.get("final_selection_agent") or {}).get("prompt"))
+            prompt_candidates.append((candidate.get("final_selection_agent") or {}).get("prompt_ref"))
+
+    for prompt_ref in prompt_candidates:
+        if is_chatgpt_prompt_payload(prompt_ref) or (
+            isinstance(prompt_ref, dict) and prompt_ref.get("prompt_path")
+        ):
+            return prompt_ref
+
+    return {}
+
+
+def product_prompt_title(prompt_kind):
+    if prompt_kind in {"choice_final_selection", "final_selection"}:
+        return "Final Selection Prompt"
+    if prompt_kind in {"store_product_ranking", "store_ranking"}:
+        return "Store Product Ranking Prompt"
+    if prompt_kind in {"product_page_analysis", "page_analysis"}:
+        return "Product Page Analysis Prompt"
+    return "ChatGPT Prompt"
 
 
 def find_store_result(choice, store_key):
@@ -1370,6 +1585,7 @@ def save_product_record_for_ingredient(
         full_address,
         quantity_context=quantity_context,
     )
+    record = compact_product_value_for_storage(record)
     item_records[record["item_key"]] = record
     selected = record.get("selected_product")
 
@@ -1426,6 +1642,12 @@ def search_store_products_for_download(
     search_url = download.get("search_url", "")
     search_term = download.get("search_term") or ingredient
     quantity_context = download.get("quantity_context") or {}
+    search_url = contextualized_product_search_url(
+        search_url,
+        store_key,
+        full_address,
+        store_locations.get(store_key, {}),
+    )
     search_label = search_term if normalize_match_text(search_term) != normalize_match_text(ingredient) else ingredient
 
     if not search_url:
@@ -3332,6 +3554,7 @@ def search_store_products(
             full_address,
             home_location,
             store_location,
+            search_term=search_term,
         )
 
         if browser_candidates:
@@ -3413,6 +3636,7 @@ def search_store_products_with_browser_agent(
     full_address,
     home_location,
     store_location,
+    search_term=None,
 ):
     store_name = store.get("label") or store_key.title()
 
@@ -3445,6 +3669,14 @@ def search_store_products_with_browser_agent(
             )
             scroll_rendered_product_results_until_stable(driver)
             handle_browser_popups_and_location(driver, full_address, store_location=store_location)
+            context_status = rendered_store_context_status(
+                driver,
+                store_key,
+                full_address,
+                store_location,
+            )
+            if not context_status.get("ok"):
+                return [], [context_status.get("message") or f"{store_name}: rendered page did not match the saved store context."]
 
             final_url = driver.current_url or search_url
             visible_cards = extract_visible_product_cards_from_browser(driver)
@@ -3460,12 +3692,18 @@ def search_store_products_with_browser_agent(
                 store_location,
             )
             rendered_html = driver.page_source or ""
+            visible_text = ""
+            try:
+                visible_text = driver.execute_script("return document.body && document.body.innerText || '';")
+            except Exception:
+                visible_text = ""
             rendered_page = save_rendered_product_search_html(
                 store_key,
                 ingredient,
-                search_term=ingredient,
+                search_term=search_term or ingredient,
                 page_url=final_url,
                 html_text=rendered_html,
+                visible_text=visible_text,
             )
             rendered_candidates = parse_product_candidates_from_html(
                 rendered_html,
@@ -3484,7 +3722,10 @@ def search_store_products_with_browser_agent(
                 for candidate in candidates:
                     candidate["rendered_page_url"] = rendered_page.get("url", final_url)
                     candidate["rendered_page_html_path"] = rendered_page.get("path", "")
+                    candidate["rendered_page_text_path"] = rendered_page.get("visible_text_path", "")
+                    candidate["rendered_page_prompt_preview_path"] = rendered_page.get("prompt_preview_path", "")
                     candidate["rendered_page_html_length"] = rendered_page.get("html_length", 0)
+                    candidate["rendered_page_visible_text_length"] = rendered_page.get("visible_text_length", 0)
                     candidate["rendered_page_html_excerpt"] = rendered_page.get("prompt_html", "")
                     candidate["ranking_reasons"] = unique_texts(
                         candidate.get("ranking_reasons", [])
@@ -3503,8 +3744,9 @@ def search_store_products_with_browser_agent(
                     pass
 
 
-def save_rendered_product_search_html(store_key, ingredient, search_term, page_url, html_text):
+def save_rendered_product_search_html(store_key, ingredient, search_term, page_url, html_text, visible_text=""):
     html_text = str(html_text or "")
+    visible_text = str(visible_text or "")
     prompt_html = clean_rendered_page_html_for_prompt(html_text)
     timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
     digest = hashlib.sha1(
@@ -3517,6 +3759,8 @@ def save_rendered_product_search_html(store_key, ingredient, search_term, page_u
         digest=digest,
     )
     path = PRODUCT_RENDERED_HTML_DIR / filename
+    text_path = path.with_name(path.stem + "_TEXT.txt")
+    preview_path = path.with_name(path.stem + "_PROMPT_PREVIEW.html")
 
     try:
         path.write_text(html_text, encoding="utf-8")
@@ -3524,10 +3768,25 @@ def save_rendered_product_search_html(store_key, ingredient, search_term, page_u
     except Exception:
         saved_path = ""
 
+    try:
+        text_path.write_text(visible_text, encoding="utf-8")
+        saved_text_path = str(text_path)
+    except Exception:
+        saved_text_path = ""
+
+    try:
+        preview_path.write_text(prompt_html, encoding="utf-8")
+        saved_preview_path = str(preview_path)
+    except Exception:
+        saved_preview_path = ""
+
     return {
         "url": page_url,
         "path": saved_path,
+        "visible_text_path": saved_text_path,
+        "prompt_preview_path": saved_preview_path,
         "html_length": len(html_text),
+        "visible_text_length": len(visible_text),
         "prompt_html": prompt_html,
         "prompt_html_length": len(prompt_html),
     }
@@ -3568,6 +3827,35 @@ def clean_rendered_page_html_for_prompt(html_text):
 
     html_text = re.sub(r"\s+", " ", html_text).strip()
     return html_text[:product_rendered_html_prompt_limit()]
+
+
+def rendered_store_context_status(driver, store_key, full_address, store_location=None):
+    store_key = normalize_item_key(store_key)
+    if store_key != "aldi":
+        return {"ok": True, "message": ""}
+
+    expected_zip = extract_zip_code(full_address) or extract_zip_code((store_location or {}).get("address", ""))
+    if not expected_zip:
+        return {"ok": True, "message": ""}
+
+    try:
+        text = driver.execute_script("return document.body && document.body.innerText || '';")
+    except Exception:
+        text = ""
+
+    context_text = clean_text(text[:2500])
+    if expected_zip in context_text:
+        return {"ok": True, "message": "", "context_text": context_text}
+
+    found_zips = unique_texts(re.findall(r"\b\d{5}\b", context_text))
+    return {
+        "ok": False,
+        "message": (
+            "Aldi rendered with the wrong store ZIP. "
+            f"Expected {expected_zip} from the saved Full Address, found {', '.join(found_zips) or 'no ZIP'}."
+        ),
+        "context_text": context_text,
+    }
 
 
 def search_meijer_products_with_reader(
@@ -3772,6 +4060,14 @@ def handle_browser_popups_and_location(driver, full_address, store_location=None
                 const blocked = [/add to cart/i, /checkout/i, /sign in/i, /log in/i, /create account/i];
 
                 function visible(el) {
+                    let node = el;
+                    while (node && node.nodeType === 1) {
+                        const nodeStyle = window.getComputedStyle(node);
+                        if (node.hidden || nodeStyle.visibility === "hidden" || nodeStyle.display === "none") {
+                            return false;
+                        }
+                        node = node.parentElement;
+                    }
                     const style = window.getComputedStyle(el);
                     const rect = el.getBoundingClientRect();
                     return style && style.visibility !== "hidden" &&
@@ -3855,6 +4151,14 @@ def select_nearest_pickup_store(driver, store_location):
             ];
 
             function visible(el) {
+                let node = el;
+                while (node && node.nodeType === 1) {
+                    const nodeStyle = window.getComputedStyle(node);
+                    if (node.hidden || nodeStyle.visibility === "hidden" || nodeStyle.display === "none" || parseFloat(nodeStyle.opacity || "1") < 0.02) {
+                        return false;
+                    }
+                    node = node.parentElement;
+                }
                 const style = window.getComputedStyle(el);
                 const rect = el.getBoundingClientRect();
                 return style && style.visibility !== "hidden" &&
@@ -3947,6 +4251,14 @@ def fill_location_inputs(driver, full_address):
             const fullValue = fullAddress || zipCode;
 
             function visible(el) {
+                let node = el;
+                while (node && node.nodeType === 1) {
+                    const nodeStyle = window.getComputedStyle(node);
+                    if (node.hidden || nodeStyle.visibility === "hidden" || nodeStyle.display === "none") {
+                        return false;
+                    }
+                    node = node.parentElement;
+                }
                 const style = window.getComputedStyle(el);
                 const rect = el.getBoundingClientRect();
                 return style && style.visibility !== "hidden" &&
@@ -4042,6 +4354,18 @@ def wait_for_rendered_product_cards(driver, timeout_seconds=8):
             count = driver.execute_script(
                 """
                 const pricePattern = /\\$\\s?\\d[\\d,]*(?:\\.\\d{2})?/;
+                function visible(el) {
+                    let node = el;
+                    while (node && node.nodeType === 1) {
+                        const nodeStyle = window.getComputedStyle(node);
+                        if (node.hidden || nodeStyle.visibility === "hidden" || nodeStyle.display === "none" || parseFloat(nodeStyle.opacity || "1") < 0.02) {
+                            return false;
+                        }
+                        node = node.parentElement;
+                    }
+                    const rect = el.getBoundingClientRect();
+                    return rect.width >= 60 && rect.height >= 35;
+                }
                 const selectors = [
                     '[data-testid*="product" i]',
                     '[data-test*="product" i]',
@@ -4051,7 +4375,7 @@ def wait_for_rendered_product_cards(driver, timeout_seconds=8):
                     'li'
                 ].join(',');
                 return Array.from(document.querySelectorAll(selectors))
-                    .filter(el => pricePattern.test(el.innerText || el.textContent || ''))
+                    .filter(el => visible(el) && pricePattern.test(el.innerText || el.textContent || ''))
                     .length;
                 """
             )
@@ -4130,6 +4454,14 @@ def extract_visible_product_cards_from_browser(driver):
             const badLinePattern = /^(add|add to cart|sponsored|sale|save|pickup|delivery|shipping|in stock|out of stock|rating|stars?|reviews?|view details|quick view)$/i;
 
             function visible(el) {
+                let node = el;
+                while (node && node.nodeType === 1) {
+                    const nodeStyle = window.getComputedStyle(node);
+                    if (node.hidden || nodeStyle.visibility === "hidden" || nodeStyle.display === "none" || parseFloat(nodeStyle.opacity || "1") < 0.02) {
+                        return false;
+                    }
+                    node = node.parentElement;
+                }
                 const style = window.getComputedStyle(el);
                 const rect = el.getBoundingClientRect();
                 return style &&
@@ -5491,7 +5823,10 @@ def final_product_candidate_payload(candidate):
         "source_page_url": candidate.get("source_page_url") or candidate.get("search_url", ""),
         "rendered_page_url": candidate.get("rendered_page_url", ""),
         "rendered_page_html_path": candidate.get("rendered_page_html_path", ""),
+        "rendered_page_text_path": candidate.get("rendered_page_text_path", ""),
+        "rendered_page_prompt_preview_path": candidate.get("rendered_page_prompt_preview_path", ""),
         "rendered_page_html_length": candidate.get("rendered_page_html_length", 0),
+        "rendered_page_visible_text_length": candidate.get("rendered_page_visible_text_length", 0),
         "product_name": candidate.get("product_name", ""),
         "brand": candidate.get("brand", ""),
         "requested_quantity": candidate.get("requested_quantity", ""),
@@ -6271,6 +6606,28 @@ def build_product_search_url(store, ingredient):
 
     separator = "&" if "?" in base_url else "?"
     return f"{base_url}{separator}q={encoded}"
+
+
+def contextualized_product_search_url(search_url, store_key, full_address="", store_location=None):
+    search_url = str(search_url or "").strip()
+    if not search_url:
+        return ""
+
+    if normalize_item_key(store_key) != "aldi":
+        return search_url
+
+    zip_code = extract_zip_code(full_address) or extract_zip_code((store_location or {}).get("address", ""))
+    if not zip_code:
+        return search_url
+
+    try:
+        parsed = urlparse(search_url)
+        query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+        query.setdefault("zipcode", zip_code)
+        return urlunparse(parsed._replace(query=urlencode(query)))
+    except Exception:
+        separator = "&" if "?" in search_url else "?"
+        return f"{search_url}{separator}zipcode={quote_plus(zip_code)}"
 
 
 def geocode_home_address(full_address):

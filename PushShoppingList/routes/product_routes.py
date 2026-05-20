@@ -14,6 +14,7 @@ from PushShoppingList.services.product_selection_service import load_product_pro
 from PushShoppingList.services.product_selection_service import normalize_item_key
 from PushShoppingList.services.product_selection_service import product_choice_for_item
 from PushShoppingList.services.product_selection_service import product_choices_by_item
+from PushShoppingList.services.product_selection_service import product_prompt_for_item
 from PushShoppingList.services.product_selection_service import select_product_choice
 from PushShoppingList.services.rules_display_service import save_home_store_rule_text
 from PushShoppingList.services.rules_display_service import save_rules_display_section
@@ -196,6 +197,23 @@ def api_product_choice_route():
         "item_key": item_key,
         "choice": choice,
     })
+
+
+@product_bp.route("/api/product_prompt")
+def api_product_prompt_route():
+    item_key = normalize_item_key(request.args.get("item_key", ""))
+    store_key = str(request.args.get("store_key", "") or "").strip()
+    product_id = str(request.args.get("product_id", "") or "").strip()
+    prompt_kind = str(request.args.get("prompt_kind", "") or "").strip()
+    result = product_prompt_for_item(
+        item_key,
+        store_key=store_key,
+        product_id=product_id,
+        prompt_kind=prompt_kind,
+    )
+    status = 200 if result.get("ok") else 404
+
+    return jsonify(result), status
 
 
 @product_bp.route("/api/product_choice/select", methods=["POST"])
