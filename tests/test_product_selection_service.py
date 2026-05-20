@@ -311,6 +311,56 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertEqual(normalized["results"][1]["ranking_status"], "rejected")
         self.assertEqual(normalized["results"][1]["rejection_reason"], "Not standard shell eggs.")
 
+    def test_rendered_store_context_requires_localization_proof(self):
+        class FakeDriver:
+            def execute_script(self, _):
+                return "Results for egg National catalog"
+
+        status = product_service.rendered_store_context_status(
+            FakeDriver(),
+            "aldi",
+            "Aldi",
+            "5905 Arlo Drive, Indianapolis, IN 46237",
+            {
+                "name": "Aldi",
+                "address": "Southport Rd, Indianapolis, IN 46237",
+                "distance_miles": 2.2,
+            },
+        )
+
+        self.assertFalse(status["ok"])
+        self.assertIn("Localized store session could not be proven", status["message"])
+
+    def test_rendered_store_context_accepts_store_banner_proof(self):
+        class FakeDriver:
+            def execute_script(self, _):
+                return "Shopping at ALDI - GRE 73 - Indianapolis Pickup available 46237 Results for egg"
+
+        status = product_service.rendered_store_context_status(
+            FakeDriver(),
+            "aldi",
+            "Aldi",
+            "5905 Arlo Drive, Indianapolis, IN 46237",
+            {
+                "name": "Aldi",
+                "address": "Southport Rd, Indianapolis, IN 46237",
+                "distance_miles": 2.2,
+                "pickup_enabled": True,
+            },
+        )
+
+        self.assertTrue(status["ok"])
+        self.assertTrue(status["proof_of_store_selection"])
+        self.assertIn("46237", " ".join(status["proof_of_store_selection"]))
+
+    def test_localized_inventory_failure_blocks_generic_fallback(self):
+        self.assertTrue(product_service.localized_inventory_blocking_failure([
+            "Aldi: Localized store session could not be proven from visible page text. Refusing to treat this as localized inventory."
+        ]))
+        self.assertFalse(product_service.localized_inventory_blocking_failure([
+            "Aldi: no visible product cards were found on the rendered search page."
+        ]))
+
     def test_egg_scoring_prefers_standard_shell_eggs(self):
         shell = candidate("Large White Eggs, 12 Count")
         shell["price"] = "$2.40"

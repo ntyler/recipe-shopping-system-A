@@ -241,6 +241,25 @@ def product_static_search_fallback_enabled():
     return os.getenv("PRODUCT_ALLOW_STATIC_PRODUCT_SEARCH_FALLBACK") == "1"
 
 
+def localized_inventory_blocking_failure(reasons):
+    text = normalize_match_text(" ".join(str(reason or "") for reason in reasons or []))
+    blocking_phrases = [
+        "localized inventory cannot be searched",
+        "localized inventory cannot",
+        "localized store session could not be proven",
+        "nearest localized store could not be verified",
+        "saved full address could not be geocoded",
+        "refusing zip only",
+        "refusing to treat this as localized inventory",
+        "rendered page did not match the saved store context",
+        "expected store zip",
+        "store selector failure",
+        "localization failure",
+        "missing localization proof",
+    ]
+    return any(phrase in text for phrase in blocking_phrases)
+
+
 def product_worker_count(total_downloads=None):
     try:
         configured = int(os.getenv("PRODUCT_SEARCH_WORKERS", "6"))
@@ -1636,6 +1655,35 @@ def build_product_download_plan(ingredients, enabled_stores, stores, quantity_co
     return downloads
 
 
+def store_location_searchable_status(store_name, full_address, home_location, store_location):
+    if not clean_text(full_address):
+        return {
+            "ok": False,
+            "message": f"{store_name}: saved Full Address is missing, so localized inventory cannot be searched.",
+        }
+
+    if not home_location:
+        return {
+            "ok": False,
+            "message": f"{store_name}: saved Full Address could not be geocoded; refusing ZIP-only or generic inventory.",
+        }
+
+    store_location = store_location or {}
+    if store_location.get("skip_reason"):
+        return {
+            "ok": False,
+            "message": f"{store_name}: nearest store resolution failed: {store_location.get('skip_reason')}",
+        }
+
+    if not clean_text(store_location.get("address")):
+        return {
+            "ok": False,
+            "message": f"{store_name}: nearest store address was not resolved from the saved Full Address.",
+        }
+
+    return {"ok": True, "message": ""}
+
+
 def search_store_products_for_download(
     download,
     stores,
@@ -1659,12 +1707,52 @@ def search_store_products_for_download(
         store_locations.get(store_key, {}),
     )
     search_label = search_term if normalize_match_text(search_term) != normalize_match_text(ingredient) else ingredient
+    store_location = store_locations.get(store_key, {})
+    store_search_status = store_location_searchable_status(
+        store_name,
+        full_address,
+        home_location,
+        store_location,
+    )
+
+    if not store_search_status.get("ok"):
+        message = store_search_status.get("message") or f"{store_name}: nearest localized store could not be verified."
+        if job_id:
+            mark_product_download(job_id, index, "failed", message, candidates_count=0)
+        return {
+            "index": index,
+            "item_key": download.get("item_key") or normalize_item_key(ingredient),
+            "ingredient": ingredient,
+            "quantity": quantity_context.get("display", ""),
+            "quantity_context": quantity_context,
+            "store_key": store_key,
+            "store_name": store_name,
+            "search_url": search_url,
+            "search_term": search_term,
+            "store_location": store_location,
+            "store_location_name": (store_location or {}).get("name", ""),
+            "store_location_address": (store_location or {}).get("address", ""),
+            "store_location_distance_miles": (store_location or {}).get("distance_miles"),
+            "candidates": [],
+            "skip_reasons": [message],
+            "agent_stages": [
+                agent_stage(
+                    "Store Resolution Agent",
+                    status="failed",
+                    message=message,
+                    metadata={
+                        "home_address": full_address,
+                        "home_location": home_location,
+                        "store_location": store_location,
+                    },
+                ),
+            ],
+        }
 
     if not search_url:
         message = f"{store_name}: no product search URL is configured."
         if job_id:
             mark_product_download(job_id, index, "skipped", message, candidates_count=0)
-        store_location = store_locations.get(store_key, {})
         return {
             "index": index,
             "item_key": download.get("item_key") or normalize_item_key(ingredient),
@@ -1742,6 +1830,7 @@ def search_store_products_for_download(
     )
     detail_failed_count = max(0, raw_direct_count - direct_count)
     failed = any("product search failed" in str(reason).lower() for reason in skip_reasons)
+    failed = failed or localized_inventory_blocking_failure(skip_reasons)
 
     if direct_count:
         state = "done"
@@ -1765,7 +1854,6 @@ def search_store_products_for_download(
             candidates_count=direct_count,
         )
 
-    store_location = store_locations.get(store_key, {})
     return {
         "index": index,
         "item_key": download.get("item_key") or normalize_item_key(ingredient),
@@ -1940,6 +2028,7 @@ def apply_validation_layer(ingredient, candidates):
             "skip_reasons": candidate.get("skip_reasons", []),
             "shortlisted_for_detail": candidate.get("shortlisted_for_detail"),
             "shortlisted_for_chatgpt_analysis": candidate.get("shortlisted_for_chatgpt_analysis"),
+            "chatgpt_rendered_html_reasoning": candidate.get("chatgpt_rendered_html_agent", {}),
             "chatgpt_store_ranking": candidate.get("chatgpt_store_ranking_agent", {}),
         }
 
@@ -2028,6 +2117,7 @@ def build_store_product_results(ingredient, raw_store_results, ranked_candidates
             store_candidates,
         )
         best_is_viable = bool(best and best.get("viable") is not False)
+        store_localization = first_store_localization(store_candidates)
 
         if best:
             best["reason_selected"] = (
@@ -2067,6 +2157,8 @@ def build_store_product_results(ingredient, raw_store_results, ranked_candidates
             "store_location_name": raw.get("store_location_name", ""),
             "store_location_address": raw.get("store_location_address", ""),
             "store_location_distance_miles": raw.get("store_location_distance_miles"),
+            "store_localization": store_localization,
+            "proof_of_store_selection": store_localization.get("proof_of_store_selection", []),
             "best_product_id": best.get("id") if best else "",
             "best_product": best,
             "best_product_is_viable": best_is_viable,
@@ -2092,6 +2184,15 @@ def build_store_product_results(ingredient, raw_store_results, ranked_candidates
         records.append(record)
 
     return records
+
+
+def first_store_localization(candidates):
+    for candidate in candidates or []:
+        if isinstance(candidate, dict) and isinstance(candidate.get("store_localization"), dict):
+            localization = candidate.get("store_localization")
+            if localization.get("proof_of_store_selection") or localization.get("verified") is not None:
+                return localization
+    return {}
 
 
 def group_raw_store_results_by_store(raw_store_results):
@@ -3577,6 +3678,9 @@ def search_store_products(
 
         skip_reasons.extend(browser_skip_reasons)
 
+        if localized_inventory_blocking_failure(skip_reasons):
+            return [], unique_texts(skip_reasons)
+
     if product_search_browser_enabled() and not product_static_search_fallback_enabled():
         fallback = build_search_page_candidate(
             ingredient,
@@ -3682,6 +3786,7 @@ def search_store_products_with_browser_agent(
             context_status = rendered_store_context_status(
                 driver,
                 store_key,
+                store_name,
                 full_address,
                 store_location,
             )
@@ -3716,6 +3821,7 @@ def search_store_products_with_browser_agent(
                 html_text=rendered_html,
                 visible_text=visible_text,
                 product_related_html=product_related_html,
+                localization_status=context_status,
             )
             chatgpt_candidates, chatgpt_skip_reasons = identify_rendered_html_products_with_chatgpt(
                 ingredient,
@@ -3752,6 +3858,8 @@ def search_store_products_with_browser_agent(
                     candidate["rendered_page_html_length"] = rendered_page.get("html_length", 0)
                     candidate["rendered_page_visible_text_length"] = rendered_page.get("visible_text_length", 0)
                     candidate["rendered_page_html_excerpt"] = rendered_page.get("prompt_html", "")
+                    candidate["store_localization"] = rendered_page.get("localization", {})
+                    candidate["proof_of_store_selection"] = rendered_page.get("localization", {}).get("proof_of_store_selection", [])
                     candidate["ranking_reasons"] = unique_texts(
                         candidate.get("ranking_reasons", [])
                         + ["Generic browser agent opened, fully rendered, scrolled, cleaned, and saved the grocery page using the saved home address context."]
@@ -3819,6 +3927,7 @@ def save_rendered_product_search_html(
     html_text,
     visible_text="",
     product_related_html="",
+    localization_status=None,
 ):
     html_text = str(html_text or "")
     visible_text = str(visible_text or "")
@@ -3874,6 +3983,7 @@ def save_rendered_product_search_html(
         "html_length": len(html_text),
         "visible_text_length": len(visible_text),
         "product_related_html_length": len(product_related_html),
+        "localization": localization_status or {},
         "prompt_html": prompt_html,
         "prompt_html_length": len(prompt_html),
     }
@@ -3932,6 +4042,168 @@ def clean_rendered_page_html_for_prompt(html_text):
 
     html_text = re.sub(r"\s+", " ", html_text).strip()
     return html_text[:product_rendered_html_prompt_limit()]
+
+
+def rendered_store_context_status(driver, store_key, store_name, full_address, store_location=None):
+    store_location = store_location or {}
+    store_name = clean_text(store_name or store_location.get("name") or store_key)
+    expected_zip = extract_zip_code((store_location or {}).get("address", "")) or extract_zip_code(full_address)
+    expected_city = expected_store_city(store_location, full_address)
+
+    try:
+        text = driver.execute_script("return document.body && document.body.innerText || '';")
+    except Exception:
+        text = ""
+
+    context_text = clean_text(text[:8000])
+    proof = []
+    errors = []
+    store_id = extract_visible_store_id(context_text, store_name)
+
+    if text_matches_store_name(context_text, store_name):
+        proof.append(f"Visible store name/chain text: {store_name}.")
+
+    if expected_city and re.search(rf"\b{re.escape(expected_city)}\b", context_text, flags=re.IGNORECASE):
+        proof.append(f"Visible store city/locality text: {expected_city}.")
+
+    if expected_zip and expected_zip in context_text:
+        proof.append(f"Visible store ZIP/postal code: {expected_zip}.")
+
+    address_match = visible_store_address_match(context_text, store_location.get("address", ""))
+    if address_match:
+        proof.append(f"Visible selected-store address evidence: {address_match}.")
+
+    localized_indicator = visible_localized_inventory_indicator(context_text)
+    if localized_indicator:
+        proof.append(localized_indicator)
+
+    if store_id:
+        proof.append(f"Visible store/session identifier: {store_id}.")
+
+    found_zips = unique_texts(re.findall(r"\b\d{5}\b", context_text))
+    if expected_zip and found_zips and expected_zip not in found_zips:
+        errors.append(
+            f"Expected store ZIP {expected_zip} from the saved Full Address/store resolution, found visible ZIP(s): {', '.join(found_zips)}."
+        )
+
+    verified = localization_proof_is_verified(
+        proof,
+        has_address=bool(address_match),
+        has_zip=bool(expected_zip and expected_zip in context_text),
+        has_city=bool(expected_city and re.search(rf"\b{re.escape(expected_city)}\b", context_text, flags=re.IGNORECASE)),
+        has_store_name=text_matches_store_name(context_text, store_name),
+        has_indicator=bool(localized_indicator),
+        has_store_id=bool(store_id),
+    )
+
+    if not verified and not errors:
+        errors.append(
+            "Localized store session could not be proven from visible page text. Refusing to treat this as localized inventory."
+        )
+
+    return {
+        "ok": bool(verified and not errors),
+        "verified": bool(verified and not errors),
+        "message": "" if verified and not errors else " ".join(errors),
+        "store_name": store_name,
+        "store_address": store_location.get("address", ""),
+        "distance_miles": store_location.get("distance_miles"),
+        "store_id": store_id,
+        "pickup_supported": store_location.get("pickup_enabled"),
+        "delivery_supported": None,
+        "proof_of_store_selection": proof,
+        "visible_context_excerpt": context_text[:1600],
+        "errors": errors,
+    }
+
+
+def expected_store_city(store_location, full_address):
+    values = [
+        clean_text((store_location or {}).get("address", "")),
+        clean_text(full_address),
+    ]
+    for value in values:
+        parts = [part.strip() for part in value.split(",") if part.strip()]
+        for part in parts:
+            if re.search(r"\bcounty\b|\b\d{5}\b|\bUnited States\b", part, flags=re.IGNORECASE):
+                continue
+            if re.search(r"\b(?:street|st|road|rd|drive|dr|avenue|ave|boulevard|blvd|lane|ln|way|court|ct)\b", part, flags=re.IGNORECASE):
+                continue
+            if part and not re.search(r"\d", part):
+                return part
+    return ""
+
+
+def visible_store_address_match(context_text, store_address):
+    store_address = clean_text(store_address)
+    if not store_address:
+        return ""
+
+    parts = [clean_text(part) for part in store_address.split(",") if clean_text(part)]
+    candidates = []
+    if parts:
+        candidates.append(parts[0])
+    zip_code = extract_zip_code(store_address)
+    if zip_code:
+        candidates.append(zip_code)
+
+    street_number_match = re.search(r"\b\d{2,6}\b", store_address)
+    if street_number_match:
+        candidates.append(street_number_match.group(0))
+
+    for candidate in unique_texts(candidates):
+        if candidate and candidate in context_text:
+            return candidate
+
+    return ""
+
+
+def text_matches_store_name(context_text, store_name):
+    name = normalize_match_text(store_name)
+    if not name:
+        return False
+    tokens = [token for token in tokenize(name) if len(token) >= 3]
+    context = normalize_match_text(context_text)
+    return bool(tokens and any(re.search(rf"\b{re.escape(token)}\b", context) for token in tokens))
+
+
+def visible_localized_inventory_indicator(context_text):
+    patterns = [
+        r"\bshopping at\b.{0,120}",
+        r"\bselected store\b.{0,120}",
+        r"\byour store\b.{0,120}",
+        r"\bpickup\b.{0,120}",
+        r"\bdelivery\b.{0,120}",
+        r"\bitem pricing and availability may vary\b.{0,120}",
+        r"\blocal(?:ized)? (?:inventory|pricing|availability)\b.{0,120}",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, context_text, flags=re.IGNORECASE)
+        if match:
+            return "Visible localized inventory/session indicator: " + clean_text(match.group(0))
+    return ""
+
+
+def extract_visible_store_id(context_text, store_name=""):
+    patterns = [
+        r"\b(?:store|location)\s*(?:#|id|number)?\s*[:#-]?\s*([A-Z]{0,5}\s*\d{1,5})\b",
+        r"\b[A-Z]{2,5}\s+\d{1,5}\b",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, context_text, flags=re.IGNORECASE)
+        if match:
+            return clean_text(match.group(0))
+    return ""
+
+
+def localization_proof_is_verified(proof, has_address=False, has_zip=False, has_city=False, has_store_name=False, has_indicator=False, has_store_id=False):
+    if has_address and (has_store_name or has_indicator):
+        return True
+    if has_zip and has_store_name and (has_city or has_indicator or has_store_id):
+        return True
+    if has_store_id and has_store_name and has_indicator:
+        return True
+    return False
 
 
 def identify_rendered_html_products_with_chatgpt(
@@ -4008,7 +4280,7 @@ def identify_rendered_html_products_with_chatgpt(
         visible_cards,
     )
 
-    return candidates, []
+    return candidates, clean_text_list(selection.get("errors", []))
 
 
 def build_rendered_html_product_agent_prompt(
@@ -4022,6 +4294,7 @@ def build_rendered_html_product_agent_prompt(
     rules_payload = product_analysis_rules_payload()
     store_location = store_location or {}
     rendered_page = rendered_page or {}
+    localization = rendered_page.get("localization", {}) if isinstance(rendered_page.get("localization"), dict) else {}
     product_blocks = [
         {
             "product_index": index,
@@ -4037,22 +4310,51 @@ def build_rendered_html_product_agent_prompt(
     ]
 
     return f"""
-You are a grocery product collection and ranking function.
+You are a grocery product collection and product ranking agent for localized grocery inventory extraction.
 
-A generic browser agent already opened the grocery webpage, applied the saved location context when possible, waited for rendering, scrolled until lazy-loaded content stopped changing, captured the rendered DOM, removed scripts/styles/tracking markup, and extracted visible product-related HTML/content.
+The generic browser agent already opened, rendered, scrolled, cleaned, and saved the grocery page before this prompt was created.
 
-Do not browse, fetch, or infer from outside websites. Use only the supplied rendered HTML/content and saved rules.
+CORE OBJECTIVE:
+1. Use the user's exact address as the home point.
+2. Search ONLY localized grocery inventory for the target store.
+3. Use ONLY the cleaned rendered HTML/content supplied below.
+4. Identify product candidates, best product, best value pick, best premium pick, alternatives, and rejected products.
+5. Return clean structured JSON only.
 
-Requested item:
-{ingredient}
+CRITICAL RULES:
+- Do not browse, fetch, or infer from outside websites.
+- You MUST NOT browse, fetch, or infer from outside websites.
+- You MUST NOT use generic national catalog results.
+- You MUST NOT hallucinate inventory or fabricate store localization.
+- You MUST include only edible grocery products unless the target explicitly requests a non-food grocery item.
+- You MUST reject decorative, toy, beauty, pet, household, bath, craft, and other non-food products unless explicitly requested.
+- You MUST reject candy unless the target explicitly requests candy.
+- You MUST rank using value, stock, package size, pickup eligibility, quality, and category-aware unit economics.
+- If localized inventory proof is missing or invalid, return empty product objects/arrays and include an error.
 
-Current saved address:
+USER LOCATION:
 {full_address}
 
-Store:
+TARGET PRODUCT:
+{ingredient}
+
+TARGET STORE:
 {store_name}
 
-Nearest store metadata:
+VERIFIED STORE INFO FROM BROWSER AUTOMATION:
+{json.dumps({
+    "verified": localization.get("verified"),
+    "store_name": localization.get("store_name") or store_name,
+    "store_address": localization.get("store_address") or store_location.get("address", ""),
+    "distance_miles": localization.get("distance_miles", store_location.get("distance_miles")),
+    "store_id": localization.get("store_id", ""),
+    "pickup_supported": localization.get("pickup_supported", store_location.get("pickup_enabled")),
+    "delivery_supported": localization.get("delivery_supported"),
+    "proof_of_store_selection": localization.get("proof_of_store_selection", []),
+    "errors": localization.get("errors", []),
+}, ensure_ascii=False)}
+
+Nearest store metadata resolved from the saved Full Address:
 {json.dumps(store_location, ensure_ascii=False)}
 
 Saved food rules:
@@ -4080,27 +4382,85 @@ Visible product blocks extracted generically:
 Cleaned rendered product HTML/content:
 {rendered_page.get("prompt_html", "")}
 
-Rules:
-- Identify every product candidate visible in the supplied product HTML/content.
-- Choose exactly one best product when a confident valid match exists.
-- Mark other valid products as alternative.
-- Mark irrelevant, unavailable, rule-failing, search-page-only, or ambiguous products as rejected.
-- Include rejection_reason for every rejected product.
-- Include confidence_score from 0 to 1 for every product.
-- Prefer direct product URLs over search/category URLs.
-- Relevance comes first, then in-stock status, best unit value, package fit, saved preferences such as organic, and nearest valid store context.
-- For eggs, prefer standard shell egg cartons, 12-count or larger cartons, availability, nearby stores, and lowest price per egg. Reject liquid eggs, egg whites only, boiled eggs, egg bites, and plant-based substitutes when possible.
-- Never return partial product lists when the supplied content clearly contains more product cards.
+LOCALIZATION VERIFICATION REQUIREMENTS:
+- Product results MUST come from the verified localized store session above.
+- Valid proof may include selected store banner text, active pickup location, localized inventory indicator, store address, store/session ID, or pickup/delivery availability tied to that location.
+- If proof_of_store_selection is empty or verified is false, STOP and return no products with an error.
+
+SEARCH RULES:
+- Search/extract ONLY for: {ingredient}
+- Capture ALL visible matching product cards from the supplied content.
+- Do not include unrelated products unless rejecting them with a rejection reason.
+
+PRODUCT DATA TO EXTRACT WHEN VISIBLE:
+- store name
+- selected store address
+- product name
+- brand
+- product category/type
+- package count
+- package size
+- price
+- unit price
+- stock status
+- pickup availability
+- delivery availability
+- product URL
+- image URL
+- product ID/SKU
+
+PRODUCT RANKING RULES:
+1. Best value per unit.
+2. In-stock products first.
+3. Larger value packs preferred.
+4. Higher-quality products preferred when value difference is reasonable.
+5. Organic/premium products preferred only if competitively priced.
+6. Avoid overpriced specialty products unless clearly premium.
+7. Prefer pickup-eligible products.
+8. Prefer reputable grocery brands.
+9. Prefer products actually available at the localized store.
+
+CATEGORY-SPECIFIC RULES:
+- eggs -> price per egg; prefer standard shell egg cartons, 12-count or larger; reject liquid eggs, egg whites only, boiled eggs, egg bites, and plant-based substitutes when possible.
+- milk -> price per ounce.
+- produce -> price per pound or each as appropriate.
+- meat -> price per pound plus quality.
+- detergent -> loads per dollar.
+- paper towels -> sheets per dollar.
+
+RETURN REQUIREMENTS:
+- searched_store must include proof_of_store_selection.
+- best_product is the overall best balanced product.
+- best_value_pick is the best unit value.
+- best_premium_pick is the best higher-quality/premium option when present.
+- alternatives contains all other valid edible alternatives.
+- rejected_products contains irrelevant/non-food/unavailable/rule-failing products with rejection_reason.
+- errors contains localization/blocking/CAPTCHA/store selector failures.
 
 Return ONLY valid JSON.
 
 Output schema:
 {{
   "timestamp": "",
+  "home_address": "{full_address}",
   "search_item": "{normalize_match_text(ingredient)}",
-  "store_name": "{store_name}",
-  "store_address": "{store_location.get("address", "")}",
+  "target_product": "{ingredient}",
+  "target_store": "{store_name}",
+  "searched_store": {{
+    "store_name": "",
+    "store_address": "",
+    "distance_miles": "",
+    "store_id": "",
+    "pickup_supported": true,
+    "delivery_supported": true,
+    "proof_of_store_selection": []
+  }},
   "best_product": {{}},
+  "best_value_pick": {{}},
+  "best_premium_pick": {{}},
+  "alternatives": [],
+  "rejected_products": [],
+  "errors": [],
   "results": [
     {{
       "product_index": 1,
@@ -4110,13 +4470,18 @@ Output schema:
       "reason": "",
       "product_name": "",
       "brand": "",
+      "product_category": "",
+      "package_count": "",
       "size": "",
       "price": "",
       "unit_price": "",
       "stock_status": "",
       "in_stock": true,
+      "pickup_available": true,
+      "delivery_available": true,
       "product_url": "",
-      "image_url": ""
+      "image_url": "",
+      "product_id": ""
     }}
   ]
 }}
@@ -4126,11 +4491,11 @@ Output schema:
 def normalize_rendered_html_product_agent_response(data):
     data = data if isinstance(data, dict) else {}
     best_product = data.get("best_product") if isinstance(data.get("best_product"), dict) else {}
-    raw_results = data.get("results") if isinstance(data.get("results"), list) else []
+    raw_results = rendered_html_agent_response_products(data)
     best_signature = rendered_html_product_signature(best_product)
     results = []
 
-    for raw in raw_results:
+    for raw, default_status in raw_results:
         if not isinstance(raw, dict):
             continue
 
@@ -4139,7 +4504,7 @@ def normalize_rendered_html_product_agent_response(data):
         if not product_name and not product_url:
             continue
 
-        status = normalize_ranking_status(raw.get("ranking_status") or raw.get("status"))
+        status = normalize_ranking_status(raw.get("ranking_status") or raw.get("status") or default_status)
         if not status and rendered_html_product_signature(raw) == best_signature:
             status = "best"
         elif not status:
@@ -4153,13 +4518,18 @@ def normalize_rendered_html_product_agent_response(data):
             "reason": clean_text(raw.get("reason")),
             "product_name": product_name,
             "brand": clean_text(raw.get("brand")),
+            "product_category": clean_text(raw.get("product_category") or raw.get("category") or raw.get("type")),
+            "package_count": clean_text(raw.get("package_count") or raw.get("count")),
             "size": clean_text(raw.get("size") or raw.get("package_size") or raw.get("count")),
             "price": normalize_price(raw.get("price")),
             "unit_price": clean_text(raw.get("unit_price") or raw.get("price_per_unit") or raw.get("price_per_egg")),
             "stock_status": clean_text(raw.get("stock_status") or raw.get("availability")),
             "in_stock": normalize_optional_bool(raw.get("in_stock")),
+            "pickup_available": normalize_optional_bool(first_present_value(raw.get("pickup_available"), raw.get("pickup_eligible"))),
+            "delivery_available": normalize_optional_bool(first_present_value(raw.get("delivery_available"), raw.get("delivery_eligible"))),
             "product_url": product_url,
             "image_url": clean_text(raw.get("image_url")),
+            "product_id": clean_text(raw.get("product_id") or raw.get("sku") or raw.get("id")),
         })
 
     if results and not any(result.get("ranking_status") == "best" for result in results):
@@ -4172,9 +4542,46 @@ def normalize_rendered_html_product_agent_response(data):
         "search_item": clean_text(data.get("search_item")),
         "store_name": clean_text(data.get("store_name")),
         "store_address": clean_text(data.get("store_address")),
+        "home_address": clean_text(data.get("home_address")),
+        "target_product": clean_text(data.get("target_product")),
+        "target_store": clean_text(data.get("target_store")),
+        "searched_store": data.get("searched_store") if isinstance(data.get("searched_store"), dict) else {},
         "best_product": best_product,
         "results": results,
+        "errors": clean_text_list(data.get("errors")),
     }
+
+
+def rendered_html_agent_response_products(data):
+    rows = []
+    seen_keys = set()
+
+    def add(raw, status):
+        if not isinstance(raw, dict):
+            return
+        key = rendered_html_product_signature(raw) or clean_text(raw.get("product_id") or raw.get("sku") or raw.get("id"))
+        key = key or f"row-{len(rows)}"
+        if key in seen_keys:
+            return
+        seen_keys.add(key)
+        item = dict(raw)
+        item.setdefault("ranking_status", status)
+        rows.append((item, status))
+
+    for raw in data.get("results") if isinstance(data.get("results"), list) else []:
+        add(raw, normalize_ranking_status(raw.get("ranking_status") or raw.get("status")) or "alternative")
+
+    for raw in data.get("alternatives") if isinstance(data.get("alternatives"), list) else []:
+        add(raw, "alternative")
+
+    for raw in data.get("rejected_products") if isinstance(data.get("rejected_products"), list) else []:
+        add(raw, "rejected")
+
+    add(data.get("best_product"), "best")
+    add(data.get("best_value_pick"), "alternative")
+    add(data.get("best_premium_pick"), "alternative")
+
+    return rows
 
 
 def rendered_html_agent_candidates_from_response(
@@ -4233,11 +4640,16 @@ def rendered_html_agent_candidates_from_response(
         reason = clean_text(result.get("reason"))
 
         candidate["brand"] = clean_text(result.get("brand"))
+        candidate["product_category"] = clean_text(result.get("product_category"))
+        candidate["package_count"] = clean_text(result.get("package_count"))
+        candidate["product_id"] = clean_text(result.get("product_id"))
         candidate["package_size"] = clean_text(result.get("size"))
         candidate["size"] = candidate["package_size"]
         candidate["unit_price"] = clean_text(result.get("unit_price"))
         candidate["availability"] = clean_text(result.get("stock_status"))
         candidate["in_stock"] = result.get("in_stock")
+        candidate["pickup_available"] = result.get("pickup_available")
+        candidate["delivery_available"] = result.get("delivery_available")
         candidate["source_page_url"] = page_url
         candidate["rendered_page_url"] = rendered_page.get("url", page_url)
         candidate["rendered_page_html_path"] = rendered_page.get("path", "")
@@ -4247,6 +4659,8 @@ def rendered_html_agent_candidates_from_response(
         candidate["rendered_page_html_length"] = rendered_page.get("html_length", 0)
         candidate["rendered_page_visible_text_length"] = rendered_page.get("visible_text_length", 0)
         candidate["rendered_page_html_excerpt"] = rendered_page.get("prompt_html", "")
+        candidate["store_localization"] = rendered_page.get("localization", {})
+        candidate["proof_of_store_selection"] = rendered_page.get("localization", {}).get("proof_of_store_selection", [])
         candidate["card_text_excerpt"] = clean_text((block or {}).get("text"))[:1600]
         candidate["raw_product_html_snippet"] = clean_product_card_html((block or {}).get("raw_product_html_snippet"))
         candidate["ranking_status"] = status
@@ -4338,6 +4752,13 @@ def parse_int(value):
         return None
 
 
+def first_present_value(*values):
+    for value in values:
+        if value is not None and value != "":
+            return value
+    return None
+
+
 def normalize_optional_bool(value):
     if isinstance(value, bool) or value is None:
         return value
@@ -4348,34 +4769,6 @@ def normalize_optional_bool(value):
     if text in {"false", "no", "n", "0", "out of stock", "unavailable", "sold out"}:
         return False
     return None
-
-
-def rendered_store_context_status(driver, store_key, full_address, store_location=None):
-    expected_zip = extract_zip_code(full_address) or extract_zip_code((store_location or {}).get("address", ""))
-    if not expected_zip:
-        return {"ok": True, "message": ""}
-
-    try:
-        text = driver.execute_script("return document.body && document.body.innerText || '';")
-    except Exception:
-        text = ""
-
-    context_text = clean_text(text[:2500])
-    if expected_zip in context_text:
-        return {"ok": True, "message": "", "context_text": context_text}
-
-    found_zips = unique_texts(re.findall(r"\b\d{5}\b", context_text))
-    if not found_zips:
-        return {"ok": True, "message": "", "context_text": context_text}
-
-    return {
-        "ok": False,
-        "message": (
-            f"{(store_key or 'Store').title()} rendered with a different visible store ZIP. "
-            f"Expected {expected_zip} from the saved Full Address, found {', '.join(found_zips) or 'no ZIP'}."
-        ),
-        "context_text": context_text,
-    }
 
 
 def search_meijer_products_with_reader(
@@ -5741,10 +6134,15 @@ def build_candidate(
         "home_location": home_location,
         "product_name": product_name,
         "brand": "",
+        "product_category": "",
+        "package_count": "",
+        "product_id": "",
         "price": price,
         "size": "",
         "package_size": "",
         "unit_price": "",
+        "pickup_available": None,
+        "delivery_available": None,
         "image_url": image_url,
         "embedded_image_base64": "",
         "product_url": product_url,
@@ -5756,6 +6154,8 @@ def build_candidate(
         "viable": True,
         "ranking_reasons": [],
         "skip_reasons": [],
+        "store_localization": {},
+        "proof_of_store_selection": [],
     }
     annotated = annotate_product_food_rules({
         "name": product_name,
@@ -6351,6 +6751,9 @@ def final_product_candidate_payload(candidate):
         "rendered_page_visible_text_length": candidate.get("rendered_page_visible_text_length", 0),
         "product_name": candidate.get("product_name", ""),
         "brand": candidate.get("brand", ""),
+        "product_category": candidate.get("product_category", ""),
+        "package_count": candidate.get("package_count", ""),
+        "product_id": candidate.get("product_id", ""),
         "requested_quantity": candidate.get("requested_quantity", ""),
         "quantity_fit": candidate.get("quantity_fit", {}),
         "size_count": product_size(candidate),
@@ -6369,6 +6772,10 @@ def final_product_candidate_payload(candidate):
         "embedded_image_base64_length": len(embedded_image),
         "availability": candidate.get("availability", ""),
         "in_stock": candidate.get("in_stock"),
+        "pickup_available": candidate.get("pickup_available"),
+        "delivery_available": candidate.get("delivery_available"),
+        "store_localization": candidate.get("store_localization", {}),
+        "proof_of_store_selection": candidate.get("proof_of_store_selection", []),
         "ranking_status": candidate.get("ranking_status", ""),
         "rejection_reason": candidate.get("rejection_reason", ""),
         "egg_product": candidate.get("egg_product", {}),
