@@ -257,19 +257,21 @@ function renderProductDownloadRow(row, index) {
     const promptButtonHtml = selected
         ? progressPromptButtonHtml(row, selected)
         : "";
+    const selectedLabel = row.selected_is_overall ? "Picked" : "Store Pick";
+    const selectedRole = row.selected_is_overall ? "picked" : "store pick";
     const selectedMeta = selected
         ? [
             selected.requested_quantity ? `need ${selected.requested_quantity}` : "",
             selected.price || row.selected_price || "Price unavailable",
             selected.size || "",
             selected.unit_price || "",
-            row.selected_is_overall ? "picked" : "store best",
+            selectedRole,
         ].filter(Boolean).join(" | ")
         : "";
     const selectedHtml = selectedName
         ? `
             <div class="bulk-picked-product${row.selected_is_overall ? " overall" : ""}">
-                <span class="bulk-picked-label">${row.selected_is_overall ? "Picked" : "Best"}</span>
+                <span class="bulk-picked-label">${selectedLabel}</span>
                 ${selectedUrl
                     ? `<a class="bulk-picked-link" href="${escapeAttribute(selectedUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(selectedName)}</a>`
                     : `<span class="bulk-picked-name">${escapeHtml(selectedName)}</span>`

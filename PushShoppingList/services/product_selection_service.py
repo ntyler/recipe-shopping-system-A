@@ -91,6 +91,37 @@ QUALIFIER_TOKENS = {
 TOKEN_ALIASES = {
     "yoghurt": "yogurt",
 }
+WHOLE_ITEM_FALLBACK_AVOID_TERMS = {
+    "ade",
+    "bar",
+    "beverage",
+    "cake",
+    "cleaner",
+    "cookie",
+    "drink",
+    "extract",
+    "filling",
+    "frosting",
+    "gatorade",
+    "juice",
+    "lemonade",
+    "limeade",
+    "marinade",
+    "mix",
+    "scent",
+    "seasoning",
+    "soda",
+    "tea",
+}
+WHOLE_ITEM_PACKAGE_TERMS = {
+    "bag",
+    "bunch",
+    "each",
+    "large",
+    "package",
+    "pkg",
+    "whole",
+}
 DETAIL_REQUIRED = os.getenv("PRODUCT_REQUIRE_DETAIL_PAGE", "1") != "0"
 BROWSER_SEARCH_MODE = os.getenv("PRODUCT_SEARCH_BROWSER_MODE", "always").strip().lower()
 PRODUCT_ANALYSIS_MODEL = os.getenv("OPENAI_PRODUCT_ANALYSIS_MODEL", os.getenv("OPENAI_RECIPE_MODEL", "gpt-4o-mini"))
@@ -789,7 +820,103 @@ def clear_product_choices():
 
 
 def product_choices_by_item():
-    return load_product_choices().get("items", {})
+    return hydrate_saved_product_choices(load_product_choices().get("items", {}))
+
+
+def hydrate_saved_product_choices(items):
+    if not isinstance(items, dict):
+        return {}
+
+    return {
+        item_key: hydrate_saved_product_choice(choice)
+        for item_key, choice in items.items()
+        if isinstance(choice, dict)
+    }
+
+
+def hydrate_saved_product_choice(choice):
+    store_results_list = choice.get("store_results_list", [])
+    candidates = choice.get("candidates", [])
+
+    if not store_results_list or not candidates:
+        return choice
+
+    ingredient = choice.get("ingredient") or choice.get("item_key") or ""
+    hydrated_results = []
+    changed = False
+
+    for store_result in store_results_list:
+        if not isinstance(store_result, dict):
+            hydrated_results.append(store_result)
+            continue
+
+        hydrated = store_result
+        if not store_result.get("best_product"):
+            store_key = store_result.get("store_key", "")
+            store_candidates = [
+                candidate
+                for candidate in candidates
+                if isinstance(candidate, dict) and candidate.get("store_key") == store_key
+            ]
+            viable_candidates = [
+                candidate
+                for candidate in store_candidates
+                if candidate.get("viable")
+            ]
+            best = viable_candidates[0] if viable_candidates else best_available_store_candidate(
+                ingredient,
+                store_candidates,
+            )
+
+            if best:
+                hydrated = hydrate_store_result_best_product(
+                    store_result,
+                    best,
+                    ingredient,
+                    viable=bool(best.get("viable") is not False),
+                )
+                changed = True
+
+        hydrated_results.append(hydrated)
+
+    if not changed:
+        return choice
+
+    hydrated_choice = dict(choice)
+    hydrated_choice["store_results_list"] = hydrated_results
+    hydrated_choice["store_results"] = {
+        result.get("store_key"): result
+        for result in hydrated_results
+        if isinstance(result, dict) and result.get("store_key")
+    }
+    return hydrated_choice
+
+
+def hydrate_store_result_best_product(store_result, best, ingredient, viable=True):
+    store_name = store_result.get("store_name") or best.get("store_name", "")
+    best = dict(best)
+    reason = best.get("reason_selected") or (
+        product_selection_reason(best, store_name)
+        if viable
+        else best_available_product_reason(ingredient, best, store_name)
+    )
+    best["reason_selected"] = reason
+    best["selected_reason"] = reason
+
+    hydrated = dict(store_result)
+    hydrated.update({
+        "best_product_id": best.get("id", ""),
+        "best_product": best,
+        "best_product_is_viable": viable,
+        "best_product_match": best.get("product_name", ""),
+        "price": best.get("price", ""),
+        "size": product_size(best),
+        "unit_price": best.get("unit_price", ""),
+        "product_url": best.get("product_url", ""),
+        "image_url": best.get("image_url", ""),
+        "reason_selected": reason,
+    })
+    return hydrated
 
 
 def product_choice_for_item(item_key, store_key=None):
@@ -1366,12 +1493,20 @@ def build_store_product_results(ingredient, raw_store_results, ranked_candidates
             for candidate in store_candidates
             if candidate.get("viable")
         ]
-        best = viable_candidates[0] if viable_candidates else None
+        best = viable_candidates[0] if viable_candidates else best_available_store_candidate(
+            ingredient,
+            store_candidates,
+        )
+        best_is_viable = bool(best and best.get("viable") is not False)
 
         if best:
-            best["reason_selected"] = product_selection_reason(best, store_name)
+            best["reason_selected"] = (
+                product_selection_reason(best, store_name)
+                if best_is_viable
+                else best_available_product_reason(ingredient, best, store_name)
+            )
             best["selected_reason"] = best["reason_selected"]
-            skip_reason = ""
+            skip_reason = "" if best_is_viable else store_skip_reason(store_name, raw, store_candidates)
         else:
             skip_reason = store_skip_reason(store_name, raw, store_candidates)
 
@@ -1391,6 +1526,7 @@ def build_store_product_results(ingredient, raw_store_results, ranked_candidates
             "store_location_distance_miles": raw.get("store_location_distance_miles"),
             "best_product_id": best.get("id") if best else "",
             "best_product": best,
+            "best_product_is_viable": best_is_viable,
             "best_product_match": best.get("product_name") if best else "",
             "price": best.get("price") if best else "",
             "size": product_size(best) if best else "",
@@ -1471,6 +1607,105 @@ def group_raw_store_results_by_store(raw_store_results):
                 record[key_name] = raw.get(key_name)
 
     return sorted(grouped.values(), key=lambda item: item.get("index", 0))
+
+
+def best_available_store_candidate(ingredient, candidates):
+    direct_candidates = [
+        candidate
+        for candidate in candidates
+        if candidate.get("source") != "search-page-fallback"
+        and candidate_has_direct_product_url(candidate)
+    ]
+    pool = direct_candidates or [
+        candidate
+        for candidate in candidates
+        if candidate.get("source") != "search-page-fallback"
+    ]
+
+    if not pool:
+        return None
+
+    return max(
+        pool,
+        key=lambda candidate: best_available_store_candidate_score(ingredient, candidate),
+    )
+
+
+def best_available_store_candidate_score(ingredient, candidate):
+    match = best_ingredient_candidate_match(ingredient, candidate)
+    name_tokens = set(tokenize(candidate.get("product_name", "")))
+    score = 0.0
+
+    score += 140 if match.get("exact_name_match") else 0
+    score += 70 if match.get("exact_phrase_match") else 0
+    score += match.get("name_token_ratio", 0) * 120
+    score += match.get("token_ratio", 0) * 60
+    score += max(-80, min(80, safe_float(candidate.get("score")) or 0)) * 0.2
+
+    if candidate_has_direct_product_url(candidate):
+        score += 45
+
+    if candidate.get("price"):
+        score += 8
+
+    if candidate.get("detail_evaluated"):
+        score += 8
+
+    if is_plain_whole_item_request(ingredient):
+        if name_tokens & WHOLE_ITEM_FALLBACK_AVOID_TERMS:
+            score -= 120
+        if name_tokens & WHOLE_ITEM_PACKAGE_TERMS:
+            score += 20
+
+    if candidate.get("viable") is False:
+        score -= 8
+
+    return score
+
+
+def is_plain_whole_item_request(ingredient):
+    tokens = set(tokenize(ingredient))
+
+    if not tokens:
+        return False
+
+    product_form_terms = {
+        "bar",
+        "broth",
+        "cream",
+        "dough",
+        "extract",
+        "flour",
+        "juice",
+        "mix",
+        "oil",
+        "powder",
+        "sauce",
+        "seasoning",
+        "sugar",
+    }
+    return not bool(tokens & product_form_terms)
+
+
+def best_available_product_reason(ingredient, candidate, store_name=""):
+    reasons = []
+    if candidate_has_direct_product_url(candidate):
+        reasons.append("direct product link")
+    if candidate.get("price"):
+        reasons.append("visible price")
+
+    match = best_ingredient_candidate_match(ingredient, candidate)
+    if match.get("exact_phrase_match") or match.get("name_token_ratio", 0) >= 0.8:
+        reasons.append("closest product-name match")
+
+    skip_reasons = candidate.get("skip_reasons", [])
+    if skip_reasons:
+        reasons.append("strict-rule issue: " + skip_reasons[0])
+
+    return "Best available {store} candidate: {reasons}.".format(
+        store=store_name or "store",
+        reasons="; ".join(reasons) if reasons else "highest fallback match",
+    )
 
 
 def product_selection_reason(candidate, store_name=""):

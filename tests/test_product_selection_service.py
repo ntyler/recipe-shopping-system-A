@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 import PushShoppingList.services.product_selection_service as product_service
 from PushShoppingList.services.product_selection_service import build_product_download_plan
+from PushShoppingList.services.product_selection_service import build_product_choice_record_from_results
 from PushShoppingList.services.product_selection_service import build_final_product_selection_prompt
 from PushShoppingList.services.product_selection_service import candidate_has_direct_product_url
 from PushShoppingList.services.product_selection_service import home_address_geocode_queries
@@ -191,6 +192,81 @@ class ProductSelectionServiceTest(unittest.TestCase):
 
         self.assertIn("Total shopping-list quantity needed:\n1", prompt)
         self.assertIn("least practical excess/waste", prompt)
+
+    def test_store_result_has_best_available_pick_when_no_candidate_is_viable(self):
+        drink = candidate("Gatorade Lemon Lime")
+        drink.update({
+            "id": "drink",
+            "store_key": "aldi",
+            "store_name": "Aldi",
+            "score": 60,
+            "viable": False,
+            "food_rule_status": {"missing_required": ["must be organic"], "blocked_by": []},
+            "skip_reasons": ["Missing required food preference: must be organic"],
+        })
+        lemons = candidate("Lemons, Bag")
+        lemons.update({
+            "id": "lemons",
+            "store_key": "aldi",
+            "store_name": "Aldi",
+            "score": -68,
+            "viable": False,
+            "package_size": "2 lb",
+            "food_rule_status": {"missing_required": ["must be organic"], "blocked_by": []},
+            "skip_reasons": ["Missing required food preference: must be organic"],
+        })
+
+        record = build_product_choice_record_from_results(
+            "lemon",
+            [
+                {
+                    "index": 0,
+                    "store_key": "aldi",
+                    "store_name": "Aldi",
+                    "candidates": [drink, lemons],
+                    "skip_reasons": [],
+                }
+            ],
+            "5905 Arlo Drive, Indianapolis, IN 46237",
+            quantity_context={"display": "1", "sources": []},
+        )
+        store_result = record["store_results"]["aldi"]
+
+        self.assertEqual(store_result["best_product"]["product_name"], "Lemons, Bag")
+        self.assertFalse(store_result["best_product_is_viable"])
+        self.assertEqual(store_result["valid_candidate_count"], 0)
+        self.assertEqual(record["selected_product_id"], "")
+
+    def test_saved_choice_hydrates_store_pick_from_saved_candidates(self):
+        lemons = candidate("Lemons, Bag")
+        lemons.update({
+            "id": "aldi-lemons",
+            "store_key": "aldi",
+            "store_name": "Aldi",
+            "viable": False,
+            "food_rule_status": {"missing_required": ["must be organic"], "blocked_by": []},
+            "skip_reasons": ["Missing required food preference: must be organic"],
+        })
+        choice = {
+            "item_key": "lemon",
+            "ingredient": "lemon",
+            "candidates": [lemons],
+            "store_results_list": [
+                {
+                    "store_key": "aldi",
+                    "store_name": "Aldi",
+                    "candidate_count": 1,
+                    "valid_candidate_count": 0,
+                }
+            ],
+        }
+
+        hydrated = product_service.hydrate_saved_product_choice(choice)
+        store_result = hydrated["store_results"]["aldi"]
+
+        self.assertEqual(store_result["best_product"]["product_name"], "Lemons, Bag")
+        self.assertEqual(store_result["best_product_id"], "aldi-lemons")
+        self.assertFalse(store_result["best_product_is_viable"])
 
     def test_progress_rows_include_selected_product_details(self):
         with TemporaryDirectory() as tmp_dir:

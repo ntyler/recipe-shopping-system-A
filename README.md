@@ -1,6 +1,6 @@
 # Recipe Shopping System
 
-Self-hosted recipe-to-shopping-list automation platform with recipe extraction, ingredient parsing, shopping list management, store selection, product lookup, food-rule review markers, and a mobile-friendly Flask UI.
+Self-hosted recipe-to-shopping-list automation platform with recipe extraction, ingredient parsing, shopping list management, store selection, product lookup, ChatGPT-assisted best-product selection, food-rule review markers, and a mobile-friendly Flask UI.
 
 ## Requirements
 
@@ -60,12 +60,25 @@ $env:DISABLE_RECIPE_PDF_ARCHIVE="1"
 $env:FORCE_OPENAI_RECIPE_EXTRACTION="1"
 ```
 
+Optional app and product-lookup controls:
+
+```powershell
+$env:SHOPPING_APP_PORT="5058"
+$env:PRODUCT_SEARCH_WORKERS="2"
+$env:PRODUCT_DETAIL_LIMIT_PER_STORE="4"
+$env:PRODUCT_AI_ANALYSIS_LIMIT_PER_STORE="2"
+$env:PRODUCT_FINAL_SELECTION_CANDIDATES="18"
+$env:PRODUCT_AI_BROWSER_WAIT_SECONDS="4"
+```
+
 Notes:
 
 - Leave `DISABLE_BROWSER_RECIPE_FETCH` unset unless you do not want Selenium/Chrome fallback.
 - Leave `DISABLE_RECIPE_HTML_CACHE_FALLBACK` unset if you want the app to reuse cached recipe HTML when a live page fails.
 - Leave `DISABLE_RECIPE_PDF_ARCHIVE` unset if you want each extracted recipe page saved as a PDF for later review.
 - Set `FORCE_OPENAI_RECIPE_EXTRACTION=1` only when you want the OpenAI extractor used even if recipe-card HTML already has enough structured data.
+- Leave `SHOPPING_APP_PORT` unset when running `py -3.11 app.py` directly and you want the default Flask port `5000`. The included `start_app.bat` currently sets `SHOPPING_APP_PORT=5058`.
+- Product lookup uses `OPENAI_API_KEY` for fully loaded product-page analysis and final best-product selection. If no key is set, the app still parses product candidates but skips ChatGPT product analysis.
 
 On Windows, you can make variables persistent with:
 
@@ -90,10 +103,18 @@ Then open:
 http://127.0.0.1:5000
 ```
 
+That direct command uses the default port `5000` unless `SHOPPING_APP_PORT` is set.
+
 Or use:
 
 ```powershell
 .\start_app.bat
+```
+
+The included launcher currently sets `SHOPPING_APP_PORT=5058`, so it opens:
+
+```text
+http://127.0.0.1:5058
 ```
 
 The app also listens on your LAN address, so another device on the same Wi-Fi can open:
@@ -102,10 +123,36 @@ The app also listens on your LAN address, so another device on the same Wi-Fi ca
 http://<computer-lan-ip>:5000
 ```
 
+If you use `start_app.bat`, replace `5000` with `5058`.
+
 Example from the current setup:
 
 ```text
-http://192.168.68.62:5000
+http://192.168.68.62:5058
+```
+
+## Best Product Lookup
+
+The **Grab Best Products** button searches the activated stores near the saved Full Address for every shopping-list item. The current workflow is:
+
+1. Build store search URLs for each item and enabled store.
+2. Load rendered search pages and collect direct product candidates.
+3. Open a limited number of full product pages per store.
+4. Send fully loaded product-page evidence to the ChatGPT API when `OPENAI_API_KEY` is available.
+5. Rank candidates using saved food rules, direct product links, visible price, product-page evidence, store distance, and the total quantity needed for the ingredient.
+6. Save one overall strict-rule winner plus one store-level pick for each activated store that returned candidates.
+
+The UI shows:
+
+- `Picked`: the overall strict-rule product selected across stores.
+- `Store Pick`: the best direct product found for that store. If the product does not satisfy strict rules, it can still be shown as the store's best available candidate while preserving the rule issue in the saved choice.
+- Product names as direct links to product pages, not search pages, whenever a direct product URL is available.
+- A `Prompt` button on picked products so you can inspect the prompt sent to the ChatGPT API.
+
+Product choice state is saved in:
+
+```text
+PushShoppingList/services/recipe-extractor/data/product_choices.json
 ```
 
 ## Tailscale Access
@@ -114,7 +161,7 @@ The Flask app listens on all network interfaces:
 
 ```python
 host="0.0.0.0"
-port=5000
+port=int(os.getenv("SHOPPING_APP_PORT", "5000"))
 ```
 
 ### Tailnet-Only Access
@@ -122,7 +169,7 @@ port=5000
 Use Tailscale Serve when you only want devices in your Tailscale tailnet to reach the app:
 
 ```powershell
-tailscale serve --bg http://127.0.0.1:5000
+tailscale serve --bg http://127.0.0.1:5058
 tailscale serve status
 ```
 
@@ -143,7 +190,7 @@ tailscale serve --https=443 off
 Use Tailscale Funnel when you want the Flask app reachable from outside your tailnet:
 
 ```powershell
-tailscale funnel --bg --yes http://127.0.0.1:5000
+tailscale funnel --bg --yes http://127.0.0.1:5058
 tailscale funnel status
 ```
 
@@ -177,16 +224,22 @@ Recommended setup:
 http://<computer-mesh-ip>:5000
 ```
 
+If you use the included launcher, use port `5058` instead:
+
+```text
+http://<computer-mesh-ip>:5058
+```
+
 Examples:
 
 ```text
-http://100.x.y.z:5000
-http://10.x.y.z:5000
+http://100.x.y.z:5058
+http://10.x.y.z:5058
 ```
 
 ## HTTPS / Secure Page Access
 
-Phone GPS/geolocation requires a secure browser origin. `http://<ip>:5000` will show as **Not Secure**, so mobile browsers may block `Use My Location`.
+Phone GPS/geolocation requires a secure browser origin. `http://<ip>:5000` or `http://<ip>:5058` will show as **Not Secure**, so mobile browsers may block `Use My Location`.
 
 Tailscale Serve and Tailscale Funnel provide HTTPS at:
 
@@ -197,13 +250,15 @@ https://desktop-in7s09s.tail906b20.ts.net/
 Quick test with Flask's temporary self-signed certificate:
 
 ```powershell
-.\start_app_https_adhoc.bat
+$env:SHOPPING_APP_SSL_ADHOC="1"
+$env:SHOPPING_APP_PORT="5058"
+py -3.11 app.py
 ```
 
 Then open:
 
 ```text
-https://<computer-ip>:5000
+https://<computer-ip>:5058
 ```
 
 Your browser will warn because the certificate is self-signed. For the most reliable phone experience, use one of these:
@@ -217,6 +272,7 @@ py -3.11 app.py
 ```
 
 - A trusted HTTPS tunnel such as Tailscale Funnel, Cloudflare Tunnel, or ngrok pointed at `http://127.0.0.1:5000`.
+- For the included `start_app.bat`, point the tunnel at `http://127.0.0.1:5058`.
 
 Do not expose this app publicly unless you add authentication, keep the tunnel private, or only run public access temporarily.
 
@@ -224,7 +280,7 @@ If the phone cannot connect:
 
 - Confirm both devices are online in the mesh/VPN app.
 - Allow Python/Flask through Windows Firewall for private networks.
-- Make sure nothing else is already using port `5000`.
+- Make sure nothing else is already using the port you started Flask on, usually `5000` for direct runs or `5058` for `start_app.bat`.
 - Use the mesh IP, not `127.0.0.1`; `127.0.0.1` only works on the same device.
 
 ## ntfy Notifications
@@ -258,6 +314,8 @@ Common files:
 - `shopping_item_state.json`: checked items, selected stores, and manual item quantities
 - `store_settings.json`: store list and enabled stores
 - `extract_progress.json`: current extraction progress for the overlay
+- `product_choices.json`: saved product candidates, per-store picks, overall picked products, direct product links, and ChatGPT prompt metadata
+- `product_progress.json`: current Grab Best Products progress overlay state
 - `pdf/*.pdf`: archived recipe PDFs created during extraction, including webpage PDFs, upload PDFs, and video caption/transcript PDFs
 - `output/*.json`: extracted recipe JSON output
 - `output/sorted_ingredients.txt`: sorted shopping-list text
@@ -271,3 +329,5 @@ If a website returns `403 Forbidden`, the app tries Chrome/Selenium fallback unl
 If browser fallback hangs or fails, make sure Chrome is installed and updated. Some recipe sites still block automated browsers.
 
 If phone and computer do not show the same progress, use the mesh IP URL on both devices and confirm both are hitting the same Flask server.
+
+If product lookup returns candidates but does not select a strict-rule winner, check the saved food rules and the product's `skip_reasons` in the Alternatives modal. Required food rules remain strict, but each store can still show a best available direct product as `Store Pick`.
