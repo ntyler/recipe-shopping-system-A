@@ -111,7 +111,7 @@ def test_grab_products(job_id=None):
     if job_id:
         update_product_progress_summary(
             job_id,
-            "Test Grab: opening a visible Chrome window, selecting localized ALDI inventory, and searching eggs.",
+            "Test Grab: loading localized ALDI inventory with Selenium and searching eggs.",
         )
 
     result = search_store_products_for_download(
@@ -174,7 +174,11 @@ def test_grab_products(job_id=None):
 
 
 def test_grab_browser_visible():
-    return os.getenv("TEST_GRAB_HEADLESS") != "1"
+    return env_truthy(os.getenv("TEST_GRAB_VISIBLE", ""))
+
+
+def env_truthy(value):
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def test_grab_visual_pause_seconds():

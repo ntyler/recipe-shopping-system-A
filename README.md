@@ -160,19 +160,19 @@ The UI shows:
 - A `Prompt` button on store picks and picked products so you can inspect the extracted-card prompt sent to the ChatGPT API. Full prompts are stored under `raw/product_prompts/` and loaded only when requested.
 - Manual alternative selections persist as `selected_by_user` with `selected_at`.
 
-The **Test Grab** button is an isolated diagnostic run backed by `PushShoppingList/scripts/test_grab_aldi_eggs.py`. It does not update the normal saved product choices. It searches only ALDI for `eggs` from the saved current Full Address, requires localized store-session proof before product extraction, uses the dedicated edible-egg ranking prompt, opens a visible Chrome window so you can watch the store selection/search/scrolling steps, and saves the last diagnostic payload to:
+The **Test Grab** button is an isolated diagnostic run backed by `PushShoppingList/scripts/test_grab_aldi_eggs.py`. It does not update the normal saved product choices. It searches only ALDI for `eggs` from the saved current Full Address, requires localized store-session proof before product extraction, uses the dedicated edible-egg ranking prompt, runs Selenium/Chrome headlessly by default, and saves the last diagnostic payload to:
 
 ```text
 PushShoppingList/services/recipe-extractor/data/test_grab_result.json
 ```
 
-You can run the same visible diagnostic directly:
+You can run the same diagnostic directly:
 
 ```powershell
 py -3.11 PushShoppingList\scripts\test_grab_aldi_eggs.py
 ```
 
-Set `TEST_GRAB_HEADLESS=1` to hide the browser, `TEST_GRAB_VISUAL_PAUSE_SECONDS` to slow each visible step, or `TEST_GRAB_VISUAL_HOLD_SECONDS` to keep the browser open longer before it closes.
+Set `TEST_GRAB_VISIBLE=1` only when you want to watch Chrome. When visible mode is enabled, `TEST_GRAB_VISUAL_PAUSE_SECONDS` slows each step and `TEST_GRAB_VISUAL_HOLD_SECONDS` keeps the browser open longer before it closes.
 
 Product choice state is saved in:
 
