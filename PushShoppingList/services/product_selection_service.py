@@ -63,7 +63,6 @@ MEIJER_PRODUCT_URL_PATTERN = re.compile(r"https://www\.meijer\.com/shopping/prod
 PRODUCT_PROGRESS_LOCK = threading.RLock()
 PRODUCT_FINAL_STATES = {"done", "failed", "skipped", "cancelled"}
 PRODUCT_BROWSER_FETCH_LOCK = threading.BoundedSemaphore(1)
-TEST_GRAB_HOME_ADDRESS = "5905 Arlo Drive Apt 2213\nIndianapolis, IN 46237\nUSA"
 TEST_GRAB_TARGET_STORE_KEY = "aldi"
 TEST_GRAB_TARGET_STORE_NAME = "Aldi"
 TEST_GRAB_TARGET_PRODUCT = "Edible grocery eggs"
@@ -1579,7 +1578,8 @@ def grab_best_products(items=None, job_id=None):
 
 def test_grab_products(job_id=None):
     ingredient = TEST_GRAB_SEARCH_TERM
-    full_address = TEST_GRAB_HOME_ADDRESS
+    home_address = load_home_address()
+    full_address = home_address.get("full_address", "")
     store_settings = load_store_settings()
     stores = store_settings.get("stores", {})
     store = stores.get(TEST_GRAB_TARGET_STORE_KEY)
@@ -4884,9 +4884,7 @@ CORE BEHAVIOR RULES:
 - Do not browse, fetch, or infer from outside websites.
 
 USER LOCATION:
-5905 Arlo Drive Apt 2213
-Indianapolis, IN 46237
-USA
+{full_address}
 
 TARGET PRODUCT:
 Edible grocery eggs
@@ -4976,7 +4974,7 @@ Cleaned rendered product HTML/content:
 Return clean structured JSON only:
 {{
   "timestamp": "",
-  "home_address": "5905 Arlo Drive Apt 2213, Indianapolis, IN 46237, USA",
+  "home_address": "{full_address}",
   "searched_store": {{
     "store_name": "",
     "store_address": "",
@@ -8152,7 +8150,7 @@ def home_address_geocode_queries(full_address):
             variants.append(value)
 
     without_unit = re.sub(
-        r"\s+(?:apt|apartment|unit|suite|ste|#)\s*[A-Za-z0-9-]+(?=,|$)",
+        r"\s+(?:(?:apt|apartment|unit|suite|ste)\b|#)\s*[A-Za-z0-9-]+",
         "",
         text,
         flags=re.IGNORECASE,

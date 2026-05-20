@@ -398,7 +398,7 @@ async function testGrabProducts(event) {
     showProductsOverlay();
     setProductsOverlayState(
         "Preparing isolated Test Grab...",
-        "Testing ALDI eggs only from 5905 Arlo Drive Apt 2213, Indianapolis, IN 46237.",
+        "Testing ALDI eggs only, using the saved current Full Address.",
         3,
         []
     );
