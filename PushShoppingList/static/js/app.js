@@ -98,6 +98,7 @@ function setProductsOverlayState(status, summary = "", percent = 0, rows = []) {
 
 function renderProductProgressRow(row, index) {
     const selected = row.selected_product || null;
+    const isTestGrab = Boolean(row.test_grab);
     const skip = (row.skip_reasons || [])[0] || "";
     const productUrl = selected && selected.product_url && selected.product_url !== selected.search_url
         ? selected.product_url
@@ -107,9 +108,19 @@ function renderProductProgressRow(row, index) {
     const selectedHtml = productUrl
         ? `<a class="bulk-product-name bulk-product-name-link" href="${escapeAttribute(productUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(selectedName)}</a>`
         : `<div class="bulk-product-name">${escapeHtml(selectedName)}</div>`;
-    const promptButtonHtml = selected
+    const promptButtonHtml = selected && !isTestGrab
         ? progressPromptButtonHtml(row, selected)
         : "";
+    const alternativesButtonHtml = isTestGrab
+        ? ""
+        : `
+            <button type="button"
+                    class="bulk-alt-toggle"
+                    data-item-key="${escapeAttribute(row.item_key || "")}"
+                    onclick="openProductAlternatives(this)">
+                Alternatives
+            </button>
+        `;
 
     return `
         <div class="bulk-progress-item">
@@ -127,12 +138,7 @@ function renderProductProgressRow(row, index) {
                 <div class="bulk-product-status">${escapeHtml(selected ? selected.store_name : "")}</div>
                 ${promptButtonHtml}
             </div>
-            <button type="button"
-                    class="bulk-alt-toggle"
-                    data-item-key="${escapeAttribute(row.item_key || "")}"
-                    onclick="openProductAlternatives(this)">
-                Alternatives
-            </button>
+            ${alternativesButtonHtml}
         </div>
     `;
 }
@@ -254,7 +260,7 @@ function renderProductDownloadRow(row, index) {
         ? selected.product_url
         : "";
     const selectedName = selected ? (selected.product_name || row.selected_name || "") : "";
-    const promptButtonHtml = selected
+    const promptButtonHtml = selected && !row.test_grab
         ? progressPromptButtonHtml(row, selected)
         : "";
     const selectedLabel = row.selected_is_overall ? "Picked" : "Store Pick";
@@ -375,6 +381,73 @@ async function grabBestProducts(event) {
         if (button) {
             button.disabled = false;
             button.textContent = originalText || "Grab Best Products";
+        }
+    }
+
+    return false;
+}
+
+async function testGrabProducts(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = form ? form.querySelector("button") : null;
+    const originalText = button ? button.textContent : "";
+    const jobId = newProductJobId();
+    activeProductJobId = jobId;
+
+    showProductsOverlay();
+    setProductsOverlayState(
+        "Preparing isolated Test Grab...",
+        "Testing ALDI eggs only from 5905 Arlo Drive Apt 2213, Indianapolis, IN 46237.",
+        3,
+        []
+    );
+    startProductProgressPolling(jobId);
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Testing...";
+    }
+
+    let data = null;
+    try {
+        const formData = new FormData(form);
+        formData.set("ajax", "1");
+        formData.set("job_id", jobId);
+        const response = await fetch(form.action, {
+            method: "POST",
+            headers: {
+                "X-Requested-With": "fetch",
+            },
+            body: formData,
+        });
+        data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            const errors = data && Array.isArray(data.errors) ? data.errors.filter(Boolean).join(" ") : "";
+            throw new Error(errors || (data && data.error) || "Unable to complete Test Grab.");
+        }
+
+        stopProductProgressPolling();
+        setProductsOverlayState(
+            "Test Grab complete.",
+            `ALDI eggs test selected ${data.selected_count || 0} best product. Result saved to ${data.result_path || "test_grab_result.json"}.`,
+            100,
+            data.results || []
+        );
+    } catch (err) {
+        console.warn("Unable to complete Test Grab.", err);
+        stopProductProgressPolling();
+        setProductsOverlayState(
+            "Unable to complete Test Grab.",
+            err.message || "Test Grab failed.",
+            100,
+            data && Array.isArray(data.results) ? data.results : []
+        );
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = originalText || "Test Grab";
         }
     }
 

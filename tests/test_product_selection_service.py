@@ -282,6 +282,38 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("Large Eggs", prompt)
         self.assertIn("best|alternative|rejected", prompt)
 
+    def test_test_grab_prompt_is_isolated_to_aldi_eggs(self):
+        prompt = product_service.build_test_grab_eggs_aldi_prompt(
+            "eggs",
+            "Aldi",
+            "5905 Arlo Drive Apt 2213\nIndianapolis, IN 46237\nUSA",
+            {"address": "Indianapolis, IN 46237", "distance_miles": 2.2},
+            {
+                "url": "https://www.aldi.us/store/aldi/s?k=eggs&zipcode=46237",
+                "prompt_html": "<article>Simply Nature Organic Cage Free Brown Eggs 12 ct $4.69</article>",
+                "localization": {
+                    "verified": True,
+                    "store_name": "Aldi",
+                    "store_address": "Indianapolis, IN 46237",
+                    "proof_of_store_selection": ["Visible store ZIP/postal code: 46237."],
+                },
+            },
+            [
+                {
+                    "name": "Simply Nature Organic Cage Free Brown Eggs",
+                    "price": "$4.69",
+                    "product_url": "https://www.aldi.us/store/aldi/products/eggs",
+                    "text": "Simply Nature Organic Cage Free Brown Eggs 12 ct $4.69",
+                }
+            ],
+        )
+
+        self.assertIn("TARGET PRODUCT:\nEdible grocery eggs", prompt)
+        self.assertIn("5905 Arlo Drive Apt 2213", prompt)
+        self.assertIn("STRICTLY EXCLUDE Easter eggs", prompt)
+        self.assertIn("liquid eggs", prompt)
+        self.assertIn("Simply Nature Organic Cage Free Brown Eggs", prompt)
+
     def test_rendered_html_agent_response_normalizes_candidates(self):
         data = {
             "best_product": {"product_name": "Large Eggs", "product_url": "/eggs"},

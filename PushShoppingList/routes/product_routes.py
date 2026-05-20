@@ -16,6 +16,7 @@ from PushShoppingList.services.product_selection_service import product_choice_f
 from PushShoppingList.services.product_selection_service import product_choices_by_item
 from PushShoppingList.services.product_selection_service import product_prompt_for_item
 from PushShoppingList.services.product_selection_service import select_product_choice
+from PushShoppingList.services.product_selection_service import test_grab_products
 from PushShoppingList.services.rules_display_service import save_home_store_rule_text
 from PushShoppingList.services.rules_display_service import save_rules_display_section
 from PushShoppingList.services.store_settings_service import save_enabled_stores
@@ -118,6 +119,22 @@ def api_grab_best_products_route():
     items = data.get("items") if isinstance(data.get("items"), list) else None
 
     return jsonify(grab_best_products(items=items, job_id=data.get("job_id")))
+
+
+@product_bp.route("/test_grab_products", methods=["POST"])
+def test_grab_products_route():
+    result = test_grab_products(job_id=request.form.get("job_id"))
+
+    if wants_json_response():
+        return jsonify(result)
+
+    return redirect("/")
+
+
+@product_bp.route("/api/test_grab_products", methods=["POST"])
+def api_test_grab_products_route():
+    data = request.get_json(silent=True) or {}
+    return jsonify(test_grab_products(job_id=data.get("job_id")))
 
 
 @product_bp.route("/api/product_progress")

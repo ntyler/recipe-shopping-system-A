@@ -44,6 +44,10 @@
                 <button type="submit" class="grab-products-btn view-action-btn">Grab Best Products</button>
             </form>
 
+            <form class="view-action-form" method="POST" action="/test_grab_products" onsubmit="return testGrabProducts(event);">
+                <button type="submit" class="grab-products-btn view-action-btn">Test Grab</button>
+            </form>
+
             <form class="view-action-form" method="POST" action="/clear_product_picks" onsubmit="return clearProductPicks(event);">
                 <button type="submit" class="clear-products-btn view-action-btn">Clear Product Picks</button>
             </form>

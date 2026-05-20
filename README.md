@@ -160,6 +160,12 @@ The UI shows:
 - A `Prompt` button on store picks and picked products so you can inspect the extracted-card prompt sent to the ChatGPT API. Full prompts are stored under `raw/product_prompts/` and loaded only when requested.
 - Manual alternative selections persist as `selected_by_user` with `selected_at`.
 
+The **Test Grab** button is an isolated diagnostic run. It does not update the normal saved product choices. It searches only ALDI for `eggs` from `5905 Arlo Drive Apt 2213, Indianapolis, IN 46237, USA`, requires localized store-session proof before product extraction, uses the dedicated edible-egg ranking prompt, and saves the last diagnostic payload to:
+
+```text
+PushShoppingList/services/recipe-extractor/data/test_grab_result.json
+```
+
 Product choice state is saved in:
 
 ```text
