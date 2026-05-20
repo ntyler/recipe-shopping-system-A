@@ -31,6 +31,7 @@ Core libraries used by the project:
 - `requests`: recipe downloads, ntfy notifications, and HTTP calls
 - `beautifulsoup4`: recipe HTML parsing
 - `openai`: recipe extraction, sorting, and quantity scaling
+- `Pillow`: product image conversion for embedded Base64 image data
 - `selenium`: browser fallback for blocked recipe pages
 - `undetected-chromedriver`: Chrome fallback for sites that return 403 to direct downloads
 - `webdriver-manager`: ChromeDriver helper/fallback support
@@ -67,7 +68,7 @@ $env:SHOPPING_APP_PORT="5059"
 $env:PRODUCT_SEARCH_WORKERS="2"
 $env:PRODUCT_DETAIL_LIMIT_PER_STORE="4"
 $env:PRODUCT_AI_ANALYSIS_LIMIT_PER_STORE="2"
-$env:PRODUCT_FINAL_SELECTION_CANDIDATES="18"
+$env:PRODUCT_FINAL_SELECTION_CANDIDATES="96"
 $env:PRODUCT_AI_BROWSER_WAIT_SECONDS="4"
 ```
 
@@ -79,6 +80,8 @@ Notes:
 - Set `FORCE_OPENAI_RECIPE_EXTRACTION=1` only when you want the OpenAI extractor used even if recipe-card HTML already has enough structured data.
 - Leave `SHOPPING_APP_PORT` unset when running `py -3.11 app.py` directly and you want the default Flask port `5000`. The included `start_app.bat` currently sets `SHOPPING_APP_PORT=5059`.
 - Product lookup uses `OPENAI_API_KEY` for fully loaded product-page analysis and final best-product selection. If no key is set, the app still parses product candidates but skips ChatGPT product analysis.
+- Product image embedding is enabled by default. Set `DISABLE_PRODUCT_IMAGE_EMBEDDING=1` to skip downloading images into `embedded_image_base64`.
+- Full Base64 image strings are stored on candidates but omitted from ChatGPT prompts by default to keep prompts usable. Set `PRODUCT_PROMPT_INCLUDE_EMBEDDED_IMAGES=1` only if you really want those large strings sent to the API.
 
 On Windows, you can make variables persistent with:
 
@@ -135,24 +138,32 @@ http://192.168.68.62:5059
 
 The **Grab Best Products** button searches the activated stores near the saved Full Address for every shopping-list item. The current workflow is:
 
-1. Build store search URLs for each item and enabled store.
-2. Load rendered search pages and collect direct product candidates.
-3. Open a limited number of full product pages per store.
-4. Send fully loaded product-page evidence to the ChatGPT API when `OPENAI_API_KEY` is available.
-5. Rank candidates using saved food rules, direct product links, visible price, product-page evidence, store distance, and the total quantity needed for the ingredient.
-6. Save one overall strict-rule winner plus one store-level pick for each activated store that returned candidates.
+1. The Planner Agent builds item/store searches from the shopping list and saved Full Address.
+2. The Store Resolution Agent resolves the nearest pickup-oriented location for each activated store.
+3. Browser Worker Agents run in parallel with `ThreadPoolExecutor`, open the real grocery search/category pages with Selenium/undetected Chrome, apply the saved address context, select the nearest pickup-oriented store when the page exposes a store selector, and scroll until no new product cards appear.
+4. The Product Extraction/Normalization Agent saves the fully rendered page HTML under `data/raw/product_pages/`, captures every visible product card up to `PRODUCT_CANDIDATE_LIMIT_PER_STORE`, and normalizes store name, store address, product name, brand, size/count, price, unit price, stock status, direct product URL, image URL, cleaned raw product-card HTML snippet, and embedded image Base64 where possible.
+5. Shortlisted candidates are opened on their full product detail pages for deeper evidence.
+6. The Validation Layer rejects irrelevant, unavailable, search-page-only, or rule-failing products while saving rejection reasons.
+7. The Ranking Agent sends the saved rules, a cleaned excerpt of the fully rendered Selenium HTML, and the extracted product-card HTML/data to ChatGPT when `OPENAI_API_KEY` is available. ChatGPT does not browse store websites; it ranks the supplied page/card data into best product, valid alternatives, and rejected products with rejection reasons and confidence scores.
+8. Results are saved with the best product, valid alternatives, rejected products, rejection reasons, scoring metadata, manual selection metadata, and store/ingredient metadata.
+
+For eggs, the built-in ranking prefers standard shell egg cartons, 12-count or larger cartons, availability, nearby stores, and lower price per egg. It avoids unrelated egg products such as liquid eggs, egg whites only, boiled eggs, egg bites, and plant-based egg substitutes when possible.
 
 The UI shows:
 
 - `Picked`: the overall strict-rule product selected across stores.
 - `Store Pick`: the best direct product found for that store. If the product does not satisfy strict rules, it can still be shown as the store's best available candidate while preserving the rule issue in the saved choice.
+- Each enabled store under each ingredient, with the store's best product price beside it.
 - Product names as direct links to product pages, not search pages, whenever a direct product URL is available.
-- A `Prompt` button on picked products so you can inspect the prompt sent to the ChatGPT API.
+- An `Alternatives` button beside each store that shows valid alternatives and rejected products with reasons.
+- A `Prompt` button on store picks and picked products so you can inspect the extracted-card prompt sent to the ChatGPT API.
+- Manual alternative selections persist as `selected_by_user` with `selected_at`.
 
 Product choice state is saved in:
 
 ```text
 PushShoppingList/services/recipe-extractor/data/product_choices.json
+PushShoppingList/services/recipe-extractor/data/product_results.json
 ```
 
 ## Tailscale Access
@@ -314,8 +325,10 @@ Common files:
 - `shopping_item_state.json`: checked items, selected stores, and manual item quantities
 - `store_settings.json`: store list and enabled stores
 - `extract_progress.json`: current extraction progress for the overlay
-- `product_choices.json`: saved product candidates, per-store picks, overall picked products, direct product links, and ChatGPT prompt metadata
+- `product_choices.json`: saved product candidates, per-store picks, overall picked products, direct product links, embedded image Base64 values, and ChatGPT prompt metadata
+- `product_results.json`: dedicated hybrid shopping results with agent-stage architecture, best products, alternatives, rejected products, rejection reasons, and scoring metadata
 - `product_progress.json`: current Grab Best Products progress overlay state
+- `raw/product_pages/*.html`: fully rendered Selenium grocery search pages saved for product-ranking review
 - `pdf/*.pdf`: archived recipe PDFs created during extraction, including webpage PDFs, upload PDFs, and video caption/transcript PDFs
 - `output/*.json`: extracted recipe JSON output
 - `output/sorted_ingredients.txt`: sorted shopping-list text

@@ -26,6 +26,15 @@
                     <span class="best-product-link">{{ best_product.get("product_name") }}</span>
                     <span class="best-product-meta">Direct product link unavailable</span>
                 {% endif %}
+                <button type="button"
+                        class="bulk-prompt-btn bulk-row-prompt-btn best-product-prompt-btn"
+                        data-item-key="{{ item_key }}"
+                        data-store-key="{{ store_result.get("store_key") }}"
+                        data-product-id="{{ best_product.get("id") }}"
+                        data-product-name="{{ best_product.get("product_name") }}"
+                        onclick="openProductPromptForProgressRow(this)">
+                    Prompt
+                </button>
                 <span class="best-product-price">{{ best_product.get("price") or "Price unavailable" }}</span>
                 {% if best_product.get("requested_quantity") %}
                     <span class="best-product-meta">Need {{ best_product.get("requested_quantity") }}</span>
@@ -63,6 +72,15 @@
             <span class="best-product-link">{{ selected_product.get("product_name") }}</span>
             <span class="best-product-meta">Direct product link unavailable</span>
         {% endif %}
+        <button type="button"
+                class="bulk-prompt-btn bulk-row-prompt-btn best-product-prompt-btn"
+                data-item-key="{{ item_key }}"
+                data-store-key="{{ selected_product.get("store_key") }}"
+                data-product-id="{{ selected_product.get("id") }}"
+                data-product-name="{{ selected_product.get("product_name") }}"
+                onclick="openProductPromptForProgressRow(this)">
+            Prompt
+        </button>
         <span class="best-product-price">{{ selected_product.get("price") or "Price unavailable" }}</span>
         {% if selected_product.get("requested_quantity") %}
             <span class="best-product-meta">Need {{ selected_product.get("requested_quantity") }}</span>

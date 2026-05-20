@@ -3551,6 +3551,11 @@ body {
             outline: none;
         }
 
+        .best-product-prompt-btn {
+            padding: 4px 8px;
+            font-size: 11px;
+        }
+
 
         .bulk-product-actions {
             display: grid;
@@ -4000,6 +4005,38 @@ body {
             border-bottom: 1px solid #2a2a2a;
         }
 
+        .bulk-alt-group {
+            border-bottom: 1px solid #303030;
+            padding: 8px 0;
+        }
+
+        .bulk-alt-group:last-child {
+            border-bottom: none;
+        }
+
+        .bulk-alt-group-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0;
+            padding: 0 8px 6px;
+            color: #e5e7eb;
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .bulk-alt-group-title span {
+            border-radius: 999px;
+            padding: 2px 7px;
+            background: #263238;
+            color: #7dd3fc;
+            font-size: 11px;
+        }
+
+        .bulk-alt-group.rejected .bulk-alt-group-title {
+            color: #fbbf24;
+        }
+
         .bulk-prompt-btn {
             width: auto;
             margin-top: 0;
@@ -4102,6 +4139,10 @@ body {
 
         .bulk-alt-option:last-child {
             border-bottom: none;
+        }
+
+        .bulk-alt-option.rejected {
+            background: rgba(251, 191, 36, 0.04);
         }
 
         .bulk-alt-name {

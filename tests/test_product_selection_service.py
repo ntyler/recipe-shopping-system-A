@@ -1,3 +1,4 @@
+import json
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -192,6 +193,84 @@ class ProductSelectionServiceTest(unittest.TestCase):
 
         self.assertIn("Total shopping-list quantity needed:\n1", prompt)
         self.assertIn("least practical excess/waste", prompt)
+        self.assertIn("You are a grocery product collection agent.", prompt)
+        self.assertIn("Never return partial product lists.", prompt)
+        self.assertIn('"best_result"', prompt)
+        self.assertIn('"results"', prompt)
+
+    def test_final_payload_includes_collection_agent_fields(self):
+        item = candidate("Large White Eggs, 12 Count")
+        item.update({
+            "store_key": "aldi",
+            "store_name": "Aldi",
+            "brand": "Goldhen",
+            "source_page_url": "https://www.aldi.us/store/aldi/s?k=eggs",
+            "image_url": "https://example.com/eggs.png",
+            "embedded_image_base64": "data:image/png;base64,AAAA",
+            "package_size": "12 ct",
+            "price": "$2.40",
+            "raw_product_html_snippet": '<article><a href="/eggs">Large White Eggs</a><span>$2.40</span></article>',
+        })
+        product_service.apply_egg_product_metadata("eggs", item)
+
+        payload = product_service.final_product_candidate_payload(item)
+
+        self.assertEqual(payload["store_name"], "Aldi")
+        self.assertEqual(payload["store_location"]["distance_miles"], 1)
+        self.assertEqual(payload["source_page_url"], "https://www.aldi.us/store/aldi/s?k=eggs")
+        self.assertEqual(payload["brand"], "Goldhen")
+        self.assertEqual(payload["price_per_egg"], "$0.20/egg")
+        self.assertIn("Large White Eggs", payload["raw_product_html_snippet"])
+        self.assertTrue(payload["embedded_image_base64_captured"])
+        self.assertIn("omitted from ChatGPT prompt", payload["embedded_image_base64"])
+
+    def test_store_ranking_prompt_uses_extracted_cards_and_forbids_browsing(self):
+        item = candidate("Organic Lemons 2 lb Bag")
+        item.update({
+            "id": "meijer-lemon",
+            "store_key": "meijer",
+            "store_name": "Meijer",
+            "store_location_address": "5325 E Southport Rd, Indianapolis, IN 46237",
+            "raw_product_html_snippet": '<li><a href="/shopping/product/organic-lemons">Organic Lemons 2 lb Bag</a><span>$6.99</span></li>',
+            "rendered_page_html_excerpt": '<html><body><div>Organic Lemons 2 lb Bag $6.99 pickup</div></body></html>',
+            "rendered_page_html_length": 72,
+            "rendered_page_html_path": "D:/tmp/meijer-lemon.html",
+            "card_text_excerpt": "Organic Lemons 2 lb Bag $6.99 2 lb",
+        })
+
+        prompt = product_service.build_store_product_ranking_prompt(
+            "lemon",
+            [item],
+            "5905 Arlo Drive, Indianapolis, IN 46237",
+            quantity_context={"display": "1 lemon", "sources": []},
+        )
+
+        self.assertIn("Selenium/undetected Chrome already opened the actual grocery website", prompt)
+        self.assertIn("Do not browse, fetch, or infer from outside websites.", prompt)
+        self.assertIn("Cleaned rendered page HTML from the fully loaded Selenium page", prompt)
+        self.assertIn("D:/tmp/meijer-lemon.html", prompt)
+        self.assertIn("raw_product_html_snippet", prompt)
+        self.assertIn("Organic Lemons 2 lb Bag", prompt)
+        self.assertIn("ranking_status", prompt)
+
+    def test_egg_scoring_prefers_standard_shell_eggs(self):
+        shell = candidate("Large White Eggs, 12 Count")
+        shell["price"] = "$2.40"
+        shell["package_size"] = "12 ct"
+        shell["unit_price"] = ""
+        shell["unit_price_value"] = None
+        liquid = candidate("Liquid Egg Whites")
+        liquid["price"] = "$3.99"
+        liquid["package_size"] = "16 oz"
+
+        shell_score, shell_reasons, _, shell_viable = score_candidate("eggs", shell)
+        liquid_score, _, liquid_skip_reasons, liquid_viable = score_candidate("eggs", liquid)
+
+        self.assertTrue(shell_viable)
+        self.assertGreater(shell_score, liquid_score)
+        self.assertIn("Standard shell egg carton match.", shell_reasons)
+        self.assertFalse(liquid_viable)
+        self.assertTrue(any("Excluded egg-product form detected" in reason for reason in liquid_skip_reasons))
 
     def test_store_result_has_best_available_pick_when_no_candidate_is_viable(self):
         drink = candidate("Gatorade Lemon Lime")
@@ -267,6 +346,101 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertEqual(store_result["best_product"]["product_name"], "Lemons, Bag")
         self.assertEqual(store_result["best_product_id"], "aldi-lemons")
         self.assertFalse(store_result["best_product_is_viable"])
+
+    def test_store_result_separates_valid_and_rejected_products(self):
+        valid = candidate("Large White Eggs, 12 Count")
+        valid.update({
+            "id": "valid-eggs",
+            "store_key": "aldi",
+            "store_name": "Aldi",
+            "package_size": "12 ct",
+            "price": "$2.40",
+        })
+        rejected = candidate("Liquid Egg Whites")
+        rejected.update({
+            "id": "liquid-eggs",
+            "store_key": "aldi",
+            "store_name": "Aldi",
+            "package_size": "16 oz",
+            "price": "$3.99",
+        })
+
+        record = build_product_choice_record_from_results(
+            "eggs",
+            [
+                {
+                    "index": 0,
+                    "store_key": "aldi",
+                    "store_name": "Aldi",
+                    "candidates": [valid, rejected],
+                    "skip_reasons": [],
+                }
+            ],
+            "5905 Arlo Drive, Indianapolis, IN 46237",
+        )
+        store_result = record["store_results"]["aldi"]
+
+        self.assertEqual(store_result["valid_candidate_count"], 1)
+        self.assertEqual(store_result["rejected_candidate_count"], 1)
+        self.assertEqual(store_result["rejected_products"][0]["product_name"], "Liquid Egg Whites")
+        self.assertTrue(store_result["rejected_products"][0]["rejection_reasons"])
+        self.assertEqual(record["validation_summary"]["rejected"], 1)
+        self.assertTrue(any(stage["name"] == "Validation Layer" for stage in record["agent_stages"]))
+
+    def test_product_results_file_is_written_with_hybrid_schema(self):
+        with TemporaryDirectory() as tmp_dir:
+            choices_file = Path(tmp_dir) / "product_choices.json"
+            results_file = Path(tmp_dir) / "product_results.json"
+
+            with patch.object(product_service, "PRODUCT_CHOICES_FILE", choices_file), patch.object(
+                product_service,
+                "PRODUCT_RESULTS_FILE",
+                results_file,
+            ):
+                product_service.save_product_choices({"items": {"eggs": {"ingredient": "eggs"}}})
+                payload = json.loads(results_file.read_text(encoding="utf-8"))
+
+        self.assertEqual(payload["schema"], "hybrid-agentic-shopping-results/v1")
+        self.assertIn("Planner Agent", payload["architecture"])
+        self.assertIn("eggs", payload["items"])
+
+    def test_manual_alternative_selection_persists_user_metadata(self):
+        with TemporaryDirectory() as tmp_dir:
+            choices_file = Path(tmp_dir) / "product_choices.json"
+            results_file = Path(tmp_dir) / "product_results.json"
+            item = candidate("Organic Lemons 2 lb Bag")
+            item.update({
+                "id": "meijer-lemons",
+                "store_key": "meijer",
+                "store_name": "Meijer",
+                "product_url": "https://www.meijer.com/shopping/product/organic-lemons/1.html",
+            })
+            state = {
+                "items": {
+                    "lemon": {
+                        "item_key": "lemon",
+                        "ingredient": "lemon",
+                        "candidates": [item],
+                        "store_results": {},
+                        "store_results_list": [],
+                    }
+                }
+            }
+
+            with patch.object(product_service, "PRODUCT_CHOICES_FILE", choices_file), patch.object(
+                product_service,
+                "PRODUCT_RESULTS_FILE",
+                results_file,
+            ), patch.object(product_service, "save_item_store"):
+                product_service.save_product_choices(state)
+                result = product_service.select_product_choice("lemon", "meijer-lemons", store_key="meijer")
+                saved = product_service.load_product_choices()["items"]["lemon"]
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(saved["selected_by_user"])
+        self.assertTrue(saved["selected_product"]["selected_by_user"])
+        self.assertTrue(saved["store_results"]["meijer"]["selected_by_user"])
+        self.assertTrue(saved["selected_at"])
 
     def test_progress_rows_include_selected_product_details(self):
         with TemporaryDirectory() as tmp_dir:

@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import json
 import math
@@ -11,6 +12,7 @@ from concurrent.futures import TimeoutError as FuturesTimeoutError
 from concurrent.futures import as_completed
 from datetime import datetime
 from fractions import Fraction
+from io import BytesIO
 from pathlib import Path
 from urllib.parse import parse_qsl
 from urllib.parse import quote_plus
@@ -42,8 +44,11 @@ from PushShoppingList.services.store_settings_service import load_store_settings
 
 BASE_DIR = Path(__file__).resolve().parent
 PRODUCT_CHOICES_FILE = BASE_DIR / "recipe-extractor" / "data" / "product_choices.json"
+PRODUCT_RESULTS_FILE = BASE_DIR / "recipe-extractor" / "data" / "product_results.json"
 PRODUCT_PROGRESS_FILE = BASE_DIR / "recipe-extractor" / "data" / "product_progress.json"
+PRODUCT_RENDERED_HTML_DIR = BASE_DIR / "recipe-extractor" / "data" / "raw" / "product_pages"
 PRODUCT_CHOICES_FILE.parent.mkdir(parents=True, exist_ok=True)
+PRODUCT_RENDERED_HTML_DIR.mkdir(parents=True, exist_ok=True)
 
 REQUEST_HEADERS = {
     "User-Agent": "PushShoppingList/1.0 local product finder",
@@ -122,6 +127,36 @@ WHOLE_ITEM_PACKAGE_TERMS = {
     "pkg",
     "whole",
 }
+EGG_PRODUCT_AVOID_TERMS = {
+    "bites",
+    "boiled",
+    "cooked",
+    "liquid",
+    "omelet",
+    "omelette",
+    "patties",
+    "plant",
+    "plantbased",
+    "substitute",
+    "substitutes",
+    "vegan",
+    "whites",
+}
+EGG_PRODUCT_SHELL_TERMS = {
+    "brown",
+    "cage",
+    "carton",
+    "count",
+    "ct",
+    "dozen",
+    "egg",
+    "eggs",
+    "free",
+    "large",
+    "organic",
+    "shell",
+    "white",
+}
 DETAIL_REQUIRED = os.getenv("PRODUCT_REQUIRE_DETAIL_PAGE", "1") != "0"
 BROWSER_SEARCH_MODE = os.getenv("PRODUCT_SEARCH_BROWSER_MODE", "always").strip().lower()
 PRODUCT_ANALYSIS_MODEL = os.getenv("OPENAI_PRODUCT_ANALYSIS_MODEL", os.getenv("OPENAI_RECIPE_MODEL", "gpt-4o-mini"))
@@ -131,11 +166,46 @@ PRODUCT_AI_ANALYSIS_LOCK = threading.BoundedSemaphore(2)
 
 def product_candidate_limit():
     try:
-        configured = int(os.getenv("PRODUCT_CANDIDATE_LIMIT_PER_STORE", "48"))
+        configured = int(os.getenv("PRODUCT_CANDIDATE_LIMIT_PER_STORE", "96"))
     except (TypeError, ValueError):
-        configured = 48
+        configured = 96
 
     return max(8, min(96, configured))
+
+
+def product_image_embedding_enabled():
+    return os.getenv("DISABLE_PRODUCT_IMAGE_EMBEDDING") != "1"
+
+
+def product_prompt_include_embedded_images():
+    return os.getenv("PRODUCT_PROMPT_INCLUDE_EMBEDDED_IMAGES") == "1"
+
+
+def product_image_embed_max_bytes():
+    try:
+        configured = int(os.getenv("PRODUCT_IMAGE_EMBED_MAX_BYTES", "350000"))
+    except (TypeError, ValueError):
+        configured = 350000
+
+    return max(50000, min(1500000, configured))
+
+
+def product_image_embed_max_dimension():
+    try:
+        configured = int(os.getenv("PRODUCT_IMAGE_EMBED_MAX_DIMENSION", "320"))
+    except (TypeError, ValueError):
+        configured = 320
+
+    return max(96, min(900, configured))
+
+
+def product_rendered_html_prompt_limit():
+    try:
+        configured = int(os.getenv("PRODUCT_RENDERED_HTML_PROMPT_CHARS", "120000"))
+    except (TypeError, ValueError):
+        configured = 120000
+
+    return max(12000, min(500000, configured))
 
 
 def product_browser_wait_seconds():
@@ -519,11 +589,11 @@ def product_final_selection_agent_enabled():
 
 def product_final_selection_candidate_limit():
     try:
-        configured = int(os.getenv("PRODUCT_FINAL_SELECTION_CANDIDATES", "18"))
+        configured = int(os.getenv("PRODUCT_FINAL_SELECTION_CANDIDATES", "96"))
     except (TypeError, ValueError):
-        configured = 18
+        configured = 96
 
-    return max(4, min(40, configured))
+    return max(4, min(96, configured))
 
 
 def get_product_analysis_client():
@@ -805,6 +875,26 @@ def load_product_choices():
     return data
 
 
+def product_results_payload(data):
+    data = data if isinstance(data, dict) else {"items": {}}
+    items = data.get("items", {}) if isinstance(data.get("items"), dict) else {}
+    return {
+        "schema": "hybrid-agentic-shopping-results/v1",
+        "updated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "architecture": hybrid_shopping_architecture(),
+        "items": items,
+    }
+
+
+def save_product_results(data):
+    payload = product_results_payload(data)
+    PRODUCT_RESULTS_FILE.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    return payload
+
+
 def save_product_choices(data):
     data = data if isinstance(data, dict) else {"items": {}}
     data.setdefault("items", {})
@@ -812,11 +902,33 @@ def save_product_choices(data):
         json.dumps(data, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
+    save_product_results(data)
     return data
 
 
 def clear_product_choices():
     return save_product_choices({"items": {}})
+
+
+def hybrid_shopping_architecture():
+    return [
+        "Planner Agent",
+        "Store Resolution Agent",
+        "Browser Worker Agent",
+        "Product Extraction/Normalization Agent",
+        "Validation Layer",
+        "Ranking Agent",
+    ]
+
+
+def agent_stage(name, status="done", message="", metadata=None):
+    return {
+        "name": name,
+        "status": status,
+        "message": message,
+        "metadata": metadata or {},
+        "timestamp": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+    }
 
 
 def product_choices_by_item():
@@ -945,6 +1057,16 @@ def product_choice_for_store(choice, store_key):
     filtered["filtered_store_name"] = (store_result or {}).get("store_name", "") or (selected or {}).get("store_name", "")
     filtered["store_result"] = store_result or {}
     filtered["candidates"] = candidates
+    filtered["valid_alternatives"] = [
+        candidate
+        for candidate in candidates
+        if candidate.get("viable") is not False
+    ]
+    filtered["rejected_products"] = [
+        candidate
+        for candidate in candidates
+        if candidate.get("viable") is False
+    ]
     filtered["selected_product"] = selected
     filtered["selected_product_id"] = (store_result or {}).get("best_product_id") or (selected or {}).get("id", "")
     filtered["skip_reasons"] = (
@@ -991,6 +1113,16 @@ def grab_best_products(items=None, job_id=None):
         quantity_context_by_item=quantity_context_by_item,
     )
     max_workers = product_worker_count(len(downloads))
+    planner_stage = agent_stage(
+        "Planner Agent",
+        message="Built ingredient/store search plan from current shopping list.",
+        metadata={
+            "ingredient_count": len(ingredients),
+            "enabled_stores": enabled_stores,
+            "download_count": len(downloads),
+            "max_workers": max_workers,
+        },
+    )
 
     if job_id:
         start_product_progress(
@@ -1014,6 +1146,7 @@ def grab_best_products(items=None, job_id=None):
             "max_workers": max_workers,
             "count": 0,
             "selected_count": 0,
+            "agent_stages": [planner_stage],
             "results": [],
         }
 
@@ -1030,6 +1163,15 @@ def grab_best_products(items=None, job_id=None):
         )
         for store_key in enabled_stores
     }
+    store_resolution_stage = agent_stage(
+        "Store Resolution Agent",
+        message="Resolved nearest pickup-oriented store locations from the saved Full Address.",
+        metadata={
+            "home_address": full_address,
+            "home_location": home_location,
+            "store_locations": store_locations,
+        },
+    )
     store_results_by_ingredient = {
         ingredient: []
         for ingredient in ingredients
@@ -1171,6 +1313,7 @@ def grab_best_products(items=None, job_id=None):
         "max_workers": max_workers,
         "count": len(results),
         "selected_count": sum(1 for item in results if item.get("selected_product")),
+        "agent_stages": [planner_stage, store_resolution_stage],
         "results": results,
     }
 
@@ -1198,6 +1341,17 @@ def failed_product_download_result(download, exc, job_id=None):
         "search_url": download.get("search_url", ""),
         "candidates": [],
         "skip_reasons": [message],
+        "agent_stages": [
+            agent_stage(
+                "Browser Worker Agent",
+                status="failed",
+                message=message,
+                metadata={
+                    "store_key": download.get("store_key", ""),
+                    "search_url": download.get("search_url", ""),
+                },
+            ),
+        ],
     }
 
 
@@ -1278,6 +1432,7 @@ def search_store_products_for_download(
         message = f"{store_name}: no product search URL is configured."
         if job_id:
             mark_product_download(job_id, index, "skipped", message, candidates_count=0)
+        store_location = store_locations.get(store_key, {})
         return {
             "index": index,
             "item_key": download.get("item_key") or normalize_item_key(ingredient),
@@ -1287,9 +1442,17 @@ def search_store_products_for_download(
             "store_key": store_key,
             "store_name": store_name,
             "search_url": search_url,
-            "store_location": store_locations.get(store_key, {}),
+            "store_location": store_location,
             "candidates": [],
             "skip_reasons": [message],
+            "agent_stages": [
+                agent_stage(
+                    "Browser Worker Agent",
+                    status="skipped",
+                    message=message,
+                    metadata={"store_location": store_location},
+                ),
+            ],
         }
 
     if job_id:
@@ -1328,6 +1491,12 @@ def search_store_products_for_download(
             job_id=job_id,
             progress_index=index,
         )
+        candidates = embed_product_candidate_images(
+            candidates,
+            job_id=job_id,
+            progress_index=index,
+            store_name=store_name,
+        )
 
     raw_direct_count = sum(
         1
@@ -1364,6 +1533,7 @@ def search_store_products_for_download(
             candidates_count=direct_count,
         )
 
+    store_location = store_locations.get(store_key, {})
     return {
         "index": index,
         "item_key": download.get("item_key") or normalize_item_key(ingredient),
@@ -1374,12 +1544,36 @@ def search_store_products_for_download(
         "store_name": store_name,
         "search_url": search_url,
         "search_term": search_term,
-        "store_location": store_locations.get(store_key, {}),
-        "store_location_name": (store_locations.get(store_key, {}) or {}).get("name", ""),
-        "store_location_address": (store_locations.get(store_key, {}) or {}).get("address", ""),
-        "store_location_distance_miles": (store_locations.get(store_key, {}) or {}).get("distance_miles"),
+        "store_location": store_location,
+        "store_location_name": (store_location or {}).get("name", ""),
+        "store_location_address": (store_location or {}).get("address", ""),
+        "store_location_distance_miles": (store_location or {}).get("distance_miles"),
         "candidates": candidates,
         "skip_reasons": skip_reasons,
+        "agent_stages": [
+            agent_stage(
+                "Browser Worker Agent",
+                status="failed" if failed else "done",
+                message=message,
+                metadata={
+                    "store_key": store_key,
+                    "store_name": store_name,
+                    "search_url": search_url,
+                    "search_term": search_term,
+                    "store_location": store_location,
+                },
+            ),
+            agent_stage(
+                "Product Extraction/Normalization Agent",
+                status="done" if raw_direct_count else "failed",
+                message=f"Captured and normalized {raw_direct_count} visible/direct product candidate(s).",
+                metadata={
+                    "candidate_count": raw_direct_count,
+                    "detail_evaluated_count": direct_count,
+                    "image_embedded_count": sum(1 for candidate in candidates if candidate.get("embedded_image_base64")),
+                },
+            ),
+        ],
     }
 
 
@@ -1405,12 +1599,19 @@ def build_product_choice_record_from_results(ingredient, store_results, full_add
         for candidate in candidates
     ]
     candidates = rank_product_candidates(ingredient, candidates, quantity_context=quantity_context)
+    candidates = apply_chatgpt_store_product_rankings(
+        ingredient,
+        candidates,
+        full_address=full_address,
+        quantity_context=quantity_context,
+    )
     candidates = apply_chatgpt_final_product_selection(
         ingredient,
         candidates,
         full_address=full_address,
         quantity_context=quantity_context,
     )
+    candidates = apply_validation_layer(ingredient, candidates)
     store_product_results_list = build_store_product_results(
         ingredient,
         store_results,
@@ -1428,6 +1629,7 @@ def build_product_choice_record_from_results(ingredient, store_results, full_add
     ]
     selected = viable_candidates[0] if viable_candidates else None
     final_selection_agent = (selected or {}).get("final_selection_agent") or {}
+    validation_summary = product_validation_summary(candidates)
 
     if not selected and not skip_reasons:
         skip_reasons.append("No valid product candidates were found for the enabled stores.")
@@ -1443,11 +1645,20 @@ def build_product_choice_record_from_results(ingredient, store_results, full_add
         "selected_product_id": selected.get("id") if selected else "",
         "selected_product": selected,
         "manual_override": False,
+        "agent_stages": product_record_agent_stages(
+            store_results,
+            candidates,
+            validation_summary,
+            final_selection_agent,
+        ),
         "chatgpt_final_selection": final_selection_agent,
         "chatgpt_final_selection_prompt": final_selection_agent.get("prompt") or {},
         "store_results": store_product_results,
         "store_results_list": store_product_results_list,
         "candidates": candidates,
+        "valid_products": [candidate for candidate in candidates if candidate.get("viable")],
+        "rejected_products": [candidate for candidate in candidates if not candidate.get("viable")],
+        "validation_summary": validation_summary,
         "skip_reasons": unique_texts(skip_reasons),
         "updated_at": now,
     }
@@ -1467,6 +1678,83 @@ def first_quantity_context(store_results):
             return {"display": quantity, "sources": []}
 
     return {}
+
+
+def apply_validation_layer(ingredient, candidates):
+    for candidate in candidates:
+        rejection_reasons = unique_texts(candidate.get("skip_reasons", []))
+        candidate["rejected"] = not bool(candidate.get("viable"))
+        candidate["rejection_reasons"] = rejection_reasons if candidate["rejected"] else []
+        candidate["validation"] = {
+            "status": "valid" if candidate.get("viable") else "rejected",
+            "is_relevant": product_matches_ingredient(ingredient, candidate),
+            "in_stock": candidate.get("in_stock"),
+            "has_direct_product_url": candidate_has_direct_product_url(candidate),
+            "reasons": [] if candidate.get("viable") else rejection_reasons,
+        }
+        candidate["ranking_status"] = candidate.get("ranking_status") or ("alternative" if candidate.get("viable") else "rejected")
+        candidate["confidence_score"] = candidate.get("confidence_score", candidate.get("confidence"))
+        if candidate["rejected"] and rejection_reasons and not candidate.get("rejection_reason"):
+            candidate["rejection_reason"] = rejection_reasons[0]
+        candidate["scoring_metadata"] = {
+            "score": candidate.get("score"),
+            "confidence": candidate.get("confidence"),
+            "confidence_score": candidate.get("confidence_score"),
+            "ranking_status": candidate.get("ranking_status"),
+            "ranking_metadata": candidate.get("ranking_metadata", {}),
+            "quantity_fit": candidate.get("quantity_fit", {}),
+            "egg_product": candidate.get("egg_product", {}),
+            "ranking_reasons": candidate.get("ranking_reasons", []),
+            "skip_reasons": candidate.get("skip_reasons", []),
+            "shortlisted_for_detail": candidate.get("shortlisted_for_detail"),
+            "shortlisted_for_chatgpt_analysis": candidate.get("shortlisted_for_chatgpt_analysis"),
+            "chatgpt_store_ranking": candidate.get("chatgpt_store_ranking_agent", {}),
+        }
+
+    return candidates
+
+
+def product_validation_summary(candidates):
+    total = len(candidates)
+    valid = sum(1 for candidate in candidates if candidate.get("viable"))
+    rejected = total - valid
+    return {
+        "total": total,
+        "valid": valid,
+        "rejected": rejected,
+        "direct_product_url_count": sum(1 for candidate in candidates if candidate_has_direct_product_url(candidate)),
+        "in_stock_count": sum(1 for candidate in candidates if candidate.get("in_stock") is True),
+        "unknown_stock_count": sum(1 for candidate in candidates if candidate.get("in_stock") is None),
+    }
+
+
+def product_record_agent_stages(store_results, candidates, validation_summary, final_selection_agent):
+    raw_stages = []
+    for result in store_results:
+        if isinstance(result, dict):
+            raw_stages.extend(result.get("agent_stages", []))
+
+    return raw_stages + [
+        agent_stage(
+            "Validation Layer",
+            message="Rejected irrelevant, unavailable, or rule-failing candidates and preserved rejection reasons.",
+            metadata=validation_summary,
+        ),
+        agent_stage(
+            "Ranking Agent",
+            message="Ranked captured Selenium product-card candidates, using ChatGPT only on extracted card data when available.",
+            metadata={
+                "candidate_count": len(candidates),
+                "store_ranking_candidate_count": sum(
+                    1
+                    for candidate in candidates
+                    if candidate.get("chatgpt_store_ranking_agent")
+                ),
+                "chatgpt_status": final_selection_agent.get("status", "not-run") if final_selection_agent else "not-run",
+                "selected_product_id": final_selection_agent.get("selected_product_id", "") if final_selection_agent else "",
+            },
+        ),
+    ]
 
 
 def build_store_product_results(ingredient, raw_store_results, ranked_candidates):
@@ -1493,6 +1781,11 @@ def build_store_product_results(ingredient, raw_store_results, ranked_candidates
             for candidate in store_candidates
             if candidate.get("viable")
         ]
+        rejected_candidates = [
+            candidate
+            for candidate in store_candidates
+            if not candidate.get("viable")
+        ]
         best = viable_candidates[0] if viable_candidates else best_available_store_candidate(
             ingredient,
             store_candidates,
@@ -1509,6 +1802,19 @@ def build_store_product_results(ingredient, raw_store_results, ranked_candidates
             skip_reason = "" if best_is_viable else store_skip_reason(store_name, raw, store_candidates)
         else:
             skip_reason = store_skip_reason(store_name, raw, store_candidates)
+
+        for candidate in store_candidates:
+            if candidate is best and best_is_viable:
+                candidate["ranking_status"] = "best"
+            elif candidate.get("viable"):
+                candidate["ranking_status"] = candidate.get("ranking_status") or "alternative"
+            else:
+                candidate["ranking_status"] = "rejected"
+                rejection_reason = candidate.get("rejection_reason") or (candidate.get("skip_reasons", [""]) or [""])[0]
+                if rejection_reason:
+                    candidate["rejection_reason"] = rejection_reason
+
+            candidate["confidence_score"] = candidate.get("confidence_score", candidate.get("confidence"))
 
         record = {
             "store_key": store_key,
@@ -1538,9 +1844,13 @@ def build_store_product_results(ingredient, raw_store_results, ranked_candidates
             "skip_reason": skip_reason,
             "candidate_count": len(store_candidates),
             "valid_candidate_count": len(viable_candidates),
+            "rejected_candidate_count": len(rejected_candidates),
             "alternative_products": store_candidates,
             "alternatives": store_candidates,
+            "valid_alternatives": viable_candidates,
+            "rejected_products": rejected_candidates,
             "skip_reasons": unique_texts(raw.get("skip_reasons", [])),
+            "agent_stages": raw.get("agent_stages", []),
         }
         records.append(record)
 
@@ -1576,6 +1886,7 @@ def group_raw_store_results_by_store(raw_store_results):
                 "store_location_distance_miles": raw.get("store_location_distance_miles"),
                 "candidates": [],
                 "skip_reasons": [],
+                "agent_stages": [],
             }
             order.append(key)
 
@@ -1589,6 +1900,7 @@ def group_raw_store_results_by_store(raw_store_results):
             record["quantity_context"] = raw.get("quantity_context", {})
         record["candidates"].extend(raw.get("candidates", []))
         record["skip_reasons"] = unique_texts(record.get("skip_reasons", []) + raw.get("skip_reasons", []))
+        record["agent_stages"].extend(raw.get("agent_stages", []))
 
         if raw.get("search_url"):
             record["search_urls"] = unique_texts(record.get("search_urls", []) + [raw.get("search_url")])
@@ -1873,10 +2185,12 @@ def enrich_product_candidates_from_pages(
 
     for candidate in candidates:
         if not candidate_needs_product_detail(candidate):
+            candidate["shortlisted_for_detail"] = False
             enriched.append(mark_detail_skipped(candidate, "No direct product page URL was available."))
             continue
 
         if candidate.get("id") not in detail_ids:
+            candidate["shortlisted_for_detail"] = False
             enriched.append(mark_detail_skipped(
                 candidate,
                 f"Full product page was not evaluated because the per-store detail limit is {limit}.",
@@ -1884,7 +2198,9 @@ def enrich_product_candidates_from_pages(
             continue
 
         evaluated += 1
+        candidate["shortlisted_for_detail"] = True
         use_chatgpt_analysis = candidate.get("id") in analysis_ids
+        candidate["shortlisted_for_chatgpt_analysis"] = use_chatgpt_analysis
         if job_id and progress_index is not None:
             action = (
                 "Opening fully loaded page for ChatGPT analysis"
@@ -1927,6 +2243,113 @@ def mark_detail_skipped(candidate, reason):
     }
     candidate["skip_reasons"] = unique_texts(candidate.get("skip_reasons", []) + [reason])
     return candidate
+
+
+def embed_product_candidate_images(candidates, job_id=None, progress_index=None, store_name=""):
+    if not product_image_embedding_enabled():
+        for candidate in candidates:
+            candidate.setdefault("embedded_image_base64", "")
+        return candidates
+
+    total = sum(
+        1
+        for candidate in candidates
+        if candidate.get("image_url") and not candidate.get("embedded_image_base64")
+    )
+    completed = 0
+
+    for candidate in candidates:
+        if not candidate.get("image_url") or candidate.get("embedded_image_base64"):
+            candidate.setdefault("embedded_image_base64", "")
+            continue
+
+        completed += 1
+        if job_id and progress_index is not None:
+            mark_product_download(
+                job_id,
+                progress_index,
+                "running",
+                "Embedding product image {done} of {total} from {store}: {name}".format(
+                    done=completed,
+                    total=total,
+                    store=store_name or candidate.get("store_name", "store"),
+                    name=candidate.get("product_name", "product"),
+                ),
+            )
+
+        data_uri = product_image_data_uri(
+            candidate.get("image_url", ""),
+            referer=candidate.get("source_page_url") or candidate.get("product_url") or candidate.get("search_url") or "",
+        )
+        candidate["embedded_image_base64"] = data_uri
+        candidate["embedded_image_base64_length"] = len(data_uri)
+
+    return candidates
+
+
+def product_image_data_uri(image_url, referer=""):
+    image_url = clean_text(image_url)
+    if not image_url:
+        return ""
+
+    if image_url.startswith("data:image/"):
+        return image_url
+
+    try:
+        headers = dict(REQUEST_HEADERS)
+        headers["Accept"] = "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
+        if referer:
+            headers["Referer"] = referer
+        response = requests.get(
+            image_url,
+            headers=headers,
+            timeout=(4, 12),
+        )
+        response.raise_for_status()
+        content = response.content or b""
+    except Exception:
+        return ""
+
+    if not content:
+        return ""
+
+    content_type = clean_text(response.headers.get("Content-Type", "")).split(";", 1)[0].lower()
+    return image_bytes_to_data_uri(content, content_type=content_type)
+
+
+def image_bytes_to_data_uri(content, content_type=""):
+    max_bytes = product_image_embed_max_bytes()
+
+    try:
+        from PIL import Image
+
+        image = Image.open(BytesIO(content))
+        image.thumbnail(
+            (product_image_embed_max_dimension(), product_image_embed_max_dimension()),
+            Image.LANCZOS,
+        )
+        if image.mode not in {"RGB", "RGBA"}:
+            image = image.convert("RGBA" if "A" in image.getbands() else "RGB")
+
+        output = BytesIO()
+        image.save(output, format="PNG", optimize=True)
+        png_bytes = output.getvalue()
+
+        if len(png_bytes) > max_bytes:
+            return ""
+
+        return "data:image/png;base64," + base64.b64encode(png_bytes).decode("ascii")
+    except Exception:
+        pass
+
+    if len(content) > max_bytes:
+        return ""
+
+    safe_type = content_type if content_type.startswith("image/") else "image/png"
+    return "data:{mime};base64,{payload}".format(
+        mime=safe_type,
+        payload=base64.b64encode(content).decode("ascii"),
+    )
 
 
 def enrich_product_candidate_from_page(candidate, ingredient, use_chatgpt_analysis=False):
@@ -2900,6 +3323,39 @@ def search_store_products(
     request_candidates = []
     request_skip_reasons = []
 
+    if product_search_browser_enabled():
+        browser_candidates, browser_skip_reasons = search_store_products_with_browser_agent(
+            ingredient,
+            store_key,
+            store,
+            search_url,
+            full_address,
+            home_location,
+            store_location,
+        )
+
+        if browser_candidates:
+            return browser_candidates, unique_texts(browser_skip_reasons)
+
+        skip_reasons.extend(browser_skip_reasons)
+
+    if store_key == "meijer":
+        reader_candidates, reader_skip_reasons = search_meijer_products_with_reader(
+            ingredient,
+            store_key,
+            store,
+            search_url,
+            full_address,
+            home_location,
+            store_location,
+        )
+
+        if reader_candidates:
+            skip_reasons.extend(reader_skip_reasons)
+            return reader_candidates, unique_texts(skip_reasons)
+
+        skip_reasons.extend(reader_skip_reasons)
+
     try:
         response = requests.get(
             search_url,
@@ -2926,46 +3382,12 @@ def search_store_products(
         if not request_candidates:
             request_skip_reasons.append(f"{store_name}: no parseable product cards were found in the initial HTML.")
 
-    if should_open_store_search_page(bool(request_candidates)):
-        browser_candidates, browser_skip_reasons = search_store_products_with_browser_agent(
-            ingredient,
-            store_key,
-            store,
-            search_url,
-            full_address,
-            home_location,
-            store_location,
-        )
-
-        if browser_candidates:
-            skip_reasons.extend(browser_skip_reasons)
-            return browser_candidates, unique_texts(skip_reasons)
-
-        skip_reasons.extend(browser_skip_reasons)
-
-    if store_key == "meijer":
-        reader_candidates, reader_skip_reasons = search_meijer_products_with_reader(
-            ingredient,
-            store_key,
-            store,
-            search_url,
-            full_address,
-            home_location,
-            store_location,
-        )
-
-        if reader_candidates:
-            skip_reasons.extend(reader_skip_reasons)
-            return reader_candidates, unique_texts(skip_reasons)
-
-        skip_reasons.extend(reader_skip_reasons)
-
     if request_candidates:
         if skip_reasons:
             for candidate in request_candidates:
                 candidate["ranking_reasons"] = unique_texts(
                     candidate.get("ranking_reasons", [])
-                    + ["Used initial HTML product data because rendered-page extraction did not return visible cards."]
+                    + ["Used request HTML product data only after Selenium rendered-page extraction did not return visible cards."]
                 )
         return request_candidates, unique_texts(skip_reasons)
 
@@ -3016,15 +3438,13 @@ def search_store_products_with_browser_agent(
                     raise
 
             wait_for_browser_document(driver, timeout_seconds=product_browser_wait_seconds())
-            handle_browser_popups_and_location(driver, full_address)
-            for _ in range(3):
-                wait_for_rendered_product_cards(
-                    driver,
-                    timeout_seconds=max(3, product_browser_wait_seconds() / 3),
-                )
-                scroll_rendered_product_page(driver)
-                wait_for_browser_text_to_settle(driver, timeout_seconds=2)
-            handle_browser_popups_and_location(driver, full_address)
+            handle_browser_popups_and_location(driver, full_address, store_location=store_location)
+            wait_for_rendered_product_cards(
+                driver,
+                timeout_seconds=max(3, product_browser_wait_seconds() / 3),
+            )
+            scroll_rendered_product_results_until_stable(driver)
+            handle_browser_popups_and_location(driver, full_address, store_location=store_location)
 
             final_url = driver.current_url or search_url
             visible_cards = extract_visible_product_cards_from_browser(driver)
@@ -3040,6 +3460,13 @@ def search_store_products_with_browser_agent(
                 store_location,
             )
             rendered_html = driver.page_source or ""
+            rendered_page = save_rendered_product_search_html(
+                store_key,
+                ingredient,
+                search_term=ingredient,
+                page_url=final_url,
+                html_text=rendered_html,
+            )
             rendered_candidates = parse_product_candidates_from_html(
                 rendered_html,
                 final_url,
@@ -3055,9 +3482,13 @@ def search_store_products_with_browser_agent(
             candidates = dedupe_candidates(visible_candidates + rendered_candidates)
             if candidates:
                 for candidate in candidates:
+                    candidate["rendered_page_url"] = rendered_page.get("url", final_url)
+                    candidate["rendered_page_html_path"] = rendered_page.get("path", "")
+                    candidate["rendered_page_html_length"] = rendered_page.get("html_length", 0)
+                    candidate["rendered_page_html_excerpt"] = rendered_page.get("prompt_html", "")
                     candidate["ranking_reasons"] = unique_texts(
                         candidate.get("ranking_reasons", [])
-                        + ["Store search page was opened in a browser using the saved home address context."]
+                        + ["Store search page was opened, scrolled, and saved from Selenium using the saved home address context."]
                     )
                 return candidates[:product_candidate_limit()], []
 
@@ -3070,6 +3501,73 @@ def search_store_products_with_browser_agent(
                     driver.quit()
                 except Exception:
                     pass
+
+
+def save_rendered_product_search_html(store_key, ingredient, search_term, page_url, html_text):
+    html_text = str(html_text or "")
+    prompt_html = clean_rendered_page_html_for_prompt(html_text)
+    timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    digest = hashlib.sha1(
+        "|".join([store_key or "", ingredient or "", search_term or "", page_url or ""]).encode("utf-8", errors="ignore")
+    ).hexdigest()[:10]
+    filename = "{timestamp}_{store}_{item}_{digest}.html".format(
+        timestamp=timestamp,
+        store=normalize_item_key(store_key or "store") or "store",
+        item=normalize_item_key(ingredient or search_term or "item") or "item",
+        digest=digest,
+    )
+    path = PRODUCT_RENDERED_HTML_DIR / filename
+
+    try:
+        path.write_text(html_text, encoding="utf-8")
+        saved_path = str(path)
+    except Exception:
+        saved_path = ""
+
+    return {
+        "url": page_url,
+        "path": saved_path,
+        "html_length": len(html_text),
+        "prompt_html": prompt_html,
+        "prompt_html_length": len(prompt_html),
+    }
+
+
+def clean_rendered_page_html_for_prompt(html_text):
+    html_text = str(html_text or "")
+    if not html_text:
+        return ""
+
+    try:
+        soup = BeautifulSoup(html_text, "html.parser")
+        for tag in soup(["script", "style", "noscript", "svg", "iframe"]):
+            tag.decompose()
+
+        allowed_attrs = {
+            "href",
+            "src",
+            "alt",
+            "title",
+            "aria-label",
+            "role",
+            "itemprop",
+            "data-testid",
+            "data-test",
+            "data-qa",
+        }
+        for tag in soup.find_all(True):
+            tag.attrs = {
+                key: value
+                for key, value in tag.attrs.items()
+                if key in allowed_attrs
+            }
+
+        html_text = str(soup)
+    except Exception:
+        pass
+
+    html_text = re.sub(r"\s+", " ", html_text).strip()
+    return html_text[:product_rendered_html_prompt_limit()]
 
 
 def search_meijer_products_with_reader(
@@ -3260,7 +3758,7 @@ def configure_browser_home_location(driver, target_url, home_location):
         pass
 
 
-def handle_browser_popups_and_location(driver, full_address):
+def handle_browser_popups_and_location(driver, full_address, store_location=None):
     for _ in range(3):
         try:
             clicked = driver.execute_script(
@@ -3318,6 +3816,121 @@ def handle_browser_popups_and_location(driver, full_address):
             time.sleep(0.45)
 
     fill_location_inputs(driver, full_address)
+    select_nearest_pickup_store(driver, store_location)
+
+
+def select_nearest_pickup_store(driver, store_location):
+    store_location = store_location or {}
+    store_name = clean_text(store_location.get("name"))
+    store_address = clean_text(store_location.get("address"))
+    store_zip = extract_zip_code(store_address)
+
+    if not (store_name or store_address or store_zip):
+        return ""
+
+    try:
+        clicked = driver.execute_script(
+            """
+            const storeName = String(arguments[0] || "").toLowerCase();
+            const storeAddress = String(arguments[1] || "").toLowerCase();
+            const storeZip = String(arguments[2] || "").toLowerCase();
+            const pickupPatterns = [
+                /pickup/i,
+                /shop this store/i,
+                /select store/i,
+                /set store/i,
+                /set as my store/i,
+                /make this my store/i,
+                /choose store/i,
+                /use this store/i,
+                /start shopping/i
+            ];
+            const blockedPatterns = [
+                /add to cart/i,
+                /checkout/i,
+                /sign in/i,
+                /log in/i,
+                /create account/i,
+                /remove/i
+            ];
+
+            function visible(el) {
+                const style = window.getComputedStyle(el);
+                const rect = el.getBoundingClientRect();
+                return style && style.visibility !== "hidden" &&
+                    style.display !== "none" &&
+                    !el.disabled &&
+                    rect.width > 0 &&
+                    rect.height > 0;
+            }
+
+            function textOf(el) {
+                return [
+                    el.innerText,
+                    el.value,
+                    el.getAttribute("aria-label"),
+                    el.getAttribute("title")
+                ].filter(Boolean).join(" ").replace(/\\s+/g, " ").trim();
+            }
+
+            function contextText(el) {
+                const context = el.closest("article, li, section, [role='dialog'], [class*='store' i], [data-testid*='store' i]") || el.parentElement || el;
+                return String(context.innerText || context.textContent || "").replace(/\\s+/g, " ").trim();
+            }
+
+            const controls = Array.from(document.querySelectorAll(
+                "button, a, [role='button'], input[type='button'], input[type='submit']"
+            ));
+            const candidates = [];
+
+            for (const control of controls) {
+                if (!visible(control)) {
+                    continue;
+                }
+
+                const text = textOf(control);
+                const context = contextText(control);
+                const combined = `${text} ${context}`.toLowerCase();
+
+                if (!text || blockedPatterns.some(pattern => pattern.test(text))) {
+                    continue;
+                }
+
+                let score = pickupPatterns.some(pattern => pattern.test(text)) ? 10 : 0;
+                if (storeZip && combined.includes(storeZip)) {
+                    score += 8;
+                }
+                if (storeAddress && combined.includes(storeAddress.slice(0, Math.min(18, storeAddress.length)))) {
+                    score += 6;
+                }
+                if (storeName && combined.includes(storeName.slice(0, Math.min(14, storeName.length)))) {
+                    score += 3;
+                }
+
+                if (score >= 10 || (score >= 8 && /store|pickup/i.test(text))) {
+                    candidates.push({ control, score, text });
+                }
+            }
+
+            candidates.sort((a, b) => b.score - a.score);
+            if (!candidates.length) {
+                return "";
+            }
+
+            candidates[0].control.click();
+            return candidates[0].text;
+            """,
+            store_name,
+            store_address,
+            store_zip,
+        )
+    except Exception:
+        clicked = ""
+
+    if clicked:
+        time.sleep(0.8)
+
+    return clicked or ""
 
 
 def fill_location_inputs(driver, full_address):
@@ -3463,6 +4076,51 @@ def scroll_rendered_product_page(driver):
         pass
 
 
+def scroll_rendered_product_results_until_stable(driver, max_passes=None, stable_passes=2):
+    max_passes = max_passes or max(6, min(18, product_candidate_limit() // 6))
+    last_count = -1
+    unchanged = 0
+
+    for _ in range(max_passes):
+        cards = extract_visible_product_cards_from_browser(driver)
+        count = len(cards)
+
+        if count > last_count:
+            last_count = count
+            unchanged = 0
+        else:
+            unchanged += 1
+
+        try:
+            at_bottom = driver.execute_script(
+                """
+                const scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
+                const viewport = window.innerHeight || document.documentElement.clientHeight || 0;
+                const height = Math.max(
+                    document.body.scrollHeight || 0,
+                    document.documentElement.scrollHeight || 0
+                );
+                window.scrollBy(0, Math.max(650, viewport * 0.82));
+                return scrollTop + viewport >= height - 12;
+                """
+            )
+        except Exception:
+            at_bottom = False
+
+        wait_for_browser_text_to_settle(driver, timeout_seconds=1.4)
+
+        if unchanged >= stable_passes and at_bottom:
+            break
+
+    try:
+        driver.execute_script("window.scrollTo(0, 0);")
+        time.sleep(0.25)
+    except Exception:
+        pass
+
+    return max(0, last_count)
+
+
 def extract_visible_product_cards_from_browser(driver):
     try:
         cards = driver.execute_script(
@@ -3552,6 +4210,15 @@ def extract_visible_product_cards_from_browser(driver):
                 return image ? (image.currentSrc || image.src || image.getAttribute("data-src") || "") : "";
             }
 
+            function cardHtml(root) {
+                const clone = root.cloneNode(true);
+                clone.querySelectorAll("script, style, noscript, svg").forEach(el => el.remove());
+                return String(clone.outerHTML || "")
+                    .replace(/\\s+/g, " ")
+                    .trim()
+                    .slice(0, 4500);
+            }
+
             const selector = [
                 'article',
                 'li',
@@ -3599,7 +4266,8 @@ def extract_visible_product_cards_from_browser(driver):
                     price: prices[0] || "",
                     product_url: bestLink(root),
                     image_url: bestImage(root),
-                    text: rawText.slice(0, 1600)
+                    text: rawText.slice(0, 1600),
+                    raw_product_html_snippet: cardHtml(root)
                 };
             }).filter(card => card.name || card.product_url || card.price);
             """,
@@ -3632,6 +4300,7 @@ def product_candidates_from_visible_cards(
         price = normalize_price(card.get("price"))
         product_url = clean_text(card.get("product_url"))
         image_url = clean_text(card.get("image_url"))
+        raw_product_html_snippet = clean_product_card_html(card.get("raw_product_html_snippet") or card.get("html"))
         raw_card_text = str(card.get("text") or "")
         card_text = clean_text(raw_card_text)
 
@@ -3666,8 +4335,10 @@ def product_candidates_from_visible_cards(
             source="browser-visible-card",
             image_url=urljoin(page_url, image_url) if image_url else "",
         )
+        candidate["source_page_url"] = page_url
         package_size = extract_package_size(" ".join([name, card_text]))
         unit_price = extract_unit_price(card_text)
+        availability = extract_availability({}, card_text)
         if package_size:
             candidate["package_size"] = package_size
             candidate["size"] = package_size
@@ -3675,14 +4346,45 @@ def product_candidates_from_visible_cards(
             candidate["unit_price"] = unit_price.get("display", "")
             candidate["unit_price_value"] = unit_price.get("value")
             candidate["unit_price_unit"] = unit_price.get("unit", "")
+        if availability.get("text"):
+            candidate["availability"] = availability.get("text", "")
+        if availability.get("in_stock") is not None:
+            candidate["in_stock"] = availability.get("in_stock")
         if card_text:
             candidate["card_text_excerpt"] = card_text[:900]
             candidate["detail_text_excerpt"] = card_text[:900]
+        if raw_product_html_snippet:
+            candidate["raw_product_html_snippet"] = raw_product_html_snippet
 
         candidate["ranking_reasons"].append("Visible product card was extracted from the rendered store page.")
         candidates.append(candidate)
 
     return dedupe_candidates(candidates)[:product_candidate_limit()]
+
+
+def clean_product_card_html(html, max_chars=4500):
+    html = str(html or "").strip()
+    if not html:
+        return ""
+
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+        for tag in soup(["script", "style", "noscript", "svg"]):
+            tag.decompose()
+
+        allowed_attrs = {"href", "src", "alt", "title", "aria-label", "itemprop"}
+        for tag in soup.find_all(True):
+            tag.attrs = {
+                key: value
+                for key, value in tag.attrs.items()
+                if key in allowed_attrs
+            }
+
+        html = str(soup)
+    except Exception:
+        pass
+
+    return re.sub(r"\s+", " ", html).strip()[:max_chars]
 
 
 def best_visible_card_name(ingredient, card_text):
@@ -3941,7 +4643,7 @@ def product_candidate_from_mapping(
     if not name or len(name) > 180:
         return None
 
-    return build_candidate(
+    candidate = build_candidate(
         ingredient,
         store_key,
         store_name,
@@ -3955,6 +4657,8 @@ def product_candidate_from_mapping(
         source,
         image_url=image_url,
     )
+    candidate["source_page_url"] = page_url
+    return candidate
 
 
 def extract_product_url_from_mapping(mapping):
@@ -4096,7 +4800,7 @@ def extract_anchor_product_candidates(
         if price_match:
             price = price_match.group(0).replace(" ", "")
 
-        candidates.append(build_candidate(
+        candidate = build_candidate(
             ingredient,
             store_key,
             store_name,
@@ -4108,7 +4812,9 @@ def extract_anchor_product_candidates(
             home_location,
             store_location,
             source="html-anchor",
-        ))
+        )
+        candidate["source_page_url"] = page_url
+        candidates.append(candidate)
 
         if len(candidates) >= limit:
             break
@@ -4169,16 +4875,29 @@ def build_candidate(
         "store_location_address": store_location.get("address", ""),
         "store_location_distance_miles": store_location.get("distance_miles"),
         "store_locator_url": store_location.get("locator_url", ""),
+        "store_address": store_location.get("address", ""),
+        "pickup_enabled": store_location.get("pickup_enabled"),
+        "store_selection_context": {
+            "home_address": full_address,
+            "nearest_store_name": store_location.get("name", ""),
+            "nearest_store_address": store_location.get("address", ""),
+            "nearest_store_distance_miles": store_location.get("distance_miles"),
+            "pickup_enabled": store_location.get("pickup_enabled"),
+            "pickup_status": store_location.get("pickup_status", ""),
+        },
         "home_address": full_address,
         "home_location": home_location,
         "product_name": product_name,
+        "brand": "",
         "price": price,
         "size": "",
         "package_size": "",
         "unit_price": "",
         "image_url": image_url,
+        "embedded_image_base64": "",
         "product_url": product_url,
         "search_url": search_url,
+        "source_page_url": search_url,
         "source": source,
         "score": 0,
         "confidence": 0,
@@ -4221,6 +4940,332 @@ def rank_product_candidates(ingredient, candidates, quantity_context=None):
     return sorted(ranked, key=lambda item: item.get("score", 0), reverse=True)
 
 
+def apply_chatgpt_store_product_rankings(ingredient, candidates, full_address="", quantity_context=None):
+    if not product_final_selection_agent_enabled():
+        return candidates
+
+    grouped = {}
+    for candidate in candidates:
+        if candidate.get("source") == "search-page-fallback":
+            continue
+        store_key = candidate.get("store_key", "")
+        grouped.setdefault(store_key, []).append(candidate)
+
+    for store_key, store_candidates in grouped.items():
+        rankable = [
+            candidate
+            for candidate in sorted(store_candidates, key=lambda item: item.get("score", 0), reverse=True)
+            if candidate.get("id")
+        ][:product_final_selection_candidate_limit()]
+        allowed_ids = {candidate.get("id") for candidate in rankable if candidate.get("id")}
+
+        if not allowed_ids:
+            continue
+
+        selection = choose_store_products_with_chatgpt(
+            ingredient,
+            rankable,
+            full_address=full_address,
+            quantity_context=quantity_context,
+            allowed_ids=allowed_ids,
+        )
+
+        apply_store_product_ranking_selection(rankable, selection)
+
+    return sorted(candidates, key=lambda item: item.get("score", 0), reverse=True)
+
+
+def choose_store_products_with_chatgpt(ingredient, candidates, full_address="", quantity_context=None, allowed_ids=None):
+    client = get_product_analysis_client()
+
+    if not client:
+        return {
+            "status": "skipped",
+            "message": "ChatGPT store product ranking skipped because OPENAI_API_KEY is not set.",
+        }
+
+    prompt_ids = {candidate.get("id") for candidate in candidates if candidate.get("id")}
+    allowed_ids = prompt_ids & set(allowed_ids or prompt_ids)
+    system_prompt = (
+        "You are a grocery product ranking function. Selenium has already loaded the store page, "
+        "selected the nearby store context, scrolled the page, and extracted product-card data. "
+        "Do not browse. Rank only the supplied candidates and return only valid JSON."
+    )
+    user_prompt = build_store_product_ranking_prompt(
+        ingredient,
+        candidates,
+        full_address,
+        quantity_context=quantity_context,
+    )
+    prompt_payload = chatgpt_prompt_payload(
+        "store-product-ranking",
+        PRODUCT_ANALYSIS_MODEL,
+        [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        temperature=0,
+    )
+
+    try:
+        with PRODUCT_AI_ANALYSIS_LOCK:
+            response = client.chat.completions.create(
+                model=PRODUCT_ANALYSIS_MODEL,
+                messages=prompt_payload["messages"],
+                response_format={"type": "json_object"},
+                temperature=0,
+            )
+        data = json.loads(clean_json_response(response.choices[0].message.content))
+    except Exception as exc:
+        return {
+            "status": "failed",
+            "message": f"ChatGPT store product ranking failed: {exc}",
+            "prompt": prompt_payload,
+        }
+
+    selection = normalize_store_product_ranking_response(data, allowed_ids)
+    selection["status"] = "done"
+    selection["model"] = PRODUCT_ANALYSIS_MODEL
+    selection["prompt"] = prompt_payload
+    selection["candidate_count_sent"] = len(candidates)
+    return selection
+
+
+def build_store_product_ranking_prompt(ingredient, candidates, full_address, quantity_context=None):
+    rules_payload = product_analysis_rules_payload()
+    quantity_context = quantity_context or {}
+    store_candidate = candidates[0] if candidates else {}
+    candidate_payload = [
+        final_product_candidate_payload(candidate)
+        for candidate in candidates
+    ]
+    rendered_page_html = store_candidate.get("rendered_page_html_excerpt", "")
+    rendered_page_meta = {
+        "url": store_candidate.get("rendered_page_url", ""),
+        "html_path": store_candidate.get("rendered_page_html_path", ""),
+        "html_length": store_candidate.get("rendered_page_html_length", 0),
+        "prompt_html_length": len(rendered_page_html),
+        "prompt_html_was_truncated": (
+            bool(store_candidate.get("rendered_page_html_length"))
+            and len(rendered_page_html) >= product_rendered_html_prompt_limit()
+            and len(rendered_page_html) < int(store_candidate.get("rendered_page_html_length") or 0)
+        ),
+    }
+
+    return f"""
+You are a grocery product ranking function.
+
+Selenium/undetected Chrome already opened the actual grocery website, used the saved address context, selected the nearest pickup-oriented store when available, fully loaded the product search page, scrolled until no new product cards appeared, saved the rendered page HTML, and extracted the product-card HTML/data below.
+
+Do not browse, fetch, or infer from outside websites. Use only the supplied product-card data and saved rules.
+
+Requested item:
+{ingredient}
+
+Current saved address:
+{full_address}
+
+Store:
+{store_candidate.get("store_name", "")}
+
+Store address:
+{store_candidate.get("store_location_address", "")}
+
+Total shopping-list quantity needed:
+{quantity_context.get("display") or "Not specified"}
+
+Quantity sources:
+{json.dumps(quantity_context.get("sources", []), ensure_ascii=False)}
+
+Saved food rules:
+{json.dumps(rules_payload.get("food_rules", {}), ensure_ascii=False)}
+
+Saved best-product ranking guidance:
+{json.dumps(rules_payload.get("best_product_ranking", []), ensure_ascii=False)}
+
+Rendered page source metadata:
+{json.dumps(rendered_page_meta, ensure_ascii=False)}
+
+Cleaned rendered page HTML from the fully loaded Selenium page:
+{rendered_page_html}
+
+Captured product cards from the fully loaded Selenium page:
+{json.dumps(candidate_payload, ensure_ascii=False)}
+
+Rules:
+- Return every supplied candidate in results. Never return partial product lists.
+- Choose exactly one best product when a valid confident match exists.
+- Mark other valid products as alternative.
+- Mark irrelevant, unavailable, rule-failing, search-page-only, or ambiguous products as rejected.
+- Include a rejection_reason for every rejected product.
+- Include confidence_score from 0 to 1 for every product.
+- Product URLs should be direct product pages when available, not search pages.
+- Relevance comes first, then in-stock status, best unit value, package fit for the total quantity needed, saved preferences such as organic, and nearest valid store context.
+- For eggs, prefer standard shell egg cartons, 12-count or larger cartons, availability, nearby stores, and lowest price per egg. Reject liquid eggs, egg whites only, boiled eggs, egg bites, and plant-based substitutes when possible.
+
+Return ONLY valid JSON.
+
+Output schema:
+{{
+  "timestamp": "",
+  "search_item": "{normalize_match_text(ingredient)}",
+  "store_name": "{store_candidate.get("store_name", "")}",
+  "store_address": "{store_candidate.get("store_location_address", "")}",
+  "best_product_id": "",
+  "best_product": {{}},
+  "results": [
+    {{
+      "id": "",
+      "ranking_status": "best|alternative|rejected",
+      "rejection_reason": "",
+      "confidence_score": 0,
+      "reason": ""
+    }}
+  ]
+}}
+"""
+
+
+def normalize_store_product_ranking_response(data, allowed_ids):
+    data = data if isinstance(data, dict) else {}
+    allowed_ids = set(allowed_ids or [])
+    best_product = data.get("best_product") if isinstance(data.get("best_product"), dict) else {}
+    best_product_id = clean_text(
+        data.get("best_product_id")
+        or best_product.get("id")
+        or best_product.get("product_id")
+        or best_product.get("candidate_id")
+    )
+    if best_product_id not in allowed_ids:
+        best_product_id = ""
+
+    raw_results = data.get("results") if isinstance(data.get("results"), list) else []
+    results = []
+    for raw in raw_results:
+        if not isinstance(raw, dict):
+            continue
+        product_id = clean_text(raw.get("id") or raw.get("product_id") or raw.get("candidate_id"))
+        if product_id not in allowed_ids:
+            continue
+
+        status = normalize_ranking_status(raw.get("ranking_status") or raw.get("status"))
+        if not status and product_id == best_product_id:
+            status = "best"
+        elif not status:
+            status = "alternative"
+
+        results.append({
+            "id": product_id,
+            "ranking_status": status,
+            "rejection_reason": clean_text(raw.get("rejection_reason") or raw.get("reject_reason")),
+            "confidence_score": bounded_confidence(raw.get("confidence_score") or raw.get("confidence")) or 0,
+            "reason": clean_text(raw.get("reason")),
+        })
+
+    result_ids = {result.get("id") for result in results}
+    for product_id in allowed_ids - result_ids:
+        results.append({
+            "id": product_id,
+            "ranking_status": "best" if product_id == best_product_id else "alternative",
+            "rejection_reason": "",
+            "confidence_score": 0,
+            "reason": "",
+        })
+
+    if not best_product_id:
+        for result in results:
+            if result.get("ranking_status") == "best":
+                best_product_id = result.get("id", "")
+                break
+
+    return {
+        "best_product_id": best_product_id,
+        "best_product": best_product,
+        "results": results,
+        "timestamp": clean_text(data.get("timestamp")),
+        "search_item": clean_text(data.get("search_item")),
+        "store_name": clean_text(data.get("store_name")),
+        "store_address": clean_text(data.get("store_address")),
+    }
+
+
+def normalize_ranking_status(value):
+    text = normalize_match_text(value)
+    if text in {"best", "selected", "winner", "pick", "picked"}:
+        return "best"
+    if text in {"alternative", "valid", "valid alternative", "candidate"}:
+        return "alternative"
+    if text in {"rejected", "reject", "invalid", "unavailable", "not relevant", "not selectable"}:
+        return "rejected"
+    return ""
+
+
+def apply_store_product_ranking_selection(candidates, selection):
+    if selection.get("status") != "done":
+        return candidates
+
+    results_by_id = {
+        result.get("id"): result
+        for result in selection.get("results", [])
+        if result.get("id")
+    }
+    best_product_id = selection.get("best_product_id", "")
+
+    for candidate in candidates:
+        result = results_by_id.get(candidate.get("id"), {})
+        status = normalize_ranking_status(result.get("ranking_status"))
+        confidence = bounded_confidence(result.get("confidence_score")) or 0
+        reason = clean_text(result.get("reason"))
+        rejection_reason = clean_text(result.get("rejection_reason"))
+        selected = candidate.get("id") == best_product_id
+
+        if selected and status != "rejected":
+            status = "best"
+
+        agent_summary = {
+            "status": "done",
+            "model": selection.get("model", PRODUCT_ANALYSIS_MODEL),
+            "selected_product_id": best_product_id,
+            "ranking_status": status,
+            "confidence_score": confidence,
+            "reason": reason,
+            "rejection_reason": rejection_reason,
+            "selected": selected,
+        }
+        if selection.get("prompt"):
+            agent_summary["prompt"] = selection.get("prompt")
+        candidate["chatgpt_store_ranking_agent"] = agent_summary
+
+        if confidence:
+            candidate["confidence"] = round(max(candidate.get("confidence", 0), confidence), 2)
+            candidate["confidence_score"] = candidate["confidence"]
+
+        if status:
+            candidate["ranking_status"] = status
+
+        if status == "rejected":
+            candidate["viable"] = False
+            if rejection_reason:
+                candidate["rejection_reason"] = rejection_reason
+                candidate["skip_reasons"] = unique_texts(candidate.get("skip_reasons", []) + [rejection_reason])
+            candidate["score"] = round(candidate.get("score", 0) - 80, 2)
+        elif status == "best":
+            candidate["score"] = round(candidate.get("score", 0) + 65 + (confidence * 20), 2)
+            candidate["reason_selected"] = reason or "ChatGPT store ranking chose this product-card candidate as the best store match."
+            candidate["ranking_reasons"] = unique_texts(
+                candidate.get("ranking_reasons", [])
+                + ["ChatGPT store ranking chose this product-card candidate as the best store match.", reason]
+            )
+        elif status == "alternative":
+            candidate["score"] = round(candidate.get("score", 0) + (confidence * 8), 2)
+            candidate["ranking_reasons"] = unique_texts(
+                candidate.get("ranking_reasons", [])
+                + ["ChatGPT store ranking kept this product as a valid alternative.", reason]
+            )
+
+    return candidates
+
+
 def apply_chatgpt_final_product_selection(ingredient, candidates, full_address="", quantity_context=None):
     if not product_final_selection_agent_enabled():
         return candidates
@@ -4228,10 +5273,16 @@ def apply_chatgpt_final_product_selection(ingredient, candidates, full_address="
     agent_candidates = [
         candidate
         for candidate in candidates
-        if candidate.get("viable") and candidate_has_direct_product_url(candidate)
+        if candidate.get("source") != "search-page-fallback"
+        and candidate_has_direct_product_url(candidate)
     ]
+    selectable_ids = {
+        candidate.get("id")
+        for candidate in agent_candidates
+        if candidate.get("viable") and candidate.get("id")
+    }
 
-    if not agent_candidates:
+    if not agent_candidates or not selectable_ids:
         return candidates
 
     selection = choose_best_product_with_chatgpt(
@@ -4239,6 +5290,7 @@ def apply_chatgpt_final_product_selection(ingredient, candidates, full_address="
         sorted(agent_candidates, key=lambda item: item.get("score", 0), reverse=True),
         full_address=full_address,
         quantity_context=quantity_context,
+        selectable_ids=selectable_ids,
     )
 
     if selection.get("status") != "done":
@@ -4256,6 +5308,8 @@ def apply_chatgpt_final_product_selection(ingredient, candidates, full_address="
             "selected_product_id": selected_id,
             "confidence": selection.get("confidence"),
             "reason": selection.get("reason", ""),
+            "best_result": selection.get("best_result", {}),
+            "result_count": len(selection.get("results", [])),
             "selected": candidate.get("id") == selected_id,
         }
         if candidate.get("id") == selected_id and selection.get("prompt"):
@@ -4285,7 +5339,7 @@ def apply_chatgpt_final_product_selection(ingredient, candidates, full_address="
     return sorted(candidates, key=lambda item: item.get("score", 0), reverse=True)
 
 
-def choose_best_product_with_chatgpt(ingredient, candidates, full_address="", quantity_context=None):
+def choose_best_product_with_chatgpt(ingredient, candidates, full_address="", quantity_context=None, selectable_ids=None):
     client = get_product_analysis_client()
 
     if not client:
@@ -4295,10 +5349,12 @@ def choose_best_product_with_chatgpt(ingredient, candidates, full_address="", qu
         }
 
     limited_candidates = candidates[:product_final_selection_candidate_limit()]
-    allowed_ids = {candidate.get("id") for candidate in limited_candidates if candidate.get("id")}
+    prompt_ids = {candidate.get("id") for candidate in limited_candidates if candidate.get("id")}
+    allowed_ids = prompt_ids & set(selectable_ids or prompt_ids)
     system_prompt = (
-        "You are the final grocery product selection agent for a shopping-list app. "
-        "Use saved rules strictly, prefer direct product links, and return only valid JSON."
+        "You are a grocery product collection agent for a shopping-list app. "
+        "Normalize every supplied product-card candidate, choose one best_result from those candidates only, "
+        "use saved rules strictly, prefer direct product links, and return only valid JSON."
     )
     user_prompt = build_final_product_selection_prompt(
         ingredient,
@@ -4347,10 +5403,19 @@ def build_final_product_selection_prompt(ingredient, candidates, full_address, q
         final_product_candidate_payload(candidate)
         for candidate in candidates
     ]
+    source_pages = unique_texts([
+        candidate.get("source_page_url") or candidate.get("search_url", "")
+        for candidate in candidates
+        if candidate.get("source_page_url") or candidate.get("search_url")
+    ])
 
     return f"""
-Choose the best grocery product for this shopping item:
+You are a grocery product collection agent.
+
+Requested item:
 {ingredient}
+
+The app has already searched nearby activated stores, loaded the search/category pages, and captured visible product cards. Treat the candidate list below as the product-card collection to normalize and judge. Do not invent products or omit candidates that were supplied.
 
 Total shopping-list quantity needed:
 {quantity_context.get("display") or "Not specified"}
@@ -4361,58 +5426,97 @@ Quantity sources:
 Current saved address:
 {full_address}
 
+Captured source/search pages:
+{json.dumps(source_pages, ensure_ascii=False)}
+
 Saved food rules:
 {json.dumps(rules_payload.get("food_rules", {}), ensure_ascii=False)}
 
 Saved best-product ranking guidance:
 {json.dumps(rules_payload.get("best_product_ranking", []), ensure_ascii=False)}
 
-Candidate products from activated nearby stores:
+Captured product-card JSON from activated nearby stores:
 {json.dumps(candidate_payload, ensure_ascii=False)}
 
-Selection rules:
-- Select exactly one selected_product_id only if it is a direct product URL, not a search page.
-- Match the shopping item as closely as possible. If the item contains OR/and-or alternatives, matching any one alternative is acceptable.
+Collection requirements:
+- Return every candidate product supplied above in results. Never return partial product lists.
+- Preserve the candidate id, store name, store location, product name, brand, size/count, price, price per egg if available, price per unit if shown, in-stock status, product URL, image URL, raw product-card HTML snippet, product-card text, and embedded image status/value.
+- Product URLs must be direct product pages when available, not search pages.
+- If a field is not available, leave it as an empty string or null.
+- You must not browse or fetch any store website. Rank only the product-card data supplied in this prompt.
+
+Best-result rules:
+- Pick best_result from the supplied results only.
+- Match the requested item as closely as possible. If the item contains OR/and-or alternatives, matching any one alternative is acceptable.
 - Take the total shopping-list quantity into account. Prefer a package or item count that covers the needed quantity with the least practical excess/waste.
+- For eggs, prefer standard shell eggs, 12-count or larger cartons, availability, nearby stores, and the lowest price per egg when possible. Include cage-free, organic, brown, white, large, extra-large, 18-count, and 24-count shell eggs. Exclude unrelated egg products when possible, including liquid eggs, egg whites only, boiled eggs, egg bites, and plant-based egg substitutes.
 - If the needed quantity is a small unitless count (for example 1 lemon, 1 onion, 2 eggs), prefer an each/single item or the smallest count package over a bulk bag, multi-pack, or multi-pound package unless the bulk package is the only candidate that satisfies strict food rules.
 - For a plain whole-food item such as lemon, onion, basil, asparagus, or egg, prefer the actual whole grocery item over juice, extract, drinks, desserts, mixes, prepared foods, cleaners, or scented products unless the shopping item asks for those forms.
 - Required food rules are strict. If a candidate does not confirm a required trait, do not choose it.
 - Avoid rules are strict. Do not choose a candidate that contains avoided ingredients, labels, or terms.
 - Prefer visible price, unit price/value, package size, in-stock status, nearby store distance, and evidence from fully loaded product-page analysis.
-- If no candidate is a confident product match, return an empty selected_product_id.
+- If no candidate is a confident product match, return best_result as an empty object.
 
-Return only JSON with this shape:
+Return ONLY valid JSON.
+
+Output schema:
 {{
-  "selected_product_id": "",
-  "confidence": 0.0,
-  "reason": "",
-  "ranked_product_ids": [],
-  "rejected_product_ids": []
+  "timestamp": "",
+  "search_item": "{normalize_match_text(ingredient)}",
+  "source_page_url": "",
+  "best_result": {{}},
+  "results": []
 }}
 """
 
 
 def final_product_candidate_payload(candidate):
     page_analysis = candidate.get("chatgpt_analysis") or {}
+    embedded_image = candidate.get("embedded_image_base64", "")
+    embedded_image_value = (
+        embedded_image
+        if product_prompt_include_embedded_images()
+        else embedded_image_prompt_placeholder(embedded_image)
+    )
 
     return {
         "id": candidate.get("id", ""),
-        "store": candidate.get("store_name", ""),
-        "nearest_store": candidate.get("store_location_name", ""),
-        "nearest_store_address": candidate.get("store_location_address", ""),
-        "nearest_store_distance_miles": candidate.get("store_location_distance_miles"),
+        "store_name": candidate.get("store_name", ""),
+        "store_location": {
+            "name": candidate.get("store_location_name", ""),
+            "address": candidate.get("store_location_address", ""),
+            "distance_miles": candidate.get("store_location_distance_miles"),
+            "pickup_enabled": candidate.get("pickup_enabled"),
+        },
+        "source_page_url": candidate.get("source_page_url") or candidate.get("search_url", ""),
+        "rendered_page_url": candidate.get("rendered_page_url", ""),
+        "rendered_page_html_path": candidate.get("rendered_page_html_path", ""),
+        "rendered_page_html_length": candidate.get("rendered_page_html_length", 0),
         "product_name": candidate.get("product_name", ""),
+        "brand": candidate.get("brand", ""),
         "requested_quantity": candidate.get("requested_quantity", ""),
         "quantity_fit": candidate.get("quantity_fit", {}),
+        "size_count": product_size(candidate),
         "price": candidate.get("price", ""),
-        "size": product_size(candidate),
-        "unit_price": candidate.get("unit_price", ""),
-        "unit_price_value": candidate.get("unit_price_value"),
-        "unit_price_unit": candidate.get("unit_price_unit", ""),
+        "price_per_egg": candidate.get("price_per_egg", ""),
+        "price_per_egg_value": candidate.get("price_per_egg_value"),
+        "price_per_unit": candidate.get("unit_price", ""),
+        "price_per_unit_value": candidate.get("unit_price_value"),
+        "price_per_unit_unit": candidate.get("unit_price_unit", ""),
         "product_url": candidate.get("product_url", ""),
+        "image_url": candidate.get("image_url", ""),
+        "raw_product_html_snippet": candidate.get("raw_product_html_snippet", ""),
+        "product_card_text": candidate.get("card_text_excerpt") or candidate.get("detail_text_excerpt", ""),
+        "embedded_image_base64": embedded_image_value,
+        "embedded_image_base64_captured": bool(embedded_image),
+        "embedded_image_base64_length": len(embedded_image),
         "availability": candidate.get("availability", ""),
         "in_stock": candidate.get("in_stock"),
+        "ranking_status": candidate.get("ranking_status", ""),
+        "rejection_reason": candidate.get("rejection_reason", ""),
+        "egg_product": candidate.get("egg_product", {}),
         "local_confidence": candidate.get("confidence"),
+        "confidence_score": candidate.get("confidence_score", candidate.get("confidence")),
         "local_score": candidate.get("score"),
         "food_rule_status": candidate.get("food_rule_status", {}),
         "ranking_reasons": candidate.get("ranking_reasons", [])[:6],
@@ -4430,16 +5534,36 @@ def final_product_candidate_payload(candidate):
     }
 
 
+def embedded_image_prompt_placeholder(value):
+    if not value:
+        return ""
+
+    return "[embedded image stored on candidate; {length} chars omitted from ChatGPT prompt]".format(
+        length=len(value),
+    )
+
+
 def normalize_final_product_selection(data, allowed_ids):
     data = data if isinstance(data, dict) else {}
-    selected_id = clean_text(data.get("selected_product_id"))
+    best_result = data.get("best_result") if isinstance(data.get("best_result"), dict) else {}
+    selected_id = clean_text(
+        data.get("selected_product_id")
+        or best_result.get("id")
+        or best_result.get("product_id")
+        or best_result.get("candidate_id")
+    )
     if selected_id not in allowed_ids:
         selected_id = ""
 
     return {
         "selected_product_id": selected_id,
-        "confidence": bounded_confidence(data.get("confidence")) or 0,
-        "reason": clean_text(data.get("reason")),
+        "confidence": bounded_confidence(data.get("confidence") or best_result.get("confidence")) or 0,
+        "reason": clean_text(data.get("reason") or best_result.get("reason")),
+        "timestamp": clean_text(data.get("timestamp")),
+        "search_item": clean_text(data.get("search_item")),
+        "source_page_url": clean_text(data.get("source_page_url")),
+        "best_result": best_result,
+        "results": data.get("results") if isinstance(data.get("results"), list) else [],
         "ranked_product_ids": [
             product_id
             for product_id in clean_text_list(data.get("ranked_product_ids"))
@@ -4677,6 +5801,131 @@ def looks_like_single_each_product(ingredient, candidate):
     )
 
 
+def apply_egg_product_metadata(ingredient, candidate):
+    if not is_egg_request(ingredient):
+        return {}
+
+    text = egg_candidate_text(candidate)
+    tokens = set(tokenize(text))
+    count = parse_egg_count(text)
+    price_amount = parse_price_amount(candidate.get("price"))
+    price_per_egg_value = None
+    price_per_egg = ""
+
+    if count and price_amount is not None:
+        price_per_egg_value = round(price_amount / count, 4)
+        price_per_egg = "${:.2f}/egg".format(price_amount / count)
+
+    avoid_matches = sorted(tokens & EGG_PRODUCT_AVOID_TERMS)
+    shell_score = len(tokens & EGG_PRODUCT_SHELL_TERMS)
+    standard_shell = (
+        not avoid_matches
+        and ("egg" in tokens or "eggs" in tokens)
+        and (shell_score >= 1 or bool(count))
+    )
+
+    metadata = {
+        "is_egg_request": True,
+        "egg_count": count,
+        "price_per_egg_value": price_per_egg_value,
+        "price_per_egg": price_per_egg,
+        "standard_shell_egg_carton": standard_shell,
+        "excluded_egg_terms": avoid_matches,
+    }
+    candidate["egg_product"] = metadata
+    candidate["egg_count"] = count
+    candidate["price_per_egg"] = price_per_egg
+    candidate["price_per_egg_value"] = price_per_egg_value
+    return metadata
+
+
+def egg_product_preference_score(ingredient, candidate):
+    metadata = apply_egg_product_metadata(ingredient, candidate)
+    if not metadata:
+        return {"score": 0, "reasons": [], "skip_reasons": []}
+
+    score = 0
+    reasons = []
+    skip_reasons = []
+
+    if metadata.get("standard_shell_egg_carton"):
+        score += 28
+        reasons.append("Standard shell egg carton match.")
+    else:
+        score -= 42
+        skip_reasons.append("Egg product is not a standard shell egg carton.")
+
+    count = metadata.get("egg_count")
+    if count:
+        if count >= 12:
+            score += 18
+            reasons.append(f"Egg carton count is {int(count)}.")
+        else:
+            score -= 10
+            skip_reasons.append(f"Egg carton count is below 12 ({int(count)}).")
+    else:
+        skip_reasons.append("Egg carton count was not clear.")
+
+    if metadata.get("price_per_egg_value") is not None:
+        score += 10
+        reasons.append(f"Price per egg calculated: {metadata.get('price_per_egg')}.")
+
+    if metadata.get("excluded_egg_terms"):
+        score -= 65
+        skip_reasons.append(
+            "Excluded egg-product form detected: "
+            + ", ".join(metadata.get("excluded_egg_terms", []))
+            + "."
+        )
+
+    return {"score": score, "reasons": reasons, "skip_reasons": skip_reasons}
+
+
+def is_egg_request(ingredient):
+    tokens = set(tokenize(ingredient))
+    return bool(tokens & {"egg", "eggs"}) and "eggplant" not in tokens
+
+
+def egg_candidate_text(candidate):
+    return " ".join([
+        candidate.get("product_name", ""),
+        candidate.get("brand", ""),
+        candidate.get("description", ""),
+        candidate.get("package_size", ""),
+        candidate.get("size", ""),
+        candidate.get("unit_price", ""),
+        candidate.get("card_text_excerpt", ""),
+        candidate.get("detail_text_excerpt", ""),
+    ]).lower()
+
+
+def parse_egg_count(text):
+    text = clean_text(text).lower()
+
+    if re.search(r"\bdozen\b", text):
+        return 12
+
+    match = re.search(
+        r"\b(\d{1,3})[-\s]*(?:count|ct|pack|pk|carton|eggs?)\b",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        value = safe_float(match.group(1))
+        return int(value) if value else None
+
+    return None
+
+
+def parse_price_amount(value):
+    text = normalize_price(value)
+    match = PRICE_PATTERN.search(text)
+    if not match:
+        return None
+
+    return safe_float(match.group(0).replace("$", ""))
+
+
 def score_candidate(ingredient, candidate, quantity_context=None):
     score = 20.0
     reasons = []
@@ -4836,6 +6085,13 @@ def score_candidate(ingredient, candidate, quantity_context=None):
     reasons.extend(quantity_adjustment.get("reasons", []))
     skip_reasons.extend(quantity_adjustment.get("skip_reasons", []))
 
+    egg_adjustment = egg_product_preference_score(ingredient, candidate)
+    score += egg_adjustment.get("score", 0)
+    reasons.extend(egg_adjustment.get("reasons", []))
+    skip_reasons.extend(egg_adjustment.get("skip_reasons", []))
+    if (candidate.get("egg_product") or {}).get("excluded_egg_terms"):
+        viable = False
+
     if candidate.get("in_stock") is True:
         score += 12
         reasons.append("Nearby store page indicates availability.")
@@ -4913,23 +6169,23 @@ def select_product_choice(item_key, product_id, store_key=""):
         selected,
         selected.get("store_name", ""),
     )
+    selected_at = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    selected["selected_by_user"] = True
+    selected["selected_at"] = selected_at
 
     if store_key:
         store_results = record.setdefault("store_results", {})
+        store_candidates = [
+            candidate
+            for candidate in record.get("candidates", [])
+            if candidate.get("store_key") == store_key
+        ]
         store_result = find_store_result(record, store_key) or {
             "store_key": store_key,
             "store_name": selected.get("store_name", ""),
             "ingredient": record.get("ingredient", item_key),
-            "alternatives": [
-                candidate
-                for candidate in record.get("candidates", [])
-                if candidate.get("store_key") == store_key
-            ],
-            "alternative_products": [
-                candidate
-                for candidate in record.get("candidates", [])
-                if candidate.get("store_key") == store_key
-            ],
+            "alternatives": store_candidates,
+            "alternative_products": store_candidates,
         }
         store_result.update({
             "best_product_id": product_id,
@@ -4943,6 +6199,20 @@ def select_product_choice(item_key, product_id, store_key=""):
             "reason_selected": selected.get("reason_selected", ""),
             "reason_skipped": "",
             "skip_reason": "",
+            "selected_by_user": True,
+            "selected_at": selected_at,
+            "alternatives": store_candidates,
+            "alternative_products": store_candidates,
+            "valid_alternatives": [
+                candidate
+                for candidate in store_candidates
+                if candidate.get("viable") is not False
+            ],
+            "rejected_products": [
+                candidate
+                for candidate in store_candidates
+                if candidate.get("viable") is False
+            ],
         })
         store_results[store_key] = store_result
         record["store_results_list"] = upsert_store_result_list(
@@ -4954,7 +6224,9 @@ def select_product_choice(item_key, product_id, store_key=""):
     record["selected_product"] = selected
     record["manual_override"] = True
     record["manual_override_store_key"] = store_key
-    record["updated_at"] = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    record["selected_by_user"] = True
+    record["selected_at"] = selected_at
+    record["updated_at"] = selected_at
     save_product_choices(state)
     save_item_store(item_key, selected.get("store_key") or "")
 
@@ -5091,6 +6363,8 @@ def find_nearest_store_location(store_key, store, full_address, home_location):
         "distance_miles": None,
         "locator_url": locator_url,
         "source": "configured-store-locator",
+        "pickup_enabled": True,
+        "pickup_status": "Assumed pickup-capable because the store is enabled for product search.",
     }
 
     if not home_location:
@@ -5140,6 +6414,8 @@ def find_nearest_store_location(store_key, store, full_address, home_location):
             "distance_miles": round(distance, 2),
             "locator_url": locator_url,
             "source": "nominatim",
+            "pickup_enabled": True,
+            "pickup_status": "Nearest location resolved for pickup-oriented grocery search.",
         })
 
     if not locations:
@@ -5226,6 +6502,37 @@ def apply_relative_candidate_preferences(candidates):
                 candidate["ranking_reasons"] = unique_texts(
                     candidate.get("ranking_reasons", [])
                     + ["Unit value compared with alternatives."]
+                )
+
+    egg_candidates = [
+        candidate
+        for candidate in candidates
+        if (
+            candidate.get("viable")
+            and isinstance(candidate.get("price_per_egg_value"), (int, float))
+            and (candidate.get("egg_product") or {}).get("standard_shell_egg_carton")
+        )
+    ]
+    if len(egg_candidates) >= 2:
+        values = [candidate.get("price_per_egg_value") for candidate in egg_candidates]
+        best = min(values)
+        worst = max(values)
+        spread = max(0.01, worst - best)
+
+        for candidate in egg_candidates:
+            value = candidate.get("price_per_egg_value")
+            if value == best:
+                candidate["score"] = round(candidate.get("score", 0) + 22, 2)
+                candidate["ranking_reasons"] = unique_texts(
+                    candidate.get("ranking_reasons", [])
+                    + ["Lowest price per egg among comparable shell-egg cartons."]
+                )
+            else:
+                value_score = max(0, 14 * ((worst - value) / spread))
+                candidate["score"] = round(candidate.get("score", 0) + value_score, 2)
+                candidate["ranking_reasons"] = unique_texts(
+                    candidate.get("ranking_reasons", [])
+                    + ["Price per egg compared with comparable shell-egg cartons."]
                 )
 
     for candidate in candidates:

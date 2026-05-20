@@ -12,7 +12,8 @@
       "preparation": null,
       "optional": false,
       "store_section": "DAIRY & EGGS",
-      "store_section_order": 3
+      "store_section_order": 3,
+      "base_quantity": "5"
     },
     {
       "section": null,
@@ -23,7 +24,8 @@
       "preparation": null,
       "optional": false,
       "store_section": "DAIRY & EGGS",
-      "store_section_order": 3
+      "store_section_order": 3,
+      "base_quantity": "2"
     },
     {
       "section": null,
@@ -34,7 +36,9 @@
       "preparation": null,
       "optional": false,
       "store_section": "BAKING",
-      "store_section_order": 7
+      "store_section_order": 7,
+      "base_quantity": "3/4",
+      "base_unit": "cup"
     },
     {
       "section": null,
@@ -45,7 +49,9 @@
       "preparation": null,
       "optional": false,
       "store_section": "BAKING",
-      "store_section_order": 7
+      "store_section_order": 7,
+      "base_quantity": "1",
+      "base_unit": "teaspoon"
     },
     {
       "section": null,
@@ -56,7 +62,9 @@
       "preparation": null,
       "optional": false,
       "store_section": "BAKING",
-      "store_section_order": 7
+      "store_section_order": 7,
+      "base_quantity": "3/4",
+      "base_unit": "cup"
     },
     {
       "section": null,
@@ -67,7 +75,9 @@
       "preparation": null,
       "optional": false,
       "store_section": "BAKING",
-      "store_section_order": 7
+      "store_section_order": 7,
+      "base_quantity": "6",
+      "base_unit": "tablespoons"
     },
     {
       "section": null,
@@ -78,7 +88,9 @@
       "preparation": null,
       "optional": false,
       "store_section": "BAKING",
-      "store_section_order": 7
+      "store_section_order": 7,
+      "base_quantity": "1/4",
+      "base_unit": "teaspoon"
     },
     {
       "section": null,
@@ -89,7 +101,9 @@
       "preparation": "warm",
       "optional": false,
       "store_section": "DAIRY & EGGS",
-      "store_section_order": 3
+      "store_section_order": 3,
+      "base_quantity": "1/4",
+      "base_unit": "cup"
     },
     {
       "section": null,
@@ -100,7 +114,9 @@
       "preparation": null,
       "optional": false,
       "store_section": "BAKING",
-      "store_section_order": 7
+      "store_section_order": 7,
+      "base_quantity": "3",
+      "base_unit": "cups"
     },
     {
       "section": null,
@@ -111,7 +127,9 @@
       "preparation": null,
       "optional": false,
       "store_section": "DAIRY & EGGS",
-      "store_section_order": 3
+      "store_section_order": 3,
+      "base_quantity": "1",
+      "base_unit": "cup"
     },
     {
       "section": null,
@@ -122,7 +140,9 @@
       "preparation": null,
       "optional": false,
       "store_section": "DAIRY & EGGS",
-      "store_section_order": 3
+      "store_section_order": 3,
+      "base_quantity": "1 to 2",
+      "base_unit": "tablespoons"
     },
     {
       "section": null,
@@ -133,7 +153,9 @@
       "preparation": "chopped",
       "optional": false,
       "store_section": "BAKING",
-      "store_section_order": 7
+      "store_section_order": 7,
+      "base_quantity": "12",
+      "base_unit": "ounces"
     },
     {
       "section": null,
@@ -144,7 +166,9 @@
       "preparation": null,
       "optional": false,
       "store_section": "BAKING",
-      "store_section_order": 7
+      "store_section_order": 7,
+      "base_quantity": "2",
+      "base_unit": "ounces"
     }
   ],
   "equipment": [
@@ -309,5 +333,28 @@
     "calcium": null,
     "iron": null,
     "other": []
+  },
+  "scaling": {
+    "selected_multiplier": 1.0,
+    "base_multiplier": 1.0,
+    "base_servings": "12 servings",
+    "available_multipliers": [
+      {
+        "label": "1/2x",
+        "value": 0.5
+      },
+      {
+        "label": "1x",
+        "value": 1.0
+      },
+      {
+        "label": "2x",
+        "value": 2.0
+      },
+      {
+        "label": "3x",
+        "value": 3.0
+      }
+    ]
   }
 }

@@ -517,6 +517,13 @@ function renderProductAlternatives(choice) {
         return;
     }
 
+    const validCandidates = Array.isArray(choice.valid_alternatives) && choice.valid_alternatives.length
+        ? choice.valid_alternatives
+        : candidates.filter(candidate => candidate && candidate.viable !== false && candidate.rejected !== true);
+    const rejectedCandidates = Array.isArray(choice.rejected_products) && choice.rejected_products.length
+        ? choice.rejected_products
+        : candidates.filter(candidate => candidate && (candidate.viable === false || candidate.rejected === true));
+
     const finalPromptHtml = hasPromptPayload(choice.chatgpt_final_selection_prompt)
         ? `
             <div class="bulk-alt-prompt-row">
@@ -527,83 +534,147 @@ function renderProductAlternatives(choice) {
         `
         : "";
 
-    content.innerHTML = finalPromptHtml + candidates.map(candidate => {
-        const selected = candidate.id === selectedId;
-        const selectable = candidate.viable !== false;
-        const size = candidate.size || candidate.package_size || "";
-        const meta = [
-            candidate.store_name,
-            candidate.price || "Price unavailable",
-            size,
-            candidate.unit_price || "",
-            selectable ? "" : "not selectable",
-            candidate.confidence ? `confidence ${candidate.confidence}` : "",
-            candidate.score !== undefined ? `score ${candidate.score}` : "",
-        ].filter(Boolean).join(" | ");
-        const notes = [
-            candidate.reason_selected || "",
-            ...(candidate.ranking_reasons || []),
-            ...(candidate.skip_reasons || [])
-        ]
-            .filter(Boolean)
-            .slice(0, 3)
-            .join(" ");
-        const imageHtml = candidate.image_url
-            ? `<img class="bulk-alt-image" src="${escapeAttribute(candidate.image_url)}" alt="">`
-            : "";
-        const productUrl = candidate.product_url && candidate.product_url !== candidate.search_url
-            ? candidate.product_url
-            : "";
-        const productLinkHtml = productUrl
-            ? `
-                    <a class="bulk-alt-link"
-                       href="${escapeAttribute(productUrl)}"
-                       target="_blank"
-                       rel="noopener noreferrer">
-                        ${escapeHtml(productUrl)}
-                    </a>
-                `
-            : `<div class="bulk-alt-meta">Direct product link unavailable.</div>`;
-        const promptButtonHtml = productPromptEntries(candidate).length
-            ? `
-                <button type="button"
-                        class="bulk-prompt-btn"
-                        data-product-id="${escapeAttribute(candidate.id || "")}"
-                        onclick="openProductPromptForCandidate(this)">
-                    Prompt
-                </button>
-            `
-            : "";
+    const groupsHtml = [
+        renderProductCandidateGroup(
+            "Valid Alternatives",
+            validCandidates,
+            selectedId,
+            choice.item_key || "",
+            storeKey,
+            false
+        ),
+        renderProductCandidateGroup(
+            "Rejected Products",
+            rejectedCandidates,
+            selectedId,
+            choice.item_key || "",
+            storeKey,
+            true
+        ),
+    ].filter(Boolean).join("");
 
-        return `
-            <div class="bulk-alt-option${candidate.image_url ? " has-image" : ""}">
-                ${imageHtml}
-                <div>
-                    <div class="bulk-alt-name">
-                        ${escapeHtml(candidate.product_name || "Unnamed product")}
-                        ${selected ? `<span class="bulk-selected-badge" style="display:inline;">Selected</span>` : ""}
-                    </div>
-                    ${productLinkHtml}
-                    <div class="bulk-alt-meta">${escapeHtml(meta)}</div>
-                    <div class="bulk-alt-meta">${escapeHtml(notes)}</div>
-                    ${promptButtonHtml}
+    content.innerHTML = finalPromptHtml + (groupsHtml || `<div class="bulk-review-note">No alternatives are saved for this ingredient.</div>`);
+}
+
+function renderProductCandidateGroup(title, candidates, selectedId, itemKey, storeKey, rejected = false) {
+    const rows = (candidates || []).filter(Boolean);
+
+    if (!rows.length) {
+        return "";
+    }
+
+    return `
+        <section class="bulk-alt-group${rejected ? " rejected" : ""}">
+            <h3 class="bulk-alt-group-title">${escapeHtml(title)} <span>${rows.length}</span></h3>
+            ${rows.map(candidate => renderProductCandidateOption(candidate, selectedId, itemKey, storeKey, rejected)).join("")}
+        </section>
+    `;
+}
+
+function renderProductCandidateOption(candidate, selectedId, itemKey, storeKey, rejected = false) {
+    const selected = candidate.id === selectedId;
+    const selectable = !rejected && candidate.viable !== false && candidate.rejected !== true;
+    const size = candidate.size || candidate.package_size || "";
+    const meta = [
+        candidate.store_name,
+        candidate.store_location_address || "",
+        candidate.price || "Price unavailable",
+        size,
+        candidate.unit_price || "",
+        candidate.price_per_egg ? `per egg ${candidate.price_per_egg}` : "",
+        candidate.ranking_status || "",
+        selectable ? "" : "not selectable",
+        candidate.confidence ? `confidence ${candidate.confidence}` : "",
+        candidate.score !== undefined ? `score ${candidate.score}` : "",
+    ].filter(Boolean).join(" | ");
+    const notes = [
+        candidate.reason_selected || "",
+        candidate.rejection_reason || "",
+        ...(candidate.rejection_reasons || []),
+        ...(candidate.ranking_reasons || []),
+        ...(candidate.skip_reasons || [])
+    ]
+        .filter(Boolean)
+        .slice(0, rejected ? 6 : 4)
+        .join(" ");
+    const imageSrc = productCandidateImageSrc(candidate);
+    const imageHtml = imageSrc
+        ? `<img class="bulk-alt-image" src="${escapeAttribute(imageSrc)}" alt="">`
+        : "";
+    const productUrl = candidate.product_url && candidate.product_url !== candidate.search_url
+        ? candidate.product_url
+        : "";
+    const productLinkHtml = productUrl
+        ? `
+                <a class="bulk-alt-link"
+                   href="${escapeAttribute(productUrl)}"
+                   target="_blank"
+                   rel="noopener noreferrer">
+                    ${escapeHtml(productUrl)}
+                </a>
+            `
+        : `<div class="bulk-alt-meta">Direct product link unavailable.</div>`;
+    const promptButtonHtml = productPromptEntries(candidate).length
+        ? `
+            <button type="button"
+                    class="bulk-prompt-btn"
+                    data-product-id="${escapeAttribute(candidate.id || "")}"
+                    onclick="openProductPromptForCandidate(this)">
+                Prompt
+            </button>
+        `
+        : "";
+
+    return `
+        <div class="bulk-alt-option${imageSrc ? " has-image" : ""}${rejected ? " rejected" : ""}">
+            ${imageHtml}
+            <div>
+                <div class="bulk-alt-name">
+                    ${escapeHtml(candidate.product_name || "Unnamed product")}
+                    ${selected ? `<span class="bulk-selected-badge" style="display:inline;">Selected</span>` : ""}
                 </div>
-                <button type="button"
-                        class="bulk-alt-select-btn${selected ? " selected" : ""}${selectable ? "" : " unavailable"}"
-                        data-item-key="${escapeAttribute(choice.item_key || "")}"
-                        data-product-id="${escapeAttribute(candidate.id || "")}"
-                        data-store-key="${escapeAttribute(storeKey || candidate.store_key || "")}"
-                        onclick="selectProductAlternative(this)"
-                        ${(selected || !selectable) ? "disabled" : ""}>
-                    ${selected ? "Selected" : (selectable ? "Select" : "Unavailable")}
-                </button>
+                ${productLinkHtml}
+                <div class="bulk-alt-meta">${escapeHtml(meta)}</div>
+                <div class="bulk-alt-meta">${escapeHtml(notes)}</div>
+                ${promptButtonHtml}
             </div>
-        `;
-    }).join("");
+            <button type="button"
+                    class="bulk-alt-select-btn${selected ? " selected" : ""}${selectable ? "" : " unavailable"}"
+                    data-item-key="${escapeAttribute(itemKey || "")}"
+                    data-product-id="${escapeAttribute(candidate.id || "")}"
+                    data-store-key="${escapeAttribute(storeKey || candidate.store_key || "")}"
+                    onclick="selectProductAlternative(this)"
+                    ${(selected || !selectable) ? "disabled" : ""}>
+                ${selected ? "Selected" : (selectable ? "Select" : "Rejected")}
+            </button>
+        </div>
+    `;
+}
+
+function productCandidateImageSrc(candidate) {
+    const direct = candidate ? candidate.image_url || "" : "";
+    const embedded = candidate ? candidate.embedded_image_base64 || "" : "";
+
+    if (direct) {
+        return direct;
+    }
+
+    if (typeof embedded === "string" && embedded.startsWith("data:image/")) {
+        return embedded;
+    }
+
+    return "";
 }
 
 function productPromptEntries(candidate) {
     const entries = [];
+
+    if (hasPromptPayload(candidate && candidate.chatgpt_store_ranking_agent && candidate.chatgpt_store_ranking_agent.prompt)) {
+        entries.push({
+            title: "Store Product Ranking Prompt",
+            prompt: candidate.chatgpt_store_ranking_agent.prompt,
+        });
+    }
 
     if (hasPromptPayload(candidate && candidate.chatgpt_analysis && candidate.chatgpt_analysis.prompt)) {
         entries.push({

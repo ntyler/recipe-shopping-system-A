@@ -1,0 +1,13 @@
+{
+  "schema": "hybrid-agentic-shopping-results/v1",
+  "updated_at": "2026-05-20T21:04:42Z",
+  "architecture": [
+    "Planner Agent",
+    "Store Resolution Agent",
+    "Browser Worker Agent",
+    "Product Extraction/Normalization Agent",
+    "Validation Layer",
+    "Ranking Agent"
+  ],
+  "items": {}
+}
