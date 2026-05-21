@@ -350,6 +350,53 @@ def dedupe_test_grab_candidates(candidates):
     return deduped
 
 
+def minimal_test_grab_rejected_candidate(candidate, search_term=None):
+    candidate = candidate if isinstance(candidate, dict) else {}
+    reason = test_grab_rejection_reason(candidate, search_term)
+    return {
+        "id": candidate.get("id", ""),
+        "product_name": candidate.get("product_name", "Unnamed product"),
+        "store_name": candidate.get("store_name", TEST_GRAB_TARGET_STORE_NAME),
+        "viable": False,
+        "rejected": True,
+        "ranking_status": "rejected",
+        "rejection_reason": reason,
+        "rejection_reasons": [reason] if reason else [],
+        "confidence": candidate.get("confidence"),
+        "confidence_score": candidate.get("confidence_score", candidate.get("confidence")),
+    }
+
+
+def test_grab_rejection_reason(candidate, search_term=None):
+    if not isinstance(candidate, dict):
+        return "Invalid product candidate."
+
+    if is_egg_test_grab(search_term):
+        if not test_grab_candidate_has_direct_product_url(candidate):
+            return "No direct product page link was available."
+        if candidate.get("in_stock") is False:
+            return "Product is out of stock."
+        text = normalize_match_text(" ".join([
+            candidate.get("product_name", ""),
+            candidate.get("brand", ""),
+            candidate.get("product_category", ""),
+            candidate.get("package_size", ""),
+            candidate.get("size", ""),
+            candidate.get("unit_price", ""),
+            candidate.get("card_text_excerpt", ""),
+        ]))
+        if "out of stock" in text:
+            return "Product is out of stock."
+        if not test_grab_is_shell_egg_carton(candidate):
+            return "Not a valid shell egg carton alternative."
+
+    return first_text(
+        candidate.get("rejection_reason", ""),
+        *clean_text_list(candidate.get("rejection_reasons", [])),
+        *clean_text_list(candidate.get("skip_reasons", [])),
+    ) or "Rejected by product rules."
+
+
 def first_text(*values):
     for value in values:
         text = clean_text(value)
@@ -426,17 +473,34 @@ def test_grab_choice_from_result(payload=None):
         "store_result": store_result,
         "selected_product": selected,
         "selected_product_id": selected_id,
-        "candidates": dedupe_test_grab_candidates(candidates),
+        "candidates": (
+            dedupe_test_grab_candidates([
+                candidate
+                for candidate in candidates
+                if test_grab_candidate_is_valid_alternative(candidate, search_term)
+            ])
+            + [
+                minimal_test_grab_rejected_candidate(candidate, search_term)
+                for candidate in dedupe_test_grab_candidates([
+                    candidate
+                    for candidate in candidates
+                    if not test_grab_candidate_is_valid_alternative(candidate, search_term)
+                ])
+            ]
+        ),
         "valid_alternatives": dedupe_test_grab_candidates([
             candidate
             for candidate in candidates
             if test_grab_candidate_is_valid_alternative(candidate, search_term)
         ]),
-        "rejected_products": dedupe_test_grab_candidates([
-            candidate
-            for candidate in candidates
-            if not test_grab_candidate_is_valid_alternative(candidate, search_term)
-        ]),
+        "rejected_products": [
+            minimal_test_grab_rejected_candidate(candidate, search_term)
+            for candidate in dedupe_test_grab_candidates([
+                candidate
+                for candidate in candidates
+                if not test_grab_candidate_is_valid_alternative(candidate, search_term)
+            ])
+        ],
         "skip_reasons": payload.get("errors", []),
         "result_path": str(TEST_GRAB_RESULTS_FILE),
     }
@@ -504,11 +568,19 @@ def select_test_grab_product(product_id):
         and candidate.get("id") != product_id
     ]
     payload["rejected_products"] = [
-        final_product_candidate_payload(candidate)
+        minimal_test_grab_rejected_candidate(candidate, search_term)
         for candidate in dedupe_test_grab_candidates(candidates)
         if isinstance(candidate, dict)
         and not test_grab_candidate_is_valid_alternative(candidate, search_term)
     ]
+    record["candidates"] = (
+        dedupe_test_grab_candidates([
+            candidate
+            for candidate in candidates
+            if test_grab_candidate_is_valid_alternative(candidate, search_term)
+        ])
+        + payload["rejected_products"]
+    )
     payload["results"] = [record]
     save_test_grab_result(payload)
 
@@ -667,9 +739,20 @@ def build_test_grab_response_payload(
         "best_value_pick": final_product_candidate_payload(best_value) if best_value else {},
         "best_premium_pick": final_product_candidate_payload(best_premium) if best_premium else {},
         "alternatives": [final_product_candidate_payload(candidate) for candidate in alternatives],
-        "rejected_products": [final_product_candidate_payload(candidate) for candidate in rejected_products],
+        "rejected_products": [
+            minimal_test_grab_rejected_candidate(candidate, search_term)
+            for candidate in rejected_products
+        ],
         "errors": errors,
-        "results": [record],
+        "results": [
+            {
+                **record,
+                "candidates": valid_products + [
+                    minimal_test_grab_rejected_candidate(candidate, search_term)
+                    for candidate in rejected_products
+                ],
+            }
+        ],
         "count": 1,
         "selected_count": 1 if selected else 0,
         "download_count": 1,

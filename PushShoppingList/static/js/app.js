@@ -936,18 +936,25 @@ function renderProductCandidateOption(candidate, selectedId, itemKey, storeKey, 
     const selected = candidate.id === selectedId;
     const selectable = !rejected && candidate.viable !== false && candidate.rejected !== true;
     const size = candidate.size || candidate.package_size || "";
-    const meta = [
-        candidate.store_name,
-        candidate.store_location_address || "",
-        candidate.price || "Price unavailable",
-        size,
-        candidate.unit_price || "",
-        candidate.price_per_egg ? `per egg ${candidate.price_per_egg}` : "",
-        candidate.ranking_status || "",
-        selectable ? "" : "not selectable",
-        candidate.confidence ? `confidence ${candidate.confidence}` : "",
-        candidate.score !== undefined ? `score ${candidate.score}` : "",
-    ].filter(Boolean).join(" | ");
+    const metaParts = rejected
+        ? [
+            candidate.store_name,
+            candidate.ranking_status || "rejected",
+            candidate.confidence ? `confidence ${candidate.confidence}` : "",
+        ]
+        : [
+            candidate.store_name,
+            candidate.store_location_address || "",
+            candidate.price || "Price unavailable",
+            size,
+            candidate.unit_price || "",
+            candidate.price_per_egg ? `per egg ${candidate.price_per_egg}` : "",
+            candidate.ranking_status || "",
+            selectable ? "" : "not selectable",
+            candidate.confidence ? `confidence ${candidate.confidence}` : "",
+            candidate.score !== undefined ? `score ${candidate.score}` : "",
+        ];
+    const meta = metaParts.filter(Boolean).join(" | ");
     const notes = [
         candidate.reason_selected || "",
         candidate.rejection_reason || "",
@@ -958,11 +965,11 @@ function renderProductCandidateOption(candidate, selectedId, itemKey, storeKey, 
         .filter(Boolean)
         .slice(0, rejected ? 6 : 4)
         .join(" ");
-    const imageSrc = productCandidateImageSrc(candidate);
+    const imageSrc = rejected ? "" : productCandidateImageSrc(candidate);
     const imageHtml = imageSrc
         ? `<img class="bulk-alt-image" src="${escapeAttribute(imageSrc)}" alt="">`
         : "";
-    const productUrl = candidate.product_url && candidate.product_url !== candidate.search_url
+    const productUrl = !rejected && candidate.product_url && candidate.product_url !== candidate.search_url
         ? candidate.product_url
         : "";
     const productLinkHtml = productUrl
@@ -974,7 +981,7 @@ function renderProductCandidateOption(candidate, selectedId, itemKey, storeKey, 
                     ${escapeHtml(productUrl)}
                 </a>
             `
-        : `<div class="bulk-alt-meta">Direct product link unavailable.</div>`;
+        : (rejected ? "" : `<div class="bulk-alt-meta">Direct product link unavailable.</div>`);
     const isTestGrabChoice = Boolean(activeProductPromptChoice && activeProductPromptChoice.test_grab);
     const candidateNameHtml = productUrl
         ? `<a class="bulk-alt-name-link" href="${escapeAttribute(productUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(candidate.product_name || "Unnamed product")}</a>`
