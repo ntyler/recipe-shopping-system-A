@@ -103,6 +103,45 @@ def click_aldi_shop_this_store(
     wait_seconds: float = 4.0,
 ) -> bool:
     click_visible_xpath = helpers["click_visible_xpath"]
+
+    try:
+        clicked_direct = driver.execute_script(
+            """
+            function visible(el) {
+                let node = el;
+                while (node && node.nodeType === 1) {
+                    const style = window.getComputedStyle(node);
+                    if (node.hidden || style.display === "none" || style.visibility === "hidden") {
+                        return false;
+                    }
+                    node = node.parentElement;
+                }
+                const rect = el.getBoundingClientRect();
+                return rect.width > 0 && rect.height > 0 && !el.disabled;
+            }
+
+            const controls = Array.from(document.querySelectorAll("button, [role='button'], input[type='submit']"));
+            const button = controls.find(el => {
+                const text = String(el.innerText || el.value || el.getAttribute("aria-label") || "")
+                    .replace(/\\s+/g, " ")
+                    .trim();
+                return visible(el) && /^shop this store$/i.test(text);
+            });
+            if (!button) {
+                return false;
+            }
+            button.scrollIntoView({ block: "center", inline: "center" });
+            button.click();
+            return true;
+            """
+        )
+    except Exception:
+        clicked_direct = False
+
+    if clicked_direct:
+        time.sleep(wait_seconds)
+        return True
+
     clicked_shop = click_visible_xpath(
         driver,
         [
@@ -128,6 +167,8 @@ def update_home_store(
     accept_cookies_if_present = helpers["accept_cookies_if_present"]
     type_visible_location_input = helpers["type_visible_location_input"]
     click_first_address_suggestion = helpers["click_first_address_suggestion"]
+    click_save_address_button = helpers["click_save_address_button"]
+    click_first_store_location_card = helpers["click_first_store_location_card"]
     click_store_card_that_matches_context = helpers["click_store_card_that_matches_context"]
     click_continue_shopping = helpers["click_continue_shopping"]
     click_visible_xpath = helpers["click_visible_xpath"]
@@ -138,6 +179,8 @@ def update_home_store(
     clicked_near_box = False
     typed_location = False
     clicked_address_suggestion = False
+    clicked_save_address = False
+    clicked_first_store_card = False
     clicked_store_card = False
     clicked_shop_this_store = False
     clicked_continue = False
@@ -165,16 +208,13 @@ def update_home_store(
 
     typed_location = type_visible_location_input(driver, context.get("search_values", []), wait=wait_seconds)
     clicked_address_suggestion = click_first_address_suggestion(driver, context, wait=wait_seconds)
-    time.sleep(2)
+    if clicked_address_suggestion:
+        clicked_save_address = click_save_address_button(driver, wait=wait_seconds)
+    time.sleep(wait_seconds)
+    accept_cookies_if_present(driver, wait=0.75)
 
-    try:
-        driver.refresh()
-        time.sleep(wait_seconds)
-        accept_cookies_if_present(driver, wait=0.75)
-    except Exception:
-        pass
-
-    clicked_store_card = click_store_card_that_matches_context(driver=driver, context=context, wait=wait_seconds)
+    clicked_first_store_card = click_first_store_location_card(driver, wait=wait_seconds)
+    clicked_store_card = bool(clicked_first_store_card) or click_store_card_that_matches_context(driver=driver, context=context, wait=wait_seconds)
     time.sleep(1)
     accept_cookies_if_present(driver, wait=0.75)
 
@@ -204,6 +244,8 @@ def update_home_store(
         "clicked_near_box": clicked_near_box,
         "typed_location": typed_location,
         "clicked_address_suggestion": clicked_address_suggestion,
+        "clicked_save_address": clicked_save_address,
+        "clicked_first_store_card": clicked_first_store_card,
         "clicked_store_card": clicked_store_card,
         "clicked_shop_this_store": clicked_shop_this_store,
         "clicked_continue": clicked_continue,

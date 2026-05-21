@@ -1,0 +1,277 @@
+{
+  "source_url": "https://www.forkinthekitchen.com/vegetarian-green-enchiladas-verde/",
+  "recipe_title": "Enchiladas Verde with Jackfruit and White Beans (Vegetarian)",
+  "servings": "6",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "2 - 2½ cups green enchilada sauce (homemade or canned)",
+      "quantity": null,
+      "unit": null,
+      "ingredient": "green enchilada sauce",
+      "preparation": "homemade or canned",
+      "optional": false,
+      "store_section": "SAUCES & CONDIMENTS",
+      "store_section_order": 9
+    },
+    {
+      "section": null,
+      "original_text": "14 ounces young green jackfruit (in brine, not syrup, drained and rinsed)",
+      "quantity": "14",
+      "unit": "ounces",
+      "ingredient": "young green jackfruit",
+      "preparation": "in brine, not syrup, drained and rinsed, drained and rinsed)",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "base_quantity": "14",
+      "base_unit": "ounces"
+    },
+    {
+      "section": null,
+      "original_text": "15 ounces canned white beans (drained and rinsed*)",
+      "quantity": "15",
+      "unit": "ounces",
+      "ingredient": "canned white beans",
+      "preparation": "drained and rinsed*",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "base_quantity": "15",
+      "base_unit": "ounces"
+    },
+    {
+      "section": null,
+      "original_text": "4 ounces cream cheese (room temperature)",
+      "quantity": "4",
+      "unit": "ounces",
+      "ingredient": "cream cheese",
+      "preparation": "room temperature",
+      "optional": false,
+      "store_section": "DAIRY & EGGS",
+      "store_section_order": 3,
+      "base_quantity": "4",
+      "base_unit": "ounces"
+    },
+    {
+      "section": null,
+      "original_text": "4 ounces diced green chiles (canned)",
+      "quantity": "4",
+      "unit": "ounces",
+      "ingredient": "green chiles",
+      "preparation": "diced, canned",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "base_quantity": "4",
+      "base_unit": "ounces"
+    },
+    {
+      "section": null,
+      "original_text": "8 ounces Monterey jack cheese (shredded (2 cups))",
+      "quantity": "8",
+      "unit": "ounces",
+      "ingredient": "Monterey jack cheese )",
+      "preparation": null,
+      "optional": false,
+      "store_section": "DAIRY & EGGS",
+      "store_section_order": 3,
+      "base_quantity": "8",
+      "base_unit": "ounces"
+    },
+    {
+      "section": null,
+      "original_text": "½ teaspoon ground cumin",
+      "quantity": "½",
+      "unit": "teaspoon",
+      "ingredient": "ground cumin",
+      "preparation": null,
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12,
+      "base_quantity": "½",
+      "base_unit": "teaspoon"
+    },
+    {
+      "section": null,
+      "original_text": "⅓ cup Cilantro (roughly chopped)",
+      "quantity": "⅓",
+      "unit": "cup",
+      "ingredient": "Cilantro",
+      "preparation": "chopped, roughly chopped",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1,
+      "base_quantity": "⅓",
+      "base_unit": "cup"
+    },
+    {
+      "section": null,
+      "original_text": "½ teaspoon kosher salt",
+      "quantity": "½",
+      "unit": "teaspoon",
+      "ingredient": "kosher salt",
+      "preparation": null,
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12,
+      "base_quantity": "½",
+      "base_unit": "teaspoon"
+    },
+    {
+      "section": null,
+      "original_text": "12  flour or corn tortillas (6 inches or so)",
+      "quantity": "12",
+      "unit": null,
+      "ingredient": "flour OR corn tortillas",
+      "preparation": null,
+      "optional": false,
+      "store_section": "BAKING",
+      "store_section_order": 7,
+      "base_quantity": "12"
+    }
+  ],
+  "equipment": [
+    {
+      "name": "cutting board",
+      "category": "prep"
+    },
+    {
+      "name": "knife",
+      "category": "prep"
+    },
+    {
+      "name": "mixing bowl",
+      "category": "prep"
+    },
+    {
+      "name": "oven",
+      "category": "appliance"
+    },
+    {
+      "name": "rolling pin",
+      "category": "prep"
+    }
+  ],
+  "instructions": [
+    {
+      "section": null,
+      "step_number": 1,
+      "instruction": "Preheat oven to 350F. Spread 1 cup of enchilada sauce across the bottom of a 9x13 baking dish. Set aside.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [
+        "oven"
+      ]
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "Drain and rinse the jackfruit, then use your hands to break it apart to \"shred\" it. Roughly chop or break apart the firm base; any \"seeds\" are fine to use as they are.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [
+        "cutting board",
+        "knife"
+      ]
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "In a large mixing bowl, combine shredded jackfruit, white beans, green chiles, 1 cup shredded cheese, cumin, cilantro, and salt.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [
+        "mixing bowl"
+      ]
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "Warm tortillas as needed; if using corn tortillas wrap in a damp paper towel and microwave for 30 seconds, or lightly fry each side in a little oil before wrapping.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": []
+    },
+    {
+      "section": null,
+      "step_number": 5,
+      "instruction": "Place a tortilla flat on a work surface, and place approximately ⅓ cup of filling in the center. Take one edge of the tortilla and roll it around the filling. Place the rolled tortilla in the baking dish, seam side down. Continue until all enchiladas are formed.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [
+        "rolling pin"
+      ]
+    },
+    {
+      "section": null,
+      "step_number": 6,
+      "instruction": "Spread the remaining sauce across the tortillas (using 1 to 1 ½ cups depending on how saucy you like them). Sprinkle the remaining cheese across the top.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": []
+    },
+    {
+      "section": null,
+      "step_number": 7,
+      "instruction": "Bake for 25-30 minutes until bubbly and the cheese is melted. Broil for 1-2 minutes for extra golden cheese. Let the enchiladas rest for 5-10 minutes before serving.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [
+        "oven"
+      ]
+    },
+    {
+      "section": null,
+      "step_number": 8,
+      "instruction": "Garnish with extra cilantro, red onion, avocado, or sour cream as desired. Enjoy!",
+      "temperature": null,
+      "time": null,
+      "equipment_used": []
+    }
+  ],
+  "nutrition": {
+    "serving_basis": "per serving",
+    "calories": "578 kcal",
+    "carbohydrates": "71 g",
+    "protein": "22 g",
+    "fat": "23 g",
+    "saturated_fat": "13 g",
+    "polyunsaturated_fat": null,
+    "monounsaturated_fat": null,
+    "trans_fat": null,
+    "cholesterol": "53 mg",
+    "sodium": "1863 mg",
+    "potassium": null,
+    "fiber": "8 g",
+    "sugar": "11 g",
+    "vitamin_a": null,
+    "vitamin_c": null,
+    "calcium": null,
+    "iron": null,
+    "other": []
+  },
+  "scaling": {
+    "selected_multiplier": 1.0,
+    "base_multiplier": 1.0,
+    "base_servings": "6",
+    "available_multipliers": [
+      {
+        "label": "1/2x",
+        "value": 0.5
+      },
+      {
+        "label": "1x",
+        "value": 1.0
+      },
+      {
+        "label": "2x",
+        "value": 2.0
+      },
+      {
+        "label": "3x",
+        "value": 3.0
+      }
+    ]
+  }
+}

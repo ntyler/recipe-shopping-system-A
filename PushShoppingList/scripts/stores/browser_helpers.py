@@ -273,6 +273,9 @@ def type_visible_location_input(driver, values: list[Any], wait: float = 1.5) ->
 
 def click_first_address_suggestion(driver, context: dict[str, Any] | None = None, wait: float = 1.5) -> bool:
     context = context or {}
+    if click_first_address_option_from_list(driver, wait=wait):
+        return True
+
     home_address = clean_store_text(context.get("home_address"))
     home_zip = clean_store_text(context.get("home_zip")) or extract_zip_from_text(home_address)
     home_parts = [clean_store_text(part) for part in home_address.split(",") if clean_store_text(part)]
@@ -293,23 +296,23 @@ def click_first_address_suggestion(driver, context: dict[str, Any] | None = None
     if not home_street:
         return False
 
-    row_xpaths = []
     street_literal = xpath_literal(home_street)
-    row_selector = (
-        "self::button or self::a or self::li or self::article or self::section "
-        "or @role='button' or @role='option' or @role='menuitem' or self::div"
-    )
+    row_xpaths = [
+        f"//*[normalize-space(.)={street_literal}]",
+    ]
     if home_zip:
         row_xpaths.append(
-            f"//*[({row_selector}) and contains(normalize-space(.), {street_literal}) "
-            f"and contains(normalize-space(.), {xpath_literal(home_zip)})]"
+            f"//*[contains(normalize-space(.), {street_literal}) and "
+            f"contains(normalize-space(.), {xpath_literal(home_zip)}) and "
+            "not(contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'create your address manually'))]"
         )
     if home_city:
         row_xpaths.append(
-            f"//*[({row_selector}) and contains(normalize-space(.), {street_literal}) "
-            f"and contains(normalize-space(.), {xpath_literal(home_city)})]"
+            f"//*[contains(normalize-space(.), {street_literal}) and "
+            f"contains(normalize-space(.), {xpath_literal(home_city)}) and "
+            "not(contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'create your address manually'))]"
         )
-    row_xpaths.append(f"//*[({row_selector}) and contains(normalize-space(.), {street_literal})]")
+    row_xpaths.append(f"//*[contains(normalize-space(.), {street_literal})]")
 
     for xpath in row_xpaths:
         try:
@@ -317,7 +320,6 @@ def click_first_address_suggestion(driver, context: dict[str, Any] | None = None
         except Exception:
             continue
 
-        visible = []
         for element in elements:
             try:
                 if not element.is_displayed() or not element.is_enabled():
@@ -327,27 +329,143 @@ def click_first_address_suggestion(driver, context: dict[str, Any] | None = None
                     continue
                 if home_zip and home_zip not in text and home_city and home_city.lower() not in text.lower():
                     continue
-                rect = element.rect or {}
-                area = float(rect.get("width", 0) or 0) * float(rect.get("height", 0) or 0)
-                visible.append((area, element))
             except Exception:
                 continue
 
-        for _, element in sorted(visible, key=lambda item: item[0]):
-            click_target = element
-            for _ in range(4):
+            click_targets = [element]
+            for ancestor_xpath in [
+                "./ancestor::*[@role='option' or @role='button' or @role='menuitem' or self::button or self::a or self::li or self::article][1]",
+                "./parent::*",
+            ]:
                 try:
-                    parent = click_target.find_element(By.XPATH, "..")
-                    parent_text = clean_store_text(parent.text)
-                    if home_street in parent_text and (not home_zip or home_zip in parent_text):
-                        click_target = parent
-                    else:
-                        break
+                    ancestor = element.find_element(By.XPATH, ancestor_xpath)
+                    ancestor_text = clean_store_text(ancestor.text)
+                    if home_street in ancestor_text and "create your address manually" not in ancestor_text.lower():
+                        click_targets.append(ancestor)
                 except Exception:
-                    break
-            if js_click(driver, click_target):
+                    pass
+
+            for click_target in click_targets:
+                if js_click(driver, click_target):
+                    time.sleep(wait)
+                    return True
+    return False
+
+
+def click_save_address_button(driver, wait: float = 1.5) -> bool:
+    xpaths = [
+        "//button[normalize-space(.)='Save Address']",
+        "//button[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'save address')]",
+        "//*[@role='button' and contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'save address')]",
+        "//input[@type='submit' and contains(translate(@value, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'save address')]",
+    ]
+    return click_visible_xpath(driver, xpaths, wait=wait)
+
+
+def click_first_store_location_card(driver, wait: float = 1.5) -> bool:
+    selectors = [
+        "ul[aria-labelledby='locations-list'] > li:first-child > button",
+        "ul[aria-labelledby='locations-list'] li:first-child button",
+    ]
+    for selector in selectors:
+        try:
+            elements = driver.find_elements(By.CSS_SELECTOR, selector)
+        except Exception:
+            continue
+
+        for element in elements:
+            try:
+                if not element.is_displayed() or not element.is_enabled():
+                    continue
+                driver.execute_script("arguments[0].scrollIntoView({block: 'center', inline: 'nearest'});", element)
+                time.sleep(0.2)
+
+                attempts = [
+                    lambda: element.click(),
+                    lambda: ActionChains(driver).move_to_element(element).pause(0.1).click().perform(),
+                    lambda: element.send_keys(Keys.ENTER),
+                    lambda: driver.execute_script(
+                        """
+                        const el = arguments[0];
+                        el.focus && el.focus();
+                        el.click();
+                        """,
+                        element,
+                    ),
+                ]
+                for attempt in attempts:
+                    try:
+                        attempt()
+                        time.sleep(wait)
+                        if shop_this_store_button_visible(driver):
+                            return True
+                    except Exception:
+                        continue
+            except Exception:
+                continue
+
+    xpaths = [
+        "(//ul[@aria-labelledby='locations-list']/li[1]/button)[1]",
+        "(//*[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'choose an in-store location')]/following::button[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'store ') and contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'away')])[1]",
+        "(//*[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'choose a pickup location')]/following::button[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'store ') and contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'away')])[1]",
+    ]
+    for xpath in xpaths:
+        if click_visible_xpath(driver, [xpath], wait=wait) and shop_this_store_button_visible(driver):
+            return True
+    return False
+
+
+def shop_this_store_button_visible(driver) -> bool:
+    try:
+        buttons = driver.find_elements(
+            By.XPATH,
+            "//button[translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')='shop this store']",
+        )
+    except Exception:
+        return False
+
+    for button in buttons:
+        try:
+            if button.is_displayed() and button.is_enabled():
+                return True
+        except Exception:
+            continue
+    return False
+
+
+def click_first_address_option_from_list(driver, wait: float = 1.5) -> bool:
+    selectors = [
+        "#address-suggestion-list_0 button",
+        "#address-suggestion-list li[role='option']:first-child button",
+        "#address-suggestion-list [role='option']:first-child button",
+        "li[id$='_0'][role='option'] button",
+        "[id='address-suggestion-list_0'] button",
+        "#address-suggestion-list_0",
+        "#address-suggestion-list li[role='option']:first-child",
+        "#address-suggestion-list [role='option']:first-child",
+    ]
+
+    for selector in selectors:
+        try:
+            elements = driver.find_elements(By.CSS_SELECTOR, selector)
+        except Exception:
+            continue
+
+        for element in elements:
+            try:
+                if not element.is_displayed() or not element.is_enabled():
+                    continue
+                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
+                time.sleep(0.2)
+                try:
+                    element.click()
+                except Exception:
+                    driver.execute_script("arguments[0].click();", element)
                 time.sleep(wait)
                 return True
+            except Exception:
+                continue
+
     return False
 
 
@@ -577,6 +695,8 @@ def build_store_helpers() -> dict[str, Any]:
         "click_visible_xpath": click_visible_xpath,
         "type_visible_location_input": type_visible_location_input,
         "click_first_address_suggestion": click_first_address_suggestion,
+        "click_save_address_button": click_save_address_button,
+        "click_first_store_location_card": click_first_store_location_card,
         "click_store_card_that_matches_context": click_store_card_that_matches_context,
         "click_continue_shopping": click_continue_shopping,
         "final_home_store_xpaths": final_home_store_xpaths,

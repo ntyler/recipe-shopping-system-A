@@ -1,8 +1,8 @@
 {
   "ok": false,
   "test_grab": true,
-  "job_id": "1779328370230-c3340de2ce23d",
-  "timestamp": "2026-05-21T01:54:45Z",
+  "job_id": "1779402851936-4e706c0f0d5fd8",
+  "timestamp": "2026-05-21T22:36:11Z",
   "home_address": "5905 Arlo Drive Apt 2213, Indianapolis, Marion County, IN 46237, United States",
   "home_location": {
     "latitude": 39.6425974,
@@ -27,7 +27,7 @@
   "alternatives": [],
   "rejected_products": [],
   "errors": [
-    "Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602."
+    "Localized store session could not be proven from visible page text. Refusing to treat this as localized inventory."
   ],
   "results": [
     {
@@ -64,12 +64,12 @@
               "pickup_status": "Nearest location resolved for pickup-oriented grocery search."
             }
           },
-          "timestamp": "2026-05-21T01:52:50Z"
+          "timestamp": "2026-05-21T22:34:13Z"
         },
         {
           "name": "Browser Worker Agent",
           "status": "failed",
-          "message": "Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602.",
+          "message": "Localized store session could not be proven from visible page text. Refusing to treat this as localized inventory.",
           "metadata": {
             "store_key": "aldi",
             "store_name": "Aldi",
@@ -87,7 +87,7 @@
               "pickup_status": "Nearest location resolved for pickup-oriented grocery search."
             }
           },
-          "timestamp": "2026-05-21T01:54:45Z"
+          "timestamp": "2026-05-21T22:36:11Z"
         },
         {
           "name": "Product Extraction/Normalization Agent",
@@ -98,7 +98,7 @@
             "detail_evaluated_count": 0,
             "image_embedded_count": 0
           },
-          "timestamp": "2026-05-21T01:54:45Z"
+          "timestamp": "2026-05-21T22:36:11Z"
         },
         {
           "name": "Validation Layer",
@@ -112,7 +112,7 @@
             "in_stock_count": 0,
             "unknown_stock_count": 0
           },
-          "timestamp": "2026-05-21T01:54:45Z"
+          "timestamp": "2026-05-21T22:36:11Z"
         },
         {
           "name": "Ranking Agent",
@@ -125,7 +125,7 @@
             "chatgpt_status": "not-run",
             "selected_product_id": ""
           },
-          "timestamp": "2026-05-21T01:54:45Z"
+          "timestamp": "2026-05-21T22:36:11Z"
         }
       ],
       "chatgpt_final_selection": {},
@@ -171,8 +171,8 @@
           "product_url": "",
           "image_url": "",
           "reason_selected": "",
-          "reason_skipped": "Aldi: Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602.",
-          "skip_reason": "Aldi: Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602.",
+          "reason_skipped": "Aldi: Localized store session could not be proven from visible page text. Refusing to treat this as localized inventory.",
+          "skip_reason": "Aldi: Localized store session could not be proven from visible page text. Refusing to treat this as localized inventory.",
           "candidate_count": 0,
           "valid_candidate_count": 0,
           "rejected_candidate_count": 0,
@@ -181,13 +181,13 @@
           "valid_alternatives": [],
           "rejected_products": [],
           "skip_reasons": [
-            "Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602."
+            "Localized store session could not be proven from visible page text. Refusing to treat this as localized inventory."
           ],
           "agent_stages": [
             {
               "name": "Browser Worker Agent",
               "status": "failed",
-              "message": "Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602.",
+              "message": "Localized store session could not be proven from visible page text. Refusing to treat this as localized inventory.",
               "metadata": {
                 "store_key": "aldi",
                 "store_name": "Aldi",
@@ -205,7 +205,7 @@
                   "pickup_status": "Nearest location resolved for pickup-oriented grocery search."
                 }
               },
-              "timestamp": "2026-05-21T01:54:45Z"
+              "timestamp": "2026-05-21T22:36:11Z"
             },
             {
               "name": "Product Extraction/Normalization Agent",
@@ -216,7 +216,7 @@
                 "detail_evaluated_count": 0,
                 "image_embedded_count": 0
               },
-              "timestamp": "2026-05-21T01:54:45Z"
+              "timestamp": "2026-05-21T22:36:11Z"
             }
           ]
         }
@@ -262,8 +262,8 @@
           "product_url": "",
           "image_url": "",
           "reason_selected": "",
-          "reason_skipped": "Aldi: Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602.",
-          "skip_reason": "Aldi: Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602.",
+          "reason_skipped": "Aldi: Localized store session could not be proven from visible page text. Refusing to treat this as localized inventory.",
+          "skip_reason": "Aldi: Localized store session could not be proven from visible page text. Refusing to treat this as localized inventory.",
           "candidate_count": 0,
           "valid_candidate_count": 0,
           "rejected_candidate_count": 0,
@@ -272,13 +272,13 @@
           "valid_alternatives": [],
           "rejected_products": [],
           "skip_reasons": [
-            "Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602."
+            "Localized store session could not be proven from visible page text. Refusing to treat this as localized inventory."
           ],
           "agent_stages": [
             {
               "name": "Browser Worker Agent",
               "status": "failed",
-              "message": "Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602.",
+              "message": "Localized store session could not be proven from visible page text. Refusing to treat this as localized inventory.",
               "metadata": {
                 "store_key": "aldi",
                 "store_name": "Aldi",
@@ -296,7 +296,7 @@
                   "pickup_status": "Nearest location resolved for pickup-oriented grocery search."
                 }
               },
-              "timestamp": "2026-05-21T01:54:45Z"
+              "timestamp": "2026-05-21T22:36:11Z"
             },
             {
               "name": "Product Extraction/Normalization Agent",
@@ -307,7 +307,7 @@
                 "detail_evaluated_count": 0,
                 "image_embedded_count": 0
               },
-              "timestamp": "2026-05-21T01:54:45Z"
+              "timestamp": "2026-05-21T22:36:11Z"
             }
           ]
         }
@@ -324,9 +324,9 @@
         "unknown_stock_count": 0
       },
       "skip_reasons": [
-        "Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602."
+        "Localized store session could not be proven from visible page text. Refusing to treat this as localized inventory."
       ],
-      "updated_at": "2026-05-21T01:54:45Z",
+      "updated_at": "2026-05-21T22:36:11Z",
       "test_grab": true,
       "target_product": "Edible grocery eggs",
       "target_store": "Aldi"
