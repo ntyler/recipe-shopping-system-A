@@ -4183,7 +4183,7 @@ body {
         }
 
         .bulk-choices.open {
-            display: block;
+            display: block !important;
         }
 
         .bulk-alt-option {

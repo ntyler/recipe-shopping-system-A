@@ -219,6 +219,145 @@ def is_egg_test_grab(search_term):
     return normalized == "edible grocery eggs" or any(token in {"egg", "eggs"} for token in tokens)
 
 
+def test_grab_candidate_for_display(candidate, search_term=None):
+    candidate = dict(candidate) if isinstance(candidate, dict) else {}
+    if not candidate:
+        return candidate
+
+    if test_grab_candidate_is_valid_alternative(candidate, search_term):
+        candidate["test_grab_valid_alternative"] = True
+        candidate["viable"] = True
+        candidate["rejected"] = False
+        if candidate.get("ranking_status") == "rejected":
+            candidate["ranking_status"] = "alternative"
+        preference_note = first_text(
+            candidate.get("rejection_reason", ""),
+            *clean_text_list(candidate.get("rejection_reasons", [])),
+            *clean_text_list(candidate.get("skip_reasons", [])),
+        )
+        if preference_note:
+            candidate["ranking_reasons"] = unique_texts(
+                [
+                    "Valid product alternative; lower preference because: "
+                    + preference_note
+                ]
+                + candidate.get("ranking_reasons", [])
+            )
+        candidate["rejection_reason"] = ""
+        candidate["rejection_reasons"] = []
+    return candidate
+
+
+def test_grab_candidate_is_valid_alternative(candidate, search_term=None):
+    if not isinstance(candidate, dict):
+        return False
+
+    if not test_grab_candidate_has_direct_product_url(candidate):
+        return False
+
+    if candidate.get("in_stock") is False:
+        return False
+
+    if is_egg_test_grab(search_term):
+        return test_grab_is_shell_egg_carton(candidate)
+
+    return candidate.get("viable") is not False
+
+
+def test_grab_candidate_has_direct_product_url(candidate):
+    product_url = str(candidate.get("product_url") or "").strip()
+    search_url = str(candidate.get("search_url") or candidate.get("source_page_url") or "").strip()
+    return product_url.startswith(("http://", "https://")) and product_url != search_url
+
+
+def test_grab_is_shell_egg_carton(candidate):
+    text = normalize_match_text(" ".join([
+        candidate.get("product_name", ""),
+        candidate.get("brand", ""),
+        candidate.get("product_category", ""),
+        candidate.get("package_size", ""),
+        candidate.get("size", ""),
+        candidate.get("unit_price", ""),
+        candidate.get("card_text_excerpt", ""),
+    ]))
+    if not text:
+        return False
+
+    if "out of stock" in text:
+        return False
+
+    invalid_phrases = {
+        "candy",
+        "chocolate",
+        "egg bite",
+        "egg bites",
+        "egg noodle",
+        "egg noodles",
+        "egg roll",
+        "egg rolls",
+        "egg white wrap",
+        "egg white wraps",
+        "kinder",
+        "omelet",
+        "omelette",
+        "plant based",
+        "sandwich",
+        "sausage",
+        "toy",
+        "wrap",
+        "wraps",
+    }
+    if any(phrase in text for phrase in invalid_phrases):
+        return False
+
+    tokens = set(text.split())
+    metadata = candidate.get("egg_product") if isinstance(candidate.get("egg_product"), dict) else {}
+    count = metadata.get("egg_count") or candidate.get("egg_count")
+    shell_phrases = {
+        "brown egg",
+        "cage free",
+        "carton",
+        "dozen",
+        "free range",
+        "grade a",
+        "large egg",
+        "organic egg",
+        "pasture raised",
+        "white egg",
+    }
+    return (
+        "egg" in tokens
+        and (bool(count) or any(phrase in text for phrase in shell_phrases))
+    )
+
+
+def dedupe_test_grab_candidates(candidates):
+    deduped = []
+    seen = set()
+    for candidate in candidates or []:
+        if not isinstance(candidate, dict):
+            continue
+        key = (
+            str(candidate.get("product_url") or "").strip().lower()
+            or str(candidate.get("id") or "").strip().lower()
+            or normalize_match_text(candidate.get("product_name", ""))
+        )
+        if key and key in seen:
+            continue
+        if key:
+            seen.add(key)
+        deduped.append(candidate)
+    return deduped
+
+
+def first_text(*values):
+    for value in values:
+        text = clean_text(value)
+        if text:
+            return text
+    return ""
+
+
 def test_grab_browser_visible():
     return env_truthy(os.getenv("TEST_GRAB_VISIBLE", ""))
 
@@ -267,8 +406,14 @@ def load_test_grab_result():
 def test_grab_choice_from_result(payload=None):
     payload = payload if isinstance(payload, dict) else load_test_grab_result()
     record = first_test_grab_record(payload)
-    candidates = record.get("candidates", []) if isinstance(record.get("candidates"), list) else []
+    search_term = record.get("ingredient") or payload.get("search_item") or TEST_GRAB_SEARCH_TERM
+    candidates = [
+        test_grab_candidate_for_display(candidate, search_term)
+        for candidate in record.get("candidates", [])
+        if isinstance(candidate, dict)
+    ] if isinstance(record.get("candidates"), list) else []
     selected = record.get("selected_product") if isinstance(record.get("selected_product"), dict) else {}
+    selected = test_grab_candidate_for_display(selected, search_term) if selected else {}
     selected_id = record.get("selected_product_id") or selected.get("id", "")
     store_result = first_store_result(record)
 
@@ -281,17 +426,17 @@ def test_grab_choice_from_result(payload=None):
         "store_result": store_result,
         "selected_product": selected,
         "selected_product_id": selected_id,
-        "candidates": candidates,
-        "valid_alternatives": [
+        "candidates": dedupe_test_grab_candidates(candidates),
+        "valid_alternatives": dedupe_test_grab_candidates([
             candidate
             for candidate in candidates
-            if isinstance(candidate, dict) and candidate.get("viable") is not False
-        ],
-        "rejected_products": [
+            if test_grab_candidate_is_valid_alternative(candidate, search_term)
+        ]),
+        "rejected_products": dedupe_test_grab_candidates([
             candidate
             for candidate in candidates
-            if isinstance(candidate, dict) and candidate.get("viable") is False
-        ],
+            if not test_grab_candidate_is_valid_alternative(candidate, search_term)
+        ]),
         "skip_reasons": payload.get("errors", []),
         "result_path": str(TEST_GRAB_RESULTS_FILE),
     }
@@ -308,23 +453,26 @@ def select_test_grab_product(product_id):
             "error": "No Test Grab result is available yet.",
         }
 
+    search_term = record.get("ingredient") or payload.get("search_item") or TEST_GRAB_SEARCH_TERM
     candidates = record.get("candidates", []) if isinstance(record.get("candidates"), list) else []
-    selected = next(
+    selected_index = next(
         (
-            candidate
-            for candidate in candidates
-            if isinstance(candidate, dict) and candidate.get("id") == product_id
+            index
+            for index, candidate in enumerate(candidates)
+            if isinstance(candidate, dict)
+            and candidate.get("id") == product_id
         ),
         None,
     )
 
-    if not selected:
+    if selected_index is None:
         return {
             "ok": False,
             "error": "That Test Grab product was not found.",
         }
 
-    if selected.get("viable") is False:
+    selected = test_grab_candidate_for_display(candidates[selected_index], search_term)
+    if not test_grab_candidate_is_valid_alternative(selected, search_term):
         return {
             "ok": False,
             "error": "That Test Grab product is rejected and cannot be selected.",
@@ -334,6 +482,7 @@ def select_test_grab_product(product_id):
     selected["selected_by_user"] = True
     selected["selected_at"] = selected_at
     selected["reason_selected"] = selected.get("reason_selected") or "Selected manually from Test Grab alternatives."
+    candidates[selected_index] = selected
 
     record["selected_product_id"] = product_id
     record["selected_product"] = selected
@@ -348,11 +497,17 @@ def select_test_grab_product(product_id):
     payload["selected_by_user"] = True
     payload["selected_at"] = selected_at
     payload["alternatives"] = [
-        final_product_candidate_payload(candidate)
-        for candidate in candidates
+        final_product_candidate_payload(test_grab_candidate_for_display(candidate, search_term))
+        for candidate in dedupe_test_grab_candidates(candidates)
         if isinstance(candidate, dict)
-        and candidate.get("viable") is not False
+        and test_grab_candidate_is_valid_alternative(candidate, search_term)
         and candidate.get("id") != product_id
+    ]
+    payload["rejected_products"] = [
+        final_product_candidate_payload(candidate)
+        for candidate in dedupe_test_grab_candidates(candidates)
+        if isinstance(candidate, dict)
+        and not test_grab_candidate_is_valid_alternative(candidate, search_term)
     ]
     payload["results"] = [record]
     save_test_grab_result(payload)
@@ -458,18 +613,23 @@ def build_test_grab_response_payload(
     raw_result = raw_result if isinstance(raw_result, dict) else {}
     search_term = test_grab_search_term(search_term or record.get("ingredient"))
     target_product = target_product or test_grab_target_product(search_term)
-    candidates = record.get("candidates", []) if isinstance(record.get("candidates"), list) else []
-    valid_products = [
+    candidates = [
+        test_grab_candidate_for_display(candidate, search_term)
+        for candidate in record.get("candidates", [])
+        if isinstance(candidate, dict)
+    ] if isinstance(record.get("candidates"), list) else []
+    valid_products = dedupe_test_grab_candidates([
         candidate
         for candidate in candidates
-        if isinstance(candidate, dict) and candidate.get("viable") is not False
-    ]
-    rejected_products = [
+        if test_grab_candidate_is_valid_alternative(candidate, search_term)
+    ])
+    rejected_products = dedupe_test_grab_candidates([
         candidate
         for candidate in candidates
-        if isinstance(candidate, dict) and candidate.get("viable") is False
-    ]
+        if not test_grab_candidate_is_valid_alternative(candidate, search_term)
+    ])
     selected = record.get("selected_product") if isinstance(record.get("selected_product"), dict) else {}
+    selected = test_grab_candidate_for_display(selected, search_term) if selected else {}
     selected_id = selected.get("id", "") if selected else ""
     best_value = best_value_egg_pick(valid_products)
     best_premium = best_premium_egg_pick(valid_products)
