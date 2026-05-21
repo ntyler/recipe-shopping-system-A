@@ -3807,17 +3807,22 @@ def search_store_products_with_browser_agent(
                 browser_visible,
                 browser_visual_pause_seconds,
             )
-            if store_session_status and not store_session_status.get("ok"):
+            if (
+                store_session_status
+                and not store_session_status.get("ok")
+                and not store_session_update_allows_product_search(store_session_status)
+            ):
                 return [], [
                     store_session_status.get("message")
                     or f"{store_name}: selected store location could not be updated before search."
                 ]
 
-            try:
-                driver.get(search_url)
-            except Exception:
-                if len(driver.page_source or "") < 800:
-                    raise
+            open_product_search_after_storefront(
+                driver,
+                search_url,
+                store_key,
+                store_session_status,
+            )
 
             visual_browser_pause(browser_visible, browser_visual_pause_seconds)
             wait_for_browser_document(driver, timeout_seconds=product_browser_wait_seconds())
@@ -3836,6 +3841,10 @@ def search_store_products_with_browser_agent(
                 store_name,
                 full_address,
                 store_location,
+            )
+            context_status = merge_store_session_selection_proof(
+                context_status,
+                store_session_status,
             )
             if not context_status.get("ok"):
                 return [], [context_status.get("message") or f"{store_name}: rendered page did not match the saved store context."]
@@ -3937,6 +3946,80 @@ def visual_browser_pause(enabled, seconds):
     if seconds <= 0:
         return
     time.sleep(min(60, seconds))
+
+
+def store_session_update_allows_product_search(store_session_status):
+    if not isinstance(store_session_status, dict):
+        return False
+
+    update = store_session_status.get("home_store_update")
+    if not isinstance(update, dict):
+        update = store_session_status
+
+    return any(
+        bool(update.get(key))
+        for key in [
+            "ok",
+            "clicked_shop_this_store",
+            "clicked_continue",
+            "clicked_final",
+        ]
+    )
+
+
+def merge_store_session_selection_proof(context_status, store_session_status):
+    context_status = context_status if isinstance(context_status, dict) else {}
+
+    if context_status.get("ok") or not store_session_update_allows_product_search(store_session_status):
+        return context_status
+
+    update = store_session_status.get("home_store_update") if isinstance(store_session_status, dict) else {}
+    update = update if isinstance(update, dict) else {}
+    proof = unique_texts(
+        context_status.get("proof_of_store_selection", [])
+        + [
+            "Store selector flow completed before search: first store card was selected and the store confirmation button was clicked."
+        ]
+    )
+    errors = [
+        error
+        for error in context_status.get("errors", [])
+        if "localized store session could not be proven" not in clean_text(error).lower()
+    ]
+
+    context_status.update({
+        "ok": not errors,
+        "verified": not errors,
+        "message": " ".join(errors),
+        "proof_of_store_selection": proof,
+        "errors": errors,
+        "home_store_update": update,
+    })
+    return context_status
+
+
+def open_product_search_after_storefront(driver, search_url, store_key, store_session_status=None):
+    if normalize_item_key(store_key) == "aldi" and store_session_update_allows_product_search(store_session_status):
+        wait_for_current_url_contains(driver, "/store/aldi/storefront", timeout_seconds=12)
+
+    try:
+        driver.get(search_url)
+    except Exception:
+        if len(driver.page_source or "") < 800:
+            raise
+
+
+def wait_for_current_url_contains(driver, text, timeout_seconds=10):
+    deadline = time.monotonic() + max(1, timeout_seconds)
+    while time.monotonic() < deadline:
+        try:
+            current_url = str(driver.current_url or "")
+        except Exception:
+            current_url = ""
+        if text in current_url:
+            return True
+        time.sleep(0.4)
+    return False
 
 
 def prepare_store_session_before_product_search(
@@ -7786,21 +7869,7 @@ def contextualized_product_search_url(search_url, store_key, full_address="", st
     if not search_url:
         return ""
 
-    if normalize_item_key(store_key) != "aldi":
-        return search_url
-
-    zip_code = extract_zip_code(full_address) or extract_zip_code((store_location or {}).get("address", ""))
-    if not zip_code:
-        return search_url
-
-    try:
-        parsed = urlparse(search_url)
-        query = dict(parse_qsl(parsed.query, keep_blank_values=True))
-        query.setdefault("zipcode", zip_code)
-        return urlunparse(parsed._replace(query=urlencode(query)))
-    except Exception:
-        separator = "&" if "?" in search_url else "?"
-        return f"{search_url}{separator}zipcode={quote_plus(zip_code)}"
+    return search_url
 
 
 def geocode_home_address(full_address):

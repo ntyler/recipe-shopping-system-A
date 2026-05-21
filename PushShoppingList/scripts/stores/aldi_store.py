@@ -157,6 +157,19 @@ def click_aldi_shop_this_store(
     return bool(clicked_shop)
 
 
+def wait_for_aldi_storefront(driver, timeout_seconds: float = 10.0) -> bool:
+    deadline = time.monotonic() + max(1, timeout_seconds)
+    while time.monotonic() < deadline:
+        try:
+            current_url = str(driver.current_url or "")
+        except Exception:
+            current_url = ""
+        if "/store/aldi/storefront" in current_url:
+            return True
+        time.sleep(0.4)
+    return False
+
+
 def update_home_store(
     driver,
     context: dict[str, Any],
@@ -183,6 +196,7 @@ def update_home_store(
     clicked_first_store_card = False
     clicked_store_card = False
     clicked_shop_this_store = False
+    reached_storefront = False
     clicked_continue = False
     clicked_final = False
 
@@ -228,18 +242,22 @@ def update_home_store(
         worker_id=worker_id,
         wait_seconds=wait_seconds,
     )
-    clicked_continue = click_continue_shopping(driver, wait=wait_seconds)
+    if clicked_shop_this_store:
+        reached_storefront = wait_for_aldi_storefront(driver, timeout_seconds=wait_seconds + 8)
+
+    clicked_continue = False if reached_storefront else click_continue_shopping(driver, wait=wait_seconds)
 
     if not clicked_continue:
         clicked_final = click_visible_xpath(driver, final_home_store_xpaths(context), wait=wait_seconds)
 
     time.sleep(wait_seconds)
     confirmed = correct_home_store_selected(driver, context)
+    ok = bool(confirmed or (clicked_shop_this_store and reached_storefront))
 
     return {
         "attempted": True,
-        "ok": bool(confirmed),
-        "message": "Aldi home store confirmed." if confirmed else "Aldi home store was not confirmed.",
+        "ok": ok,
+        "message": "Aldi home store confirmed." if ok else "Aldi home store was not confirmed.",
         "clicked_location": clicked_location,
         "clicked_near_box": clicked_near_box,
         "typed_location": typed_location,
@@ -248,6 +266,8 @@ def update_home_store(
         "clicked_first_store_card": clicked_first_store_card,
         "clicked_store_card": clicked_store_card,
         "clicked_shop_this_store": clicked_shop_this_store,
+        "reached_storefront": reached_storefront,
+        "storefront_url": str(getattr(driver, "current_url", "") or ""),
         "clicked_continue": clicked_continue,
         "clicked_final": clicked_final,
         **context,
