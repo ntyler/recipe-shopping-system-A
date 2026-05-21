@@ -271,6 +271,122 @@ def type_visible_location_input(driver, values: list[Any], wait: float = 1.5) ->
     return False
 
 
+def click_first_address_suggestion(driver, context: dict[str, Any] | None = None, wait: float = 1.5) -> bool:
+    context = context or {}
+    home_address = clean_store_text(context.get("home_address"))
+    home_zip = clean_store_text(context.get("home_zip")) or extract_zip_from_text(home_address)
+    street_number_match = re.search(r"\b\d{2,6}\b", home_address)
+    street_number = street_number_match.group(0) if street_number_match else ""
+
+    try:
+        clicked = driver.execute_script(
+            """
+            const homeZip = String(arguments[0] || "").toLowerCase();
+            const streetNumber = String(arguments[1] || "").toLowerCase();
+
+            function visible(el) {
+                let node = el;
+                while (node && node.nodeType === 1) {
+                    const nodeStyle = window.getComputedStyle(node);
+                    if (node.hidden || nodeStyle.visibility === "hidden" || nodeStyle.display === "none" || parseFloat(nodeStyle.opacity || "1") < 0.02) {
+                        return false;
+                    }
+                    node = node.parentElement;
+                }
+                const style = window.getComputedStyle(el);
+                const rect = el.getBoundingClientRect();
+                return style && style.visibility !== "hidden" &&
+                    style.display !== "none" &&
+                    !el.disabled &&
+                    rect.width > 0 &&
+                    rect.height > 0;
+            }
+
+            function textOf(el) {
+                return String(el.innerText || el.textContent || "")
+                    .replace(/\\s+/g, " ")
+                    .trim();
+            }
+
+            function area(el) {
+                const rect = el.getBoundingClientRect();
+                return Math.max(1, rect.width * rect.height);
+            }
+
+            const scopes = Array.from(document.querySelectorAll("[role='dialog'], [aria-modal='true'], section, div"))
+                .filter(visible)
+                .filter(el => /choose address/i.test(textOf(el)))
+                .sort((a, b) => area(a) - area(b));
+            const scope = scopes[0] || document.body;
+            const elements = Array.from(scope.querySelectorAll("[role='option'], [role='button'], button, li, article, div"));
+            const candidates = [];
+
+            for (const el of elements) {
+                if (!visible(el) || el.matches("input, textarea")) {
+                    continue;
+                }
+
+                const text = textOf(el);
+                const lower = text.toLowerCase();
+                if (!text || text.length < 8) {
+                    continue;
+                }
+                if (/^(close|x|choose address|enter your address)$/i.test(text)) {
+                    continue;
+                }
+                if (/don't see your address|create your address manually/i.test(text)) {
+                    continue;
+                }
+                if (!(/\\d/.test(text) && /\\b[A-Z]{2}\\s+\\d{5}\\b/i.test(text)) && !(homeZip && lower.includes(homeZip))) {
+                    continue;
+                }
+
+                const rect = el.getBoundingClientRect();
+                let score = 0;
+                if (homeZip && lower.includes(homeZip)) {
+                    score += 30;
+                }
+                if (streetNumber && lower.includes(streetNumber)) {
+                    score += 20;
+                }
+                if (/\\b[A-Z]{2}\\s+\\d{5}\\b/i.test(text)) {
+                    score += 8;
+                }
+                if (rect.height > 170) {
+                    score -= 10;
+                }
+
+                candidates.push({ el, score, top: rect.top, left: rect.left, size: area(el), text });
+            }
+
+            candidates.sort((a, b) =>
+                (b.score - a.score) ||
+                (a.top - b.top) ||
+                (a.left - b.left) ||
+                (a.size - b.size)
+            );
+
+            if (!candidates.length) {
+                return "";
+            }
+
+            const target = candidates[0].el;
+            target.scrollIntoView({ block: "center", inline: "center" });
+            target.click();
+            return candidates[0].text;
+            """,
+            home_zip,
+            street_number,
+        )
+    except Exception:
+        clicked = ""
+
+    if clicked:
+        time.sleep(wait)
+        return True
+    return False
+
+
 def common_location_xpaths() -> list[str]:
     phrases = [
         "change store",
@@ -496,6 +612,7 @@ def build_store_helpers() -> dict[str, Any]:
         "click_text_button": click_text_button,
         "click_visible_xpath": click_visible_xpath,
         "type_visible_location_input": type_visible_location_input,
+        "click_first_address_suggestion": click_first_address_suggestion,
         "click_store_card_that_matches_context": click_store_card_that_matches_context,
         "click_continue_shopping": click_continue_shopping,
         "final_home_store_xpaths": final_home_store_xpaths,
@@ -504,4 +621,3 @@ def build_store_helpers() -> dict[str, Any]:
         "common_location_xpaths": common_location_xpaths,
         "clean_store_text": clean_store_text,
     }
-

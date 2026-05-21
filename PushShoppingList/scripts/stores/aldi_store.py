@@ -127,6 +127,7 @@ def update_home_store(
 ) -> dict[str, Any]:
     accept_cookies_if_present = helpers["accept_cookies_if_present"]
     type_visible_location_input = helpers["type_visible_location_input"]
+    click_first_address_suggestion = helpers["click_first_address_suggestion"]
     click_store_card_that_matches_context = helpers["click_store_card_that_matches_context"]
     click_continue_shopping = helpers["click_continue_shopping"]
     click_visible_xpath = helpers["click_visible_xpath"]
@@ -136,6 +137,7 @@ def update_home_store(
     clicked_location = False
     clicked_near_box = False
     typed_location = False
+    clicked_address_suggestion = False
     clicked_store_card = False
     clicked_shop_this_store = False
     clicked_continue = False
@@ -162,6 +164,7 @@ def update_home_store(
         clicked_near_box = False
 
     typed_location = type_visible_location_input(driver, context.get("search_values", []), wait=wait_seconds)
+    clicked_address_suggestion = click_first_address_suggestion(driver, context, wait=wait_seconds)
     time.sleep(2)
 
     try:
@@ -200,10 +203,10 @@ def update_home_store(
         "clicked_location": clicked_location,
         "clicked_near_box": clicked_near_box,
         "typed_location": typed_location,
+        "clicked_address_suggestion": clicked_address_suggestion,
         "clicked_store_card": clicked_store_card,
         "clicked_shop_this_store": clicked_shop_this_store,
         "clicked_continue": clicked_continue,
         "clicked_final": clicked_final,
         **context,
     }
-
