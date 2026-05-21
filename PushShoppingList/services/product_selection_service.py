@@ -3795,6 +3795,24 @@ def search_store_products_with_browser_agent(
             driver.set_page_load_timeout(product_browser_wait_seconds() + 8)
             configure_browser_home_location(driver, search_url, home_location)
 
+            store_session_status = prepare_store_session_before_product_search(
+                driver,
+                store_key,
+                store,
+                search_url,
+                full_address,
+                home_location,
+                store_location,
+                store_name,
+                browser_visible,
+                browser_visual_pause_seconds,
+            )
+            if store_session_status and not store_session_status.get("ok"):
+                return [], [
+                    store_session_status.get("message")
+                    or f"{store_name}: selected store location could not be updated before search."
+                ]
+
             try:
                 driver.get(search_url)
             except Exception:
@@ -3919,6 +3937,177 @@ def visual_browser_pause(enabled, seconds):
     if seconds <= 0:
         return
     time.sleep(min(60, seconds))
+
+
+def prepare_store_session_before_product_search(
+    driver,
+    store_key,
+    store,
+    search_url,
+    full_address,
+    home_location,
+    store_location,
+    store_name,
+    browser_visible=False,
+    browser_visual_pause_seconds=0,
+):
+    if normalize_item_key(store_key) == "aldi":
+        start_url = aldi_store_session_url(search_url, full_address, store_location)
+    else:
+        start_url = str(store.get("urlStoreSelector") or store.get("url") or "").strip()
+    if not start_url:
+        start_url = store.get("urlStoreSelector") or store.get("url") or search_url
+
+    try:
+        from PushShoppingList.services.recipe_extract_service import wait_for_browser_document
+        from PushShoppingList.scripts.stores.home_store_router import route_update_home_store
+
+        configure_browser_home_location(driver, start_url, home_location)
+
+        update_result = route_update_home_store(
+            driver=driver,
+            store_key=store_key,
+            store=store,
+            full_address=full_address,
+            store_location=store_location,
+            start_url=start_url,
+            worker_id=0,
+            wait_seconds=max(2, min(8, product_browser_wait_seconds() / 2)),
+        )
+        visual_browser_pause(browser_visible, browser_visual_pause_seconds)
+        wait_for_browser_document(driver, timeout_seconds=product_browser_wait_seconds())
+
+        status = rendered_store_context_status(
+            driver,
+            store_key,
+            store_name,
+            full_address,
+            store_location,
+        )
+        status["home_store_update"] = update_result
+        status["pre_search_store_url"] = start_url
+        if not status.get("ok"):
+            status["message"] = (
+                status.get("message")
+                or update_result.get("message")
+                or f"{store_name}: could not update the website selected store before searching."
+            )
+        return status
+    except Exception as exc:
+        return {
+            "ok": False,
+            "verified": False,
+            "message": f"{store_name}: could not update selected store before search: {exc}",
+            "pre_search_store_url": start_url,
+            "proof_of_store_selection": [],
+            "errors": [str(exc)],
+        }
+
+
+def aldi_store_session_url(search_url, full_address="", store_location=None):
+    search_url = str(search_url or "").strip()
+    if not search_url:
+        return ""
+
+    zip_code = extract_zip_code(full_address) or extract_zip_code((store_location or {}).get("address", ""))
+    try:
+        parsed = urlparse(search_url)
+        path = parsed.path or "/store/aldi"
+        if "/store/aldi" in path:
+            path = path[: path.index("/store/aldi") + len("/store/aldi")]
+        else:
+            path = "/store/aldi"
+        query = {}
+        if zip_code:
+            query["zipcode"] = zip_code
+        return urlunparse(parsed._replace(path=path, query=urlencode(query), fragment=""))
+    except Exception:
+        base = "https://www.aldi.us/store/aldi"
+        return f"{base}?zipcode={quote_plus(zip_code)}" if zip_code else base
+
+
+def open_store_selector_for_location(driver):
+    try:
+        clicked = driver.execute_script(
+            """
+            const preferredPatterns = [
+                /change store/i,
+                /edit/i,
+                /find stores?/i,
+                /store selector/i,
+                /select another store/i,
+                /choose another store/i,
+                /pickup.*change/i,
+                /delivery.*change/i
+            ];
+            const blockedPatterns = [
+                /add to cart/i,
+                /checkout/i,
+                /sign in/i,
+                /log in/i,
+                /create account/i,
+                /remove/i
+            ];
+
+            function visible(el) {
+                let node = el;
+                while (node && node.nodeType === 1) {
+                    const nodeStyle = window.getComputedStyle(node);
+                    if (node.hidden || nodeStyle.visibility === "hidden" || nodeStyle.display === "none" || parseFloat(nodeStyle.opacity || "1") < 0.02) {
+                        return false;
+                    }
+                    node = node.parentElement;
+                }
+                const style = window.getComputedStyle(el);
+                const rect = el.getBoundingClientRect();
+                return style && style.visibility !== "hidden" &&
+                    style.display !== "none" &&
+                    !el.disabled &&
+                    rect.width > 0 &&
+                    rect.height > 0;
+            }
+
+            function textOf(el) {
+                return [
+                    el.innerText,
+                    el.value,
+                    el.getAttribute("aria-label"),
+                    el.getAttribute("title")
+                ].filter(Boolean).join(" ").replace(/\\s+/g, " ").trim();
+            }
+
+            const controls = Array.from(document.querySelectorAll(
+                "button, a, [role='button'], input[type='button'], input[type='submit']"
+            ));
+            const candidates = [];
+            for (const control of controls) {
+                if (!visible(control)) {
+                    continue;
+                }
+                const text = textOf(control);
+                if (!text || blockedPatterns.some(pattern => pattern.test(text))) {
+                    continue;
+                }
+                const scoreIndex = preferredPatterns.findIndex(pattern => pattern.test(text));
+                if (scoreIndex >= 0) {
+                    candidates.push({ control, text, score: 100 - scoreIndex });
+                }
+            }
+
+            candidates.sort((a, b) => b.score - a.score);
+            if (!candidates.length) {
+                return "";
+            }
+            candidates[0].control.click();
+            return candidates[0].text;
+            """
+        )
+    except Exception:
+        clicked = ""
+
+    if clicked:
+        time.sleep(0.8)
+    return clicked or ""
 
 
 def rendered_product_content_html(cards):
@@ -5013,7 +5202,7 @@ def handle_browser_popups_and_location(driver, full_address, store_location=None
                 const patterns = [
                     /accept all/i, /accept/i, /agree/i, /allow/i,
                     /use current location/i, /use my location/i,
-                    /continue/i, /got it/i, /no thanks/i, /not now/i,
+                    /confirm/i, /continue/i, /got it/i, /no thanks/i, /not now/i,
                     /dismiss/i, /^close$/i
                 ];
                 const blocked = [/add to cart/i, /checkout/i, /sign in/i, /log in/i, /create account/i];
@@ -5098,6 +5287,8 @@ def select_nearest_pickup_store(driver, store_location):
                 /make this my store/i,
                 /choose store/i,
                 /use this store/i,
+                /confirm/i,
+                /continue/i,
                 /start shopping/i
             ];
             const blockedPatterns = [

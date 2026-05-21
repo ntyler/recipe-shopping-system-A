@@ -406,7 +406,7 @@ def first_text(*values):
 
 
 def test_grab_browser_visible():
-    return env_truthy(os.getenv("TEST_GRAB_VISIBLE", ""))
+    return env_truthy(os.getenv("TEST_GRAB_VISIBLE", "1"))
 
 
 def env_truthy(value):
