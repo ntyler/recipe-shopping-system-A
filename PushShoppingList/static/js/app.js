@@ -13,6 +13,8 @@ let cancelExtractRequested = false;
 let productProgressTimer = null;
 let activeProductJobId = null;
 let activeProductPromptChoice = null;
+let activeTestGrabAldiButton = null;
+let testGrabAldiRunning = false;
 const recipeQuantitySaveTimers = new WeakMap();
 const recipeQuantityNoticeTimers = new Map();
 const recipeQuantitySaveDelayMs = 2000;
@@ -458,6 +460,174 @@ async function grabBestProducts(event) {
         if (button) {
             button.disabled = false;
             button.textContent = originalText || "Grab Best Products";
+        }
+    }
+
+    return false;
+}
+
+function openTestGrabAldiModal(button) {
+    if (testGrabAldiRunning) {
+        return false;
+    }
+
+    activeTestGrabAldiButton = button || null;
+    const modal = ensureTestGrabAldiModal();
+    const input = document.getElementById("testGrabAldiInput");
+    const lastIngredient = localStorage.getItem("testGrabAldiIngredient") || localStorage.getItem("testGrabIngredient") || "eggs";
+
+    if (input) {
+        input.value = lastIngredient;
+    }
+
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+
+    window.setTimeout(() => {
+        if (input) {
+            input.focus();
+            input.select();
+        }
+    }, 0);
+
+    return false;
+}
+
+function ensureTestGrabAldiModal() {
+    let modal = document.getElementById("testGrabAldiModal");
+
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "testGrabAldiModal";
+        modal.className = "test-grab-modal-backdrop";
+        modal.setAttribute("aria-hidden", "true");
+        modal.innerHTML = `
+            <div class="test-grab-modal" role="dialog" aria-modal="true" aria-labelledby="testGrabAldiTitle">
+                <h2 id="testGrabAldiTitle" class="test-grab-modal-title">Enter Ingredient Or Product</h2>
+                <form onsubmit="return submitTestGrabAldiModal(event)">
+                    <input id="testGrabAldiInput"
+                           class="test-grab-input"
+                           type="text"
+                           autocomplete="off"
+                           placeholder="eggs, butter, yellow onion"
+                           aria-label="Enter ingredient or product">
+                    <div class="test-grab-modal-actions">
+                        <button type="button" class="product-close-btn" onclick="closeTestGrabAldiModal()">Cancel</button>
+                        <button type="submit" class="grab-products-btn">Submit</button>
+                    </div>
+                </form>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        modal.addEventListener("keydown", event => {
+            if (event.key === "Escape") {
+                closeTestGrabAldiModal();
+            }
+        });
+    }
+
+    return modal;
+}
+
+function closeTestGrabAldiModal() {
+    const modal = document.getElementById("testGrabAldiModal");
+
+    if (modal) {
+        modal.classList.remove("open");
+        modal.setAttribute("aria-hidden", "true");
+    }
+
+    if (!document.querySelector(".bulk-alt-modal-backdrop.open") && !document.querySelector(".product-prompt-modal-backdrop.open")) {
+        document.body.classList.remove("modal-open");
+    }
+
+    return false;
+}
+
+function submitTestGrabAldiModal(event) {
+    if (event) {
+        event.preventDefault();
+    }
+
+    const input = document.getElementById("testGrabAldiInput");
+    const ingredient = input ? input.value.trim() : "";
+
+    if (!ingredient) {
+        if (input) {
+            input.focus();
+        }
+        return false;
+    }
+
+    closeTestGrabAldiModal();
+    runTestGrabAldi(ingredient, activeTestGrabAldiButton);
+    return false;
+}
+
+async function runTestGrabAldi(ingredient, button) {
+    const originalText = button ? button.textContent : "";
+    const jobId = newProductJobId();
+    activeProductJobId = jobId;
+    testGrabAldiRunning = true;
+    localStorage.setItem("testGrabAldiIngredient", ingredient);
+    localStorage.setItem("testGrabIngredient", ingredient);
+
+    showProductsOverlay();
+    setProductsOverlayState(
+        "Opening ALDI...",
+        `Searching ALDI for: ${ingredient}`,
+        3,
+        []
+    );
+    startProductProgressPolling(jobId);
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Testing...";
+    }
+
+    let data = null;
+    try {
+        const response = await fetch("/test-grab-aldi", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "fetch",
+            },
+            body: JSON.stringify({
+                ingredient,
+                job_id: jobId,
+            }),
+        });
+        data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            const errors = data && Array.isArray(data.errors) ? data.errors.filter(Boolean).join(" ") : "";
+            throw new Error(errors || (data && data.error) || "Unable to complete Test Grab ALDI.");
+        }
+
+        stopProductProgressPolling();
+        setProductsOverlayState(
+            "Complete.",
+            `Searching ALDI for: ${data.search_term || ingredient}. ${data.selected_count || 0} best product selected.`,
+            100,
+            data.results || []
+        );
+    } catch (err) {
+        console.warn("Unable to complete Test Grab ALDI.", err);
+        stopProductProgressPolling();
+        setProductsOverlayState(
+            "Failed.",
+            err.message || "Test Grab ALDI failed.",
+            100,
+            data && Array.isArray(data.results) ? data.results : []
+        );
+    } finally {
+        testGrabAldiRunning = false;
+        if (button) {
+            button.disabled = false;
+            button.textContent = originalText || "Test Grab ALDI";
         }
     }
 

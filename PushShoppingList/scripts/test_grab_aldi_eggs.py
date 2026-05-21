@@ -42,10 +42,10 @@ TEST_GRAB_TARGET_PRODUCT = "Edible grocery eggs"
 TEST_GRAB_SEARCH_TERM = "eggs"
 
 
-def test_grab_products(job_id=None, ingredient=None):
+def test_grab_products(job_id=None, ingredient=None, home_address_override=None):
     ingredient = test_grab_search_term(ingredient)
     target_product = test_grab_target_product(ingredient)
-    home_address = load_home_address()
+    home_address = normalize_test_grab_home_address(home_address_override)
     full_address = home_address.get("full_address", "")
     store_settings = load_store_settings()
     stores = store_settings.get("stores", {})
@@ -90,10 +90,13 @@ def test_grab_products(job_id=None, ingredient=None):
         )
         update_product_progress_summary(
             job_id,
-            "Test Grab: resolving the nearest ALDI from the saved current Full Address.",
+            "Opening ALDI.",
         )
 
     home_location = geocode_home_address(full_address)
+    if job_id:
+        update_product_progress_summary(job_id, "Selecting nearest store.")
+
     store_location = find_nearest_store_location(
         TEST_GRAB_TARGET_STORE_KEY,
         store,
@@ -114,7 +117,7 @@ def test_grab_products(job_id=None, ingredient=None):
     if job_id:
         update_product_progress_summary(
             job_id,
-            f"Test Grab: loading localized ALDI inventory with Selenium and searching {ingredient}.",
+            f"Verifying localized store. Searching for: {ingredient}.",
         )
 
     result = search_store_products_for_download(
@@ -140,6 +143,9 @@ def test_grab_products(job_id=None, ingredient=None):
             candidate.get("ranking_reasons", [])
             + [reason]
         )
+
+    if job_id:
+        update_product_progress_summary(job_id, "Ranking products.")
 
     record = build_product_choice_record_from_results(
         ingredient,
@@ -180,6 +186,20 @@ def test_grab_products(job_id=None, ingredient=None):
         )
 
     return payload
+
+
+def normalize_test_grab_home_address(home_address_override=None):
+    if isinstance(home_address_override, dict):
+        full_address = clean_text(home_address_override.get("full_address"))
+        if full_address:
+            return {**home_address_override, "full_address": full_address}
+
+    if isinstance(home_address_override, str):
+        full_address = clean_text(home_address_override)
+        if full_address:
+            return {"full_address": full_address}
+
+    return load_home_address()
 
 
 def test_grab_search_term(value=None):

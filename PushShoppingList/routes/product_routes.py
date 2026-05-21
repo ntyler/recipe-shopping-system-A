@@ -7,6 +7,7 @@ from PushShoppingList.services.food_rules_service import annotate_product_food_r
 from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.food_rules_service import suggest_food_rules_from_prompt
 from PushShoppingList.services.food_rules_service import update_food_rules
+from PushShoppingList.services.home_address_service import load_home_address
 from PushShoppingList.services.home_address_service import save_home_address
 from PushShoppingList.services.product_selection_service import clear_product_choices
 from PushShoppingList.services.product_selection_service import grab_best_products
@@ -19,6 +20,7 @@ from PushShoppingList.services.product_selection_service import select_product_c
 from PushShoppingList.services.rules_display_service import save_home_store_rule_text
 from PushShoppingList.services.rules_display_service import save_rules_display_section
 from PushShoppingList.services.store_settings_service import save_enabled_stores
+from PushShoppingList.scripts.aldi import run_test_grab_aldi
 from PushShoppingList.scripts.test_grab_aldi_eggs import select_test_grab_product
 from PushShoppingList.scripts.test_grab_aldi_eggs import test_grab_choice_from_result
 from PushShoppingList.scripts.test_grab_aldi_eggs import test_grab_products
@@ -143,6 +145,27 @@ def api_test_grab_products_route():
         job_id=data.get("job_id"),
         ingredient=data.get("ingredient") or data.get("search_term"),
     ))
+
+
+@product_bp.route("/test-grab-aldi", methods=["POST"])
+def test_grab_aldi_route():
+    data = request.get_json(silent=True) or {}
+    ingredient = str(data.get("ingredient", "") or "").strip()
+
+    if not ingredient:
+        return jsonify({
+            "ok": False,
+            "error": "Ingredient is required.",
+            "errors": ["Ingredient is required."],
+        }), 400
+
+    result = run_test_grab_aldi(
+        home_address=load_home_address(),
+        search_term=ingredient,
+        job_id=data.get("job_id"),
+    )
+
+    return jsonify(result)
 
 
 @product_bp.route("/api/test_grab_result")
