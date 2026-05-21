@@ -862,6 +862,7 @@ function renderProductAlternatives(choice) {
     const selectedId = choice.selected_product_id || "";
     const storeName = choice.filtered_store_name || (choice.store_result ? choice.store_result.store_name : "") || "";
     const storeKey = choice.filtered_store_key || "";
+    const isTestGrabChoice = Boolean(choice.test_grab);
     activeProductPromptChoice = choice;
 
     if (subtitle) {
@@ -873,17 +874,17 @@ function renderProductAlternatives(choice) {
         return;
     }
 
-    if (!candidates.length) {
-        content.innerHTML = `<div class="bulk-review-note">No alternatives are saved for this ingredient.</div>`;
-        return;
-    }
-
     const validCandidates = Array.isArray(choice.valid_alternatives) && choice.valid_alternatives.length
         ? choice.valid_alternatives
         : candidates.filter(candidate => candidate && candidate.viable !== false && candidate.rejected !== true);
     const rejectedCandidates = Array.isArray(choice.rejected_products) && choice.rejected_products.length
         ? choice.rejected_products
         : candidates.filter(candidate => candidate && (candidate.viable === false || candidate.rejected === true));
+
+    if (!candidates.length && !validCandidates.length) {
+        content.innerHTML = `<div class="bulk-review-note">No alternatives are saved for this ingredient.</div>`;
+        return;
+    }
 
     const finalPromptHtml = hasPromptData(choice.chatgpt_final_selection_prompt)
         ? `
@@ -894,6 +895,16 @@ function renderProductAlternatives(choice) {
             </div>
         `
         : "";
+
+    if (isTestGrabChoice) {
+        content.innerHTML = finalPromptHtml + renderTestGrabAlternativeSlider(
+            choice,
+            validCandidates,
+            selectedId,
+            storeKey
+        );
+        return;
+    }
 
     const groupsHtml = [
         renderProductCandidateGroup(
@@ -915,6 +926,112 @@ function renderProductAlternatives(choice) {
     ].filter(Boolean).join("");
 
     content.innerHTML = finalPromptHtml + (groupsHtml || `<div class="bulk-review-note">No alternatives are saved for this ingredient.</div>`);
+}
+
+function renderTestGrabAlternativeSlider(choice, candidates, selectedId, storeKey) {
+    const rows = (candidates || []).filter(candidate => candidate && candidate.viable !== false && candidate.rejected !== true);
+    const itemLabel = choice.ingredient || choice.item_key || "product";
+    const storeName = choice.filtered_store_name || "ALDI";
+
+    if (!rows.length) {
+        return `<div class="bulk-review-note">No valid alternatives are saved for this ingredient.</div>`;
+    }
+
+    return `
+        <section class="test-grab-storefront">
+            <div class="test-grab-storefront-header">
+                <div class="test-grab-store-icon">ALDI</div>
+                <div>
+                    <div class="test-grab-store-name">${escapeHtml(storeName)}</div>
+                    <div class="test-grab-store-meta">Localized Test Grab results</div>
+                </div>
+            </div>
+            <div class="test-grab-results-title">Results for "${escapeHtml(itemLabel)}"</div>
+            <div class="test-grab-slider-shell">
+                <button type="button"
+                        class="test-grab-slider-nav"
+                        aria-label="Scroll alternatives left"
+                        onclick="scrollTestGrabSlider(-1)">
+                    &lsaquo;
+                </button>
+                <div id="testGrabAlternativeSlider" class="test-grab-slider" tabindex="0">
+                    ${rows.map(candidate => renderTestGrabAlternativeCard(candidate, selectedId, choice.item_key || "", storeKey)).join("")}
+                </div>
+                <button type="button"
+                        class="test-grab-slider-nav"
+                        aria-label="Scroll alternatives right"
+                        onclick="scrollTestGrabSlider(1)">
+                    &rsaquo;
+                </button>
+            </div>
+        </section>
+    `;
+}
+
+function renderTestGrabAlternativeCard(candidate, selectedId, itemKey, storeKey) {
+    const selected = candidate.id === selectedId;
+    const imageSrc = productCandidateImageSrc(candidate);
+    const productUrl = candidate.product_url && candidate.product_url !== candidate.search_url
+        ? candidate.product_url
+        : "";
+    const name = candidate.product_name || "Unnamed product";
+    const size = candidate.size_count || candidate.size || candidate.package_size || "";
+    const unit = candidate.price_per_egg || candidate.price_per_unit || candidate.unit_price || "";
+    const badges = [
+        selected ? "Selected" : "",
+        /organic/i.test(name) ? "Organic" : "",
+        /free range/i.test(name) ? "Free range" : "",
+        /cage free/i.test(name) ? "Cage free" : "",
+    ].filter(Boolean);
+
+    return `
+        <article class="test-grab-product-card${selected ? " selected" : ""}">
+            <a class="test-grab-product-image-wrap"
+               href="${escapeAttribute(productUrl || "#")}"
+               target="${productUrl ? "_blank" : ""}"
+               rel="noopener noreferrer"
+               aria-label="${escapeAttribute(name)}">
+                ${imageSrc
+                    ? `<img class="test-grab-product-image" src="${escapeAttribute(imageSrc)}" alt="">`
+                    : `<div class="test-grab-product-image-placeholder"></div>`
+                }
+                ${badges.length
+                    ? `<div class="test-grab-product-badges">${badges.slice(0, 2).map(badge => `<span>${escapeHtml(badge)}</span>`).join("")}</div>`
+                    : ""
+                }
+            </a>
+            <div class="test-grab-product-price">${escapeHtml(candidate.price || "Price unavailable")}</div>
+            <a class="test-grab-product-name"
+               href="${escapeAttribute(productUrl || "#")}"
+               target="${productUrl ? "_blank" : ""}"
+               rel="noopener noreferrer">
+                ${escapeHtml(name)}
+            </a>
+            <div class="test-grab-product-size">${escapeHtml(size)}</div>
+            <div class="test-grab-product-unit">${escapeHtml(unit)}</div>
+            <button type="button"
+                    class="test-grab-card-select${selected ? " selected" : ""}"
+                    data-item-key="${escapeAttribute(itemKey || "")}"
+                    data-product-id="${escapeAttribute(candidate.id || "")}"
+                    data-store-key="${escapeAttribute(storeKey || candidate.store_key || "")}"
+                    onclick="selectProductAlternative(this)"
+                    ${selected ? "disabled" : ""}>
+                ${selected ? "Selected" : "Select"}
+            </button>
+        </article>
+    `;
+}
+
+function scrollTestGrabSlider(direction) {
+    const slider = document.getElementById("testGrabAlternativeSlider");
+    if (!slider) {
+        return false;
+    }
+    slider.scrollBy({
+        left: (direction || 1) * Math.max(260, slider.clientWidth * 0.82),
+        behavior: "smooth",
+    });
+    return false;
 }
 
 function renderProductCandidateGroup(title, candidates, selectedId, itemKey, storeKey, rejected = false) {

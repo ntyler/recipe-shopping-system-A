@@ -473,34 +473,17 @@ def test_grab_choice_from_result(payload=None):
         "store_result": store_result,
         "selected_product": selected,
         "selected_product_id": selected_id,
-        "candidates": (
-            dedupe_test_grab_candidates([
-                candidate
-                for candidate in candidates
-                if test_grab_candidate_is_valid_alternative(candidate, search_term)
-            ])
-            + [
-                minimal_test_grab_rejected_candidate(candidate, search_term)
-                for candidate in dedupe_test_grab_candidates([
-                    candidate
-                    for candidate in candidates
-                    if not test_grab_candidate_is_valid_alternative(candidate, search_term)
-                ])
-            ]
-        ),
+        "candidates": dedupe_test_grab_candidates([
+            candidate
+            for candidate in candidates
+            if test_grab_candidate_is_valid_alternative(candidate, search_term)
+        ]),
         "valid_alternatives": dedupe_test_grab_candidates([
             candidate
             for candidate in candidates
             if test_grab_candidate_is_valid_alternative(candidate, search_term)
         ]),
-        "rejected_products": [
-            minimal_test_grab_rejected_candidate(candidate, search_term)
-            for candidate in dedupe_test_grab_candidates([
-                candidate
-                for candidate in candidates
-                if not test_grab_candidate_is_valid_alternative(candidate, search_term)
-            ])
-        ],
+        "rejected_products": [],
         "skip_reasons": payload.get("errors", []),
         "result_path": str(TEST_GRAB_RESULTS_FILE),
     }
@@ -567,20 +550,12 @@ def select_test_grab_product(product_id):
         and test_grab_candidate_is_valid_alternative(candidate, search_term)
         and candidate.get("id") != product_id
     ]
-    payload["rejected_products"] = [
-        minimal_test_grab_rejected_candidate(candidate, search_term)
-        for candidate in dedupe_test_grab_candidates(candidates)
-        if isinstance(candidate, dict)
-        and not test_grab_candidate_is_valid_alternative(candidate, search_term)
-    ]
-    record["candidates"] = (
-        dedupe_test_grab_candidates([
-            candidate
-            for candidate in candidates
-            if test_grab_candidate_is_valid_alternative(candidate, search_term)
-        ])
-        + payload["rejected_products"]
-    )
+    payload["rejected_products"] = []
+    record["candidates"] = dedupe_test_grab_candidates([
+        candidate
+        for candidate in candidates
+        if test_grab_candidate_is_valid_alternative(candidate, search_term)
+    ])
     payload["results"] = [record]
     save_test_grab_result(payload)
 
@@ -695,11 +670,6 @@ def build_test_grab_response_payload(
         for candidate in candidates
         if test_grab_candidate_is_valid_alternative(candidate, search_term)
     ])
-    rejected_products = dedupe_test_grab_candidates([
-        candidate
-        for candidate in candidates
-        if not test_grab_candidate_is_valid_alternative(candidate, search_term)
-    ])
     selected = record.get("selected_product") if isinstance(record.get("selected_product"), dict) else {}
     selected = test_grab_candidate_for_display(selected, search_term) if selected else {}
     selected_id = selected.get("id", "") if selected else ""
@@ -739,18 +709,12 @@ def build_test_grab_response_payload(
         "best_value_pick": final_product_candidate_payload(best_value) if best_value else {},
         "best_premium_pick": final_product_candidate_payload(best_premium) if best_premium else {},
         "alternatives": [final_product_candidate_payload(candidate) for candidate in alternatives],
-        "rejected_products": [
-            minimal_test_grab_rejected_candidate(candidate, search_term)
-            for candidate in rejected_products
-        ],
+        "rejected_products": [],
         "errors": errors,
         "results": [
             {
                 **record,
-                "candidates": valid_products + [
-                    minimal_test_grab_rejected_candidate(candidate, search_term)
-                    for candidate in rejected_products
-                ],
+                "candidates": valid_products,
             }
         ],
         "count": 1,

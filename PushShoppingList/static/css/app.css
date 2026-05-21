@@ -4267,6 +4267,204 @@ body {
             cursor: not-allowed;
         }
 
+        .test-grab-storefront {
+            padding: 8px 0 4px;
+            color: #f8fafc;
+        }
+
+        .test-grab-storefront-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 0 4px 14px;
+            border-bottom: 1px solid #2a2a2a;
+        }
+
+        .test-grab-store-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 6px;
+            display: grid;
+            place-items: center;
+            background: #0b4aa2;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 900;
+            border: 2px solid #f59e0b;
+            box-sizing: border-box;
+        }
+
+        .test-grab-store-name {
+            font-size: 18px;
+            font-weight: 800;
+            line-height: 1.1;
+        }
+
+        .test-grab-store-meta {
+            color: #a7f3d0;
+            font-size: 12px;
+            margin-top: 2px;
+        }
+
+        .test-grab-results-title {
+            margin: 18px 4px 10px;
+            font-size: 18px;
+            font-weight: 800;
+            color: #f8fafc;
+        }
+
+        .test-grab-slider-shell {
+            display: grid;
+            grid-template-columns: 34px minmax(0, 1fr) 34px;
+            align-items: stretch;
+            gap: 8px;
+        }
+
+        .test-grab-slider {
+            display: grid;
+            grid-auto-flow: column;
+            grid-auto-columns: minmax(156px, 176px);
+            gap: 14px;
+            overflow-x: auto;
+            overscroll-behavior-x: contain;
+            scroll-snap-type: x mandatory;
+            padding: 4px 2px 14px;
+            scrollbar-color: #747474 #111;
+            scrollbar-width: thin;
+        }
+
+        .test-grab-slider-nav {
+            width: 34px;
+            min-width: 34px;
+            margin: 4px 0 14px;
+            border: 1px solid #2f3b32;
+            border-radius: 999px;
+            background: #101712;
+            color: #f8fafc;
+            font-size: 30px;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .test-grab-slider-nav:hover {
+            background: #173222;
+            border-color: #0aad66;
+        }
+
+        .test-grab-product-card {
+            scroll-snap-align: start;
+            display: flex;
+            flex-direction: column;
+            min-height: 300px;
+            border-radius: 10px;
+            background: #050505;
+            border: 1px solid #1f2937;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        .test-grab-product-card.selected {
+            border-color: #0aad66;
+            box-shadow: inset 0 0 0 1px rgba(10, 173, 102, 0.35);
+        }
+
+        .test-grab-product-image-wrap {
+            position: relative;
+            display: grid;
+            place-items: center;
+            aspect-ratio: 1.35 / 1;
+            border-radius: 9px;
+            background: #fff;
+            overflow: hidden;
+            text-decoration: none;
+        }
+
+        .test-grab-product-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        .test-grab-product-image-placeholder {
+            width: 74%;
+            height: 56%;
+            border-radius: 10px;
+            background: #e5e7eb;
+        }
+
+        .test-grab-product-badges {
+            position: absolute;
+            right: 6px;
+            bottom: 6px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 4px;
+        }
+
+        .test-grab-product-badges span {
+            border-radius: 4px;
+            background: #111;
+            color: #fff;
+            padding: 2px 5px;
+            font-size: 10px;
+            font-weight: 800;
+        }
+
+        .test-grab-product-price {
+            margin-top: 10px;
+            color: #f8fafc;
+            font-size: 18px;
+            font-weight: 900;
+        }
+
+        .test-grab-product-name {
+            margin-top: 5px;
+            color: #f8fafc;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 700;
+            line-height: 1.25;
+            min-height: 52px;
+        }
+
+        .test-grab-product-name:hover {
+            text-decoration: underline;
+        }
+
+        .test-grab-product-size,
+        .test-grab-product-unit {
+            color: #94a3b8;
+            font-size: 12px;
+            min-height: 16px;
+        }
+
+        .test-grab-card-select {
+            margin-top: auto;
+            width: 100%;
+            border: 0;
+            border-radius: 999px;
+            background: #005a3c;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 900;
+            padding: 10px 12px;
+            cursor: pointer;
+        }
+
+        .test-grab-card-select:hover {
+            background: #007a4d;
+        }
+
+        .test-grab-card-select.selected,
+        .test-grab-card-select:disabled {
+            background: #29333a;
+            color: #d1d5db;
+            cursor: not-allowed;
+        }
+
         .bulk-selected-badge {
             display: none;
         }
