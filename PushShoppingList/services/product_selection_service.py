@@ -3836,6 +3836,8 @@ def search_store_products_with_browser_agent(
             scroll_rendered_product_results_until_stable(driver)
             visual_browser_pause(browser_visible, browser_visual_pause_seconds)
             handle_browser_popups_and_location(driver, full_address, store_location=store_location)
+            final_url = driver.current_url or search_url
+            rendered_snapshot = capture_rendered_product_page_snapshot(driver)
             context_status = rendered_store_context_status(
                 driver,
                 store_key,
@@ -3847,12 +3849,23 @@ def search_store_products_with_browser_agent(
                 context_status,
                 store_session_status,
             )
+            rendered_page = save_rendered_product_search_html(
+                store_key,
+                ingredient,
+                search_term=search_term or ingredient,
+                page_url=final_url,
+                html_text=rendered_snapshot.get("html", ""),
+                visible_text=rendered_snapshot.get("visible_text", ""),
+                product_related_html=rendered_snapshot.get("product_related_html", ""),
+                localization_status=context_status,
+            )
             if not context_status.get("ok"):
-                return [], [context_status.get("message") or f"{store_name}: rendered page did not match the saved store context."]
+                message = context_status.get("message") or f"{store_name}: rendered page did not match the saved store context."
+                if rendered_page.get("path"):
+                    message = f"{message} Saved rendered page HTML: {rendered_page.get('path')}"
+                return [], [message]
 
-            final_url = driver.current_url or search_url
-            visible_cards = extract_visible_product_cards_from_browser(driver)
-            product_related_html = rendered_product_content_html(visible_cards)
+            visible_cards = rendered_snapshot.get("visible_cards", [])
             visible_candidates = product_candidates_from_visible_cards(
                 visible_cards,
                 ingredient,
@@ -3863,22 +3876,6 @@ def search_store_products_with_browser_agent(
                 full_address,
                 home_location,
                 store_location,
-            )
-            rendered_html = driver.page_source or ""
-            visible_text = ""
-            try:
-                visible_text = driver.execute_script("return document.body && document.body.innerText || '';")
-            except Exception:
-                visible_text = ""
-            rendered_page = save_rendered_product_search_html(
-                store_key,
-                ingredient,
-                search_term=search_term or ingredient,
-                page_url=final_url,
-                html_text=rendered_html,
-                visible_text=visible_text,
-                product_related_html=product_related_html,
-                localization_status=context_status,
             )
             chatgpt_candidates, chatgpt_skip_reasons = identify_rendered_html_products_with_chatgpt(
                 ingredient,
@@ -3895,7 +3892,7 @@ def search_store_products_with_browser_agent(
             )
             visual_browser_pause(browser_visible, browser_visual_pause_seconds)
             rendered_candidates = parse_product_candidates_from_html(
-                rendered_html,
+                rendered_snapshot.get("html", ""),
                 final_url,
                 ingredient,
                 store_key,
@@ -5853,6 +5850,38 @@ def scroll_rendered_product_results_until_stable(driver, max_passes=None, stable
         pass
 
     return max(0, last_count)
+
+
+def capture_rendered_product_page_snapshot(driver):
+    visible_cards = extract_visible_product_cards_from_browser(driver)
+    return {
+        "html": extract_browser_document_html(driver),
+        "visible_text": extract_browser_visible_text(driver),
+        "visible_cards": visible_cards,
+        "product_related_html": rendered_product_content_html(visible_cards),
+    }
+
+
+def extract_browser_document_html(driver):
+    try:
+        html_text = driver.execute_script("return document.documentElement && document.documentElement.outerHTML || '';")
+    except Exception:
+        html_text = ""
+
+    if html_text:
+        return str(html_text)
+
+    try:
+        return str(driver.page_source or "")
+    except Exception:
+        return ""
+
+
+def extract_browser_visible_text(driver):
+    try:
+        return str(driver.execute_script("return document.body && document.body.innerText || '';") or "")
+    except Exception:
+        return ""
 
 
 def extract_visible_product_cards_from_browser(driver):

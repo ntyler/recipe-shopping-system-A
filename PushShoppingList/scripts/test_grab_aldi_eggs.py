@@ -127,7 +127,6 @@ def test_grab_products(job_id=None, ingredient=None, home_address_override=None)
         home_location,
         store_locations,
         job_id=job_id,
-        product_agent_prompt_builder=build_test_grab_eggs_aldi_prompt,
         browser_visible=test_grab_browser_visible(),
         browser_visual_pause_seconds=test_grab_visual_pause_seconds(),
         browser_visual_hold_seconds=test_grab_visual_hold_seconds(),

@@ -315,6 +315,51 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("liquid eggs", prompt)
         self.assertIn("Simply Nature Organic Cage Free Brown Eggs", prompt)
 
+    def test_test_grab_uses_shared_grab_best_products_rendered_html_agent(self):
+        raw_result = {
+            "index": 0,
+            "store_key": "aldi",
+            "store_name": "Aldi",
+            "candidates": [],
+            "skip_reasons": [],
+        }
+
+        with patch.object(
+            test_grab_script,
+            "load_store_settings",
+            return_value={
+                "stores": {
+                    "aldi": {
+                        "label": "Aldi",
+                        "url": "https://www.aldi.us/store/aldi/s?k=",
+                    }
+                }
+            },
+        ), patch.object(
+            test_grab_script,
+            "normalize_test_grab_home_address",
+            return_value={"full_address": "5905 Arlo Drive, Indianapolis, IN 46237"},
+        ), patch.object(
+            test_grab_script,
+            "geocode_home_address",
+            return_value={"latitude": 39.64, "longitude": -86.06},
+        ), patch.object(
+            test_grab_script,
+            "find_nearest_store_location",
+            return_value={"name": "Aldi", "address": "Indianapolis, IN 46237", "distance_miles": 2.2},
+        ), patch.object(
+            test_grab_script,
+            "search_store_products_for_download",
+            return_value=raw_result,
+        ) as search_mock, patch.object(
+            test_grab_script,
+            "save_test_grab_result",
+            side_effect=lambda payload: payload,
+        ):
+            test_grab_script.test_grab_products(ingredient="eggs")
+
+        self.assertNotIn("product_agent_prompt_builder", search_mock.call_args.kwargs)
+
     def test_rendered_html_agent_response_normalizes_candidates(self):
         data = {
             "best_product": {"product_name": "Large Eggs", "product_url": "/eggs"},
@@ -447,6 +492,35 @@ class ProductSelectionServiceTest(unittest.TestCase):
 
         self.assertEqual(driver.current_url, "https://www.aldi.us/store/aldi/s?k=eggs")
         self.assertEqual(driver.get_calls, [])
+
+    def test_post_scroll_snapshot_captures_current_dom_html_and_product_html(self):
+        class FakeDriver:
+            page_source = "<html><body>Fallback</body></html>"
+
+            def execute_script(self, script, *args):
+                if "document.documentElement" in script:
+                    return "<html><body><article>Large Eggs $1.99</article></body></html>"
+                if "const limit = arguments[0]" in script:
+                    return [
+                        {
+                            "name": "Large Eggs",
+                            "price": "$1.99",
+                            "product_url": "https://www.aldi.us/store/aldi/products/eggs",
+                            "image_url": "https://example.com/eggs.jpg",
+                            "text": "Large Eggs 12 ct $1.99",
+                            "raw_product_html_snippet": "<article><a href='/eggs'>Large Eggs</a><span>$1.99</span></article>",
+                        }
+                    ]
+                if "return document.body" in script:
+                    return "Shopping at ALDI Results for eggs Large Eggs $1.99"
+                return ""
+
+        snapshot = product_service.capture_rendered_product_page_snapshot(FakeDriver())
+
+        self.assertIn("Large Eggs $1.99", snapshot["html"])
+        self.assertIn("Results for eggs", snapshot["visible_text"])
+        self.assertEqual(snapshot["visible_cards"][0]["name"], "Large Eggs")
+        self.assertIn('data-name="Large Eggs"', snapshot["product_related_html"])
 
     def test_localized_inventory_failure_blocks_generic_fallback(self):
         self.assertTrue(product_service.localized_inventory_blocking_failure([
