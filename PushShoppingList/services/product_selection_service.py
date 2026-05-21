@@ -3822,6 +3822,7 @@ def search_store_products_with_browser_agent(
                 search_url,
                 store_key,
                 store_session_status,
+                search_term=search_term,
             )
 
             visual_browser_pause(browser_visible, browser_visual_pause_seconds)
@@ -3948,14 +3949,19 @@ def visual_browser_pause(enabled, seconds):
     time.sleep(min(60, seconds))
 
 
-def store_session_update_allows_product_search(store_session_status):
+def store_session_update_payload(store_session_status):
     if not isinstance(store_session_status, dict):
-        return False
+        return {}
 
     update = store_session_status.get("home_store_update")
     if not isinstance(update, dict):
         update = store_session_status
 
+    return update if isinstance(update, dict) else {}
+
+
+def store_session_update_has_store_confirmation(store_session_status):
+    update = store_session_update_payload(store_session_status)
     return any(
         bool(update.get(key))
         for key in [
@@ -3967,14 +3973,32 @@ def store_session_update_allows_product_search(store_session_status):
     )
 
 
+def store_session_update_has_address_selection(store_session_status):
+    update = store_session_update_payload(store_session_status)
+    return any(
+        bool(update.get(key))
+        for key in [
+            "clicked_address_suggestion",
+            "clicked_save_address",
+            "typed_location",
+        ]
+    )
+
+
+def store_session_update_allows_product_search(store_session_status):
+    return (
+        store_session_update_has_store_confirmation(store_session_status)
+        or store_session_update_has_address_selection(store_session_status)
+    )
+
+
 def merge_store_session_selection_proof(context_status, store_session_status):
     context_status = context_status if isinstance(context_status, dict) else {}
 
-    if context_status.get("ok") or not store_session_update_allows_product_search(store_session_status):
+    if context_status.get("ok") or not store_session_update_has_store_confirmation(store_session_status):
         return context_status
 
-    update = store_session_status.get("home_store_update") if isinstance(store_session_status, dict) else {}
-    update = update if isinstance(update, dict) else {}
+    update = store_session_update_payload(store_session_status)
     proof = unique_texts(
         context_status.get("proof_of_store_selection", [])
         + [
@@ -3998,15 +4022,168 @@ def merge_store_session_selection_proof(context_status, store_session_status):
     return context_status
 
 
-def open_product_search_after_storefront(driver, search_url, store_key, store_session_status=None):
+def open_product_search_after_storefront(driver, search_url, store_key, store_session_status=None, search_term=None):
     if normalize_item_key(store_key) == "aldi" and store_session_update_allows_product_search(store_session_status):
-        wait_for_current_url_contains(driver, "/store/aldi/storefront", timeout_seconds=12)
+        if store_session_update_has_store_confirmation(store_session_status):
+            wait_for_current_url_contains(driver, "/store/aldi/storefront", timeout_seconds=12)
+        return open_aldi_product_search(driver, search_url, search_term=search_term)
 
     try:
         driver.get(search_url)
     except Exception:
         if len(driver.page_source or "") < 800:
             raise
+
+
+def open_aldi_product_search(driver, search_url, search_term=None):
+    search_url = str(search_url or "").strip()
+    if not search_url:
+        return False
+
+    search_term = clean_text(search_term or aldi_search_term_from_url(search_url))
+    if search_term and submit_aldi_search_box(driver, search_term):
+        if wait_for_aldi_search_page(driver, search_url, search_term, timeout_seconds=8):
+            return True
+
+    try:
+        driver.get(search_url)
+    except Exception:
+        if len(driver.page_source or "") < 800:
+            raise
+
+    if wait_for_aldi_search_page(driver, search_url, search_term, timeout_seconds=8):
+        return True
+
+    if search_term and submit_aldi_search_box(driver, search_term):
+        return wait_for_aldi_search_page(driver, search_url, search_term, timeout_seconds=8)
+
+    return False
+
+
+def submit_aldi_search_box(driver, search_term):
+    search_term = clean_text(search_term)
+    if not search_term:
+        return False
+
+    try:
+        return bool(driver.execute_script(
+            """
+            const term = arguments[0];
+            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+                window.HTMLInputElement.prototype,
+                "value"
+            ).set;
+
+            function visible(el) {
+                let node = el;
+                while (node && node.nodeType === 1) {
+                    const style = window.getComputedStyle(node);
+                    if (node.hidden || style.display === "none" || style.visibility === "hidden") {
+                        return false;
+                    }
+                    node = node.parentElement;
+                }
+                const rect = el.getBoundingClientRect();
+                return rect.width > 0 && rect.height > 0;
+            }
+
+            const selectors = [
+                "form[role='search'] input",
+                "form[data-identifier='search_input'] input",
+                "#search-bar-input",
+                "input[aria-autocomplete]",
+                "input[type='search']",
+                "input[placeholder*='Search' i]"
+            ];
+            const inputs = selectors
+                .flatMap(selector => Array.from(document.querySelectorAll(selector)))
+                .filter((input, index, all) => all.indexOf(input) === index)
+                .filter(visible);
+            const input = inputs[0];
+            if (!input) {
+                return false;
+            }
+
+            input.focus();
+            nativeInputValueSetter.call(input, term);
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+            input.dispatchEvent(new Event("change", { bubbles: true }));
+
+            const form = input.closest("form");
+            if (form) {
+                if (typeof form.requestSubmit === "function") {
+                    form.requestSubmit();
+                } else {
+                    form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+                }
+                return true;
+            }
+
+            const button = document.querySelector(
+                "form[role='search'] button[type='submit'], form[data-identifier='search_input'] button[type='submit'], button[aria-label='Search']"
+            );
+            if (button && visible(button)) {
+                button.click();
+                return true;
+            }
+
+            input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true }));
+            input.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", bubbles: true }));
+            return true;
+            """,
+            search_term,
+        ))
+    except Exception:
+        return False
+
+
+def wait_for_aldi_search_page(driver, search_url, search_term="", timeout_seconds=8):
+    deadline = time.monotonic() + max(1, timeout_seconds)
+    while time.monotonic() < deadline:
+        if aldi_search_page_loaded(driver, search_url, search_term):
+            return True
+        time.sleep(0.4)
+    return False
+
+
+def aldi_search_page_loaded(driver, search_url, search_term=""):
+    search_term = clean_text(search_term or aldi_search_term_from_url(search_url))
+    normalized_term = normalize_match_text(search_term)
+
+    try:
+        current_url = str(driver.current_url or "")
+    except Exception:
+        current_url = ""
+
+    if current_url:
+        parsed = urlparse(current_url)
+        query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+        current_term = clean_text(query.get("k") or query.get("q") or "")
+        if "/store/aldi/s" in parsed.path and (
+            not normalized_term
+            or normalize_match_text(current_term) == normalized_term
+        ):
+            return True
+
+    if normalized_term:
+        try:
+            text = clean_text(driver.execute_script("return document.body && document.body.innerText || '';"))
+        except Exception:
+            text = ""
+        normalized_text = normalize_match_text(text[:4000])
+        if re.search(rf"\bresults for\b.{0,20}\b{re.escape(normalized_term)}\b", normalized_text):
+            return True
+
+    return False
+
+
+def aldi_search_term_from_url(search_url):
+    try:
+        parsed = urlparse(str(search_url or ""))
+        query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+        return clean_text(query.get("k") or query.get("q") or "")
+    except Exception:
+        return ""
 
 
 def wait_for_current_url_contains(driver, text, timeout_seconds=10):

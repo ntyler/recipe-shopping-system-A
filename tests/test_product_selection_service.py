@@ -386,6 +386,68 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertTrue(status["proof_of_store_selection"])
         self.assertIn("46237", " ".join(status["proof_of_store_selection"]))
 
+    def test_aldi_address_selection_can_continue_to_actual_search_without_proof_bypass(self):
+        status = {
+            "ok": False,
+            "home_store_update": {
+                "typed_location": True,
+                "clicked_address_suggestion": True,
+                "clicked_save_address": True,
+                "clicked_shop_this_store": False,
+            },
+        }
+
+        self.assertTrue(product_service.store_session_update_allows_product_search(status))
+        self.assertFalse(product_service.store_session_update_has_store_confirmation(status))
+
+        context_status = {
+            "ok": False,
+            "verified": False,
+            "message": "Localized store session could not be proven from visible page text.",
+            "proof_of_store_selection": [],
+            "errors": ["Localized store session could not be proven from visible page text."],
+        }
+
+        merged = product_service.merge_store_session_selection_proof(context_status, status)
+
+        self.assertFalse(merged["ok"])
+        self.assertEqual(merged["proof_of_store_selection"], [])
+
+    def test_aldi_search_after_storefront_submits_ingredient_search(self):
+        class FakeDriver:
+            current_url = "https://www.aldi.us/store/aldi/storefront"
+            page_source = "<html><body>Shopping at ALDI - GRE 73 - Indianapolis</body></html>"
+
+            def __init__(self):
+                self.get_calls = []
+                self.script_calls = []
+
+            def get(self, url):
+                self.get_calls.append(url)
+                self.current_url = url
+
+            def execute_script(self, script, *args):
+                self.script_calls.append((script, args))
+                if "HTMLInputElement" in script:
+                    self.current_url = f"https://www.aldi.us/store/aldi/s?k={args[0]}"
+                    return True
+                if "return document.body" in script:
+                    return 'Results for "eggs"'
+                return ""
+
+        driver = FakeDriver()
+
+        product_service.open_product_search_after_storefront(
+            driver,
+            "https://www.aldi.us/store/aldi/s?k=eggs",
+            "aldi",
+            {"home_store_update": {"clicked_shop_this_store": True}},
+            search_term="eggs",
+        )
+
+        self.assertEqual(driver.current_url, "https://www.aldi.us/store/aldi/s?k=eggs")
+        self.assertEqual(driver.get_calls, [])
+
     def test_localized_inventory_failure_blocks_generic_fallback(self):
         self.assertTrue(product_service.localized_inventory_blocking_failure([
             "Aldi: Localized store session could not be proven from visible page text. Refusing to treat this as localized inventory."
