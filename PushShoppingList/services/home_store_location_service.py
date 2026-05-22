@@ -70,6 +70,31 @@ def resolve_nearest_stores_for_home_address(home_address=None, store_settings=No
     ]
     full_address = str(home_address.get("full_address", "") or "").strip()
     home_location = geocode_home_address(full_address)
+
+    if not full_address:
+        return {
+            "ok": False,
+            "saved": False,
+            "home_address": full_address,
+            "home_location": None,
+            "enabled_stores": enabled_stores,
+            "store_locations": load_nearest_store_results().get("store_locations", {}),
+            "updated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+            "error": "Full Address is missing.",
+        }
+
+    if not home_location:
+        return {
+            "ok": False,
+            "saved": False,
+            "home_address": full_address,
+            "home_location": None,
+            "enabled_stores": enabled_stores,
+            "store_locations": load_nearest_store_results().get("store_locations", {}),
+            "updated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+            "error": "Full Address could not be geocoded.",
+        }
+
     store_locations = {}
 
     for store_key in enabled_stores:
@@ -81,17 +106,13 @@ def resolve_nearest_stores_for_home_address(home_address=None, store_settings=No
         )
 
     result = {
-        "ok": bool(full_address and home_location),
+        "ok": True,
+        "saved": True,
         "home_address": full_address,
         "home_location": home_location,
         "enabled_stores": enabled_stores,
         "store_locations": store_locations,
         "updated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
     }
-
-    if not full_address:
-        result["error"] = "Full Address is missing."
-    elif not home_location:
-        result["error"] = "Full Address could not be geocoded."
 
     return save_nearest_store_results(result)

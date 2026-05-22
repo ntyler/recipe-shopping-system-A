@@ -5717,7 +5717,9 @@ async function runFindNearestStores(form, button) {
         }
 
         await refreshStoreMarkup({ cacheBust: true });
-        showRecipeQuantityUpdatedMessage("", "", "", "Nearest stores updated.");
+        showRecipeQuantityUpdatedMessage("", "", "", data && data.warning
+            ? `Nearest stores not updated: ${data.warning}`
+            : "Nearest stores updated.");
     } catch (err) {
         console.warn("Unable to find nearest stores in the background.", err);
         showRecipeQuantityUpdatedMessage("", "", "", err.message || "Unable to find nearest stores.");

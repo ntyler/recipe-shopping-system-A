@@ -313,6 +313,37 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertTrue(response.headers["Location"].endswith("/#storeOptionsSection"))
         resolver.assert_called_once_with(saved_address)
 
+    def test_run_find_nearest_stores_ajax_returns_warning_without_jump_failure(self):
+        from PushShoppingList.app import create_app
+
+        app = create_app()
+        app.config["TESTING"] = True
+        saved_address = {"full_address": "5905 Arlo Drive, Indianapolis, IN 46237"}
+        nearest_result = {
+            "ok": False,
+            "saved": False,
+            "home_address": saved_address["full_address"],
+            "store_locations": {},
+            "error": "Full Address could not be geocoded.",
+        }
+
+        with patch("PushShoppingList.routes.main_routes.save_home_address", return_value=saved_address), patch(
+            "PushShoppingList.routes.main_routes.resolve_nearest_stores_for_home_address",
+            return_value=nearest_result,
+        ):
+            response = app.test_client().post(
+                "/save_home_address",
+                data={"action": "run_find_nearest", "ajax": "1"},
+                headers={"X-Requested-With": "fetch"},
+            )
+
+        data = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["warning"], "Full Address could not be geocoded.")
+        self.assertFalse(data["nearest_store_results"]["saved"])
+
     def test_chatgpt_mismatch_is_not_selectable(self):
         item = candidate("Organic Lemon")
         item["chatgpt_analysis"] = {

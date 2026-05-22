@@ -965,10 +965,9 @@ def save_home_address_route():
         }
         if nearest_store_results is not None:
             response["nearest_store_results"] = nearest_store_results
-            response["ok"] = bool(nearest_store_results.get("ok"))
             if nearest_store_results.get("error"):
-                response["error"] = nearest_store_results.get("error")
-        return jsonify(response), 200 if response["ok"] else 400
+                response["warning"] = nearest_store_results.get("error")
+        return jsonify(response)
 
     return redirect("/#storeOptionsSection" if nearest_store_results is not None else "/#home-address-section")
 

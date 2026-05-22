@@ -132,29 +132,102 @@ body {
 
         .store-manager-row {
             display: grid;
-            grid-template-columns: 34px 130px minmax(0, 1fr) 330px;
+            grid-template-columns: 28px minmax(150px, 210px) minmax(0, 1fr) auto;
             gap: 12px;
-            align-items: start;
-            background: #202425;
-            border: 1px solid #444;
+            align-items: center;
+            background: #1b1f20;
+            border: 1px solid #4d514c;
             border-radius: 12px;
             padding: 14px;
             box-sizing: border-box;
         }
 
+        .store-manager-row.inactive {
+            opacity: 0.72;
+        }
+
         .store-manager-row input[type="checkbox"] {
             transform: scale(1.2);
             cursor: pointer;
-            margin-top: 9px;
+            margin: 0;
+        }
+
+        .store-manager-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .store-logo {
+            width: 40px;
+            height: 40px;
+            min-width: 40px;
+            display: inline-grid;
+            place-items: center;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.25);
+            color: #fff;
+            background: #293036;
+            font-size: 12px;
+            line-height: 1;
+            font-weight: 900;
+            letter-spacing: 0;
+            box-shadow: inset 0 0 0 1px rgba(0,0,0,0.25);
+        }
+
+        .store-logo-aldi {
+            background: #0046ad;
+            border-color: #f59e0b;
+        }
+
+        .store-logo-kroger {
+            background: #0b4ea2;
+        }
+
+        .store-logo-walmart {
+            background: #0071ce;
+            color: #ffc220;
+        }
+
+        .store-logo-meijer {
+            background: #c41230;
+        }
+
+        .store-logo-target {
+            background: #cc0000;
+        }
+
+        .store-logo-costco {
+            background: #005dab;
+            color: #f3f4f6;
+        }
+
+        .store-brand-copy {
+            min-width: 0;
         }
 
         .store-manager-label {
             color: #fff;
             font-weight: bold;
             font-size: 15px;
-            padding-top: 7px;
             white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
             min-width: 0;
+        }
+
+        .store-manager-state {
+            color: #a7f3d0;
+            font-size: 11px;
+            font-weight: 800;
+            margin-top: 2px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .store-manager-row.inactive .store-manager-state {
+            color: #aaa;
         }
 
         .store-manager-url {
@@ -163,7 +236,6 @@ body {
             word-break: break-word;
             overflow-wrap: anywhere;
             min-width: 0;
-            padding-top: 4px;
         }
 
         .store-options-collapsed-summary {
@@ -209,8 +281,8 @@ body {
             align-items: center;
             justify-content: flex-end;
             gap: 10px;
-            width: 330px;
-            min-width: 330px;
+            width: auto;
+            min-width: 176px;
             margin: 0;
             flex-wrap: nowrap;
             box-sizing: border-box;
@@ -258,7 +330,7 @@ body {
             background: #181b1c;
             border: 1px solid #555;
             border-radius: 9px;
-            padding: 9px 10px;
+            padding: 10px 12px;
             font-size: 12px;
             line-height: 1.45;
             color: #bbb;
@@ -268,6 +340,10 @@ body {
         }
 
         .store-detail-line {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
             margin-top: 3px;
         }
 
@@ -282,13 +358,24 @@ body {
 
         .store-distance-pill {
             display: inline-block;
-            margin-left: 6px;
             padding: 2px 6px;
             border-radius: 999px;
             background: #263238;
             color: #7dd3fc;
             font-size: 11px;
             font-weight: 700;
+        }
+
+        .store-nearest-address {
+            color: #e5e7eb;
+        }
+
+        .store-nearest-warning {
+            color: #fbbf24;
+        }
+
+        .store-nearest-empty {
+            color: #aaa;
         }
 
         .store-detail-link {
@@ -4579,13 +4666,11 @@ body {
             .store-manager-row input[type="checkbox"] {
                 grid-column: 1 / 2;
                 grid-row: 1 / 2;
-                margin-top: 6px;
             }
 
-            .store-manager-label {
+            .store-manager-brand {
                 grid-column: 2 / 3;
                 grid-row: 1 / 2;
-                padding-top: 4px;
             }
 
             .store-manager-url {

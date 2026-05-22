@@ -20,15 +20,23 @@
 
         <div class="store-manager-list">
             {% for store_key, store in available_stores.items() %}
-                <div class="store-manager-row">
+                {% set store_logo_text = {"aldi": "ALDI", "kroger": "K", "walmart": "W", "meijer": "M", "target": "T", "costco": "C"}.get(store_key, store.label[:2]|upper) %}
+                {% set store_enabled = store_key in enabled_stores %}
+                <div class="store-manager-row{% if not store_enabled %} inactive{% endif %}">
                     <input type="checkbox"
                            form="store-options-form"
                            name="enabled_stores"
                            value="{{ store_key }}"
                            onchange="saveStoreToggle(this)"
-                           {% if store_key in enabled_stores %}checked{% endif %}>
+                           {% if store_enabled %}checked{% endif %}>
 
-                    <div class="store-manager-label">{{ store.label }}</div>
+                    <div class="store-manager-brand">
+                        <span class="store-logo store-logo-{{ store_key|replace('_', '-') }}">{{ store_logo_text }}</span>
+                        <div class="store-brand-copy">
+                            <div class="store-manager-label">{{ store.label }}</div>
+                            <div class="store-manager-state">{{ "Enabled" if store_enabled else "Disabled" }}</div>
+                        </div>
+                    </div>
 
                     <div class="store-manager-url">
                         <div class="store-detail-line">
@@ -62,14 +70,14 @@
                         <div class="store-detail-line">
                             <span class="store-detail-label">Nearest</span>
                             {% if nearest_store and nearest_store.address %}
-                                <span>{{ nearest_store.address }}</span>
+                                <span class="store-nearest-address">{{ nearest_store.address }}</span>
                                 {% if nearest_store.distance_miles is defined and nearest_store.distance_miles is not none %}
                                     <span class="store-distance-pill">{{ nearest_store.distance_miles }} mi</span>
                                 {% endif %}
                             {% elif nearest_store and nearest_store.skip_reason %}
-                                <span>{{ nearest_store.skip_reason }}</span>
+                                <span class="store-nearest-warning">{{ nearest_store.skip_reason }}</span>
                             {% else %}
-                                No nearest location saved yet. Run <strong>Run Find Nearest Stores</strong>.
+                                <span class="store-nearest-empty">No nearest location saved yet. Use Run Find Nearest Stores.</span>
                             {% endif %}
                         </div>
                     </div>
