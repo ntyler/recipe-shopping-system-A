@@ -5,6 +5,7 @@ from flask import request
 
 from PushShoppingList.services.store_settings_service import add_store
 from PushShoppingList.services.store_settings_service import delete_store
+from PushShoppingList.services.home_store_location_service import select_nearby_store_location
 from PushShoppingList.services.item_state_service import reset_item_stores
 from PushShoppingList.services.item_state_service import save_item_store
 from PushShoppingList.services.store_settings_service import load_store_settings
@@ -93,6 +94,17 @@ def reset_stores_route():
         })
 
     return redirect("/")
+
+
+@store_bp.route("/select_nearby_store_location/<store_key>", methods=["POST"])
+def select_nearby_store_location_route(store_key):
+    result = select_nearby_store_location(store_key, request.form.get("nearby_index"))
+
+    if wants_json_response():
+        status = 200 if result.get("ok") else 400
+        return jsonify(result), status
+
+    return redirect("/#storeOptionsSection")
 
 
 @store_bp.route("/save_item_store", methods=["POST"])

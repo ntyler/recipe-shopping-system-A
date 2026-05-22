@@ -69,7 +69,7 @@
                         {% set nearest_store = nearest_store_locations.get(store_key, {}) if nearest_store_locations else {} %}
                         {% set nearby_stores = nearest_store.nearby_locations if nearest_store and nearest_store.nearby_locations else [] %}
                         <div class="store-detail-line">
-                            <span class="store-detail-label">Nearest</span>
+                            <span class="store-detail-label">Selected</span>
                             {% if nearest_store and nearest_store.address %}
                                 <span class="store-nearest-address">{{ nearest_store.address }}</span>
                                 {% if nearest_store.distance_miles is defined and nearest_store.distance_miles is not none %}
@@ -89,13 +89,22 @@
                             </div>
                             <div class="nearby-store-list">
                                 {% for nearby_store in nearby_stores %}
-                                    <div class="nearby-store-row{% if loop.first %} nearest{% endif %}">
+                                    {% set nearby_selected = nearest_store.address == nearby_store.address and nearest_store.distance_miles == nearby_store.distance_miles %}
+                                    <button type="button"
+                                            class="nearby-store-row{% if nearby_selected %} selected{% endif %}"
+                                            data-store-key="{{ store_key }}"
+                                            data-nearby-index="{{ loop.index0 }}"
+                                            aria-pressed="{{ 'true' if nearby_selected else 'false' }}"
+                                            onclick="return selectNearbyStoreLocation(this);">
                                         <span class="nearby-store-rank">{{ loop.index }}</span>
                                         <span class="nearby-store-address">{{ nearby_store.address }}</span>
                                         {% if nearby_store.distance_miles is defined and nearby_store.distance_miles is not none %}
                                             <span class="store-distance-pill">{{ nearby_store.distance_miles }} mi</span>
                                         {% endif %}
-                                    </div>
+                                        {% if nearby_selected %}
+                                            <span class="nearby-store-selected">Selected</span>
+                                        {% endif %}
+                                    </button>
                                 {% endfor %}
                             </div>
                         {% endif %}

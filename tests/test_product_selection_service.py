@@ -470,6 +470,75 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertEqual(aldi["nearby_count"], 2)
         self.assertEqual(aldi["nearby_locations"][1]["address"], "Second Aldi")
 
+    def test_select_nearby_store_location_promotes_clicked_address(self):
+        from PushShoppingList.services import home_store_location_service
+
+        saved_payloads = []
+        saved_results = {
+            "ok": True,
+            "home_address": "5905 Arlo Drive, Indianapolis, IN 46237",
+            "search_radius_miles": 5,
+            "store_locations": {
+                "aldi": {
+                    "name": "Aldi",
+                    "address": "Nearest Aldi",
+                    "distance_miles": 1.2,
+                    "search_radius_miles": 5,
+                    "nearby_locations": [
+                        {
+                            "name": "Aldi",
+                            "address": "Nearest Aldi",
+                            "distance_miles": 1.2,
+                            "search_radius_miles": 5,
+                        },
+                        {
+                            "name": "Aldi",
+                            "address": "Second Aldi",
+                            "distance_miles": 3.4,
+                            "search_radius_miles": 5,
+                        },
+                    ],
+                }
+            },
+        }
+
+        with patch.object(
+            home_store_location_service,
+            "load_nearest_store_results",
+            return_value=saved_results,
+        ), patch.object(
+            home_store_location_service,
+            "save_nearest_store_results",
+            side_effect=lambda payload: saved_payloads.append(payload) or payload,
+        ):
+            result = home_store_location_service.select_nearby_store_location("aldi", "1")
+
+        selected = result["selected_location"]
+        self.assertTrue(result["ok"])
+        self.assertEqual(selected["address"], "Second Aldi")
+        self.assertEqual(selected["nearby_count"], 2)
+        self.assertEqual(saved_payloads[0]["store_locations"]["aldi"]["address"], "Second Aldi")
+
+    def test_select_nearby_store_location_route_returns_json(self):
+        from PushShoppingList.app import create_app
+
+        app = create_app()
+        app.config["TESTING"] = True
+
+        with patch(
+            "PushShoppingList.routes.store_routes.select_nearby_store_location",
+            return_value={"ok": True, "store_key": "aldi"},
+        ) as selector:
+            response = app.test_client().post(
+                "/select_nearby_store_location/aldi",
+                data={"ajax": "1", "nearby_index": "1"},
+                headers={"X-Requested-With": "fetch"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.get_json()["ok"])
+        selector.assert_called_once_with("aldi", "1")
+
     def test_chatgpt_mismatch_is_not_selectable(self):
         item = candidate("Organic Lemon")
         item["chatgpt_analysis"] = {

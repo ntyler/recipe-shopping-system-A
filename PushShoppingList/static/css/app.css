@@ -403,15 +403,30 @@ body {
             grid-template-columns: 24px minmax(0, 1fr) auto;
             gap: 8px;
             align-items: start;
+            width: 100%;
             padding: 7px 8px;
             background: #101314;
             border: 1px solid #2f3638;
             border-radius: 8px;
+            color: inherit;
+            font: inherit;
+            text-align: left;
+            cursor: pointer;
         }
 
-        .nearby-store-row.nearest {
+        .nearby-store-row:hover {
+            border-color: #0f766e;
+            background: #111f1d;
+        }
+
+        .nearby-store-row.selected {
             border-color: #0f766e;
             background: #0d1f1c;
+        }
+
+        .nearby-store-row:disabled {
+            cursor: wait;
+            opacity: 0.8;
         }
 
         .nearby-store-rank {
@@ -429,6 +444,15 @@ body {
         .nearby-store-address {
             color: #e5e7eb;
             min-width: 0;
+        }
+
+        .nearby-store-selected {
+            grid-column: 2 / 4;
+            color: #a7f3d0;
+            font-size: 11px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
         }
 
         .store-detail-link {

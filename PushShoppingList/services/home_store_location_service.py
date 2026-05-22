@@ -108,6 +108,59 @@ def save_nearest_store_results(data):
     return data
 
 
+def select_nearby_store_location(store_key, nearby_index):
+    data = load_nearest_store_results()
+    store_locations = data.get("store_locations", {})
+    current_location = store_locations.get(store_key)
+
+    if not isinstance(current_location, dict):
+        return {
+            "ok": False,
+            "error": "No saved nearby locations are available for this store.",
+        }
+
+    nearby_locations = current_location.get("nearby_locations")
+    if not isinstance(nearby_locations, list) or not nearby_locations:
+        return {
+            "ok": False,
+            "error": "No saved nearby locations are available for this store.",
+        }
+
+    try:
+        index = int(nearby_index)
+    except (TypeError, ValueError):
+        index = -1
+
+    if index < 0 or index >= len(nearby_locations):
+        return {
+            "ok": False,
+            "error": "Selected store location was not found.",
+        }
+
+    selected_location = dict(nearby_locations[index])
+    search_radius = normalize_store_search_radius(
+        selected_location.get(
+            "search_radius_miles",
+            current_location.get("search_radius_miles", data.get("search_radius_miles", DEFAULT_STORE_SEARCH_RADIUS_MILES)),
+        )
+    )
+    selected_location["nearby_locations"] = nearby_locations
+    selected_location["nearby_count"] = len(nearby_locations)
+    selected_location["search_radius_miles"] = search_radius
+    selected_location["search_radius_display"] = format_store_search_radius(search_radius)
+    store_locations[store_key] = selected_location
+    data["store_locations"] = store_locations
+    data["updated_at"] = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+
+    save_nearest_store_results(data)
+
+    return {
+        "ok": True,
+        "store_key": store_key,
+        "selected_location": selected_location,
+    }
+
+
 def resolve_nearest_stores_for_home_address(home_address=None, store_settings=None, search_radius_miles=None):
     from PushShoppingList.services.product_selection_service import find_nearby_store_locations
     from PushShoppingList.services.product_selection_service import geocode_home_address

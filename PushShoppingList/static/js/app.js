@@ -6004,6 +6004,53 @@ async function deleteStore(event, message) {
     return false;
 }
 
+async function selectNearbyStoreLocation(button) {
+    const storeKey = button ? button.dataset.storeKey || "" : "";
+    const nearbyIndex = button ? button.dataset.nearbyIndex || "" : "";
+
+    if (!storeKey) {
+        return false;
+    }
+
+    const formData = new FormData();
+    formData.set("ajax", "1");
+    formData.set("nearby_index", nearbyIndex);
+
+    if (button) {
+        button.disabled = true;
+    }
+
+    try {
+        const response = await fetch(`/select_nearby_store_location/${encodeURIComponent(storeKey)}`, {
+            method: "POST",
+            headers: {
+                "X-Requested-With": "fetch",
+            },
+            body: formData,
+        });
+        const contentType = response.headers.get("content-type") || "";
+        const data = contentType.includes("application/json")
+            ? await response.json()
+            : null;
+
+        if (!response.ok || (data && !data.ok)) {
+            throw new Error((data && data.error) || "Unable to select store location.");
+        }
+
+        await refreshStoreMarkup({ cacheBust: true });
+        showRecipeQuantityUpdatedMessage("", "", "", "Store location selected.");
+    } catch (err) {
+        console.warn("Unable to select store location.", err);
+        showRecipeQuantityUpdatedMessage("", "", "", err.message || "Unable to select store location.");
+
+        if (button && button.isConnected) {
+            button.disabled = false;
+        }
+    }
+
+    return false;
+}
+
 async function submitStoreForm(form) {
     const formData = new FormData(form);
     formData.set("ajax", "1");
