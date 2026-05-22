@@ -65,7 +65,14 @@ def add_store_route():
 
 @store_bp.route("/update_store/<store_key>", methods=["POST"])
 def update_store_route(store_key):
-    update_store(store_key, request.form)
+    settings = update_store(store_key, request.form)
+
+    if wants_json_response():
+        return jsonify({
+            "ok": True,
+            "stores": settings["stores"],
+            "enabled_stores": settings["enabled_stores"],
+        })
 
     return redirect("/#store-options")
 

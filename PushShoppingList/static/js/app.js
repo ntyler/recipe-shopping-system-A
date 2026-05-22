@@ -6215,6 +6215,120 @@ async function addStore(event) {
     return false;
 }
 
+function saveStoreDetails(event) {
+    event.preventDefault();
+    saveStoreDetailsForm(event.currentTarget);
+
+    return false;
+}
+
+async function saveStoreDetailsForm(form) {
+    const submitButton = form.querySelector('button[type="submit"]');
+
+    if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.setAttribute("aria-busy", "true");
+    }
+
+    try {
+        await submitStoreForm(form);
+        updateStoreDetailsFromForm(form);
+    } catch (err) {
+        console.warn("Unable to save store details in the background.", err);
+    } finally {
+        if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.removeAttribute("aria-busy");
+        }
+    }
+}
+
+function updateStoreDetailLine(container, label, value) {
+    if (!container) {
+        return;
+    }
+
+    const normalizedLabel = label.toLowerCase();
+    let line = Array.from(container.querySelectorAll(".store-detail-line"))
+        .find(candidate => {
+            const detailLabel = candidate.querySelector(".store-detail-label");
+            return ((detailLabel && detailLabel.textContent) || "").trim().toLowerCase() === normalizedLabel;
+        });
+
+    if (!line && value) {
+        line = document.createElement("div");
+        line.className = "store-detail-line";
+        line.innerHTML = `<span class="store-detail-label"></span> <a class="store-detail-link" target="_blank"></a>`;
+        line.querySelector(".store-detail-label").textContent = label;
+        container.appendChild(line);
+    }
+
+    if (!line) {
+        return;
+    }
+
+    const link = line.querySelector(".store-detail-link");
+
+    if (!value) {
+        line.remove();
+        return;
+    }
+
+    if (link) {
+        link.href = value;
+        link.textContent = value;
+    }
+}
+
+function updateStoreDetailsFromForm(form) {
+    const storeKey = (form.id || "").replace(/^store-edit-/, "");
+    const row = form.closest(".store-manager-row");
+    const labelInput = form.querySelector('[name="store_label"]');
+    const searchUrlInput = form.querySelector('[name="store_url"]');
+    const selectorUrlInput = form.querySelector('[name="urlStoreSelector"]');
+    const label = ((labelInput && labelInput.value) || "").trim();
+    const searchUrl = ((searchUrlInput && searchUrlInput.value) || "").trim();
+    const selectorUrl = ((selectorUrlInput && selectorUrlInput.value) || "").trim();
+    const storeName = label || "Store";
+    const storeUrl = selectorUrl || searchUrl;
+    const managerLabel = row ? row.querySelector(".store-manager-label") : null;
+    const managerUrl = row ? row.querySelector(".store-manager-url") : null;
+    const activeCard = Array.from(document.querySelectorAll(".active-store-card"))
+        .find(card => card.dataset.storeKey === storeKey);
+
+    if (managerLabel) {
+        managerLabel.textContent = storeName;
+    }
+
+    updateStoreDetailLine(managerUrl, "Search", searchUrl);
+    updateStoreDetailLine(managerUrl, "Store Selector URL", selectorUrl);
+
+    if (!activeCard) {
+        return;
+    }
+
+    const activeName = activeCard.querySelector(".active-store-name");
+    const isActive = activeCard.dataset.storeActive === "true";
+
+    if (activeName) {
+        activeName.textContent = storeName;
+    }
+
+    if (storeUrl) {
+        activeCard.href = storeUrl;
+        activeCard.dataset.storeUrl = storeUrl;
+    }
+
+    activeCard.dataset.storeTitle = `Open ${storeName}`;
+    activeCard.dataset.activationTitle = `${isActive ? "Deactivate" : "Activate"} ${storeName}`;
+
+    if (!activeCard.dataset.googleMapsUrl) {
+        activeCard.dataset.mapTitle = activeCard.dataset.storeTitle;
+    }
+
+    setActiveStoreIconMode(localStorage.getItem("active-store-icon-mode") || "store");
+}
+
 async function deleteStore(event, message) {
     event.preventDefault();
 
@@ -6600,8 +6714,8 @@ async function submitStoreForm(form) {
 }
 
 async function refreshStoreMarkup(options = {}) {
-    const scrollX = window.scrollX;
-    const scrollY = window.scrollY;
+    const scrollX = Number.isFinite(options.scrollX) ? options.scrollX : window.scrollX;
+    const scrollY = Number.isFinite(options.scrollY) ? options.scrollY : window.scrollY;
     const refreshUrl = new URL(window.location.href);
 
     if (options.cacheBust) {
@@ -6646,7 +6760,18 @@ async function refreshStoreMarkup(options = {}) {
     restoreStoreOptionsDisplaySettings();
     restoreActiveStoreIconMode();
     initStoreLocationMaps();
-    window.scrollTo(scrollX, scrollY);
+    restoreWindowScroll(scrollX, scrollY);
+}
+
+function restoreWindowScroll(scrollX, scrollY) {
+    const targetX = Math.max(0, scrollX || 0);
+    const targetY = Math.max(0, scrollY || 0);
+    const scrollBack = () => window.scrollTo(targetX, targetY);
+
+    scrollBack();
+    window.requestAnimationFrame(scrollBack);
+    window.setTimeout(scrollBack, 0);
+    window.setTimeout(scrollBack, 120);
 }
 
 function replaceSectionFromPage(nextPage, selector) {

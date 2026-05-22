@@ -256,7 +256,7 @@
                           class="store-edit-form"
                           method="POST"
                           action="/update_store/{{ store_key }}"
-                          onsubmit="saveScroll()">
+                          onsubmit="return saveStoreDetails(event);">
                         <label class="store-edit-field">
                             Store Name
                             <input name="store_label" value="{{ store.label }}">
