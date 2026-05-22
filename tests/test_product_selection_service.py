@@ -778,12 +778,56 @@ class ProductSelectionServiceTest(unittest.TestCase):
         wait_mock.assert_called_once()
         route_mock.assert_not_called()
 
+    def test_aldi_already_confirmed_store_skips_post_update_document_wait(self):
+        class FakeDriver:
+            current_url = "https://www.aldi.us/store/aldi/products/16902710-friendly-farms-vitamin-d-milk-1-gal"
+
+        update_result = {
+            "attempted": False,
+            "ok": True,
+            "already_selected": True,
+            "storefront_url": FakeDriver.current_url,
+        }
+
+        with patch.object(
+            product_service,
+            "try_reuse_aldi_profile_store_session",
+            return_value={"ok": False},
+        ), patch(
+            "PushShoppingList.services.recipe_extract_service.wait_for_browser_document",
+        ) as wait_mock, patch(
+            "PushShoppingList.scripts.stores.home_store_router.route_update_home_store",
+            return_value=update_result,
+        ) as route_mock, patch.object(
+            product_service,
+            "rendered_store_context_status",
+            return_value={"ok": False, "verified": False, "proof_of_store_selection": [], "errors": ["slow check skipped"]},
+        ):
+            status = product_service.prepare_store_session_before_product_search(
+                FakeDriver(),
+                "aldi",
+                {"label": "Aldi", "url": "https://www.aldi.us/store/aldi/s?k="},
+                "https://www.aldi.us/store/aldi/s?k=bread",
+                "5905 Arlo Drive, Indianapolis, IN 46237",
+                {"latitude": 39.64, "longitude": -86.06},
+                {"name": "Aldi", "address": "Aldi, 6835 South Emerson Avenue, Indianapolis, IN 46237"},
+                "Aldi",
+            )
+
+        self.assertTrue(status["ok"])
+        self.assertTrue(status["verified"])
+        self.assertTrue(status["home_store_update"]["already_selected"])
+        self.assertIn("already confirmed", " ".join(status["proof_of_store_selection"]))
+        wait_mock.assert_not_called()
+        route_mock.assert_called_once()
+
     def test_aldi_reused_profile_product_restore_jumps_back_to_search(self):
         class FakeDriver:
             current_url = ""
 
             def __init__(self):
                 self.get_calls = []
+                self.script_assign_calls = []
 
             def get(self, url):
                 self.get_calls.append(url)
@@ -793,6 +837,10 @@ class ProductSelectionServiceTest(unittest.TestCase):
                     self.current_url = url
 
             def execute_script(self, script, *args):
+                if "window.location.assign" in script:
+                    self.script_assign_calls.append(args[0])
+                    self.current_url = args[0]
+                    return None
                 if "document.body" in script:
                     return 'Shopping at ALDI - GRE 73 - Indianapolis Pickup Results for "chips"'
                 return ""
@@ -811,13 +859,8 @@ class ProductSelectionServiceTest(unittest.TestCase):
         )
 
         self.assertTrue(status["ok"])
-        self.assertEqual(
-            driver.get_calls,
-            [
-                "https://www.aldi.us/store/aldi/s?k=chips",
-                "https://www.aldi.us/store/aldi/s?k=chips",
-            ],
-        )
+        self.assertEqual(driver.get_calls, ["https://www.aldi.us/store/aldi/s?k=chips"])
+        self.assertEqual(driver.script_assign_calls, ["https://www.aldi.us/store/aldi/s?k=chips"])
 
     def test_aldi_product_search_does_not_noop_on_product_detail_overlay(self):
         class FakeDriver:
@@ -826,6 +869,7 @@ class ProductSelectionServiceTest(unittest.TestCase):
 
             def __init__(self):
                 self.get_calls = []
+                self.script_assign_calls = []
 
             def get(self, url):
                 self.get_calls.append(url)
@@ -834,6 +878,10 @@ class ProductSelectionServiceTest(unittest.TestCase):
             def execute_script(self, script, *args):
                 if "return document.body" in script:
                     return 'Results for "chips"'
+                if "window.location.assign" in script:
+                    self.script_assign_calls.append(args[0])
+                    self.current_url = args[0]
+                    return None
                 if "HTMLInputElement" in script:
                     return False
                 return ""
@@ -845,7 +893,8 @@ class ProductSelectionServiceTest(unittest.TestCase):
             "https://www.aldi.us/store/aldi/s?k=chips",
             search_term="chips",
         ))
-        self.assertEqual(driver.get_calls, ["https://www.aldi.us/store/aldi/s?k=chips"])
+        self.assertEqual(driver.script_assign_calls, ["https://www.aldi.us/store/aldi/s?k=chips"])
+        self.assertEqual(driver.get_calls, [])
 
     def test_aldi_reused_profile_search_does_not_wait_for_storefront(self):
         class FakeDriver:
@@ -956,6 +1005,47 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertEqual(driver.current_url, "https://www.aldi.us/store/aldi/s?k=eggs")
         self.assertEqual(driver.get_calls, [])
 
+    def test_aldi_store_update_skips_selector_when_store_already_confirmed(self):
+        class FakeDriver:
+            current_url = "https://www.aldi.us/store/aldi/products/16902710-friendly-farms-vitamin-d-milk-1-gal"
+
+        unexpected_calls = []
+
+        def unexpected_helper(*_args, **_kwargs):
+            unexpected_calls.append(True)
+            return False
+
+        helpers = {
+            "accept_cookies_if_present": lambda *_args, **_kwargs: False,
+            "type_visible_location_input": unexpected_helper,
+            "click_first_address_suggestion": unexpected_helper,
+            "click_save_address_button": unexpected_helper,
+            "click_first_store_location_card": unexpected_helper,
+            "click_store_card_that_matches_context": unexpected_helper,
+            "click_continue_shopping": unexpected_helper,
+            "click_visible_xpath": unexpected_helper,
+            "final_home_store_xpaths": lambda _context: ["//button"],
+            "correct_home_store_selected": lambda *_args, **_kwargs: True,
+        }
+
+        with patch.object(aldi_store, "open_aldi_store_selector_page") as selector_mock:
+            result = aldi_store.update_home_store(
+                FakeDriver(),
+                {
+                    "search_values": ["5905 Arlo Drive, Indianapolis, IN 46237"],
+                    "store_key": "aldi",
+                    "store_name": "Aldi",
+                },
+                helpers,
+                wait_seconds=0,
+            )
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["already_selected"])
+        self.assertFalse(result["attempted"])
+        selector_mock.assert_not_called()
+        self.assertEqual(unexpected_calls, [])
+
     def test_aldi_store_update_does_not_click_final_after_reaching_storefront(self):
         class FakeDriver:
             current_url = "https://www.aldi.us/store/aldi/storefront"
@@ -965,6 +1055,12 @@ class ProductSelectionServiceTest(unittest.TestCase):
         def final_click(*_args, **_kwargs):
             final_clicks.append(True)
             return True
+
+        confirmation_checks = []
+
+        def correct_store_after_selector(*_args, **_kwargs):
+            confirmation_checks.append(True)
+            return len(confirmation_checks) > 1
 
         helpers = {
             "accept_cookies_if_present": lambda *_args, **_kwargs: False,
@@ -976,7 +1072,7 @@ class ProductSelectionServiceTest(unittest.TestCase):
             "click_continue_shopping": lambda *_args, **_kwargs: False,
             "click_visible_xpath": final_click,
             "final_home_store_xpaths": lambda _context: ["//button"],
-            "correct_home_store_selected": lambda *_args, **_kwargs: True,
+            "correct_home_store_selected": correct_store_after_selector,
         }
 
         with patch.object(aldi_store, "open_aldi_store_selector_page", return_value=True), patch.object(

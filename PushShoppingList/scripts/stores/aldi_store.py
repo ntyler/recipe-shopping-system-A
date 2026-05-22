@@ -201,6 +201,27 @@ def update_home_store(
     clicked_final = False
 
     accept_cookies_if_present(driver, wait=0.75)
+    if correct_home_store_selected(driver, context):
+        return {
+            "attempted": False,
+            "ok": True,
+            "message": "Aldi home store was already confirmed.",
+            "already_selected": True,
+            "clicked_location": clicked_location,
+            "clicked_near_box": clicked_near_box,
+            "typed_location": typed_location,
+            "clicked_address_suggestion": clicked_address_suggestion,
+            "clicked_save_address": clicked_save_address,
+            "clicked_first_store_card": clicked_first_store_card,
+            "clicked_store_card": clicked_store_card,
+            "clicked_shop_this_store": clicked_shop_this_store,
+            "reached_storefront": reached_storefront,
+            "storefront_url": str(getattr(driver, "current_url", "") or ""),
+            "clicked_continue": clicked_continue,
+            "clicked_final": clicked_final,
+            **context,
+        }
+
     clicked_location = open_aldi_store_selector_page(
         driver=driver,
         context=context,

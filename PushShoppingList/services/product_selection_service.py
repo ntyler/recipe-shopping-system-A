@@ -4231,6 +4231,14 @@ def force_open_aldi_search_url(driver, search_url):
     if not search_url:
         return False
 
+    if aldi_current_url_is_product_detail(driver):
+        try:
+            driver.execute_script("window.location.assign(arguments[0]);", search_url)
+        except Exception:
+            pass
+        else:
+            return True
+
     try:
         driver.get(search_url)
     except Exception:
@@ -4465,7 +4473,8 @@ def prepare_store_session_before_product_search(
             wait_seconds=max(2, min(8, product_browser_wait_seconds() / 2)),
         )
         visual_browser_pause(browser_visible, browser_visual_pause_seconds)
-        wait_for_browser_document(driver, timeout_seconds=product_browser_wait_seconds())
+        if not update_result.get("already_selected"):
+            wait_for_browser_document(driver, timeout_seconds=product_browser_wait_seconds())
 
         status = rendered_store_context_status(
             driver,
@@ -4474,6 +4483,17 @@ def prepare_store_session_before_product_search(
             full_address,
             store_location,
         )
+        if update_result.get("already_selected"):
+            status.update({
+                "ok": True,
+                "verified": True,
+                "message": "",
+                "proof_of_store_selection": unique_texts(
+                    status.get("proof_of_store_selection", [])
+                    + ["ALDI home store was already confirmed from the visible page before product search."]
+                ),
+                "errors": [],
+            })
         status["home_store_update"] = update_result
         status["pre_search_store_url"] = start_url
         if not status.get("ok"):
