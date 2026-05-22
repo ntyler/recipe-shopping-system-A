@@ -145,6 +145,21 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertEqual(image_mock.call_count, 12)
         self.assertEqual(sum(1 for item in enriched if item.get("embedded_image_base64")), 12)
 
+    def test_rendered_html_chatgpt_skips_when_visible_cards_are_rankable(self):
+        items = []
+        for index in range(3):
+            item = candidate(f"Simply Nature Organic Bread {index}")
+            item.update({
+                "source": "browser-visible-card",
+                "detail_evaluated": False,
+                "product_url": f"https://www.aldi.us/store/aldi/products/2535034{index}-simply-nature-organic-bread-27-oz",
+                "search_url": "https://www.aldi.us/store/aldi/s?k=bread",
+                "card_text_excerpt": f"Simply Nature Organic Bread {index} 27 oz Many in stock Current price: $3.99",
+            })
+            items.append(item)
+
+        self.assertTrue(product_service.should_skip_rendered_html_chatgpt("bread", items))
+
     def test_chatgpt_mismatch_is_not_selectable(self):
         item = candidate("Organic Lemon")
         item["chatgpt_analysis"] = {
@@ -601,6 +616,66 @@ class ProductSelectionServiceTest(unittest.TestCase):
 
         self.assertEqual(profile_dir.name, "aldi_46237")
         self.assertIn("browser_profiles", str(profile_dir))
+
+    def test_aldi_reuses_verified_profile_session_before_store_selector(self):
+        class FakeDriver:
+            current_url = ""
+
+            def __init__(self):
+                self.get_calls = []
+
+            def get(self, url):
+                self.get_calls.append(url)
+                self.current_url = url
+
+            def execute_script(self, script, *args):
+                if "document.body" in script:
+                    return "Shopping at ALDI - GRE 73 - Indianapolis Pickup"
+                return ""
+
+        driver = FakeDriver()
+
+        with patch(
+            "PushShoppingList.services.recipe_extract_service.wait_for_browser_document",
+        ) as wait_mock, patch(
+            "PushShoppingList.scripts.stores.home_store_router.route_update_home_store",
+        ) as route_mock:
+            status = product_service.prepare_store_session_before_product_search(
+                driver,
+                "aldi",
+                {"label": "Aldi", "url": "https://www.aldi.us/store/aldi/s?k="},
+                "https://www.aldi.us/store/aldi/s?k=bread",
+                "5905 Arlo Drive, Indianapolis, IN 46237",
+                {"latitude": 39.64, "longitude": -86.06},
+                {"name": "Aldi", "address": "Aldi, 6835 South Emerson Avenue, Indianapolis, IN 46237"},
+                "Aldi",
+            )
+
+        self.assertTrue(status["ok"])
+        self.assertTrue(status["home_store_update"]["reused_profile_session"])
+        self.assertEqual(driver.get_calls, ["https://www.aldi.us/store/aldi?zipcode=46237"])
+        wait_mock.assert_called_once()
+        route_mock.assert_not_called()
+
+    def test_aldi_reused_profile_search_does_not_wait_for_storefront(self):
+        class FakeDriver:
+            pass
+
+        with patch.object(product_service, "wait_for_current_url_contains") as wait_mock, patch.object(
+            product_service,
+            "open_aldi_product_search",
+            return_value=True,
+        ) as search_mock:
+            product_service.open_product_search_after_storefront(
+                FakeDriver(),
+                "https://www.aldi.us/store/aldi/s?k=bread",
+                "aldi",
+                {"home_store_update": {"ok": True, "reused_profile_session": True}},
+                search_term="bread",
+            )
+
+        wait_mock.assert_not_called()
+        search_mock.assert_called_once()
 
     def test_aldi_address_selection_can_continue_to_actual_search_without_proof_bypass(self):
         status = {

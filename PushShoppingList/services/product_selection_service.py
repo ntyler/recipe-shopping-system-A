@@ -213,6 +213,15 @@ def product_image_embed_limit():
     return max(0, min(product_candidate_limit(), configured))
 
 
+def product_rendered_html_chatgpt_min_visible_cards():
+    try:
+        configured = int(os.getenv("PRODUCT_RENDERED_HTML_CHATGPT_MIN_VISIBLE_CARDS", "3"))
+    except (TypeError, ValueError):
+        configured = 3
+
+    return max(0, min(product_candidate_limit(), configured))
+
+
 def product_rendered_html_prompt_limit():
     try:
         configured = int(os.getenv("PRODUCT_RENDERED_HTML_PROMPT_CHARS", "120000"))
@@ -3963,19 +3972,25 @@ def search_store_products_with_browser_agent(
                 home_location,
                 store_location,
             )
-            chatgpt_candidates, chatgpt_skip_reasons = identify_rendered_html_products_with_chatgpt(
-                ingredient,
-                store_key,
-                store_name,
-                final_url,
-                search_url,
-                full_address,
-                home_location,
-                store_location,
-                rendered_page,
-                visible_cards,
-                prompt_builder=product_agent_prompt_builder,
-            )
+            if should_skip_rendered_html_chatgpt(ingredient, visible_candidates):
+                chatgpt_candidates = []
+                chatgpt_skip_reasons = [
+                    f"{store_name}: ChatGPT rendered-HTML product reasoning skipped because visible product cards were already extracted."
+                ]
+            else:
+                chatgpt_candidates, chatgpt_skip_reasons = identify_rendered_html_products_with_chatgpt(
+                    ingredient,
+                    store_key,
+                    store_name,
+                    final_url,
+                    search_url,
+                    full_address,
+                    home_location,
+                    store_location,
+                    rendered_page,
+                    visible_cards,
+                    prompt_builder=product_agent_prompt_builder,
+                )
             rendered_candidates = parse_product_candidates_from_html(
                 rendered_snapshot.get("html", ""),
                 final_url,
@@ -4039,6 +4054,19 @@ def store_browser_profile_dir(store_key, full_address="", store_location=None):
     profile_key = zip_code or hashlib.sha1(clean_text(full_address).encode("utf-8", errors="ignore")).hexdigest()[:10]
     profile_key = re.sub(r"[^a-zA-Z0-9_-]+", "_", profile_key or "default").strip("_") or "default"
     return PRODUCT_BROWSER_PROFILES_DIR / f"aldi_{profile_key}"
+
+
+def should_skip_rendered_html_chatgpt(ingredient, visible_candidates):
+    required = product_rendered_html_chatgpt_min_visible_cards()
+    if required <= 0:
+        return False
+
+    rankable_count = sum(
+        1
+        for candidate in visible_candidates or []
+        if candidate_has_rankable_card_evidence(ingredient, candidate)
+    )
+    return rankable_count >= required
 
 
 def close_browser_after_rendered_snapshot(driver, browser_visible=False, browser_visual_hold_seconds=0):
@@ -4127,7 +4155,7 @@ def merge_store_session_selection_proof(context_status, store_session_status):
 
 def open_product_search_after_storefront(driver, search_url, store_key, store_session_status=None, search_term=None):
     if normalize_item_key(store_key) == "aldi" and store_session_update_allows_product_search(store_session_status):
-        if store_session_update_has_store_confirmation(store_session_status):
+        if store_session_update_has_store_confirmation(store_session_status) and not store_session_reused_profile(store_session_status):
             wait_for_current_url_contains(driver, "/store/aldi/storefront", timeout_seconds=12)
         return open_aldi_product_search(driver, search_url, search_term=search_term)
 
@@ -4302,6 +4330,11 @@ def wait_for_current_url_contains(driver, text, timeout_seconds=10):
     return False
 
 
+def store_session_reused_profile(store_session_status):
+    update = store_session_update_payload(store_session_status)
+    return bool(update.get("reused_profile_session"))
+
+
 def prepare_store_session_before_product_search(
     driver,
     store_key,
@@ -4326,6 +4359,20 @@ def prepare_store_session_before_product_search(
         from PushShoppingList.scripts.stores.home_store_router import route_update_home_store
 
         configure_browser_home_location(driver, start_url, home_location)
+
+        if normalize_item_key(store_key) == "aldi":
+            reused_status = try_reuse_aldi_profile_store_session(
+                driver,
+                start_url,
+                store_key,
+                store_name,
+                full_address,
+                store_location,
+                wait_for_browser_document,
+            )
+            if reused_status.get("ok"):
+                reused_status["pre_search_store_url"] = start_url
+                return reused_status
 
         update_result = route_update_home_store(
             driver=driver,
@@ -4365,6 +4412,53 @@ def prepare_store_session_before_product_search(
             "proof_of_store_selection": [],
             "errors": [str(exc)],
         }
+
+
+def try_reuse_aldi_profile_store_session(
+    driver,
+    start_url,
+    store_key,
+    store_name,
+    full_address,
+    store_location,
+    wait_for_browser_document,
+):
+    try:
+        driver.get(start_url)
+        wait_for_browser_document(driver, timeout_seconds=max(3, min(7, product_browser_wait_seconds() / 2)))
+        status = rendered_store_context_status(
+            driver,
+            store_key,
+            store_name,
+            full_address,
+            store_location,
+        )
+    except Exception as exc:
+        return {
+            "ok": False,
+            "verified": False,
+            "message": f"{store_name}: saved browser profile could not be checked quickly: {exc}",
+            "home_store_update": {
+                "attempted": False,
+                "ok": False,
+                "reused_profile_session": False,
+            },
+        }
+
+    if not status.get("ok"):
+        return status
+
+    status["home_store_update"] = {
+        "attempted": False,
+        "ok": True,
+        "message": "Aldi saved browser profile already had the expected store session.",
+        "reused_profile_session": True,
+        "store_key": store_key,
+        "store_name": store_name,
+        "store_location": store_location,
+    }
+    status["profile_reused"] = True
+    return status
 
 
 def aldi_store_session_url(search_url, full_address="", store_location=None):
