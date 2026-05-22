@@ -452,6 +452,23 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("function toggleStoreOptionsDisplay", script)
         self.assertIn("function restoreStoreOptionsDisplaySettings", script)
 
+    def test_home_address_summary_opens_google_or_apple_maps(self):
+        home_template = Path("PushShoppingList/templates/sections/home_address.html").read_text(encoding="utf-8")
+        script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+        css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+        self.assertIn("home-address-map-link", home_template)
+        self.assertIn("https://www.google.com/maps/search/?api=1&query=", home_template)
+        self.assertIn("https://maps.apple.com/?q=", home_template)
+        self.assertIn("data-google-maps-url", home_template)
+        self.assertIn("data-apple-maps-url", home_template)
+        self.assertIn("onclick=\"return openStoreAddressMap(this, event);\"", home_template)
+        self.assertIn("function homeAddressGoogleMapsUrl", script)
+        self.assertIn("function homeAddressAppleMapsUrl", script)
+        self.assertIn("function updateHomeAddressMapLink", script)
+        self.assertIn("updateHomeAddressMapLink(summary, text)", script)
+        self.assertIn(".home-address-map-link", css)
+
     def test_store_manager_actions_match_recipe_log_buttons(self):
         store_template = Path("PushShoppingList/templates/sections/store_options.html").read_text(encoding="utf-8")
         recipe_log_template = Path("PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(
@@ -488,6 +505,17 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn(".behavior-toggle", css)
         self.assertIn("justify-content: flex-start", css)
         self.assertIn("text-align: left", css)
+
+    def test_mobile_controls_do_not_trigger_focus_zoom_outside_maps(self):
+        css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+        self.assertIn("@media (max-width: 650px)", css)
+        self.assertIn("body :where(input, select, textarea)", css)
+        self.assertIn("font-size: 16px !important", css)
+        self.assertIn('body :where(button, a, [role="button"], input, select, textarea, label)', css)
+        self.assertIn("touch-action: manipulation", css)
+        self.assertIn(".leaflet-container", css)
+        self.assertIn("touch-action: auto", css)
 
     def test_nearby_store_list_prevents_horizontal_scroll(self):
         css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")

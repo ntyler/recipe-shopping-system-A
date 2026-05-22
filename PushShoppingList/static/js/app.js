@@ -5913,11 +5913,41 @@ function updateHomeAddressSummaries(address) {
 
     if (summary) {
         summary.textContent = text;
+        updateHomeAddressMapLink(summary, text);
     }
 
     if (collapsedSummary) {
         collapsedSummary.textContent = text || "No home address saved.";
+        updateHomeAddressMapLink(collapsedSummary, text);
     }
+}
+
+function homeAddressGoogleMapsUrl(address) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+}
+
+function homeAddressAppleMapsUrl(address) {
+    return `https://maps.apple.com/?q=${encodeURIComponent(address)}`;
+}
+
+function updateHomeAddressMapLink(element, address) {
+    if (!element || element.tagName !== "A") {
+        return;
+    }
+
+    if (!address) {
+        element.removeAttribute("href");
+        element.dataset.googleMapsUrl = "";
+        element.dataset.appleMapsUrl = "";
+        return;
+    }
+
+    const googleMapsUrl = homeAddressGoogleMapsUrl(address);
+    const appleMapsUrl = homeAddressAppleMapsUrl(address);
+    element.href = googleMapsUrl;
+    element.dataset.googleMapsUrl = googleMapsUrl;
+    element.dataset.appleMapsUrl = appleMapsUrl;
+    element.title = "Open home address in Maps";
 }
 
 function adjustStoreSearchRadius(delta) {

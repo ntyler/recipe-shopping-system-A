@@ -29,7 +29,21 @@
 
             <div class="address-summary-box">
                 <span class="store-detail-label">Current full address</span>
-                <span id="homeAddressSummary">{{ home_address.full_address }}</span>
+                {% if home_address.full_address %}
+                    {% set home_google_maps_url = "https://www.google.com/maps/search/?api=1&query=" ~ (home_address.full_address|urlencode) %}
+                    {% set home_apple_maps_url = "https://maps.apple.com/?q=" ~ (home_address.full_address|urlencode) %}
+                    <a id="homeAddressSummary"
+                       class="home-address-map-link"
+                       href="{{ home_google_maps_url }}"
+                       data-google-maps-url="{{ home_google_maps_url }}"
+                       data-apple-maps-url="{{ home_apple_maps_url }}"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       onclick="return openStoreAddressMap(this, event);"
+                       title="Open home address in Maps">{{ home_address.full_address }}</a>
+                {% else %}
+                    <span id="homeAddressSummary"></span>
+                {% endif %}
             </div>
 
             <div class="address-actions-grid home-address-actions-copy">
@@ -46,6 +60,20 @@
 
     <div class="home-address-collapsed-summary">
         <span class="store-detail-label">Current full address</span>
-        <span id="homeAddressCollapsedSummary">{{ home_address.full_address or "No home address saved." }}</span>
+        {% if home_address.full_address %}
+            {% set collapsed_home_google_maps_url = "https://www.google.com/maps/search/?api=1&query=" ~ (home_address.full_address|urlencode) %}
+            {% set collapsed_home_apple_maps_url = "https://maps.apple.com/?q=" ~ (home_address.full_address|urlencode) %}
+            <a id="homeAddressCollapsedSummary"
+               class="home-address-map-link"
+               href="{{ collapsed_home_google_maps_url }}"
+               data-google-maps-url="{{ collapsed_home_google_maps_url }}"
+               data-apple-maps-url="{{ collapsed_home_apple_maps_url }}"
+               target="_blank"
+               rel="noopener noreferrer"
+               onclick="return openStoreAddressMap(this, event);"
+               title="Open home address in Maps">{{ home_address.full_address }}</a>
+        {% else %}
+            <span id="homeAddressCollapsedSummary">No home address saved.</span>
+        {% endif %}
     </div>
 </div>

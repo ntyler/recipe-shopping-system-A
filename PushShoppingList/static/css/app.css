@@ -1307,6 +1307,19 @@ body {
             display: block;
         }
 
+        .home-address-map-link {
+            color: #e5e7eb;
+            text-decoration: none;
+            overflow-wrap: anywhere;
+        }
+
+        .home-address-map-link:hover,
+        .home-address-map-link:focus-visible {
+            color: #67e8f9;
+            text-decoration: underline;
+            outline: none;
+        }
+
         .store-options-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
@@ -5227,6 +5240,19 @@ body {
         }
 
         @media (max-width: 650px) {
+            body :where(input, select, textarea) {
+                font-size: 16px !important;
+            }
+
+            body :where(button, a, [role="button"], input, select, textarea, label) {
+                touch-action: manipulation;
+            }
+
+            .leaflet-container,
+            .leaflet-container * {
+                touch-action: auto;
+            }
+
             .store-manager-row {
                 grid-template-columns: 28px minmax(0, 1fr) auto;
                 gap: 10px;
