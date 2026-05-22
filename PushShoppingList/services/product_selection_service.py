@@ -242,9 +242,9 @@ def product_browser_wait_seconds():
 
 def product_rendered_scroll_max_passes():
     try:
-        configured = int(os.getenv("PRODUCT_RENDERED_SCROLL_MAX_PASSES", "5"))
+        configured = int(os.getenv("PRODUCT_RENDERED_SCROLL_MAX_PASSES", "14"))
     except (TypeError, ValueError):
-        configured = 5
+        configured = 14
 
     return max(1, min(18, configured))
 
@@ -6181,7 +6181,6 @@ def scroll_rendered_product_page(driver):
 
 def scroll_rendered_product_results_until_stable(driver, max_passes=None, stable_passes=2):
     max_passes = max_passes or product_rendered_scroll_max_passes()
-    target_cards = product_rendered_scroll_target_cards()
     settle_seconds = product_rendered_scroll_settle_seconds()
     last_count = -1
     unchanged = 0
@@ -6214,8 +6213,11 @@ def scroll_rendered_product_results_until_stable(driver, max_passes=None, stable
 
         wait_for_browser_text_to_settle(driver, timeout_seconds=settle_seconds)
 
-        if count >= target_cards and unchanged >= 1:
-            break
+        clicked_load_more = click_rendered_load_more_button(driver)
+        if clicked_load_more:
+            unchanged = 0
+            wait_for_browser_text_to_settle(driver, timeout_seconds=settle_seconds)
+            continue
 
         if unchanged >= stable_passes and at_bottom:
             break
@@ -6227,6 +6229,45 @@ def scroll_rendered_product_results_until_stable(driver, max_passes=None, stable
         pass
 
     return max(0, last_count)
+
+
+def click_rendered_load_more_button(driver):
+    try:
+        return bool(driver.execute_script(
+            """
+            function visible(el) {
+                let node = el;
+                while (node && node.nodeType === 1) {
+                    const style = window.getComputedStyle(node);
+                    if (node.hidden || style.visibility === "hidden" || style.display === "none" || parseFloat(style.opacity || "1") < 0.02) {
+                        return false;
+                    }
+                    node = node.parentElement;
+                }
+                const rect = el.getBoundingClientRect();
+                return rect.width >= 30 && rect.height >= 20;
+            }
+
+            const buttons = Array.from(document.querySelectorAll("button, [role='button']"));
+            const button = buttons.find(el => {
+                const text = String(el.innerText || el.textContent || "").replace(/\\s+/g, " ").trim().toLowerCase();
+                const ariaDisabled = String(el.getAttribute("aria-disabled") || "").toLowerCase();
+                return visible(el) &&
+                    !el.disabled &&
+                    ariaDisabled !== "true" &&
+                    (text === "load more" || text === "show more" || text.includes("load more"));
+            });
+            if (!button) {
+                return false;
+            }
+
+            button.scrollIntoView({block: "center", inline: "nearest"});
+            button.click();
+            return true;
+            """
+        ))
+    except Exception:
+        return False
 
 
 def capture_rendered_product_page_snapshot(driver):

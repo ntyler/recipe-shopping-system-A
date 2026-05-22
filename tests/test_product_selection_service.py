@@ -193,7 +193,7 @@ class ProductSelectionServiceTest(unittest.TestCase):
             [item["product_name"] for item in limited],
         )
 
-    def test_rendered_scroll_loop_uses_short_default_cap(self):
+    def test_rendered_scroll_loop_uses_configured_default_cap(self):
         class FakeDriver:
             def __init__(self):
                 self.scroll_calls = 0
@@ -211,9 +211,9 @@ class ProductSelectionServiceTest(unittest.TestCase):
             product_service.scroll_rendered_product_results_until_stable(driver)
 
         self.assertEqual(settle_mock.call_count, product_service.product_rendered_scroll_max_passes())
-        self.assertLessEqual(settle_mock.call_count, 5)
+        self.assertLessEqual(settle_mock.call_count, 18)
 
-    def test_rendered_scroll_loop_stops_after_target_cards_settle(self):
+    def test_rendered_scroll_loop_does_not_stop_at_target_before_bottom(self):
         class FakeDriver:
             def execute_script(self, *_args):
                 return False
@@ -228,7 +228,58 @@ class ProductSelectionServiceTest(unittest.TestCase):
             count = product_service.scroll_rendered_product_results_until_stable(FakeDriver())
 
         self.assertEqual(count, len(enough_cards))
-        self.assertEqual(extract_mock.call_count, 2)
+        self.assertEqual(extract_mock.call_count, product_service.product_rendered_scroll_max_passes())
+
+    def test_rendered_scroll_loop_stops_after_bottom_is_stable(self):
+        class FakeDriver:
+            def execute_script(self, *_args):
+                return True
+
+        cards = [{"name": "bread"}]
+
+        with patch.object(
+            product_service,
+            "extract_visible_product_cards_from_browser",
+            return_value=cards,
+        ) as extract_mock, patch.object(product_service, "wait_for_browser_text_to_settle"), patch.object(
+            product_service,
+            "click_rendered_load_more_button",
+            return_value=False,
+        ):
+            count = product_service.scroll_rendered_product_results_until_stable(FakeDriver())
+
+        self.assertEqual(count, len(cards))
+        self.assertEqual(extract_mock.call_count, 3)
+
+    def test_rendered_scroll_loop_clicks_load_more_before_settling(self):
+        class FakeDriver:
+            def execute_script(self, *_args):
+                return True
+
+        card_batches = [
+            [{"name": "bread 1"}],
+            [{"name": "bread 1"}, {"name": "bread 2"}],
+            [{"name": "bread 1"}, {"name": "bread 2"}],
+        ]
+
+        with patch.object(
+            product_service,
+            "extract_visible_product_cards_from_browser",
+            side_effect=card_batches,
+        ) as extract_mock, patch.object(product_service, "wait_for_browser_text_to_settle"), patch.object(
+            product_service,
+            "click_rendered_load_more_button",
+            side_effect=[True, False, False],
+        ) as click_mock:
+            count = product_service.scroll_rendered_product_results_until_stable(
+                FakeDriver(),
+                max_passes=3,
+                stable_passes=1,
+            )
+
+        self.assertEqual(count, 2)
+        self.assertEqual(click_mock.call_count, 3)
+        self.assertEqual(extract_mock.call_count, 3)
 
     def test_chatgpt_mismatch_is_not_selectable(self):
         item = candidate("Organic Lemon")
