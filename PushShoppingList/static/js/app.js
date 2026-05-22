@@ -5716,14 +5716,22 @@ async function runFindNearestStores(form, button) {
             updateHomeAddressSummaries(data.home_address.full_address || "");
         }
 
-        await refreshStoreMarkup({ cacheBust: true });
-        showRecipeQuantityUpdatedMessage("", "", "", data && data.warning
+        let message = data && data.warning
             ? `Nearest stores not updated: ${data.warning}`
-            : "Nearest stores updated.");
+            : "Nearest stores updated.";
+
+        try {
+            await refreshStoreMarkup({ cacheBust: true });
+        } catch (refreshErr) {
+            console.warn("Nearest stores were resolved, but the store markup refresh failed.", refreshErr);
+            message += " Refresh the page if the store list does not update.";
+        }
+
+        showRecipeQuantityUpdatedMessage("", "", "", message);
     } catch (err) {
         console.warn("Unable to find nearest stores in the background.", err);
         showRecipeQuantityUpdatedMessage("", "", "", err.message || "Unable to find nearest stores.");
-
+    } finally {
         if (button && button.isConnected) {
             button.disabled = false;
             button.textContent = originalText;
