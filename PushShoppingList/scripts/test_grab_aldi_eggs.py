@@ -223,6 +223,8 @@ def test_grab_candidate_for_display(candidate, search_term=None):
     if not candidate:
         return candidate
 
+    candidate = normalize_test_grab_candidate_shape(candidate)
+
     if test_grab_candidate_is_valid_alternative(candidate, search_term):
         candidate["test_grab_valid_alternative"] = True
         candidate["viable"] = True
@@ -247,9 +249,60 @@ def test_grab_candidate_for_display(candidate, search_term=None):
     return candidate
 
 
+def normalize_test_grab_candidate_shape(candidate):
+    candidate = dict(candidate) if isinstance(candidate, dict) else {}
+    candidate.setdefault("store_key", TEST_GRAB_TARGET_STORE_KEY)
+    candidate.setdefault("store_name", TEST_GRAB_TARGET_STORE_NAME)
+    candidate.setdefault("search_url", "")
+    candidate.setdefault("size", "")
+    candidate.setdefault("package_size", "")
+    candidate.setdefault("unit_price", "")
+    candidate.setdefault("card_text_excerpt", "")
+    candidate.setdefault("detail_text_excerpt", "")
+
+    if candidate.get("source_page_url") and not candidate.get("search_url"):
+        candidate["search_url"] = candidate.get("source_page_url")
+
+    if candidate.get("size_count"):
+        if not candidate.get("size"):
+            candidate["size"] = candidate.get("size_count")
+        if not candidate.get("package_size"):
+            candidate["package_size"] = candidate.get("size_count")
+
+    if candidate.get("price_per_unit"):
+        if not candidate.get("unit_price"):
+            candidate["unit_price"] = candidate.get("price_per_unit")
+
+    if candidate.get("product_card_text"):
+        if not candidate.get("card_text_excerpt"):
+            candidate["card_text_excerpt"] = candidate.get("product_card_text")
+        if not candidate.get("detail_text_excerpt"):
+            candidate["detail_text_excerpt"] = candidate.get("product_card_text")
+
+    if candidate.get("local_confidence") is not None and candidate.get("confidence") is None:
+        candidate["confidence"] = candidate.get("local_confidence")
+
+    if candidate.get("local_score") is not None and candidate.get("score") is None:
+        candidate["score"] = candidate.get("local_score")
+
+    if candidate.get("raw_product_html_snippet") is None:
+        candidate["raw_product_html_snippet"] = ""
+
+    if candidate.get("store_location") and not candidate.get("store_location_address"):
+        store_location = candidate.get("store_location") if isinstance(candidate.get("store_location"), dict) else {}
+        candidate["store_location_name"] = store_location.get("name", "")
+        candidate["store_location_address"] = store_location.get("address", "")
+        candidate["store_location_distance_miles"] = store_location.get("distance_miles")
+        candidate["pickup_enabled"] = store_location.get("pickup_enabled")
+
+    return candidate
+
+
 def test_grab_candidate_is_valid_alternative(candidate, search_term=None):
     if not isinstance(candidate, dict):
         return False
+
+    candidate = normalize_test_grab_candidate_shape(candidate)
 
     if not test_grab_candidate_has_direct_product_url(candidate):
         return False
@@ -274,9 +327,13 @@ def test_grab_is_shell_egg_carton(candidate):
         candidate.get("product_name", ""),
         candidate.get("brand", ""),
         candidate.get("product_category", ""),
+        candidate.get("package_count", ""),
+        candidate.get("size_count", ""),
         candidate.get("package_size", ""),
         candidate.get("size", ""),
+        candidate.get("price_per_unit", ""),
         candidate.get("unit_price", ""),
+        candidate.get("product_card_text", ""),
         candidate.get("card_text_excerpt", ""),
     ]))
     if not text:
@@ -370,6 +427,8 @@ def test_grab_rejection_reason(candidate, search_term=None):
     if not isinstance(candidate, dict):
         return "Invalid product candidate."
 
+    candidate = normalize_test_grab_candidate_shape(candidate)
+
     if is_egg_test_grab(search_term):
         if not test_grab_candidate_has_direct_product_url(candidate):
             return "No direct product page link was available."
@@ -379,9 +438,13 @@ def test_grab_rejection_reason(candidate, search_term=None):
             candidate.get("product_name", ""),
             candidate.get("brand", ""),
             candidate.get("product_category", ""),
+            candidate.get("package_count", ""),
+            candidate.get("size_count", ""),
             candidate.get("package_size", ""),
             candidate.get("size", ""),
+            candidate.get("price_per_unit", ""),
             candidate.get("unit_price", ""),
+            candidate.get("product_card_text", ""),
             candidate.get("card_text_excerpt", ""),
         ]))
         if "out of stock" in text:
@@ -453,15 +516,16 @@ def test_grab_choice_from_result(payload=None):
     payload = payload if isinstance(payload, dict) else load_test_grab_result()
     record = first_test_grab_record(payload)
     search_term = record.get("ingredient") or payload.get("search_item") or TEST_GRAB_SEARCH_TERM
-    candidates = [
-        test_grab_candidate_for_display(candidate, search_term)
-        for candidate in record.get("candidates", [])
-        if isinstance(candidate, dict)
-    ] if isinstance(record.get("candidates"), list) else []
-    selected = record.get("selected_product") if isinstance(record.get("selected_product"), dict) else {}
+    candidates = test_grab_candidates_from_payload(payload, record, search_term)
+    selected = first_test_grab_selected_product(payload, record)
     selected = test_grab_candidate_for_display(selected, search_term) if selected else {}
     selected_id = record.get("selected_product_id") or selected.get("id", "")
     store_result = first_store_result(record)
+    valid_alternatives = dedupe_test_grab_candidates([
+        candidate
+        for candidate in candidates
+        if test_grab_candidate_is_valid_alternative(candidate, search_term)
+    ])
 
     return {
         "test_grab": True,
@@ -472,20 +536,67 @@ def test_grab_choice_from_result(payload=None):
         "store_result": store_result,
         "selected_product": selected,
         "selected_product_id": selected_id,
-        "candidates": dedupe_test_grab_candidates([
+        "candidates": valid_alternatives,
+        "valid_alternatives": valid_alternatives,
+        "alternatives": [
             candidate
-            for candidate in candidates
-            if test_grab_candidate_is_valid_alternative(candidate, search_term)
-        ]),
-        "valid_alternatives": dedupe_test_grab_candidates([
-            candidate
-            for candidate in candidates
-            if test_grab_candidate_is_valid_alternative(candidate, search_term)
-        ]),
+            for candidate in valid_alternatives
+            if not selected_id or candidate.get("id") != selected_id
+        ],
         "rejected_products": [],
         "skip_reasons": payload.get("errors", []),
         "result_path": str(TEST_GRAB_RESULTS_FILE),
     }
+
+
+def test_grab_candidates_from_payload(payload, record=None, search_term=None):
+    payload = payload if isinstance(payload, dict) else {}
+    record = record if isinstance(record, dict) else first_test_grab_record(payload)
+    store_result = first_store_result(record)
+    sources = []
+
+    def add_many(values):
+        if isinstance(values, list):
+            sources.extend(item for item in values if isinstance(item, dict))
+
+    def add_one(value):
+        if isinstance(value, dict) and value:
+            sources.append(value)
+
+    add_many(record.get("candidates"))
+    add_one(record.get("selected_product"))
+    add_one(payload.get("best_product"))
+    add_one(payload.get("best_value_pick"))
+    add_one(payload.get("best_premium_pick"))
+    add_many(payload.get("alternatives"))
+    add_many(record.get("valid_products"))
+    add_many(record.get("valid_alternatives"))
+    add_many(store_result.get("valid_alternatives") if isinstance(store_result, dict) else [])
+    add_many(store_result.get("alternatives") if isinstance(store_result, dict) else [])
+    add_many(store_result.get("alternative_products") if isinstance(store_result, dict) else [])
+
+    return dedupe_test_grab_candidates([
+        test_grab_candidate_for_display(candidate, search_term)
+        for candidate in sources
+        if isinstance(candidate, dict)
+    ])
+
+
+def first_test_grab_selected_product(payload, record):
+    record = record if isinstance(record, dict) else {}
+    payload = payload if isinstance(payload, dict) else {}
+    selected = record.get("selected_product") if isinstance(record.get("selected_product"), dict) else {}
+    if selected:
+        return selected
+
+    selected_id = record.get("selected_product_id")
+    if selected_id:
+        for candidate in test_grab_candidates_from_payload(payload, record, record.get("ingredient") or payload.get("search_item")):
+            if candidate.get("id") == selected_id:
+                return candidate
+
+    best = payload.get("best_product") if isinstance(payload.get("best_product"), dict) else {}
+    return best
 
 
 def select_test_grab_product(product_id):
@@ -500,7 +611,7 @@ def select_test_grab_product(product_id):
         }
 
     search_term = record.get("ingredient") or payload.get("search_item") or TEST_GRAB_SEARCH_TERM
-    candidates = record.get("candidates", []) if isinstance(record.get("candidates"), list) else []
+    candidates = test_grab_candidates_from_payload(payload, record, search_term)
     selected_index = next(
         (
             index
@@ -543,7 +654,7 @@ def select_test_grab_product(product_id):
     payload["selected_by_user"] = True
     payload["selected_at"] = selected_at
     payload["alternatives"] = [
-        final_product_candidate_payload(test_grab_candidate_for_display(candidate, search_term))
+        final_product_candidate_payload(normalize_test_grab_candidate_shape(test_grab_candidate_for_display(candidate, search_term)))
         for candidate in dedupe_test_grab_candidates(candidates)
         if isinstance(candidate, dict)
         and test_grab_candidate_is_valid_alternative(candidate, search_term)

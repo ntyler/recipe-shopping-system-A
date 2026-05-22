@@ -360,6 +360,88 @@ class ProductSelectionServiceTest(unittest.TestCase):
 
         self.assertNotIn("product_agent_prompt_builder", search_mock.call_args.kwargs)
 
+    def test_test_grab_alternatives_fall_back_to_instacart_payload_shape(self):
+        payload = {
+            "test_grab": True,
+            "search_item": "eggs",
+            "best_product": {
+                "id": "best-eggs",
+                "store_name": "Aldi",
+                "source_page_url": "https://www.aldi.us/store/aldi/s?k=eggs",
+                "product_name": "Simply Nature Organic Cage Free Brown Eggs",
+                "size_count": "12 ct",
+                "price": "$4.69",
+                "price_per_egg": "$0.39/egg",
+                "product_url": "https://www.aldi.us/store/aldi/products/17498616-eggs",
+                "image_url": "https://www.instacart.com/image-server/eggs.jpg",
+                "raw_product_html_snippet": "<li><a>Simply Nature Organic Cage Free Brown Eggs</a></li>",
+                "product_card_text": "Simply Nature Organic Cage Free Brown Eggs 12 ct Many in stock",
+                "in_stock": True,
+            },
+            "alternatives": [
+                {
+                    "id": "value-eggs",
+                    "store_name": "Aldi",
+                    "source_page_url": "https://www.aldi.us/store/aldi/s?k=eggs",
+                    "product_name": "Goldhen Grade A Large Eggs",
+                    "size_count": "12 ct",
+                    "price": "$1.46",
+                    "price_per_egg": "$0.12/egg",
+                    "product_url": "https://www.aldi.us/store/aldi/products/115095-eggs",
+                    "image_url": "https://www.instacart.com/image-server/value-eggs.jpg",
+                    "raw_product_html_snippet": "<li><a>Goldhen Grade A Large Eggs</a></li>",
+                    "product_card_text": "Goldhen Grade A Large Eggs 12 ct Many in stock",
+                    "in_stock": True,
+                }
+            ],
+            "results": [
+                {
+                    "item_key": "eggs",
+                    "ingredient": "eggs",
+                    "selected_product_id": "best-eggs",
+                    "candidates": [],
+                    "valid_products": [
+                        {
+                            "id": "value-eggs",
+                            "product_name": "Goldhen Grade A Large Eggs",
+                            "price": "$1.46",
+                            "product_url": "https://www.aldi.us/store/aldi/products/115095-eggs",
+                        }
+                    ],
+                    "store_results_list": [
+                        {
+                            "store_key": "aldi",
+                            "store_name": "Aldi",
+                            "valid_alternatives": [],
+                        }
+                    ],
+                }
+            ],
+        }
+
+        choice = test_grab_script.test_grab_choice_from_result(payload)
+
+        self.assertEqual(len(choice["valid_alternatives"]), 2)
+        self.assertEqual(choice["selected_product"]["id"], "best-eggs")
+        self.assertEqual(choice["valid_alternatives"][1]["store_key"], "aldi")
+        self.assertEqual(choice["valid_alternatives"][1]["search_url"], "https://www.aldi.us/store/aldi/s?k=eggs")
+        self.assertEqual(choice["valid_alternatives"][1]["size"], "12 ct")
+        self.assertEqual(choice["valid_alternatives"][1]["unit_price"], "")
+        self.assertIn("Goldhen Grade A Large Eggs", choice["valid_alternatives"][1]["raw_product_html_snippet"])
+
+    def test_test_grab_shell_egg_detection_accepts_final_payload_card_text(self):
+        candidate = {
+            "id": "payload-eggs",
+            "source_page_url": "https://www.aldi.us/store/aldi/s?k=eggs",
+            "product_name": "Goldhen Grade A Large Eggs",
+            "size_count": "12 ct",
+            "product_url": "https://www.aldi.us/store/aldi/products/115095-eggs",
+            "product_card_text": "Goldhen Grade A Large Eggs 12 ct Many in stock",
+            "in_stock": True,
+        }
+
+        self.assertTrue(test_grab_script.test_grab_candidate_is_valid_alternative(candidate, "eggs"))
+
     def test_rendered_html_agent_response_normalizes_candidates(self):
         data = {
             "best_product": {"product_name": "Large Eggs", "product_url": "/eggs"},

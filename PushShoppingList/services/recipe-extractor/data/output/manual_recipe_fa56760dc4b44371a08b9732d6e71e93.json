@@ -1,0 +1,44 @@
+{
+  "source_url": "manual://recipe/fa56760dc4b44371a08b9732d6e71e93",
+  "recipe_title": "New Recipe",
+  "servings": "",
+  "ingredients": [],
+  "equipment": [],
+  "instructions": [],
+  "nutrition": {
+    "serving_basis": "per serving",
+    "calories": "",
+    "carbohydrates": "",
+    "protein": "",
+    "fat": "",
+    "saturated_fat": "",
+    "cholesterol": "",
+    "sodium": "",
+    "fiber": "",
+    "sugar": "",
+    "other": []
+  },
+  "scaling": {
+    "selected_multiplier": 1,
+    "base_multiplier": 1,
+    "base_servings": "",
+    "available_multipliers": [
+      {
+        "label": "1/2x",
+        "value": 0.5
+      },
+      {
+        "label": "1x",
+        "value": 1
+      },
+      {
+        "label": "2x",
+        "value": 2
+      },
+      {
+        "label": "3x",
+        "value": 3
+      }
+    ]
+  }
+}
