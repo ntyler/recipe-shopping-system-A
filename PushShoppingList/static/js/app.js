@@ -1003,8 +1003,22 @@ function renderTestGrabAlternativeSlider(choice, candidates, selectedId, storeKe
             </div>
             <div class="test-grab-results-title">Results for "${escapeHtml(itemLabel)}"</div>
             <div class="test-grab-results-count">${rows.length} acceptable alternative${rows.length === 1 ? "" : "s"}</div>
-            <div id="testGrabAlternativeSlider" class="test-grab-alternatives-grid" tabindex="0">
-                ${rows.map(candidate => renderTestGrabAlternativeCard(candidate, selectedId, choice.item_key || "", storeKey)).join("")}
+            <div class="test-grab-slider-shell">
+                <button type="button"
+                        class="test-grab-slider-nav"
+                        aria-label="Scroll alternatives left"
+                        onclick="scrollTestGrabSlider(-1)">
+                    &lsaquo;
+                </button>
+                <div id="testGrabAlternativeSlider" class="test-grab-slider" tabindex="0">
+                    ${rows.map(candidate => renderTestGrabAlternativeCard(candidate, selectedId, choice.item_key || "", storeKey)).join("")}
+                </div>
+                <button type="button"
+                        class="test-grab-slider-nav"
+                        aria-label="Scroll alternatives right"
+                        onclick="scrollTestGrabSlider(1)">
+                    &rsaquo;
+                </button>
             </div>
         </section>
     `;

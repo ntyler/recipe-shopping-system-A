@@ -1,8 +1,8 @@
 {
   "ok": true,
   "test_grab": true,
-  "job_id": "1779473648459-928f0b93d8bf88",
-  "timestamp": "2026-05-22T18:14:40Z",
+  "job_id": "1779473792866-0317531498d67",
+  "timestamp": "2026-05-22T18:17:03Z",
   "home_address": "5905 Arlo Drive Apt 2213, Indianapolis, Marion County, IN 46237, United States",
   "home_location": {
     "latitude": 39.6425974,
@@ -37,12 +37,12 @@
     },
     "source_page_url": "https://www.aldi.us/store/aldi/s?k=bread",
     "rendered_page_url": "https://www.aldi.us/store/aldi/s?k=bread",
-    "rendered_page_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e.html",
-    "rendered_page_text_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_TEXT.txt",
-    "rendered_page_prompt_preview_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_PROMPT_PREVIEW.html",
-    "rendered_page_product_related_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_PRODUCTS.html",
-    "rendered_page_html_length": 1042604,
-    "rendered_page_visible_text_length": 19013,
+    "rendered_page_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e.html",
+    "rendered_page_text_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_TEXT.txt",
+    "rendered_page_prompt_preview_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_PROMPT_PREVIEW.html",
+    "rendered_page_product_related_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_PRODUCTS.html",
+    "rendered_page_html_length": 1042293,
+    "rendered_page_visible_text_length": 18991,
     "product_name": "Simply Nature Organic Rustic Italian Boule",
     "brand": "",
     "product_category": "",
@@ -86,7 +86,7 @@
         "Visible localized inventory/session indicator: Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begi",
         "Visible store/session identifier: GRE 73."
       ],
-      "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:05-3:29pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
+      "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:08-3:31pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
       "errors": []
     },
     "proof_of_store_selection": [
@@ -150,12 +150,12 @@
     },
     "source_page_url": "https://www.aldi.us/store/aldi/s?k=bread",
     "rendered_page_url": "https://www.aldi.us/store/aldi/s?k=bread",
-    "rendered_page_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e.html",
-    "rendered_page_text_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_TEXT.txt",
-    "rendered_page_prompt_preview_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_PROMPT_PREVIEW.html",
-    "rendered_page_product_related_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_PRODUCTS.html",
-    "rendered_page_html_length": 1042604,
-    "rendered_page_visible_text_length": 19013,
+    "rendered_page_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e.html",
+    "rendered_page_text_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_TEXT.txt",
+    "rendered_page_prompt_preview_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_PROMPT_PREVIEW.html",
+    "rendered_page_product_related_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_PRODUCTS.html",
+    "rendered_page_html_length": 1042293,
+    "rendered_page_visible_text_length": 18991,
     "product_name": "Simply Nature Organic Rustic Italian Boule",
     "brand": "",
     "product_category": "",
@@ -199,7 +199,7 @@
         "Visible localized inventory/session indicator: Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begi",
         "Visible store/session identifier: GRE 73."
       ],
-      "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:05-3:29pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
+      "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:08-3:31pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
       "errors": []
     },
     "proof_of_store_selection": [
@@ -263,12 +263,12 @@
     },
     "source_page_url": "https://www.aldi.us/store/aldi/s?k=bread",
     "rendered_page_url": "https://www.aldi.us/store/aldi/s?k=bread",
-    "rendered_page_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e.html",
-    "rendered_page_text_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_TEXT.txt",
-    "rendered_page_prompt_preview_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_PROMPT_PREVIEW.html",
-    "rendered_page_product_related_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_PRODUCTS.html",
-    "rendered_page_html_length": 1042604,
-    "rendered_page_visible_text_length": 19013,
+    "rendered_page_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e.html",
+    "rendered_page_text_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_TEXT.txt",
+    "rendered_page_prompt_preview_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_PROMPT_PREVIEW.html",
+    "rendered_page_product_related_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_PRODUCTS.html",
+    "rendered_page_html_length": 1042293,
+    "rendered_page_visible_text_length": 18991,
     "product_name": "Simply Nature Organic Rustic Italian Boule",
     "brand": "",
     "product_category": "",
@@ -312,7 +312,7 @@
         "Visible localized inventory/session indicator: Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begi",
         "Visible store/session identifier: GRE 73."
       ],
-      "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:05-3:29pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
+      "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:08-3:31pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
       "errors": []
     },
     "proof_of_store_selection": [
@@ -377,12 +377,12 @@
       },
       "source_page_url": "https://www.aldi.us/store/aldi/s?k=bread",
       "rendered_page_url": "https://www.aldi.us/store/aldi/s?k=bread",
-      "rendered_page_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e.html",
-      "rendered_page_text_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_TEXT.txt",
-      "rendered_page_prompt_preview_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_PROMPT_PREVIEW.html",
-      "rendered_page_product_related_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_PRODUCTS.html",
-      "rendered_page_html_length": 1042604,
-      "rendered_page_visible_text_length": 19013,
+      "rendered_page_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e.html",
+      "rendered_page_text_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_TEXT.txt",
+      "rendered_page_prompt_preview_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_PROMPT_PREVIEW.html",
+      "rendered_page_product_related_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_PRODUCTS.html",
+      "rendered_page_html_length": 1042293,
+      "rendered_page_visible_text_length": 18991,
       "product_name": "Simply Nature Graintastic Organic Thin-Sliced Bread",
       "brand": "",
       "product_category": "",
@@ -426,7 +426,7 @@
           "Visible localized inventory/session indicator: Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begi",
           "Visible store/session identifier: GRE 73."
         ],
-        "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:05-3:29pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
+        "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:08-3:31pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
         "errors": []
       },
       "proof_of_store_selection": [
@@ -490,12 +490,12 @@
       },
       "source_page_url": "https://www.aldi.us/store/aldi/s?k=bread",
       "rendered_page_url": "https://www.aldi.us/store/aldi/s?k=bread",
-      "rendered_page_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e.html",
-      "rendered_page_text_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_TEXT.txt",
-      "rendered_page_prompt_preview_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_PROMPT_PREVIEW.html",
-      "rendered_page_product_related_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_PRODUCTS.html",
-      "rendered_page_html_length": 1042604,
-      "rendered_page_visible_text_length": 19013,
+      "rendered_page_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e.html",
+      "rendered_page_text_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_TEXT.txt",
+      "rendered_page_prompt_preview_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_PROMPT_PREVIEW.html",
+      "rendered_page_product_related_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_PRODUCTS.html",
+      "rendered_page_html_length": 1042293,
+      "rendered_page_visible_text_length": 18991,
       "product_name": "Simply Nature Graintastic Organic Bread",
       "brand": "",
       "product_category": "",
@@ -539,7 +539,7 @@
           "Visible localized inventory/session indicator: Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begi",
           "Visible store/session identifier: GRE 73."
         ],
-        "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:05-3:29pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
+        "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:08-3:31pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
         "errors": []
       },
       "proof_of_store_selection": [
@@ -603,12 +603,12 @@
       },
       "source_page_url": "https://www.aldi.us/store/aldi/s?k=bread",
       "rendered_page_url": "https://www.aldi.us/store/aldi/s?k=bread",
-      "rendered_page_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e.html",
-      "rendered_page_text_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_TEXT.txt",
-      "rendered_page_prompt_preview_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_PROMPT_PREVIEW.html",
-      "rendered_page_product_related_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_PRODUCTS.html",
-      "rendered_page_html_length": 1042604,
-      "rendered_page_visible_text_length": 19013,
+      "rendered_page_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e.html",
+      "rendered_page_text_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_TEXT.txt",
+      "rendered_page_prompt_preview_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_PROMPT_PREVIEW.html",
+      "rendered_page_product_related_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_PRODUCTS.html",
+      "rendered_page_html_length": 1042293,
+      "rendered_page_visible_text_length": 18991,
       "product_name": "Simply Nature Seedtastic Organic Bread",
       "brand": "",
       "product_category": "",
@@ -652,7 +652,7 @@
           "Visible localized inventory/session indicator: Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begi",
           "Visible store/session identifier: GRE 73."
         ],
-        "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:05-3:29pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
+        "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:08-3:31pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
         "errors": []
       },
       "proof_of_store_selection": [
@@ -716,12 +716,12 @@
       },
       "source_page_url": "https://www.aldi.us/store/aldi/s?k=bread",
       "rendered_page_url": "https://www.aldi.us/store/aldi/s?k=bread",
-      "rendered_page_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e.html",
-      "rendered_page_text_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_TEXT.txt",
-      "rendered_page_prompt_preview_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_PROMPT_PREVIEW.html",
-      "rendered_page_product_related_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_PRODUCTS.html",
-      "rendered_page_html_length": 1042604,
-      "rendered_page_visible_text_length": 19013,
+      "rendered_page_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e.html",
+      "rendered_page_text_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_TEXT.txt",
+      "rendered_page_prompt_preview_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_PROMPT_PREVIEW.html",
+      "rendered_page_product_related_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_PRODUCTS.html",
+      "rendered_page_html_length": 1042293,
+      "rendered_page_visible_text_length": 18991,
       "product_name": "Simply Nature Seedtastic Organic Thin-Sliced Bread",
       "brand": "",
       "product_category": "",
@@ -765,7 +765,7 @@
           "Visible localized inventory/session indicator: Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begi",
           "Visible store/session identifier: GRE 73."
         ],
-        "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:05-3:29pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
+        "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:08-3:31pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
         "errors": []
       },
       "proof_of_store_selection": [
@@ -908,7 +908,7 @@
             "Visible localized inventory/session indicator: Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begi",
             "Visible store/session identifier: GRE 73."
           ],
-          "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:05-3:29pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
+          "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:08-3:31pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
           "errors": []
         },
         "proof_of_store_selection": [
@@ -928,12 +928,12 @@
         "card_text_excerpt": "Current price: $4.39 $ 4 39 Simply Nature Organic Rustic Italian Boule 24 oz Many in stock Add",
         "detail_text_excerpt": "Current price: $4.39 $ 4 39 Simply Nature Organic Rustic Italian Boule 24 oz Many in stock Add",
         "rendered_page_url": "https://www.aldi.us/store/aldi/s?k=bread",
-        "rendered_page_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e.html",
-        "rendered_page_text_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_TEXT.txt",
-        "rendered_page_prompt_preview_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_PROMPT_PREVIEW.html",
-        "rendered_page_product_related_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_PRODUCTS.html",
-        "rendered_page_html_length": 1042604,
-        "rendered_page_visible_text_length": 19013,
+        "rendered_page_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e.html",
+        "rendered_page_text_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_TEXT.txt",
+        "rendered_page_prompt_preview_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_PROMPT_PREVIEW.html",
+        "rendered_page_product_related_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_PRODUCTS.html",
+        "rendered_page_html_length": 1042293,
+        "rendered_page_visible_text_length": 18991,
         "rendered_page_html_excerpt": "",
         "shortlisted_for_detail": false,
         "detail_evaluated": false,
@@ -1053,7 +1053,7 @@
               "pickup_status": "Nearest location resolved for pickup-oriented grocery search."
             }
           },
-          "timestamp": "2026-05-22T18:14:09Z"
+          "timestamp": "2026-05-22T18:16:33Z"
         },
         {
           "name": "Browser Worker Agent",
@@ -1076,7 +1076,7 @@
               "pickup_status": "Nearest location resolved for pickup-oriented grocery search."
             }
           },
-          "timestamp": "2026-05-22T18:14:36Z"
+          "timestamp": "2026-05-22T18:16:58Z"
         },
         {
           "name": "Product Extraction/Normalization Agent",
@@ -1087,7 +1087,7 @@
             "detail_evaluated_count": 0,
             "image_embedded_count": 12
           },
-          "timestamp": "2026-05-22T18:14:36Z"
+          "timestamp": "2026-05-22T18:16:58Z"
         },
         {
           "name": "Validation Layer",
@@ -1098,10 +1098,10 @@
             "valid": 5,
             "rejected": 91,
             "direct_product_url_count": 96,
-            "in_stock_count": 44,
-            "unknown_stock_count": 52
+            "in_stock_count": 43,
+            "unknown_stock_count": 53
           },
-          "timestamp": "2026-05-22T18:14:40Z"
+          "timestamp": "2026-05-22T18:17:03Z"
         },
         {
           "name": "Ranking Agent",
@@ -1114,7 +1114,7 @@
             "chatgpt_status": "not-run",
             "selected_product_id": ""
           },
-          "timestamp": "2026-05-22T18:14:40Z"
+          "timestamp": "2026-05-22T18:17:03Z"
         }
       ],
       "chatgpt_final_selection": {},
@@ -1164,7 +1164,7 @@
               "Visible localized inventory/session indicator: Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begi",
               "Visible store/session identifier: GRE 73."
             ],
-            "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:05-3:29pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
+            "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:08-3:31pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
             "errors": []
           },
           "proof_of_store_selection": [
@@ -1253,7 +1253,7 @@
                 "Visible localized inventory/session indicator: Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begi",
                 "Visible store/session identifier: GRE 73."
               ],
-              "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:05-3:29pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
+              "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:08-3:31pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
               "errors": []
             },
             "proof_of_store_selection": [
@@ -1273,12 +1273,12 @@
             "card_text_excerpt": "Current price: $4.39 $ 4 39 Simply Nature Organic Rustic Italian Boule 24 oz Many in stock Add",
             "detail_text_excerpt": "Current price: $4.39 $ 4 39 Simply Nature Organic Rustic Italian Boule 24 oz Many in stock Add",
             "rendered_page_url": "https://www.aldi.us/store/aldi/s?k=bread",
-            "rendered_page_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e.html",
-            "rendered_page_text_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_TEXT.txt",
-            "rendered_page_prompt_preview_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_PROMPT_PREVIEW.html",
-            "rendered_page_product_related_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_PRODUCTS.html",
-            "rendered_page_html_length": 1042604,
-            "rendered_page_visible_text_length": 19013,
+            "rendered_page_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e.html",
+            "rendered_page_text_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_TEXT.txt",
+            "rendered_page_prompt_preview_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_PROMPT_PREVIEW.html",
+            "rendered_page_product_related_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_PRODUCTS.html",
+            "rendered_page_html_length": 1042293,
+            "rendered_page_visible_text_length": 18991,
             "rendered_page_html_excerpt": "",
             "shortlisted_for_detail": false,
             "detail_evaluated": false,
@@ -2841,28 +2841,6 @@
               "score": -127.95
             },
             {
-              "id": "9a6fe723452d16ef",
-              "product_name": "Pantene Pro-V 2n1 Classic Clean",
-              "store_key": "aldi",
-              "store_name": "Aldi",
-              "price": "$6.35",
-              "size": "12 fl oz",
-              "unit_price": "",
-              "product_url": "https://www.aldi.us/store/aldi/products/25324336-pantene-classic-clean-2-n-1-in-shampoo-conditioner-12-fl-oz",
-              "image_url": "https://www.instacart.com/image-server/197x197/filters:fill(FFFFFF,true):format(jpg)/d2lnr5mha7bycj.cloudfront.net/product-image/file/large_aeb6fe42-055c-47ef-95d5-df1637cec553.jpg",
-              "viable": false,
-              "ranking_status": "rejected",
-              "rejection_reason": "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
-              "rejection_reasons": [
-                "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
-                "Full product page was not successfully evaluated.",
-                "Product name does not clearly match the ingredient."
-              ],
-              "confidence": 0.05,
-              "confidence_score": 0.05,
-              "score": -127.95
-            },
-            {
               "id": "2eee97736c4055ab",
               "product_name": "L'oven Fresh Plain English Muffins",
               "store_key": "aldi",
@@ -3136,6 +3114,28 @@
               "unit_price": "",
               "product_url": "https://www.aldi.us/store/aldi/products/57463230-garlic-breadsticks",
               "image_url": "https://www.instacart.com/image-server/197x197/filters:fill(FFFFFF,true):format(jpg)/d2lnr5mha7bycj.cloudfront.net/product-image/file/large_9b1d2257-c96a-473a-9a2f-6ee1d65c70b1.jpg",
+              "viable": false,
+              "ranking_status": "rejected",
+              "rejection_reason": "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
+              "rejection_reasons": [
+                "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
+                "Full product page was not successfully evaluated.",
+                "Product name does not clearly match the ingredient."
+              ],
+              "confidence": 0.05,
+              "confidence_score": 0.05,
+              "score": -139.95
+            },
+            {
+              "id": "9c66bee5a7ebbf55",
+              "product_name": "M&M's Peanut Butter M&M Sand",
+              "store_key": "aldi",
+              "store_name": "Aldi",
+              "price": "$5.39",
+              "size": "16 fl oz",
+              "unit_price": "",
+              "product_url": "https://www.aldi.us/store/aldi/products/60147029-m-m-s-peanut-butter-ice-cream-sandwiches-4-ct",
+              "image_url": "https://www.instacart.com/image-server/197x197/filters:fill(FFFFFF,true):format(jpg)/d2lnr5mha7bycj.cloudfront.net/product-image/file/large_339b26f4-0e42-4913-aaf2-83864bab0881.jpg",
               "viable": false,
               "ranking_status": "rejected",
               "rejection_reason": "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
@@ -4935,28 +4935,6 @@
               "score": -127.95
             },
             {
-              "id": "9a6fe723452d16ef",
-              "product_name": "Pantene Pro-V 2n1 Classic Clean",
-              "store_key": "aldi",
-              "store_name": "Aldi",
-              "price": "$6.35",
-              "size": "12 fl oz",
-              "unit_price": "",
-              "product_url": "https://www.aldi.us/store/aldi/products/25324336-pantene-classic-clean-2-n-1-in-shampoo-conditioner-12-fl-oz",
-              "image_url": "https://www.instacart.com/image-server/197x197/filters:fill(FFFFFF,true):format(jpg)/d2lnr5mha7bycj.cloudfront.net/product-image/file/large_aeb6fe42-055c-47ef-95d5-df1637cec553.jpg",
-              "viable": false,
-              "ranking_status": "rejected",
-              "rejection_reason": "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
-              "rejection_reasons": [
-                "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
-                "Full product page was not successfully evaluated.",
-                "Product name does not clearly match the ingredient."
-              ],
-              "confidence": 0.05,
-              "confidence_score": 0.05,
-              "score": -127.95
-            },
-            {
               "id": "2eee97736c4055ab",
               "product_name": "L'oven Fresh Plain English Muffins",
               "store_key": "aldi",
@@ -5230,6 +5208,28 @@
               "unit_price": "",
               "product_url": "https://www.aldi.us/store/aldi/products/57463230-garlic-breadsticks",
               "image_url": "https://www.instacart.com/image-server/197x197/filters:fill(FFFFFF,true):format(jpg)/d2lnr5mha7bycj.cloudfront.net/product-image/file/large_9b1d2257-c96a-473a-9a2f-6ee1d65c70b1.jpg",
+              "viable": false,
+              "ranking_status": "rejected",
+              "rejection_reason": "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
+              "rejection_reasons": [
+                "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
+                "Full product page was not successfully evaluated.",
+                "Product name does not clearly match the ingredient."
+              ],
+              "confidence": 0.05,
+              "confidence_score": 0.05,
+              "score": -139.95
+            },
+            {
+              "id": "9c66bee5a7ebbf55",
+              "product_name": "M&M's Peanut Butter M&M Sand",
+              "store_key": "aldi",
+              "store_name": "Aldi",
+              "price": "$5.39",
+              "size": "16 fl oz",
+              "unit_price": "",
+              "product_url": "https://www.aldi.us/store/aldi/products/60147029-m-m-s-peanut-butter-ice-cream-sandwiches-4-ct",
+              "image_url": "https://www.instacart.com/image-server/197x197/filters:fill(FFFFFF,true):format(jpg)/d2lnr5mha7bycj.cloudfront.net/product-image/file/large_339b26f4-0e42-4913-aaf2-83864bab0881.jpg",
               "viable": false,
               "ranking_status": "rejected",
               "rejection_reason": "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
@@ -7031,28 +7031,6 @@
               "score": -127.95
             },
             {
-              "id": "9a6fe723452d16ef",
-              "product_name": "Pantene Pro-V 2n1 Classic Clean",
-              "store_key": "aldi",
-              "store_name": "Aldi",
-              "price": "$6.35",
-              "size": "12 fl oz",
-              "unit_price": "",
-              "product_url": "https://www.aldi.us/store/aldi/products/25324336-pantene-classic-clean-2-n-1-in-shampoo-conditioner-12-fl-oz",
-              "image_url": "https://www.instacart.com/image-server/197x197/filters:fill(FFFFFF,true):format(jpg)/d2lnr5mha7bycj.cloudfront.net/product-image/file/large_aeb6fe42-055c-47ef-95d5-df1637cec553.jpg",
-              "viable": false,
-              "ranking_status": "rejected",
-              "rejection_reason": "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
-              "rejection_reasons": [
-                "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
-                "Full product page was not successfully evaluated.",
-                "Product name does not clearly match the ingredient."
-              ],
-              "confidence": 0.05,
-              "confidence_score": 0.05,
-              "score": -127.95
-            },
-            {
               "id": "2eee97736c4055ab",
               "product_name": "L'oven Fresh Plain English Muffins",
               "store_key": "aldi",
@@ -7326,6 +7304,28 @@
               "unit_price": "",
               "product_url": "https://www.aldi.us/store/aldi/products/57463230-garlic-breadsticks",
               "image_url": "https://www.instacart.com/image-server/197x197/filters:fill(FFFFFF,true):format(jpg)/d2lnr5mha7bycj.cloudfront.net/product-image/file/large_9b1d2257-c96a-473a-9a2f-6ee1d65c70b1.jpg",
+              "viable": false,
+              "ranking_status": "rejected",
+              "rejection_reason": "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
+              "rejection_reasons": [
+                "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
+                "Full product page was not successfully evaluated.",
+                "Product name does not clearly match the ingredient."
+              ],
+              "confidence": 0.05,
+              "confidence_score": 0.05,
+              "score": -139.95
+            },
+            {
+              "id": "9c66bee5a7ebbf55",
+              "product_name": "M&M's Peanut Butter M&M Sand",
+              "store_key": "aldi",
+              "store_name": "Aldi",
+              "price": "$5.39",
+              "size": "16 fl oz",
+              "unit_price": "",
+              "product_url": "https://www.aldi.us/store/aldi/products/60147029-m-m-s-peanut-butter-ice-cream-sandwiches-4-ct",
+              "image_url": "https://www.instacart.com/image-server/197x197/filters:fill(FFFFFF,true):format(jpg)/d2lnr5mha7bycj.cloudfront.net/product-image/file/large_339b26f4-0e42-4913-aaf2-83864bab0881.jpg",
               "viable": false,
               "ranking_status": "rejected",
               "rejection_reason": "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
@@ -7694,7 +7694,7 @@
                   "pickup_status": "Nearest location resolved for pickup-oriented grocery search."
                 }
               },
-              "timestamp": "2026-05-22T18:14:36Z"
+              "timestamp": "2026-05-22T18:16:58Z"
             },
             {
               "name": "Product Extraction/Normalization Agent",
@@ -7705,7 +7705,7 @@
                 "detail_evaluated_count": 0,
                 "image_embedded_count": 12
               },
-              "timestamp": "2026-05-22T18:14:36Z"
+              "timestamp": "2026-05-22T18:16:58Z"
             }
           ]
         }
@@ -7755,7 +7755,7 @@
               "Visible localized inventory/session indicator: Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begi",
               "Visible store/session identifier: GRE 73."
             ],
-            "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:05-3:29pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
+            "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:08-3:31pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
             "errors": []
           },
           "proof_of_store_selection": [
@@ -7844,7 +7844,7 @@
                 "Visible localized inventory/session indicator: Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begi",
                 "Visible store/session identifier: GRE 73."
               ],
-              "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:05-3:29pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
+              "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:08-3:31pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
               "errors": []
             },
             "proof_of_store_selection": [
@@ -7864,12 +7864,12 @@
             "card_text_excerpt": "Current price: $4.39 $ 4 39 Simply Nature Organic Rustic Italian Boule 24 oz Many in stock Add",
             "detail_text_excerpt": "Current price: $4.39 $ 4 39 Simply Nature Organic Rustic Italian Boule 24 oz Many in stock Add",
             "rendered_page_url": "https://www.aldi.us/store/aldi/s?k=bread",
-            "rendered_page_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e.html",
-            "rendered_page_text_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_TEXT.txt",
-            "rendered_page_prompt_preview_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_PROMPT_PREVIEW.html",
-            "rendered_page_product_related_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_PRODUCTS.html",
-            "rendered_page_html_length": 1042604,
-            "rendered_page_visible_text_length": 19013,
+            "rendered_page_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e.html",
+            "rendered_page_text_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_TEXT.txt",
+            "rendered_page_prompt_preview_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_PROMPT_PREVIEW.html",
+            "rendered_page_product_related_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_PRODUCTS.html",
+            "rendered_page_html_length": 1042293,
+            "rendered_page_visible_text_length": 18991,
             "rendered_page_html_excerpt": "",
             "shortlisted_for_detail": false,
             "detail_evaluated": false,
@@ -9432,28 +9432,6 @@
               "score": -127.95
             },
             {
-              "id": "9a6fe723452d16ef",
-              "product_name": "Pantene Pro-V 2n1 Classic Clean",
-              "store_key": "aldi",
-              "store_name": "Aldi",
-              "price": "$6.35",
-              "size": "12 fl oz",
-              "unit_price": "",
-              "product_url": "https://www.aldi.us/store/aldi/products/25324336-pantene-classic-clean-2-n-1-in-shampoo-conditioner-12-fl-oz",
-              "image_url": "https://www.instacart.com/image-server/197x197/filters:fill(FFFFFF,true):format(jpg)/d2lnr5mha7bycj.cloudfront.net/product-image/file/large_aeb6fe42-055c-47ef-95d5-df1637cec553.jpg",
-              "viable": false,
-              "ranking_status": "rejected",
-              "rejection_reason": "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
-              "rejection_reasons": [
-                "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
-                "Full product page was not successfully evaluated.",
-                "Product name does not clearly match the ingredient."
-              ],
-              "confidence": 0.05,
-              "confidence_score": 0.05,
-              "score": -127.95
-            },
-            {
               "id": "2eee97736c4055ab",
               "product_name": "L'oven Fresh Plain English Muffins",
               "store_key": "aldi",
@@ -9727,6 +9705,28 @@
               "unit_price": "",
               "product_url": "https://www.aldi.us/store/aldi/products/57463230-garlic-breadsticks",
               "image_url": "https://www.instacart.com/image-server/197x197/filters:fill(FFFFFF,true):format(jpg)/d2lnr5mha7bycj.cloudfront.net/product-image/file/large_9b1d2257-c96a-473a-9a2f-6ee1d65c70b1.jpg",
+              "viable": false,
+              "ranking_status": "rejected",
+              "rejection_reason": "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
+              "rejection_reasons": [
+                "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
+                "Full product page was not successfully evaluated.",
+                "Product name does not clearly match the ingredient."
+              ],
+              "confidence": 0.05,
+              "confidence_score": 0.05,
+              "score": -139.95
+            },
+            {
+              "id": "9c66bee5a7ebbf55",
+              "product_name": "M&M's Peanut Butter M&M Sand",
+              "store_key": "aldi",
+              "store_name": "Aldi",
+              "price": "$5.39",
+              "size": "16 fl oz",
+              "unit_price": "",
+              "product_url": "https://www.aldi.us/store/aldi/products/60147029-m-m-s-peanut-butter-ice-cream-sandwiches-4-ct",
+              "image_url": "https://www.instacart.com/image-server/197x197/filters:fill(FFFFFF,true):format(jpg)/d2lnr5mha7bycj.cloudfront.net/product-image/file/large_339b26f4-0e42-4913-aaf2-83864bab0881.jpg",
               "viable": false,
               "ranking_status": "rejected",
               "rejection_reason": "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
@@ -11526,28 +11526,6 @@
               "score": -127.95
             },
             {
-              "id": "9a6fe723452d16ef",
-              "product_name": "Pantene Pro-V 2n1 Classic Clean",
-              "store_key": "aldi",
-              "store_name": "Aldi",
-              "price": "$6.35",
-              "size": "12 fl oz",
-              "unit_price": "",
-              "product_url": "https://www.aldi.us/store/aldi/products/25324336-pantene-classic-clean-2-n-1-in-shampoo-conditioner-12-fl-oz",
-              "image_url": "https://www.instacart.com/image-server/197x197/filters:fill(FFFFFF,true):format(jpg)/d2lnr5mha7bycj.cloudfront.net/product-image/file/large_aeb6fe42-055c-47ef-95d5-df1637cec553.jpg",
-              "viable": false,
-              "ranking_status": "rejected",
-              "rejection_reason": "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
-              "rejection_reasons": [
-                "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
-                "Full product page was not successfully evaluated.",
-                "Product name does not clearly match the ingredient."
-              ],
-              "confidence": 0.05,
-              "confidence_score": 0.05,
-              "score": -127.95
-            },
-            {
               "id": "2eee97736c4055ab",
               "product_name": "L'oven Fresh Plain English Muffins",
               "store_key": "aldi",
@@ -11821,6 +11799,28 @@
               "unit_price": "",
               "product_url": "https://www.aldi.us/store/aldi/products/57463230-garlic-breadsticks",
               "image_url": "https://www.instacart.com/image-server/197x197/filters:fill(FFFFFF,true):format(jpg)/d2lnr5mha7bycj.cloudfront.net/product-image/file/large_9b1d2257-c96a-473a-9a2f-6ee1d65c70b1.jpg",
+              "viable": false,
+              "ranking_status": "rejected",
+              "rejection_reason": "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
+              "rejection_reasons": [
+                "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
+                "Full product page was not successfully evaluated.",
+                "Product name does not clearly match the ingredient."
+              ],
+              "confidence": 0.05,
+              "confidence_score": 0.05,
+              "score": -139.95
+            },
+            {
+              "id": "9c66bee5a7ebbf55",
+              "product_name": "M&M's Peanut Butter M&M Sand",
+              "store_key": "aldi",
+              "store_name": "Aldi",
+              "price": "$5.39",
+              "size": "16 fl oz",
+              "unit_price": "",
+              "product_url": "https://www.aldi.us/store/aldi/products/60147029-m-m-s-peanut-butter-ice-cream-sandwiches-4-ct",
+              "image_url": "https://www.instacart.com/image-server/197x197/filters:fill(FFFFFF,true):format(jpg)/d2lnr5mha7bycj.cloudfront.net/product-image/file/large_339b26f4-0e42-4913-aaf2-83864bab0881.jpg",
               "viable": false,
               "ranking_status": "rejected",
               "rejection_reason": "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
@@ -13622,28 +13622,6 @@
               "score": -127.95
             },
             {
-              "id": "9a6fe723452d16ef",
-              "product_name": "Pantene Pro-V 2n1 Classic Clean",
-              "store_key": "aldi",
-              "store_name": "Aldi",
-              "price": "$6.35",
-              "size": "12 fl oz",
-              "unit_price": "",
-              "product_url": "https://www.aldi.us/store/aldi/products/25324336-pantene-classic-clean-2-n-1-in-shampoo-conditioner-12-fl-oz",
-              "image_url": "https://www.instacart.com/image-server/197x197/filters:fill(FFFFFF,true):format(jpg)/d2lnr5mha7bycj.cloudfront.net/product-image/file/large_aeb6fe42-055c-47ef-95d5-df1637cec553.jpg",
-              "viable": false,
-              "ranking_status": "rejected",
-              "rejection_reason": "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
-              "rejection_reasons": [
-                "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
-                "Full product page was not successfully evaluated.",
-                "Product name does not clearly match the ingredient."
-              ],
-              "confidence": 0.05,
-              "confidence_score": 0.05,
-              "score": -127.95
-            },
-            {
               "id": "2eee97736c4055ab",
               "product_name": "L'oven Fresh Plain English Muffins",
               "store_key": "aldi",
@@ -13917,6 +13895,28 @@
               "unit_price": "",
               "product_url": "https://www.aldi.us/store/aldi/products/57463230-garlic-breadsticks",
               "image_url": "https://www.instacart.com/image-server/197x197/filters:fill(FFFFFF,true):format(jpg)/d2lnr5mha7bycj.cloudfront.net/product-image/file/large_9b1d2257-c96a-473a-9a2f-6ee1d65c70b1.jpg",
+              "viable": false,
+              "ranking_status": "rejected",
+              "rejection_reason": "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
+              "rejection_reasons": [
+                "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
+                "Full product page was not successfully evaluated.",
+                "Product name does not clearly match the ingredient."
+              ],
+              "confidence": 0.05,
+              "confidence_score": 0.05,
+              "score": -139.95
+            },
+            {
+              "id": "9c66bee5a7ebbf55",
+              "product_name": "M&M's Peanut Butter M&M Sand",
+              "store_key": "aldi",
+              "store_name": "Aldi",
+              "price": "$5.39",
+              "size": "16 fl oz",
+              "unit_price": "",
+              "product_url": "https://www.aldi.us/store/aldi/products/60147029-m-m-s-peanut-butter-ice-cream-sandwiches-4-ct",
+              "image_url": "https://www.instacart.com/image-server/197x197/filters:fill(FFFFFF,true):format(jpg)/d2lnr5mha7bycj.cloudfront.net/product-image/file/large_339b26f4-0e42-4913-aaf2-83864bab0881.jpg",
               "viable": false,
               "ranking_status": "rejected",
               "rejection_reason": "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
@@ -14285,7 +14285,7 @@
                   "pickup_status": "Nearest location resolved for pickup-oriented grocery search."
                 }
               },
-              "timestamp": "2026-05-22T18:14:36Z"
+              "timestamp": "2026-05-22T18:16:58Z"
             },
             {
               "name": "Product Extraction/Normalization Agent",
@@ -14296,7 +14296,7 @@
                 "detail_evaluated_count": 0,
                 "image_embedded_count": 12
               },
-              "timestamp": "2026-05-22T18:14:36Z"
+              "timestamp": "2026-05-22T18:16:58Z"
             }
           ]
         }
@@ -14382,7 +14382,7 @@
               "Visible localized inventory/session indicator: Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begi",
               "Visible store/session identifier: GRE 73."
             ],
-            "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:05-3:29pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
+            "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:08-3:31pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
             "errors": []
           },
           "proof_of_store_selection": [
@@ -14402,12 +14402,12 @@
           "card_text_excerpt": "Current price: $4.39 $ 4 39 Simply Nature Organic Rustic Italian Boule 24 oz Many in stock Add",
           "detail_text_excerpt": "Current price: $4.39 $ 4 39 Simply Nature Organic Rustic Italian Boule 24 oz Many in stock Add",
           "rendered_page_url": "https://www.aldi.us/store/aldi/s?k=bread",
-          "rendered_page_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e.html",
-          "rendered_page_text_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_TEXT.txt",
-          "rendered_page_prompt_preview_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_PROMPT_PREVIEW.html",
-          "rendered_page_product_related_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_PRODUCTS.html",
-          "rendered_page_html_length": 1042604,
-          "rendered_page_visible_text_length": 19013,
+          "rendered_page_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e.html",
+          "rendered_page_text_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_TEXT.txt",
+          "rendered_page_prompt_preview_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_PROMPT_PREVIEW.html",
+          "rendered_page_product_related_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_PRODUCTS.html",
+          "rendered_page_html_length": 1042293,
+          "rendered_page_visible_text_length": 18991,
           "rendered_page_html_excerpt": "",
           "shortlisted_for_detail": false,
           "detail_evaluated": false,
@@ -14583,7 +14583,7 @@
               "Visible localized inventory/session indicator: Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begi",
               "Visible store/session identifier: GRE 73."
             ],
-            "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:05-3:29pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
+            "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:08-3:31pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
             "errors": []
           },
           "proof_of_store_selection": [
@@ -14603,12 +14603,12 @@
           "card_text_excerpt": "Current price: $3.85 $ 3 85 Simply Nature Graintastic Organic Thin-Sliced Bread 20.4 oz Many in stock Add",
           "detail_text_excerpt": "Current price: $3.85 $ 3 85 Simply Nature Graintastic Organic Thin-Sliced Bread 20.4 oz Many in stock Add",
           "rendered_page_url": "https://www.aldi.us/store/aldi/s?k=bread",
-          "rendered_page_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e.html",
-          "rendered_page_text_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_TEXT.txt",
-          "rendered_page_prompt_preview_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_PROMPT_PREVIEW.html",
-          "rendered_page_product_related_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_PRODUCTS.html",
-          "rendered_page_html_length": 1042604,
-          "rendered_page_visible_text_length": 19013,
+          "rendered_page_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e.html",
+          "rendered_page_text_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_TEXT.txt",
+          "rendered_page_prompt_preview_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_PROMPT_PREVIEW.html",
+          "rendered_page_product_related_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_PRODUCTS.html",
+          "rendered_page_html_length": 1042293,
+          "rendered_page_visible_text_length": 18991,
           "rendered_page_html_excerpt": "",
           "shortlisted_for_detail": false,
           "detail_evaluated": false,
@@ -14782,7 +14782,7 @@
               "Visible localized inventory/session indicator: Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begi",
               "Visible store/session identifier: GRE 73."
             ],
-            "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:05-3:29pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
+            "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:08-3:31pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
             "errors": []
           },
           "proof_of_store_selection": [
@@ -14802,12 +14802,12 @@
           "card_text_excerpt": "Current price: $4.39 $ 4 39 Simply Nature Graintastic Organic Bread 27 oz Many in stock Add",
           "detail_text_excerpt": "Current price: $4.39 $ 4 39 Simply Nature Graintastic Organic Bread 27 oz Many in stock Add",
           "rendered_page_url": "https://www.aldi.us/store/aldi/s?k=bread",
-          "rendered_page_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e.html",
-          "rendered_page_text_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_TEXT.txt",
-          "rendered_page_prompt_preview_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_PROMPT_PREVIEW.html",
-          "rendered_page_product_related_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_PRODUCTS.html",
-          "rendered_page_html_length": 1042604,
-          "rendered_page_visible_text_length": 19013,
+          "rendered_page_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e.html",
+          "rendered_page_text_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_TEXT.txt",
+          "rendered_page_prompt_preview_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_PROMPT_PREVIEW.html",
+          "rendered_page_product_related_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_PRODUCTS.html",
+          "rendered_page_html_length": 1042293,
+          "rendered_page_visible_text_length": 18991,
           "rendered_page_html_excerpt": "",
           "shortlisted_for_detail": false,
           "detail_evaluated": false,
@@ -14981,7 +14981,7 @@
               "Visible localized inventory/session indicator: Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begi",
               "Visible store/session identifier: GRE 73."
             ],
-            "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:05-3:29pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
+            "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:08-3:31pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
             "errors": []
           },
           "proof_of_store_selection": [
@@ -15001,12 +15001,12 @@
           "card_text_excerpt": "Current price: $4.39 $ 4 39 Simply Nature Seedtastic Organic Bread 27 oz Many in stock Add",
           "detail_text_excerpt": "Current price: $4.39 $ 4 39 Simply Nature Seedtastic Organic Bread 27 oz Many in stock Add",
           "rendered_page_url": "https://www.aldi.us/store/aldi/s?k=bread",
-          "rendered_page_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e.html",
-          "rendered_page_text_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_TEXT.txt",
-          "rendered_page_prompt_preview_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_PROMPT_PREVIEW.html",
-          "rendered_page_product_related_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_PRODUCTS.html",
-          "rendered_page_html_length": 1042604,
-          "rendered_page_visible_text_length": 19013,
+          "rendered_page_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e.html",
+          "rendered_page_text_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_TEXT.txt",
+          "rendered_page_prompt_preview_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_PROMPT_PREVIEW.html",
+          "rendered_page_product_related_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_PRODUCTS.html",
+          "rendered_page_html_length": 1042293,
+          "rendered_page_visible_text_length": 18991,
           "rendered_page_html_excerpt": "",
           "shortlisted_for_detail": false,
           "detail_evaluated": false,
@@ -15180,7 +15180,7 @@
               "Visible localized inventory/session indicator: Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begi",
               "Visible store/session identifier: GRE 73."
             ],
-            "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:05-3:29pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
+            "visible_context_excerpt": "Skip Navigation Weekly Ads Buy It Again Find Stores Delivery · 3:08-3:31pm 5905 Arlo Drive Shopping at ALDI - GRE 73 - Indianapolis Products Weekly Specials Featured Recipes Explore popular searches with arrow keys or begin typing in the search field, and the app will offer suggestions. Use the arrow keys to navigate to a suggestion and then use the Enter key to select it. Once you press Enter, navigate to the search results that appear. Give Us Feedback View cart 1 View cart Sign In / Register View Pricing Policy Buy It Again Explore All Products This Week's ALDI Finds Upcoming ALDI Finds Fresh Produce Meat & Seafood Snacks & Candy Frozen Foods Dairy & Eggs Bakery & Bread Beverages Alcohol Pantry Essentials Deli Household Essentials Breakfast & Cereals Pet Supplies Personal Care Baby Items Departments ALDI Exclusive Brands Shop By Diet Recipes ALDI Brands It all starts and ends with bread. Shop All Current price: $1.65 $165 L'oven Fresh White Bread 20 oz Many in stock Add Current price: $3.85 $385 Specially Selected Sliced Sourdough Round 24 oz Many in stock Add Current price: $2.05 $205 L'oven Fresh Honey Wheat Bread 20 oz Many in stock Add Current price: $2.15 $215 L'oven Fresh 100% Whole Wheat Bread 20 oz Many in stock Add Current price: $3.55 $355 L'oven Fresh Artisanal Bread 20 oz Many in stock Add Current price: $1.65 $165 L'oven Fresh Split Top Wheat Bread 20 oz Many in stock Add Current price: $2.99 $299 L'oven Fresh 12 Grain Bread Wide Pan 24 oz Many in stock Add Current price: $3.85 $385 Specially Selected Everything Sourdough Loaf 24 oz Many in stock Add Current",
             "errors": []
           },
           "proof_of_store_selection": [
@@ -15200,12 +15200,12 @@
           "card_text_excerpt": "Current price: $3.85 $ 3 85 Simply Nature Seedtastic Organic Thin-Sliced Bread 20.4 oz Many in stock Add",
           "detail_text_excerpt": "Current price: $3.85 $ 3 85 Simply Nature Seedtastic Organic Thin-Sliced Bread 20.4 oz Many in stock Add",
           "rendered_page_url": "https://www.aldi.us/store/aldi/s?k=bread",
-          "rendered_page_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e.html",
-          "rendered_page_text_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_TEXT.txt",
-          "rendered_page_prompt_preview_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_PROMPT_PREVIEW.html",
-          "rendered_page_product_related_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181431Z_aldi_bread_c92c82020e_PRODUCTS.html",
-          "rendered_page_html_length": 1042604,
-          "rendered_page_visible_text_length": 19013,
+          "rendered_page_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e.html",
+          "rendered_page_text_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_TEXT.txt",
+          "rendered_page_prompt_preview_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_PROMPT_PREVIEW.html",
+          "rendered_page_product_related_html_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T181654Z_aldi_bread_c92c82020e_PRODUCTS.html",
+          "rendered_page_html_length": 1042293,
+          "rendered_page_visible_text_length": 18991,
           "rendered_page_html_excerpt": "",
           "shortlisted_for_detail": false,
           "detail_evaluated": false,
@@ -16758,28 +16758,6 @@
           "score": -127.95
         },
         {
-          "id": "9a6fe723452d16ef",
-          "product_name": "Pantene Pro-V 2n1 Classic Clean",
-          "store_key": "aldi",
-          "store_name": "Aldi",
-          "price": "$6.35",
-          "size": "12 fl oz",
-          "unit_price": "",
-          "product_url": "https://www.aldi.us/store/aldi/products/25324336-pantene-classic-clean-2-n-1-in-shampoo-conditioner-12-fl-oz",
-          "image_url": "https://www.instacart.com/image-server/197x197/filters:fill(FFFFFF,true):format(jpg)/d2lnr5mha7bycj.cloudfront.net/product-image/file/large_aeb6fe42-055c-47ef-95d5-df1637cec553.jpg",
-          "viable": false,
-          "ranking_status": "rejected",
-          "rejection_reason": "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
-          "rejection_reasons": [
-            "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
-            "Full product page was not successfully evaluated.",
-            "Product name does not clearly match the ingredient."
-          ],
-          "confidence": 0.05,
-          "confidence_score": 0.05,
-          "score": -127.95
-        },
-        {
           "id": "2eee97736c4055ab",
           "product_name": "L'oven Fresh Plain English Muffins",
           "store_key": "aldi",
@@ -17053,6 +17031,28 @@
           "unit_price": "",
           "product_url": "https://www.aldi.us/store/aldi/products/57463230-garlic-breadsticks",
           "image_url": "https://www.instacart.com/image-server/197x197/filters:fill(FFFFFF,true):format(jpg)/d2lnr5mha7bycj.cloudfront.net/product-image/file/large_9b1d2257-c96a-473a-9a2f-6ee1d65c70b1.jpg",
+          "viable": false,
+          "ranking_status": "rejected",
+          "rejection_reason": "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
+          "rejection_reasons": [
+            "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
+            "Full product page was not successfully evaluated.",
+            "Product name does not clearly match the ingredient."
+          ],
+          "confidence": 0.05,
+          "confidence_score": 0.05,
+          "score": -139.95
+        },
+        {
+          "id": "9c66bee5a7ebbf55",
+          "product_name": "M&M's Peanut Butter M&M Sand",
+          "store_key": "aldi",
+          "store_name": "Aldi",
+          "price": "$5.39",
+          "size": "16 fl oz",
+          "unit_price": "",
+          "product_url": "https://www.aldi.us/store/aldi/products/60147029-m-m-s-peanut-butter-ice-cream-sandwiches-4-ct",
+          "image_url": "https://www.instacart.com/image-server/197x197/filters:fill(FFFFFF,true):format(jpg)/d2lnr5mha7bycj.cloudfront.net/product-image/file/large_339b26f4-0e42-4913-aaf2-83864bab0881.jpg",
           "viable": false,
           "ranking_status": "rejected",
           "rejection_reason": "Full product page was skipped because rendered product cards had enough direct evidence for ranking.",
@@ -17401,13 +17401,13 @@
         "valid": 5,
         "rejected": 91,
         "direct_product_url_count": 96,
-        "in_stock_count": 44,
-        "unknown_stock_count": 52
+        "in_stock_count": 43,
+        "unknown_stock_count": 53
       },
       "skip_reasons": [
         "Aldi: ChatGPT rendered-HTML product reasoning skipped because visible product cards were already extracted."
       ],
-      "updated_at": "2026-05-22T18:14:40Z",
+      "updated_at": "2026-05-22T18:17:03Z",
       "test_grab": true,
       "target_product": "Edible grocery bread",
       "target_store": "Aldi"
