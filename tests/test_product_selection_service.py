@@ -690,9 +690,79 @@ class ProductSelectionServiceTest(unittest.TestCase):
 
         self.assertTrue(status["ok"])
         self.assertTrue(status["home_store_update"]["reused_profile_session"])
-        self.assertEqual(driver.get_calls, ["https://www.aldi.us/store/aldi?zipcode=46237"])
+        self.assertEqual(driver.get_calls, ["https://www.aldi.us/store/aldi/s?k=bread"])
+        self.assertEqual(status["pre_search_store_url"], "https://www.aldi.us/store/aldi?zipcode=46237")
         wait_mock.assert_called_once()
         route_mock.assert_not_called()
+
+    def test_aldi_reused_profile_product_restore_jumps_back_to_search(self):
+        class FakeDriver:
+            current_url = ""
+
+            def __init__(self):
+                self.get_calls = []
+
+            def get(self, url):
+                self.get_calls.append(url)
+                if len(self.get_calls) == 1:
+                    self.current_url = "https://www.aldi.us/store/aldi/products/26274163-mandarins-bag-3-lb"
+                else:
+                    self.current_url = url
+
+            def execute_script(self, script, *args):
+                if "document.body" in script:
+                    return 'Shopping at ALDI - GRE 73 - Indianapolis Pickup Results for "chips"'
+                return ""
+
+        driver = FakeDriver()
+
+        status = product_service.try_reuse_aldi_profile_store_session(
+            driver,
+            "https://www.aldi.us/store/aldi/s?k=chips",
+            "https://www.aldi.us/store/aldi?zipcode=46237",
+            "aldi",
+            "Aldi",
+            "5905 Arlo Drive, Indianapolis, IN 46237",
+            {"name": "Aldi", "address": "Aldi, 6835 South Emerson Avenue, Indianapolis, IN 46237"},
+            lambda *_args, **_kwargs: None,
+        )
+
+        self.assertTrue(status["ok"])
+        self.assertEqual(
+            driver.get_calls,
+            [
+                "https://www.aldi.us/store/aldi/s?k=chips",
+                "https://www.aldi.us/store/aldi/s?k=chips",
+            ],
+        )
+
+    def test_aldi_product_search_does_not_noop_on_product_detail_overlay(self):
+        class FakeDriver:
+            current_url = "https://www.aldi.us/store/aldi/products/26274163-mandarins-bag-3-lb"
+            page_source = "<html><body>Results for chips</body></html>"
+
+            def __init__(self):
+                self.get_calls = []
+
+            def get(self, url):
+                self.get_calls.append(url)
+                self.current_url = url
+
+            def execute_script(self, script, *args):
+                if "return document.body" in script:
+                    return 'Results for "chips"'
+                if "HTMLInputElement" in script:
+                    return False
+                return ""
+
+        driver = FakeDriver()
+
+        self.assertTrue(product_service.open_aldi_product_search(
+            driver,
+            "https://www.aldi.us/store/aldi/s?k=chips",
+            search_term="chips",
+        ))
+        self.assertEqual(driver.get_calls, ["https://www.aldi.us/store/aldi/s?k=chips"])
 
     def test_aldi_reused_profile_search_does_not_wait_for_storefront(self):
         class FakeDriver:

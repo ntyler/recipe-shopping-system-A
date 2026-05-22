@@ -4199,6 +4199,9 @@ def open_aldi_product_search(driver, search_url, search_term=None):
         return False
 
     search_term = clean_text(search_term or aldi_search_term_from_url(search_url))
+    if aldi_search_page_loaded(driver, search_url, search_term) and not aldi_current_url_is_product_detail(driver):
+        return True
+
     if search_term and submit_aldi_search_box(driver, search_term):
         if wait_for_aldi_search_page(driver, search_url, search_term, timeout_seconds=8):
             return True
@@ -4390,6 +4393,7 @@ def prepare_store_session_before_product_search(
         if normalize_item_key(store_key) == "aldi":
             reused_status = try_reuse_aldi_profile_store_session(
                 driver,
+                search_url,
                 start_url,
                 store_key,
                 store_name,
@@ -4443,6 +4447,7 @@ def prepare_store_session_before_product_search(
 
 def try_reuse_aldi_profile_store_session(
     driver,
+    search_url,
     start_url,
     store_key,
     store_name,
@@ -4450,9 +4455,21 @@ def try_reuse_aldi_profile_store_session(
     store_location,
     wait_for_browser_document,
 ):
+    search_url = str(search_url or "").strip()
+    start_url = str(start_url or "").strip()
+    profile_probe_url = search_url or start_url
+    search_term = aldi_search_term_from_url(search_url)
+
     try:
-        driver.get(start_url)
+        driver.get(profile_probe_url)
         wait_for_browser_document(driver, timeout_seconds=max(3, min(7, product_browser_wait_seconds() / 2)))
+        if aldi_current_url_is_product_detail(driver) and search_url:
+            driver.get(search_url)
+            wait_for_browser_document(driver, timeout_seconds=max(3, min(7, product_browser_wait_seconds() / 2)))
+        elif search_url and search_term and not aldi_search_page_loaded(driver, search_url, search_term):
+            open_aldi_product_search(driver, search_url, search_term=search_term)
+            wait_for_browser_document(driver, timeout_seconds=max(3, min(7, product_browser_wait_seconds() / 2)))
+
         status = rendered_store_context_status(
             driver,
             store_key,
@@ -4483,9 +4500,20 @@ def try_reuse_aldi_profile_store_session(
         "store_key": store_key,
         "store_name": store_name,
         "store_location": store_location,
+        "profile_probe_url": profile_probe_url,
+        "store_session_url": start_url,
     }
     status["profile_reused"] = True
     return status
+
+
+def aldi_current_url_is_product_detail(driver):
+    try:
+        parsed = urlparse(str(driver.current_url or ""))
+    except Exception:
+        return False
+
+    return "/store/aldi/products/" in parsed.path
 
 
 def aldi_store_session_url(search_url, full_address="", store_location=None):
