@@ -46,6 +46,19 @@ def open_aldi_store_selector_page(
     )
     time.sleep(1)
 
+    clicked_address_edit = click_visible_xpath(
+        driver,
+        [
+            "//*[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'delivery')]/following::button[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'edit')][1]",
+            "//button[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'change address')]",
+            "//button[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'edit address')]",
+            "//button[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'edit')]",
+        ],
+        wait=wait_seconds,
+    )
+    if clicked_address_edit:
+        return True
+
     clicked_change_store = click_visible_xpath(
         driver,
         [
@@ -171,13 +184,22 @@ def aldi_location_search_values(context: dict[str, Any]) -> list[str]:
         if value and value.lower() not in {existing.lower() for existing in values}:
             values.append(value)
 
-    add(context.get("pickup_zip"))
-    add(context.get("home_zip"))
-    add(context.get("exact_address"))
     add(context.get("home_address"))
+    add(context.get("home_zip"))
+    add(context.get("pickup_zip"))
+    add(context.get("exact_address"))
     for value in context.get("search_values", []):
         add(value)
     return values
+
+
+def aldi_store_card_context(context: dict[str, Any]) -> dict[str, Any]:
+    card_context = dict(context or {})
+    selected_name = clean_aldi_text(card_context.get("selected_name"))
+    store_name = clean_aldi_text(card_context.get("store_name"))
+    if selected_name.lower() in {"aldi", store_name.lower()}:
+        card_context["selected_name"] = ""
+    return card_context
 
 
 def find_aldi_location_input(driver):
@@ -387,8 +409,13 @@ def update_home_store(
     time.sleep(wait_seconds)
     accept_cookies_if_present(driver, wait=0.75)
 
-    clicked_store_card = click_store_card_that_matches_context(driver=driver, context=context, wait=wait_seconds)
-    if not clicked_store_card:
+    clicked_store_card = click_store_card_that_matches_context(
+        driver=driver,
+        context=aldi_store_card_context(context),
+        wait=wait_seconds,
+    )
+    address_update_attempted = bool(typed_location or clicked_address_suggestion or clicked_save_address)
+    if not clicked_store_card and address_update_attempted:
         clicked_first_store_card = click_first_store_location_card(driver, wait=wait_seconds)
         clicked_store_card = bool(clicked_first_store_card)
     time.sleep(1)
@@ -414,7 +441,7 @@ def update_home_store(
 
     time.sleep(wait_seconds)
     confirmed = correct_home_store_selected(driver, context)
-    ok = bool(confirmed or (clicked_shop_this_store and reached_storefront))
+    ok = bool(confirmed)
 
     return {
         "attempted": True,

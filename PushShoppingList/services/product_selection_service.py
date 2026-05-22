@@ -3929,7 +3929,10 @@ def search_store_products_with_browser_agent(
             if (
                 store_session_status
                 and not store_session_status.get("ok")
-                and not store_session_update_allows_product_search(store_session_status)
+                and (
+                    store_session_has_zip_mismatch(store_session_status)
+                    or not store_session_update_allows_product_search(store_session_status)
+                )
             ):
                 return [], [
                     store_session_status.get("message")
@@ -4138,18 +4141,30 @@ def store_session_update_has_address_selection(store_session_status):
         for key in [
             "clicked_address_suggestion",
             "clicked_save_address",
-            "clicked_first_store_card",
-            "clicked_store_card",
-            "clicked_shop_this_store",
         ]
     )
 
 
 def store_session_update_allows_product_search(store_session_status):
+    if store_session_has_zip_mismatch(store_session_status):
+        return False
     return (
         store_session_update_has_store_confirmation(store_session_status)
         or store_session_update_has_address_selection(store_session_status)
     )
+
+
+def store_session_has_zip_mismatch(store_session_status):
+    if not isinstance(store_session_status, dict):
+        return False
+    haystack = " ".join(
+        clean_text(value)
+        for value in [
+            store_session_status.get("message", ""),
+            *store_session_status.get("errors", []),
+        ]
+    ).lower()
+    return "expected store zip" in haystack and "found visible zip" in haystack
 
 
 def merge_store_session_selection_proof(context_status, store_session_status):

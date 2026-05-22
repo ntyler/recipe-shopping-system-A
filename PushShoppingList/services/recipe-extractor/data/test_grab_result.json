@@ -1,8 +1,8 @@
 {
   "ok": false,
   "test_grab": true,
-  "job_id": "1779465504098-f4855eea7b0fb8",
-  "timestamp": "2026-05-22T15:58:48Z",
+  "job_id": "1779466272748-d271d5040897f",
+  "timestamp": "2026-05-22T16:11:35Z",
   "home_address": "5905 Arlo Drive Apt 2213, Indianapolis, Marion County, IN 46237, United States",
   "home_location": {
     "latitude": 39.6425974,
@@ -27,7 +27,7 @@
   "alternatives": [],
   "rejected_products": [],
   "errors": [
-    "Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602. Saved rendered page HTML: D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T155848Z_aldi_bread_c92c82020e.html"
+    "Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602. Saved rendered page HTML: D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T161135Z_aldi_bread_c92c82020e.html"
   ],
   "results": [
     {
@@ -64,12 +64,12 @@
               "pickup_status": "Nearest location resolved for pickup-oriented grocery search."
             }
           },
-          "timestamp": "2026-05-22T15:58:24Z"
+          "timestamp": "2026-05-22T16:11:13Z"
         },
         {
           "name": "Browser Worker Agent",
           "status": "failed",
-          "message": "Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602. Saved rendered page HTML: D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T155848Z_aldi_bread_c92c82020e.html",
+          "message": "Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602. Saved rendered page HTML: D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T161135Z_aldi_bread_c92c82020e.html",
           "metadata": {
             "store_key": "aldi",
             "store_name": "Aldi",
@@ -87,7 +87,7 @@
               "pickup_status": "Nearest location resolved for pickup-oriented grocery search."
             }
           },
-          "timestamp": "2026-05-22T15:58:48Z"
+          "timestamp": "2026-05-22T16:11:35Z"
         },
         {
           "name": "Product Extraction/Normalization Agent",
@@ -98,7 +98,7 @@
             "detail_evaluated_count": 0,
             "image_embedded_count": 0
           },
-          "timestamp": "2026-05-22T15:58:48Z"
+          "timestamp": "2026-05-22T16:11:35Z"
         },
         {
           "name": "Validation Layer",
@@ -112,7 +112,7 @@
             "in_stock_count": 0,
             "unknown_stock_count": 0
           },
-          "timestamp": "2026-05-22T15:58:48Z"
+          "timestamp": "2026-05-22T16:11:35Z"
         },
         {
           "name": "Ranking Agent",
@@ -125,7 +125,7 @@
             "chatgpt_status": "not-run",
             "selected_product_id": ""
           },
-          "timestamp": "2026-05-22T15:58:48Z"
+          "timestamp": "2026-05-22T16:11:35Z"
         }
       ],
       "chatgpt_final_selection": {},
@@ -171,8 +171,8 @@
           "product_url": "",
           "image_url": "",
           "reason_selected": "",
-          "reason_skipped": "Aldi: Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602. Saved rendered page HTML: D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T155848Z_aldi_bread_c92c82020e.html",
-          "skip_reason": "Aldi: Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602. Saved rendered page HTML: D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T155848Z_aldi_bread_c92c82020e.html",
+          "reason_skipped": "Aldi: Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602. Saved rendered page HTML: D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T161135Z_aldi_bread_c92c82020e.html",
+          "skip_reason": "Aldi: Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602. Saved rendered page HTML: D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T161135Z_aldi_bread_c92c82020e.html",
           "candidate_count": 0,
           "valid_candidate_count": 0,
           "rejected_candidate_count": 0,
@@ -181,13 +181,13 @@
           "valid_alternatives": [],
           "rejected_products": [],
           "skip_reasons": [
-            "Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602. Saved rendered page HTML: D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T155848Z_aldi_bread_c92c82020e.html"
+            "Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602. Saved rendered page HTML: D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T161135Z_aldi_bread_c92c82020e.html"
           ],
           "agent_stages": [
             {
               "name": "Browser Worker Agent",
               "status": "failed",
-              "message": "Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602. Saved rendered page HTML: D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T155848Z_aldi_bread_c92c82020e.html",
+              "message": "Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602. Saved rendered page HTML: D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T161135Z_aldi_bread_c92c82020e.html",
               "metadata": {
                 "store_key": "aldi",
                 "store_name": "Aldi",
@@ -205,7 +205,7 @@
                   "pickup_status": "Nearest location resolved for pickup-oriented grocery search."
                 }
               },
-              "timestamp": "2026-05-22T15:58:48Z"
+              "timestamp": "2026-05-22T16:11:35Z"
             },
             {
               "name": "Product Extraction/Normalization Agent",
@@ -216,7 +216,7 @@
                 "detail_evaluated_count": 0,
                 "image_embedded_count": 0
               },
-              "timestamp": "2026-05-22T15:58:48Z"
+              "timestamp": "2026-05-22T16:11:35Z"
             }
           ]
         }
@@ -262,8 +262,8 @@
           "product_url": "",
           "image_url": "",
           "reason_selected": "",
-          "reason_skipped": "Aldi: Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602. Saved rendered page HTML: D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T155848Z_aldi_bread_c92c82020e.html",
-          "skip_reason": "Aldi: Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602. Saved rendered page HTML: D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T155848Z_aldi_bread_c92c82020e.html",
+          "reason_skipped": "Aldi: Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602. Saved rendered page HTML: D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T161135Z_aldi_bread_c92c82020e.html",
+          "skip_reason": "Aldi: Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602. Saved rendered page HTML: D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T161135Z_aldi_bread_c92c82020e.html",
           "candidate_count": 0,
           "valid_candidate_count": 0,
           "rejected_candidate_count": 0,
@@ -272,13 +272,13 @@
           "valid_alternatives": [],
           "rejected_products": [],
           "skip_reasons": [
-            "Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602. Saved rendered page HTML: D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T155848Z_aldi_bread_c92c82020e.html"
+            "Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602. Saved rendered page HTML: D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T161135Z_aldi_bread_c92c82020e.html"
           ],
           "agent_stages": [
             {
               "name": "Browser Worker Agent",
               "status": "failed",
-              "message": "Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602. Saved rendered page HTML: D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T155848Z_aldi_bread_c92c82020e.html",
+              "message": "Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602. Saved rendered page HTML: D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T161135Z_aldi_bread_c92c82020e.html",
               "metadata": {
                 "store_key": "aldi",
                 "store_name": "Aldi",
@@ -296,7 +296,7 @@
                   "pickup_status": "Nearest location resolved for pickup-oriented grocery search."
                 }
               },
-              "timestamp": "2026-05-22T15:58:48Z"
+              "timestamp": "2026-05-22T16:11:35Z"
             },
             {
               "name": "Product Extraction/Normalization Agent",
@@ -307,7 +307,7 @@
                 "detail_evaluated_count": 0,
                 "image_embedded_count": 0
               },
-              "timestamp": "2026-05-22T15:58:48Z"
+              "timestamp": "2026-05-22T16:11:35Z"
             }
           ]
         }
@@ -324,9 +324,9 @@
         "unknown_stock_count": 0
       },
       "skip_reasons": [
-        "Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602. Saved rendered page HTML: D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T155848Z_aldi_bread_c92c82020e.html"
+        "Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602. Saved rendered page HTML: D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\raw\\product_pages\\20260522T161135Z_aldi_bread_c92c82020e.html"
       ],
-      "updated_at": "2026-05-22T15:58:48Z",
+      "updated_at": "2026-05-22T16:11:35Z",
       "test_grab": true,
       "target_product": "Edible grocery bread",
       "target_store": "Aldi"

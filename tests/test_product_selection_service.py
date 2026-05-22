@@ -984,6 +984,20 @@ class ProductSelectionServiceTest(unittest.TestCase):
 
         self.assertFalse(product_service.store_session_update_allows_product_search(status))
 
+    def test_aldi_zip_mismatch_blocks_product_search_even_after_store_clicks(self):
+        status = {
+            "ok": False,
+            "message": "Expected store ZIP 46237 from the saved Full Address/store resolution, found visible ZIP(s): 60602.",
+            "home_store_update": {
+                "clicked_store_card": True,
+                "clicked_shop_this_store": True,
+                "reached_storefront": True,
+            },
+        }
+
+        self.assertTrue(product_service.store_session_has_zip_mismatch(status))
+        self.assertFalse(product_service.store_session_update_allows_product_search(status))
+
     def test_aldi_search_after_storefront_submits_ingredient_search(self):
         class FakeDriver:
             current_url = "https://www.aldi.us/store/aldi/storefront"
@@ -1133,6 +1147,70 @@ class ProductSelectionServiceTest(unittest.TestCase):
         scoped_type_mock.assert_called_once()
         self.assertEqual(save_calls, [True])
         self.assertEqual(generic_type_calls, [])
+
+    def test_aldi_store_update_does_not_fallback_to_first_card_without_address_update(self):
+        class FakeDriver:
+            current_url = "https://www.aldi.us/store/aldi/s?k=bread"
+
+        first_card_calls = []
+
+        helpers = {
+            "accept_cookies_if_present": lambda *_args, **_kwargs: False,
+            "type_visible_location_input": lambda *_args, **_kwargs: False,
+            "click_first_address_suggestion": lambda *_args, **_kwargs: False,
+            "click_save_address_button": lambda *_args, **_kwargs: False,
+            "click_first_store_location_card": lambda *_args, **_kwargs: first_card_calls.append(True) or True,
+            "click_store_card_that_matches_context": lambda *_args, **_kwargs: False,
+            "click_continue_shopping": lambda *_args, **_kwargs: False,
+            "click_visible_xpath": lambda *_args, **_kwargs: False,
+            "final_home_store_xpaths": lambda _context: ["//button"],
+            "correct_home_store_selected": lambda *_args, **_kwargs: False,
+        }
+
+        with patch.object(aldi_store, "open_aldi_store_selector_page", return_value=True), patch.object(
+            aldi_store,
+            "click_aldi_near_button",
+            return_value=False,
+        ), patch.object(
+            aldi_store,
+            "type_aldi_location_input",
+            return_value=False,
+        ), patch.object(
+            aldi_store,
+            "click_aldi_shop_this_store",
+            return_value=False,
+        ), patch.object(
+            aldi_store.time,
+            "sleep",
+            return_value=None,
+        ):
+            result = aldi_store.update_home_store(
+                FakeDriver(),
+                {
+                    "search_values": ["5905 Arlo Drive, Indianapolis, IN 46237"],
+                    "home_zip": "46237",
+                    "pickup_zip": "46237",
+                    "selected_name": "Aldi",
+                    "store_key": "aldi",
+                    "store_name": "Aldi",
+                },
+                helpers,
+                wait_seconds=0,
+            )
+
+        self.assertFalse(result["ok"])
+        self.assertFalse(result["clicked_first_store_card"])
+        self.assertEqual(first_card_calls, [])
+
+    def test_aldi_store_card_context_removes_generic_chain_name(self):
+        card_context = aldi_store.aldi_store_card_context({
+            "store_name": "Aldi",
+            "selected_name": "Aldi",
+            "pickup_zip": "46237",
+        })
+
+        self.assertEqual(card_context["selected_name"], "")
+        self.assertEqual(card_context["pickup_zip"], "46237")
 
     def test_aldi_store_update_does_not_click_final_after_reaching_storefront(self):
         class FakeDriver:
