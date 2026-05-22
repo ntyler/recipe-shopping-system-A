@@ -17,5 +17,6 @@ PushShoppingList/services/recipe-extractor/data/raw/*_SOCIAL_PDF_API_RESPONSE.tx
 PushShoppingList/services/recipe-extractor/data/raw/*_SOCIAL_PDF_API_ERROR.txt
 PushShoppingList/services/recipe-extractor/data/raw/product_pages/
 PushShoppingList/services/recipe-extractor/data/raw/product_prompts/
+PushShoppingList/services/recipe-extractor/data/browser_profiles/
 shopping_app_*.log
 flask_*.log
