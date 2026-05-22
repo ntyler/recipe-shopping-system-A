@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import PushShoppingList.services.product_selection_service as product_service
 import PushShoppingList.scripts.test_grab_aldi_eggs as test_grab_script
+from PushShoppingList.scripts.stores import aldi_store
 from PushShoppingList.services.product_selection_service import build_product_download_plan
 from PushShoppingList.services.product_selection_service import build_product_choice_record_from_results
 from PushShoppingList.services.product_selection_service import build_final_product_selection_prompt
@@ -574,6 +575,61 @@ class ProductSelectionServiceTest(unittest.TestCase):
 
         self.assertEqual(driver.current_url, "https://www.aldi.us/store/aldi/s?k=eggs")
         self.assertEqual(driver.get_calls, [])
+
+    def test_aldi_store_update_does_not_click_final_after_reaching_storefront(self):
+        class FakeDriver:
+            current_url = "https://www.aldi.us/store/aldi/storefront"
+
+        final_clicks = []
+
+        def final_click(*_args, **_kwargs):
+            final_clicks.append(True)
+            return True
+
+        helpers = {
+            "accept_cookies_if_present": lambda *_args, **_kwargs: False,
+            "type_visible_location_input": lambda *_args, **_kwargs: True,
+            "click_first_address_suggestion": lambda *_args, **_kwargs: True,
+            "click_save_address_button": lambda *_args, **_kwargs: True,
+            "click_first_store_location_card": lambda *_args, **_kwargs: True,
+            "click_store_card_that_matches_context": lambda *_args, **_kwargs: False,
+            "click_continue_shopping": lambda *_args, **_kwargs: False,
+            "click_visible_xpath": final_click,
+            "final_home_store_xpaths": lambda _context: ["//button"],
+            "correct_home_store_selected": lambda *_args, **_kwargs: True,
+        }
+
+        with patch.object(aldi_store, "open_aldi_store_selector_page", return_value=True), patch.object(
+            aldi_store,
+            "click_aldi_near_button",
+            return_value=True,
+        ), patch.object(
+            aldi_store,
+            "click_aldi_shop_this_store",
+            return_value=True,
+        ), patch.object(
+            aldi_store,
+            "wait_for_aldi_storefront",
+            return_value=True,
+        ), patch.object(
+            aldi_store.time,
+            "sleep",
+            return_value=None,
+        ):
+            result = aldi_store.update_home_store(
+                FakeDriver(),
+                {
+                    "search_values": ["5905 Arlo Drive, Indianapolis, IN 46237"],
+                    "store_key": "aldi",
+                    "store_name": "Aldi",
+                },
+                helpers,
+                wait_seconds=0,
+            )
+
+        self.assertTrue(result["reached_storefront"])
+        self.assertFalse(result["clicked_final"])
+        self.assertEqual(final_clicks, [])
 
     def test_post_scroll_snapshot_captures_current_dom_html_and_product_html(self):
         class FakeDriver:

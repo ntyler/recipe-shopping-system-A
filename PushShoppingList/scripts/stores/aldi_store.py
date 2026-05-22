@@ -247,7 +247,7 @@ def update_home_store(
 
     clicked_continue = False if reached_storefront else click_continue_shopping(driver, wait=wait_seconds)
 
-    if not clicked_continue:
+    if not reached_storefront and not clicked_continue:
         clicked_final = click_visible_xpath(driver, final_home_store_xpaths(context), wait=wait_seconds)
 
     time.sleep(wait_seconds)
