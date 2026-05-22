@@ -253,21 +253,31 @@ body {
 
         .store-options-sticky-stack {
             position: sticky;
-            top: var(--view-switcher-sticky-offset, 0px);
+            top: 0;
             z-index: 1200;
-            margin-bottom: 12px;
-            padding-bottom: 12px;
-            background: #1b1b1b;
-            border-bottom: 1px solid #2f3638;
-            box-shadow: 0 12px 22px rgba(0,0,0,0.35);
+            margin: -10px -10px 14px;
+            padding: 10px 12px 12px;
+            background: #111414;
+            border: 1px solid #3a3a3a;
+            border-radius: 10px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+            box-sizing: border-box;
         }
 
         .store-options-title-toggle {
-            background: #181818;
+            padding: 0 2px 8px;
+            background: transparent;
+            border: 0;
+            border-radius: 0;
+            font-size: 22px;
+        }
+
+        .store-options-title-toggle:hover {
+            background: transparent;
         }
 
         .store-options-sticky-toolbar {
-            margin: 10px 0 0;
+            margin: 0;
             padding: 0;
             background: transparent;
         }
@@ -421,6 +431,7 @@ body {
             color: #7dd3fc;
             font-size: 11px;
             font-weight: 700;
+            white-space: nowrap;
         }
 
         .store-nearest-address {
@@ -450,7 +461,8 @@ body {
             display: grid;
             gap: 6px;
             max-height: 210px;
-            overflow: auto;
+            overflow-y: auto;
+            overflow-x: hidden;
             margin-top: 8px;
             padding-right: 4px;
         }
@@ -469,6 +481,8 @@ body {
             font: inherit;
             text-align: left;
             cursor: pointer;
+            box-sizing: border-box;
+            min-width: 0;
         }
 
         .nearby-store-row:hover,
@@ -503,6 +517,8 @@ body {
         .nearby-store-address {
             color: #e5e7eb;
             min-width: 0;
+            overflow-wrap: anywhere;
+            word-break: break-word;
         }
 
         .store-address-link {

@@ -408,6 +408,15 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn(".store-options-sticky-toolbar", css)
         self.assertNotIn("#storeOptionsSection.card-collapsed .store-options-sticky-toolbar", css)
 
+    def test_store_options_sticky_bar_matches_display_view_alignment(self):
+        css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+        self.assertIn(".store-options-sticky-stack", css)
+        self.assertIn("top: 0", css)
+        self.assertIn("background: #111414", css)
+        self.assertIn("border: 1px solid #3a3a3a", css)
+        self.assertIn(".store-options-title-toggle:hover", css)
+
     def test_store_options_toolbar_only_runs_nearest_stores(self):
         home_template = Path("PushShoppingList/templates/sections/home_address.html").read_text(encoding="utf-8")
         store_template = Path("PushShoppingList/templates/sections/store_options.html").read_text(encoding="utf-8")
@@ -428,6 +437,14 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn(".behavior-toggle", css)
         self.assertIn("justify-content: flex-start", css)
         self.assertIn("text-align: left", css)
+
+    def test_nearby_store_list_prevents_horizontal_scroll(self):
+        css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+        self.assertIn("overflow-x: hidden", css)
+        self.assertIn("overflow-y: auto", css)
+        self.assertIn("box-sizing: border-box", css)
+        self.assertIn("overflow-wrap: anywhere", css)
 
     def test_active_store_summary_uses_linked_logo_tiles(self):
         store_template = Path("PushShoppingList/templates/sections/store_options.html").read_text(encoding="utf-8")
