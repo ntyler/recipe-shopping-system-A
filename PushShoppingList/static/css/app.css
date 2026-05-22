@@ -251,13 +251,21 @@ body {
             display: block;
         }
 
-        .store-options-sticky-toolbar {
+        .store-options-title-toggle {
             position: sticky;
             top: var(--view-switcher-sticky-offset, 0px);
-            z-index: 80;
+            z-index: 92;
+            background: #181818;
+            box-shadow: 0 8px 18px rgba(0,0,0,0.35);
+        }
+
+        .store-options-sticky-toolbar {
+            position: sticky;
+            top: calc(var(--view-switcher-sticky-offset, 0px) + 58px);
+            z-index: 91;
             margin: -2px 0 12px;
             padding: 10px 0 12px;
-            background: #111414;
+            background: #1b1b1b;
             border-bottom: 1px solid #2f3638;
             box-shadow: 0 12px 22px rgba(0,0,0,0.35);
         }

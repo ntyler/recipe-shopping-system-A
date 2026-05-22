@@ -387,9 +387,12 @@ class ProductSelectionServiceTest(unittest.TestCase):
         css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
         self.assertNotIn("store-radius-control", home_template)
+        self.assertIn("home-address-actions-copy", home_template)
         self.assertIn("store-options-sticky-toolbar", store_template)
+        self.assertIn("store-options-title-toggle", store_template)
         self.assertIn('form="homeAddressForm"', store_template)
         self.assertIn("position: sticky", css)
+        self.assertIn(".store-options-title-toggle", css)
         self.assertIn(".store-options-sticky-toolbar", css)
 
     def test_active_store_summary_uses_linked_logo_tiles(self):

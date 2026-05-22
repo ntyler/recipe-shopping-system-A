@@ -32,6 +32,16 @@
                 <span id="homeAddressSummary">{{ home_address.full_address }}</span>
             </div>
 
+            <div class="address-actions-grid home-address-actions-copy">
+                <button type="submit" name="action" value="save" class="address-save-btn">Save Address</button>
+                <button type="button"
+                        class="location-address-btn"
+                        onclick="useDeviceLocationForHomeAddress(this)">
+                    Use My Location
+                </button>
+                <button type="submit" name="action" value="run_find_nearest" class="nearest-stores-btn">Run Find Nearest Stores</button>
+            </div>
+
         </form>
     </div>
 
