@@ -1352,6 +1352,31 @@ body {
             box-shadow: 0 0 0 3px rgba(36,147,232,0.28), 0 -6px 24px rgba(0,0,0,0.3);
         }
 
+        .store-add-inline-action {
+            margin-top: 16px;
+            padding-top: 14px;
+            border-top: 1px solid #333;
+        }
+
+        .store-add-inline-btn {
+            width: 100%;
+            margin: 0;
+            padding: 13px 16px;
+            background: #0078D7;
+            border: 1px solid #2493e8;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 16px;
+            font-weight: 800;
+        }
+
+        .store-add-inline-btn:hover,
+        .store-add-inline-btn:focus-visible {
+            background: #0b84de;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(36,147,232,0.28);
+        }
+
         .store-add-modal-backdrop {
             position: fixed;
             inset: 0;
