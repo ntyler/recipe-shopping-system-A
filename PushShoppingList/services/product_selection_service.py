@@ -4138,7 +4138,9 @@ def store_session_update_has_address_selection(store_session_status):
         for key in [
             "clicked_address_suggestion",
             "clicked_save_address",
-            "typed_location",
+            "clicked_first_store_card",
+            "clicked_store_card",
+            "clicked_shop_this_store",
         ]
     )
 

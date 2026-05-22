@@ -970,6 +970,20 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertFalse(merged["ok"])
         self.assertEqual(merged["proof_of_store_selection"], [])
 
+    def test_aldi_typed_location_alone_does_not_allow_product_search(self):
+        status = {
+            "ok": False,
+            "home_store_update": {
+                "typed_location": True,
+                "clicked_address_suggestion": False,
+                "clicked_save_address": False,
+                "clicked_store_card": False,
+                "clicked_shop_this_store": False,
+            },
+        }
+
+        self.assertFalse(product_service.store_session_update_allows_product_search(status))
+
     def test_aldi_search_after_storefront_submits_ingredient_search(self):
         class FakeDriver:
             current_url = "https://www.aldi.us/store/aldi/storefront"
@@ -1045,6 +1059,80 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertFalse(result["attempted"])
         selector_mock.assert_not_called()
         self.assertEqual(unexpected_calls, [])
+
+    def test_aldi_store_update_uses_scoped_location_input_and_saves_after_typing(self):
+        class FakeDriver:
+            current_url = "https://www.aldi.us/store/aldi/s?k=bread"
+
+        generic_type_calls = []
+        save_calls = []
+        confirmation_checks = []
+
+        def generic_type(*_args, **_kwargs):
+            generic_type_calls.append(True)
+            return True
+
+        def save_address(*_args, **_kwargs):
+            save_calls.append(True)
+            return True
+
+        def correct_store_after_update(*_args, **_kwargs):
+            confirmation_checks.append(True)
+            return len(confirmation_checks) > 1
+
+        helpers = {
+            "accept_cookies_if_present": lambda *_args, **_kwargs: False,
+            "type_visible_location_input": generic_type,
+            "click_first_address_suggestion": lambda *_args, **_kwargs: False,
+            "click_save_address_button": save_address,
+            "click_first_store_location_card": lambda *_args, **_kwargs: False,
+            "click_store_card_that_matches_context": lambda *_args, **_kwargs: True,
+            "click_continue_shopping": lambda *_args, **_kwargs: False,
+            "click_visible_xpath": lambda *_args, **_kwargs: False,
+            "final_home_store_xpaths": lambda _context: ["//button"],
+            "correct_home_store_selected": correct_store_after_update,
+        }
+
+        with patch.object(aldi_store, "open_aldi_store_selector_page", return_value=True), patch.object(
+            aldi_store,
+            "click_aldi_near_button",
+            return_value=False,
+        ), patch.object(
+            aldi_store,
+            "type_aldi_location_input",
+            return_value=True,
+        ) as scoped_type_mock, patch.object(
+            aldi_store,
+            "click_aldi_shop_this_store",
+            return_value=True,
+        ), patch.object(
+            aldi_store,
+            "wait_for_aldi_storefront",
+            return_value=True,
+        ), patch.object(
+            aldi_store.time,
+            "sleep",
+            return_value=None,
+        ):
+            result = aldi_store.update_home_store(
+                FakeDriver(),
+                {
+                    "search_values": ["5905 Arlo Drive, Indianapolis, IN 46237"],
+                    "home_zip": "46237",
+                    "pickup_zip": "46237",
+                    "store_key": "aldi",
+                    "store_name": "Aldi",
+                },
+                helpers,
+                wait_seconds=0,
+            )
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["typed_location"])
+        self.assertTrue(result["clicked_save_address"])
+        scoped_type_mock.assert_called_once()
+        self.assertEqual(save_calls, [True])
+        self.assertEqual(generic_type_calls, [])
 
     def test_aldi_store_update_does_not_click_final_after_reaching_storefront(self):
         class FakeDriver:
