@@ -4182,7 +4182,11 @@ def merge_store_session_selection_proof(context_status, store_session_status):
 
 def open_product_search_after_storefront(driver, search_url, store_key, store_session_status=None, search_term=None):
     if normalize_item_key(store_key) == "aldi" and store_session_update_allows_product_search(store_session_status):
-        if store_session_update_has_store_confirmation(store_session_status) and not store_session_reused_profile(store_session_status):
+        if (
+            store_session_update_has_store_confirmation(store_session_status)
+            and not store_session_reused_profile(store_session_status)
+            and not store_session_context_verified(store_session_status)
+        ):
             wait_for_current_url_contains(driver, "/store/aldi/storefront", timeout_seconds=12)
         return open_aldi_product_search(driver, search_url, search_term=search_term)
 
@@ -4202,15 +4206,16 @@ def open_aldi_product_search(driver, search_url, search_term=None):
     if aldi_search_page_loaded(driver, search_url, search_term) and not aldi_current_url_is_product_detail(driver):
         return True
 
+    if aldi_current_url_is_product_detail(driver):
+        force_open_aldi_search_url(driver, search_url)
+        if wait_for_aldi_search_page(driver, search_url, search_term, timeout_seconds=6):
+            return True
+
     if search_term and submit_aldi_search_box(driver, search_term):
         if wait_for_aldi_search_page(driver, search_url, search_term, timeout_seconds=8):
             return True
 
-    try:
-        driver.get(search_url)
-    except Exception:
-        if len(driver.page_source or "") < 800:
-            raise
+    force_open_aldi_search_url(driver, search_url)
 
     if wait_for_aldi_search_page(driver, search_url, search_term, timeout_seconds=8):
         return True
@@ -4219,6 +4224,39 @@ def open_aldi_product_search(driver, search_url, search_term=None):
         return wait_for_aldi_search_page(driver, search_url, search_term, timeout_seconds=8)
 
     return False
+
+
+def force_open_aldi_search_url(driver, search_url):
+    search_url = str(search_url or "").strip()
+    if not search_url:
+        return False
+
+    try:
+        driver.get(search_url)
+    except Exception:
+        if len(driver.page_source or "") < 800:
+            raise
+
+    if not aldi_current_url_is_product_detail(driver):
+        return True
+
+    try:
+        driver.get("about:blank")
+    except Exception:
+        pass
+
+    try:
+        driver.get(search_url)
+        return True
+    except Exception:
+        if len(driver.page_source or "") < 800:
+            raise
+
+    try:
+        driver.execute_script("window.location.assign(arguments[0]);", search_url)
+        return True
+    except Exception:
+        return False
 
 
 def submit_aldi_search_box(driver, search_term):
@@ -4365,6 +4403,17 @@ def store_session_reused_profile(store_session_status):
     return bool(update.get("reused_profile_session"))
 
 
+def store_session_context_verified(store_session_status):
+    return bool(
+        isinstance(store_session_status, dict)
+        and (
+            store_session_status.get("ok")
+            or store_session_status.get("verified")
+            or store_session_status.get("proof_of_store_selection")
+        )
+    )
+
+
 def prepare_store_session_before_product_search(
     driver,
     store_key,
@@ -4463,13 +4512,6 @@ def try_reuse_aldi_profile_store_session(
     try:
         driver.get(profile_probe_url)
         wait_for_browser_document(driver, timeout_seconds=max(3, min(7, product_browser_wait_seconds() / 2)))
-        if aldi_current_url_is_product_detail(driver) and search_url:
-            driver.get(search_url)
-            wait_for_browser_document(driver, timeout_seconds=max(3, min(7, product_browser_wait_seconds() / 2)))
-        elif search_url and search_term and not aldi_search_page_loaded(driver, search_url, search_term):
-            open_aldi_product_search(driver, search_url, search_term=search_term)
-            wait_for_browser_document(driver, timeout_seconds=max(3, min(7, product_browser_wait_seconds() / 2)))
-
         status = rendered_store_context_status(
             driver,
             store_key,
@@ -4477,6 +4519,31 @@ def try_reuse_aldi_profile_store_session(
             full_address,
             store_location,
         )
+        if status.get("ok") and search_url and (
+            aldi_current_url_is_product_detail(driver)
+            or (search_term and not aldi_search_page_loaded(driver, search_url, search_term))
+        ):
+            force_open_aldi_search_url(driver, search_url)
+            wait_for_browser_document(driver, timeout_seconds=max(3, min(7, product_browser_wait_seconds() / 2)))
+            refreshed_status = rendered_store_context_status(
+                driver,
+                store_key,
+                store_name,
+                full_address,
+                store_location,
+            )
+            if refreshed_status.get("ok"):
+                status = refreshed_status
+        elif search_url and search_term and not aldi_search_page_loaded(driver, search_url, search_term):
+            open_aldi_product_search(driver, search_url, search_term=search_term)
+            wait_for_browser_document(driver, timeout_seconds=max(3, min(7, product_browser_wait_seconds() / 2)))
+            status = rendered_store_context_status(
+                driver,
+                store_key,
+                store_name,
+                full_address,
+                store_location,
+            )
     except Exception as exc:
         return {
             "ok": False,
@@ -6746,6 +6813,145 @@ def extract_image_url_from_mapping(mapping):
     return ""
 
 
+def extract_product_card_assets_from_html(html_text, page_url=""):
+    soup = BeautifulSoup(html_text or "", "html.parser")
+    assets = {}
+
+    for anchor in soup.find_all("a", href=True):
+        product_url = urljoin(page_url or "", anchor.get("href") or "")
+        if not product_url or "/products/" not in urlparse(product_url).path:
+            continue
+
+        asset = product_card_asset_from_anchor(anchor, page_url)
+        if not asset.get("product_url"):
+            continue
+
+        for key in product_card_asset_keys(asset.get("product_url", "")):
+            if not key:
+                continue
+            assets[key] = merge_product_card_asset(assets.get(key, {}), asset)
+
+    return assets
+
+
+def product_card_asset_from_anchor(anchor, page_url=""):
+    product_url = urljoin(page_url or "", anchor.get("href") or "")
+    root = closest_product_card_node(anchor)
+    root_text = clean_text(root.get_text(" ", strip=True) if root else anchor.get_text(" ", strip=True))
+    name = product_card_asset_name(anchor, root)
+    price = normalize_price(root_text)
+    image_url = product_card_image_url(anchor, page_url) or product_card_image_url(root, page_url)
+    raw_html = clean_product_card_html(str(root or anchor))
+    package_size = extract_package_size(root_text)
+
+    return {
+        "product_url": product_url,
+        "name": name,
+        "price": price,
+        "image_url": image_url,
+        "raw_product_html_snippet": raw_html,
+        "card_text_excerpt": root_text[:900],
+        "package_size": package_size,
+    }
+
+
+def closest_product_card_node(anchor):
+    node = anchor
+    fallback = anchor
+
+    for _ in range(8):
+        if not node or not getattr(node, "name", None):
+            break
+
+        if node.name in {"li", "article"}:
+            return node
+
+        attrs = getattr(node, "attrs", {}) or {}
+        if attrs.get("data-item-card") or attrs.get("data-product-url"):
+            fallback = node
+
+        node = node.parent
+
+    return fallback
+
+
+def product_card_asset_name(anchor, root):
+    for node in [root, anchor]:
+        if not node:
+            continue
+
+        for attr in ["data-name", "aria-label", "title"]:
+            value = clean_text(node.get(attr))
+            if value and len(value) <= 180:
+                return value
+
+        image = node.find("img") if hasattr(node, "find") else None
+        alt = clean_text(image.get("alt") if image else "")
+        if alt and len(alt) <= 180:
+            return alt
+
+    return clean_text(anchor.get_text(" ", strip=True))
+
+
+def product_card_image_url(node, page_url=""):
+    if not node:
+        return ""
+
+    image = node.find("img") if hasattr(node, "find") and getattr(node, "name", "") != "img" else node
+    candidates = []
+
+    for source in [node, image]:
+        if not source:
+            continue
+        for attr in ["data-image-url", "currentSrc", "src", "data-src"]:
+            candidates.append(source.get(attr))
+        candidates.append(first_srcset_url(source.get("srcset")))
+
+    for value in candidates:
+        value = clean_text(value)
+        if value:
+            return urljoin(page_url or "", value)
+
+    return ""
+
+
+def first_srcset_url(value):
+    text = str(value or "").strip()
+    if not text:
+        return ""
+
+    first = text.split(",", 1)[0].strip()
+    return first.split()[0].strip() if first else ""
+
+
+def product_card_asset_keys(product_url):
+    text = clean_text(product_url).lower().rstrip("/")
+    if not text:
+        return []
+
+    keys = [text]
+    try:
+        parsed = urlparse(text)
+        path = parsed.path.rstrip("/")
+        if path:
+            keys.append(path)
+        match = re.search(r"/products/([^/?#]+)", path)
+        if match:
+            keys.append(match.group(1))
+    except Exception:
+        pass
+
+    return unique_texts(keys)
+
+
+def merge_product_card_asset(existing, new):
+    merged = dict(existing or {})
+    for key, value in (new or {}).items():
+        if value and not merged.get(key):
+            merged[key] = value
+    return merged
+
+
 def extract_price_from_mapping(mapping):
     if not isinstance(mapping, dict):
         return ""
@@ -6815,21 +7021,27 @@ def extract_anchor_product_candidates(
     limit = product_candidate_limit()
 
     for anchor in soup.find_all("a", href=True):
-        name = clean_text(anchor.get_text(" ", strip=True))
+        asset = product_card_asset_from_anchor(anchor, page_url)
+        raw_name = clean_text(asset.get("name") or anchor.get_text(" ", strip=True))
+        name = raw_name
 
         if not name or len(name) > 140:
-            continue
+            better_name = best_visible_card_name(
+                ingredient,
+                asset.get("card_text_excerpt") or anchor.get_text(" ", strip=True),
+            )
+            if better_name:
+                name = better_name
+            else:
+                continue
 
         name_tokens = set(tokenize(name))
         overlap = len(ingredient_tokens & name_tokens)
         if ingredient_tokens and overlap == 0:
             continue
 
-        parent_text = clean_text(anchor.parent.get_text(" ", strip=True) if anchor.parent else name)
-        price = ""
-        price_match = PRICE_PATTERN.search(parent_text)
-        if price_match:
-            price = price_match.group(0).replace(" ", "")
+        parent_text = asset.get("card_text_excerpt") or clean_text(anchor.parent.get_text(" ", strip=True) if anchor.parent else name)
+        price = asset.get("price") or ""
 
         candidate = build_candidate(
             ingredient,
@@ -6843,8 +7055,17 @@ def extract_anchor_product_candidates(
             home_location,
             store_location,
             source="html-anchor",
+            image_url=asset.get("image_url", ""),
         )
         candidate["source_page_url"] = page_url
+        if asset.get("raw_product_html_snippet"):
+            candidate["raw_product_html_snippet"] = asset.get("raw_product_html_snippet")
+        if parent_text:
+            candidate["card_text_excerpt"] = parent_text[:900]
+            candidate["detail_text_excerpt"] = parent_text[:900]
+        if asset.get("package_size"):
+            candidate["package_size"] = asset.get("package_size")
+            candidate["size"] = asset.get("package_size")
         candidates.append(candidate)
 
         if len(candidates) >= limit:

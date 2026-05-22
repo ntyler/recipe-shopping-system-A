@@ -947,22 +947,9 @@ function renderTestGrabAlternativeSlider(choice, candidates, selectedId, storeKe
                 </div>
             </div>
             <div class="test-grab-results-title">Results for "${escapeHtml(itemLabel)}"</div>
-            <div class="test-grab-slider-shell">
-                <button type="button"
-                        class="test-grab-slider-nav"
-                        aria-label="Scroll alternatives left"
-                        onclick="scrollTestGrabSlider(-1)">
-                    &lsaquo;
-                </button>
-                <div id="testGrabAlternativeSlider" class="test-grab-slider" tabindex="0">
-                    ${rows.map(candidate => renderTestGrabAlternativeCard(candidate, selectedId, choice.item_key || "", storeKey)).join("")}
-                </div>
-                <button type="button"
-                        class="test-grab-slider-nav"
-                        aria-label="Scroll alternatives right"
-                        onclick="scrollTestGrabSlider(1)">
-                    &rsaquo;
-                </button>
+            <div class="test-grab-results-count">${rows.length} acceptable alternative${rows.length === 1 ? "" : "s"}</div>
+            <div id="testGrabAlternativeSlider" class="test-grab-alternatives-grid" tabindex="0">
+                ${rows.map(candidate => renderTestGrabAlternativeCard(candidate, selectedId, choice.item_key || "", storeKey)).join("")}
             </div>
         </section>
     `;
@@ -1145,16 +1132,52 @@ function renderProductCandidateOption(candidate, selectedId, itemKey, storeKey, 
 function productCandidateImageSrc(candidate) {
     const direct = candidate ? candidate.image_url || "" : "";
     const embedded = candidate ? candidate.embedded_image_base64 || "" : "";
+    const hint = candidate ? candidate.image_url_hint || "" : "";
+    const rawHtml = candidate ? candidate.raw_product_html_snippet || candidate.product_card_html || "" : "";
 
     if (direct) {
         return direct;
+    }
+
+    if (hint) {
+        return hint;
     }
 
     if (typeof embedded === "string" && embedded.startsWith("data:image/")) {
         return embedded;
     }
 
+    const snippetImage = imageSrcFromHtmlSnippet(rawHtml);
+    if (snippetImage) {
+        return snippetImage;
+    }
+
     return "";
+}
+
+function imageSrcFromHtmlSnippet(html) {
+    if (!html || typeof DOMParser === "undefined") {
+        return "";
+    }
+
+    try {
+        const doc = new DOMParser().parseFromString(html, "text/html");
+        const image = doc.querySelector("img");
+        if (!image) {
+            return "";
+        }
+
+        const src = image.getAttribute("src") || image.getAttribute("data-src") || "";
+        if (src) {
+            return src;
+        }
+
+        const srcset = image.getAttribute("srcset") || "";
+        const first = srcset.split(",", 1)[0].trim();
+        return first ? first.split(/\s+/)[0] : "";
+    } catch (err) {
+        return "";
+    }
 }
 
 function productPromptEntries(candidate) {

@@ -4307,10 +4307,24 @@ body {
         }
 
         .test-grab-results-title {
-            margin: 18px 4px 10px;
+            margin: 18px 4px 4px;
             font-size: 18px;
             font-weight: 800;
             color: #f8fafc;
+        }
+
+        .test-grab-results-count {
+            margin: 0 4px 12px;
+            color: #a7f3d0;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .test-grab-alternatives-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(156px, 1fr));
+            gap: 14px;
+            padding: 4px 2px 14px;
         }
 
         .test-grab-slider-shell {

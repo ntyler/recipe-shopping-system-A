@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -16,6 +17,7 @@ from PushShoppingList.services.product_selection_service import clean_product_ca
 from PushShoppingList.services.product_selection_service import clean_text
 from PushShoppingList.services.product_selection_service import clean_text_list
 from PushShoppingList.services.product_selection_service import compact_product_value_for_storage
+from PushShoppingList.services.product_selection_service import extract_product_card_assets_from_html
 from PushShoppingList.services.product_selection_service import final_product_candidate_payload
 from PushShoppingList.services.product_selection_service import find_nearest_store_location
 from PushShoppingList.services.product_selection_service import finish_product_progress
@@ -575,11 +577,116 @@ def test_grab_candidates_from_payload(payload, record=None, search_term=None):
     add_many(store_result.get("alternatives") if isinstance(store_result, dict) else [])
     add_many(store_result.get("alternative_products") if isinstance(store_result, dict) else [])
 
-    return dedupe_test_grab_candidates([
+    candidates = [
         test_grab_candidate_for_display(candidate, search_term)
         for candidate in sources
         if isinstance(candidate, dict)
-    ])
+    ]
+    candidates = hydrate_test_grab_candidates_from_rendered_html(candidates)
+    return dedupe_test_grab_candidates(candidates)
+
+
+def hydrate_test_grab_candidates_from_rendered_html(candidates):
+    candidates = [
+        dict(candidate)
+        for candidate in candidates or []
+        if isinstance(candidate, dict)
+    ]
+    path_values = []
+    for candidate in candidates:
+        path_values.extend([
+            candidate.get("rendered_page_product_related_html_path", ""),
+            candidate.get("rendered_page_html_path", ""),
+        ])
+    paths = unique_texts(path_values)
+    if not paths:
+        return candidates
+
+    asset_index = {}
+    for path_value in paths[:3]:
+        try:
+            path = Path(path_value)
+            if not path.exists():
+                continue
+            page_assets = extract_product_card_assets_from_html(path.read_text(encoding="utf-8", errors="ignore"))
+        except Exception:
+            continue
+
+        for key, asset in page_assets.items():
+            existing = asset_index.get(key, {})
+            merged = dict(existing)
+            for asset_key, asset_value in asset.items():
+                if asset_value and not merged.get(asset_key):
+                    merged[asset_key] = asset_value
+            asset_index[key] = merged
+
+    if not asset_index:
+        return candidates
+
+    for candidate in candidates:
+        asset = first_test_grab_asset_match(asset_index, candidate.get("product_url", ""))
+        if not asset:
+            continue
+
+        if not candidate.get("image_url") and asset.get("image_url"):
+            candidate["image_url"] = asset["image_url"]
+
+        if test_grab_product_name_needs_cleanup(candidate.get("product_name", "")) and asset.get("name"):
+            candidate["product_name"] = asset["name"]
+
+        if not candidate.get("price") and asset.get("price"):
+            candidate["price"] = asset["price"]
+
+        if not candidate.get("size") and asset.get("package_size"):
+            candidate["size"] = asset["package_size"]
+        if not candidate.get("package_size") and asset.get("package_size"):
+            candidate["package_size"] = asset["package_size"]
+        if not candidate.get("size_count") and asset.get("package_size"):
+            candidate["size_count"] = asset["package_size"]
+
+        if not candidate.get("raw_product_html_snippet") and asset.get("raw_product_html_snippet"):
+            candidate["raw_product_html_snippet"] = asset["raw_product_html_snippet"]
+        if not candidate.get("product_card_text") and asset.get("card_text_excerpt"):
+            candidate["product_card_text"] = asset["card_text_excerpt"]
+        if not candidate.get("card_text_excerpt") and asset.get("card_text_excerpt"):
+            candidate["card_text_excerpt"] = asset["card_text_excerpt"]
+        if not candidate.get("detail_text_excerpt") and asset.get("card_text_excerpt"):
+            candidate["detail_text_excerpt"] = asset["card_text_excerpt"]
+
+    return candidates
+
+
+def first_test_grab_asset_match(asset_index, product_url):
+    for key in test_grab_product_url_keys(product_url):
+        asset = asset_index.get(key)
+        if asset:
+            return asset
+    return {}
+
+
+def test_grab_product_url_keys(product_url):
+    text = clean_text(product_url).lower().rstrip("/")
+    if not text:
+        return []
+
+    keys = [text]
+    match = re.search(r"(/store/[^?#]+)", text)
+    if match:
+        keys.append(match.group(1).rstrip("/"))
+    match = re.search(r"/products/([^/?#]+)", text)
+    if match:
+        keys.append(match.group(1))
+    return unique_texts(keys)
+
+
+def test_grab_product_name_needs_cleanup(name):
+    text = clean_text(name)
+    return (
+        not text
+        or len(text) > 80
+        or re.search(r"\$\s?\d", text) is not None
+        or text.lower().startswith("current price")
+    )
 
 
 def first_test_grab_selected_product(payload, record):

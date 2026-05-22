@@ -560,6 +560,56 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertEqual(choice["valid_alternatives"][1]["unit_price"], "")
         self.assertIn("Goldhen Grade A Large Eggs", choice["valid_alternatives"][1]["raw_product_html_snippet"])
 
+    def test_test_grab_hydrates_missing_candidate_images_from_saved_html(self):
+        with TemporaryDirectory() as tmpdir:
+            html_path = Path(tmpdir) / "aldi_bread.html"
+            html_path.write_text(
+                """
+                <html><body>
+                    <li data-item-card="true">
+                        <a href="/store/aldi/products/24735034-simply-nature-organic-thin-sliced-graintastic-bread-20-4-oz">
+                            <img alt="Simply Nature Graintastic Organic Thin-Sliced Bread"
+                                 srcset="https://www.instacart.com/image-server/197x197/product-image/file/large_thin.jpg 1x">
+                            <span>Current price: $3.49</span>
+                            <span>20.4 oz</span>
+                            <span>Many in stock</span>
+                        </a>
+                    </li>
+                </body></html>
+                """,
+                encoding="utf-8",
+            )
+            payload = {
+                "test_grab": True,
+                "search_item": "bread",
+                "results": [
+                    {
+                        "item_key": "bread",
+                        "ingredient": "bread",
+                        "selected_product_id": "thin-bread",
+                        "candidates": [
+                            {
+                                "id": "thin-bread",
+                                "product_name": "Current price: $3.49 $ 3 49 Simply Nature Graintastic Organic Thin-Sliced Bread 20.4 oz Many in stock Bread",
+                                "price": "$3.49",
+                                "product_url": "https://www.aldi.us/store/aldi/products/24735034-simply-nature-organic-thin-sliced-graintastic-bread-20-4-oz",
+                                "rendered_page_html_path": str(html_path),
+                                "image_url": "",
+                                "viable": True,
+                            }
+                        ],
+                    }
+                ],
+            }
+
+            choice = test_grab_script.test_grab_choice_from_result(payload)
+
+        item = choice["valid_alternatives"][0]
+        self.assertEqual(item["product_name"], "Simply Nature Graintastic Organic Thin-Sliced Bread")
+        self.assertIn("large_thin.jpg", item["image_url"])
+        self.assertEqual(item["size"], "20.4 oz")
+        self.assertIn("Simply Nature Graintastic Organic Thin-Sliced Bread", item["raw_product_html_snippet"])
+
     def test_test_grab_shell_egg_detection_accepts_final_payload_card_text(self):
         candidate = {
             "id": "payload-eggs",
@@ -572,6 +622,39 @@ class ProductSelectionServiceTest(unittest.TestCase):
         }
 
         self.assertTrue(test_grab_script.test_grab_candidate_is_valid_alternative(candidate, "eggs"))
+
+    def test_html_anchor_candidates_capture_aldi_card_images(self):
+        html = """
+            <html><body>
+                <li data-item-card="true">
+                    <a href="/store/aldi/products/24735124-simply-nature-seedtastic-thin-sliced-organic-bread-20-4-oz">
+                        <img alt="Simply Nature Seedtastic Organic Thin-Sliced Bread"
+                             srcset="https://www.instacart.com/image-server/197x197/product-image/file/large_seed.jpg 1x,
+                                     https://www.instacart.com/image-server/394x394/product-image/file/large_seed.jpg 2x">
+                        <span>Current price: $3.49</span>
+                        <span>20.4 oz</span>
+                        <span>Many in stock</span>
+                    </a>
+                </li>
+            </body></html>
+        """
+
+        candidates = product_service.parse_product_candidates_from_html(
+            html,
+            "https://www.aldi.us/store/aldi/s?k=bread",
+            "bread",
+            "aldi",
+            "Aldi",
+            "https://www.aldi.us/store/aldi/s?k=bread",
+            "",
+            None,
+            {},
+        )
+
+        self.assertEqual(candidates[0]["product_name"], "Simply Nature Seedtastic Organic Thin-Sliced Bread")
+        self.assertEqual(candidates[0]["price"], "$3.49")
+        self.assertEqual(candidates[0]["package_size"], "20.4 oz")
+        self.assertIn("large_seed.jpg", candidates[0]["image_url"])
 
     def test_rendered_html_agent_response_normalizes_candidates(self):
         data = {
@@ -778,6 +861,33 @@ class ProductSelectionServiceTest(unittest.TestCase):
                 "https://www.aldi.us/store/aldi/s?k=bread",
                 "aldi",
                 {"home_store_update": {"ok": True, "reused_profile_session": True}},
+                search_term="bread",
+            )
+
+        wait_mock.assert_not_called()
+        search_mock.assert_called_once()
+
+    def test_aldi_verified_store_context_search_does_not_wait_for_storefront(self):
+        class FakeDriver:
+            pass
+
+        status = {
+            "ok": True,
+            "verified": True,
+            "proof_of_store_selection": ["Visible store/session identifier: GRE 73."],
+            "home_store_update": {"ok": True, "clicked_final": True},
+        }
+
+        with patch.object(product_service, "wait_for_current_url_contains") as wait_mock, patch.object(
+            product_service,
+            "open_aldi_product_search",
+            return_value=True,
+        ) as search_mock:
+            product_service.open_product_search_after_storefront(
+                FakeDriver(),
+                "https://www.aldi.us/store/aldi/s?k=bread",
+                "aldi",
+                status,
                 search_term="bread",
             )
 
