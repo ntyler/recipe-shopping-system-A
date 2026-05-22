@@ -102,6 +102,21 @@ TOKEN_ALIASES = {
     "boule": "bread",
     "yoghurt": "yogurt",
 }
+SEMANTIC_REVIEW_REASON = (
+    "Included for ChatGPT semantic review from the rendered product-card data even though "
+    "the product name did not share literal ingredient tokens."
+)
+LOCAL_SEMANTIC_REJECTION_REASONS = {
+    "Full product page was not successfully evaluated.",
+    "Product name does not clearly match the ingredient.",
+    "Full product details do not confirm enough ingredient terms.",
+}
+STRICT_LOCAL_REJECTION_PREFIXES = (
+    "Blocked by food rules:",
+    "Missing required food preference:",
+    "Product page indicates the product is unavailable or out of stock.",
+    "A direct product URL was not available; search-page links are not selectable.",
+)
 WHOLE_ITEM_FALLBACK_AVOID_TERMS = {
     "ade",
     "bar",
@@ -2660,7 +2675,7 @@ def candidate_needs_product_detail(candidate):
     return product_url.startswith(("http://", "https://")) and product_url != search_url
 
 
-def candidate_has_rankable_card_evidence(ingredient, candidate):
+def candidate_has_product_card_evidence(candidate):
     if candidate.get("source") == "search-page-fallback":
         return False
 
@@ -2673,12 +2688,17 @@ def candidate_has_rankable_card_evidence(ingredient, candidate):
         candidate.get("raw_product_html_snippet", ""),
         candidate.get("detail_text_excerpt", ""),
     ]))
-    if not any([
+    return bool(any([
         candidate.get("price"),
         candidate.get("package_size"),
         candidate.get("unit_price"),
+        candidate.get("image_url"),
         card_evidence,
-    ]):
+    ]))
+
+
+def candidate_has_rankable_card_evidence(ingredient, candidate):
+    if not candidate_has_product_card_evidence(candidate):
         return False
 
     match = best_ingredient_candidate_match(ingredient, candidate)
@@ -6546,6 +6566,13 @@ def product_candidates_from_visible_cards(
         if raw_product_html_snippet:
             candidate["raw_product_html_snippet"] = raw_product_html_snippet
 
+        candidate_name_tokens = set(tokenize(name))
+        if ingredient_tokens and not (ingredient_tokens & candidate_name_tokens):
+            candidate["semantic_review_needed"] = True
+            candidate["ranking_reasons"] = unique_texts(
+                candidate.get("ranking_reasons", []) + [SEMANTIC_REVIEW_REASON]
+            )
+
         candidate["ranking_reasons"].append("Visible product card was extracted from the rendered store page.")
         candidates.append(candidate)
 
@@ -7072,6 +7099,19 @@ def product_card_asset_keys(product_url):
     return unique_texts(keys)
 
 
+def product_url_looks_like_product_page(product_url):
+    try:
+        path = urlparse(str(product_url or "")).path.lower()
+    except Exception:
+        return False
+
+    return any(marker in path for marker in [
+        "/products/",
+        "/product/",
+        "/shopping/product/",
+    ])
+
+
 def merge_product_card_asset(existing, new):
     merged = dict(existing or {})
     for key, value in (new or {}).items():
@@ -7150,6 +7190,7 @@ def extract_anchor_product_candidates(
 
     for anchor in soup.find_all("a", href=True):
         asset = product_card_asset_from_anchor(anchor, page_url)
+        product_url = urljoin(page_url, anchor.get("href"))
         raw_name = clean_text(asset.get("name") or anchor.get_text(" ", strip=True))
         name = raw_name
 
@@ -7165,11 +7206,20 @@ def extract_anchor_product_candidates(
 
         name_tokens = set(tokenize(name))
         overlap = len(ingredient_tokens & name_tokens)
-        if ingredient_tokens and overlap == 0:
-            continue
-
         parent_text = asset.get("card_text_excerpt") or clean_text(anchor.parent.get_text(" ", strip=True) if anchor.parent else name)
         price = asset.get("price") or ""
+        needs_semantic_review = bool(ingredient_tokens and overlap == 0)
+        if needs_semantic_review:
+            if not product_url_looks_like_product_page(product_url):
+                continue
+            if not any([
+                price,
+                asset.get("package_size"),
+                asset.get("image_url"),
+                PRICE_PATTERN.search(parent_text or ""),
+                PACKAGE_SIZE_PATTERN.search(parent_text or ""),
+            ]):
+                continue
 
         candidate = build_candidate(
             ingredient,
@@ -7177,7 +7227,7 @@ def extract_anchor_product_candidates(
             store_name,
             name,
             price,
-            urljoin(page_url, anchor.get("href")),
+            product_url,
             search_url,
             full_address,
             home_location,
@@ -7194,6 +7244,11 @@ def extract_anchor_product_candidates(
         if asset.get("package_size"):
             candidate["package_size"] = asset.get("package_size")
             candidate["size"] = asset.get("package_size")
+        if needs_semantic_review:
+            candidate["semantic_review_needed"] = True
+            candidate["ranking_reasons"] = unique_texts(
+                candidate.get("ranking_reasons", []) + [SEMANTIC_REVIEW_REASON]
+            )
         candidates.append(candidate)
 
         if len(candidates) >= limit:
@@ -7339,11 +7394,7 @@ def apply_chatgpt_store_product_rankings(ingredient, candidates, full_address=""
         grouped.setdefault(store_key, []).append(candidate)
 
     for store_key, store_candidates in grouped.items():
-        rankable = [
-            candidate
-            for candidate in sorted(store_candidates, key=lambda item: item.get("score", 0), reverse=True)
-            if candidate.get("id")
-        ][:product_final_selection_candidate_limit()]
+        rankable = chatgpt_store_ranking_candidates(ingredient, store_candidates)
         allowed_ids = {candidate.get("id") for candidate in rankable if candidate.get("id")}
 
         if not allowed_ids:
@@ -7360,6 +7411,45 @@ def apply_chatgpt_store_product_rankings(ingredient, candidates, full_address=""
         apply_store_product_ranking_selection(rankable, selection)
 
     return sorted(candidates, key=lambda item: item.get("score", 0), reverse=True)
+
+
+def chatgpt_store_ranking_candidates(ingredient, store_candidates):
+    candidates = [
+        candidate
+        for candidate in dedupe_candidates(store_candidates)
+        if candidate.get("id")
+        and candidate.get("source") != "search-page-fallback"
+        and candidate_has_direct_product_url(candidate)
+    ]
+    limit = product_final_selection_candidate_limit()
+
+    if len(candidates) <= limit:
+        return candidates
+
+    return sorted(
+        candidates,
+        key=lambda candidate: chatgpt_store_ranking_priority(ingredient, candidate),
+        reverse=True,
+    )[:limit]
+
+
+def chatgpt_store_ranking_priority(ingredient, candidate):
+    match = best_ingredient_candidate_match(ingredient, candidate)
+    score = 0.0
+
+    score += 120 if candidate.get("ranking_status") == "best" else 0
+    score += 90 if candidate.get("ranking_status") == "alternative" else 0
+    score += 70 if candidate_has_product_card_evidence(candidate) else 0
+    score += 35 if candidate.get("semantic_review_needed") else 0
+    score += 30 if candidate.get("raw_product_html_snippet") else 0
+    score += 20 if candidate.get("image_url") else 0
+    score += 15 if candidate.get("price") else 0
+    score += 12 if candidate.get("package_size") else 0
+    score += match.get("name_token_ratio", 0) * 50
+    score += match.get("token_ratio", 0) * 30
+    score += max(-50, min(100, safe_float(candidate.get("score")) or 0)) * 0.15
+
+    return score
 
 
 def choose_store_products_with_chatgpt(ingredient, candidates, full_address="", quantity_context=None, allowed_ids=None):
@@ -7484,6 +7574,9 @@ Rules:
 - Choose exactly one best product when a valid confident match exists.
 - Mark other valid products as alternative.
 - Mark irrelevant, unavailable, rule-failing, search-page-only, or ambiguous products as rejected.
+- Treat this ChatGPT response as the semantic approval layer for the captured HTML/cards: approve candidates that are valid forms, categories, or common grocery synonyms for the requested item even when local scoring says they lacked exact token overlap.
+- Do not reject solely because the product name lacks the exact requested word; for example, an Italian boule, ciabatta, sourdough loaf, or rolls can be valid alternatives for bread when the card evidence supports that match.
+- Use local score, skip_reasons, and rejection_reason as hints, not final truth, except strict saved food-rule failures, unavailable/out-of-stock evidence, and missing direct product URLs.
 - Include a rejection_reason for every rejected product.
 - Include confidence_score from 0 to 1 for every product.
 - Product URLs should be direct product pages when available, not search pages.
@@ -7553,8 +7646,8 @@ def normalize_store_product_ranking_response(data, allowed_ids):
     for product_id in allowed_ids - result_ids:
         results.append({
             "id": product_id,
-            "ranking_status": "best" if product_id == best_product_id else "alternative",
-            "rejection_reason": "",
+            "ranking_status": "best" if product_id == best_product_id else "rejected",
+            "rejection_reason": "" if product_id == best_product_id else "ChatGPT store ranking did not return a classification for this candidate.",
             "confidence_score": 0,
             "reason": "",
         })
@@ -7585,6 +7678,36 @@ def normalize_ranking_status(value):
     if text in {"rejected", "reject", "invalid", "unavailable", "not relevant", "not selectable"}:
         return "rejected"
     return ""
+
+
+def candidate_has_strict_local_rejection(candidate):
+    reasons = list(candidate.get("skip_reasons", []) or [])
+    if candidate.get("rejection_reason"):
+        reasons.append(candidate.get("rejection_reason"))
+
+    for reason in reasons:
+        text = clean_text(reason)
+        if any(text.startswith(prefix) for prefix in STRICT_LOCAL_REJECTION_PREFIXES):
+            return True
+
+    return False
+
+
+def clear_local_semantic_rejections(candidate):
+    cleaned_reasons = []
+
+    for reason in candidate.get("skip_reasons", []) or []:
+        text = clean_text(reason)
+        if text in LOCAL_SEMANTIC_REJECTION_REASONS:
+            continue
+        if text.startswith("Full product page was not evaluated because"):
+            continue
+        cleaned_reasons.append(text)
+
+    candidate["skip_reasons"] = unique_texts(cleaned_reasons)
+    candidate["rejection_reason"] = ""
+    candidate["rejection_reasons"] = []
+    candidate["rejected"] = False
 
 
 def apply_store_product_ranking_selection(candidates, selection):
@@ -7637,6 +7760,9 @@ def apply_store_product_ranking_selection(candidates, selection):
                 candidate["skip_reasons"] = unique_texts(candidate.get("skip_reasons", []) + [rejection_reason])
             candidate["score"] = round(candidate.get("score", 0) - 80, 2)
         elif status == "best":
+            if not candidate_has_strict_local_rejection(candidate):
+                candidate["viable"] = True
+                clear_local_semantic_rejections(candidate)
             candidate["score"] = round(candidate.get("score", 0) + 65 + (confidence * 20), 2)
             candidate["reason_selected"] = reason or "ChatGPT store ranking chose this product-card candidate as the best store match."
             candidate["ranking_reasons"] = unique_texts(
@@ -7644,6 +7770,9 @@ def apply_store_product_ranking_selection(candidates, selection):
                 + ["ChatGPT store ranking chose this product-card candidate as the best store match.", reason]
             )
         elif status == "alternative":
+            if not candidate_has_strict_local_rejection(candidate):
+                candidate["viable"] = True
+                clear_local_semantic_rejections(candidate)
             candidate["score"] = round(candidate.get("score", 0) + (confidence * 8), 2)
             candidate["ranking_reasons"] = unique_texts(
                 candidate.get("ranking_reasons", [])

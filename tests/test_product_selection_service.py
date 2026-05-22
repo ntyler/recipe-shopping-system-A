@@ -363,6 +363,36 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertEqual(products[0]["package_size"], "24 oz")
         self.assertIn("filters:fill(FFFFFF,true):format(jpg)", products[0]["image_url"])
 
+    def test_aldi_semantic_bread_anchor_is_kept_for_chatgpt_review(self):
+        html = """
+        <li data-item-card="true">
+          <a href="/store/aldi/products/12345-specially-selected-artisan-ciabatta-rolls-12-oz">
+            <img alt="Specially Selected Artisan Ciabatta Rolls" src="https://example.com/ciabatta.jpg">
+            <span>Current price: $3.29</span>
+            <div role="heading">Specially Selected Artisan Ciabatta Rolls</div>
+            <span>12 oz</span>
+            <span>Many in stock</span>
+          </a>
+        </li>
+        """
+
+        products = product_service.parse_product_candidates_from_html(
+            html,
+            "https://www.aldi.us/store/aldi/s?k=bread",
+            "bread",
+            "aldi",
+            "Aldi",
+            "https://www.aldi.us/store/aldi/s?k=bread",
+            "5905 Arlo Drive, Indianapolis, IN 46237",
+            None,
+            {"name": "Aldi"},
+        )
+
+        self.assertEqual(len(products), 1)
+        self.assertEqual(products[0]["product_name"], "Specially Selected Artisan Ciabatta Rolls")
+        self.assertTrue(products[0]["semantic_review_needed"])
+        self.assertIn("ChatGPT semantic review", products[0]["ranking_reasons"][0])
+
     def test_meijer_reader_search_returns_direct_product_candidates(self):
         markdown = """
 [![Image 20](https://www.meijer.com/content/dam/meijer/product/0605/04/9017/06/0605049017066_1_A1C1_0200.jpg) ## Lemons, 2 lb Original price $3.99/bag (19) 3.2 out of 5 stars. 19 reviews](https://www.meijer.com/shopping/product/lemons-2-lb/60504901706.html)
@@ -502,6 +532,8 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("raw_product_html_snippet", prompt)
         self.assertIn("Organic Lemons 2 lb Bag", prompt)
         self.assertIn("ranking_status", prompt)
+        self.assertIn("semantic approval layer", prompt)
+        self.assertIn("Italian boule", prompt)
 
     def test_rendered_html_prompt_uses_generic_browser_content(self):
         prompt = product_service.build_rendered_html_product_agent_prompt(
@@ -850,6 +882,90 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertTrue(normalized["results"][0]["in_stock"])
         self.assertEqual(normalized["results"][1]["ranking_status"], "rejected")
         self.assertEqual(normalized["results"][1]["rejection_reason"], "Not standard shell eggs.")
+
+    def test_store_ranking_response_rejects_unclassified_candidates(self):
+        normalized = product_service.normalize_store_product_ranking_response(
+            {
+                "best_product_id": "bread-a",
+                "results": [
+                    {
+                        "id": "bread-a",
+                        "ranking_status": "best",
+                        "confidence_score": 0.92,
+                    }
+                ],
+            },
+            {"bread-a", "bread-b"},
+        )
+        results = {item["id"]: item for item in normalized["results"]}
+
+        self.assertEqual(results["bread-a"]["ranking_status"], "best")
+        self.assertEqual(results["bread-b"]["ranking_status"], "rejected")
+        self.assertIn("did not return a classification", results["bread-b"]["rejection_reason"])
+
+    def test_chatgpt_store_ranking_can_rescue_semantic_card_candidate(self):
+        item = candidate("Specially Selected Artisan Ciabatta Rolls")
+        item.update({
+            "id": "ciabatta-rolls",
+            "score": -20,
+            "viable": False,
+            "semantic_review_needed": True,
+            "skip_reasons": [
+                "Product name does not clearly match the ingredient.",
+                "Full product details do not confirm enough ingredient terms.",
+            ],
+            "rejection_reason": "Product name does not clearly match the ingredient.",
+        })
+
+        product_service.apply_store_product_ranking_selection(
+            [item],
+            {
+                "status": "done",
+                "best_product_id": "",
+                "results": [
+                    {
+                        "id": "ciabatta-rolls",
+                        "ranking_status": "alternative",
+                        "confidence_score": 0.88,
+                        "reason": "Ciabatta rolls are a valid bread alternative.",
+                    }
+                ],
+            },
+        )
+
+        self.assertTrue(item["viable"])
+        self.assertFalse(item["rejected"])
+        self.assertEqual(item["rejection_reason"], "")
+        self.assertEqual(item["ranking_status"], "alternative")
+        self.assertIn("ChatGPT store ranking kept this product as a valid alternative.", item["ranking_reasons"])
+
+    def test_chatgpt_store_ranking_does_not_override_strict_food_rules(self):
+        item = candidate("Lemons, Bag")
+        item.update({
+            "id": "lemons-bag",
+            "viable": False,
+            "skip_reasons": ["Missing required food preference: must be organic"],
+            "rejection_reason": "Missing required food preference: must be organic",
+        })
+
+        product_service.apply_store_product_ranking_selection(
+            [item],
+            {
+                "status": "done",
+                "best_product_id": "",
+                "results": [
+                    {
+                        "id": "lemons-bag",
+                        "ranking_status": "alternative",
+                        "confidence_score": 0.88,
+                        "reason": "Lemons match the ingredient.",
+                    }
+                ],
+            },
+        )
+
+        self.assertFalse(item["viable"])
+        self.assertEqual(item["rejection_reason"], "Missing required food preference: must be organic")
 
     def test_rendered_store_context_requires_localization_proof(self):
         class FakeDriver:
