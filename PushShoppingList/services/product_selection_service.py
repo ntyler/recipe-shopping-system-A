@@ -99,6 +99,7 @@ QUALIFIER_TOKENS = {
     "zero",
 }
 TOKEN_ALIASES = {
+    "boule": "bread",
     "yoghurt": "yogurt",
 }
 WHOLE_ITEM_FALLBACK_AVOID_TERMS = {
@@ -6971,17 +6972,42 @@ def product_card_asset_name(anchor, root):
         if not node:
             continue
 
-        for attr in ["data-name", "aria-label", "title"]:
-            value = clean_text(node.get(attr))
-            if value and len(value) <= 180:
+        for attr in ["data-name", "title", "aria-label"]:
+            value = clean_product_card_name(node.get(attr))
+            if value:
                 return value
 
-        image = node.find("img") if hasattr(node, "find") else None
-        alt = clean_text(image.get("alt") if image else "")
-        if alt and len(alt) <= 180:
-            return alt
+        headings = node.find_all(attrs={"role": "heading"}) if hasattr(node, "find_all") else []
+        for heading in headings:
+            value = clean_product_card_name(heading.get_text(" ", strip=True))
+            if value:
+                return value
 
-    return clean_text(anchor.get_text(" ", strip=True))
+        images = node.find_all("img") if hasattr(node, "find_all") else []
+        for image in images:
+            value = clean_product_card_name(image.get("alt"))
+            if value:
+                return value
+
+        value = clean_product_card_name(best_visible_card_name("", node.get_text(" ", strip=True)))
+        if value:
+            return value
+
+    return clean_product_card_name(best_visible_card_name("", anchor.get_text(" ", strip=True)))
+
+
+def clean_product_card_name(value):
+    text = clean_text(value)
+    if not text or len(text) > 180:
+        return ""
+
+    lowered = text.lower()
+    if lowered in {"product", "add", "add to list", "add to cart"}:
+        return ""
+    if lowered.startswith(("add ", "current price")) or PRICE_PATTERN.search(text):
+        return ""
+
+    return text
 
 
 def product_card_image_url(node, page_url=""):
@@ -7011,7 +7037,18 @@ def first_srcset_url(value):
     if not text:
         return ""
 
-    first = text.split(",", 1)[0].strip()
+    depth = 0
+    split_at = len(text)
+    for index, character in enumerate(text):
+        if character == "(":
+            depth += 1
+        elif character == ")" and depth:
+            depth -= 1
+        elif character == "," and depth == 0:
+            split_at = index
+            break
+
+    first = text[:split_at].strip()
     return first.split()[0].strip() if first else ""
 
 

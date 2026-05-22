@@ -324,6 +324,45 @@ class ProductSelectionServiceTest(unittest.TestCase):
     def test_plural_product_name_matches_singular_ingredient(self):
         self.assertTrue(product_matches_ingredient("lemon", candidate("Lemons, 2 lb")))
 
+    def test_boule_product_matches_bread_ingredient(self):
+        self.assertTrue(product_matches_ingredient("bread", candidate("Simply Nature Organic Rustic Italian Boule")))
+
+    def test_aldi_boule_anchor_is_extracted_as_bread_candidate(self):
+        image_url = "https://www.instacart.com/image-server/197x197/filters:fill(FFFFFF,true):format(jpg)/d2lnr5mha7bycj.cloudfront.net/product-image/file/large_boule.jpg"
+        html = f"""
+        <li>
+          <div data-item-card="true">
+            <div role="group">
+              <a href="/store/aldi/products/62751457-organic-rustic-italian-boule">
+                <img alt="" srcset="{image_url}, {image_url} 1.5x">
+                <span>Current price: $4.39</span><span>$</span><span>4</span><span>39</span>
+                <div role="heading"><div>Simply Nature Organic Rustic Italian Boule</div></div>
+                <div title="24 oz">24 oz</div>
+                <div>Many in stock</div>
+              </a>
+            </div>
+          </div>
+        </li>
+        """
+
+        products = product_service.parse_product_candidates_from_html(
+            html,
+            "https://www.aldi.us/store/aldi/s?k=bread",
+            "bread",
+            "aldi",
+            "Aldi",
+            "https://www.aldi.us/store/aldi/s?k=bread",
+            "5905 Arlo Drive, Indianapolis, IN 46237",
+            None,
+            {"name": "Aldi"},
+        )
+
+        self.assertEqual(len(products), 1)
+        self.assertEqual(products[0]["product_name"], "Simply Nature Organic Rustic Italian Boule")
+        self.assertEqual(products[0]["price"], "$4.39")
+        self.assertEqual(products[0]["package_size"], "24 oz")
+        self.assertIn("filters:fill(FFFFFF,true):format(jpg)", products[0]["image_url"])
+
     def test_meijer_reader_search_returns_direct_product_candidates(self):
         markdown = """
 [![Image 20](https://www.meijer.com/content/dam/meijer/product/0605/04/9017/06/0605049017066_1_A1C1_0200.jpg) ## Lemons, 2 lb Original price $3.99/bag (19) 3.2 out of 5 stars. 19 reviews](https://www.meijer.com/shopping/product/lemons-2-lb/60504901706.html)
