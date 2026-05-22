@@ -159,6 +159,12 @@ function newProductJobId() {
     return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function formActionUrl(form) {
+    // Read the attribute directly because named form controls can shadow form.action.
+    const action = form ? form.getAttribute("action") : "";
+    return new URL(action || window.location.href, window.location.href).toString();
+}
+
 function startProductProgressPolling(jobId) {
     stopProductProgressPolling();
     activeProductJobId = jobId;
@@ -431,7 +437,7 @@ async function grabBestProducts(event) {
         const formData = new FormData(form);
         formData.set("ajax", "1");
         formData.set("job_id", jobId);
-        const response = await fetch(form.action, {
+        const response = await fetch(formActionUrl(form), {
             method: "POST",
             headers: {
                 "X-Requested-With": "fetch",
@@ -676,7 +682,7 @@ async function testGrabProducts(event) {
         formData.set("ajax", "1");
         formData.set("job_id", jobId);
         formData.set("ingredient", ingredient);
-        const response = await fetch(form.action, {
+        const response = await fetch(formActionUrl(form), {
             method: "POST",
             headers: {
                 "X-Requested-With": "fetch",
@@ -723,7 +729,7 @@ async function clearProductPicks(event) {
     try {
         const formData = new FormData(form);
         formData.set("ajax", "1");
-        const response = await fetch(form.action, {
+        const response = await fetch(formActionUrl(form), {
             method: "POST",
             headers: {
                 "X-Requested-With": "fetch",
@@ -2314,7 +2320,7 @@ async function submitRecipeMediaUpload(input) {
     }, 1600);
 
     try {
-        const response = await fetch(form.action, {
+        const response = await fetch(formActionUrl(form), {
             method: "POST",
             headers: {
                 "X-Requested-With": "fetch",
@@ -5696,7 +5702,7 @@ async function runFindNearestStores(form, button) {
     }
 
     try {
-        const response = await fetch(form.action, {
+        const response = await fetch(formActionUrl(form), {
             method: "POST",
             headers: {
                 "X-Requested-With": "fetch",
@@ -5751,7 +5757,7 @@ async function saveHomeAddressForm(form) {
     }
 
     try {
-        const response = await fetch(form.action, {
+        const response = await fetch(formActionUrl(form), {
             method: "POST",
             headers: {
                 "X-Requested-With": "fetch",
@@ -6002,7 +6008,7 @@ async function submitStoreForm(form) {
     const formData = new FormData(form);
     formData.set("ajax", "1");
 
-    const response = await fetch(form.action, {
+    const response = await fetch(formActionUrl(form), {
         method: "POST",
         headers: {
             "X-Requested-With": "fetch",

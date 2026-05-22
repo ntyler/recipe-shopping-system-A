@@ -344,6 +344,13 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertEqual(data["warning"], "Full Address could not be geocoded.")
         self.assertFalse(data["nearest_store_results"]["saved"])
 
+    def test_app_js_uses_form_action_attribute_for_fetches(self):
+        js_path = Path("PushShoppingList/static/js/app.js")
+        script = js_path.read_text(encoding="utf-8")
+
+        self.assertIn("function formActionUrl(form)", script)
+        self.assertNotIn("fetch(form.action", script)
+
     def test_chatgpt_mismatch_is_not_selectable(self):
         item = candidate("Organic Lemon")
         item["chatgpt_analysis"] = {
