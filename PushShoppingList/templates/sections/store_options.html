@@ -179,7 +179,26 @@
                                             <span class="store-distance-pill">{{ nearby_store.distance_miles }} mi</span>
                                         {% endif %}
                                         {% if nearby_selected %}
-                                            <span class="nearby-store-selected">Selected</span>
+                                            {% if home_location and home_location.latitude is defined and home_location.latitude is not none and home_location.longitude is defined and home_location.longitude is not none and nearby_store.latitude is defined and nearby_store.latitude is not none and nearby_store.longitude is defined and nearby_store.longitude is not none %}
+                                                {% set directions_url = "https://www.google.com/maps/dir/?api=1&origin=" ~ home_location.latitude ~ "," ~ home_location.longitude ~ "&destination=" ~ nearby_store.latitude ~ "," ~ nearby_store.longitude ~ "&travelmode=driving" %}
+                                            {% elif nearest_store_results.home_address and nearby_store.address %}
+                                                {% set directions_url = "https://www.google.com/maps/dir/?api=1&origin=" ~ (nearest_store_results.home_address|urlencode) ~ "&destination=" ~ (nearby_store.address|urlencode) ~ "&travelmode=driving" %}
+                                            {% else %}
+                                                {% set directions_url = "" %}
+                                            {% endif %}
+                                            {% if directions_url %}
+                                                <a class="nearby-store-selected store-directions-link"
+                                                   href="{{ directions_url }}"
+                                                   target="_blank"
+                                                   rel="noopener noreferrer"
+                                                   onclick="return openStoreDirections(this, event);"
+                                                   onkeydown="event.stopPropagation();"
+                                                   title="Open Google Maps directions from home to {{ store.label }}">
+                                                    Selected
+                                                </a>
+                                            {% else %}
+                                                <span class="nearby-store-selected">Selected</span>
+                                            {% endif %}
                                         {% endif %}
                                     </div>
                                 {% endfor %}

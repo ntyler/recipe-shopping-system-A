@@ -6141,6 +6141,33 @@ function selectNearbyStoreLocationFromKey(event, element) {
     return selectNearbyStoreLocation(element);
 }
 
+function openStoreDirections(link, event) {
+    if (event) {
+        event.stopPropagation();
+    }
+
+    if (!link || !link.href) {
+        return false;
+    }
+
+    const popup = window.open(
+        link.href,
+        "storeDirections",
+        "popup=yes,width=1120,height=780,noopener,noreferrer"
+    );
+
+    if (popup) {
+        popup.opener = null;
+        popup.focus();
+        if (event) {
+            event.preventDefault();
+        }
+        return false;
+    }
+
+    return true;
+}
+
 function parseMapCoordinate(value) {
     const parsed = Number.parseFloat(value);
     return Number.isFinite(parsed) ? parsed : null;

@@ -629,6 +629,19 @@ body {
             letter-spacing: 0.04em;
         }
 
+        .store-directions-link {
+            width: max-content;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .store-directions-link:hover,
+        .store-directions-link:focus-visible {
+            color: #67e8f9;
+            text-decoration: underline;
+            outline: none;
+        }
+
         .store-location-map-wrap,
         .selected-stores-map-wrap {
             position: relative;
