@@ -2745,10 +2745,56 @@ function setActiveStoreIconMode(mode, options = {}) {
     if (options.persist) {
         localStorage.setItem("active-store-icon-mode", nextMode);
     }
+
+    filterActiveStores();
 }
 
 function restoreActiveStoreIconMode() {
     setActiveStoreIconMode(localStorage.getItem("active-store-icon-mode") || "store");
+}
+
+function normalizeActiveStoreSearchText(value) {
+    return String(value || "").trim().toLowerCase();
+}
+
+function activeStoreCardName(card) {
+    const name = card ? card.querySelector(".active-store-name") : null;
+
+    return name ? name.textContent : "";
+}
+
+function activeStoreCardIsEligibleForSearch(card) {
+    if (document.body.classList.contains("active-store-activation-mode")) {
+        return true;
+    }
+
+    return card && card.dataset.storeActive === "true";
+}
+
+function filterActiveStores(value) {
+    const input = document.getElementById("activeStoreSearchInput");
+    const query = normalizeActiveStoreSearchText(value !== undefined ? value : (input ? input.value : ""));
+    let visibleCount = 0;
+
+    if (input && value !== undefined && input.value !== value) {
+        input.value = value;
+    }
+
+    document.querySelectorAll(".active-store-card").forEach(card => {
+        const storeName = normalizeActiveStoreSearchText(activeStoreCardName(card));
+        const matchesSearch = !query || storeName.includes(query);
+        const eligible = activeStoreCardIsEligibleForSearch(card);
+
+        card.classList.toggle("active-store-search-hidden", !matchesSearch);
+
+        if (matchesSearch && eligible) {
+            visibleCount += 1;
+        }
+    });
+
+    document.querySelectorAll(".active-store-search-empty").forEach(empty => {
+        empty.hidden = !query || visibleCount > 0;
+    });
 }
 
 function openActiveStoreIcon(link, event) {
@@ -2799,6 +2845,8 @@ function updateActiveStoreCardActivationState(card, isActive) {
         card.setAttribute("title", card.dataset.activationTitle);
         card.setAttribute("aria-label", card.dataset.activationTitle);
     }
+
+    filterActiveStores();
 }
 
 async function toggleStoreActivationFromCard(card) {
@@ -6451,6 +6499,7 @@ function updateStoreDetailsFromForm(form) {
     }
 
     setActiveStoreIconMode(localStorage.getItem("active-store-icon-mode") || "store");
+    filterActiveStores();
 }
 
 async function deleteStore(event, message) {

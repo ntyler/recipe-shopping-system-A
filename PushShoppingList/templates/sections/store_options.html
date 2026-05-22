@@ -362,6 +362,14 @@
         {% set active_home_location = nearest_store_results.get("home_location") if nearest_store_results else {} %}
         <div class="active-store-summary-header">
             <span class="store-detail-label active-store-heading-label" data-active-store-heading-label>Active stores</span>
+            <div class="active-store-search">
+                <input id="activeStoreSearchInput"
+                       type="search"
+                       placeholder="Search stores by name"
+                       autocomplete="off"
+                       aria-label="Search stores by name"
+                       oninput="filterActiveStores(this.value)">
+            </div>
             <div class="active-store-mode-controls" aria-label="Active store logo behavior">
                 <button type="button"
                         class="active-store-mode-toggle"
@@ -440,6 +448,7 @@
                     <span class="active-store-status">{{ "Active" if store_enabled else "Inactive" }}</span>
                 </a>
             {% endfor %}
+            <span class="active-store-search-empty" hidden>No matching stores.</span>
             {% if not enabled_stores %}
                 <span class="active-store-empty">No active stores selected.</span>
             {% endif %}

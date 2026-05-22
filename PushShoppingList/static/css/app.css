@@ -354,12 +354,45 @@ body {
             flex-wrap: wrap;
         }
 
+        .active-store-heading-label {
+            flex: 0 0 auto;
+        }
+
+        .active-store-search {
+            flex: 1 1 240px;
+            min-width: 180px;
+            max-width: 420px;
+        }
+
+        .active-store-search input {
+            width: 100%;
+            box-sizing: border-box;
+            margin: 0;
+            padding: 9px 11px;
+            background: #202425;
+            color: #fff;
+            border: 1px solid #4b5563;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .active-store-search input::placeholder {
+            color: #8a8f94;
+        }
+
+        .active-store-search input:focus {
+            border-color: #14b8a6;
+            box-shadow: 0 0 0 3px rgba(20,184,166,0.18);
+        }
+
         .active-store-mode-controls {
             display: inline-flex;
             align-items: center;
             justify-content: flex-end;
             flex-wrap: wrap;
             gap: 6px;
+            margin-left: auto;
             padding: 3px;
             border: 1px solid #333;
             border-radius: 8px;
@@ -425,6 +458,10 @@ body {
 
         body:not(.active-store-activation-mode) .active-store-card.active-store-inactive {
             display: none;
+        }
+
+        .active-store-card.active-store-search-hidden {
+            display: none !important;
         }
 
         body.active-store-map-mode .active-store-card[data-google-maps-url]:not([data-google-maps-url=""]) {
@@ -538,6 +575,12 @@ body {
         .active-store-empty {
             color: #aaa;
             font-size: 14px;
+        }
+
+        .active-store-search-empty {
+            color: #aaa;
+            font-size: 14px;
+            padding: 8px 0;
         }
 
         .store-action-row {
@@ -5512,6 +5555,25 @@ body {
             .store-edit-form {
                 grid-column: 1 / 4;
                 grid-template-columns: 1fr;
+            }
+
+            .active-store-summary-header {
+                align-items: stretch;
+            }
+
+            .active-store-heading-label {
+                align-self: center;
+            }
+
+            .active-store-search {
+                order: 3;
+                flex: 1 1 100%;
+                min-width: 0;
+                max-width: none;
+            }
+
+            .active-store-mode-controls {
+                margin-left: 0;
             }
 
             .add-store-grid {
