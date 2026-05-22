@@ -2525,6 +2525,16 @@ def prioritize_candidates_for_detail(ingredient, candidates):
     )
 
 
+def limit_product_candidates_for_search(ingredient, candidates, limit=None):
+    limit = limit or product_candidate_limit()
+    candidates = dedupe_candidates(candidates)
+
+    if len(candidates) <= limit:
+        return candidates
+
+    return prioritize_candidates_for_detail(ingredient, candidates)[:limit]
+
+
 def pre_detail_candidate_score(ingredient, candidate):
     name = candidate.get("product_name", "")
     text = " ".join([
@@ -4033,7 +4043,10 @@ def search_store_products_with_browser_agent(
                 store_location,
             )
 
-            candidates = dedupe_candidates(chatgpt_candidates + visible_candidates + rendered_candidates)
+            candidates = limit_product_candidates_for_search(
+                ingredient,
+                chatgpt_candidates + visible_candidates + rendered_candidates,
+            )
             if candidates:
                 for candidate in candidates:
                     candidate["rendered_page_url"] = rendered_page.get("url", final_url)
@@ -4050,7 +4063,7 @@ def search_store_products_with_browser_agent(
                         candidate.get("ranking_reasons", [])
                         + ["Generic browser agent opened, fully rendered, scrolled, cleaned, and saved the grocery page using the saved home address context."]
                     )
-                return candidates[:product_candidate_limit()], unique_texts(chatgpt_skip_reasons)
+                return candidates, unique_texts(chatgpt_skip_reasons)
 
             return [], unique_texts(chatgpt_skip_reasons + [f"{store_name}: generic browser agent found no visible product-related content on the rendered search page."])
         except Exception as exc:

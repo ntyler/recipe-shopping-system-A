@@ -160,6 +160,39 @@ class ProductSelectionServiceTest(unittest.TestCase):
 
         self.assertTrue(product_service.should_skip_rendered_html_chatgpt("bread", items))
 
+    def test_candidate_limit_keeps_relevant_rendered_anchor_after_visible_cap(self):
+        visible_candidates = []
+        for index in range(4):
+            item = candidate(f"Snack Mix {index}")
+            item.update({
+                "source": "browser-visible-card",
+                "id": f"visible-{index}",
+                "product_url": f"https://www.aldi.us/store/aldi/products/snack-{index}",
+                "search_url": "https://www.aldi.us/store/aldi/s?k=bread",
+            })
+            visible_candidates.append(item)
+
+        rendered_anchor = candidate("Simply Nature Seedtastic Organic Thin-Sliced Bread")
+        rendered_anchor.update({
+            "source": "html-anchor",
+            "id": "rendered-bread",
+            "product_url": "https://www.aldi.us/store/aldi/products/24735124-simply-nature-seedtastic-thin-sliced-organic-bread-20-4-oz",
+            "search_url": "https://www.aldi.us/store/aldi/s?k=bread",
+            "card_text_excerpt": "Simply Nature Seedtastic Organic Thin-Sliced Bread 20.4 oz Many in stock Current price: $3.85",
+        })
+
+        limited = product_service.limit_product_candidates_for_search(
+            "bread",
+            visible_candidates + [rendered_anchor],
+            limit=4,
+        )
+
+        self.assertEqual(len(limited), 4)
+        self.assertIn(
+            "Simply Nature Seedtastic Organic Thin-Sliced Bread",
+            [item["product_name"] for item in limited],
+        )
+
     def test_rendered_scroll_loop_uses_short_default_cap(self):
         class FakeDriver:
             def __init__(self):
