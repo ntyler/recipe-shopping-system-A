@@ -446,6 +446,25 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("function toggleStoreOptionsDisplay", script)
         self.assertIn("function restoreStoreOptionsDisplaySettings", script)
 
+    def test_store_manager_actions_match_recipe_log_buttons(self):
+        store_template = Path("PushShoppingList/templates/sections/store_options.html").read_text(encoding="utf-8")
+        recipe_log_template = Path("PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(
+            encoding="utf-8"
+        )
+        css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+        self.assertIn("edit-recipe-btn recipe-url-summary-edit", recipe_log_template)
+        self.assertIn("remove-recipe-btn recipe-url-summary-remove", recipe_log_template)
+        self.assertIn("store-edit-btn edit-recipe-btn recipe-url-summary-edit", store_template)
+        self.assertIn("store-delete-btn remove-recipe-btn recipe-url-summary-remove", store_template)
+        self.assertIn("aria-label=\"Delete {{ store.label }}\"", store_template)
+        self.assertIn(">X</button>", store_template)
+        self.assertNotIn(">Delete</button>", store_template)
+        self.assertIn(".store-action-row .store-edit-btn", css)
+        self.assertIn(".store-action-row .store-delete-btn", css)
+        self.assertIn("width: 34px", css)
+        self.assertIn("height: 32px", css)
+
     def test_behavior_toggles_left_align_on_mobile(self):
         css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 

@@ -97,14 +97,17 @@
 
                     <div class="store-action-row">
                         <button type="button"
-                                class="store-edit-btn"
+                                class="store-edit-btn edit-recipe-btn recipe-url-summary-edit"
                                 onclick="toggleStorePanel('store-edit-{{ store_key }}')">
                             Edit
                         </button>
                         <form method="POST"
                               action="/delete_store/{{ store_key }}"
+                              class="remove-recipe-form recipe-url-summary-remove-form store-delete-form"
                               onsubmit="return deleteStore(event, 'Delete {{ store.label }}?');">
-                            <button type="submit" class="store-delete-btn">Delete</button>
+                            <button type="submit"
+                                    class="store-delete-btn remove-recipe-btn recipe-url-summary-remove"
+                                    aria-label="Delete {{ store.label }}">X</button>
                         </form>
                     </div>
 

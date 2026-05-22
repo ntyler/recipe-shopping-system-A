@@ -418,49 +418,64 @@ body {
             display: flex;
             align-items: center;
             justify-content: flex-end;
-            gap: 10px;
+            gap: 8px;
             width: auto;
-            min-width: 176px;
+            min-width: 92px;
             margin: 0;
             flex-wrap: nowrap;
             box-sizing: border-box;
         }
 
+        .store-action-row .store-delete-form {
+            margin: 0;
+        }
+
         .store-edit-btn,
         .store-delete-btn {
-            width: 86px;
-            min-width: 86px;
-            max-width: 86px;
-            height: 38px;
-            padding: 0;
             margin: 0;
-            border: none;
-            border-radius: 9px;
-            color: #fff;
-            font-size: 14px;
-            font-weight: 700;
-            cursor: pointer;
-            box-sizing: border-box;
             display: flex;
             align-items: center;
             justify-content: center;
-            flex: 0 0 86px;
         }
 
-        .store-edit-btn {
-            background: #444;
+        .store-action-row .store-edit-btn {
+            flex: 0 0 auto;
+            width: auto;
+            min-width: 0;
+            max-width: none;
+            height: 32px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            background: #155da8;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 700;
         }
 
-        .store-edit-btn:hover {
-            background: #666;
+        .store-action-row .store-edit-btn:hover,
+        .store-action-row .store-edit-btn:focus-visible {
+            background: #1d6fc3;
+            outline: none;
         }
 
-        .store-delete-btn {
-            background: #7f1d1d;
+        .store-action-row .store-delete-btn {
+            flex: 0 0 auto;
+            width: 34px;
+            min-width: 34px;
+            max-width: 34px;
+            height: 32px;
+            padding: 0;
+            border-radius: 5px;
+            background: #aa0000;
+            color: #fff;
+            font-size: 16px;
+            font-weight: 800;
         }
 
-        .store-delete-btn:hover {
-            background: #991b1b;
+        .store-action-row .store-delete-btn:hover,
+        .store-action-row .store-delete-btn:focus-visible {
+            background: #c00000;
+            outline: none;
         }
 
         .store-location-details {
@@ -5150,14 +5165,6 @@ body {
                 width: 100%;
                 min-width: 0;
                 justify-content: flex-start;
-            }
-
-            .store-edit-btn,
-            .store-delete-btn {
-                width: 86px;
-                min-width: 86px;
-                max-width: 86px;
-                flex: 0 0 86px;
             }
 
             .store-location-details {
