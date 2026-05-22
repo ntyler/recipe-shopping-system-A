@@ -476,11 +476,11 @@ def env_truthy(value):
 
 
 def test_grab_visual_pause_seconds():
-    return bounded_env_float("TEST_GRAB_VISUAL_PAUSE_SECONDS", 1.25, 0, 10)
+    return bounded_env_float("TEST_GRAB_VISUAL_PAUSE_SECONDS", 0.25, 0, 10)
 
 
 def test_grab_visual_hold_seconds():
-    return bounded_env_float("TEST_GRAB_VISUAL_HOLD_SECONDS", 12, 0, 120)
+    return bounded_env_float("TEST_GRAB_VISUAL_HOLD_SECONDS", 0, 0, 120)
 
 
 def bounded_env_float(name, default, minimum, maximum):

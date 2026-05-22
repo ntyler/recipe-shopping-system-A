@@ -3865,6 +3865,9 @@ def search_store_products_with_browser_agent(
                     message = f"{message} Saved rendered page HTML: {rendered_page.get('path')}"
                 return [], [message]
 
+            close_browser_after_rendered_snapshot(driver, browser_visible, browser_visual_hold_seconds)
+            driver = None
+
             visible_cards = rendered_snapshot.get("visible_cards", [])
             visible_candidates = product_candidates_from_visible_cards(
                 visible_cards,
@@ -3890,7 +3893,6 @@ def search_store_products_with_browser_agent(
                 visible_cards,
                 prompt_builder=product_agent_prompt_builder,
             )
-            visual_browser_pause(browser_visible, browser_visual_pause_seconds)
             rendered_candidates = parse_product_candidates_from_html(
                 rendered_snapshot.get("html", ""),
                 final_url,
@@ -3944,6 +3946,17 @@ def visual_browser_pause(enabled, seconds):
     if seconds <= 0:
         return
     time.sleep(min(60, seconds))
+
+
+def close_browser_after_rendered_snapshot(driver, browser_visible=False, browser_visual_hold_seconds=0):
+    if driver is None:
+        return
+
+    visual_browser_pause(browser_visible, browser_visual_hold_seconds)
+    try:
+        driver.quit()
+    except Exception:
+        pass
 
 
 def store_session_update_payload(store_session_status):

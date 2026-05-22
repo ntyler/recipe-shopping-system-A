@@ -361,6 +361,11 @@ class ProductSelectionServiceTest(unittest.TestCase):
 
         self.assertNotIn("product_agent_prompt_builder", search_mock.call_args.kwargs)
 
+    def test_test_grab_visible_defaults_do_not_hold_browser_open(self):
+        with patch.dict("os.environ", {}, clear=True):
+            self.assertEqual(test_grab_script.test_grab_visual_pause_seconds(), 0.25)
+            self.assertEqual(test_grab_script.test_grab_visual_hold_seconds(), 0)
+
     def test_test_grab_alternatives_fall_back_to_instacart_payload_shape(self):
         payload = {
             "test_grab": True,
@@ -630,6 +635,26 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertTrue(result["reached_storefront"])
         self.assertFalse(result["clicked_final"])
         self.assertEqual(final_clicks, [])
+
+    def test_browser_closes_after_rendered_snapshot_before_offline_reasoning(self):
+        class FakeDriver:
+            def __init__(self):
+                self.quit_called = False
+
+            def quit(self):
+                self.quit_called = True
+
+        driver = FakeDriver()
+
+        with patch.object(product_service, "visual_browser_pause") as pause_mock:
+            product_service.close_browser_after_rendered_snapshot(
+                driver,
+                browser_visible=True,
+                browser_visual_hold_seconds=0.5,
+            )
+
+        pause_mock.assert_called_once_with(True, 0.5)
+        self.assertTrue(driver.quit_called)
 
     def test_post_scroll_snapshot_captures_current_dom_html_and_product_html(self):
         class FakeDriver:
