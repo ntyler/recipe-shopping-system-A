@@ -296,36 +296,64 @@
             {% endfor %}
         </div>
 
-        <div class="view-control-section">
-            <div class="view-control-title">Add Store</div>
+        <div class="store-add-sticky-action">
+            <button type="button"
+                    class="store-add-sticky-btn"
+                    onclick="openAddStoreModal()">
+                Add Store
+            </button>
+        </div>
 
-            <form method="POST" action="/add_store" onsubmit="return addStore(event);">
-                <div class="add-store-grid">
-                    <input name="store_label" placeholder="Store name, e.g. Costco">
-                    <input name="homepage_url" placeholder="Homepage, e.g. https://www.costco.com">
-                    <input name="store_url" placeholder="Search URL override, e.g. https://site.com/search?q=">
-                    <input name="urlStoreSelector" placeholder="Store Selector URL, e.g. https://info.aldi.us/stores">
-                    <input name="store_username" placeholder="Username / email optional" autocomplete="username">
-                    <div class="password-input-wrap">
-                        <input id="add-store-password"
-                               name="store_password"
-                               type="password"
-                               placeholder="Password optional"
-                               autocomplete="current-password">
-                        <button type="button"
-                                class="password-toggle-btn"
-                                onclick="togglePasswordVisibility('add-store-password', this)">
-                            Show
-                        </button>
+        <div id="addStoreModal"
+             class="store-add-modal-backdrop"
+             aria-hidden="true"
+             onclick="closeAddStoreModalFromBackdrop(event)">
+            <div class="store-add-modal" role="dialog" aria-modal="true" aria-labelledby="addStoreModalTitle">
+                <div class="store-add-modal-header">
+                    <h2 id="addStoreModalTitle">Add Store</h2>
+                    <button type="button"
+                            class="store-add-modal-close"
+                            aria-label="Close Add Store"
+                            onclick="closeAddStoreModal()">
+                        X
+                    </button>
+                </div>
+
+                <form method="POST" action="/add_store" onsubmit="return addStore(event);">
+                    <div class="add-store-grid">
+                        <input name="store_label" placeholder="Store name, e.g. Costco">
+                        <input name="homepage_url" placeholder="Homepage, e.g. https://www.costco.com">
+                        <input name="store_url" placeholder="Search URL override, e.g. https://site.com/search?q=">
+                        <input name="urlStoreSelector" placeholder="Store Selector URL, e.g. https://info.aldi.us/stores">
+                        <input name="store_username" placeholder="Username / email optional" autocomplete="username">
+                        <div class="password-input-wrap">
+                            <input id="add-store-password"
+                                   name="store_password"
+                                   type="password"
+                                   placeholder="Password optional"
+                                   autocomplete="current-password">
+                            <button type="button"
+                                    class="password-toggle-btn"
+                                    onclick="togglePasswordVisibility('add-store-password', this)">
+                                Show
+                            </button>
+                        </div>
                     </div>
-                </div>
 
-                <div class="add-store-help">
-                    Enter a homepage and the app will guess a search URL. Store Selector URL is the first page opened when setting a store location.
-                </div>
+                    <div class="add-store-help">
+                        Enter a homepage and the app will guess a search URL. Store Selector URL is the first page opened when setting a store location.
+                    </div>
 
-                <button type="submit" class="store-save-btn">Add Store</button>
-            </form>
+                    <div class="store-add-modal-actions">
+                        <button type="button"
+                                class="store-add-cancel-btn"
+                                onclick="closeAddStoreModal()">
+                            Cancel
+                        </button>
+                        <button type="submit" class="store-save-btn">Add Store</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 

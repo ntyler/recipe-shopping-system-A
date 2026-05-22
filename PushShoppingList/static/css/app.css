@@ -251,6 +251,10 @@ body {
             display: block;
         }
 
+        .store-options-content {
+            padding-bottom: 76px;
+        }
+
         #storeOptionsSection {
             --store-options-sticky-inset: 10px;
         }
@@ -1220,6 +1224,132 @@ body {
             margin-top: 8px;
             text-align: center;
             line-height: 1.35;
+        }
+
+        .store-add-sticky-action {
+            position: fixed;
+            bottom: 0;
+            left: 16px;
+            z-index: 1180;
+            display: none;
+            width: calc(100vw - 32px);
+            max-width: 900px;
+            margin: 0;
+            padding: 12px 10px calc(12px + env(safe-area-inset-bottom));
+            background:
+                linear-gradient(to top, #151818 0%, #151818 74%, rgba(21,24,24,0));
+            border-top: 1px solid #333;
+            box-sizing: border-box;
+        }
+
+        .store-add-sticky-action.is-visible {
+            display: block;
+        }
+
+        .store-add-sticky-btn {
+            width: 100%;
+            margin: 0;
+            padding: 13px 16px;
+            background: #0078D7;
+            border: 1px solid #2493e8;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 16px;
+            font-weight: 800;
+            box-shadow: 0 -6px 24px rgba(0,0,0,0.3);
+        }
+
+        .store-add-sticky-btn:hover,
+        .store-add-sticky-btn:focus-visible {
+            background: #0b84de;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(36,147,232,0.28), 0 -6px 24px rgba(0,0,0,0.3);
+        }
+
+        .store-add-modal-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 10020;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: rgba(0,0,0,0.74);
+            box-sizing: border-box;
+        }
+
+        .store-add-modal-backdrop.open {
+            display: flex;
+        }
+
+        .store-add-modal {
+            width: min(760px, 100%);
+            max-height: calc(100vh - 40px);
+            overflow: auto;
+            background: #151818;
+            border: 1px solid #5f665f;
+            border-radius: 10px;
+            box-shadow: 0 18px 72px rgba(0,0,0,0.82);
+            padding: 16px;
+            box-sizing: border-box;
+        }
+
+        .store-add-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .store-add-modal-header h2 {
+            margin: 0;
+            text-align: left;
+            font-size: 22px;
+        }
+
+        .store-add-modal-close {
+            width: 36px;
+            height: 36px;
+            margin: 0;
+            padding: 0;
+            border: 1px solid #444;
+            border-radius: 8px;
+            background: #222;
+            color: #fff;
+            font-size: 15px;
+            font-weight: 900;
+            line-height: 1;
+        }
+
+        .store-add-modal-close:hover,
+        .store-add-modal-close:focus-visible {
+            background: #333;
+            outline: none;
+        }
+
+        .store-add-modal-actions {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .store-add-modal-actions button {
+            margin: 0;
+            width: 100%;
+            font-size: 15px;
+        }
+
+        .store-add-cancel-btn {
+            background: #343a40;
+            border: 1px solid #4b5563;
+        }
+
+        .store-add-cancel-btn:hover,
+        .store-add-cancel-btn:focus-visible {
+            background: #414952;
+            outline: none;
         }
 
         .address-grid {
@@ -5388,6 +5518,30 @@ body {
                 grid-template-columns: 1fr;
             }
 
+            .store-add-sticky-action {
+                left: 12px;
+                width: calc(100vw - 24px);
+                padding-right: 6px;
+                padding-left: 6px;
+            }
+
+            .store-add-modal-backdrop {
+                align-items: flex-end;
+                padding: 12px;
+            }
+
+            .store-add-modal {
+                max-height: calc(100vh - 24px);
+                padding: 14px;
+            }
+
+            .store-add-modal-header h2 {
+                font-size: 20px;
+            }
+
+            .store-add-modal-actions {
+                grid-template-columns: 1fr;
+            }
 
             .address-grid,
             .address-actions-grid {

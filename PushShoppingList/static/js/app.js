@@ -2463,6 +2463,7 @@ function toggleCardCollapse(key) {
     }
 
     window.setTimeout(initStoreLocationMaps, 0);
+    scheduleAddStoreStickyVisibilityUpdate();
 
     if (key === "store-options" && isCollapsed) {
         window.setTimeout(scrollStoreOptionsIntoView, 0);
@@ -2535,6 +2536,8 @@ function restoreCardCollapseState() {
             toggle.setAttribute("aria-expanded", shouldCollapse ? "false" : "true");
         }
     });
+
+    scheduleAddStoreStickyVisibilityUpdate();
 }
 
 function getOpenStorePanels() {
@@ -6191,6 +6194,126 @@ async function saveStoreOptionsForm(form) {
     }
 }
 
+let addStoreReturnFocus = null;
+
+function openAddStoreModal() {
+    const modal = document.getElementById("addStoreModal");
+
+    if (!modal) {
+        return;
+    }
+
+    addStoreReturnFocus = document.activeElement;
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+    updateAddStoreStickyVisibility();
+
+    window.setTimeout(() => {
+        const firstInput = modal.querySelector('input[name="store_label"]');
+
+        if (firstInput) {
+            firstInput.focus();
+        }
+    }, 0);
+}
+
+function closeAddStoreModal(options = {}) {
+    const modal = document.getElementById("addStoreModal");
+
+    if (!modal) {
+        return;
+    }
+
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("modal-open");
+    updateAddStoreStickyVisibility();
+
+    if (options.reset) {
+        const form = modal.querySelector("form");
+        const passwordInput = document.getElementById("add-store-password");
+        const passwordToggle = modal.querySelector(".password-toggle-btn");
+
+        if (form) {
+            form.reset();
+        }
+
+        if (passwordInput) {
+            passwordInput.type = "password";
+        }
+
+        if (passwordToggle) {
+            passwordToggle.textContent = "Show";
+        }
+    }
+
+    if (options.returnFocus !== false && addStoreReturnFocus && typeof addStoreReturnFocus.focus === "function") {
+        addStoreReturnFocus.focus();
+    }
+
+    addStoreReturnFocus = null;
+}
+
+function updateAddStoreStickyVisibility() {
+    const section = document.getElementById("storeOptionsSection");
+    const content = document.querySelector('[data-collapse-content="store-options"]');
+    const action = document.querySelector(".store-add-sticky-action");
+    const modal = document.getElementById("addStoreModal");
+
+    if (!section || !content || !action) {
+        return;
+    }
+
+    const sectionRect = section.getBoundingClientRect();
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    const expanded = !content.classList.contains("collapsed");
+    const sectionVisible = sectionRect.top < viewportHeight && sectionRect.bottom > 0;
+    const modalOpen = modal && modal.classList.contains("open");
+    const shouldShow = expanded && sectionVisible && !modalOpen;
+
+    action.classList.toggle("is-visible", shouldShow);
+    action.setAttribute("aria-hidden", shouldShow ? "false" : "true");
+
+    if (!shouldShow) {
+        action.style.left = "";
+        action.style.width = "";
+        return;
+    }
+
+    const horizontalInset = viewportWidth <= 650 ? 12 : 16;
+    const maxWidth = Math.max(0, viewportWidth - (horizontalInset * 2));
+    const actionWidth = Math.min(sectionRect.width, maxWidth);
+    const preferredLeft = sectionRect.left + ((sectionRect.width - actionWidth) / 2);
+    const minLeft = horizontalInset;
+    const maxLeft = viewportWidth - horizontalInset - actionWidth;
+    const actionLeft = Math.max(minLeft, Math.min(preferredLeft, maxLeft));
+
+    action.style.left = `${actionLeft}px`;
+    action.style.width = `${actionWidth}px`;
+}
+
+function scheduleAddStoreStickyVisibilityUpdate() {
+    window.requestAnimationFrame(updateAddStoreStickyVisibility);
+}
+
+function closeAddStoreModalFromBackdrop(event) {
+    if (event && event.target === event.currentTarget) {
+        closeAddStoreModal();
+    }
+}
+
+function closeAddStoreModalOnEscape(event) {
+    if (event.key === "Escape") {
+        const modal = document.getElementById("addStoreModal");
+
+        if (modal && modal.classList.contains("open")) {
+            closeAddStoreModal();
+        }
+    }
+}
+
 async function addStore(event) {
     event.preventDefault();
 
@@ -6203,6 +6326,7 @@ async function addStore(event) {
 
     try {
         await submitStoreForm(form);
+        closeAddStoreModal({ reset: true, returnFocus: false });
         await refreshStoreMarkup();
     } catch (err) {
         console.warn("Unable to add store in the background.", err);
@@ -6761,6 +6885,7 @@ async function refreshStoreMarkup(options = {}) {
     restoreActiveStoreIconMode();
     initStoreLocationMaps();
     restoreWindowScroll(scrollX, scrollY);
+    window.setTimeout(updateAddStoreStickyVisibility, 140);
 }
 
 function restoreWindowScroll(scrollX, scrollY) {
@@ -6828,11 +6953,15 @@ document.addEventListener("DOMContentLoaded", function () {
     restoreActiveStoreIconMode();
     initStoreLocationMaps();
     startExtractionProgressPolling();
+    document.addEventListener("keydown", closeAddStoreModalOnEscape);
+    updateAddStoreStickyVisibility();
 });
 
 window.addEventListener("resize", updateRecipeEditStickyOffsets);
 window.addEventListener("resize", updateViewSwitcherStickyOffset);
 window.addEventListener("resize", invalidateStoreLocationMaps);
+window.addEventListener("resize", scheduleAddStoreStickyVisibilityUpdate);
+window.addEventListener("scroll", scheduleAddStoreStickyVisibilityUpdate, { passive: true });
 
 async function startRecipeExtraction(event) {
     event.preventDefault();
