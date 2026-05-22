@@ -251,11 +251,15 @@ body {
             display: block;
         }
 
+        #storeOptionsSection {
+            --store-options-sticky-inset: 10px;
+        }
+
         .store-options-sticky-stack {
             position: sticky;
             top: 0;
             z-index: 1200;
-            margin: -10px -10px 14px;
+            margin: calc(-1 * var(--store-options-sticky-inset)) calc(-1 * var(--store-options-sticky-inset)) 14px;
             padding: 10px 12px 12px;
             background: #111414;
             border: 1px solid #3a3a3a;
@@ -5240,6 +5244,10 @@ body {
         }
 
         @media (max-width: 650px) {
+            #storeOptionsSection {
+                --store-options-sticky-inset: 17px;
+            }
+
             body :where(input, select, textarea) {
                 font-size: 16px !important;
             }
