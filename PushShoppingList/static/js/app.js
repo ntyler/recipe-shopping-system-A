@@ -858,7 +858,7 @@ function renderProductAlternativesLoading(itemKey, storeKey = "") {
 function renderProductAlternatives(choice) {
     const subtitle = document.getElementById("productAlternativesSubtitle");
     const content = document.getElementById("productAlternativesContent");
-    const candidates = choice.candidates || [];
+    const candidates = productAlternativeCandidateList(choice);
     const selectedId = choice.selected_product_id || "";
     const storeName = choice.filtered_store_name || (choice.store_result ? choice.store_result.store_name : "") || "";
     const storeKey = choice.filtered_store_key || "";
@@ -874,8 +874,14 @@ function renderProductAlternatives(choice) {
         return;
     }
 
-    const validCandidates = Array.isArray(choice.valid_alternatives) && choice.valid_alternatives.length
-        ? choice.valid_alternatives
+    const validSourceCandidates = productAlternativeCandidateList({
+        selected_product: choice.selected_product,
+        candidates: [],
+        valid_alternatives: choice.valid_alternatives,
+        alternatives: choice.alternatives,
+    });
+    const validCandidates = validSourceCandidates.length
+        ? validSourceCandidates
         : candidates.filter(candidate => candidate && candidate.viable !== false && candidate.rejected !== true);
     const rejectedCandidates = Array.isArray(choice.rejected_products) && choice.rejected_products.length
         ? choice.rejected_products
@@ -926,6 +932,55 @@ function renderProductAlternatives(choice) {
     ].filter(Boolean).join("");
 
     content.innerHTML = finalPromptHtml + (groupsHtml || `<div class="bulk-review-note">No alternatives are saved for this ingredient.</div>`);
+}
+
+function productAlternativeCandidateList(choice = {}) {
+    return dedupeProductAlternativeCandidates(
+        choice.selected_product ? [choice.selected_product] : [],
+        choice.valid_alternatives,
+        choice.alternatives,
+        choice.candidates,
+        choice.valid_products,
+        choice.alternative_products
+    );
+}
+
+function dedupeProductAlternativeCandidates(...lists) {
+    const rows = [];
+    const seen = new Set();
+
+    lists.forEach(list => {
+        if (!Array.isArray(list)) {
+            return;
+        }
+
+        list.forEach(candidate => {
+            if (!candidate || typeof candidate !== "object") {
+                return;
+            }
+
+            const key = productAlternativeCandidateKey(candidate);
+            if (key && seen.has(key)) {
+                return;
+            }
+            if (key) {
+                seen.add(key);
+            }
+            rows.push(candidate);
+        });
+    });
+
+    return rows;
+}
+
+function productAlternativeCandidateKey(candidate) {
+    return String(
+        candidate.product_url
+        || candidate.id
+        || candidate.product_name
+        || candidate.name
+        || ""
+    ).trim().toLowerCase();
 }
 
 function renderTestGrabAlternativeSlider(choice, candidates, selectedId, storeKey) {

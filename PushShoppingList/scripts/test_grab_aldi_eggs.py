@@ -535,15 +535,15 @@ def test_grab_choice_from_result(payload=None):
         "ingredient": record.get("ingredient") or payload.get("search_item") or TEST_GRAB_SEARCH_TERM,
         "filtered_store_key": TEST_GRAB_TARGET_STORE_KEY,
         "filtered_store_name": TEST_GRAB_TARGET_STORE_NAME,
-        "store_result": store_result,
-        "selected_product": selected,
-        "selected_product_id": selected_id,
-        "candidates": valid_alternatives,
-        "valid_alternatives": valid_alternatives,
-        "alternatives": [
-            candidate
-            for candidate in valid_alternatives
-            if not selected_id or candidate.get("id") != selected_id
+            "store_result": store_result,
+            "selected_product": selected,
+            "selected_product_id": selected_id,
+            "candidates": candidates,
+            "valid_alternatives": valid_alternatives,
+            "alternatives": [
+                candidate
+                for candidate in valid_alternatives
+                if not selected_id or candidate.get("id") != selected_id
         ],
         "rejected_products": [],
         "skip_reasons": payload.get("errors", []),

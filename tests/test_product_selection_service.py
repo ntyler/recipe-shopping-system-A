@@ -560,6 +560,49 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertEqual(choice["valid_alternatives"][1]["unit_price"], "")
         self.assertIn("Goldhen Grade A Large Eggs", choice["valid_alternatives"][1]["raw_product_html_snippet"])
 
+    def test_test_grab_choice_preserves_raw_candidates_for_alternatives_modal(self):
+        payload = {
+            "test_grab": True,
+            "search_item": "bread",
+            "best_product": {
+                "id": "best-bread",
+                "product_name": "L'oven Fresh White Bread",
+                "product_url": "https://www.aldi.us/store/aldi/products/white-bread",
+                "source_page_url": "https://www.aldi.us/store/aldi/s?k=bread",
+                "in_stock": True,
+            },
+            "results": [
+                {
+                    "item_key": "bread",
+                    "ingredient": "bread",
+                    "selected_product_id": "best-bread",
+                    "candidates": [
+                        {
+                            "id": "raw-bread",
+                            "product_name": "Raw Bread Candidate",
+                            "product_url": "https://www.aldi.us/store/aldi/products/raw-bread",
+                            "source_page_url": "https://www.aldi.us/store/aldi/s?k=bread",
+                            "viable": False,
+                        }
+                    ],
+                    "store_results_list": [
+                        {
+                            "store_key": "aldi",
+                            "store_name": "Aldi",
+                            "valid_alternatives": [],
+                        }
+                    ],
+                }
+            ],
+        }
+
+        choice = test_grab_script.test_grab_choice_from_result(payload)
+
+        self.assertTrue(choice["test_grab"])
+        self.assertEqual(len(choice["valid_alternatives"]), 1)
+        self.assertEqual(len(choice["candidates"]), 2)
+        self.assertTrue(any(candidate["id"] == "raw-bread" for candidate in choice["candidates"]))
+
     def test_test_grab_hydrates_missing_candidate_images_from_saved_html(self):
         with TemporaryDirectory() as tmpdir:
             html_path = Path(tmpdir) / "aldi_bread.html"
