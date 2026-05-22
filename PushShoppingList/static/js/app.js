@@ -6115,6 +6115,19 @@ function storeLocationMapIcon(className, label) {
     });
 }
 
+function coordinatesMatch(latA, lonA, latB, lonB) {
+    return latA !== null
+        && lonA !== null
+        && latB !== null
+        && lonB !== null
+        && Math.abs(latA - latB) < 0.00001
+        && Math.abs(lonA - lonB) < 0.00001;
+}
+
+function addressMatches(addressA, addressB) {
+    return String(addressA || "").trim().toLowerCase() === String(addressB || "").trim().toLowerCase();
+}
+
 function initStoreLocationMaps() {
     if (!window.L) {
         return;
@@ -6145,13 +6158,22 @@ function initStoreLocationMaps() {
 
         const homeLat = parseMapCoordinate(container.dataset.homeLat);
         const homeLon = parseMapCoordinate(container.dataset.homeLon);
+        const selectedLat = parseMapCoordinate(container.dataset.selectedLat);
+        const selectedLon = parseMapCoordinate(container.dataset.selectedLon);
+        const selectedAddress = container.dataset.selectedAddress || "";
         const storePins = locations
-            .map((location, index) => ({
-                index,
-                location,
-                lat: parseMapCoordinate(location.latitude),
-                lon: parseMapCoordinate(location.longitude),
-            }))
+            .map((location, index) => {
+                const lat = parseMapCoordinate(location.latitude);
+                const lon = parseMapCoordinate(location.longitude);
+                return {
+                    index,
+                    location,
+                    lat,
+                    lon,
+                    selected: coordinatesMatch(lat, lon, selectedLat, selectedLon)
+                        || addressMatches(location.address, selectedAddress),
+                };
+            })
             .filter(pin => pin.lat !== null && pin.lon !== null);
 
         if (homeLat === null || homeLon === null || !storePins.length) {
@@ -6181,10 +6203,12 @@ function initStoreLocationMaps() {
 
         storePins.forEach(pin => {
             const markerLabel = String(pin.index + 1);
+            const markerClass = pin.selected ? "store selected" : "store nearby";
+            const markerTitle = pin.selected ? `Selected ${storeLabel}` : `${storeLabel} ${markerLabel}`;
             L.marker([pin.lat, pin.lon], {
-                icon: storeLocationMapIcon("store", markerLabel),
+                icon: storeLocationMapIcon(markerClass, markerLabel),
             }).addTo(map).bindPopup(storeLocationPopupHtml(
-                `${storeLabel} ${markerLabel}`,
+                markerTitle,
                 pin.location.address || pin.location.name || "",
                 pin.location.distance_miles,
                 pin.lat,

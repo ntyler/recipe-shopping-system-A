@@ -381,6 +381,16 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("function formActionUrl(form)", script)
         self.assertNotIn("fetch(form.action", script)
 
+    def test_store_options_renders_first_in_main_page_flow(self):
+        index_template = Path("PushShoppingList/templates/index.html").read_text(encoding="utf-8")
+
+        store_options_index = index_template.index('{% include "sections/store_options.html" %}')
+        enter_recipe_index = index_template.index('{% include "sections/enter_recipe_links.html" %}')
+        home_address_index = index_template.index('{% include "sections/home_address.html" %}')
+
+        self.assertLess(store_options_index, enter_recipe_index)
+        self.assertLess(store_options_index, home_address_index)
+
     def test_store_radius_toolbar_lives_in_store_options(self):
         home_template = Path("PushShoppingList/templates/sections/home_address.html").read_text(encoding="utf-8")
         store_template = Path("PushShoppingList/templates/sections/store_options.html").read_text(encoding="utf-8")
@@ -396,7 +406,7 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn(".store-options-sticky-stack", css)
         self.assertIn(".store-options-title-toggle", css)
         self.assertIn(".store-options-sticky-toolbar", css)
-        self.assertIn("#storeOptionsSection.card-collapsed .store-options-sticky-toolbar", css)
+        self.assertNotIn("#storeOptionsSection.card-collapsed .store-options-sticky-toolbar", css)
 
     def test_active_store_summary_uses_linked_logo_tiles(self):
         store_template = Path("PushShoppingList/templates/sections/store_options.html").read_text(encoding="utf-8")
@@ -420,13 +430,30 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("https://www.openstreetmap.org/?mlat=", store_template)
         self.assertIn("data-store-map", store_template)
         self.assertIn("data-home-lat", store_template)
+        self.assertIn("data-selected-address", store_template)
+        self.assertIn("data-selected-lat", store_template)
+        self.assertIn("store-location-map-legend", store_template)
         self.assertIn("data-locations", store_template)
         self.assertIn("leaflet@1.9.4", index_template)
         self.assertIn("function initStoreLocationMaps()", script)
+        self.assertIn("function coordinatesMatch", script)
+        self.assertIn("store selected", script)
         self.assertIn("function selectNearbyStoreLocationFromKey", script)
         self.assertIn(".store-location-map", css)
         self.assertIn(".store-map-pin.home", css)
         self.assertIn(".store-map-pin.store", css)
+        self.assertIn(".store-map-pin.store.selected", css)
+        self.assertIn(".store-map-pin.store.nearby", css)
+        self.assertIn(".store-location-map-legend", css)
+
+    def test_sticky_headers_render_above_store_maps(self):
+        css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+        self.assertIn(".store-options-sticky-stack", css)
+        self.assertIn(".view-switcher-sticky", css)
+        self.assertIn(".store-location-map-wrap", css)
+        self.assertIn("z-index: 1200", css)
+        self.assertIn("isolation: isolate", css)
 
     def test_find_nearby_store_locations_filters_by_radius_and_sorts(self):
         class FakeResponse:

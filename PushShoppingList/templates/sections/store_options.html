@@ -173,12 +173,20 @@
                         {% endif %}
                         {% if store_map_locations and home_location and home_location.latitude is defined and home_location.latitude is not none and home_location.longitude is defined and home_location.longitude is not none %}
                             <div class="store-location-map-wrap" aria-label="{{ store.label }} nearby store map">
+                                <div class="store-location-map-legend" aria-label="Map pin legend">
+                                    <span><span class="store-map-pin legend home" aria-hidden="true">H</span> Home</span>
+                                    <span><span class="store-map-pin legend store selected" aria-hidden="true">1</span> Selected</span>
+                                    <span><span class="store-map-pin legend store nearby" aria-hidden="true">2</span> Nearby</span>
+                                </div>
                                 <div class="store-location-map"
                                      data-store-map
                                      data-store-label="{{ store.label }}"
                                      data-home-address="{{ nearest_store_results.home_address or '' }}"
                                      data-home-lat="{{ home_location.latitude }}"
                                      data-home-lon="{{ home_location.longitude }}"
+                                     data-selected-address="{{ nearest_store.address or '' }}"
+                                     data-selected-lat="{{ nearest_store.latitude if nearest_store.latitude is defined and nearest_store.latitude is not none else '' }}"
+                                     data-selected-lon="{{ nearest_store.longitude if nearest_store.longitude is defined and nearest_store.longitude is not none else '' }}"
                                      data-locations="{{ store_map_locations|tojson|forceescape }}"></div>
                             </div>
                         {% endif %}
