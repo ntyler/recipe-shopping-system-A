@@ -6141,6 +6141,60 @@ function selectNearbyStoreLocationFromKey(event, element) {
     return selectNearbyStoreLocation(element);
 }
 
+function shouldOpenAppleMaps() {
+    const userAgent = navigator.userAgent || "";
+    const platform = navigator.userAgentData && navigator.userAgentData.platform
+        ? navigator.userAgentData.platform
+        : navigator.platform || "";
+
+    return /iPad|iPhone|iPod|Mac/i.test(`${platform} ${userAgent}`);
+}
+
+function openExternalMapUrl(url, windowName = "_blank") {
+    if (!url) {
+        return false;
+    }
+
+    const mapWindow = window.open(url, windowName, "noopener,noreferrer");
+
+    if (mapWindow) {
+        mapWindow.opener = null;
+        mapWindow.focus();
+        return true;
+    }
+
+    return false;
+}
+
+function openStoreAddressMap(link, event) {
+    if (event) {
+        event.stopPropagation();
+    }
+
+    if (!link) {
+        return true;
+    }
+
+    const googleMapsUrl = link.dataset.googleMapsUrl || link.href || "";
+    const appleMapsUrl = link.dataset.appleMapsUrl || "";
+    const mapUrl = shouldOpenAppleMaps() && appleMapsUrl ? appleMapsUrl : googleMapsUrl || appleMapsUrl;
+
+    if (!mapUrl) {
+        return true;
+    }
+
+    if (event) {
+        event.preventDefault();
+    }
+
+    if (openExternalMapUrl(mapUrl)) {
+        return false;
+    }
+
+    link.href = mapUrl;
+    return true;
+}
+
 function openStoreDirections(link, event) {
     if (event) {
         event.stopPropagation();
@@ -6150,11 +6204,7 @@ function openStoreDirections(link, event) {
         return false;
     }
 
-    const popup = window.open(
-        link.href,
-        "storeDirections",
-        "popup=yes,width=1120,height=780,noopener,noreferrer"
-    );
+    const popup = window.open(link.href, "storeDirections", "popup=yes,width=1120,height=780,noopener,noreferrer");
 
     if (popup) {
         popup.opener = null;

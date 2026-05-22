@@ -503,7 +503,11 @@ class ProductSelectionServiceTest(unittest.TestCase):
         css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
         self.assertIn("store-address-link", store_template)
-        self.assertIn("https://www.openstreetmap.org/?mlat=", store_template)
+        self.assertIn("https://www.google.com/maps/search/?api=1&query=", store_template)
+        self.assertIn("https://maps.apple.com/", store_template)
+        self.assertIn("data-google-maps-url", store_template)
+        self.assertIn("data-apple-maps-url", store_template)
+        self.assertIn("onclick=\"return openStoreAddressMap(this, event);\"", store_template)
         self.assertIn("https://www.google.com/maps/dir/?api=1", store_template)
         self.assertIn("travelmode=driving", store_template)
         self.assertIn("store-directions-link", store_template)
@@ -520,6 +524,8 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("function initStoreLocationMaps()", script)
         self.assertIn("function coordinatesMatch", script)
         self.assertIn("function storeHomePinMarkup", script)
+        self.assertIn("function shouldOpenAppleMaps", script)
+        self.assertIn("function openStoreAddressMap", script)
         self.assertIn("function openStoreDirections", script)
         self.assertIn('"storeDirections"', script)
         self.assertIn("store-logo-pin", script)
@@ -563,6 +569,11 @@ class ProductSelectionServiceTest(unittest.TestCase):
                         "lon": "-86.0600",
                     },
                     {
+                        "display_name": "Aldi Fuel Center, Indianapolis, Indiana",
+                        "lat": "39.6450",
+                        "lon": "-86.0600",
+                    },
+                    {
                         "display_name": "Nearest Aldi, Indianapolis, Indiana",
                         "lat": "39.6500",
                         "lon": "-86.0600",
@@ -586,6 +597,42 @@ class ProductSelectionServiceTest(unittest.TestCase):
             ],
         )
         self.assertEqual(locations[0]["search_radius_miles"], 5.0)
+
+    def test_find_nearby_store_locations_excludes_secondary_brand_pois(self):
+        class FakeResponse:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return [
+                    {
+                        "display_name": "Kroger Fuel Center, 8745, South Emerson Avenue, Indianapolis, Indiana",
+                        "lat": "39.6420",
+                        "lon": "-86.0600",
+                    },
+                    {
+                        "display_name": "Kroger, 8745, South Emerson Avenue, Indianapolis, Indiana",
+                        "lat": "39.6410",
+                        "lon": "-86.0600",
+                    },
+                    {
+                        "display_name": "Kroger Pharmacy, 8745, South Emerson Avenue, Indianapolis, Indiana",
+                        "lat": "39.6405",
+                        "lon": "-86.0600",
+                    },
+                ]
+
+        with patch.object(product_service.requests, "get", return_value=FakeResponse()):
+            locations = product_service.find_nearby_store_locations(
+                "kroger",
+                {"label": "Kroger", "urlStoreSelector": "https://www.kroger.com/stores/search"},
+                "5905 Arlo Drive, Indianapolis, IN 46237",
+                {"latitude": 39.64, "longitude": -86.06},
+                radius_miles=1,
+            )
+
+        self.assertEqual(len(locations), 1)
+        self.assertEqual(locations[0]["address"], "Kroger, 8745, South Emerson Avenue, Indianapolis, Indiana")
 
     def test_home_store_resolver_saves_nearest_with_nearby_locations(self):
         from PushShoppingList.services import home_store_location_service

@@ -178,6 +178,16 @@ EGG_PRODUCT_SHELL_TERMS = {
     "shell",
     "white",
 }
+STORE_LOCATION_SECONDARY_POI_PATTERNS = (
+    re.compile(r"\bfuel\s+center\b", re.IGNORECASE),
+    re.compile(r"\bgas(?:oline)?\b", re.IGNORECASE),
+    re.compile(r"\bgas\s+station\b", re.IGNORECASE),
+    re.compile(r"\bpharmacy\b", re.IGNORECASE),
+    re.compile(r"\bgarden\s+cent(?:er|re)\b", re.IGNORECASE),
+    re.compile(r"\boptical\b", re.IGNORECASE),
+    re.compile(r"\bliquor\b", re.IGNORECASE),
+    re.compile(r"\bwine\s+(?:and|&)\s+spirits\b", re.IGNORECASE),
+)
 DETAIL_REQUIRED = os.getenv("PRODUCT_REQUIRE_DETAIL_PAGE", "1") != "0"
 BROWSER_SEARCH_MODE = os.getenv("PRODUCT_SEARCH_BROWSER_MODE", "always").strip().lower()
 PRODUCT_ANALYSIS_MODEL = os.getenv("OPENAI_PRODUCT_ANALYSIS_MODEL", os.getenv("OPENAI_RECIPE_MODEL", "gpt-4o-mini"))
@@ -8919,6 +8929,18 @@ def store_search_radius_miles(value, default=10):
     return max(1.0, min(100.0, radius))
 
 
+def store_location_primary_name(display_name):
+    return clean_text(str(display_name or "").split(",", 1)[0])
+
+
+def is_primary_store_location_result(display_name):
+    primary_name = store_location_primary_name(display_name)
+    if not primary_name:
+        return False
+
+    return not any(pattern.search(primary_name) for pattern in STORE_LOCATION_SECONDARY_POI_PATTERNS)
+
+
 def find_nearby_store_locations(store_key, store, full_address, home_location, radius_miles=10):
     store_name = store.get("label") or store_key.title()
     locator_url = build_store_locator_url(store, full_address)
@@ -8962,6 +8984,9 @@ def find_nearby_store_locations(store_key, store, full_address, home_location, r
             continue
 
         display_name = clean_text(item.get("display_name"))
+        if not is_primary_store_location_result(display_name):
+            continue
+
         distance = haversine_miles(lat, lon, item_lat, item_lon)
         if distance > radius:
             continue

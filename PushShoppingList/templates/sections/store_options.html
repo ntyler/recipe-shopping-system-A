@@ -123,14 +123,19 @@
                             <span class="store-detail-label">Selected</span>
                             {% if nearest_store and nearest_store.address %}
                                 {% if nearest_store.latitude is defined and nearest_store.latitude is not none and nearest_store.longitude is defined and nearest_store.longitude is not none %}
-                                    {% set selected_store_url = "https://www.openstreetmap.org/?mlat=" ~ nearest_store.latitude ~ "&mlon=" ~ nearest_store.longitude ~ "#map=16/" ~ nearest_store.latitude ~ "/" ~ nearest_store.longitude %}
+                                    {% set selected_google_maps_url = "https://www.google.com/maps/search/?api=1&query=" ~ nearest_store.latitude ~ "," ~ nearest_store.longitude %}
+                                    {% set selected_apple_maps_url = "https://maps.apple.com/?ll=" ~ nearest_store.latitude ~ "," ~ nearest_store.longitude ~ "&q=" ~ (nearest_store.address|urlencode) %}
                                 {% else %}
-                                    {% set selected_store_url = nearest_store.locator_url or store.urlStoreSelector or store.url %}
+                                    {% set selected_google_maps_url = "https://www.google.com/maps/search/?api=1&query=" ~ (nearest_store.address|urlencode) %}
+                                    {% set selected_apple_maps_url = "https://maps.apple.com/?q=" ~ (nearest_store.address|urlencode) %}
                                 {% endif %}
                                 <a class="store-nearest-address store-address-link"
-                                   href="{{ selected_store_url }}"
+                                   href="{{ selected_google_maps_url }}"
+                                   data-google-maps-url="{{ selected_google_maps_url }}"
+                                   data-apple-maps-url="{{ selected_apple_maps_url }}"
                                    target="_blank"
                                    rel="noopener noreferrer"
+                                   onclick="return openStoreAddressMap(this, event);"
                                    title="Open {{ store.label }} location">
                                     {{ nearest_store.address }}
                                 </a>
@@ -153,9 +158,11 @@
                                 {% for nearby_store in nearby_stores %}
                                     {% set nearby_selected = nearest_store.address == nearby_store.address and nearest_store.distance_miles == nearby_store.distance_miles %}
                                     {% if nearby_store.latitude is defined and nearby_store.latitude is not none and nearby_store.longitude is defined and nearby_store.longitude is not none %}
-                                        {% set nearby_store_url = "https://www.openstreetmap.org/?mlat=" ~ nearby_store.latitude ~ "&mlon=" ~ nearby_store.longitude ~ "#map=16/" ~ nearby_store.latitude ~ "/" ~ nearby_store.longitude %}
+                                        {% set nearby_google_maps_url = "https://www.google.com/maps/search/?api=1&query=" ~ nearby_store.latitude ~ "," ~ nearby_store.longitude %}
+                                        {% set nearby_apple_maps_url = "https://maps.apple.com/?ll=" ~ nearby_store.latitude ~ "," ~ nearby_store.longitude ~ "&q=" ~ (nearby_store.address|urlencode) %}
                                     {% else %}
-                                        {% set nearby_store_url = nearby_store.locator_url or store.urlStoreSelector or store.url %}
+                                        {% set nearby_google_maps_url = "https://www.google.com/maps/search/?api=1&query=" ~ (nearby_store.address|urlencode) %}
+                                        {% set nearby_apple_maps_url = "https://maps.apple.com/?q=" ~ (nearby_store.address|urlencode) %}
                                     {% endif %}
                                     <div class="nearby-store-row{% if nearby_selected %} selected{% endif %}"
                                          role="button"
@@ -167,10 +174,12 @@
                                          onkeydown="return selectNearbyStoreLocationFromKey(event, this);">
                                         <span class="nearby-store-rank">{{ loop.index }}</span>
                                         <a class="nearby-store-address store-address-link"
-                                           href="{{ nearby_store_url }}"
+                                           href="{{ nearby_google_maps_url }}"
+                                           data-google-maps-url="{{ nearby_google_maps_url }}"
+                                           data-apple-maps-url="{{ nearby_apple_maps_url }}"
                                            target="_blank"
                                            rel="noopener noreferrer"
-                                           onclick="event.stopPropagation();"
+                                           onclick="return openStoreAddressMap(this, event);"
                                            onkeydown="event.stopPropagation();"
                                            title="Open {{ store.label }} location">
                                             {{ nearby_store.address }}
