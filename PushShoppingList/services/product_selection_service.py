@@ -186,7 +186,18 @@ STORE_LOCATION_SECONDARY_POI_PATTERNS = (
     re.compile(r"\bgarden\s+cent(?:er|re)\b", re.IGNORECASE),
     re.compile(r"\boptical\b", re.IGNORECASE),
     re.compile(r"\bliquor\b", re.IGNORECASE),
+    re.compile(r"\bmeijer\s+express\b", re.IGNORECASE),
     re.compile(r"\bwine\s+(?:and|&)\s+spirits\b", re.IGNORECASE),
+)
+STORE_LOCATION_DUPLICATE_DISTANCE_MILES = 0.16
+STORE_LOCATION_SPECIFIC_STORE_PATTERN = re.compile(
+    r"\b(supercenter|supermarket|marketplace|neighborhood\s+market|market|grocery|foods?)\b",
+    re.IGNORECASE,
+)
+STORE_LOCATION_ROAD_ONLY_PATTERN = re.compile(
+    r"\b(?:avenue|ave|boulevard|blvd|circle|court|ct|drive|dr|highway|hwy|lane|ln|parkway|pkwy|pike|road|rd|"
+    r"street|st|terrace|trail|way)\b$",
+    re.IGNORECASE,
 )
 DETAIL_REQUIRED = os.getenv("PRODUCT_REQUIRE_DETAIL_PAGE", "1") != "0"
 BROWSER_SEARCH_MODE = os.getenv("PRODUCT_SEARCH_BROWSER_MODE", "always").strip().lower()
@@ -8938,7 +8949,74 @@ def is_primary_store_location_result(display_name):
     if not primary_name:
         return False
 
+    if STORE_LOCATION_ROAD_ONLY_PATTERN.search(primary_name):
+        return False
+
     return not any(pattern.search(primary_name) for pattern in STORE_LOCATION_SECONDARY_POI_PATTERNS)
+
+
+def store_location_has_street_number(display_name):
+    address_parts = [part.strip() for part in str(display_name or "").split(",")[1:5]]
+    return any(re.search(r"\b\d{2,}\b", part) for part in address_parts)
+
+
+def store_location_candidate_score(location, store_name=""):
+    address = clean_text((location or {}).get("address"))
+    primary_name = store_location_primary_name(address)
+    normalized_primary = primary_name.lower()
+    normalized_store = clean_text(store_name).lower()
+    score = 0
+
+    if store_location_has_street_number(address):
+        score += 20
+    if STORE_LOCATION_SPECIFIC_STORE_PATTERN.search(primary_name):
+        score += 10
+    if normalized_primary and normalized_primary != normalized_store:
+        score += 3
+
+    return score
+
+
+def prefer_store_location(existing, candidate, store_name=""):
+    existing_score = store_location_candidate_score(existing, store_name)
+    candidate_score = store_location_candidate_score(candidate, store_name)
+
+    if candidate_score != existing_score:
+        return candidate if candidate_score > existing_score else existing
+
+    existing_distance = existing.get("distance_miles")
+    candidate_distance = candidate.get("distance_miles")
+    try:
+        return candidate if float(candidate_distance) < float(existing_distance) else existing
+    except (TypeError, ValueError):
+        return existing
+
+
+def dedupe_nearby_store_locations(locations, store_name=""):
+    deduped = []
+    for location in sorted(locations, key=lambda item: item.get("distance_miles", float("inf"))):
+        duplicate_index = None
+        for index, existing in enumerate(deduped):
+            try:
+                duplicate_distance = haversine_miles(
+                    float(location["latitude"]),
+                    float(location["longitude"]),
+                    float(existing["latitude"]),
+                    float(existing["longitude"]),
+                )
+            except (KeyError, TypeError, ValueError):
+                continue
+
+            if duplicate_distance <= STORE_LOCATION_DUPLICATE_DISTANCE_MILES:
+                duplicate_index = index
+                break
+
+        if duplicate_index is None:
+            deduped.append(location)
+        else:
+            deduped[duplicate_index] = prefer_store_location(deduped[duplicate_index], location, store_name)
+
+    return sorted(deduped, key=lambda item: item["distance_miles"])
 
 
 def find_nearby_store_locations(store_key, store, full_address, home_location, radius_miles=10):
@@ -9004,7 +9082,7 @@ def find_nearby_store_locations(store_key, store, full_address, home_location, r
             "search_radius_miles": radius,
         })
 
-    return sorted(locations, key=lambda item: item["distance_miles"])
+    return dedupe_nearby_store_locations(locations, store_name)
 
 
 def find_nearest_store_location(store_key, store, full_address, home_location, radius_miles=10):

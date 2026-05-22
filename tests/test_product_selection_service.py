@@ -633,6 +633,72 @@ class ProductSelectionServiceTest(unittest.TestCase):
 
         self.assertEqual(len(locations), 1)
         self.assertEqual(locations[0]["address"], "Kroger, 8745, South Emerson Avenue, Indianapolis, Indiana")
+        self.assertFalse(product_service.is_primary_store_location_result("Meijer Express, 5303, East Southport Road"))
+        self.assertTrue(product_service.is_primary_store_location_result("Meijer, 5325, East Southport Road"))
+        self.assertFalse(product_service.is_primary_store_location_result("Costco Drive, Indianapolis, Indiana"))
+        self.assertTrue(product_service.is_primary_store_location_result("Costco, 4628, Costco Drive"))
+
+    def test_dedupe_nearby_store_locations_keeps_numbered_store_address(self):
+        locations = [
+            {
+                "address": "Costco Drive, Indianapolis, Indiana",
+                "latitude": 39.6367099,
+                "longitude": -86.0901902,
+                "distance_miles": 1.45,
+            },
+            {
+                "address": "Costco, 4628, Costco Drive, Indianapolis, Indiana",
+                "latitude": 39.6387011,
+                "longitude": -86.0896104,
+                "distance_miles": 1.39,
+            },
+        ]
+
+        deduped = product_service.dedupe_nearby_store_locations(locations, "Costco")
+
+        self.assertEqual(len(deduped), 1)
+        self.assertEqual(deduped[0]["address"], "Costco, 4628, Costco Drive, Indianapolis, Indiana")
+
+    def test_find_nearby_store_locations_dedupes_same_physical_store(self):
+        class FakeResponse:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return [
+                    {
+                        "display_name": "Walmart, Wilson Drive, Greenwood, Indiana",
+                        "lat": "39.6345362",
+                        "lon": "-86.0790417",
+                    },
+                    {
+                        "display_name": "Walmart Supercenter, 1133, Wilson Drive, Greenwood, Indiana",
+                        "lat": "39.6337446",
+                        "lon": "-86.0800703",
+                    },
+                    {
+                        "display_name": "Walmart Supercenter, 4650, South Emerson Avenue, Beech Grove, Indiana",
+                        "lat": "39.6900",
+                        "lon": "-86.0800",
+                    },
+                ]
+
+        with patch.object(product_service.requests, "get", return_value=FakeResponse()):
+            locations = product_service.find_nearby_store_locations(
+                "walmart",
+                {"label": "Walmart", "urlStoreSelector": "https://www.walmart.com/"},
+                "5905 Arlo Drive, Indianapolis, IN 46237",
+                {"latitude": 39.6425974, "longitude": -86.0639388},
+                radius_miles=5,
+            )
+
+        self.assertEqual(
+            [location["address"] for location in locations],
+            [
+                "Walmart Supercenter, 1133, Wilson Drive, Greenwood, Indiana",
+                "Walmart Supercenter, 4650, South Emerson Avenue, Beech Grove, Indiana",
+            ],
+        )
 
     def test_home_store_resolver_saves_nearest_with_nearby_locations(self):
         from PushShoppingList.services import home_store_location_service
