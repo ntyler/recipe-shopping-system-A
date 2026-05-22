@@ -410,17 +410,23 @@ class ProductSelectionServiceTest(unittest.TestCase):
 
     def test_store_options_sticky_bar_matches_display_view_alignment(self):
         css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+        script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
 
         self.assertIn(".store-options-sticky-stack", css)
         self.assertIn("top: 0", css)
         self.assertIn("background: #111414", css)
         self.assertIn("border: 1px solid #3a3a3a", css)
         self.assertIn(".store-options-title-toggle:hover", css)
+        self.assertIn('key === "store-options" && isCollapsed', script)
+        self.assertIn("function scrollStoreOptionsIntoView", script)
+        self.assertIn('document.getElementById("storeOptionsSection")', script)
+        self.assertIn("scrollIntoView", script)
 
     def test_store_options_toolbar_only_runs_nearest_stores(self):
         home_template = Path("PushShoppingList/templates/sections/home_address.html").read_text(encoding="utf-8")
         store_template = Path("PushShoppingList/templates/sections/store_options.html").read_text(encoding="utf-8")
         css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+        script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
 
         self.assertIn("Save Address", home_template)
         self.assertIn("Use My Location", home_template)
@@ -430,6 +436,15 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("Run Find Nearest Stores", store_template)
         self.assertIn('value="run_find_nearest"', store_template)
         self.assertIn(".store-options-sticky-toolbar .address-actions-grid", css)
+        self.assertIn("Show all Addresses", store_template)
+        self.assertIn("Show Maps", store_template)
+        self.assertIn("data-store-display-toggle=\"addresses\"", store_template)
+        self.assertIn("data-store-display-toggle=\"maps\"", store_template)
+        self.assertIn(".store-options-display-controls", css)
+        self.assertIn("body.store-addresses-hidden", css)
+        self.assertIn("body.store-maps-hidden", css)
+        self.assertIn("function toggleStoreOptionsDisplay", script)
+        self.assertIn("function restoreStoreOptionsDisplaySettings", script)
 
     def test_behavior_toggles_left_align_on_mobile(self):
         css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
@@ -451,11 +466,15 @@ class ProductSelectionServiceTest(unittest.TestCase):
         css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
         self.assertIn("active-store-card", store_template)
+        self.assertIn("active-store-unavailable", store_template)
+        self.assertIn("selected_store.skip_reason", store_template)
+        self.assertIn("title=\"{{ store_tile_title }}\"", store_template)
         self.assertIn("store.urlStoreSelector or store.url", store_template)
         self.assertIn("store-logo-", store_template)
         self.assertIn("active-store-name", store_template)
         self.assertIn("rel=\"noopener noreferrer\"", store_template)
         self.assertIn(".active-store-card", css)
+        self.assertIn(".active-store-card.active-store-unavailable", css)
         self.assertIn(".active-store-name", css)
 
     def test_store_location_addresses_are_linked_and_mapped(self):

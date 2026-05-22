@@ -31,6 +31,23 @@
             <div class="address-actions-grid">
                 <button form="homeAddressForm" type="submit" name="action" value="run_find_nearest" class="nearest-stores-btn">Run Find Nearest Stores</button>
             </div>
+
+            <div class="store-options-display-controls" aria-label="Store Options display controls">
+                <button type="button"
+                        class="store-display-toggle"
+                        data-store-display-toggle="addresses"
+                        aria-pressed="true"
+                        onclick="toggleStoreOptionsDisplay('addresses')">
+                    Show all Addresses
+                </button>
+                <button type="button"
+                        class="store-display-toggle"
+                        data-store-display-toggle="maps"
+                        aria-pressed="true"
+                        onclick="toggleStoreOptionsDisplay('maps')">
+                    Show Maps
+                </button>
+            </div>
         </div>
     </div>
 
@@ -282,6 +299,8 @@
                 {% set store_logo_text = {"aldi": "ALDI", "kroger": "K", "walmart": "W", "meijer": "M", "target": "T", "costco": "C"}.get(store_key, store.label[:2]|upper) %}
                 {% set store_home_url = store.urlStoreSelector or store.url %}
                 {% set selected_store = nearest_store_locations.get(store_key, {}) if nearest_store_locations else {} %}
+                {% set store_unavailable_reason = selected_store.skip_reason if selected_store and selected_store.skip_reason else "" %}
+                {% set store_tile_title = store_unavailable_reason or "Open " ~ store.label %}
                 {% if selected_store and selected_store.latitude is defined and selected_store.latitude is not none and selected_store.longitude is defined and selected_store.longitude is not none %}
                     {% set _ = active_store_map_locations.append({
                         "store_key": store_key,
@@ -294,11 +313,12 @@
                         "locator_url": selected_store.locator_url or store_home_url
                     }) %}
                 {% endif %}
-                <a class="active-store-card"
+                <a class="active-store-card{% if store_unavailable_reason %} active-store-unavailable{% endif %}"
                    href="{{ store_home_url }}"
                    target="_blank"
                    rel="noopener noreferrer"
-                   aria-label="Open {{ store.label }}">
+                   title="{{ store_tile_title }}"
+                   aria-label="{{ store_tile_title }}">
                     <span class="store-logo store-logo-{{ store_key|replace('_', '-') }}">{{ store_logo_text }}</span>
                     <span class="active-store-name">{{ store.label }}</span>
                 </a>

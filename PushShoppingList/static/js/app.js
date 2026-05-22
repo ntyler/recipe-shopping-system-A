@@ -2463,6 +2463,23 @@ function toggleCardCollapse(key) {
     }
 
     window.setTimeout(initStoreLocationMaps, 0);
+
+    if (key === "store-options" && isCollapsed) {
+        window.setTimeout(scrollStoreOptionsIntoView, 0);
+    }
+}
+
+function scrollStoreOptionsIntoView() {
+    const section = document.getElementById("storeOptionsSection");
+
+    if (!section) {
+        return;
+    }
+
+    section.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+    });
 }
 
 function cardCollapseDefaultIsCollapsed(content) {
@@ -2648,6 +2665,46 @@ function restoreViewBehaviorSettings() {
     restoreToggleSetting("hideCheckedItemsToggle", "hide-checked-items", false, "hide-checked-items");
     restoreToggleSetting("compactModeToggle", "compact-mode", false, "compact-mode");
     showView(localStorage.getItem("shopping-view") || "section");
+}
+
+function storeOptionsDisplayBodyClass(kind) {
+    return kind === "maps" ? "store-maps-hidden" : "store-addresses-hidden";
+}
+
+function storeOptionsDisplayStorageKey(kind) {
+    return kind === "maps" ? "store-options-show-maps" : "store-options-show-addresses";
+}
+
+function setStoreOptionsDisplay(kind, shouldShow, options = {}) {
+    const bodyClass = storeOptionsDisplayBodyClass(kind);
+
+    document.body.classList.toggle(bodyClass, !shouldShow);
+    document.querySelectorAll(`[data-store-display-toggle="${kind}"]`).forEach(button => {
+        button.classList.toggle("active", shouldShow);
+        button.setAttribute("aria-pressed", shouldShow ? "true" : "false");
+    });
+
+    if (options.persist) {
+        localStorage.setItem(storeOptionsDisplayStorageKey(kind), shouldShow ? "1" : "0");
+    }
+
+    if (kind === "maps" && shouldShow) {
+        window.setTimeout(invalidateStoreLocationMaps, 0);
+    }
+}
+
+function toggleStoreOptionsDisplay(kind) {
+    const bodyClass = storeOptionsDisplayBodyClass(kind);
+    const shouldShow = document.body.classList.contains(bodyClass);
+
+    setStoreOptionsDisplay(kind, shouldShow, { persist: true });
+}
+
+function restoreStoreOptionsDisplaySettings() {
+    ["addresses", "maps"].forEach(kind => {
+        const savedValue = localStorage.getItem(storeOptionsDisplayStorageKey(kind));
+        setStoreOptionsDisplay(kind, savedValue === null ? true : savedValue === "1");
+    });
 }
 
 function restoreToggleSetting(inputId, storageKey, defaultChecked, bodyClass, invertBodyClass = false) {
@@ -6339,6 +6396,7 @@ async function refreshStoreMarkup(options = {}) {
     bindRecipeDetailToggles();
     bindRecipeTaskChecks();
     updateViewSwitcherStickyOffset();
+    restoreStoreOptionsDisplaySettings();
     initStoreLocationMaps();
     window.scrollTo(scrollX, scrollY);
 }
@@ -6393,6 +6451,7 @@ document.addEventListener("DOMContentLoaded", function () {
     bindRecipeTaskChecks();
     updateRecipeEditStickyOffsets();
     updateViewSwitcherStickyOffset();
+    restoreStoreOptionsDisplaySettings();
     initStoreLocationMaps();
     startExtractionProgressPolling();
 });
