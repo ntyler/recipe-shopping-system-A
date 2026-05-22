@@ -465,6 +465,17 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("width: 34px", css)
         self.assertIn("height: 32px", css)
 
+    def test_store_manager_actions_stay_in_mobile_card_header(self):
+        css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+        self.assertIn("@media (max-width: 650px)", css)
+        self.assertIn("grid-template-columns: 28px minmax(0, 1fr) auto", css)
+        self.assertIn(".store-action-row", css)
+        self.assertIn("grid-column: 3 / 4", css)
+        self.assertIn("grid-row: 1 / 2", css)
+        self.assertIn("justify-self: end", css)
+        self.assertIn("grid-column: 1 / 4", css)
+
     def test_behavior_toggles_left_align_on_mobile(self):
         css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
