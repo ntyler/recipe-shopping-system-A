@@ -5666,8 +5666,9 @@ async function saveHomeAddress(event) {
     const action = submitter ? submitter.value : "";
 
     if (action === "run_find_nearest") {
-        saveScroll();
-        return true;
+        event.preventDefault();
+        await runFindNearestStores(form, submitter);
+        return false;
     }
 
     event.preventDefault();
@@ -5679,6 +5680,53 @@ async function saveHomeAddress(event) {
     }
 
     return false;
+}
+
+async function runFindNearestStores(form, button) {
+    const originalText = button ? button.textContent : "";
+    const formData = new FormData(form);
+    formData.set("ajax", "1");
+    formData.set("action", "run_find_nearest");
+
+    updateHomeAddressSummaries(buildAddressSummaryFromForm(form));
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Finding stores...";
+    }
+
+    try {
+        const response = await fetch(form.action, {
+            method: "POST",
+            headers: {
+                "X-Requested-With": "fetch",
+            },
+            body: formData,
+        });
+        const contentType = response.headers.get("content-type") || "";
+        const data = contentType.includes("application/json")
+            ? await response.json()
+            : null;
+
+        if (!response.ok || (data && !data.ok)) {
+            throw new Error((data && data.error) || "Unable to find nearest stores.");
+        }
+
+        if (data && data.home_address) {
+            updateHomeAddressSummaries(data.home_address.full_address || "");
+        }
+
+        await refreshStoreMarkup({ cacheBust: true });
+        showRecipeQuantityUpdatedMessage("", "", "", "Nearest stores updated.");
+    } catch (err) {
+        console.warn("Unable to find nearest stores in the background.", err);
+        showRecipeQuantityUpdatedMessage("", "", "", err.message || "Unable to find nearest stores.");
+
+        if (button && button.isConnected) {
+            button.disabled = false;
+            button.textContent = originalText;
+        }
+    }
 }
 
 async function saveHomeAddressForm(form) {
