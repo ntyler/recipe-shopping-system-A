@@ -2775,6 +2775,7 @@ function filterActiveStores(value) {
     const input = document.getElementById("activeStoreSearchInput");
     const query = normalizeActiveStoreSearchText(value !== undefined ? value : (input ? input.value : ""));
     let visibleCount = 0;
+    const storeShelf = document.querySelector(".active-store-list");
 
     if (input && value !== undefined && input.value !== value) {
         input.value = value;
@@ -2795,6 +2796,83 @@ function filterActiveStores(value) {
     document.querySelectorAll(".active-store-search-empty").forEach(empty => {
         empty.hidden = !query || visibleCount > 0;
     });
+
+    if (value !== undefined && storeShelf) {
+        storeShelf.scrollTo({ left: 0, behavior: "smooth" });
+    }
+}
+
+function visibleActiveStoreCards() {
+    return Array.from(document.querySelectorAll(".active-store-card"))
+        .filter(card => card.offsetParent !== null);
+}
+
+function scrollActiveStoreShelf(direction) {
+    const shelf = document.querySelector(".active-store-list");
+
+    if (!shelf) {
+        return false;
+    }
+
+    const cards = visibleActiveStoreCards();
+    const firstCard = cards.length ? cards[0] : null;
+    const gap = parseFloat(window.getComputedStyle(shelf).columnGap || "12") || 12;
+    const cardWidth = firstCard ? firstCard.getBoundingClientRect().width + gap : 94;
+    const distance = Math.max(cardWidth * 2, shelf.clientWidth * 0.72);
+
+    shelf.scrollBy({
+        left: direction * distance,
+        behavior: "smooth",
+    });
+
+    shelf.focus({ preventScroll: true });
+    return false;
+}
+
+function storeSortName(element, selector) {
+    const name = element ? element.querySelector(selector) : null;
+
+    return normalizeActiveStoreSearchText(name ? name.textContent : "");
+}
+
+function sortStoreChildren(container, itemClass, nameSelector) {
+    if (!container) {
+        return 0;
+    }
+
+    const children = Array.from(container.children);
+    const items = children.filter(child => child.classList.contains(itemClass));
+    const trailing = children.filter(child => !child.classList.contains(itemClass));
+
+    items
+        .sort((a, b) => storeSortName(a, nameSelector).localeCompare(
+            storeSortName(b, nameSelector),
+            undefined,
+            { numeric: true, sensitivity: "base" }
+        ))
+        .forEach(item => container.appendChild(item));
+    trailing.forEach(item => container.appendChild(item));
+
+    return items.length;
+}
+
+function sortStoreOptionsList(options = {}) {
+    sortStoreChildren(document.querySelector(".store-manager-list"), "store-manager-row", ".store-manager-label");
+    sortStoreChildren(document.querySelector(".active-store-list"), "active-store-card", ".active-store-name");
+
+    if (options.persist !== false) {
+        localStorage.setItem("store-options-sort", "name");
+    }
+
+    filterActiveStores();
+    window.setTimeout(invalidateStoreLocationMaps, 0);
+    return false;
+}
+
+function restoreStoreOptionsListSort() {
+    if (localStorage.getItem("store-options-sort") === "name") {
+        sortStoreOptionsList({ persist: false });
+    }
 }
 
 function openActiveStoreIcon(link, event) {
@@ -6317,9 +6395,11 @@ function updateAddStoreStickyVisibility() {
     const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
     const expanded = !content.classList.contains("collapsed");
-    const sectionVisible = sectionRect.top < viewportHeight && sectionRect.bottom > 0;
+    const actionHeight = action.offsetHeight || 68;
+    const sectionStarted = sectionRect.top < viewportHeight - actionHeight;
+    const sectionContinuesBelowAction = sectionRect.bottom > viewportHeight + actionHeight;
     const modalOpen = modal && modal.classList.contains("open");
-    const shouldShow = expanded && sectionVisible && !modalOpen;
+    const shouldShow = expanded && sectionStarted && sectionContinuesBelowAction && !modalOpen;
 
     action.classList.toggle("is-visible", shouldShow);
     action.setAttribute("aria-hidden", shouldShow ? "false" : "true");
@@ -6499,7 +6579,7 @@ function updateStoreDetailsFromForm(form) {
     }
 
     setActiveStoreIconMode(localStorage.getItem("active-store-icon-mode") || "store");
-    filterActiveStores();
+    restoreStoreOptionsListSort();
 }
 
 async function deleteStore(event, message) {
@@ -6932,6 +7012,7 @@ async function refreshStoreMarkup(options = {}) {
     updateViewSwitcherStickyOffset();
     restoreStoreOptionsDisplaySettings();
     restoreActiveStoreIconMode();
+    restoreStoreOptionsListSort();
     initStoreLocationMaps();
     restoreWindowScroll(scrollX, scrollY);
     window.setTimeout(updateAddStoreStickyVisibility, 140);
@@ -7000,6 +7081,7 @@ document.addEventListener("DOMContentLoaded", function () {
     updateViewSwitcherStickyOffset();
     restoreStoreOptionsDisplaySettings();
     restoreActiveStoreIconMode();
+    restoreStoreOptionsListSort();
     initStoreLocationMaps();
     startExtractionProgressPolling();
     document.addEventListener("keydown", closeAddStoreModalOnEscape);
