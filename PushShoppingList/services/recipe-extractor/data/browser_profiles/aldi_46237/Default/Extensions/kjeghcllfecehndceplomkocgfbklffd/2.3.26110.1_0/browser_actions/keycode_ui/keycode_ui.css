@@ -1,0 +1,76 @@
+html {
+	height: Auto;
+}
+
+body {
+	line-height: 20px;
+	width: 350px;
+	white-space: normal;
+	margin: 0px;
+	font-size:12px;
+	display: block;
+}
+
+h2 {
+	font-size:18px;
+	margin:3px 0 10px 0;
+}
+
+.frame{
+	display:flex;
+	flex-direction:row;
+	padding:15px;
+}
+
+.logo {
+	height: 25px;
+}
+
+.column1 {
+	padding:0 15px 0 0;
+}
+
+#features > ul {
+	padding-left: 10px;
+}
+
+#expirewarning{
+	display:none;
+}
+
+#warningtext_1 {
+	margin-bottom: 5px;
+}
+
+.renewbuttons {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	height:36px;
+	margin: 15px 15px 0 0px;
+}
+
+.renewbutton {
+	font-size:12px;
+}
+
+#remindmelaterbutton {
+	color: #0058DB;
+	text-decoration: none;
+	text-align: right;
+	cursor: pointer;
+}
+
+/*Override bright mode styles when dark mode is enabled*/
+@media (prefers-color-scheme: dark) {
+
+	body {
+		background: #0B1328;
+		color: #ffffff;
+	}
+	#remindmelaterbutton {
+		color: #73D0FF;
+	}
+}
+
+

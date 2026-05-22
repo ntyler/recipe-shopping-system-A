@@ -1,0 +1,662 @@
+{
+   "Abortion": {
+      "message": "Abtreibung"
+   },
+   "Abused_Drugs": {
+      "message": "Drogenmissbrauch"
+   },
+   "Adult_and_Pornography": {
+      "message": "Erwachsene und Pornographie"
+   },
+   "Alcohol_and_Tobacco": {
+      "message": "Alkohol und Tabak"
+   },
+   "Auctions": {
+      "message": "Auktionen"
+   },
+   "BA_ERROR_COMPONENT": {
+      "message": "Keine Verbindung zu dieser Komponente"
+   },
+   "BA_ERROR_HDR": {
+      "message": "Verbindung unterbrochen"
+   },
+   "BA_ERROR_TXT": {
+      "message": "Die Bewertungen sind vorübergehend nicht verfügbar. Bitte warten Sie, bis der Service wieder einsatzbereit ist. Weitere Informationen finden Sie \u003Ca href=\"https://answers.webroot.com/Webroot/Loginr.aspx?pid=12&login=1&app=vw&solutionid=2658\" id=\"grey5\">hier\u003C/a>."
+   },
+   "BA_ERROR_TXT_COMPONENT": {
+      "message": "Web Threat Shield kann keine Verbindung zu einer seiner Komponenten herstellen. Erwägen Sie einen Neustart oder eine erneute Installation."
+   },
+   "BA_KEYCODE_COMINGSOON_PREFIX": {
+      "message": "\u003Cb>DEMNÄCHST:\u003C/b>"
+   },
+   "BA_KEYCODE_FEATURES": {
+      "message": "Funktionen des Web Threat Shield:"
+   },
+   "BA_KEYCODE_FEATURE_1": {
+      "message": "\u003Cb>Browser-Anmerkungen\u003C/b> – Diese zeigen die Reputation der Website an, die Sie gerade besuchen."
+   },
+   "BA_KEYCODE_FEATURE_2": {
+      "message": "\u003Cb>Such-Anmerkungen\u003C/b> – Diese zeigen die Reputation der Seiten in den Suchergebnissen Ihres Browsers an, sodass Sie wissen, welche Seitenergebnisse sicher anklickbar sind."
+   },
+   "BA_KEYCODE_FEATURE_3": {
+      "message": "\u003Cb>Echtzeit-Schutz vor bösartigen Websites\u003C/b> – Wir blockieren automatisch bösartige Websites für Sie, um sicherzustellen, dass Sie online sicher sind."
+   },
+   "BA_KEYCODE_HEADER": {
+      "message": "Web Threat Shield"
+   },
+   "BA_KEYCODE_REMINDMELATER_BUTTON": {
+      "message": "Später erneut erinnern"
+   },
+   "BA_KEYCODE_RENEW_BUTTON": {
+      "message": "Lizenz verlängern"
+   },
+   "BA_KEYCODE_WARNING_TEXT_1a": {
+      "message": "Der Keycode läuft in 1 Tag ab."
+   },
+   "BA_KEYCODE_WARNING_TEXT_1b": {
+      "message": "Der Keycode läuft in $days$ Tagen ab.",
+      "placeholders": {
+         "days": {
+            "content": "$1",
+            "example": "2"
+         }
+      }
+   },
+   "BA_KEYCODE_WARNING_TEXT_2": {
+      "message": "Ihre Lizenz für Webroot SecureAnywhere läuft ab. Dies wirkt sich auf Ihre Web Threat Shield-Erweiterungen aus. Verlängern Sie noch heute Ihre Lizenz, um weiterhin sicher im Internet zu surfen."
+   },
+   "BA_WSAERROR_TXT": {
+      "message": "Für diese Erweiterung muss die PC-Version von Webroot SecureAnywhere installiert und ausgeführt werden. Weitere Informationen finden Sie \u003Ca href=\"http://answers.webroot.com/Webroot/Loginr.aspx?pid=12&login=1&app=vw&solutionid=2657\" id=\"grey4\">hier\u003C/a>."
+   },
+   "BA_WSAERROR_TXT_OT": {
+      "message": "Für diese Erweiterung muss die PC-Version von OpenText™ SecureAnywhere installiert und ausgeführt werden. Weitere Informationen finden Sie \u003Ca href=\"http://answers.webroot.com/Webroot/Loginr.aspx?pid=12&login=1&app=vw&solutionid=2657\" id=\"grey4\">hier\u003C/a>."
+   },
+   "Bot_Nets": {
+      "message": "Bot-Netze"
+   },
+   "Business_and_Economy": {
+      "message": "Geschäftskunden und Wirtschaft"
+   },
+   "Cheating": {
+      "message": "Betrug"
+   },
+   "Classification": {
+      "message": "Webroot-Klassifizierung"
+   },
+   "Computer_and_Internet_Info": {
+      "message": "Angaben zu Computer und Internet"
+   },
+   "Computer_and_Internet_Security": {
+      "message": "Computer- und Internet-Sicherheit"
+   },
+   "Confirmed_SPAM_Sources": {
+      "message": "Bestätigte SPAM-Quellen"
+   },
+   "Content_Delivery_Networks": {
+      "message": "Inhaltsübertragungs-Netzwerke"
+   },
+   "Cult_and_Occult": {
+      "message": "Kult und Okkultismus"
+   },
+   "DESCRIPTION_TEXT_48": {
+      "message": "Dieses Add-on ist kompatibel mit Firefox 48 oder höher. Wenn dieses Add-on deaktiviert ist, dann verwenden Sie eine Version von Firefox 47 oder niedriger. Bitte überprüfen Sie die Add-on-Liste auf eine aktivierte Version des Add-ons, die mit Ihrer Firefox-Installation kompatibel ist. Wenn Sie keine aktivierte Version des Add-ons sehen, wenden Sie sich an den Webroot-Support, um weitere Unterstützung zu erhalten."
+   },
+   "Dating": {
+      "message": "Dating"
+   },
+   "Dead_Sites": {
+      "message": "Tote Standorte (nur db Ops)"
+   },
+   "Dynamically_Generated_Content": {
+      "message": "Dynamisch generierter Inhalt"
+   },
+   "Educational_Institutions": {
+      "message": "Bildungsstätten"
+   },
+   "Entertainment_and_Arts": {
+      "message": "Unterhaltung und Kunst"
+   },
+   "Fashion_and_Beauty": {
+      "message": "Mode und Beauty"
+   },
+   "Financial_Services": {
+      "message": "Finanzdienstleistungen"
+   },
+   "Gambling": {
+      "message": "Glücksspiele"
+   },
+   "Games": {
+      "message": "Spiele"
+   },
+   "Government": {
+      "message": "Regierung"
+   },
+   "Gross": {
+      "message": "Grob"
+   },
+   "Hacking": {
+      "message": "Hacking"
+   },
+   "Hate_and_Racism": {
+      "message": "Hass und Rassismus"
+   },
+   "Health_and_Medicine": {
+      "message": "Gesundheit und Medizin"
+   },
+   "Home_and_Garden": {
+      "message": "Zuhause und Garten"
+   },
+   "Hunting_and_Fishing": {
+      "message": "Jagen und Angeln"
+   },
+   "Illegal": {
+      "message": "Illegales"
+   },
+   "Image_and_Video_Search": {
+      "message": "Bild- und Video-Suche"
+   },
+   "Individual_Stock_Advice_and_Tools": {
+      "message": "Individuelle Aktienratschläge und Tools"
+   },
+   "Internet_Communications": {
+      "message": "Internet-Kommunikationen"
+   },
+   "Internet_Portals": {
+      "message": "Internet-Portale"
+   },
+   "Job_Search": {
+      "message": "Stellensuche"
+   },
+   "Keyloggers_and_Monitoring": {
+      "message": "Keylogger und Überwachung"
+   },
+   "Kids": {
+      "message": "Kinder"
+   },
+   "Legal": {
+      "message": "Rechtliches"
+   },
+   "Local_Information": {
+      "message": "Lokale Information"
+   },
+   "Malware_Sites": {
+      "message": "Malware-Webseiten"
+   },
+   "Marijuana": {
+      "message": "Marihuana"
+   },
+   "Military": {
+      "message": "Militär"
+   },
+   "Motor_Vehicles": {
+      "message": "Kraftfahrzeuge"
+   },
+   "Music": {
+      "message": "Musik"
+   },
+   "News_and_Media": {
+      "message": "News und Medien"
+   },
+   "Nudity": {
+      "message": "Nacktheit"
+   },
+   "OPTIONS_DONTSHOW": {
+      "message": "Diese Mitteilung nicht mehr anzeigen"
+   },
+   "OPTIONS_EXPERIMENTAL_LABELPII": {
+      "message": "Warn before sensitive data may be sent to AI-related websites (available on supported platforms)."
+   },
+   "OPTIONS_EXPERIMENTAL_LEARNMOREPII": {
+      "message": "Learn more"
+   },
+   "OPTIONS_EXPERIMENTAL_SETTINGS": {
+      "message": "EXPERIMENTAL SETTINGS"
+   },
+   "OPTIONS_FOOTER_ABOUT": {
+      "message": "Über uns"
+   },
+   "OPTIONS_FOOTER_LEGAL": {
+      "message": "Rechtliches"
+   },
+   "OPTIONS_FOOTER_PRIVACY": {
+      "message": "Datenschutz"
+   },
+   "OPTIONS_FORGOT_BUTTON": {
+      "message": "Benötigen Sie Hilfe bei der Suche nach Ihrem Keycode?"
+   },
+   "OPTIONS_INTEGRATED_ACTIVE": {
+      "message": "Browser-Erweiterungen akzeptieren"
+   },
+   "OPTIONS_INTEGRATED_HOWTOMODIFY": {
+      "message": "Wie können diese Einstellungen geändert werden?"
+   },
+   "OPTIONS_INTEGRATED_HOWTOUNINSTALL": {
+      "message": "Diese Erweiterung deinstallieren"
+   },
+   "OPTIONS_INTEGRATED_MODE": {
+      "message": "Die Erweiterungseinstellungen von Web Threat Shield werden von Webroot SecureAnywhere verwaltet."
+   },
+   "OPTIONS_INTEGRATED_MODE_DETAILS": {
+      "message": "Die Erweiterungseinstellungen für Web Threat Shield werden bei Privatanwendern im installierten Webroot SecureAnywhere-Agenten und bei Geschäftsanwendern per Richtlinie in der Verwaltungskonsole vorgenommen. Die aktuellen Einstellungen sind unten aufgeführt."
+   },
+   "OPTIONS_INTEGRATED_MODE_DETAILS_OT": {
+      "message": "Die Erweiterungseinstellungen für Web Threat Shield werden bei unverwalteten Agenten im installierten OpenText™-Agenten oder bei Geschäftsanwendern per Richtlinie in der Verwaltungskonsole vorgenommen. Die aktuellen Einstellungen sind unten aufgeführt."
+   },
+   "OPTIONS_INTEGRATED_MODE_OT": {
+      "message": "Die Erweiterungseinstellungen von Web Threat Shield werden von OpenText™ SecureAnywhere verwaltet."
+   },
+   "OPTIONS_INTEGRATED_MODE_SAFARI_PERMISSION": {
+      "message": "Setup incomplete! Please allow all pages for this extension!"
+   },
+   "OPTIONS_INTEGRATED_MODE_SAFARI_SETUPINCOMPLETE": {
+      "message": "Setup incomplete! To enable Web Threat Shield, please complete Webroot agent setup and enter a valid keycode!"
+   },
+   "OPTIONS_INTEGRATED_PHISHBLOCKING": {
+      "message": "Anti-Phishing in Echtzeit aktivieren"
+   },
+   "OPTIONS_INTEGRATED_REFRESHNOTE": {
+      "message": "Änderungen, die im SecureAnywhere-Agenten vorgenommen wurden, werden hier angezeigt, nachdem Sie eine neue Seite in einer anderen Registerkarte aufgerufen haben."
+   },
+   "OPTIONS_INTEGRATED_SEARCHANNOTATION": {
+      "message": "Bei der Nutzung von Suchmaschinen Sicherheitsbewertungen anzeigen"
+   },
+   "OPTIONS_INTEGRATED_SETTINGS_HEADLINE": {
+      "message": "AKTUELLE EINSTELLUNGEN"
+   },
+   "OPTIONS_INTEGRATED_URLBLOCKING": {
+      "message": "Schädliche Websites blockieren"
+   },
+   "OPTIONS_KEYCODE_KC_LABEL": {
+      "message": "Keycode: "
+   },
+   "OPTIONS_KEYCODE_VALIDATOR_SUCCESS": {
+      "message": "Dieser Keycode ist gültig und Ihr Produkt wird ausgeführt. Es sind keine weiteren Maßnahmen erforderlich."
+   },
+   "OPTIONS_KEYCODE_VALIDATOR_WARNING_1": {
+      "message": "Ungültiger Keycode!"
+   },
+   "OPTIONS_KEYCODE_VALIDATOR_WARNING_2": {
+      "message": "Verbindung zum Server konnte nicht hergestellt werden!"
+   },
+   "OPTIONS_KEYCODE_VALIDATOR_WARNING_3": {
+      "message": "Keycode abgelaufen!"
+   },
+   "OPTIONS_NEW_KEYCODE": {
+      "message": "Neuer Keycode:"
+   },
+   "OPTIONS_NOTIFICATION_LABEL": {
+      "message": "Benachrichtigungen und Erinnerungen anzeigen: "
+   },
+   "OPTIONS_NOTIFICATION_VALUE_1": {
+      "message": "Immer"
+   },
+   "OPTIONS_NOTIFICATION_VALUE_2": {
+      "message": "Beim Start"
+   },
+   "OPTIONS_NOTIFICATION_VALUE_3": {
+      "message": "Niemals"
+   },
+   "OPTIONS_PRIVACY_ALLOW_BUTTON": {
+      "message": "Zulassen"
+   },
+   "OPTIONS_PRIVACY_BACK_BUTTON": {
+      "message": "Zurück"
+   },
+   "OPTIONS_PRIVACY_DECLINE_BUTTON": {
+      "message": "Ablehnen"
+   },
+   "OPTIONS_PRIVACY_DECLINE_TEXT1": {
+      "message": "Leider funktioniert Web Threat Shield nicht wie vorgesehen, wenn Sie die Sammlung der notwendigen Informationen zu URLs nicht genehmigen."
+   },
+   "OPTIONS_PRIVACY_DECLINE_TEXT2": {
+      "message": "Wenn Sie die Sammlung dieser Informationen nicht doch noch genehmigen möchten, sollten Sie die Erweiterung entfernen und deinstallieren."
+   },
+   "OPTIONS_PRIVACY_DESCRIPTION1": {
+      "message": "Die Erweiterung „Webroot Web Threat Shield for Mozilla Firefox“ benötigt Ihre Genehmigung zum Sammeln von Informationen zu den von Ihnen besuchten Webseiten (URLs und IP-Adressen). Dies ist erforderlich, damit unsere Datenbankserver die Webseite überprüfen und Malware erkennen können. Ohne diese Genehmigung kann die Erweiterung keine potenziell schädlichen Websites erkennen."
+   },
+   "OPTIONS_PRIVACY_DESCRIPTION1_OT": {
+      "message": "Die Erweiterung „Web Threat Shield for Mozilla Firefox“ benötigt Ihre Genehmigung zum Sammeln von Informationen zu den von Ihnen besuchten Webseiten (URLs und IP-Adressen). Dies ist erforderlich, damit unsere Datenbankserver die Webseite überprüfen und Malware erkennen können. Ohne diese Genehmigung kann die Erweiterung keine potenziell schädlichen Websites erkennen."
+   },
+   "OPTIONS_PRIVACY_DESCRIPTION2": {
+      "message": "Durch Klicken auf „Zulassen“ und die Installation der Erweiterung stimmen Sie der Weiterleitung der Informationen zu den aufgerufenen gesuchten URLs an Webroot-Server zu, damit diese mit URLs in den Malware-Datenbanken verglichen werden können."
+   },
+   "OPTIONS_PRIVACY_DESCRIPTION2_OT": {
+      "message": "Durch Klicken auf „Zulassen“ und die Installation der Erweiterung stimmen Sie der Weiterleitung der Informationen zu den aufgerufenen gesuchten URLs an OpenText™-Server zu, damit diese mit URLs in den Malware-Datenbanken verglichen werden können."
+   },
+   "OPTIONS_PRIVACY_DESCRIPTION3": {
+      "message": "Weitere Informationen dazu, welche Daten wir erfassen und wie wir diese Daten schützen, finden Sie in unserer \u003Ca href=\"https://addons.mozilla.org/en-GB/firefox/addon/web-threat-shield/privacy/\" target=\"_blank\">Datenschutzrichtlinie\u003C/a>."
+   },
+   "OPTIONS_PRIVACY_HEADLINE1": {
+      "message": "Datenschutzvertrag"
+   },
+   "OPTIONS_PRIVACY_HEADLINE2": {
+      "message": "Datenschutzvertrag – Abgelehnt"
+   },
+   "OPTIONS_PRIVACY_REMOVE_BUTTON": {
+      "message": "Entfernen"
+   },
+   "OPTIONS_STANDALONE_EULATEXT": {
+      "message": "Um diese Erweiterung zu aktivieren, geben Sie bitte unten Ihren Webroot SecureAnywhere Keycode ein.\u003Cbr />Durch Klicken auf \"Keycode bestätigen\" stimmen Sie hiermit der Webroot SecureAnywhere\u003Cbr />Solution Vereinbarung zu, die Sie \u003Ca href=\"https://www.webroot.com/us/en/legal/service-terms-and-conditions\" target=\"_blank\">hier\u003C/a> finden, sowie der Webroot SecureAnywhere Datenschutzerklärung,\u003Cbr />die Sie \u003Ca href=\"https://www.webroot.com/us/en/legal/privacy\" target=\"_blank\">hier\u003C/a> finden."
+   },
+   "OPTIONS_SUBSCRIPTION_LABEL": {
+      "message": "Verbleibende Tage des Abonnements:"
+   },
+   "OPTIONS_SUBSCRIPTION_VALUE": {
+      "message": "  Tage"
+   },
+   "OPTIONS_SUBSCRIPTION_VALUE_1": {
+      "message": "  Tag"
+   },
+   "OPTIONS_TITLE": {
+      "message": "Einstellungen des Web Threat Shield"
+   },
+   "OPTIONS_VALIDATE_BUTTON": {
+      "message": "Keycode bestätigen"
+   },
+   "Online_Greeting_Cards": {
+      "message": "Online-Grußkarten"
+   },
+   "Open_HTTP_Proxies": {
+      "message": "Offene HTTP-Proxys"
+   },
+   "PERMISSION_DESC_FF_1": {
+      "message": "Diese Erweiterung erfordert Ihre Erlaubnis, auf alle von Ihnen besuchten Websites zuzugreifen, um Malware-Seiten zu identifizieren."
+   },
+   "PERMISSION_DESC_FF_2": {
+      "message": "Mit Anklicken der Option Zulassen öffnet Firefox ein Dialogfeld zum Bestätigen oder Verweigern der Zugriffsberechtigung. Berechtigungen können jederzeit auf der Registerkarte Berechtigungen der Erweiterung geändert werden."
+   },
+   "PERMISSION_HEADLINE_FF": {
+      "message": "Zusätzliche Browserberechtigungen"
+   },
+   "PIITYPE_ADDRESS": {
+      "message": "Address"
+   },
+   "PIITYPE_BANK_NUMBER": {
+      "message": "Bank Account"
+   },
+   "PIITYPE_CREDIT_CARD": {
+      "message": "Credit Card"
+   },
+   "PIITYPE_CRYPTO": {
+      "message": "Crypto Key"
+   },
+   "PIITYPE_DRIVER_LICENSE": {
+      "message": "Driver License"
+   },
+   "PIITYPE_EMAIL_ADDRESS": {
+      "message": "Email"
+   },
+   "PIITYPE_IP_ADDRESS": {
+      "message": "IP Address"
+   },
+   "PIITYPE_ITIN": {
+      "message": "ITIN"
+   },
+   "PIITYPE_PASSPORT": {
+      "message": "Passport No"
+   },
+   "PIITYPE_PERSON": {
+      "message": "Person"
+   },
+   "PIITYPE_PHONE_NUMBER": {
+      "message": "Phone"
+   },
+   "PIITYPE_SSN": {
+      "message": "SSN"
+   },
+   "PIITYPE_SWIFT_CODE": {
+      "message": "Swift Code"
+   },
+   "PIITYPE_UNKNOWN": {
+      "message": "Unspecified PII"
+   },
+   "PII_ERROR_LOSTCONTEXT": {
+      "message": "Protection temporarily unavailable. Refresh to continue monitoring!"
+   },
+   "PII_POPUP_ACCURATE": {
+      "message": "Is this information accurate?"
+   },
+   "PII_POPUP_ACCURATE_DONE": {
+      "message": "Thank you for your feedback."
+   },
+   "PII_POPUP_DETECTED": {
+      "message": "$pii$ detected",
+      "placeholders": {
+         "pii": {
+            "content": "$1",
+            "example": "SSN, Credit Card, Email, Phone, Address, Driver License, Passport No, ITIN, IP Address, Swift Code, Crypto Key, Person"
+         }
+      }
+   },
+   "PII_POPUP_HEADLINE": {
+      "message": "Detected Information"
+   },
+   "PII_POPUP_HEADLINE2": {
+      "message": "Information protected"
+   },
+   "PII_POPUP_REDACT": {
+      "message": "Redact"
+   },
+   "PII_POPUP_UNDO": {
+      "message": "Undo"
+   },
+   "Parked_Domains": {
+      "message": "Geparkte Domains"
+   },
+   "Password": {
+      "message": "Das von Ihnen eingegebene Passwort ist ungültig."
+   },
+   "Pay_to_Surf": {
+      "message": "Bezahltes Surfen"
+   },
+   "Peer_to_Peer": {
+      "message": "Peer-to-Peer"
+   },
+   "Personal_Storage": {
+      "message": "Persönlicher Online-Speicher"
+   },
+   "Personal_sites_and_Blogs": {
+      "message": "Persönliche Webseiten und Blogs"
+   },
+   "Philosophy_and_Political_Advocacy": {
+      "message": "Philosophie und politische Lobbyarbeit"
+   },
+   "Phishing_and_Other_Frauds": {
+      "message": "Phishing und andere Arten von Betrug"
+   },
+   "Private_IP_Addresses": {
+      "message": "Private IP-Adressen"
+   },
+   "Proxy_Avoidance_and_Anonymizers": {
+      "message": "Proxy-Vermeidung und Anonymisierung"
+   },
+   "Questionable": {
+      "message": "Fraglich"
+   },
+   "Real_Estate": {
+      "message": "Immobilien"
+   },
+   "Recreation_and_Hobbies": {
+      "message": "Freizeit und Hobbys"
+   },
+   "Reference_and_Research": {
+      "message": "Referenzen und Forschung"
+   },
+   "Religion": {
+      "message": "Religion"
+   },
+   "SPAM_URLs": {
+      "message": "SPAM-URLs"
+   },
+   "SRA_ERROR_TXT": {
+      "message": " Die Bewertungen sind vorübergehend nicht verfügbar oder der Webroot-Agent läuft nicht. Bitte warten Sie, bis der Service wieder einsatzbereit ist bzw. versichern Sie sich, dass der Webroot-Agent läuft."
+   },
+   "Search_Engines": {
+      "message": "Suchmaschinen"
+   },
+   "Sex_Education": {
+      "message": "Sexualerziehung"
+   },
+   "Shareware_and_Freeware": {
+      "message": "Shareware und Freeware"
+   },
+   "Shopping": {
+      "message": "Shopping"
+   },
+   "Social_Networking": {
+      "message": "Soziale Netzwerke"
+   },
+   "Society": {
+      "message": "Gesellschaft"
+   },
+   "Sports": {
+      "message": "Sport"
+   },
+   "Spyware_and_Adware": {
+      "message": "Spyware und Adware"
+   },
+   "Streaming_Media": {
+      "message": "Streaming-Medien"
+   },
+   "Sure": {
+      "message": "sicher"
+   },
+   "Swimsuits_Intimate_Apparel": {
+      "message": "Badeanzüge und Unterwäsche"
+   },
+   "TEXT_BA_ERROR": {
+      "message": "Die Bewertungen sind vorübergehend nicht verfügbar oder der Webroot-Agent läuft nicht. Bitte warten Sie, bis der Service wieder einsatzbereit ist bzw. versichern Sie sich, dass der Webroot-Agent läuft."
+   },
+   "TEXT_RISK": {
+      "message": "Diese Website enthält Malware oder andere Sicherheitsrisiken."
+   },
+   "TEXT_SUSPICIOUS": {
+      "message": "Diese Website kann Inhalte enthalten, die Ihre Online-Sicherheit beeinträchtigen können."
+   },
+   "TEXT_TRUSTWORTHY": {
+      "message": "Sie können sicher fortfahren."
+   },
+   "TITLE_BCAP_BOTNET": {
+      "message": "Erkannte Botnet-Webseite"
+   },
+   "TITLE_BCAP_KEYLOGGER": {
+      "message": "Erkannte Webseite mit Überwachung der Tastatur"
+   },
+   "TITLE_BCAP_MALWARE": {
+      "message": "Erkannte Malware-Webseite"
+   },
+   "TITLE_BCAP_PHISHING": {
+      "message": "Erkannte Phishing-Webseite"
+   },
+   "TITLE_BCAP_RISK": {
+      "message": "Bösartig"
+   },
+   "TITLE_BCAP_SPAM": {
+      "message": "Erkannte Spam-Webseite"
+   },
+   "TITLE_BCAP_SPYWARE": {
+      "message": "Erkannte Spyware/Adware-Webseite"
+   },
+   "TITLE_BCAP_SUSPICIOUS": {
+      "message": "Vorsicht"
+   },
+   "TITLE_BCAP_TRUSTWORTHY": {
+      "message": "Vertrauenswürdig"
+   },
+   "TITLE_RTAP_PHISHING": {
+      "message": "Bewertet als Phishing-Webseite"
+   },
+   "Training_and_Tools": {
+      "message": "Weiterbildung und Tools"
+   },
+   "Translation": {
+      "message": "Übersetzung"
+   },
+   "Travel": {
+      "message": "Reisen"
+   },
+   "Trustworthy": {
+      "message": "vertrauenswürdig"
+   },
+   "Uncategorized": {
+      "message": "Nicht kategorisiert"
+   },
+   "Unconfirmed_SPAM_Sources": {
+      "message": "Unbestätigte SPAM-Quellen"
+   },
+   "Violence": {
+      "message": "Gewalt"
+   },
+   "Weapons": {
+      "message": "Waffen"
+   },
+   "Web_Advertisements": {
+      "message": "Web-Werbung"
+   },
+   "Web_Hosting": {
+      "message": "Web-Hosting"
+   },
+   "Web_based_email": {
+      "message": "Webbasierte E-Mail"
+   },
+   "category": {
+      "message": "Kategorie"
+   },
+   "confidence": {
+      "message": "Selbstvertrauen"
+   },
+   "description": {
+      "message": "Schützt Sie beim Surfen im Internet, indem gefährliche Websites identifiziert und blockiert werden."
+   },
+   "failed": {
+      "message": "Verbindung zum Server konnte nicht hergestellt werden"
+   },
+   "processing": {
+      "message": "Link wird verarbeitet"
+   },
+   "score": {
+      "message": "Score"
+   },
+   "serverUnAvailable": {
+      "message": "Die Bewertungen sind vorübergehend nicht verfügbar.  Wir arbeiten daran, den Dienst wiederherzustellen. Keine weitere Handlung notwendig"
+   },
+   "toolTip_1_A": {
+      "message": "Diese Website fällt in die Kategorie"
+   },
+   "toolTip_1_B": {
+      "message": "Beim Besuch dieser Website gibt es"
+   },
+   "toolTip_1_C": {
+      "message": "und"
+   },
+   "toolTip_2_A": {
+      "message": "die Wahrscheinlichkeit ist hoch, dass Sie bösartigen Links oder Payloads ausgesetzt werden"
+   },
+   "toolTip_2_B": {
+      "message": "die Wahrscheinlichkeit liegt über dem Durchschnitt, dass Sie bösartigen Links oder Payloads ausgesetzt werden"
+   },
+   "toolTip_2_C": {
+      "message": "die Wahrscheinlichkeit existiert, dass Sie bösartigen Links oder Payloads ausgesetzt werden"
+   },
+   "toolTip_2_D": {
+      "message": "die Wahrscheinlichkeit ist gering, dass Sie bösartigen Links oder Payloads ausgesetzt werden"
+   },
+   "toolTip_2_E": {
+      "message": "die Wahrscheinlichkeit ist sehr gering, dass Sie bösartigen Links oder Payloads ausgesetzt sind"
+   },
+   "toolTip_3_A": {
+      "message": "Reputation: VERTRAUENSWÜRDIG"
+   },
+   "toolTip_3_B": {
+      "message": "Reputation: GERINGES RISIKO"
+   },
+   "toolTip_3_C": {
+      "message": "Reputation: MÄẞIGES RISIKO"
+   },
+   "toolTip_3_D": {
+      "message": "Reputation: VERDÄCHTIG"
+   },
+   "toolTip_3_E": {
+      "message": "Reputation: HOHES RISIKO"
+   }
+}

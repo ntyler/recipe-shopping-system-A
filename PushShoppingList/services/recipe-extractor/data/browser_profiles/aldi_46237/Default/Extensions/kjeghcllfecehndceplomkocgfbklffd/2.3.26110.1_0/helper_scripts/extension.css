@@ -1,0 +1,54 @@
+@import url('/helper_scripts/fonts.css');
+
+body{
+	font-family:"Open Sans", sans-serif;
+	font-size:14px;
+	font-weight:400;
+	color:#1f262f;
+	background-color:#F3F3F3;
+	letter-spacing:0;
+}
+
+input[type=button] {
+	font-family:"Open Sans", sans-serif;
+	border-radius:6px;
+	text-align:center;
+	min-height:40px;
+	font-size:14px;
+	font-weight:bolder;
+	padding:0 12px 0 12px;
+	border:none;
+	cursor:pointer;
+}
+
+.bluebutton {
+	background-color: #005799;
+	color: white;
+}
+
+.bluebutton:hover,
+.bluebutton:focus {
+	background-color:#00457A;
+}
+
+.bluebutton:active {
+	background-color:#002B4C;
+}
+
+.bluebutton:disabled {
+	background-color: #CCCCCC;
+	color: #575757;
+	border-color: #575757;
+	cursor: not-allowed;
+	border: none;
+}
+
+@media (prefers-color-scheme: dark) {
+	.bluebutton:disabled {
+		background-color: #444444;
+		color: #B8B8B8;
+		border-color: #B8B8B8;
+		cursor: not-allowed;
+		border: none;
+	}
+}

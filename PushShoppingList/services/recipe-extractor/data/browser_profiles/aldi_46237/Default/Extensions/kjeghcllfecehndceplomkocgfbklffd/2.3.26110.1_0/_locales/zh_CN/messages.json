@@ -1,0 +1,662 @@
+{
+   "Abortion": {
+      "message": "堕胎"
+   },
+   "Abused_Drugs": {
+      "message": "滥用药物"
+   },
+   "Adult_and_Pornography": {
+      "message": "成人和色情"
+   },
+   "Alcohol_and_Tobacco": {
+      "message": "烟酒"
+   },
+   "Auctions": {
+      "message": "拍卖"
+   },
+   "BA_ERROR_COMPONENT": {
+      "message": "无法访问组件"
+   },
+   "BA_ERROR_HDR": {
+      "message": "连接中断"
+   },
+   "BA_ERROR_TXT": {
+      "message": "评分暂时不可用。 请等待服务恢复正常或在\u003Ca href=\"https://answers.webroot.com/Webroot/Loginr.aspx?pid=12&login=1&app=vw&solutionid=2658\" id=\"grey5\">此处\u003C/a>了解更多信息。"
+   },
+   "BA_ERROR_TXT_COMPONENT": {
+      "message": "Web Threat Shield 无法访问它的一个组件。 请考虑重新启动或重新安装。"
+   },
+   "BA_KEYCODE_COMINGSOON_PREFIX": {
+      "message": "\u003Cb>即将推出：\u003C/b>"
+   },
+   "BA_KEYCODE_FEATURES": {
+      "message": "Web Threat Shield 功能："
+   },
+   "BA_KEYCODE_FEATURE_1": {
+      "message": "\u003Cb>浏览器批注\u003C/b> - 这些批注显示您当前访问的网站的信誉度。"
+   },
+   "BA_KEYCODE_FEATURE_2": {
+      "message": "\u003Cb>搜索批注\u003C/b> - 这些批注在您的浏览器搜索结果中显示页面的信誉度，使您了解哪些网站结果是可以安全访问的。"
+   },
+   "BA_KEYCODE_FEATURE_3": {
+      "message": "\u003Cb>恶意网站实时防护\u003C/b> - 我们将自动为您阻止恶意网站以确保您在网上的安全。"
+   },
+   "BA_KEYCODE_HEADER": {
+      "message": "Web Threat Shield"
+   },
+   "BA_KEYCODE_REMINDMELATER_BUTTON": {
+      "message": "以后提醒我"
+   },
+   "BA_KEYCODE_RENEW_BUTTON": {
+      "message": "续订许可证"
+   },
+   "BA_KEYCODE_WARNING_TEXT_1a": {
+      "message": "密钥将在1天后过期。"
+   },
+   "BA_KEYCODE_WARNING_TEXT_1b": {
+      "message": "密钥将在$days$天后过期。",
+      "placeholders": {
+         "days": {
+            "content": "$1",
+            "example": "2"
+         }
+      }
+   },
+   "BA_KEYCODE_WARNING_TEXT_2": {
+      "message": "您的 Webroot SecureAnywhere 许可证即将到期。 这将影响您的 Web Threat Shield 扩展程序。 请立即续订您的许可证以继续安全地浏览网站！"
+   },
+   "BA_WSAERROR_TXT": {
+      "message": "此扩展程序要求安装并运行 Webroot SecureAnywhere PC 版，在\u003Ca href=\"http://answers.webroot.com/Webroot/Loginr.aspx?pid=12&login=1&app=vw&solutionid=2657\" id=\"grey4\">此处\u003C/a>可了解更多信息。"
+   },
+   "BA_WSAERROR_TXT_OT": {
+      "message": "此扩展程序要求安装并运行 OpenText™ SecureAnywhere PC 版，在\u003Ca href=\"http://answers.webroot.com/Webroot/Loginr.aspx?pid=12&login=1&app=vw&solutionid=2657\" id=\"grey4\">此处\u003C/a>可了解更多信息。"
+   },
+   "Bot_Nets": {
+      "message": "僵尸网络"
+   },
+   "Business_and_Economy": {
+      "message": "商业和经济"
+   },
+   "Cheating": {
+      "message": "欺诈"
+   },
+   "Classification": {
+      "message": "Webroot URL 分类"
+   },
+   "Computer_and_Internet_Info": {
+      "message": "计算机和 Internet 信息"
+   },
+   "Computer_and_Internet_Security": {
+      "message": "计算机和 Internet 安全"
+   },
+   "Confirmed_SPAM_Sources": {
+      "message": "确定的垃圾信息来源"
+   },
+   "Content_Delivery_Networks": {
+      "message": "内容分发网络"
+   },
+   "Cult_and_Occult": {
+      "message": "祭仪和神秘主义"
+   },
+   "DESCRIPTION_TEXT_48": {
+      "message": "此附加程序与 Firefox 48 或更高版本兼容。 \n如果此附加程序被禁用，则表示您正在使用 Firefox 47 或更低版本。请检查附加程序列表，查看该附加程序是否有与所安装 Firefox 兼容的已启用版本。 如果您看不到此附加程序的已启用版本，请联系 Webroot 支持以寻求进一步的协助。"
+   },
+   "Dating": {
+      "message": "约会"
+   },
+   "Dead_Sites": {
+      "message": "废弃站点（仅限数据库操作）"
+   },
+   "Dynamically_Generated_Content": {
+      "message": "动态生成的内容"
+   },
+   "Educational_Institutions": {
+      "message": "教育机构"
+   },
+   "Entertainment_and_Arts": {
+      "message": "娱乐和艺术"
+   },
+   "Fashion_and_Beauty": {
+      "message": "时尚和美容"
+   },
+   "Financial_Services": {
+      "message": "金融服务"
+   },
+   "Gambling": {
+      "message": "博彩"
+   },
+   "Games": {
+      "message": "游戏"
+   },
+   "Government": {
+      "message": "政府部门"
+   },
+   "Gross": {
+      "message": "不雅"
+   },
+   "Hacking": {
+      "message": "黑客入侵"
+   },
+   "Hate_and_Racism": {
+      "message": "仇恨和种族歧视"
+   },
+   "Health_and_Medicine": {
+      "message": "健康和医药"
+   },
+   "Home_and_Garden": {
+      "message": "家居和园艺"
+   },
+   "Hunting_and_Fishing": {
+      "message": "狩猎和捕鱼"
+   },
+   "Illegal": {
+      "message": "非法"
+   },
+   "Image_and_Video_Search": {
+      "message": "图像和视频搜索"
+   },
+   "Individual_Stock_Advice_and_Tools": {
+      "message": "个股建议和工具"
+   },
+   "Internet_Communications": {
+      "message": "Internet 通信"
+   },
+   "Internet_Portals": {
+      "message": "Internet 门户网站"
+   },
+   "Job_Search": {
+      "message": "求职"
+   },
+   "Keyloggers_and_Monitoring": {
+      "message": "按键记录器和监视"
+   },
+   "Kids": {
+      "message": "儿童"
+   },
+   "Legal": {
+      "message": "合法"
+   },
+   "Local_Information": {
+      "message": "本地信息"
+   },
+   "Malware_Sites": {
+      "message": "恶意软件网站"
+   },
+   "Marijuana": {
+      "message": "大麻"
+   },
+   "Military": {
+      "message": "军事"
+   },
+   "Motor_Vehicles": {
+      "message": "机动车"
+   },
+   "Music": {
+      "message": "音乐"
+   },
+   "News_and_Media": {
+      "message": "新闻和媒体"
+   },
+   "Nudity": {
+      "message": "裸露"
+   },
+   "OPTIONS_DONTSHOW": {
+      "message": "请勿再显示此信息"
+   },
+   "OPTIONS_EXPERIMENTAL_LABELPII": {
+      "message": "Warn before sensitive data may be sent to AI-related websites (available on supported platforms)."
+   },
+   "OPTIONS_EXPERIMENTAL_LEARNMOREPII": {
+      "message": "Learn more"
+   },
+   "OPTIONS_EXPERIMENTAL_SETTINGS": {
+      "message": "EXPERIMENTAL SETTINGS"
+   },
+   "OPTIONS_FOOTER_ABOUT": {
+      "message": "关于我们"
+   },
+   "OPTIONS_FOOTER_LEGAL": {
+      "message": "法律"
+   },
+   "OPTIONS_FOOTER_PRIVACY": {
+      "message": "隐私"
+   },
+   "OPTIONS_FORGOT_BUTTON": {
+      "message": "是否需要帮助您找到激活码？"
+   },
+   "OPTIONS_INTEGRATED_ACTIVE": {
+      "message": "激活浏览器扩展"
+   },
+   "OPTIONS_INTEGRATED_HOWTOMODIFY": {
+      "message": "如何修改这些设置？"
+   },
+   "OPTIONS_INTEGRATED_HOWTOUNINSTALL": {
+      "message": "卸载此扩展程序"
+   },
+   "OPTIONS_INTEGRATED_MODE": {
+      "message": "Web Threat Shield 扩展程序设置受 Webroot SecureAnywhere 管理。"
+   },
+   "OPTIONS_INTEGRATED_MODE_DETAILS": {
+      "message": "对于居家工作用户而言，Web Threat Shield 扩展程序的设置应用于安装的 Webroot SecureAnywhere 代理程序中，而对于企业用户而言，这些设置会通过策略应用于管理控制台中。以下显示的是当前设置。"
+   },
+   "OPTIONS_INTEGRATED_MODE_DETAILS_OT": {
+      "message": "对于非托管代理，Web Threat Shield 扩展程序的设置应用于安装的 OpenText™ 代理程序中，而对于企业用户而言，这些设置会通过策略应用于管理控制台中。以下显示的是当前设置。"
+   },
+   "OPTIONS_INTEGRATED_MODE_OT": {
+      "message": "Web Threat Shield 扩展程序设置受 OpenText™ SecureAnywhere 管理。"
+   },
+   "OPTIONS_INTEGRATED_MODE_SAFARI_PERMISSION": {
+      "message": "Setup incomplete! Please allow all pages for this extension!"
+   },
+   "OPTIONS_INTEGRATED_MODE_SAFARI_SETUPINCOMPLETE": {
+      "message": "Setup incomplete! To enable Web Threat Shield, please complete Webroot agent setup and enter a valid keycode!"
+   },
+   "OPTIONS_INTEGRATED_PHISHBLOCKING": {
+      "message": "启用实时反仿冒网站"
+   },
+   "OPTIONS_INTEGRATED_REFRESHNOTE": {
+      "message": "在 SecureAnywhere 代理程序中所作的更改将在另一标签页浏览新页面后反映在这里。"
+   },
+   "OPTIONS_INTEGRATED_SEARCHANNOTATION": {
+      "message": "使用搜索引擎时显示安全级别"
+   },
+   "OPTIONS_INTEGRATED_SETTINGS_HEADLINE": {
+      "message": "当前设置"
+   },
+   "OPTIONS_INTEGRATED_URLBLOCKING": {
+      "message": "阻止恶意网站"
+   },
+   "OPTIONS_KEYCODE_KC_LABEL": {
+      "message": "激活码： "
+   },
+   "OPTIONS_KEYCODE_VALIDATOR_SUCCESS": {
+      "message": "此激活码有效，您的产品正在运行。 无需进一步操作。"
+   },
+   "OPTIONS_KEYCODE_VALIDATOR_WARNING_1": {
+      "message": "激活码无效！"
+   },
+   "OPTIONS_KEYCODE_VALIDATOR_WARNING_2": {
+      "message": "未能连接到服务器！"
+   },
+   "OPTIONS_KEYCODE_VALIDATOR_WARNING_3": {
+      "message": "激活码已到期！"
+   },
+   "OPTIONS_NEW_KEYCODE": {
+      "message": "新激活码："
+   },
+   "OPTIONS_NOTIFICATION_LABEL": {
+      "message": "显示通知和提醒： "
+   },
+   "OPTIONS_NOTIFICATION_VALUE_1": {
+      "message": "始终显示"
+   },
+   "OPTIONS_NOTIFICATION_VALUE_2": {
+      "message": "启动时显示"
+   },
+   "OPTIONS_NOTIFICATION_VALUE_3": {
+      "message": "从不显示"
+   },
+   "OPTIONS_PRIVACY_ALLOW_BUTTON": {
+      "message": "允许"
+   },
+   "OPTIONS_PRIVACY_BACK_BUTTON": {
+      "message": "返回"
+   },
+   "OPTIONS_PRIVACY_DECLINE_BUTTON": {
+      "message": "拒绝"
+   },
+   "OPTIONS_PRIVACY_DECLINE_TEXT1": {
+      "message": "很抱歉，Web Threat Shield 未获得您的许可，无法收集必要的 URL 信息，因此无法正常运行。"
+   },
+   "OPTIONS_PRIVACY_DECLINE_TEXT2": {
+      "message": "如果您不希望重新考虑授予收集此信息的权限，我们建议您删除并卸载此扩展程序。"
+   },
+   "OPTIONS_PRIVACY_DESCRIPTION1": {
+      "message": "适用于 Mozilla Firefox 的 Webroot Web Threat Shield 扩展程序需要获得您的许可才能收集您所访问网页的相关信息（URL 和 IP 地址）。只有获得许可，我们的数据库服务器才能检查网页并检测恶意软件。在未获得此许可的情况下，扩展程序将无法检测任何可能的恶意网站。"
+   },
+   "OPTIONS_PRIVACY_DESCRIPTION1_OT": {
+      "message": "适用于 Mozilla Firefox 的 Web Threat Shield 扩展程序需要获得您的许可才能收集您所访问网页的相关信息（URL 和 IP 地址）。只有获得许可，我们的数据库服务器才能检查网页并检测恶意软件。在未获得此许可的情况下，扩展程序将无法检测任何可能的恶意网站。"
+   },
+   "OPTIONS_PRIVACY_DESCRIPTION2": {
+      "message": "单击“允许”并安装此扩展程序，即表示您同意将您所访问或搜索的 URL 信息转发到 Webroot 服务器，以便我们将该信息与恶意软件数据库中的 URL 进行比对。"
+   },
+   "OPTIONS_PRIVACY_DESCRIPTION2_OT": {
+      "message": "单击“允许”并安装此扩展程序，即表示您同意将您所访问或搜索的 URL 信息转发到 OpenText™ 服务器，以便我们将该信息与恶意软件数据库中的 URL 进行比对。"
+   },
+   "OPTIONS_PRIVACY_DESCRIPTION3": {
+      "message": "有关我们会收集哪些数据以及我们如何保护这些数据的更多信息，请参阅我们的\u003Ca href=\"https://addons.mozilla.org/en-GB/firefox/addon/web-threat-shield/privacy/\" target=\"_blank\">隐私条款\u003C/a>。"
+   },
+   "OPTIONS_PRIVACY_HEADLINE1": {
+      "message": "隐私政策协议"
+   },
+   "OPTIONS_PRIVACY_HEADLINE2": {
+      "message": "隐私政策协议 - 拒绝"
+   },
+   "OPTIONS_PRIVACY_REMOVE_BUTTON": {
+      "message": "删除"
+   },
+   "OPTIONS_STANDALONE_EULATEXT": {
+      "message": "要激活此扩展程序，请在下方输入您的 Webroot SecureAnywhere 激活码。\u003Cbr />点击“验证激活码”即表明您同意\u003Cbr />\u003Ca href=\"https://www.webroot.com/us/en/legal/service-terms-and-conditions\" target=\"_blank\">此处\u003C/a>提供的 Webroot SecureAnywhere 解决方案协议和\u003Cbr />\u003Ca href=\"https://www.webroot.com/us/en/legal/privacy\" target=\"_blank\">此处\u003C/a>提供的 Webroot SecureAnywhere 隐私声明。"
+   },
+   "OPTIONS_SUBSCRIPTION_LABEL": {
+      "message": "订阅剩余天数："
+   },
+   "OPTIONS_SUBSCRIPTION_VALUE": {
+      "message": "  天"
+   },
+   "OPTIONS_SUBSCRIPTION_VALUE_1": {
+      "message": "  天"
+   },
+   "OPTIONS_TITLE": {
+      "message": "Web Threat Shield 设置"
+   },
+   "OPTIONS_VALIDATE_BUTTON": {
+      "message": "验证激活码"
+   },
+   "Online_Greeting_Cards": {
+      "message": "电子贺卡"
+   },
+   "Open_HTTP_Proxies": {
+      "message": "开放式 HTTP 代理"
+   },
+   "PERMISSION_DESC_FF_1": {
+      "message": "此扩展程序需要您的授权才能访问您访问过的所有网站，以便识别恶意软件页面。"
+   },
+   "PERMISSION_DESC_FF_2": {
+      "message": "单击”允许“，Firefox 将打开一个对话框，以确认或拒绝访问。您可以在扩展程序的”权限“选项卡中随时更改权限。"
+   },
+   "PERMISSION_HEADLINE_FF": {
+      "message": "附加浏览器权限"
+   },
+   "PIITYPE_ADDRESS": {
+      "message": "Address"
+   },
+   "PIITYPE_BANK_NUMBER": {
+      "message": "Bank Account"
+   },
+   "PIITYPE_CREDIT_CARD": {
+      "message": "Credit Card"
+   },
+   "PIITYPE_CRYPTO": {
+      "message": "Crypto Key"
+   },
+   "PIITYPE_DRIVER_LICENSE": {
+      "message": "Driver License"
+   },
+   "PIITYPE_EMAIL_ADDRESS": {
+      "message": "Email"
+   },
+   "PIITYPE_IP_ADDRESS": {
+      "message": "IP Address"
+   },
+   "PIITYPE_ITIN": {
+      "message": "ITIN"
+   },
+   "PIITYPE_PASSPORT": {
+      "message": "Passport No"
+   },
+   "PIITYPE_PERSON": {
+      "message": "Person"
+   },
+   "PIITYPE_PHONE_NUMBER": {
+      "message": "Phone"
+   },
+   "PIITYPE_SSN": {
+      "message": "SSN"
+   },
+   "PIITYPE_SWIFT_CODE": {
+      "message": "Swift Code"
+   },
+   "PIITYPE_UNKNOWN": {
+      "message": "Unspecified PII"
+   },
+   "PII_ERROR_LOSTCONTEXT": {
+      "message": "Protection temporarily unavailable. Refresh to continue monitoring!"
+   },
+   "PII_POPUP_ACCURATE": {
+      "message": "Is this information accurate?"
+   },
+   "PII_POPUP_ACCURATE_DONE": {
+      "message": "Thank you for your feedback."
+   },
+   "PII_POPUP_DETECTED": {
+      "message": "$pii$ detected",
+      "placeholders": {
+         "pii": {
+            "content": "$1",
+            "example": "SSN, Credit Card, Email, Phone, Address, Driver License, Passport No, ITIN, IP Address, Swift Code, Crypto Key, Person"
+         }
+      }
+   },
+   "PII_POPUP_HEADLINE": {
+      "message": "Detected Information"
+   },
+   "PII_POPUP_HEADLINE2": {
+      "message": "Information protected"
+   },
+   "PII_POPUP_REDACT": {
+      "message": "Redact"
+   },
+   "PII_POPUP_UNDO": {
+      "message": "Undo"
+   },
+   "Parked_Domains": {
+      "message": "寄放域名"
+   },
+   "Password": {
+      "message": "您输入的密码无效。"
+   },
+   "Pay_to_Surf": {
+      "message": "上网赚钱"
+   },
+   "Peer_to_Peer": {
+      "message": "点对点"
+   },
+   "Personal_Storage": {
+      "message": "个人存储"
+   },
+   "Personal_sites_and_Blogs": {
+      "message": "个人网站和博客"
+   },
+   "Philosophy_and_Political_Advocacy": {
+      "message": "哲学和政治主张"
+   },
+   "Phishing_and_Other_Frauds": {
+      "message": "网络钓鱼和其他欺诈"
+   },
+   "Private_IP_Addresses": {
+      "message": "私有 IP 地址"
+   },
+   "Proxy_Avoidance_and_Anonymizers": {
+      "message": "代理规避和匿名程序"
+   },
+   "Questionable": {
+      "message": "可疑"
+   },
+   "Real_Estate": {
+      "message": "房地产"
+   },
+   "Recreation_and_Hobbies": {
+      "message": "休闲娱乐和爱好"
+   },
+   "Reference_and_Research": {
+      "message": "参考和研究"
+   },
+   "Religion": {
+      "message": "宗教"
+   },
+   "SPAM_URLs": {
+      "message": "垃圾信息 URL"
+   },
+   "SRA_ERROR_TXT": {
+      "message": " 评分暂时不可用或 Webroot 代理已关闭。 请等待服务恢复正常或检查以确保 Webroot 代理正在运行。"
+   },
+   "Search_Engines": {
+      "message": "搜索引擎"
+   },
+   "Sex_Education": {
+      "message": "性教育"
+   },
+   "Shareware_and_Freeware": {
+      "message": "共享软件和免费软件"
+   },
+   "Shopping": {
+      "message": "购物"
+   },
+   "Social_Networking": {
+      "message": "社交网络"
+   },
+   "Society": {
+      "message": "社会"
+   },
+   "Sports": {
+      "message": "体育运动"
+   },
+   "Spyware_and_Adware": {
+      "message": "间谍软件和广告软件"
+   },
+   "Streaming_Media": {
+      "message": "流媒体"
+   },
+   "Sure": {
+      "message": "确定"
+   },
+   "Swimsuits_Intimate_Apparel": {
+      "message": "泳装和内衣"
+   },
+   "TEXT_BA_ERROR": {
+      "message": "评分暂时不可用或 Webroot 代理已关闭。 请等待服务恢复正常或检查以确保 Webroot 代理正在运行。"
+   },
+   "TEXT_RISK": {
+      "message": "此站点包含恶意软件或其他安全风险。"
+   },
+   "TEXT_SUSPICIOUS": {
+      "message": "此站点可能包含影响您在线安全的内容。"
+   },
+   "TEXT_TRUSTWORTHY": {
+      "message": "安全，您可以继续操作。"
+   },
+   "TITLE_BCAP_BOTNET": {
+      "message": "检测到僵尸网络网站"
+   },
+   "TITLE_BCAP_KEYLOGGER": {
+      "message": "检测到按键监视网站"
+   },
+   "TITLE_BCAP_MALWARE": {
+      "message": "检测到恶意软件网站"
+   },
+   "TITLE_BCAP_PHISHING": {
+      "message": "检测到网络钓鱼网站"
+   },
+   "TITLE_BCAP_RISK": {
+      "message": "恶意的"
+   },
+   "TITLE_BCAP_SPAM": {
+      "message": "检测到垃圾信息网站"
+   },
+   "TITLE_BCAP_SPYWARE": {
+      "message": "检测到间谍软件/广告软件网站"
+   },
+   "TITLE_BCAP_SUSPICIOUS": {
+      "message": "注意"
+   },
+   "TITLE_BCAP_TRUSTWORTHY": {
+      "message": "可靠的"
+   },
+   "TITLE_RTAP_PHISHING": {
+      "message": "评估为网络钓鱼网站"
+   },
+   "Training_and_Tools": {
+      "message": "培训和工具"
+   },
+   "Translation": {
+      "message": "翻译"
+   },
+   "Travel": {
+      "message": "旅游"
+   },
+   "Trustworthy": {
+      "message": "可信"
+   },
+   "Uncategorized": {
+      "message": "未分类"
+   },
+   "Unconfirmed_SPAM_Sources": {
+      "message": "未确定的垃圾信息来源"
+   },
+   "Violence": {
+      "message": "暴力"
+   },
+   "Weapons": {
+      "message": "武器"
+   },
+   "Web_Advertisements": {
+      "message": "网络广告"
+   },
+   "Web_Hosting": {
+      "message": "Web 托管"
+   },
+   "Web_based_email": {
+      "message": "基于 Web 的电子邮件"
+   },
+   "category": {
+      "message": "类别"
+   },
+   "confidence": {
+      "message": "置信度"
+   },
+   "description": {
+      "message": "通过识别和阻止危险网站，在您网上冲浪时确保您的安全。"
+   },
+   "failed": {
+      "message": "未能连接到服务器"
+   },
+   "processing": {
+      "message": "正在处理链接"
+   },
+   "score": {
+      "message": "分数"
+   },
+   "serverUnAvailable": {
+      "message": "评分暂时不可用。  我们正在努力恢复服务。 无需用户操作"
+   },
+   "toolTip_1_A": {
+      "message": "此网站归入类别"
+   },
+   "toolTip_1_B": {
+      "message": "如果访问此网站，"
+   },
+   "toolTip_1_C": {
+      "message": "而且"
+   },
+   "toolTip_2_A": {
+      "message": "您接触到恶意链接或负载的可能性很高"
+   },
+   "toolTip_2_B": {
+      "message": "您接触到恶意链接或负载的可能性高于平均水平"
+   },
+   "toolTip_2_C": {
+      "message": "您有一定可能会接触到恶意链接或负载"
+   },
+   "toolTip_2_D": {
+      "message": "您接触到恶意链接或负载的可能性较低"
+   },
+   "toolTip_2_E": {
+      "message": "您接触到恶意链接或负载的可能性非常低"
+   },
+   "toolTip_3_A": {
+      "message": "信誉度： 可信"
+   },
+   "toolTip_3_B": {
+      "message": "信誉度： 低风险"
+   },
+   "toolTip_3_C": {
+      "message": "信誉度： 中等风险"
+   },
+   "toolTip_3_D": {
+      "message": "信誉度： 可疑"
+   },
+   "toolTip_3_E": {
+      "message": "信誉度： 高风险"
+   }
+}

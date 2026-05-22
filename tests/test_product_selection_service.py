@@ -72,6 +72,39 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertFalse(candidate_has_direct_product_url(item))
         self.assertIn("A direct product URL was not available; search-page links are not selectable.", skip_reasons)
 
+    def test_strong_rendered_card_can_rank_without_detail_page(self):
+        item = candidate("Simply Nature Organic Bread")
+        item.update({
+            "source": "browser-visible-card",
+            "detail_evaluated": False,
+            "product_url": "https://www.aldi.us/store/aldi/products/25350346-simply-nature-seedtastic-organic-bread-27-oz",
+            "search_url": "https://www.aldi.us/store/aldi/s?k=bread",
+            "card_text_excerpt": "Simply Nature Organic Bread 27 oz Many in stock Current price: $3.99",
+            "raw_product_html_snippet": "<li>Simply Nature Organic Bread 27 oz Many in stock $3.99</li>",
+            "skip_reasons": ["Full product page was not evaluated because the per-store detail limit is 4."],
+        })
+
+        _, reasons, skip_reasons, viable = score_candidate("bread", item)
+
+        self.assertTrue(viable)
+        self.assertIn("Visible product card has enough direct product evidence for ranking.", reasons)
+        self.assertNotIn("Full product page was not successfully evaluated.", skip_reasons)
+
+    def test_generic_card_name_still_requires_detail_page_confirmation(self):
+        item = candidate("Bread")
+        item.update({
+            "source": "browser-visible-card",
+            "detail_evaluated": False,
+            "product_url": "https://www.aldi.us/store/aldi/products/19876330-bake-shop-large-croissants-12-oz",
+            "search_url": "https://www.aldi.us/store/aldi/s?k=bread",
+            "card_text_excerpt": "Bread Current price: $2.79 Large Croissants 12 oz Many in stock",
+        })
+
+        _, _, skip_reasons, viable = score_candidate("bread", item)
+
+        self.assertFalse(viable)
+        self.assertIn("Full product page was not successfully evaluated.", skip_reasons)
+
     def test_chatgpt_mismatch_is_not_selectable(self):
         item = candidate("Organic Lemon")
         item["chatgpt_analysis"] = {
@@ -518,6 +551,16 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertTrue(status["ok"])
         self.assertTrue(status["proof_of_store_selection"])
         self.assertIn("46237", " ".join(status["proof_of_store_selection"]))
+
+    def test_aldi_uses_zip_scoped_persistent_browser_profile(self):
+        profile_dir = product_service.store_browser_profile_dir(
+            "aldi",
+            "5905 Arlo Drive, Indianapolis, IN 46237",
+            {"address": "Aldi, 6835 South Emerson Avenue, Indianapolis, IN 46237"},
+        )
+
+        self.assertEqual(profile_dir.name, "aldi_46237")
+        self.assertIn("browser_profiles", str(profile_dir))
 
     def test_aldi_address_selection_can_continue_to_actual_search_without_proof_bypass(self):
         status = {

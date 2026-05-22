@@ -49,9 +49,11 @@ PRODUCT_RESULTS_FILE = BASE_DIR / "recipe-extractor" / "data" / "product_results
 PRODUCT_PROGRESS_FILE = BASE_DIR / "recipe-extractor" / "data" / "product_progress.json"
 PRODUCT_RENDERED_HTML_DIR = BASE_DIR / "recipe-extractor" / "data" / "raw" / "product_pages"
 PRODUCT_PROMPTS_DIR = BASE_DIR / "recipe-extractor" / "data" / "raw" / "product_prompts"
+PRODUCT_BROWSER_PROFILES_DIR = BASE_DIR / "recipe-extractor" / "data" / "browser_profiles"
 PRODUCT_CHOICES_FILE.parent.mkdir(parents=True, exist_ok=True)
 PRODUCT_RENDERED_HTML_DIR.mkdir(parents=True, exist_ok=True)
 PRODUCT_PROMPTS_DIR.mkdir(parents=True, exist_ok=True)
+PRODUCT_BROWSER_PROFILES_DIR.mkdir(parents=True, exist_ok=True)
 
 REQUEST_HEADERS = {
     "User-Agent": "PushShoppingList/1.0 local product finder",
@@ -3786,6 +3788,7 @@ def search_store_products_with_browser_agent(
                 prefer_undetected=True,
                 page_load_strategy="normal",
                 headless=not browser_visible,
+                user_data_dir=store_browser_profile_dir(store_key, full_address, store_location),
             )
             if browser_visible:
                 try:
@@ -3946,6 +3949,16 @@ def visual_browser_pause(enabled, seconds):
     if seconds <= 0:
         return
     time.sleep(min(60, seconds))
+
+
+def store_browser_profile_dir(store_key, full_address="", store_location=None):
+    if normalize_item_key(store_key) != "aldi":
+        return None
+
+    zip_code = extract_zip_code((store_location or {}).get("address", "")) or extract_zip_code(full_address)
+    profile_key = zip_code or hashlib.sha1(clean_text(full_address).encode("utf-8", errors="ignore")).hexdigest()[:10]
+    profile_key = re.sub(r"[^a-zA-Z0-9_-]+", "_", profile_key or "default").strip("_") or "default"
+    return PRODUCT_BROWSER_PROFILES_DIR / f"aldi_{profile_key}"
 
 
 def close_browser_after_rendered_snapshot(driver, browser_visible=False, browser_visual_hold_seconds=0):

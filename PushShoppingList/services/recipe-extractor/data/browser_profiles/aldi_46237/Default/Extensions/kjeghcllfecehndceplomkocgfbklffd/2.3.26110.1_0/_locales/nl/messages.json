@@ -1,0 +1,662 @@
+{
+   "Abortion": {
+      "message": "Abortus"
+   },
+   "Abused_Drugs": {
+      "message": "Drugmisbruik"
+   },
+   "Adult_and_Pornography": {
+      "message": "Pornografie"
+   },
+   "Alcohol_and_Tobacco": {
+      "message": "Alcohol en tabak"
+   },
+   "Auctions": {
+      "message": "Veilingen"
+   },
+   "BA_ERROR_COMPONENT": {
+      "message": "Onderdeel kan niet worden bereikt"
+   },
+   "BA_ERROR_HDR": {
+      "message": "Verbinding verbroken"
+   },
+   "BA_ERROR_TXT": {
+      "message": "Beoordelingen zijn tijdelijk niet beschikbaar. Wacht tot de service is hersteld of kijk \u003Ca href=\"https://answers.webroot.com/Webroot/Loginr.aspx?pid=12&login=1&app=vw&solutionid=2658\" id=\"grey5\">hier\u003C/a> voor meer informatie."
+   },
+   "BA_ERROR_TXT_COMPONENT": {
+      "message": "Web Threat Shield kan een van de onderdelen niet bereiken. Overweeg de toepassing opnieuw te starten of te installeren."
+   },
+   "BA_KEYCODE_COMINGSOON_PREFIX": {
+      "message": "\u003Cb>BINNENKORT:\u003C/b>"
+   },
+   "BA_KEYCODE_FEATURES": {
+      "message": "Eigenschappen van Web Threat Shield:"
+   },
+   "BA_KEYCODE_FEATURE_1": {
+      "message": "\u003Cb>Browseraantekeningen\u003C/b>: tonen de reputatie van de site die u momenteel bezoekt."
+   },
+   "BA_KEYCODE_FEATURE_2": {
+      "message": "\u003Cb>Zoekaantekeningen\u003C/b>: tonen de reputatie van pagina's in de zoekresultaten van uw browser, zodat u weet op welke sites u veilig kunt klikken."
+   },
+   "BA_KEYCODE_FEATURE_3": {
+      "message": "\u003Cb>Realtime bescherming tegen schadelijke sites\u003C/b>: we blokkeren automatisch schadelijke sites voor u, zodat u online veilig bent."
+   },
+   "BA_KEYCODE_HEADER": {
+      "message": "Web Threat Shield"
+   },
+   "BA_KEYCODE_REMINDMELATER_BUTTON": {
+      "message": "Me later herinneren"
+   },
+   "BA_KEYCODE_RENEW_BUTTON": {
+      "message": "Licentie vernieuwen"
+   },
+   "BA_KEYCODE_WARNING_TEXT_1a": {
+      "message": "Sleutelcode verloopt over 1 dag."
+   },
+   "BA_KEYCODE_WARNING_TEXT_1b": {
+      "message": "Sleutelcode verloopt over $days$ dagen.",
+      "placeholders": {
+         "days": {
+            "content": "$1",
+            "example": "2"
+         }
+      }
+   },
+   "BA_KEYCODE_WARNING_TEXT_2": {
+      "message": "Uw licentie voor Webroot SecureAnywhere verloopt. Dat heeft gevolgen voor uw extensies van Web Threat Shield. Vernieuw uw licentie vandaag om veilig op het internet te kunnen blijven surfen!"
+   },
+   "BA_WSAERROR_TXT": {
+      "message": "Deze extensie vereist dat Webroot SecureAnywhere PC is geïnstalleerd en actief is. Kijk \u003Ca href=\"http://answers.webroot.com/Webroot/Loginr.aspx?pid=12&login=1&app=vw&solutionid=2657\" id=\"grey4\">hier\u003C/a> voor meer informatie."
+   },
+   "BA_WSAERROR_TXT_OT": {
+      "message": "Deze extensie vereist dat OpenText™ SecureAnywhere PC is geïnstalleerd en actief is. Kijk \u003Ca href=\"http://answers.webroot.com/Webroot/Loginr.aspx?pid=12&login=1&app=vw&solutionid=2657\" id=\"grey4\">hier\u003C/a> voor meer informatie."
+   },
+   "Bot_Nets": {
+      "message": "Botnets"
+   },
+   "Business_and_Economy": {
+      "message": "Zaken en economie"
+   },
+   "Cheating": {
+      "message": "Bedrog"
+   },
+   "Classification": {
+      "message": "URL-classificatie van Webroot"
+   },
+   "Computer_and_Internet_Info": {
+      "message": "Computer- en internetinformatie"
+   },
+   "Computer_and_Internet_Security": {
+      "message": "Computer- en internetbeveiliging"
+   },
+   "Confirmed_SPAM_Sources": {
+      "message": "Bevestigde SPAM-bronnen"
+   },
+   "Content_Delivery_Networks": {
+      "message": "Content delivery networks"
+   },
+   "Cult_and_Occult": {
+      "message": "Cult en het occulte"
+   },
+   "DESCRIPTION_TEXT_48": {
+      "message": "Deze add-on is compatibel met Firefox 48 of hoger. \nAls deze add-on is uitgeschakeld, gebruikt u een versie van Firefox 47 of ouder. Zoek in de lijst met add-ons een ingeschakelde versie van de add-on die compatibel is met uw Firefox-installatie. Als u geen ingeschakelde versie van de add-on ziet, neem dan voor hulp contact met de ondersteuning van Webroot op."
+   },
+   "Dating": {
+      "message": "Daten"
+   },
+   "Dead_Sites": {
+      "message": "Dode sites (alleen database Ops)"
+   },
+   "Dynamically_Generated_Content": {
+      "message": "Dynamische gegenereerde content"
+   },
+   "Educational_Institutions": {
+      "message": "Onderwijsinstellingen"
+   },
+   "Entertainment_and_Arts": {
+      "message": "Vermaak en kunst"
+   },
+   "Fashion_and_Beauty": {
+      "message": "Mode en schoonheid"
+   },
+   "Financial_Services": {
+      "message": "Financiële diensten"
+   },
+   "Gambling": {
+      "message": "Gokken"
+   },
+   "Games": {
+      "message": "Games"
+   },
+   "Government": {
+      "message": "Overheid"
+   },
+   "Gross": {
+      "message": "Grof"
+   },
+   "Hacking": {
+      "message": "Hacken"
+   },
+   "Hate_and_Racism": {
+      "message": "Haat en racisme"
+   },
+   "Health_and_Medicine": {
+      "message": "Gezondheid en medicijnen"
+   },
+   "Home_and_Garden": {
+      "message": "Huis en tuin"
+   },
+   "Hunting_and_Fishing": {
+      "message": "Jagen en vissen"
+   },
+   "Illegal": {
+      "message": "Illegaal"
+   },
+   "Image_and_Video_Search": {
+      "message": "Afbeeldingen en video's zoeken"
+   },
+   "Individual_Stock_Advice_and_Tools": {
+      "message": "Individueel beleggingsadvies en tools"
+   },
+   "Internet_Communications": {
+      "message": "Internetcommunicatie"
+   },
+   "Internet_Portals": {
+      "message": "Internetportals"
+   },
+   "Job_Search": {
+      "message": "Baan zoeken"
+   },
+   "Keyloggers_and_Monitoring": {
+      "message": "Keyloggers en controle"
+   },
+   "Kids": {
+      "message": "Kinderen"
+   },
+   "Legal": {
+      "message": "Juridisch"
+   },
+   "Local_Information": {
+      "message": "Plaatselijke informatie"
+   },
+   "Malware_Sites": {
+      "message": "Malwaresites"
+   },
+   "Marijuana": {
+      "message": "Marihuana"
+   },
+   "Military": {
+      "message": "Militair"
+   },
+   "Motor_Vehicles": {
+      "message": "Motorvoertuigen"
+   },
+   "Music": {
+      "message": "Muziek"
+   },
+   "News_and_Media": {
+      "message": "Nieuws en media"
+   },
+   "Nudity": {
+      "message": "Naaktheid"
+   },
+   "OPTIONS_DONTSHOW": {
+      "message": "Dit niet meer tonen"
+   },
+   "OPTIONS_EXPERIMENTAL_LABELPII": {
+      "message": "Warn before sensitive data may be sent to AI-related websites (available on supported platforms)."
+   },
+   "OPTIONS_EXPERIMENTAL_LEARNMOREPII": {
+      "message": "Learn more"
+   },
+   "OPTIONS_EXPERIMENTAL_SETTINGS": {
+      "message": "EXPERIMENTAL SETTINGS"
+   },
+   "OPTIONS_FOOTER_ABOUT": {
+      "message": "Over ons"
+   },
+   "OPTIONS_FOOTER_LEGAL": {
+      "message": "Juridisch"
+   },
+   "OPTIONS_FOOTER_PRIVACY": {
+      "message": "Privacy"
+   },
+   "OPTIONS_FORGOT_BUTTON": {
+      "message": "Hulp nodig bij het vinden van uw toegangscode?"
+   },
+   "OPTIONS_INTEGRATED_ACTIVE": {
+      "message": "Browseruitbreidingen activeren"
+   },
+   "OPTIONS_INTEGRATED_HOWTOMODIFY": {
+      "message": "Hoe wijzigt u deze instellingen?"
+   },
+   "OPTIONS_INTEGRATED_HOWTOUNINSTALL": {
+      "message": "Verwijder deze extensie"
+   },
+   "OPTIONS_INTEGRATED_MODE": {
+      "message": "Instellingen van de extensie Web Threat Shield worden beheerd door Webroot SecureAnywhere."
+   },
+   "OPTIONS_INTEGRATED_MODE_DETAILS": {
+      "message": "Instellingen van de extensie Web Threat Shield worden toegepast in de geïnstalleerde Webroot SecureAnywhere-agent voor thuisgebruikers of door beleid in de beheerconsole voor zakelijke gebruikers. De huidige instellingen staan hieronder."
+   },
+   "OPTIONS_INTEGRATED_MODE_DETAILS_OT": {
+      "message": "Instellingen van de extensie Web Threat Shield worden toegepast in de geïnstalleerde OpenText™-agent voor onbeheerde agenten of door beleid in de beheerconsole voor zakelijke gebruikers. De huidige instellingen staan hieronder."
+   },
+   "OPTIONS_INTEGRATED_MODE_OT": {
+      "message": "Instellingen van de extensie Web Threat Shield worden beheerd door OpenText™ SecureAnywhere."
+   },
+   "OPTIONS_INTEGRATED_MODE_SAFARI_PERMISSION": {
+      "message": "Setup incomplete! Please allow all pages for this extension!"
+   },
+   "OPTIONS_INTEGRATED_MODE_SAFARI_SETUPINCOMPLETE": {
+      "message": "Setup incomplete! To enable Web Threat Shield, please complete Webroot agent setup and enter a valid keycode!"
+   },
+   "OPTIONS_INTEGRATED_PHISHBLOCKING": {
+      "message": "Realtime anti-phishing inschakelen"
+   },
+   "OPTIONS_INTEGRATED_REFRESHNOTE": {
+      "message": "Wijzigingen die zijn aangebracht in de SecureAnywhere-agent worden hier getoond nadat u naar een nieuwe pagina in een ander tabblad bent gegaan."
+   },
+   "OPTIONS_INTEGRATED_SEARCHANNOTATION": {
+      "message": "Veiligheidsbeoordeling tonen bij gebruik van zoekmachines"
+   },
+   "OPTIONS_INTEGRATED_SETTINGS_HEADLINE": {
+      "message": "HUIDIGE INSTELLINGEN"
+   },
+   "OPTIONS_INTEGRATED_URLBLOCKING": {
+      "message": "Malafide websites blokkeren"
+   },
+   "OPTIONS_KEYCODE_KC_LABEL": {
+      "message": "Toegangscode: "
+   },
+   "OPTIONS_KEYCODE_VALIDATOR_SUCCESS": {
+      "message": "Deze toegangscode is geldig en uw product is actief. Geen verdere actie door gebruiker vereist."
+   },
+   "OPTIONS_KEYCODE_VALIDATOR_WARNING_1": {
+      "message": "Ongeldige toegangscode."
+   },
+   "OPTIONS_KEYCODE_VALIDATOR_WARNING_2": {
+      "message": "Maken van verbinding met server mislukt."
+   },
+   "OPTIONS_KEYCODE_VALIDATOR_WARNING_3": {
+      "message": "Toegangscode verlopen."
+   },
+   "OPTIONS_NEW_KEYCODE": {
+      "message": "Nieuwe toegangscode:"
+   },
+   "OPTIONS_NOTIFICATION_LABEL": {
+      "message": "Meldingen en herinneringen weergeven: "
+   },
+   "OPTIONS_NOTIFICATION_VALUE_1": {
+      "message": "Altijd"
+   },
+   "OPTIONS_NOTIFICATION_VALUE_2": {
+      "message": "Bij starten"
+   },
+   "OPTIONS_NOTIFICATION_VALUE_3": {
+      "message": "Nooit"
+   },
+   "OPTIONS_PRIVACY_ALLOW_BUTTON": {
+      "message": "Toestaan"
+   },
+   "OPTIONS_PRIVACY_BACK_BUTTON": {
+      "message": "Terug"
+   },
+   "OPTIONS_PRIVACY_DECLINE_BUTTON": {
+      "message": "Afwijzen"
+   },
+   "OPTIONS_PRIVACY_DECLINE_TEXT1": {
+      "message": "Zonder uw toestemming om de benodigde URL-informatie te verzamelen kan Web Threat Shield helaas niet functioneren zoals bedoeld."
+   },
+   "OPTIONS_PRIVACY_DECLINE_TEXT2": {
+      "message": "Tenzij u de toestemming om deze informatie te verzamelen wilt heroverwegen, raden we u aan de extensie te verwijderen."
+   },
+   "OPTIONS_PRIVACY_DESCRIPTION1": {
+      "message": "De Webroot-extensie Web Threat Shield for Mozilla Firefox heeft uw toestemming nodig om informatie te verzamelen over de webpagina's die u bezoekt (URL's en IP-adressen). Onze databaseservers hebben deze toestemming nodig om webpagina's te controleren en malware te detecteren. Zonder deze toestemming kan de extensie geen potentieel schadelijke sites detecteren."
+   },
+   "OPTIONS_PRIVACY_DESCRIPTION1_OT": {
+      "message": "De extensie Web Threat Shield for Mozilla Firefox heeft uw toestemming nodig om informatie te verzamelen over de webpagina's die u bezoekt (URL's en IP-adressen). Onze databaseservers hebben deze toestemming nodig om webpagina's te controleren en malware te detecteren. Zonder deze toestemming kan de extensie geen potentieel schadelijke sites detecteren."
+   },
+   "OPTIONS_PRIVACY_DESCRIPTION2": {
+      "message": "Door op Toestaan te klikken en de extensie te installeren gaat u ermee akkoord informatie over bezochte of doorzochte URL's naar Webroot-servers door te sturen, zodat de URL's kunnen worden vergeleken met URL's in de malwaredatabases."
+   },
+   "OPTIONS_PRIVACY_DESCRIPTION2_OT": {
+      "message": "Door op Toestaan te klikken en de extensie te installeren gaat u ermee akkoord informatie over bezochte of doorzochte URL's naar OpenText™-servers door te sturen, zodat de URL's kunnen worden vergeleken met URL's in de malwaredatabases."
+   },
+   "OPTIONS_PRIVACY_DESCRIPTION3": {
+      "message": "Voor meer informatie over welke gegevens we verzamelen en hoe we deze beschermen, verwijzen we u naar ons \u003Ca href=\"https://addons.mozilla.org/en-GB/firefox/addon/web-threat-shield/privacy/\" target=\"_blank\">privacybeleid\u003C/a>."
+   },
+   "OPTIONS_PRIVACY_HEADLINE1": {
+      "message": "Overeenkomst privacybeleid"
+   },
+   "OPTIONS_PRIVACY_HEADLINE2": {
+      "message": "Overeenkomst privacybeleid - afgewezen"
+   },
+   "OPTIONS_PRIVACY_REMOVE_BUTTON": {
+      "message": "Verwijderen"
+   },
+   "OPTIONS_STANDALONE_EULATEXT": {
+      "message": "Als u deze extensie wilt activeren, voert u hieronder uw Webroot SecureAnywhere-sleutelcode in.\u003Cbr />Door op \"Toegangscode valideren\" te klikken gaat u akkoord met de Overeenkomst Webroot SecureAnywhere-\u003Cbr />oplossing, die \u003Ca href=\"https://www.webroot.com/us/en/legal/service-terms-and-conditions\" target=\"_blank\">hier\u003C/a> beschikbaar is, en de privacyverklaring van Webroot SecureAnywhere, die\u003Cbr />\u003Ca href=\"https://www.webroot.com/us/en/legal/privacy\" target=\"_blank\">hier\u003C/a> beschikbaar is."
+   },
+   "OPTIONS_SUBSCRIPTION_LABEL": {
+      "message": "Resterend aantal dagen van abonnement:"
+   },
+   "OPTIONS_SUBSCRIPTION_VALUE": {
+      "message": "  dagen"
+   },
+   "OPTIONS_SUBSCRIPTION_VALUE_1": {
+      "message": "  Dag"
+   },
+   "OPTIONS_TITLE": {
+      "message": "Instellingen van Web Threat Shield"
+   },
+   "OPTIONS_VALIDATE_BUTTON": {
+      "message": "Toegangscode valideren"
+   },
+   "Online_Greeting_Cards": {
+      "message": "Online wenskaarten"
+   },
+   "Open_HTTP_Proxies": {
+      "message": "Open HTTP-proxies"
+   },
+   "PERMISSION_DESC_FF_1": {
+      "message": "Deze extensie vereist uw toestemming om toegang te krijgen tot alle websites die u bezoekt om malwarepagina's te identificeren."
+   },
+   "PERMISSION_DESC_FF_2": {
+      "message": "Door op Toestaan te klikken, opent Firefox een dialoogvenster om de toegang te bevestigen of te weigeren. U kunt de machtigingen op elk moment wijzigen op het tabblad 'Toestemmingen' van de extensie."
+   },
+   "PERMISSION_HEADLINE_FF": {
+      "message": "Aanvullende browsermachtigingen"
+   },
+   "PIITYPE_ADDRESS": {
+      "message": "Address"
+   },
+   "PIITYPE_BANK_NUMBER": {
+      "message": "Bank Account"
+   },
+   "PIITYPE_CREDIT_CARD": {
+      "message": "Credit Card"
+   },
+   "PIITYPE_CRYPTO": {
+      "message": "Crypto Key"
+   },
+   "PIITYPE_DRIVER_LICENSE": {
+      "message": "Driver License"
+   },
+   "PIITYPE_EMAIL_ADDRESS": {
+      "message": "Email"
+   },
+   "PIITYPE_IP_ADDRESS": {
+      "message": "IP Address"
+   },
+   "PIITYPE_ITIN": {
+      "message": "ITIN"
+   },
+   "PIITYPE_PASSPORT": {
+      "message": "Passport No"
+   },
+   "PIITYPE_PERSON": {
+      "message": "Person"
+   },
+   "PIITYPE_PHONE_NUMBER": {
+      "message": "Phone"
+   },
+   "PIITYPE_SSN": {
+      "message": "SSN"
+   },
+   "PIITYPE_SWIFT_CODE": {
+      "message": "Swift Code"
+   },
+   "PIITYPE_UNKNOWN": {
+      "message": "Unspecified PII"
+   },
+   "PII_ERROR_LOSTCONTEXT": {
+      "message": "Protection temporarily unavailable. Refresh to continue monitoring!"
+   },
+   "PII_POPUP_ACCURATE": {
+      "message": "Is this information accurate?"
+   },
+   "PII_POPUP_ACCURATE_DONE": {
+      "message": "Thank you for your feedback."
+   },
+   "PII_POPUP_DETECTED": {
+      "message": "$pii$ detected",
+      "placeholders": {
+         "pii": {
+            "content": "$1",
+            "example": "SSN, Credit Card, Email, Phone, Address, Driver License, Passport No, ITIN, IP Address, Swift Code, Crypto Key, Person"
+         }
+      }
+   },
+   "PII_POPUP_HEADLINE": {
+      "message": "Detected Information"
+   },
+   "PII_POPUP_HEADLINE2": {
+      "message": "Information protected"
+   },
+   "PII_POPUP_REDACT": {
+      "message": "Redact"
+   },
+   "PII_POPUP_UNDO": {
+      "message": "Undo"
+   },
+   "Parked_Domains": {
+      "message": "Geparkeerde domeinen"
+   },
+   "Password": {
+      "message": "Het wachtwoord dat u hebt ingevoerd, is ongeldig."
+   },
+   "Pay_to_Surf": {
+      "message": "Betalen om te surfen"
+   },
+   "Peer_to_Peer": {
+      "message": "Peer-to-peer"
+   },
+   "Personal_Storage": {
+      "message": "Persoonlijke opslag"
+   },
+   "Personal_sites_and_Blogs": {
+      "message": "Persoonlijke sites en blogs"
+   },
+   "Philosophy_and_Political_Advocacy": {
+      "message": "Filosofie en politieke belangenbehartiging"
+   },
+   "Phishing_and_Other_Frauds": {
+      "message": "Phishing en andere fraude"
+   },
+   "Private_IP_Addresses": {
+      "message": "Persoonlijke IP-adressen"
+   },
+   "Proxy_Avoidance_and_Anonymizers": {
+      "message": "Proxy-omzeiling en anoniem surfen"
+   },
+   "Questionable": {
+      "message": "Twijfelachtig"
+   },
+   "Real_Estate": {
+      "message": "Vastgoed"
+   },
+   "Recreation_and_Hobbies": {
+      "message": "Vrije tijd en hobby's"
+   },
+   "Reference_and_Research": {
+      "message": "Referentie en onderzoek"
+   },
+   "Religion": {
+      "message": "Godsdienst"
+   },
+   "SPAM_URLs": {
+      "message": "SPAM-URL's"
+   },
+   "SRA_ERROR_TXT": {
+      "message": " Beoordelingen zijn tijdelijk niet beschikbaar of de Webroot-agent is afgesloten. Wacht tot de service is hersteld of controleer of de Webroot-agent actief is."
+   },
+   "Search_Engines": {
+      "message": "Zoekmachines"
+   },
+   "Sex_Education": {
+      "message": "Seksuele voorlichting"
+   },
+   "Shareware_and_Freeware": {
+      "message": "Shareware en freeware"
+   },
+   "Shopping": {
+      "message": "Winkelen"
+   },
+   "Social_Networking": {
+      "message": "Sociale netwerken"
+   },
+   "Society": {
+      "message": "Gemeenschap"
+   },
+   "Sports": {
+      "message": "Sport"
+   },
+   "Spyware_and_Adware": {
+      "message": "Spyware en adware"
+   },
+   "Streaming_Media": {
+      "message": "Streaming media"
+   },
+   "Sure": {
+      "message": "zeker"
+   },
+   "Swimsuits_Intimate_Apparel": {
+      "message": "Zwemkleding en lingerie"
+   },
+   "TEXT_BA_ERROR": {
+      "message": "Beoordelingen zijn tijdelijk niet beschikbaar of de Webroot-agent is afgesloten. Wacht tot de service is hersteld of controleer of de Webroot-agent actief is."
+   },
+   "TEXT_RISK": {
+      "message": "Deze site bevat malware of andere beveiligingsrisico's."
+   },
+   "TEXT_SUSPICIOUS": {
+      "message": "Deze site kan onveilige content bevatten."
+   },
+   "TEXT_TRUSTWORTHY": {
+      "message": "U kunt veilig doorgaan."
+   },
+   "TITLE_BCAP_BOTNET": {
+      "message": "Gedetecteerde botnetsite"
+   },
+   "TITLE_BCAP_KEYLOGGER": {
+      "message": "Gedetecteerde site die toetsaanslagen controleert"
+   },
+   "TITLE_BCAP_MALWARE": {
+      "message": "Gedetecteerde malwaresite"
+   },
+   "TITLE_BCAP_PHISHING": {
+      "message": "Gedetecteerde phishingsite"
+   },
+   "TITLE_BCAP_RISK": {
+      "message": "Schadelijk"
+   },
+   "TITLE_BCAP_SPAM": {
+      "message": "Gedetecteerde spamsite"
+   },
+   "TITLE_BCAP_SPYWARE": {
+      "message": "Gedetecteerde spyware/adware-site"
+   },
+   "TITLE_BCAP_SUSPICIOUS": {
+      "message": "Let op"
+   },
+   "TITLE_BCAP_TRUSTWORTHY": {
+      "message": "Betrouwbaar"
+   },
+   "TITLE_RTAP_PHISHING": {
+      "message": "Beoordeeld als een phishingsite"
+   },
+   "Training_and_Tools": {
+      "message": "Opleidingen en tools"
+   },
+   "Translation": {
+      "message": "Vertalen"
+   },
+   "Travel": {
+      "message": "Reizen"
+   },
+   "Trustworthy": {
+      "message": "betrouwbaar"
+   },
+   "Uncategorized": {
+      "message": "Niet gecategoriseerd"
+   },
+   "Unconfirmed_SPAM_Sources": {
+      "message": "Onbevestigde SPAM-bronnen"
+   },
+   "Violence": {
+      "message": "Geweld"
+   },
+   "Weapons": {
+      "message": "Wapens"
+   },
+   "Web_Advertisements": {
+      "message": "Internetreclame"
+   },
+   "Web_Hosting": {
+      "message": "Internethosting"
+   },
+   "Web_based_email": {
+      "message": "Webgebaseerde e-mail"
+   },
+   "category": {
+      "message": "Categorie"
+   },
+   "confidence": {
+      "message": "Vertrouwen"
+   },
+   "description": {
+      "message": "U surft hiermee veilig op internet doordat gevaarlijke websites worden geïdentificeerd en geblokkeerd."
+   },
+   "failed": {
+      "message": "Verbinding met server maken mislukt"
+   },
+   "processing": {
+      "message": "Link verwerken"
+   },
+   "score": {
+      "message": "Score"
+   },
+   "serverUnAvailable": {
+      "message": "Beoordeling is tijdelijk niet beschikbaar.  We werken aan het herstel van de service. Geen actie door gebruiker vereist"
+   },
+   "toolTip_1_A": {
+      "message": "Deze website valt in de categorie"
+   },
+   "toolTip_1_B": {
+      "message": "Wanneer u deze website daar"
+   },
+   "toolTip_1_C": {
+      "message": "en daar bezoekt"
+   },
+   "toolTip_2_A": {
+      "message": "is er een grote kans dat u wordt blootgesteld aan schadelijke links of payloads"
+   },
+   "toolTip_2_B": {
+      "message": "is er een meer dan gemiddelde kans dat u wordt blootgesteld aan schadelijke links of payloads"
+   },
+   "toolTip_2_C": {
+      "message": "is er enige kans dat u wordt blootgesteld aan schadelijke links of payloads"
+   },
+   "toolTip_2_D": {
+      "message": "is er een kleine kans dat u wordt blootgesteld aan schadelijke links of payloads"
+   },
+   "toolTip_2_E": {
+      "message": "is er een zeer kleine kans dat u wordt blootgesteld aan schadelijke links of payloads"
+   },
+   "toolTip_3_A": {
+      "message": "Reputatie: BETROUWBAAR"
+   },
+   "toolTip_3_B": {
+      "message": "Reputatie: LAAG RISICO"
+   },
+   "toolTip_3_C": {
+      "message": "Reputatie: MATIG RISICO"
+   },
+   "toolTip_3_D": {
+      "message": "Reputatie: VERDACHT"
+   },
+   "toolTip_3_E": {
+      "message": "Reputatie: HOOG RISICO"
+   }
+}

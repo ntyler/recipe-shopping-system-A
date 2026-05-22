@@ -1,0 +1,53 @@
+{
+   "action": {
+      "default_icon": {
+         "128": "images/Webroot128.png",
+         "16": "images/Webroot16.png",
+         "24": "images/Webroot24.png",
+         "32": "images/Webroot32.png",
+         "48": "images/Webroot48.png",
+         "96": "images/Webroot96.png"
+      },
+      "default_popup": "browser_actions/keycode_ui/keycode_ui.html",
+      "default_title": "Webroot Web Threat Shield"
+   },
+   "author": "Webroot Inc.",
+   "background": {
+      "service_worker": "background_scripts/worker.js"
+   },
+   "content_scripts": [ {
+      "all_frames": true,
+      "css": [ "content_scripts/sra.css", "content_scripts/chat.css" ],
+      "js": [ "helper_scripts/helper.js", "helper_scripts/browser.js", "content_scripts/sra_observer.js", "content_scripts/rtap_observer.js", "content_scripts/sra.js", "content_scripts/main.js", "content_scripts/chat.js" ],
+      "matches": [ "http://*/*", "https://*/*" ],
+      "run_at": "document_end"
+   } ],
+   "content_security_policy": {
+      "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+   },
+   "default_locale": "en",
+   "description": "__MSG_description__",
+   "externally_connectable": {
+      "matches": [ "https://wf.webrootanywhere.com/consumerblockpage.aspx?*" ]
+   },
+   "host_permissions": [ "http://*/*", "https://*/*" ],
+   "icons": {
+      "128": "images/Webroot128.png",
+      "16": "images/Webroot16.png",
+      "24": "images/Webroot24.png",
+      "32": "images/Webroot32.png",
+      "48": "images/Webroot48.png",
+      "96": "images/Webroot96.png"
+   },
+   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoRBucJ4ywhVsZs7npe35VO0IzhZC1boWmCjwYDOA4BVWPOAeP7WLtipYhputfT0wFuexUDDGGFVqTO29udtG/ZVKob3I8ERqYtMWugVCEgdkoAnQA4WuVtyXiYJsvV+DQMjYjx3en9QT8ISYxFWtx5I41hu8aQTbAsLXuYeBhx83ShogS1Ov1MG7d5+4cMRsLxpB2Jj7Irzn2ieCFB9H/dyyzsEhf8DE7IGd4NYiid/srutfRlWOERan/wDexFECzBECmmUlGMZmFGdza0bdZOhNuYpcdxCweacEnFnmNj+YjNFtxSr6NU271SwhauUk8ITvHfTis2HFoG3/Wi+ARwIDAQAB",
+   "manifest_version": 3,
+   "name": "Web Threat Shield",
+   "options_page": "options/options.html",
+   "permissions": [ "activeTab", "storage", "notifications", "downloads", "webRequest" ],
+   "update_url": "https://clients2.google.com/service/update2/crx",
+   "version": "2.3.26110.1",
+   "web_accessible_resources": [ {
+      "matches": [ "https://www.bing.com/*", "https://www.google.com/*", "https://www.google.ac/*", "https://www.google.bg/*", "https://www.google.ms/*", "https://www.google.tk/*", "https://www.google.vg/*", "https://www.google.com.ai/*", "https://www.google.com.hk/*", "https://www.google.com.tn/*", "https://*.search.yahoo.com/*", "https://search.yahoo.co.jp/*", "https://gemini.google.com/*", "https://chatgpt.com/*" ],
+      "resources": [ "/images/*", "content_scripts/sra.css", "content_scripts/chat.css", "images/fonts/OpenSans_300_400_600_700.woff2" ]
+   } ]
+}

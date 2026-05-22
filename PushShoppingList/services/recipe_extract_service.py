@@ -2173,7 +2173,16 @@ def create_headless_chrome_driver(
     prefer_undetected=True,
     page_load_strategy="eager",
     headless=True,
+    user_data_dir=None,
 ):
+    profile_path = None
+    if user_data_dir:
+        try:
+            profile_path = Path(user_data_dir)
+            profile_path.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            profile_path = None
+
     if prefer_undetected:
         try:
             import undetected_chromedriver as uc
@@ -2186,6 +2195,10 @@ def create_headless_chrome_driver(
             options.add_argument("--no-sandbox")
             options.add_argument("--disable-dev-shm-usage")
             options.add_argument(f"--window-size={window_size}")
+            if profile_path:
+                options.add_argument(f"--user-data-dir={profile_path}")
+                options.add_argument("--no-first-run")
+                options.add_argument("--no-default-browser-check")
             if not headless:
                 options.add_argument("--start-maximized")
             return uc.Chrome(options=options, use_subprocess=True)
@@ -2203,6 +2216,10 @@ def create_headless_chrome_driver(
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument(f"--window-size={window_size}")
+    if profile_path:
+        options.add_argument(f"--user-data-dir={profile_path}")
+        options.add_argument("--no-first-run")
+        options.add_argument("--no-default-browser-check")
     if not headless:
         options.add_argument("--start-maximized")
     return webdriver.Chrome(options=options)

@@ -1,0 +1,662 @@
+{
+   "Abortion": {
+      "message": "Аборты"
+   },
+   "Abused_Drugs": {
+      "message": "Наркотики"
+   },
+   "Adult_and_Pornography": {
+      "message": "Услуги для взрослых и порнография"
+   },
+   "Alcohol_and_Tobacco": {
+      "message": "Алкоголь и табак"
+   },
+   "Auctions": {
+      "message": "Аукционы"
+   },
+   "BA_ERROR_COMPONENT": {
+      "message": "Нет доступа к компоненту"
+   },
+   "BA_ERROR_HDR": {
+      "message": "Ошибка соединения"
+   },
+   "BA_ERROR_TXT": {
+      "message": "Рейтинги временно недоступны. Дождитесь восстановления сервиса или ознакомьтесь с подробной информацией \u003Ca href=\"https://answers.webroot.com/Webroot/Loginr.aspx?pid=12&login=1&app=vw&solutionid=2658\" id=\"grey5\">здесь\u003C/a>."
+   },
+   "BA_ERROR_TXT_COMPONENT": {
+      "message": "Щит веб-угроз не может получить доступ к одному из своих компонентов. Выполните перезапуск или повторную установку."
+   },
+   "BA_KEYCODE_COMINGSOON_PREFIX": {
+      "message": "\u003Cb>СКОРО НА САЙТЕ:\u003C/b>"
+   },
+   "BA_KEYCODE_FEATURES": {
+      "message": "Параметры щита веб-угроз:"
+   },
+   "BA_KEYCODE_FEATURE_1": {
+      "message": "\u003Cb>Маркировка в браузере\u003C/b>: показывает репутацию сайта, который вы в настоящий момент посещаете."
+   },
+   "BA_KEYCODE_FEATURE_2": {
+      "message": "\u003Cb>Маркировка в поиске\u003C/b>: показывает репутацию страниц в результатах поиска браузера, чтобы вы видели, какие сайты безопасны для посещения."
+   },
+   "BA_KEYCODE_FEATURE_3": {
+      "message": "\u003Cb>Защита от вредоносных сайтов в режиме реального времени\u003C/b>: мы будем автоматически блокировать вредоносные сайты, чтобы обеспечивать вашу безопасность в Интернете."
+   },
+   "BA_KEYCODE_HEADER": {
+      "message": "Щит веб-угроз"
+   },
+   "BA_KEYCODE_REMINDMELATER_BUTTON": {
+      "message": "Напомнить позже"
+   },
+   "BA_KEYCODE_RENEW_BUTTON": {
+      "message": "Обновить лицензию"
+   },
+   "BA_KEYCODE_WARNING_TEXT_1a": {
+      "message": "Срок действия ключа истекает через 1 день."
+   },
+   "BA_KEYCODE_WARNING_TEXT_1b": {
+      "message": "Срок действия ключа истекает через $days$ дней.",
+      "placeholders": {
+         "days": {
+            "content": "$1",
+            "example": "2"
+         }
+      }
+   },
+   "BA_KEYCODE_WARNING_TEXT_2": {
+      "message": "Срок действия вашей лицензии Webroot SecureAnywhere заканчивается. Это повлияет на работу ваших щитов веб-угроз. Обновите лицензию, чтобы и дальше обеспечивать свою безопасность во время посещения веб-страниц!"
+   },
+   "BA_WSAERROR_TXT": {
+      "message": "Для этого расширения необходимо установить и запустить Webroot SecureAnywhere на компьютере. Ознакомьтесь с подробной информацией \u003Ca href=\"http://answers.webroot.com/Webroot/Loginr.aspx?pid=12&login=1&app=vw&solutionid=2657\" id=\"grey4\">здесь\u003C/a>."
+   },
+   "BA_WSAERROR_TXT_OT": {
+      "message": "Для этого расширения необходимо установить и запустить OpenText™ SecureAnywhere на компьютере. Ознакомьтесь с подробной информацией \u003Ca href=\"http://answers.webroot.com/Webroot/Loginr.aspx?pid=12&login=1&app=vw&solutionid=2657\" id=\"grey4\">здесь\u003C/a>."
+   },
+   "Bot_Nets": {
+      "message": "Бот-сети"
+   },
+   "Business_and_Economy": {
+      "message": "Бизнес и экономика"
+   },
+   "Cheating": {
+      "message": "Мошенничество"
+   },
+   "Classification": {
+      "message": "Классификация URL-адресов Webroot"
+   },
+   "Computer_and_Internet_Info": {
+      "message": "Информация о компьютере и Интернете"
+   },
+   "Computer_and_Internet_Security": {
+      "message": "Безопасность компьютера и в Интернете"
+   },
+   "Confirmed_SPAM_Sources": {
+      "message": "Подтвержденные источники спама"
+   },
+   "Content_Delivery_Networks": {
+      "message": "Сети доставки контента"
+   },
+   "Cult_and_Occult": {
+      "message": "Культ и оккультизм"
+   },
+   "DESCRIPTION_TEXT_48": {
+      "message": "Эта надстройка совместима с Firefox 48 и последующими версиями. Если эта надстройка неактивна, значит вы используете Firefox 47 или предыдущие версии. Вы можете найти доступную версию надстройки, совместимую с вашей версией Firefox, в списке надстроек. Если вы не видите доступную версию надстройки, обратитесь в службу поддержки Webroot для получения дальнейших рекомендаций."
+   },
+   "Dating": {
+      "message": "Знакомства"
+   },
+   "Dead_Sites": {
+      "message": "Мертвые сайты (только db Ops)"
+   },
+   "Dynamically_Generated_Content": {
+      "message": "Динамически создаваемый контент"
+   },
+   "Educational_Institutions": {
+      "message": "Образовательные учреждения"
+   },
+   "Entertainment_and_Arts": {
+      "message": "Развлечения и искусство"
+   },
+   "Fashion_and_Beauty": {
+      "message": "Мода и красота"
+   },
+   "Financial_Services": {
+      "message": "Финансовые услуги"
+   },
+   "Gambling": {
+      "message": "Азартные игры"
+   },
+   "Games": {
+      "message": "Игры"
+   },
+   "Government": {
+      "message": "Правительство"
+   },
+   "Gross": {
+      "message": "Грубость"
+   },
+   "Hacking": {
+      "message": "Попытка взлома"
+   },
+   "Hate_and_Racism": {
+      "message": "Ненависть и расизм"
+   },
+   "Health_and_Medicine": {
+      "message": "Здоровье и медицина"
+   },
+   "Home_and_Garden": {
+      "message": "Дом и сад"
+   },
+   "Hunting_and_Fishing": {
+      "message": "Охота и рыбалка"
+   },
+   "Illegal": {
+      "message": "Противозаконный контент"
+   },
+   "Image_and_Video_Search": {
+      "message": "Поиск изображений и видео"
+   },
+   "Individual_Stock_Advice_and_Tools": {
+      "message": "Советы по персональным фондам и инструменты"
+   },
+   "Internet_Communications": {
+      "message": "Интернет-связь"
+   },
+   "Internet_Portals": {
+      "message": "Интернет-порталы"
+   },
+   "Job_Search": {
+      "message": "Поиск работы"
+   },
+   "Keyloggers_and_Monitoring": {
+      "message": "Клавиатурные шпионы и мониторинг"
+   },
+   "Kids": {
+      "message": "Дети"
+   },
+   "Legal": {
+      "message": "Право"
+   },
+   "Local_Information": {
+      "message": "Местная информация"
+   },
+   "Malware_Sites": {
+      "message": "Вредоносные сайты"
+   },
+   "Marijuana": {
+      "message": "Марихуана"
+   },
+   "Military": {
+      "message": "Военная тематика"
+   },
+   "Motor_Vehicles": {
+      "message": "Автомобильный транспорт"
+   },
+   "Music": {
+      "message": "Музыка"
+   },
+   "News_and_Media": {
+      "message": "Новости и СМИ"
+   },
+   "Nudity": {
+      "message": "Изображение обнаженного тела"
+   },
+   "OPTIONS_DONTSHOW": {
+      "message": "Больше не показывать"
+   },
+   "OPTIONS_EXPERIMENTAL_LABELPII": {
+      "message": "Warn before sensitive data may be sent to AI-related websites (available on supported platforms)."
+   },
+   "OPTIONS_EXPERIMENTAL_LEARNMOREPII": {
+      "message": "Learn more"
+   },
+   "OPTIONS_EXPERIMENTAL_SETTINGS": {
+      "message": "EXPERIMENTAL SETTINGS"
+   },
+   "OPTIONS_FOOTER_ABOUT": {
+      "message": "О нас"
+   },
+   "OPTIONS_FOOTER_LEGAL": {
+      "message": "Право"
+   },
+   "OPTIONS_FOOTER_PRIVACY": {
+      "message": "Конфиденциальность"
+   },
+   "OPTIONS_FORGOT_BUTTON": {
+      "message": "Нужна помощь в поиске ключа?"
+   },
+   "OPTIONS_INTEGRATED_ACTIVE": {
+      "message": "Активировать расширения браузера"
+   },
+   "OPTIONS_INTEGRATED_HOWTOMODIFY": {
+      "message": "Как изменить эти настройки?"
+   },
+   "OPTIONS_INTEGRATED_HOWTOUNINSTALL": {
+      "message": "Удалить это расширение"
+   },
+   "OPTIONS_INTEGRATED_MODE": {
+      "message": "Настройки расширения Web Threat Shield управляются посредством Webroot SecureAnywhere."
+   },
+   "OPTIONS_INTEGRATED_MODE_DETAILS": {
+      "message": "Настройки расширения Web Threat Shield применяются в установленном агенте Webroot SecureAnywhere для частных пользователей или посредством консоли управления политикой для корпоративных пользователей. Текущие настройки показаны ниже."
+   },
+   "OPTIONS_INTEGRATED_MODE_DETAILS_OT": {
+      "message": "Настройки расширения Web Threat Shield применяются в установленном агенте OpenText™ для неуправляемых агентов или политикой в консоли управления для корпоративных пользователей. Текущие настройки показаны ниже."
+   },
+   "OPTIONS_INTEGRATED_MODE_OT": {
+      "message": "Настройки расширения Web Threat Shield управляются посредством OpenText™ SecureAnywhere."
+   },
+   "OPTIONS_INTEGRATED_MODE_SAFARI_PERMISSION": {
+      "message": "Setup incomplete! Please allow all pages for this extension!"
+   },
+   "OPTIONS_INTEGRATED_MODE_SAFARI_SETUPINCOMPLETE": {
+      "message": "Setup incomplete! To enable Web Threat Shield, please complete Webroot agent setup and enter a valid keycode!"
+   },
+   "OPTIONS_INTEGRATED_PHISHBLOCKING": {
+      "message": "Включить антифишинг в реальном времени"
+   },
+   "OPTIONS_INTEGRATED_REFRESHNOTE": {
+      "message": "Изменения, сделанные в агенте SecureAnywhere, отобразятся здесь после перехода на новую страницу в другой вкладке."
+   },
+   "OPTIONS_INTEGRATED_SEARCHANNOTATION": {
+      "message": "Отображать рейтинги безопасности при использовании поисковых систем"
+   },
+   "OPTIONS_INTEGRATED_SETTINGS_HEADLINE": {
+      "message": "ТЕКУЩИЕ НАСТРОЙКИ"
+   },
+   "OPTIONS_INTEGRATED_URLBLOCKING": {
+      "message": "Блокировать вредоносные веб-сайты"
+   },
+   "OPTIONS_KEYCODE_KC_LABEL": {
+      "message": "Ключ: "
+   },
+   "OPTIONS_KEYCODE_VALIDATOR_SUCCESS": {
+      "message": "Ключ действителен, ваш продукт включен. Дальнейшие действия не требуются."
+   },
+   "OPTIONS_KEYCODE_VALIDATOR_WARNING_1": {
+      "message": "Неверный ключ!"
+   },
+   "OPTIONS_KEYCODE_VALIDATOR_WARNING_2": {
+      "message": "Не удалось подключиться к серверу!"
+   },
+   "OPTIONS_KEYCODE_VALIDATOR_WARNING_3": {
+      "message": "Срок действия ключа истек!"
+   },
+   "OPTIONS_NEW_KEYCODE": {
+      "message": "Новый ключ:"
+   },
+   "OPTIONS_NOTIFICATION_LABEL": {
+      "message": "Экранные уведомления и напоминания: "
+   },
+   "OPTIONS_NOTIFICATION_VALUE_1": {
+      "message": "Всегда"
+   },
+   "OPTIONS_NOTIFICATION_VALUE_2": {
+      "message": "При запуске"
+   },
+   "OPTIONS_NOTIFICATION_VALUE_3": {
+      "message": "Никогда"
+   },
+   "OPTIONS_PRIVACY_ALLOW_BUTTON": {
+      "message": "Разрешить"
+   },
+   "OPTIONS_PRIVACY_BACK_BUTTON": {
+      "message": "Назад"
+   },
+   "OPTIONS_PRIVACY_DECLINE_BUTTON": {
+      "message": "Отказаться"
+   },
+   "OPTIONS_PRIVACY_DECLINE_TEXT1": {
+      "message": "К сожалению, без вашего разрешения на сбор необходимой информации об URL-адресах Web Threat Shield не сможет работать должным образом."
+   },
+   "OPTIONS_PRIVACY_DECLINE_TEXT2": {
+      "message": "Если вы не даете разрешение на сбор этой информации, мы рекомендуем удалить это расширение."
+   },
+   "OPTIONS_PRIVACY_DESCRIPTION1": {
+      "message": "Расширению «Webroot Web Threat Shield» для Mozilla Firefox требуется разрешение на сбор информации о веб-страницах, которые вы посещаете (URL и IP-адреса). Это необходимо для того, чтобы наши серверы баз данных могли проверять веб-страницы и обнаруживать вредоносные программы. Без этого разрешения расширение не сможет обнаруживать потенциально вредоносные сайты."
+   },
+   "OPTIONS_PRIVACY_DESCRIPTION1_OT": {
+      "message": "Расширению «Web Threat Shield» для Mozilla Firefox требуется разрешение на сбор информации о веб-страницах, которые вы посещаете (URL и IP-адреса). Это необходимо для того, чтобы наши серверы баз данных могли проверять веб-страницы и обнаруживать вредоносные программы. Без этого разрешения расширение не сможет обнаруживать потенциально вредоносные сайты."
+   },
+   "OPTIONS_PRIVACY_DESCRIPTION2": {
+      "message": "Нажимая «Разрешить» и устанавливая это расширение, вы соглашаетесь отправлять информацию об URL-адресах, которые вы искали и посещали, на серверы Webroot для сравнения с вредоносными URL-адресами из наших баз данных."
+   },
+   "OPTIONS_PRIVACY_DESCRIPTION2_OT": {
+      "message": "Нажимая «Разрешить» и устанавливая это расширение, вы соглашаетесь отправлять информацию об URL-адресах, которые вы искали и посещали, на серверы OpenText™ для сравнения с вредоносными URL-адресами из наших баз данных."
+   },
+   "OPTIONS_PRIVACY_DESCRIPTION3": {
+      "message": "Подробную информацию о том, какие данные мы собираем и как их защищаем, см. в нашей \u003Ca href=\"https://addons.mozilla.org/en-GB/firefox/addon/web-threat-shield/privacy/\" target=\"_blank\">Политике конфиденциальности\u003C/a>."
+   },
+   "OPTIONS_PRIVACY_HEADLINE1": {
+      "message": "Соглашение о политике конфиденциальности"
+   },
+   "OPTIONS_PRIVACY_HEADLINE2": {
+      "message": "Соглашение о политике конфиденциальности — отклонено"
+   },
+   "OPTIONS_PRIVACY_REMOVE_BUTTON": {
+      "message": "Удалить"
+   },
+   "OPTIONS_STANDALONE_EULATEXT": {
+      "message": "Чтобы активировать это расширение, введите свой ключ Webroot SecureAnywhere ниже.\u003Cbr />Нажимая «Проверить ключ», вы принимаете соглашение об использовании Webroot SecureAnywhere,\u003Cbr /> доступное по этой \u003Ca href=\"https://www.webroot.com/us/en/legal/service-terms-and-conditions\" target=\"_blank\">ссылке\u003C/a>, и положение о конфиденциальности Webroot SecureAnywhere, \u003Cbr />доступное по этой \u003Ca href=\"https://www.webroot.com/us/en/legal/privacy\" target=\"_blank\">ссылке\u003C/a>."
+   },
+   "OPTIONS_SUBSCRIPTION_LABEL": {
+      "message": "Оставшийся срок действия подписки:"
+   },
+   "OPTIONS_SUBSCRIPTION_VALUE": {
+      "message": " (в днях)"
+   },
+   "OPTIONS_SUBSCRIPTION_VALUE_1": {
+      "message": "  день"
+   },
+   "OPTIONS_TITLE": {
+      "message": "Настройки щита веб-угроз"
+   },
+   "OPTIONS_VALIDATE_BUTTON": {
+      "message": "Проверка ключа"
+   },
+   "Online_Greeting_Cards": {
+      "message": "Электронные поздравительные открытки"
+   },
+   "Open_HTTP_Proxies": {
+      "message": "Открытые прокси-серверы с поддержкой HTTP"
+   },
+   "PERMISSION_DESC_FF_1": {
+      "message": "Для идентификации страниц с вредоносным ПО этому расширению требуется разрешение на доступ ко всем веб-сайтам, которые вы посещаете."
+   },
+   "PERMISSION_DESC_FF_2": {
+      "message": "Если нажать «Разрешить», браузер Firefox откроет диалоговое окно с вариантами «разрешить» или «закрыть» доступ. Разрешения можно изменить в любой момент на вкладке «Разрешения» в расширении."
+   },
+   "PERMISSION_HEADLINE_FF": {
+      "message": "Дополнительные разрешения браузера"
+   },
+   "PIITYPE_ADDRESS": {
+      "message": "Address"
+   },
+   "PIITYPE_BANK_NUMBER": {
+      "message": "Bank Account"
+   },
+   "PIITYPE_CREDIT_CARD": {
+      "message": "Credit Card"
+   },
+   "PIITYPE_CRYPTO": {
+      "message": "Crypto Key"
+   },
+   "PIITYPE_DRIVER_LICENSE": {
+      "message": "Driver License"
+   },
+   "PIITYPE_EMAIL_ADDRESS": {
+      "message": "Email"
+   },
+   "PIITYPE_IP_ADDRESS": {
+      "message": "IP Address"
+   },
+   "PIITYPE_ITIN": {
+      "message": "ITIN"
+   },
+   "PIITYPE_PASSPORT": {
+      "message": "Passport No"
+   },
+   "PIITYPE_PERSON": {
+      "message": "Person"
+   },
+   "PIITYPE_PHONE_NUMBER": {
+      "message": "Phone"
+   },
+   "PIITYPE_SSN": {
+      "message": "SSN"
+   },
+   "PIITYPE_SWIFT_CODE": {
+      "message": "Swift Code"
+   },
+   "PIITYPE_UNKNOWN": {
+      "message": "Unspecified PII"
+   },
+   "PII_ERROR_LOSTCONTEXT": {
+      "message": "Protection temporarily unavailable. Refresh to continue monitoring!"
+   },
+   "PII_POPUP_ACCURATE": {
+      "message": "Is this information accurate?"
+   },
+   "PII_POPUP_ACCURATE_DONE": {
+      "message": "Thank you for your feedback."
+   },
+   "PII_POPUP_DETECTED": {
+      "message": "$pii$ detected",
+      "placeholders": {
+         "pii": {
+            "content": "$1",
+            "example": "SSN, Credit Card, Email, Phone, Address, Driver License, Passport No, ITIN, IP Address, Swift Code, Crypto Key, Person"
+         }
+      }
+   },
+   "PII_POPUP_HEADLINE": {
+      "message": "Detected Information"
+   },
+   "PII_POPUP_HEADLINE2": {
+      "message": "Information protected"
+   },
+   "PII_POPUP_REDACT": {
+      "message": "Redact"
+   },
+   "PII_POPUP_UNDO": {
+      "message": "Undo"
+   },
+   "Parked_Domains": {
+      "message": "Домены-заглушки"
+   },
+   "Password": {
+      "message": "Указан неверный пароль."
+   },
+   "Pay_to_Surf": {
+      "message": "Плата за серфинг по Интернету"
+   },
+   "Peer_to_Peer": {
+      "message": "Равноправная связь"
+   },
+   "Personal_Storage": {
+      "message": "Частное хранилище"
+   },
+   "Personal_sites_and_Blogs": {
+      "message": "Персональные сайты и блоги"
+   },
+   "Philosophy_and_Political_Advocacy": {
+      "message": "Основные принципы и защита политических прав"
+   },
+   "Phishing_and_Other_Frauds": {
+      "message": "Фишинг и другие виды мошенничества"
+   },
+   "Private_IP_Addresses": {
+      "message": "Частные IP-адреса"
+   },
+   "Proxy_Avoidance_and_Anonymizers": {
+      "message": "Исключения прокси и анонимайзеры"
+   },
+   "Questionable": {
+      "message": "Сомнительный контент"
+   },
+   "Real_Estate": {
+      "message": "Недвижимость"
+   },
+   "Recreation_and_Hobbies": {
+      "message": "Отдых и хобби"
+   },
+   "Reference_and_Research": {
+      "message": "Источники и исследования"
+   },
+   "Religion": {
+      "message": "Религия"
+   },
+   "SPAM_URLs": {
+      "message": "URL-спам"
+   },
+   "SRA_ERROR_TXT": {
+      "message": " Рейтинги временно недоступны, или агент Webroot выключен. Дождитесь восстановления сервиса или проверьте, что агент Webroot включен."
+   },
+   "Search_Engines": {
+      "message": "Поисковые системы"
+   },
+   "Sex_Education": {
+      "message": "Половое воспитание"
+   },
+   "Shareware_and_Freeware": {
+      "message": "Условно-бесплатное и бесплатное программное обеспечение"
+   },
+   "Shopping": {
+      "message": "Шопинг"
+   },
+   "Social_Networking": {
+      "message": "Социальные сети"
+   },
+   "Society": {
+      "message": "Общество"
+   },
+   "Sports": {
+      "message": "Спорт"
+   },
+   "Spyware_and_Adware": {
+      "message": "Шпионские и рекламные программы"
+   },
+   "Streaming_Media": {
+      "message": "Мультимедийный поток"
+   },
+   "Sure": {
+      "message": "точно"
+   },
+   "Swimsuits_Intimate_Apparel": {
+      "message": "Купальники и нижнее белье"
+   },
+   "TEXT_BA_ERROR": {
+      "message": "Рейтинги временно недоступны, или агент Webroot выключен. Дождитесь восстановления сервиса или проверьте, что агент Webroot включен."
+   },
+   "TEXT_RISK": {
+      "message": "Этот сайт содержит вредоносные программы или представляет угрозу безопасности."
+   },
+   "TEXT_SUSPICIOUS": {
+      "message": "Этот сайт может содержать контент, угрожающий вашей безопасности в сети."
+   },
+   "TEXT_TRUSTWORTHY": {
+      "message": "Можно безопасно продолжать."
+   },
+   "TITLE_BCAP_BOTNET": {
+      "message": "Обнаруженный ботнет-сайт"
+   },
+   "TITLE_BCAP_KEYLOGGER": {
+      "message": "Обнаружен сайт, отслеживающий нажатие клавиш на клавиатуре"
+   },
+   "TITLE_BCAP_MALWARE": {
+      "message": "Обнаруженный вредоносный сайт"
+   },
+   "TITLE_BCAP_PHISHING": {
+      "message": "Обнаруженный поддельный сайт"
+   },
+   "TITLE_BCAP_RISK": {
+      "message": "Опасно"
+   },
+   "TITLE_BCAP_SPAM": {
+      "message": "Обнаруженный спам-сайт"
+   },
+   "TITLE_BCAP_SPYWARE": {
+      "message": "Обнаруженный шпионский/рекламный сайт"
+   },
+   "TITLE_BCAP_SUSPICIOUS": {
+      "message": "Осторожно"
+   },
+   "TITLE_BCAP_TRUSTWORTHY": {
+      "message": "Надежно"
+   },
+   "TITLE_RTAP_PHISHING": {
+      "message": "Определен как поддельный сайт"
+   },
+   "Training_and_Tools": {
+      "message": "Обучение и инструменты"
+   },
+   "Translation": {
+      "message": "Перевод"
+   },
+   "Travel": {
+      "message": "Путешествия"
+   },
+   "Trustworthy": {
+      "message": "надежно"
+   },
+   "Uncategorized": {
+      "message": "Без категории"
+   },
+   "Unconfirmed_SPAM_Sources": {
+      "message": "Неподтвержденные источники спама"
+   },
+   "Violence": {
+      "message": "Насилие"
+   },
+   "Weapons": {
+      "message": "Оружие"
+   },
+   "Web_Advertisements": {
+      "message": "Интернет-реклама"
+   },
+   "Web_Hosting": {
+      "message": "Веб-хостинг"
+   },
+   "Web_based_email": {
+      "message": "Интернет-почта"
+   },
+   "category": {
+      "message": "Классификация"
+   },
+   "confidence": {
+      "message": "Достоверность"
+   },
+   "description": {
+      "message": "Защищает вас во время посещения веб-страниц благодаря обнаружению опасных сайтов и их блокировке."
+   },
+   "failed": {
+      "message": "Не удалось подключиться к серверу"
+   },
+   "processing": {
+      "message": "Ссылка для обработки"
+   },
+   "score": {
+      "message": "Оценка"
+   },
+   "serverUnAvailable": {
+      "message": "Рейтинги временно недоступны.  Мы работаем над восстановлением сервиса. Действия со стороны пользователя не требуются"
+   },
+   "toolTip_1_A": {
+      "message": "Этот веб-сайт относится к категории"
+   },
+   "toolTip_1_B": {
+      "message": "При посещении этого веб-сайта здесь"
+   },
+   "toolTip_1_C": {
+      "message": "и здесь"
+   },
+   "toolTip_2_A": {
+      "message": "существует высокая вероятность, что вы можете быть уязвимыми для вредоносных ссылок и данных"
+   },
+   "toolTip_2_B": {
+      "message": "существует более чем средняя вероятность того, что вы можете быть уязвимыми для вредоносных ссылок и данных"
+   },
+   "toolTip_2_C": {
+      "message": "существует вероятность того, что вы можете быть уязвимыми для вредоносных ссылок и данных"
+   },
+   "toolTip_2_D": {
+      "message": "существует низкая вероятность того, что вы можете быть уязвимыми для вредоносных ссылок и данных"
+   },
+   "toolTip_2_E": {
+      "message": "существует очень низкая вероятность того, что вы можете быть уязвимыми для вредоносных ссылок и данных"
+   },
+   "toolTip_3_A": {
+      "message": "Репутация: НАДЕЖНО"
+   },
+   "toolTip_3_B": {
+      "message": "Репутация: НИЗКИЙ УРОВЕНЬ РИСКА"
+   },
+   "toolTip_3_C": {
+      "message": "Репутация: СРЕДНИЙ УРОВЕНЬ РИСКА"
+   },
+   "toolTip_3_D": {
+      "message": "Репутация: ПОДОЗРИТЕЛЬНО"
+   },
+   "toolTip_3_E": {
+      "message": "Репутация: ВЫСОКИЙ УРОВЕНЬ РИСКА"
+   }
+}

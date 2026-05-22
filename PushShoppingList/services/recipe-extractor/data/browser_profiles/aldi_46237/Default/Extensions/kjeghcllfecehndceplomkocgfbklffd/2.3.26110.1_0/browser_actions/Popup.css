@@ -1,0 +1,89 @@
+﻿body{
+	font-size:12px;
+	font-weight:normal;
+	line-height:14.4px;
+	white-space:normal;
+	margin:0px;
+	border-radius:5px;
+}
+.WebrootDiv{
+	min-width:400px;
+}
+.WebrootDiv > .webrootlogotitle{
+	margin:10px 13px 5px 13px;
+}
+.WebrootDiv > .webrootlogotitle > img {
+	height:12px;
+}
+.WebrootDiv > .webrootlogotitle p{
+	display:inline;
+	font-weight:bold;
+}
+.WebrootDiv > .webrootlogobody{
+	margin:5px 10px 10px 13px;
+}
+.WebrootDiv > .expire{
+	display:none;
+	text-align:right;
+	margin:7px 5px 10px 13px;
+}
+.WebrootDiv > .expire > img{
+	height:19px;
+	width:19px;
+}
+.WebrootDiv > .expire span{
+	height:12px;
+	color:blue;
+	cursor:pointer;
+	text-decoration:underline;
+	vertical-align:super;
+}
+.greenBody {
+	background:#e9f7e9;
+	border:2px solid #408740;
+	color:#54565b;
+}
+.yellowBody {
+	background:#fff1d1;
+	border:2px solid #ff9a22;
+	color:#54565b;
+}
+.redBody {
+	background:#fce8e8;
+	border:2px solid #a70000;
+	color:#54565b;
+}
+.errorBody {
+	background:#eaeaeb;
+	border:2px solid #54565b;
+	color:#54565b;
+}
+.componenterrorBody {
+	background:#eaeaeb;
+	border:2px solid #54565b;
+	color:#54565b;
+}
+.WSA_UNREACHABLEBody {
+	background:#eaeaeb;
+	border:2px solid #54565b;
+	color:#54565b;
+}
+.UNSUPPORTED_OSBody {
+	background:#eaeaeb;
+	border:2px solid #54565b;
+	color:#54565b;
+}
+.MAC_OSBody {
+	background:#eaeaeb;
+	border:2px solid #54565b;
+	color:#54565b;
+}
+
+/*Override bright mode styles when dark mode is enabled*/
+@media (prefers-color-scheme: dark) {
+
+	body {
+		background: #0B1328;
+		color: #ffffff;
+	}
+}
