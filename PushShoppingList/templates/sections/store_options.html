@@ -29,12 +29,6 @@
             </label>
 
             <div class="address-actions-grid">
-                <button form="homeAddressForm" type="submit" name="action" value="save" class="address-save-btn">Save Address</button>
-                <button type="button"
-                        class="location-address-btn"
-                        onclick="useDeviceLocationForHomeAddress(this)">
-                    Use My Location
-                </button>
                 <button form="homeAddressForm" type="submit" name="action" value="run_find_nearest" class="nearest-stores-btn">Run Find Nearest Stores</button>
             </div>
         </div>
@@ -174,7 +168,16 @@
                         {% if store_map_locations and home_location and home_location.latitude is defined and home_location.latitude is not none and home_location.longitude is defined and home_location.longitude is not none %}
                             <div class="store-location-map-wrap" aria-label="{{ store.label }} nearby store map">
                                 <div class="store-location-map-legend" aria-label="Map pin legend">
-                                    <span><span class="store-map-pin legend home" aria-hidden="true">H</span> Home</span>
+                                    <span>
+                                        <span class="store-map-pin legend home house" aria-hidden="true">
+                                            <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                                                <path d="M3 11.5 12 4l9 7.5"></path>
+                                                <path d="M5.5 10.5V20h13v-9.5"></path>
+                                                <path d="M9.5 20v-6h5v6"></path>
+                                            </svg>
+                                        </span>
+                                        Home
+                                    </span>
                                     <span><span class="store-map-pin legend store selected" aria-hidden="true">1</span> Selected</span>
                                     <span><span class="store-map-pin legend store nearby" aria-hidden="true">2</span> Nearby</span>
                                 </div>
@@ -270,12 +273,27 @@
     </div>
 
     <div class="store-options-collapsed-summary" aria-label="Active stores">
+        {% set active_store_map_locations = [] %}
+        {% set active_home_location = nearest_store_results.get("home_location") if nearest_store_results else {} %}
         <span class="store-detail-label">Active stores</span>
         <div class="active-store-list">
             {% for store_key in enabled_stores if store_key in available_stores %}
                 {% set store = available_stores[store_key] %}
                 {% set store_logo_text = {"aldi": "ALDI", "kroger": "K", "walmart": "W", "meijer": "M", "target": "T", "costco": "C"}.get(store_key, store.label[:2]|upper) %}
                 {% set store_home_url = store.urlStoreSelector or store.url %}
+                {% set selected_store = nearest_store_locations.get(store_key, {}) if nearest_store_locations else {} %}
+                {% if selected_store and selected_store.latitude is defined and selected_store.latitude is not none and selected_store.longitude is defined and selected_store.longitude is not none %}
+                    {% set _ = active_store_map_locations.append({
+                        "store_key": store_key,
+                        "label": store.label,
+                        "logo_text": store_logo_text,
+                        "address": selected_store.address or store.label,
+                        "latitude": selected_store.latitude,
+                        "longitude": selected_store.longitude,
+                        "distance_miles": selected_store.distance_miles if selected_store.distance_miles is defined else none,
+                        "locator_url": selected_store.locator_url or store_home_url
+                    }) %}
+                {% endif %}
                 <a class="active-store-card"
                    href="{{ store_home_url }}"
                    target="_blank"
@@ -288,5 +306,30 @@
                 <span class="active-store-empty">No active stores selected.</span>
             {% endfor %}
         </div>
+        {% if active_store_map_locations and active_home_location and active_home_location.latitude is defined and active_home_location.latitude is not none and active_home_location.longitude is defined and active_home_location.longitude is not none %}
+            <div class="selected-stores-map-wrap" aria-label="Selected stores map">
+                <div class="store-location-map-legend selected-stores-map-legend" aria-label="Selected stores map legend">
+                    <span>
+                        <span class="store-map-pin legend home house" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                                <path d="M3 11.5 12 4l9 7.5"></path>
+                                <path d="M5.5 10.5V20h13v-9.5"></path>
+                                <path d="M9.5 20v-6h5v6"></path>
+                            </svg>
+                        </span>
+                        Home
+                    </span>
+                    <span><span class="store-map-pin legend store-logo-pin store-logo-aldi" aria-hidden="true">ALDI</span> Selected stores</span>
+                </div>
+                <div class="store-location-map selected-stores-map"
+                     data-store-map
+                     data-selected-stores-map="1"
+                     data-store-label="Selected stores"
+                     data-home-address="{{ nearest_store_results.home_address or '' }}"
+                     data-home-lat="{{ active_home_location.latitude }}"
+                     data-home-lon="{{ active_home_location.longitude }}"
+                     data-locations="{{ active_store_map_locations|tojson|forceescape }}"></div>
+            </div>
+        {% endif %}
     </div>
 </div>

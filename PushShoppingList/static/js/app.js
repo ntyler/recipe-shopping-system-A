@@ -2462,9 +2462,7 @@ function toggleCardCollapse(key) {
         toggle.setAttribute("aria-expanded", isCollapsed ? "false" : "true");
     }
 
-    if (!isCollapsed) {
-        window.setTimeout(initStoreLocationMaps, 0);
-    }
+    window.setTimeout(initStoreLocationMaps, 0);
 }
 
 function cardCollapseDefaultIsCollapsed(content) {
@@ -6105,12 +6103,33 @@ function storeLocationPopupHtml(title, address, distance, lat, lon) {
     return `<strong>${escapeHtml(title)}</strong><br>${escapeHtml(address || "")}${distanceText}${mapLink}`;
 }
 
-function storeLocationMapIcon(className, label) {
+function storeHomePinMarkup() {
+    return [
+        '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">',
+        '<path d="M3 11.5 12 4l9 7.5"></path>',
+        '<path d="M5.5 10.5V20h13v-9.5"></path>',
+        '<path d="M9.5 20v-6h5v6"></path>',
+        '</svg>',
+    ].join("");
+}
+
+function cssClassPart(value) {
+    return String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "") || "custom";
+}
+
+function storeLocationMapIcon(className, label, options = {}) {
+    const iconSize = options.iconSize || [24, 24];
+    const iconHtml = options.html || escapeHtml(label);
+
     return L.divIcon({
         className: "store-map-pin-shell",
-        html: `<span class="store-map-pin ${escapeAttribute(className)}">${escapeHtml(label)}</span>`,
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
+        html: `<span class="store-map-pin ${escapeAttribute(className)}">${iconHtml}</span>`,
+        iconSize,
+        iconAnchor: [iconSize[0] / 2, iconSize[1] / 2],
         popupAnchor: [0, -12],
     });
 }
@@ -6158,6 +6177,7 @@ function initStoreLocationMaps() {
 
         const homeLat = parseMapCoordinate(container.dataset.homeLat);
         const homeLon = parseMapCoordinate(container.dataset.homeLon);
+        const selectedStoresMap = container.dataset.selectedStoresMap === "1";
         const selectedLat = parseMapCoordinate(container.dataset.selectedLat);
         const selectedLon = parseMapCoordinate(container.dataset.selectedLon);
         const selectedAddress = container.dataset.selectedAddress || "";
@@ -6197,16 +6217,28 @@ function initStoreLocationMaps() {
         const homeAddress = container.dataset.homeAddress || "Current address";
 
         L.marker([homeLat, homeLon], {
-            icon: storeLocationMapIcon("home", "H"),
+            icon: storeLocationMapIcon("home house", "", {
+                html: storeHomePinMarkup(),
+                iconSize: [28, 28],
+            }),
         }).addTo(map).bindPopup(storeLocationPopupHtml("Current address", homeAddress, "", homeLat, homeLon));
         bounds.push([homeLat, homeLon]);
 
         storePins.forEach(pin => {
-            const markerLabel = String(pin.index + 1);
-            const markerClass = pin.selected ? "store selected" : "store nearby";
-            const markerTitle = pin.selected ? `Selected ${storeLabel}` : `${storeLabel} ${markerLabel}`;
+            const markerLabel = selectedStoresMap
+                ? String(pin.location.logo_text || pin.location.label || pin.index + 1)
+                : String(pin.index + 1);
+            const markerClass = selectedStoresMap
+                ? `store-logo-pin store-logo-${cssClassPart(pin.location.store_key || pin.location.label)}`
+                : (pin.selected ? "store selected" : "store nearby");
+            const markerTitle = selectedStoresMap
+                ? String(pin.location.label || pin.location.name || storeLabel)
+                : (pin.selected ? `Selected ${storeLabel}` : `${storeLabel} ${markerLabel}`);
+            const markerIconSize = selectedStoresMap ? [34, 34] : [24, 24];
             L.marker([pin.lat, pin.lon], {
-                icon: storeLocationMapIcon(markerClass, markerLabel),
+                icon: storeLocationMapIcon(markerClass, markerLabel, {
+                    iconSize: markerIconSize,
+                }),
             }).addTo(map).bindPopup(storeLocationPopupHtml(
                 markerTitle,
                 pin.location.address || pin.location.name || "",
