@@ -381,6 +381,17 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("function formActionUrl(form)", script)
         self.assertNotIn("fetch(form.action", script)
 
+    def test_store_radius_toolbar_lives_in_store_options(self):
+        home_template = Path("PushShoppingList/templates/sections/home_address.html").read_text(encoding="utf-8")
+        store_template = Path("PushShoppingList/templates/sections/store_options.html").read_text(encoding="utf-8")
+        css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+        self.assertNotIn("store-radius-control", home_template)
+        self.assertIn("store-options-sticky-toolbar", store_template)
+        self.assertIn('form="homeAddressForm"', store_template)
+        self.assertIn("position: sticky", css)
+        self.assertIn(".store-options-sticky-toolbar", css)
+
     def test_find_nearby_store_locations_filters_by_radius_and_sorts(self):
         class FakeResponse:
             def raise_for_status(self):

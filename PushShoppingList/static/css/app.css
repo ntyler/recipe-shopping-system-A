@@ -251,6 +251,21 @@ body {
             display: block;
         }
 
+        .store-options-sticky-toolbar {
+            position: sticky;
+            top: var(--view-switcher-sticky-offset, 0px);
+            z-index: 80;
+            margin: -2px 0 12px;
+            padding: 10px 0 12px;
+            background: #111414;
+            border-bottom: 1px solid #2f3638;
+            box-shadow: 0 12px 22px rgba(0,0,0,0.35);
+        }
+
+        .store-options-sticky-toolbar .store-radius-control {
+            margin-top: 0;
+        }
+
         .active-store-list {
             display: flex;
             flex-wrap: wrap;
