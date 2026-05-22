@@ -112,7 +112,7 @@
                     <div class="store-action-row">
                         <button type="button"
                                 class="store-edit-btn edit-recipe-btn recipe-url-summary-edit"
-                                onclick="toggleStorePanel('store-edit-{{ store_key }}')">
+                                onclick="return openStoreEditModal('store-edit-{{ store_key }}', this)">
                             Edit
                         </button>
                         <form method="POST"
@@ -261,7 +261,20 @@
                           class="store-edit-form"
                           method="POST"
                           action="/update_store/{{ store_key }}"
+                          aria-hidden="true"
+                          aria-modal="true"
+                          aria-labelledby="store-edit-title-{{ store_key }}"
+                          role="dialog"
                           onsubmit="return saveStoreDetails(event);">
+                        <div class="store-edit-modal-header">
+                            <h2 id="store-edit-title-{{ store_key }}">Edit {{ store.label }}</h2>
+                            <button type="button"
+                                    class="store-edit-modal-close"
+                                    aria-label="Close {{ store.label }} editor"
+                                    onclick="closeStoreEditModal({ reset: true })">
+                                X
+                            </button>
+                        </div>
                         <label class="store-edit-field">
                             Store Name
                             <input name="store_label" value="{{ store.label }}">
@@ -295,11 +308,23 @@
                                 </button>
                             </div>
                         </label>
-                        <button type="submit" class="store-edit-save-btn">Save Store Details</button>
+                        <div class="store-edit-modal-actions">
+                            <button type="button"
+                                    class="store-edit-cancel-btn"
+                                    onclick="closeStoreEditModal({ reset: true })">
+                                Cancel
+                            </button>
+                            <button type="submit" class="store-edit-save-btn">Save Store Details</button>
+                        </div>
                     </form>
                 </div>
             {% endfor %}
         </div>
+
+        <div id="storeEditModalBackdrop"
+             class="store-edit-modal-backdrop"
+             aria-hidden="true"
+             onclick="closeStoreEditModal({ reset: true })"></div>
 
         <div class="store-add-sticky-action">
             <button type="button"

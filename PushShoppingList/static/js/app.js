@@ -2494,21 +2494,91 @@ function cardCollapseDefaultIsCollapsed(content) {
     return defaultState === "collapsed";
 }
 
+let storeEditReturnFocus = null;
+
 function toggleStorePanel(panelId) {
-    const panel = document.getElementById(panelId);
+    return openStoreEditModal(panelId);
+}
 
-    if (panel) {
-        const isOpen = panel.classList.toggle("open");
-        const openPanels = getOpenStorePanels();
+function openStoreEditModal(formId, trigger) {
+    const form = document.getElementById(formId);
+    const backdrop = document.getElementById("storeEditModalBackdrop");
 
-        if (isOpen) {
-            openPanels.add(panelId);
-        } else {
-            openPanels.delete(panelId);
-        }
-
-        saveOpenStorePanels(openPanels);
+    if (!form) {
+        return false;
     }
+
+    closeStoreEditModal({ reset: true, returnFocus: false });
+    storeEditReturnFocus = trigger || document.activeElement;
+
+    if (backdrop) {
+        backdrop.classList.add("open");
+        backdrop.setAttribute("aria-hidden", "false");
+    }
+
+    form.classList.add("open");
+    form.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+
+    window.setTimeout(() => {
+        const firstInput = form.querySelector('input[name="store_label"]');
+
+        if (firstInput) {
+            firstInput.focus();
+            firstInput.select();
+        }
+    }, 0);
+
+    return false;
+}
+
+function closeStoreEditModal(options = {}) {
+    const form = document.querySelector(".store-edit-form.open");
+    const backdrop = document.getElementById("storeEditModalBackdrop");
+
+    if (form && options.reset) {
+        resetStoreEditForm(form);
+    }
+
+    if (form) {
+        form.classList.remove("open");
+        form.setAttribute("aria-hidden", "true");
+    }
+
+    if (backdrop) {
+        backdrop.classList.remove("open");
+        backdrop.setAttribute("aria-hidden", "true");
+    }
+
+    if (!document.querySelector("#addStoreModal.open")) {
+        document.body.classList.remove("modal-open");
+    }
+
+    if (options.returnFocus !== false && storeEditReturnFocus && typeof storeEditReturnFocus.focus === "function") {
+        storeEditReturnFocus.focus();
+    }
+
+    storeEditReturnFocus = null;
+}
+
+function resetStoreEditForm(form) {
+    form.reset();
+    const passwordInput = form.querySelector('input[name="store_password"]');
+    const passwordToggle = form.querySelector(".password-toggle-btn");
+
+    if (passwordInput) {
+        passwordInput.type = "password";
+    }
+
+    if (passwordToggle) {
+        passwordToggle.textContent = "Show";
+    }
+}
+
+function syncStoreEditFormDefaults(form) {
+    form.querySelectorAll("input").forEach(input => {
+        input.defaultValue = input.value;
+    });
 }
 
 function restoreCardCollapseState() {
@@ -2554,19 +2624,11 @@ function saveOpenStorePanels(openPanels) {
 }
 
 function restoreOpenStorePanels() {
-    const openPanels = getOpenStorePanels();
-    const validOpenPanels = new Set();
-
-    openPanels.forEach(panelId => {
-        const panel = document.getElementById(panelId);
-
-        if (panel) {
-            panel.classList.add("open");
-            validOpenPanels.add(panelId);
-        }
+    saveOpenStorePanels(new Set());
+    document.querySelectorAll(".store-edit-form.open").forEach(form => {
+        form.classList.remove("open");
+        form.setAttribute("aria-hidden", "true");
     });
-
-    saveOpenStorePanels(validOpenPanels);
 }
 
 function togglePasswordVisibility(inputId, button) {
@@ -6434,6 +6496,13 @@ function closeAddStoreModalFromBackdrop(event) {
 
 function closeAddStoreModalOnEscape(event) {
     if (event.key === "Escape") {
+        const storeEditForm = document.querySelector(".store-edit-form.open");
+
+        if (storeEditForm) {
+            closeStoreEditModal({ reset: true });
+            return;
+        }
+
         const modal = document.getElementById("addStoreModal");
 
         if (modal && modal.classList.contains("open")) {
@@ -6485,6 +6554,8 @@ async function saveStoreDetailsForm(form) {
     try {
         await submitStoreForm(form);
         updateStoreDetailsFromForm(form);
+        syncStoreEditFormDefaults(form);
+        closeStoreEditModal({ returnFocus: false });
     } catch (err) {
         console.warn("Unable to save store details in the background.", err);
     } finally {
@@ -6545,11 +6616,21 @@ function updateStoreDetailsFromForm(form) {
     const storeUrl = selectorUrl || searchUrl;
     const managerLabel = row ? row.querySelector(".store-manager-label") : null;
     const managerUrl = row ? row.querySelector(".store-manager-url") : null;
+    const modalTitle = form.querySelector(".store-edit-modal-header h2");
+    const modalClose = form.querySelector(".store-edit-modal-close");
     const activeCard = Array.from(document.querySelectorAll(".active-store-card"))
         .find(card => card.dataset.storeKey === storeKey);
 
     if (managerLabel) {
         managerLabel.textContent = storeName;
+    }
+
+    if (modalTitle) {
+        modalTitle.textContent = `Edit ${storeName}`;
+    }
+
+    if (modalClose) {
+        modalClose.setAttribute("aria-label", `Close ${storeName} editor`);
     }
 
     updateStoreDetailLine(managerUrl, "Search", searchUrl);
