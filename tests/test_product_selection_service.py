@@ -402,10 +402,14 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("store-options-sticky-toolbar", store_template)
         self.assertIn("store-options-title-toggle", store_template)
         self.assertIn('form="homeAddressForm"', store_template)
+        self.assertIn("storeSearchRadiusMiles", store_template)
+        self.assertIn("adjustStoreSearchRadius(-1)", store_template)
+        self.assertIn("adjustStoreSearchRadius(1)", store_template)
         self.assertIn("position: sticky", css)
         self.assertIn(".store-options-sticky-stack", css)
         self.assertIn(".store-options-title-toggle", css)
         self.assertIn(".store-options-sticky-toolbar", css)
+        self.assertIn(".store-radius-stepper", css)
         self.assertNotIn("#storeOptionsSection.card-collapsed .store-options-sticky-toolbar", css)
 
     def test_store_options_sticky_bar_matches_display_view_alignment(self):
@@ -421,6 +425,8 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("function scrollStoreOptionsIntoView", script)
         self.assertIn('document.getElementById("storeOptionsSection")', script)
         self.assertIn("scrollIntoView", script)
+        self.assertIn("function adjustStoreSearchRadius", script)
+        self.assertIn('document.getElementById("storeSearchRadiusMiles")', script)
 
     def test_store_options_toolbar_only_runs_nearest_stores(self):
         home_template = Path("PushShoppingList/templates/sections/home_address.html").read_text(encoding="utf-8")

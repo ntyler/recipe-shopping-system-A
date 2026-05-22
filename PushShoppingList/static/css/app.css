@@ -1156,27 +1156,53 @@ body {
         .store-radius-input-wrap {
             display: inline-flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
             flex: 0 0 auto;
             color: #a7f3d0;
             font-weight: 800;
         }
 
         .store-radius-input-wrap input {
-            width: 86px;
+            width: 68px;
             box-sizing: border-box;
             background: #202425;
             color: #fff;
             border: 1px solid #555;
             border-radius: 8px;
-            padding: 10px 11px;
+            padding: 10px 8px;
             font-size: 15px;
+            text-align: center;
             outline: none;
         }
 
         .store-radius-input-wrap input:focus {
             border-color: #00cc66;
             box-shadow: 0 0 0 3px rgba(0,204,102,0.16);
+        }
+
+        .store-radius-stepper {
+            display: inline-grid;
+            place-items: center;
+            width: 34px;
+            height: 34px;
+            margin: 0;
+            padding: 0;
+            border: 1px solid #0f766e;
+            border-radius: 8px;
+            background: #0f3f3b;
+            color: #d1fae5;
+            font-size: 20px;
+            font-weight: 900;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .store-radius-stepper:hover,
+        .store-radius-stepper:focus-visible {
+            border-color: #14b8a6;
+            background: #0f766e;
+            color: #fff;
+            outline: none;
         }
 
         .address-actions-grid {

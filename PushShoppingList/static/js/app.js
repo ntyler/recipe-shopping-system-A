@@ -5875,6 +5875,25 @@ function updateHomeAddressSummaries(address) {
     }
 }
 
+function adjustStoreSearchRadius(delta) {
+    const input = document.getElementById("storeSearchRadiusMiles");
+
+    if (!input) {
+        return;
+    }
+
+    const min = Number.parseFloat(input.min || "1");
+    const max = Number.parseFloat(input.max || "100");
+    const step = Number.parseFloat(input.step || "1") || 1;
+    const current = Number.parseFloat(input.value);
+    const base = Number.isFinite(current) ? current : min;
+    const next = Math.max(min, Math.min(max, base + (delta * step)));
+
+    input.value = Number.isInteger(next) ? String(next) : String(Number(next.toFixed(2)));
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
 async function useDeviceLocationForHomeAddress(button) {
     const form = document.getElementById("homeAddressForm");
 
