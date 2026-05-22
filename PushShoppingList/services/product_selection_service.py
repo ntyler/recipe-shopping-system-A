@@ -240,6 +240,33 @@ def product_browser_wait_seconds():
     return max(4, min(45, configured))
 
 
+def product_rendered_scroll_max_passes():
+    try:
+        configured = int(os.getenv("PRODUCT_RENDERED_SCROLL_MAX_PASSES", "5"))
+    except (TypeError, ValueError):
+        configured = 5
+
+    return max(1, min(18, configured))
+
+
+def product_rendered_scroll_target_cards():
+    try:
+        configured = int(os.getenv("PRODUCT_RENDERED_SCROLL_TARGET_CARDS", "48"))
+    except (TypeError, ValueError):
+        configured = 48
+
+    return max(8, min(product_candidate_limit(), configured))
+
+
+def product_rendered_scroll_settle_seconds():
+    try:
+        configured = float(os.getenv("PRODUCT_RENDERED_SCROLL_SETTLE_SECONDS", "0.6"))
+    except (TypeError, ValueError):
+        configured = 0.6
+
+    return max(0.2, min(2.0, configured))
+
+
 def product_search_browser_enabled():
     if os.getenv("DISABLE_BROWSER_PRODUCT_SEARCH") == "1":
         return False
@@ -6008,7 +6035,9 @@ def scroll_rendered_product_page(driver):
 
 
 def scroll_rendered_product_results_until_stable(driver, max_passes=None, stable_passes=2):
-    max_passes = max_passes or max(6, min(18, product_candidate_limit() // 6))
+    max_passes = max_passes or product_rendered_scroll_max_passes()
+    target_cards = product_rendered_scroll_target_cards()
+    settle_seconds = product_rendered_scroll_settle_seconds()
     last_count = -1
     unchanged = 0
 
@@ -6038,7 +6067,10 @@ def scroll_rendered_product_results_until_stable(driver, max_passes=None, stable
         except Exception:
             at_bottom = False
 
-        wait_for_browser_text_to_settle(driver, timeout_seconds=1.4)
+        wait_for_browser_text_to_settle(driver, timeout_seconds=settle_seconds)
+
+        if count >= target_cards and unchanged >= 1:
+            break
 
         if unchanged >= stable_passes and at_bottom:
             break

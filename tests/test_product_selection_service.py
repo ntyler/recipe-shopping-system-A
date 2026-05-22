@@ -160,6 +160,43 @@ class ProductSelectionServiceTest(unittest.TestCase):
 
         self.assertTrue(product_service.should_skip_rendered_html_chatgpt("bread", items))
 
+    def test_rendered_scroll_loop_uses_short_default_cap(self):
+        class FakeDriver:
+            def __init__(self):
+                self.scroll_calls = 0
+
+            def execute_script(self, *_args):
+                self.scroll_calls += 1
+                return False
+
+        driver = FakeDriver()
+
+        with patch.object(product_service, "extract_visible_product_cards_from_browser", return_value=[{"name": "chips"}]), patch.object(
+            product_service,
+            "wait_for_browser_text_to_settle",
+        ) as settle_mock:
+            product_service.scroll_rendered_product_results_until_stable(driver)
+
+        self.assertEqual(settle_mock.call_count, product_service.product_rendered_scroll_max_passes())
+        self.assertLessEqual(settle_mock.call_count, 5)
+
+    def test_rendered_scroll_loop_stops_after_target_cards_settle(self):
+        class FakeDriver:
+            def execute_script(self, *_args):
+                return False
+
+        enough_cards = [{"name": f"chips {index}"} for index in range(product_service.product_rendered_scroll_target_cards())]
+
+        with patch.object(
+            product_service,
+            "extract_visible_product_cards_from_browser",
+            return_value=enough_cards,
+        ) as extract_mock, patch.object(product_service, "wait_for_browser_text_to_settle"):
+            count = product_service.scroll_rendered_product_results_until_stable(FakeDriver())
+
+        self.assertEqual(count, len(enough_cards))
+        self.assertEqual(extract_mock.call_count, 2)
+
     def test_chatgpt_mismatch_is_not_selectable(self):
         item = candidate("Organic Lemon")
         item["chatgpt_analysis"] = {
