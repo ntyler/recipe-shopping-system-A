@@ -280,6 +280,17 @@ body {
             margin-right: 5px;
         }
 
+        .store-distance-pill {
+            display: inline-block;
+            margin-left: 6px;
+            padding: 2px 6px;
+            border-radius: 999px;
+            background: #263238;
+            color: #7dd3fc;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
         .store-detail-link {
             color: #38bdf8;
             text-decoration: none;

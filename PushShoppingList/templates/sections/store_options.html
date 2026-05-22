@@ -58,9 +58,19 @@
                     </div>
 
                     <div class="store-location-details">
+                        {% set nearest_store = nearest_store_locations.get(store_key, {}) if nearest_store_locations else {} %}
                         <div class="store-detail-line">
                             <span class="store-detail-label">Nearest</span>
-                            No nearest location saved yet. Run <code>update_home_stores.py</code>.
+                            {% if nearest_store and nearest_store.address %}
+                                <span>{{ nearest_store.address }}</span>
+                                {% if nearest_store.distance_miles is defined and nearest_store.distance_miles is not none %}
+                                    <span class="store-distance-pill">{{ nearest_store.distance_miles }} mi</span>
+                                {% endif %}
+                            {% elif nearest_store and nearest_store.skip_reason %}
+                                <span>{{ nearest_store.skip_reason }}</span>
+                            {% else %}
+                                No nearest location saved yet. Run <strong>Run Find Nearest Stores</strong>.
+                            {% endif %}
                         </div>
                     </div>
 

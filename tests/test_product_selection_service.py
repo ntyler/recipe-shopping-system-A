@@ -281,6 +281,38 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertEqual(click_mock.call_count, 3)
         self.assertEqual(extract_mock.call_count, 3)
 
+    def test_run_find_nearest_stores_button_route_runs_resolver(self):
+        from PushShoppingList.app import create_app
+
+        app = create_app()
+        app.config["TESTING"] = True
+        saved_address = {"full_address": "5905 Arlo Drive, Indianapolis, IN 46237"}
+        nearest_result = {
+            "ok": True,
+            "home_address": saved_address["full_address"],
+            "store_locations": {
+                "aldi": {
+                    "name": "Aldi",
+                    "address": "Aldi, Indianapolis, IN 46237",
+                    "distance_miles": 1.95,
+                }
+            },
+        }
+
+        with patch("PushShoppingList.routes.main_routes.save_home_address", return_value=saved_address), patch(
+            "PushShoppingList.routes.main_routes.resolve_nearest_stores_for_home_address",
+            return_value=nearest_result,
+        ) as resolver:
+            response = app.test_client().post(
+                "/save_home_address",
+                data={"action": "run_find_nearest"},
+                follow_redirects=False,
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.headers["Location"].endswith("/#storeOptionsSection"))
+        resolver.assert_called_once_with(saved_address)
+
     def test_chatgpt_mismatch_is_not_selectable(self):
         item = candidate("Organic Lemon")
         item["chatgpt_analysis"] = {

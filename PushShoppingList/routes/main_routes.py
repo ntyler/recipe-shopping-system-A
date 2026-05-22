@@ -19,6 +19,8 @@ from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.food_rules_service import shopping_item_food_rule_status
 from PushShoppingList.services.home_address_service import load_home_address
 from PushShoppingList.services.home_address_service import save_home_address
+from PushShoppingList.services.home_store_location_service import load_nearest_store_results
+from PushShoppingList.services.home_store_location_service import resolve_nearest_stores_for_home_address
 from PushShoppingList.services.item_state_service import load_item_state
 from PushShoppingList.services.item_state_service import save_item_manual_qty
 from PushShoppingList.services.recipe_url_service import recipe_url_rows
@@ -871,6 +873,7 @@ def index():
     item_state = load_item_state()
     recipe_rows = recipe_view_rows(recipe_urls)
     product_choices = product_choices_by_item()
+    nearest_store_results = load_nearest_store_results()
     recipe_item_quantities = recipe_quantity_lookup(recipe_rows)
     recipe_item_quantity_sources = recipe_quantity_sources_lookup(recipe_rows)
     item_quantities = apply_manual_item_quantities(
@@ -885,6 +888,8 @@ def index():
         items=items,
         current_urls=recipe_log_rows,
         home_address=load_home_address(),
+        nearest_store_results=nearest_store_results,
+        nearest_store_locations=nearest_store_results.get("store_locations", {}),
         available_stores=store_settings["stores"],
         enabled_stores=store_settings["enabled_stores"],
         shopping_items=shopping_items_only(items),
@@ -945,17 +950,27 @@ def sort_list():
 @main_bp.route("/save_home_address", methods=["POST"])
 def save_home_address_route():
     saved_address = save_home_address(request.form)
+    nearest_store_results = None
+
+    if request.form.get("action") == "run_find_nearest":
+        nearest_store_results = resolve_nearest_stores_for_home_address(saved_address)
 
     if (
         request.headers.get("X-Requested-With") == "fetch"
         or request.form.get("ajax") == "1"
     ):
-        return jsonify({
+        response = {
             "ok": True,
             "home_address": saved_address,
-        })
+        }
+        if nearest_store_results is not None:
+            response["nearest_store_results"] = nearest_store_results
+            response["ok"] = bool(nearest_store_results.get("ok"))
+            if nearest_store_results.get("error"):
+                response["error"] = nearest_store_results.get("error")
+        return jsonify(response), 200 if response["ok"] else 400
 
-    return redirect("/#home-address-section")
+    return redirect("/#storeOptionsSection" if nearest_store_results is not None else "/#home-address-section")
 
 
 @main_bp.route("/api/reverse_geocode", methods=["POST"])
