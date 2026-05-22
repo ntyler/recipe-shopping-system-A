@@ -353,6 +353,8 @@ body {
         .active-store-mode-controls {
             display: inline-flex;
             align-items: center;
+            justify-content: flex-end;
+            flex-wrap: wrap;
             gap: 6px;
             padding: 3px;
             border: 1px solid #333;
@@ -417,6 +419,10 @@ body {
             outline: none;
         }
 
+        body:not(.active-store-activation-mode) .active-store-card.active-store-inactive {
+            display: none;
+        }
+
         body.active-store-map-mode .active-store-card[data-google-maps-url]:not([data-google-maps-url=""]) {
             border-color: rgba(20, 184, 166, 0.45);
         }
@@ -444,6 +450,45 @@ body {
             box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35);
         }
 
+        body.active-store-activation-mode .selected-stores-map-wrap,
+        body.active-store-activation-mode .active-store-empty {
+            display: none;
+        }
+
+        body.active-store-activation-mode .active-store-card {
+            border-color: rgba(20, 184, 166, 0.36);
+            background: #0d1f1c;
+            cursor: pointer;
+        }
+
+        body.active-store-activation-mode .active-store-card:hover,
+        body.active-store-activation-mode .active-store-card:focus-visible {
+            border-color: #14b8a6;
+            background: #102522;
+        }
+
+        body.active-store-activation-mode .active-store-card[aria-pressed="true"] {
+            box-shadow: 0 0 0 2px rgba(20, 184, 166, 0.2);
+        }
+
+        body.active-store-activation-mode .active-store-card.active-store-inactive {
+            border-color: #374151;
+            background: #151818;
+            box-shadow: none;
+            opacity: 0.76;
+        }
+
+        body.active-store-activation-mode .active-store-card.active-store-inactive .store-logo {
+            filter: grayscale(0.9);
+            opacity: 0.56;
+            box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35);
+        }
+
+        body.active-store-activation-mode .active-store-card.saving {
+            cursor: progress;
+            opacity: 0.65;
+        }
+
         .active-store-card .store-logo {
             width: 42px;
             height: 42px;
@@ -461,6 +506,28 @@ body {
         }
 
         .active-store-card.active-store-unavailable .active-store-name {
+            color: #9ca3af;
+        }
+
+        body.active-store-activation-mode .active-store-card.active-store-inactive .active-store-name {
+            color: #9ca3af;
+        }
+
+        .active-store-status {
+            display: none;
+            color: #a7f3d0;
+            font-size: 10px;
+            font-weight: 900;
+            line-height: 1;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        body.active-store-activation-mode .active-store-status {
+            display: block;
+        }
+
+        body.active-store-activation-mode .active-store-card.active-store-inactive .active-store-status {
             color: #9ca3af;
         }
 

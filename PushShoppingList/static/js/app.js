@@ -2708,18 +2708,26 @@ function restoreStoreOptionsDisplaySettings() {
 }
 
 function setActiveStoreIconMode(mode, options = {}) {
-    const nextMode = mode === "map" ? "map" : "store";
+    const allowedModes = new Set(["store", "map", "activation"]);
+    const nextMode = allowedModes.has(mode) ? mode : "store";
 
     document.body.classList.toggle("active-store-map-mode", nextMode === "map");
+    document.body.classList.toggle("active-store-activation-mode", nextMode === "activation");
     document.querySelectorAll("[data-active-store-mode-toggle]").forEach(button => {
         const active = button.dataset.activeStoreModeToggle === nextMode;
         button.classList.toggle("active", active);
         button.setAttribute("aria-pressed", active ? "true" : "false");
     });
+    document.querySelectorAll("[data-active-store-heading-label]").forEach(label => {
+        label.textContent = nextMode === "activation" ? "All stores" : "Active stores";
+    });
     document.querySelectorAll(".active-store-card").forEach(card => {
         const storeTitle = card.dataset.storeTitle || card.getAttribute("title") || "";
         const mapTitle = card.dataset.mapTitle || storeTitle;
-        const title = nextMode === "map" ? mapTitle : storeTitle;
+        const activationTitle = card.dataset.activationTitle || storeTitle;
+        const title = nextMode === "activation"
+            ? activationTitle
+            : (nextMode === "map" ? mapTitle : storeTitle);
         const storeUrl = card.dataset.storeUrl || card.getAttribute("href") || "";
 
         if (storeUrl) {
@@ -2741,6 +2749,15 @@ function restoreActiveStoreIconMode() {
 }
 
 function openActiveStoreIcon(link, event) {
+    if (document.body.classList.contains("active-store-activation-mode")) {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        toggleStoreActivationFromCard(link);
+        return false;
+    }
+
     if (!document.body.classList.contains("active-store-map-mode")) {
         return true;
     }
@@ -2750,6 +2767,65 @@ function openActiveStoreIcon(link, event) {
     }
 
     return openStoreAddressMap(link, event);
+}
+
+function findStoreEnabledInput(storeKey) {
+    return Array.from(document.querySelectorAll('input[form="store-options-form"][name="enabled_stores"]'))
+        .find(input => input.value === storeKey) || null;
+}
+
+function updateActiveStoreCardActivationState(card, isActive) {
+    if (!card) {
+        return;
+    }
+
+    const label = card.querySelector(".active-store-name");
+    const storeName = label ? label.textContent.trim() : "store";
+    const status = card.querySelector(".active-store-status");
+
+    card.dataset.storeActive = isActive ? "true" : "false";
+    card.classList.toggle("active-store-inactive", !isActive);
+    card.setAttribute("aria-pressed", isActive ? "true" : "false");
+    card.dataset.activationTitle = `${isActive ? "Deactivate" : "Activate"} ${storeName}`;
+
+    if (status) {
+        status.textContent = isActive ? "Active" : "Inactive";
+    }
+
+    if (document.body.classList.contains("active-store-activation-mode")) {
+        card.setAttribute("title", card.dataset.activationTitle);
+        card.setAttribute("aria-label", card.dataset.activationTitle);
+    }
+}
+
+async function toggleStoreActivationFromCard(card) {
+    if (!card || card.classList.contains("saving")) {
+        return false;
+    }
+
+    const storeKey = card.dataset.storeKey || "";
+    const input = findStoreEnabledInput(storeKey);
+
+    if (!input) {
+        return false;
+    }
+
+    const nextChecked = !input.checked;
+    input.checked = nextChecked;
+    updateActiveStoreCardActivationState(card, nextChecked);
+    card.classList.add("saving");
+    card.setAttribute("aria-busy", "true");
+
+    const saved = await saveStoreToggle(input);
+
+    if (!saved) {
+        input.checked = !nextChecked;
+        updateActiveStoreCardActivationState(card, !nextChecked);
+        card.classList.remove("saving");
+        card.removeAttribute("aria-busy");
+    }
+
+    return saved;
 }
 
 function restoreToggleSetting(inputId, storageKey, defaultChecked, bodyClass, invertBodyClass = false) {
@@ -6101,17 +6177,17 @@ async function saveStoreToggle(toggle) {
         return false;
     }
 
-    await saveStoreOptionsForm(form);
-
-    return false;
+    return saveStoreOptionsForm(form);
 }
 
 async function saveStoreOptionsForm(form) {
     try {
         await submitStoreForm(form);
         await refreshStoreMarkup();
+        return true;
     } catch (err) {
         console.warn("Unable to save store options in the background.", err);
+        return false;
     }
 }
 
