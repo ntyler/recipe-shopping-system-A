@@ -1037,6 +1037,11 @@ class ProductSelectionServiceTest(unittest.TestCase):
         class FakeDriver:
             current_url = "https://www.aldi.us/store/aldi/products/16902710-friendly-farms-vitamin-d-milk-1-gal"
 
+            def execute_script(self, script, *args):
+                if "document.body" in script:
+                    return "In-Store open 9am - 8pm ALDI - GRE 73 - Indianapolis 46237"
+                return ""
+
         unexpected_calls = []
 
         def unexpected_helper(*_args, **_kwargs):
@@ -1061,6 +1066,10 @@ class ProductSelectionServiceTest(unittest.TestCase):
                 FakeDriver(),
                 {
                     "search_values": ["5905 Arlo Drive, Indianapolis, IN 46237"],
+                    "home_zip": "46237",
+                    "pickup_zip": "46237",
+                    "exact_address": "Aldi, 6835 South Emerson Avenue, Indianapolis, IN 46237",
+                    "address_hints": ["46237", "6835 South Emerson Avenue"],
                     "store_key": "aldi",
                     "store_name": "Aldi",
                 },
@@ -1074,13 +1083,48 @@ class ProductSelectionServiceTest(unittest.TestCase):
         selector_mock.assert_not_called()
         self.assertEqual(unexpected_calls, [])
 
+    def test_aldi_visible_confirmation_rejects_hidden_expected_zip_when_header_is_wrong(self):
+        class FakeDriver:
+            page_source = "<html><script>46237 Indianapolis</script><body>60602 Chicago</body></html>"
+
+            def execute_script(self, script, *args):
+                if "document.body" in script:
+                    return "Delivery 60602 Shopping at ALDI - BAT 104 - Chicago"
+                return ""
+
+        self.assertFalse(aldi_store.aldi_visible_home_store_selected(
+            FakeDriver(),
+            {
+                "home_zip": "46237",
+                "pickup_zip": "46237",
+                "exact_address": "Aldi, 6835 South Emerson Avenue, Indianapolis, IN 46237",
+                "address_hints": ["46237", "6835 South Emerson Avenue"],
+            },
+        ))
+
+    def test_aldi_visible_confirmation_accepts_visible_expected_store_header(self):
+        class FakeDriver:
+            def execute_script(self, script, *args):
+                if "document.body" in script:
+                    return "In-Store open 9am - 8pm ALDI - GRE 73 - Indianapolis"
+                return ""
+
+        self.assertTrue(aldi_store.aldi_visible_home_store_selected(
+            FakeDriver(),
+            {
+                "home_zip": "46237",
+                "pickup_zip": "46237",
+                "exact_address": "Aldi, 6835 South Emerson Avenue, Indianapolis, IN 46237",
+                "address_hints": ["46237", "6835 South Emerson Avenue"],
+            },
+        ))
+
     def test_aldi_store_update_uses_scoped_location_input_and_saves_after_typing(self):
         class FakeDriver:
             current_url = "https://www.aldi.us/store/aldi/s?k=bread"
 
         generic_type_calls = []
         save_calls = []
-        confirmation_checks = []
 
         def generic_type(*_args, **_kwargs):
             generic_type_calls.append(True)
@@ -1089,10 +1133,6 @@ class ProductSelectionServiceTest(unittest.TestCase):
         def save_address(*_args, **_kwargs):
             save_calls.append(True)
             return True
-
-        def correct_store_after_update(*_args, **_kwargs):
-            confirmation_checks.append(True)
-            return len(confirmation_checks) > 1
 
         helpers = {
             "accept_cookies_if_present": lambda *_args, **_kwargs: False,
@@ -1104,10 +1144,14 @@ class ProductSelectionServiceTest(unittest.TestCase):
             "click_continue_shopping": lambda *_args, **_kwargs: False,
             "click_visible_xpath": lambda *_args, **_kwargs: False,
             "final_home_store_xpaths": lambda _context: ["//button"],
-            "correct_home_store_selected": correct_store_after_update,
+            "correct_home_store_selected": lambda *_args, **_kwargs: False,
         }
 
-        with patch.object(aldi_store, "open_aldi_store_selector_page", return_value=True), patch.object(
+        with patch.object(aldi_store, "aldi_visible_home_store_selected", side_effect=[False, True]), patch.object(
+            aldi_store,
+            "open_aldi_store_selector_page",
+            return_value=True,
+        ), patch.object(
             aldi_store,
             "click_aldi_near_button",
             return_value=False,
@@ -1179,7 +1223,7 @@ class ProductSelectionServiceTest(unittest.TestCase):
             aldi_store,
             "click_aldi_shop_this_store",
             return_value=False,
-        ), patch.object(
+        ) as shop_mock, patch.object(
             aldi_store.time,
             "sleep",
             return_value=None,
@@ -1201,6 +1245,7 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertFalse(result["clicked_first_store_card"])
         self.assertEqual(first_card_calls, [])
+        shop_mock.assert_not_called()
 
     def test_aldi_store_card_context_removes_generic_chain_name(self):
         card_context = aldi_store.aldi_store_card_context({
@@ -1241,7 +1286,11 @@ class ProductSelectionServiceTest(unittest.TestCase):
             "correct_home_store_selected": correct_store_after_selector,
         }
 
-        with patch.object(aldi_store, "open_aldi_store_selector_page", return_value=True), patch.object(
+        with patch.object(aldi_store, "aldi_visible_home_store_selected", side_effect=[False, True]), patch.object(
+            aldi_store,
+            "open_aldi_store_selector_page",
+            return_value=True,
+        ), patch.object(
             aldi_store,
             "click_aldi_near_button",
             return_value=True,

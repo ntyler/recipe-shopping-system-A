@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import time
 from typing import Any
 
@@ -176,6 +177,67 @@ def clean_aldi_text(value: Any) -> str:
     return " ".join(str(value or "").split())
 
 
+def aldi_zip_from_text(value: Any) -> str:
+    match = re.search(r"\b\d{5}(?:-\d{4})?\b", str(value or ""))
+    return match.group(0) if match else ""
+
+
+def aldi_expected_city(context: dict[str, Any]) -> str:
+    for source in [context.get("exact_address"), context.get("home_address")]:
+        parts = [clean_aldi_text(part) for part in str(source or "").split(",") if clean_aldi_text(part)]
+        for part in parts:
+            if re.search(r"\bcounty\b|\b\d{5}\b|\bUnited States\b", part, flags=re.IGNORECASE):
+                continue
+            if re.search(r"\b(?:street|st|road|rd|drive|dr|avenue|ave|boulevard|blvd|lane|ln|way|court|ct)\b", part, flags=re.IGNORECASE):
+                continue
+            if part and not re.search(r"\d", part):
+                return part
+    return ""
+
+
+def aldi_visible_text(driver) -> str:
+    try:
+        return clean_aldi_text(driver.execute_script("return document.body && document.body.innerText || '';"))
+    except Exception:
+        return ""
+
+
+def aldi_visible_home_store_selected(driver, context: dict[str, Any]) -> bool:
+    text = aldi_visible_text(driver)
+    if not text:
+        return False
+
+    lowered = text.lower()
+    expected_zip = (
+        clean_aldi_text(context.get("pickup_zip"))
+        or clean_aldi_text(context.get("home_zip"))
+        or aldi_zip_from_text(context.get("exact_address"))
+        or aldi_zip_from_text(context.get("home_address"))
+    )
+    expected_city = aldi_expected_city(context)
+    exact_address = clean_aldi_text(context.get("exact_address"))
+    address_hints = [clean_aldi_text(hint) for hint in context.get("address_hints", []) if clean_aldi_text(hint)]
+
+    found_zips = set(re.findall(r"\b\d{5}\b", text))
+    if expected_zip and found_zips and expected_zip not in found_zips:
+        return False
+
+    if expected_zip and expected_zip in text:
+        return True
+
+    if exact_address and exact_address in text:
+        return True
+
+    for hint in address_hints:
+        if re.search(r"\d", hint) and len(hint) >= 4 and hint in text:
+            return True
+
+    if expected_city and re.search(rf"\b{re.escape(expected_city)}\b", text, flags=re.IGNORECASE):
+        return "shopping at aldi" in lowered or "aldi -" in lowered or "in-store" in lowered or "pickup" in lowered
+
+    return False
+
+
 def aldi_location_search_values(context: dict[str, Any]) -> list[str]:
     values: list[str] = []
 
@@ -347,7 +409,6 @@ def update_home_store(
     click_continue_shopping = helpers["click_continue_shopping"]
     click_visible_xpath = helpers["click_visible_xpath"]
     final_home_store_xpaths = helpers["final_home_store_xpaths"]
-    correct_home_store_selected = helpers["correct_home_store_selected"]
 
     clicked_location = False
     clicked_near_box = False
@@ -362,7 +423,7 @@ def update_home_store(
     clicked_final = False
 
     accept_cookies_if_present(driver, wait=0.75)
-    if correct_home_store_selected(driver, context):
+    if aldi_visible_home_store_selected(driver, context):
         return {
             "attempted": False,
             "ok": True,
@@ -421,16 +482,13 @@ def update_home_store(
     time.sleep(1)
     accept_cookies_if_present(driver, wait=0.75)
 
-    if not clicked_store_card:
-        clicked_store_card = click_store_card_that_matches_context(driver=driver, context=context, wait=wait_seconds)
-        time.sleep(1)
-
-    clicked_shop_this_store = click_aldi_shop_this_store(
-        driver=driver,
-        helpers=helpers,
-        worker_id=worker_id,
-        wait_seconds=wait_seconds,
-    )
+    if clicked_store_card:
+        clicked_shop_this_store = click_aldi_shop_this_store(
+            driver=driver,
+            helpers=helpers,
+            worker_id=worker_id,
+            wait_seconds=wait_seconds,
+        )
     if clicked_shop_this_store:
         reached_storefront = wait_for_aldi_storefront(driver, timeout_seconds=wait_seconds + 8)
 
@@ -440,7 +498,7 @@ def update_home_store(
         clicked_final = click_visible_xpath(driver, final_home_store_xpaths(context), wait=wait_seconds)
 
     time.sleep(wait_seconds)
-    confirmed = correct_home_store_selected(driver, context)
+    confirmed = aldi_visible_home_store_selected(driver, context)
     ok = bool(confirmed)
 
     return {
