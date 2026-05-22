@@ -2581,6 +2581,47 @@ def candidate_needs_product_detail(candidate):
     return product_url.startswith(("http://", "https://")) and product_url != search_url
 
 
+def candidate_has_rankable_card_evidence(ingredient, candidate):
+    if candidate.get("source") == "search-page-fallback":
+        return False
+
+    if not candidate_has_direct_product_url(candidate):
+        return False
+
+    card_evidence = clean_text(" ".join([
+        candidate.get("card_text_excerpt", ""),
+        candidate.get("product_card_text", ""),
+        candidate.get("raw_product_html_snippet", ""),
+        candidate.get("detail_text_excerpt", ""),
+    ]))
+    if not any([
+        candidate.get("price"),
+        candidate.get("package_size"),
+        candidate.get("unit_price"),
+        card_evidence,
+    ]):
+        return False
+
+    match = best_ingredient_candidate_match(ingredient, candidate)
+    ingredient_tokens = match.get("ingredient_tokens", set())
+    if not ingredient_tokens:
+        return True
+
+    name = candidate.get("product_name", "")
+    name_tokens = set(tokenize(name))
+    name_is_specific = (
+        len(name_tokens) >= len(ingredient_tokens) + 1
+        and len(clean_text(name)) <= 100
+        and not PRICE_PATTERN.search(name)
+    )
+    if name_is_specific and match.get("name_token_ratio", 0) >= 0.8:
+        return True
+
+    url_text = normalize_match_text(urlparse(candidate.get("product_url") or "").path.replace("-", " "))
+    url_overlap = len(ingredient_tokens & set(tokenize(url_text)))
+    return url_overlap >= max(1, min(len(ingredient_tokens), 2))
+
+
 def mark_detail_skipped(candidate, reason):
     candidate["detail_evaluated"] = False
     candidate["detail_fetch"] = {
@@ -7803,9 +7844,13 @@ def score_candidate(ingredient, candidate, quantity_context=None):
     candidate["ranking_metadata"] = metadata
 
     if DETAIL_REQUIRED and not candidate.get("detail_evaluated"):
-        score -= 45
-        viable = False
-        skip_reasons.append("Full product page was not successfully evaluated.")
+        if candidate_has_rankable_card_evidence(ingredient, candidate):
+            score -= 8
+            reasons.append("Visible product card has enough direct product evidence for ranking.")
+        else:
+            score -= 45
+            viable = False
+            skip_reasons.append("Full product page was not successfully evaluated.")
     elif candidate.get("detail_evaluated"):
         score += 15
         reasons.append("Full product page was opened and evaluated.")
