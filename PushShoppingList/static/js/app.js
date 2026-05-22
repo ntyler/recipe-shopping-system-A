@@ -2707,6 +2707,51 @@ function restoreStoreOptionsDisplaySettings() {
     });
 }
 
+function setActiveStoreIconMode(mode, options = {}) {
+    const nextMode = mode === "map" ? "map" : "store";
+
+    document.body.classList.toggle("active-store-map-mode", nextMode === "map");
+    document.querySelectorAll("[data-active-store-mode-toggle]").forEach(button => {
+        const active = button.dataset.activeStoreModeToggle === nextMode;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+    document.querySelectorAll(".active-store-card").forEach(card => {
+        const storeTitle = card.dataset.storeTitle || card.getAttribute("title") || "";
+        const mapTitle = card.dataset.mapTitle || storeTitle;
+        const title = nextMode === "map" ? mapTitle : storeTitle;
+        const storeUrl = card.dataset.storeUrl || card.getAttribute("href") || "";
+
+        if (storeUrl) {
+            card.setAttribute("href", storeUrl);
+        }
+        if (title) {
+            card.setAttribute("title", title);
+            card.setAttribute("aria-label", title);
+        }
+    });
+
+    if (options.persist) {
+        localStorage.setItem("active-store-icon-mode", nextMode);
+    }
+}
+
+function restoreActiveStoreIconMode() {
+    setActiveStoreIconMode(localStorage.getItem("active-store-icon-mode") || "store");
+}
+
+function openActiveStoreIcon(link, event) {
+    if (!document.body.classList.contains("active-store-map-mode")) {
+        return true;
+    }
+
+    if (!link || !link.dataset.googleMapsUrl) {
+        return true;
+    }
+
+    return openStoreAddressMap(link, event);
+}
+
 function restoreToggleSetting(inputId, storageKey, defaultChecked, bodyClass, invertBodyClass = false) {
     const input = document.getElementById(inputId);
 
@@ -6493,6 +6538,7 @@ async function refreshStoreMarkup(options = {}) {
     bindRecipeTaskChecks();
     updateViewSwitcherStickyOffset();
     restoreStoreOptionsDisplaySettings();
+    restoreActiveStoreIconMode();
     initStoreLocationMaps();
     window.scrollTo(scrollX, scrollY);
 }
@@ -6548,6 +6594,7 @@ document.addEventListener("DOMContentLoaded", function () {
     updateRecipeEditStickyOffsets();
     updateViewSwitcherStickyOffset();
     restoreStoreOptionsDisplaySettings();
+    restoreActiveStoreIconMode();
     initStoreLocationMaps();
     startExtractionProgressPolling();
 });

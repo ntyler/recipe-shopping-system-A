@@ -338,6 +338,49 @@ body {
             display: none;
         }
 
+        .active-store-summary-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .active-store-mode-controls {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            background: #101314;
+        }
+
+        .active-store-mode-toggle {
+            margin: 0;
+            padding: 6px 9px;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            background: transparent;
+            color: #d1d5db;
+            font-size: 12px;
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        .active-store-mode-toggle[aria-pressed="true"] {
+            border-color: #0f766e;
+            background: #0f766e;
+            color: #fff;
+        }
+
+        .active-store-mode-toggle:hover,
+        .active-store-mode-toggle:focus-visible {
+            border-color: #14b8a6;
+            color: #fff;
+            outline: none;
+        }
+
         .active-store-list {
             display: flex;
             flex-wrap: wrap;
@@ -368,6 +411,14 @@ body {
             border-color: #0f766e;
             background: #0d1f1c;
             outline: none;
+        }
+
+        body.active-store-map-mode .active-store-card[data-google-maps-url]:not([data-google-maps-url=""]) {
+            border-color: rgba(20, 184, 166, 0.45);
+        }
+
+        body.active-store-map-mode .active-store-card[data-google-maps-url]:not([data-google-maps-url=""]) .store-logo {
+            box-shadow: 0 0 0 2px rgba(20, 184, 166, 0.22), inset 0 0 0 1px rgba(0,0,0,0.25);
         }
 
         .active-store-card.active-store-unavailable {
