@@ -1460,6 +1460,13 @@ def grab_best_products(items=None, job_id=None):
     if job_id:
         update_product_progress_summary(job_id, "Finding the nearest enabled store locations from the saved Full Address.")
 
+    try:
+        from PushShoppingList.services.home_store_location_service import load_nearest_store_results
+
+        saved_store_radius = load_nearest_store_results().get("search_radius_miles", 10)
+    except Exception:
+        saved_store_radius = 10
+
     home_location = geocode_home_address(full_address)
     store_locations = {
         store_key: find_nearest_store_location(
@@ -1467,6 +1474,7 @@ def grab_best_products(items=None, job_id=None):
             stores[store_key],
             full_address,
             home_location,
+            radius_miles=saved_store_radius,
         )
         for store_key in enabled_stores
     }
@@ -1476,6 +1484,7 @@ def grab_best_products(items=None, job_id=None):
         metadata={
             "home_address": full_address,
             "home_location": home_location,
+            "search_radius_miles": saved_store_radius,
             "store_locations": store_locations,
         },
     )
@@ -8901,26 +8910,28 @@ def home_address_geocode_queries(full_address):
     return variants
 
 
-def find_nearest_store_location(store_key, store, full_address, home_location):
+def store_search_radius_miles(value, default=10):
+    try:
+        radius = float(value)
+    except (TypeError, ValueError):
+        radius = float(default)
+
+    return max(1.0, min(100.0, radius))
+
+
+def find_nearby_store_locations(store_key, store, full_address, home_location, radius_miles=10):
     store_name = store.get("label") or store_key.title()
     locator_url = build_store_locator_url(store, full_address)
-    fallback = {
-        "name": store_name,
-        "address": "",
-        "distance_miles": None,
-        "locator_url": locator_url,
-        "source": "configured-store-locator",
-        "pickup_enabled": True,
-        "pickup_status": "Assumed pickup-capable because the store is enabled for product search.",
-    }
+    radius = store_search_radius_miles(radius_miles)
 
     if not home_location:
-        fallback["skip_reason"] = "Home address could not be geocoded."
-        return fallback
+        return []
 
     lat = home_location["latitude"]
     lon = home_location["longitude"]
-    delta = 0.45
+    lat_delta = max(0.02, radius / 69.0)
+    lon_degrees_per_mile = max(0.15, 69.0 * math.cos(math.radians(lat)))
+    lon_delta = max(0.02, radius / lon_degrees_per_mile)
 
     try:
         response = requests.get(
@@ -8928,10 +8939,10 @@ def find_nearest_store_location(store_key, store, full_address, home_location):
             params={
                 "format": "jsonv2",
                 "q": store_name,
-                "limit": 8,
+                "limit": 50,
                 "countrycodes": "us",
                 "bounded": 1,
-                "viewbox": f"{lon - delta},{lat + delta},{lon + delta},{lat - delta}",
+                "viewbox": f"{lon - lon_delta},{lat + lat_delta},{lon + lon_delta},{lat - lat_delta}",
                 "addressdetails": 1,
             },
             headers=REQUEST_HEADERS,
@@ -8939,9 +8950,8 @@ def find_nearest_store_location(store_key, store, full_address, home_location):
         )
         response.raise_for_status()
         data = response.json()
-    except Exception as exc:
-        fallback["skip_reason"] = f"Nearest store lookup failed: {exc}"
-        return fallback
+    except Exception:
+        return []
 
     locations = []
     for item in data if isinstance(data, list) else []:
@@ -8953,6 +8963,9 @@ def find_nearest_store_location(store_key, store, full_address, home_location):
 
         display_name = clean_text(item.get("display_name"))
         distance = haversine_miles(lat, lon, item_lat, item_lon)
+        if distance > radius:
+            continue
+
         locations.append({
             "name": store_name,
             "address": display_name,
@@ -8963,13 +8976,57 @@ def find_nearest_store_location(store_key, store, full_address, home_location):
             "source": "nominatim",
             "pickup_enabled": True,
             "pickup_status": "Nearest location resolved for pickup-oriented grocery search.",
+            "search_radius_miles": radius,
         })
 
-    if not locations:
-        fallback["skip_reason"] = "No nearby store location was found."
+    return sorted(locations, key=lambda item: item["distance_miles"])
+
+
+def find_nearest_store_location(store_key, store, full_address, home_location, radius_miles=10):
+    store_name = store.get("label") or store_key.title()
+    locator_url = build_store_locator_url(store, full_address)
+    radius = store_search_radius_miles(radius_miles)
+    fallback = {
+        "name": store_name,
+        "address": "",
+        "distance_miles": None,
+        "locator_url": locator_url,
+        "source": "configured-store-locator",
+        "pickup_enabled": True,
+        "pickup_status": "Assumed pickup-capable because the store is enabled for product search.",
+        "nearby_locations": [],
+        "nearby_count": 0,
+        "search_radius_miles": radius,
+    }
+
+    if not home_location:
+        fallback["skip_reason"] = "Home address could not be geocoded."
         return fallback
 
-    return min(locations, key=lambda item: item["distance_miles"])
+    locations = find_nearby_store_locations(
+        store_key,
+        store,
+        full_address,
+        home_location,
+        radius_miles=radius,
+    )
+
+    if not locations:
+        fallback["skip_reason"] = f"No nearby store location was found within {format_radius_miles(radius)} mi."
+        return fallback
+
+    nearest = dict(locations[0])
+    nearest["nearby_locations"] = locations
+    nearest["nearby_count"] = len(locations)
+    nearest["search_radius_miles"] = radius
+    return nearest
+
+
+def format_radius_miles(radius):
+    radius = store_search_radius_miles(radius)
+    if float(radius).is_integer():
+        return str(int(radius))
+    return f"{radius:.1f}".rstrip("0").rstrip(".")
 
 
 def build_store_locator_url(store, full_address):

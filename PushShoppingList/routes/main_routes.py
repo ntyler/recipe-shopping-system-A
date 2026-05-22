@@ -19,6 +19,8 @@ from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.food_rules_service import shopping_item_food_rule_status
 from PushShoppingList.services.home_address_service import load_home_address
 from PushShoppingList.services.home_address_service import save_home_address
+from PushShoppingList.services.home_store_location_service import DEFAULT_STORE_SEARCH_RADIUS_MILES
+from PushShoppingList.services.home_store_location_service import format_store_search_radius
 from PushShoppingList.services.home_store_location_service import load_nearest_store_results
 from PushShoppingList.services.home_store_location_service import resolve_nearest_stores_for_home_address
 from PushShoppingList.services.item_state_service import load_item_state
@@ -890,6 +892,9 @@ def index():
         home_address=load_home_address(),
         nearest_store_results=nearest_store_results,
         nearest_store_locations=nearest_store_results.get("store_locations", {}),
+        nearest_store_search_radius_miles=format_store_search_radius(
+            nearest_store_results.get("search_radius_miles", DEFAULT_STORE_SEARCH_RADIUS_MILES)
+        ),
         available_stores=store_settings["stores"],
         enabled_stores=store_settings["enabled_stores"],
         shopping_items=shopping_items_only(items),
@@ -953,7 +958,10 @@ def save_home_address_route():
     nearest_store_results = None
 
     if request.form.get("action") == "run_find_nearest":
-        nearest_store_results = resolve_nearest_stores_for_home_address(saved_address)
+        nearest_store_results = resolve_nearest_stores_for_home_address(
+            saved_address,
+            search_radius_miles=request.form.get("store_search_radius_miles"),
+        )
 
     if (
         request.headers.get("X-Requested-With") == "fetch"

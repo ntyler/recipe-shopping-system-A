@@ -67,6 +67,7 @@
 
                     <div class="store-location-details">
                         {% set nearest_store = nearest_store_locations.get(store_key, {}) if nearest_store_locations else {} %}
+                        {% set nearby_stores = nearest_store.nearby_locations if nearest_store and nearest_store.nearby_locations else [] %}
                         <div class="store-detail-line">
                             <span class="store-detail-label">Nearest</span>
                             {% if nearest_store and nearest_store.address %}
@@ -80,6 +81,24 @@
                                 <span class="store-nearest-empty">No nearest location saved yet. Use Run Find Nearest Stores.</span>
                             {% endif %}
                         </div>
+                        {% if nearby_stores %}
+                            <div class="nearby-store-summary">
+                                <span class="store-detail-label">Nearby</span>
+                                <span>{{ nearby_stores|length }} {{ store.label }} location{% if nearby_stores|length != 1 %}s{% endif %}
+                                    within {{ nearest_store.search_radius_display or nearest_store_results.search_radius_display or nearest_store.search_radius_miles or nearest_store_results.search_radius_miles or 10 }} mi</span>
+                            </div>
+                            <div class="nearby-store-list">
+                                {% for nearby_store in nearby_stores %}
+                                    <div class="nearby-store-row{% if loop.first %} nearest{% endif %}">
+                                        <span class="nearby-store-rank">{{ loop.index }}</span>
+                                        <span class="nearby-store-address">{{ nearby_store.address }}</span>
+                                        {% if nearby_store.distance_miles is defined and nearby_store.distance_miles is not none %}
+                                            <span class="store-distance-pill">{{ nearby_store.distance_miles }} mi</span>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
                     </div>
 
                     <form id="store-edit-{{ store_key }}"

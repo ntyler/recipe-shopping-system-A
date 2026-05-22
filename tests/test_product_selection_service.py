@@ -311,7 +311,7 @@ class ProductSelectionServiceTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertTrue(response.headers["Location"].endswith("/#storeOptionsSection"))
-        resolver.assert_called_once_with(saved_address)
+        resolver.assert_called_once_with(saved_address, search_radius_miles=None)
 
     def test_run_find_nearest_stores_ajax_returns_warning_without_jump_failure(self):
         from PushShoppingList.app import create_app
@@ -344,12 +344,131 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertEqual(data["warning"], "Full Address could not be geocoded.")
         self.assertFalse(data["nearest_store_results"]["saved"])
 
+    def test_run_find_nearest_stores_passes_radius_to_resolver(self):
+        from PushShoppingList.app import create_app
+
+        app = create_app()
+        app.config["TESTING"] = True
+        saved_address = {"full_address": "5905 Arlo Drive, Indianapolis, IN 46237"}
+        nearest_result = {
+            "ok": True,
+            "home_address": saved_address["full_address"],
+            "search_radius_miles": 15,
+            "store_locations": {},
+        }
+
+        with patch("PushShoppingList.routes.main_routes.save_home_address", return_value=saved_address), patch(
+            "PushShoppingList.routes.main_routes.resolve_nearest_stores_for_home_address",
+            return_value=nearest_result,
+        ) as resolver:
+            response = app.test_client().post(
+                "/save_home_address",
+                data={
+                    "action": "run_find_nearest",
+                    "ajax": "1",
+                    "store_search_radius_miles": "15",
+                },
+                headers={"X-Requested-With": "fetch"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        resolver.assert_called_once_with(saved_address, search_radius_miles="15")
+
     def test_app_js_uses_form_action_attribute_for_fetches(self):
         js_path = Path("PushShoppingList/static/js/app.js")
         script = js_path.read_text(encoding="utf-8")
 
         self.assertIn("function formActionUrl(form)", script)
         self.assertNotIn("fetch(form.action", script)
+
+    def test_find_nearby_store_locations_filters_by_radius_and_sorts(self):
+        class FakeResponse:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return [
+                    {
+                        "display_name": "Far Aldi, Indianapolis, Indiana",
+                        "lat": "39.8200",
+                        "lon": "-86.0600",
+                    },
+                    {
+                        "display_name": "Second Aldi, Indianapolis, Indiana",
+                        "lat": "39.6900",
+                        "lon": "-86.0600",
+                    },
+                    {
+                        "display_name": "Nearest Aldi, Indianapolis, Indiana",
+                        "lat": "39.6500",
+                        "lon": "-86.0600",
+                    },
+                ]
+
+        with patch.object(product_service.requests, "get", return_value=FakeResponse()):
+            locations = product_service.find_nearby_store_locations(
+                "aldi",
+                {"label": "Aldi", "urlStoreSelector": "https://info.aldi.us/stores"},
+                "5905 Arlo Drive, Indianapolis, IN 46237",
+                {"latitude": 39.64, "longitude": -86.06},
+                radius_miles=5,
+            )
+
+        self.assertEqual(
+            [location["address"] for location in locations],
+            [
+                "Nearest Aldi, Indianapolis, Indiana",
+                "Second Aldi, Indianapolis, Indiana",
+            ],
+        )
+        self.assertEqual(locations[0]["search_radius_miles"], 5.0)
+
+    def test_home_store_resolver_saves_nearest_with_nearby_locations(self):
+        from PushShoppingList.services import home_store_location_service
+
+        nearby_locations = [
+            {
+                "name": "Aldi",
+                "address": "Nearest Aldi",
+                "distance_miles": 1.2,
+            },
+            {
+                "name": "Aldi",
+                "address": "Second Aldi",
+                "distance_miles": 3.4,
+            },
+        ]
+
+        with patch(
+            "PushShoppingList.services.product_selection_service.geocode_home_address",
+            return_value={"latitude": 39.64, "longitude": -86.06},
+        ), patch(
+            "PushShoppingList.services.product_selection_service.find_nearby_store_locations",
+            return_value=nearby_locations,
+        ), patch.object(
+            home_store_location_service,
+            "save_nearest_store_results",
+            side_effect=lambda result: result,
+        ):
+            result = home_store_location_service.resolve_nearest_stores_for_home_address(
+                {"full_address": "5905 Arlo Drive, Indianapolis, IN 46237"},
+                {
+                    "stores": {
+                        "aldi": {
+                            "label": "Aldi",
+                            "urlStoreSelector": "https://info.aldi.us/stores",
+                        }
+                    },
+                    "enabled_stores": ["aldi"],
+                },
+                search_radius_miles="7",
+            )
+
+        aldi = result["store_locations"]["aldi"]
+        self.assertEqual(result["search_radius_miles"], 7.0)
+        self.assertEqual(aldi["address"], "Nearest Aldi")
+        self.assertEqual(aldi["nearby_count"], 2)
+        self.assertEqual(aldi["nearby_locations"][1]["address"], "Second Aldi")
 
     def test_chatgpt_mismatch_is_not_selectable(self):
         item = candidate("Organic Lemon")
