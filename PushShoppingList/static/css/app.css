@@ -251,23 +251,30 @@ body {
             display: block;
         }
 
-        .store-options-title-toggle {
+        .store-options-sticky-stack {
             position: sticky;
             top: var(--view-switcher-sticky-offset, 0px);
             z-index: 92;
-            background: #181818;
-            box-shadow: 0 8px 18px rgba(0,0,0,0.35);
-        }
-
-        .store-options-sticky-toolbar {
-            position: sticky;
-            top: calc(var(--view-switcher-sticky-offset, 0px) + 58px);
-            z-index: 91;
-            margin: -2px 0 12px;
-            padding: 10px 0 12px;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
             background: #1b1b1b;
             border-bottom: 1px solid #2f3638;
             box-shadow: 0 12px 22px rgba(0,0,0,0.35);
+        }
+
+        .store-options-title-toggle {
+            background: #181818;
+        }
+
+        .store-options-sticky-toolbar {
+            margin: 10px 0 0;
+            padding: 0;
+            background: transparent;
+        }
+
+        #storeOptionsSection.card-collapsed .store-options-sticky-toolbar,
+        .store-options-sticky-stack:has(+ .store-options-content.collapsed) .store-options-sticky-toolbar {
+            display: none;
         }
 
         .store-options-sticky-toolbar .store-radius-control {
@@ -465,9 +472,11 @@ body {
             cursor: pointer;
         }
 
-        .nearby-store-row:hover {
+        .nearby-store-row:hover,
+        .nearby-store-row:focus-visible {
             border-color: #0f766e;
             background: #111f1d;
+            outline: none;
         }
 
         .nearby-store-row.selected {
@@ -475,7 +484,7 @@ body {
             background: #0d1f1c;
         }
 
-        .nearby-store-row:disabled {
+        .nearby-store-row.selecting {
             cursor: wait;
             opacity: 0.8;
         }
@@ -497,6 +506,19 @@ body {
             min-width: 0;
         }
 
+        .store-address-link {
+            color: #e5e7eb;
+            text-decoration: none;
+            overflow-wrap: anywhere;
+        }
+
+        .store-address-link:hover,
+        .store-address-link:focus-visible {
+            color: #67e8f9;
+            text-decoration: underline;
+            outline: none;
+        }
+
         .nearby-store-selected {
             grid-column: 2 / 4;
             color: #a7f3d0;
@@ -504,6 +526,55 @@ body {
             font-weight: 900;
             text-transform: uppercase;
             letter-spacing: 0.04em;
+        }
+
+        .store-location-map-wrap {
+            margin-top: 12px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #101314;
+        }
+
+        .store-location-map-wrap.store-location-map-empty {
+            display: none;
+        }
+
+        .store-location-map {
+            height: 220px;
+            min-height: 220px;
+            width: 100%;
+            background: #0f1416;
+        }
+
+        .store-location-map .leaflet-control-attribution {
+            font-size: 10px;
+        }
+
+        .store-map-pin-shell {
+            background: transparent;
+            border: 0;
+        }
+
+        .store-map-pin {
+            display: grid;
+            place-items: center;
+            width: 24px;
+            height: 24px;
+            border-radius: 999px;
+            border: 2px solid #fff;
+            color: #fff;
+            font-size: 11px;
+            font-weight: 900;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+        }
+
+        .store-map-pin.home {
+            background: #0369a1;
+        }
+
+        .store-map-pin.store {
+            background: #0f766e;
         }
 
         .store-detail-link {
@@ -4890,6 +4961,10 @@ body {
             .nearby-store-row .store-distance-pill {
                 grid-column: 2 / 3;
                 justify-self: start;
+            }
+
+            .nearby-store-selected {
+                grid-column: 2 / 3;
             }
 
             .store-edit-form {

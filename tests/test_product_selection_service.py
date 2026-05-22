@@ -388,12 +388,15 @@ class ProductSelectionServiceTest(unittest.TestCase):
 
         self.assertNotIn("store-radius-control", home_template)
         self.assertIn("home-address-actions-copy", home_template)
+        self.assertIn("store-options-sticky-stack", store_template)
         self.assertIn("store-options-sticky-toolbar", store_template)
         self.assertIn("store-options-title-toggle", store_template)
         self.assertIn('form="homeAddressForm"', store_template)
         self.assertIn("position: sticky", css)
+        self.assertIn(".store-options-sticky-stack", css)
         self.assertIn(".store-options-title-toggle", css)
         self.assertIn(".store-options-sticky-toolbar", css)
+        self.assertIn("#storeOptionsSection.card-collapsed .store-options-sticky-toolbar", css)
 
     def test_active_store_summary_uses_linked_logo_tiles(self):
         store_template = Path("PushShoppingList/templates/sections/store_options.html").read_text(encoding="utf-8")
@@ -406,6 +409,24 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("rel=\"noopener noreferrer\"", store_template)
         self.assertIn(".active-store-card", css)
         self.assertIn(".active-store-name", css)
+
+    def test_store_location_addresses_are_linked_and_mapped(self):
+        store_template = Path("PushShoppingList/templates/sections/store_options.html").read_text(encoding="utf-8")
+        index_template = Path("PushShoppingList/templates/index.html").read_text(encoding="utf-8")
+        script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+        css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+        self.assertIn("store-address-link", store_template)
+        self.assertIn("https://www.openstreetmap.org/?mlat=", store_template)
+        self.assertIn("data-store-map", store_template)
+        self.assertIn("data-home-lat", store_template)
+        self.assertIn("data-locations", store_template)
+        self.assertIn("leaflet@1.9.4", index_template)
+        self.assertIn("function initStoreLocationMaps()", script)
+        self.assertIn("function selectNearbyStoreLocationFromKey", script)
+        self.assertIn(".store-location-map", css)
+        self.assertIn(".store-map-pin.home", css)
+        self.assertIn(".store-map-pin.store", css)
 
     def test_find_nearby_store_locations_filters_by_radius_and_sorts(self):
         class FakeResponse:

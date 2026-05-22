@@ -6,6 +6,7 @@
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=app_css_version) }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/extraction_overlay_old.css') }}">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 
 <body>
@@ -29,6 +30,7 @@
 {% include "sections/view_behavior.html" %}
 {% include "sections/items.html" %}
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="{{ url_for('static', filename='js/app.js', v=app_js_version) }}"></script>
 
 </body>

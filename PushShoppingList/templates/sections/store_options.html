@@ -1,14 +1,14 @@
 <div class="app-card" id="storeOptionsSection">
-    <button type="button"
-            class="card-collapse-toggle store-options-title-toggle"
-            data-collapse-toggle="store-options"
-            aria-expanded="false"
-            onclick="toggleCardCollapse('store-options')">
-        <span>Store Options</span>
-        <span class="card-collapse-icon" data-collapse-icon="store-options">Show v</span>
-    </button>
+    <div class="store-options-sticky-stack">
+        <button type="button"
+                class="card-collapse-toggle store-options-title-toggle"
+                data-collapse-toggle="store-options"
+                aria-expanded="false"
+                onclick="toggleCardCollapse('store-options')">
+            <span>Store Options</span>
+            <span class="card-collapse-icon" data-collapse-icon="store-options">Show v</span>
+        </button>
 
-    <div class="card-collapse-content store-options-content collapsed" data-collapse-content="store-options">
         <div class="store-options-sticky-toolbar">
             <label class="store-radius-control">
                 <span>
@@ -38,7 +38,9 @@
                 <button form="homeAddressForm" type="submit" name="action" value="run_find_nearest" class="nearest-stores-btn">Run Find Nearest Stores</button>
             </div>
         </div>
+    </div>
 
+    <div class="card-collapse-content store-options-content collapsed" data-collapse-content="store-options">
         <p class="helper-text">
             This is your editable store list. Check stores to show buttons next to each item.
         </p>
@@ -98,10 +100,26 @@
                     <div class="store-location-details">
                         {% set nearest_store = nearest_store_locations.get(store_key, {}) if nearest_store_locations else {} %}
                         {% set nearby_stores = nearest_store.nearby_locations if nearest_store and nearest_store.nearby_locations else [] %}
+                        {% set home_location = nearest_store_results.get("home_location") if nearest_store_results else {} %}
+                        {% set store_map_locations = nearby_stores %}
+                        {% if not store_map_locations and nearest_store and nearest_store.latitude is defined and nearest_store.latitude is not none and nearest_store.longitude is defined and nearest_store.longitude is not none %}
+                            {% set store_map_locations = [nearest_store] %}
+                        {% endif %}
                         <div class="store-detail-line">
                             <span class="store-detail-label">Selected</span>
                             {% if nearest_store and nearest_store.address %}
-                                <span class="store-nearest-address">{{ nearest_store.address }}</span>
+                                {% if nearest_store.latitude is defined and nearest_store.latitude is not none and nearest_store.longitude is defined and nearest_store.longitude is not none %}
+                                    {% set selected_store_url = "https://www.openstreetmap.org/?mlat=" ~ nearest_store.latitude ~ "&mlon=" ~ nearest_store.longitude ~ "#map=16/" ~ nearest_store.latitude ~ "/" ~ nearest_store.longitude %}
+                                {% else %}
+                                    {% set selected_store_url = nearest_store.locator_url or store.urlStoreSelector or store.url %}
+                                {% endif %}
+                                <a class="store-nearest-address store-address-link"
+                                   href="{{ selected_store_url }}"
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   title="Open {{ store.label }} location">
+                                    {{ nearest_store.address }}
+                                </a>
                                 {% if nearest_store.distance_miles is defined and nearest_store.distance_miles is not none %}
                                     <span class="store-distance-pill">{{ nearest_store.distance_miles }} mi</span>
                                 {% endif %}
@@ -120,22 +138,48 @@
                             <div class="nearby-store-list">
                                 {% for nearby_store in nearby_stores %}
                                     {% set nearby_selected = nearest_store.address == nearby_store.address and nearest_store.distance_miles == nearby_store.distance_miles %}
-                                    <button type="button"
-                                            class="nearby-store-row{% if nearby_selected %} selected{% endif %}"
-                                            data-store-key="{{ store_key }}"
-                                            data-nearby-index="{{ loop.index0 }}"
-                                            aria-pressed="{{ 'true' if nearby_selected else 'false' }}"
-                                            onclick="return selectNearbyStoreLocation(this);">
+                                    {% if nearby_store.latitude is defined and nearby_store.latitude is not none and nearby_store.longitude is defined and nearby_store.longitude is not none %}
+                                        {% set nearby_store_url = "https://www.openstreetmap.org/?mlat=" ~ nearby_store.latitude ~ "&mlon=" ~ nearby_store.longitude ~ "#map=16/" ~ nearby_store.latitude ~ "/" ~ nearby_store.longitude %}
+                                    {% else %}
+                                        {% set nearby_store_url = nearby_store.locator_url or store.urlStoreSelector or store.url %}
+                                    {% endif %}
+                                    <div class="nearby-store-row{% if nearby_selected %} selected{% endif %}"
+                                         role="button"
+                                         tabindex="0"
+                                         data-store-key="{{ store_key }}"
+                                         data-nearby-index="{{ loop.index0 }}"
+                                         aria-pressed="{{ 'true' if nearby_selected else 'false' }}"
+                                         onclick="return selectNearbyStoreLocation(this);"
+                                         onkeydown="return selectNearbyStoreLocationFromKey(event, this);">
                                         <span class="nearby-store-rank">{{ loop.index }}</span>
-                                        <span class="nearby-store-address">{{ nearby_store.address }}</span>
+                                        <a class="nearby-store-address store-address-link"
+                                           href="{{ nearby_store_url }}"
+                                           target="_blank"
+                                           rel="noopener noreferrer"
+                                           onclick="event.stopPropagation();"
+                                           onkeydown="event.stopPropagation();"
+                                           title="Open {{ store.label }} location">
+                                            {{ nearby_store.address }}
+                                        </a>
                                         {% if nearby_store.distance_miles is defined and nearby_store.distance_miles is not none %}
                                             <span class="store-distance-pill">{{ nearby_store.distance_miles }} mi</span>
                                         {% endif %}
                                         {% if nearby_selected %}
                                             <span class="nearby-store-selected">Selected</span>
                                         {% endif %}
-                                    </button>
+                                    </div>
                                 {% endfor %}
+                            </div>
+                        {% endif %}
+                        {% if store_map_locations and home_location and home_location.latitude is defined and home_location.latitude is not none and home_location.longitude is defined and home_location.longitude is not none %}
+                            <div class="store-location-map-wrap" aria-label="{{ store.label }} nearby store map">
+                                <div class="store-location-map"
+                                     data-store-map
+                                     data-store-label="{{ store.label }}"
+                                     data-home-address="{{ nearest_store_results.home_address or '' }}"
+                                     data-home-lat="{{ home_location.latitude }}"
+                                     data-home-lon="{{ home_location.longitude }}"
+                                     data-locations="{{ store_map_locations|tojson|forceescape }}"></div>
                             </div>
                         {% endif %}
                     </div>

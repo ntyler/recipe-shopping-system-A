@@ -2447,7 +2447,12 @@ function toggleCardCollapse(key) {
     }
 
     const isCollapsed = content.classList.toggle("collapsed");
+    const card = content.closest(".app-card");
     localStorage.setItem(`card-collapse:${key}`, isCollapsed ? "collapsed" : "expanded");
+
+    if (card) {
+        card.classList.toggle("card-collapsed", isCollapsed);
+    }
 
     if (icon) {
         icon.textContent = isCollapsed ? "Show v" : "Hide ^";
@@ -2455,6 +2460,10 @@ function toggleCardCollapse(key) {
 
     if (toggle) {
         toggle.setAttribute("aria-expanded", isCollapsed ? "false" : "true");
+    }
+
+    if (!isCollapsed) {
+        window.setTimeout(initStoreLocationMaps, 0);
     }
 }
 
@@ -2495,8 +2504,13 @@ function restoreCardCollapseState() {
         const shouldCollapse = savedState
             ? savedState === "collapsed"
             : cardCollapseDefaultIsCollapsed(content);
+        const card = content.closest(".app-card");
 
         content.classList.toggle("collapsed", shouldCollapse);
+
+        if (card) {
+            card.classList.toggle("card-collapsed", shouldCollapse);
+        }
 
         if (icon) {
             icon.textContent = shouldCollapse ? "Show v" : "Hide ^";
@@ -6012,12 +6026,20 @@ async function selectNearbyStoreLocation(button) {
         return false;
     }
 
+    if (button && button.classList.contains("selecting")) {
+        return false;
+    }
+
     const formData = new FormData();
     formData.set("ajax", "1");
     formData.set("nearby_index", nearbyIndex);
 
     if (button) {
-        button.disabled = true;
+        button.classList.add("selecting");
+        button.setAttribute("aria-busy", "true");
+        if ("disabled" in button) {
+            button.disabled = true;
+        }
     }
 
     try {
@@ -6044,11 +6066,155 @@ async function selectNearbyStoreLocation(button) {
         showRecipeQuantityUpdatedMessage("", "", "", err.message || "Unable to select store location.");
 
         if (button && button.isConnected) {
-            button.disabled = false;
+            button.classList.remove("selecting");
+            button.removeAttribute("aria-busy");
+            if ("disabled" in button) {
+                button.disabled = false;
+            }
         }
     }
 
     return false;
+}
+
+function selectNearbyStoreLocationFromKey(event, element) {
+    if (!event || (event.key !== "Enter" && event.key !== " ")) {
+        return true;
+    }
+
+    event.preventDefault();
+    return selectNearbyStoreLocation(element);
+}
+
+function parseMapCoordinate(value) {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+function storeLocationMapUrl(lat, lon, zoom = 16) {
+    return `https://www.openstreetmap.org/?mlat=${encodeURIComponent(lat)}&mlon=${encodeURIComponent(lon)}#map=${zoom}/${encodeURIComponent(lat)}/${encodeURIComponent(lon)}`;
+}
+
+function storeLocationPopupHtml(title, address, distance, lat, lon) {
+    const distanceText = distance || distance === 0 ? `<br><span>${escapeHtml(distance)} mi</span>` : "";
+    const mapUrl = lat !== null && lon !== null ? storeLocationMapUrl(lat, lon) : "";
+    const mapLink = mapUrl
+        ? `<br><a href="${escapeAttribute(mapUrl)}" target="_blank" rel="noopener noreferrer">Open location</a>`
+        : "";
+
+    return `<strong>${escapeHtml(title)}</strong><br>${escapeHtml(address || "")}${distanceText}${mapLink}`;
+}
+
+function storeLocationMapIcon(className, label) {
+    return L.divIcon({
+        className: "store-map-pin-shell",
+        html: `<span class="store-map-pin ${escapeAttribute(className)}">${escapeHtml(label)}</span>`,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+        popupAnchor: [0, -12],
+    });
+}
+
+function initStoreLocationMaps() {
+    if (!window.L) {
+        return;
+    }
+
+    document.querySelectorAll("[data-store-map]").forEach(container => {
+        if (container.dataset.mapReady === "1") {
+            if (container._storeLocationMap && container.offsetParent !== null) {
+                window.setTimeout(() => container._storeLocationMap.invalidateSize(), 0);
+            }
+            return;
+        }
+
+        if (container.offsetParent === null) {
+            return;
+        }
+
+        let locations = [];
+        try {
+            locations = JSON.parse(container.dataset.locations || "[]");
+        } catch (err) {
+            console.warn("Unable to parse store map locations.", err);
+        }
+
+        if (!Array.isArray(locations)) {
+            locations = [];
+        }
+
+        const homeLat = parseMapCoordinate(container.dataset.homeLat);
+        const homeLon = parseMapCoordinate(container.dataset.homeLon);
+        const storePins = locations
+            .map((location, index) => ({
+                index,
+                location,
+                lat: parseMapCoordinate(location.latitude),
+                lon: parseMapCoordinate(location.longitude),
+            }))
+            .filter(pin => pin.lat !== null && pin.lon !== null);
+
+        if (homeLat === null || homeLon === null || !storePins.length) {
+            const mapWrap = container.closest(".store-location-map-wrap");
+            if (mapWrap) {
+                mapWrap.classList.add("store-location-map-empty");
+            }
+            return;
+        }
+
+        const map = L.map(container, {
+            scrollWheelZoom: false,
+        });
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            maxZoom: 19,
+            attribution: "&copy; OpenStreetMap",
+        }).addTo(map);
+
+        const bounds = [];
+        const storeLabel = container.dataset.storeLabel || "Store";
+        const homeAddress = container.dataset.homeAddress || "Current address";
+
+        L.marker([homeLat, homeLon], {
+            icon: storeLocationMapIcon("home", "H"),
+        }).addTo(map).bindPopup(storeLocationPopupHtml("Current address", homeAddress, "", homeLat, homeLon));
+        bounds.push([homeLat, homeLon]);
+
+        storePins.forEach(pin => {
+            const markerLabel = String(pin.index + 1);
+            L.marker([pin.lat, pin.lon], {
+                icon: storeLocationMapIcon("store", markerLabel),
+            }).addTo(map).bindPopup(storeLocationPopupHtml(
+                `${storeLabel} ${markerLabel}`,
+                pin.location.address || pin.location.name || "",
+                pin.location.distance_miles,
+                pin.lat,
+                pin.lon,
+            ));
+            bounds.push([pin.lat, pin.lon]);
+        });
+
+        if (bounds.length === 1) {
+            map.setView(bounds[0], 14);
+        } else {
+            map.fitBounds(bounds, {
+                padding: [28, 28],
+                maxZoom: 14,
+            });
+        }
+
+        container._storeLocationMap = map;
+        container.dataset.mapReady = "1";
+        window.setTimeout(() => map.invalidateSize(), 0);
+    });
+}
+
+function invalidateStoreLocationMaps() {
+    initStoreLocationMaps();
+    document.querySelectorAll("[data-store-map]").forEach(container => {
+        if (container._storeLocationMap && container.offsetParent !== null) {
+            container._storeLocationMap.invalidateSize();
+        }
+    });
 }
 
 async function submitStoreForm(form) {
@@ -6117,6 +6283,7 @@ async function refreshStoreMarkup(options = {}) {
     bindRecipeDetailToggles();
     bindRecipeTaskChecks();
     updateViewSwitcherStickyOffset();
+    initStoreLocationMaps();
     window.scrollTo(scrollX, scrollY);
 }
 
@@ -6170,11 +6337,13 @@ document.addEventListener("DOMContentLoaded", function () {
     bindRecipeTaskChecks();
     updateRecipeEditStickyOffsets();
     updateViewSwitcherStickyOffset();
+    initStoreLocationMaps();
     startExtractionProgressPolling();
 });
 
 window.addEventListener("resize", updateRecipeEditStickyOffsets);
 window.addEventListener("resize", updateViewSwitcherStickyOffset);
+window.addEventListener("resize", invalidateStoreLocationMaps);
 
 async function startRecipeExtraction(event) {
     event.preventDefault();
