@@ -392,6 +392,18 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("position: sticky", css)
         self.assertIn(".store-options-sticky-toolbar", css)
 
+    def test_active_store_summary_uses_linked_logo_tiles(self):
+        store_template = Path("PushShoppingList/templates/sections/store_options.html").read_text(encoding="utf-8")
+        css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+        self.assertIn("active-store-card", store_template)
+        self.assertIn("store.urlStoreSelector or store.url", store_template)
+        self.assertIn("store-logo-", store_template)
+        self.assertIn("active-store-name", store_template)
+        self.assertIn("rel=\"noopener noreferrer\"", store_template)
+        self.assertIn(".active-store-card", css)
+        self.assertIn(".active-store-name", css)
+
     def test_find_nearby_store_locations_filters_by_radius_and_sorts(self):
         class FakeResponse:
             def raise_for_status(self):

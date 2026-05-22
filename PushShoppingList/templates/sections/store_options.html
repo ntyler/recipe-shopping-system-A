@@ -221,7 +221,17 @@
         <span class="store-detail-label">Active stores</span>
         <div class="active-store-list">
             {% for store_key in enabled_stores if store_key in available_stores %}
-                <span class="active-store-pill">{{ available_stores[store_key].label }}</span>
+                {% set store = available_stores[store_key] %}
+                {% set store_logo_text = {"aldi": "ALDI", "kroger": "K", "walmart": "W", "meijer": "M", "target": "T", "costco": "C"}.get(store_key, store.label[:2]|upper) %}
+                {% set store_home_url = store.urlStoreSelector or store.url %}
+                <a class="active-store-card"
+                   href="{{ store_home_url }}"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   aria-label="Open {{ store.label }}">
+                    <span class="store-logo store-logo-{{ store_key|replace('_', '-') }}">{{ store_logo_text }}</span>
+                    <span class="active-store-name">{{ store.label }}</span>
+                </a>
             {% else %}
                 <span class="active-store-empty">No active stores selected.</span>
             {% endfor %}
