@@ -204,6 +204,15 @@ def product_image_embed_max_dimension():
     return max(96, min(900, configured))
 
 
+def product_image_embed_limit():
+    try:
+        configured = int(os.getenv("PRODUCT_IMAGE_EMBED_LIMIT_PER_STORE", "12"))
+    except (TypeError, ValueError):
+        configured = 12
+
+    return max(0, min(product_candidate_limit(), configured))
+
+
 def product_rendered_html_prompt_limit():
     try:
         configured = int(os.getenv("PRODUCT_RENDERED_HTML_PROMPT_CHARS", "120000"))
@@ -1838,6 +1847,11 @@ def search_store_products_for_download(
         for candidate in candidates
         if candidate.get("source") != "search-page-fallback" and candidate.get("detail_evaluated")
     )
+    rankable_card_count = sum(
+        1
+        for candidate in candidates
+        if candidate_has_rankable_card_evidence(ingredient, candidate)
+    )
     detail_failed_count = max(0, raw_direct_count - direct_count)
     failed = any("product search failed" in str(reason).lower() for reason in skip_reasons)
     failed = failed or localized_inventory_blocking_failure(skip_reasons)
@@ -1845,15 +1859,23 @@ def search_store_products_for_download(
     if direct_count:
         state = "done"
         message = f"Opened and evaluated {direct_count} full product page(s) from {store_name}."
+        candidates_count = direct_count
+    elif rankable_card_count:
+        state = "done"
+        message = f"Captured {rankable_card_count} rankable product card(s) from {store_name}."
+        candidates_count = rankable_card_count
     elif detail_failed_count:
         state = "failed"
         message = f"Found {detail_failed_count} product link(s), but no full product page could be evaluated."
+        candidates_count = 0
     elif failed:
         state = "failed"
         message = skip_reasons[0] if skip_reasons else f"{store_name}: product search failed."
+        candidates_count = 0
     else:
         state = "done"
         message = skip_reasons[0] if skip_reasons else f"{store_name}: no product candidates were found."
+        candidates_count = direct_count
 
     if job_id:
         mark_product_download(
@@ -1861,7 +1883,7 @@ def search_store_products_for_download(
             index,
             state,
             message,
-            candidates_count=direct_count,
+            candidates_count=candidates_count,
         )
 
     return {
@@ -2514,10 +2536,15 @@ def enrich_product_candidates_from_pages(
     progress_index=None,
 ):
     enriched = []
+    skip_detail_when_cards_are_rankable = any(
+        candidate_has_rankable_card_evidence(ingredient, candidate)
+        for candidate in candidates
+    )
     detail_candidates = [
         candidate
         for candidate in candidates
         if candidate_needs_product_detail(candidate)
+        and not skip_detail_when_cards_are_rankable
     ]
     limit = product_detail_limit()
     detail_ids = {
@@ -2539,9 +2566,14 @@ def enrich_product_candidates_from_pages(
 
         if candidate.get("id") not in detail_ids:
             candidate["shortlisted_for_detail"] = False
+            reason = (
+                "Full product page was skipped because rendered product cards had enough direct evidence for ranking."
+                if skip_detail_when_cards_are_rankable
+                else f"Full product page was not evaluated because the per-store detail limit is {limit}."
+            )
             enriched.append(mark_detail_skipped(
                 candidate,
-                f"Full product page was not evaluated because the per-store detail limit is {limit}.",
+                reason,
             ))
             continue
 
@@ -2640,14 +2672,21 @@ def embed_product_candidate_images(candidates, job_id=None, progress_index=None,
             candidate.setdefault("embedded_image_base64", "")
         return candidates
 
-    total = sum(
-        1
+    limit = product_image_embed_limit()
+    image_candidates = [
+        candidate
         for candidate in candidates
         if candidate.get("image_url") and not candidate.get("embedded_image_base64")
-    )
+    ][:limit]
+    image_candidate_ids = {candidate.get("id") for candidate in image_candidates if candidate.get("id")}
+    total = len(image_candidates)
     completed = 0
 
     for candidate in candidates:
+        if candidate.get("id") not in image_candidate_ids:
+            candidate.setdefault("embedded_image_base64", "")
+            continue
+
         if not candidate.get("image_url") or candidate.get("embedded_image_base64"):
             candidate.setdefault("embedded_image_base64", "")
             continue

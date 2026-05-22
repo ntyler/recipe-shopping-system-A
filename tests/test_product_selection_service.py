@@ -105,6 +105,46 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertFalse(viable)
         self.assertIn("Full product page was not successfully evaluated.", skip_reasons)
 
+    def test_rankable_rendered_cards_skip_detail_page_opens(self):
+        item = candidate("Simply Nature Organic Bread")
+        item.update({
+            "source": "browser-visible-card",
+            "detail_evaluated": False,
+            "product_url": "https://www.aldi.us/store/aldi/products/25350346-simply-nature-seedtastic-organic-bread-27-oz",
+            "search_url": "https://www.aldi.us/store/aldi/s?k=bread",
+            "card_text_excerpt": "Simply Nature Organic Bread 27 oz Many in stock Current price: $3.99",
+            "raw_product_html_snippet": "<li>Simply Nature Organic Bread 27 oz Many in stock $3.99</li>",
+        })
+
+        with patch.object(product_service, "enrich_product_candidate_from_page") as detail_mock:
+            enriched = product_service.enrich_product_candidates_from_pages(
+                [item],
+                "bread",
+                "Aldi",
+            )
+
+        detail_mock.assert_not_called()
+        self.assertFalse(enriched[0]["detail_evaluated"])
+        self.assertFalse(enriched[0]["shortlisted_for_detail"])
+        self.assertIn("rendered product cards had enough direct evidence", enriched[0]["detail_fetch"]["reason"])
+
+    def test_product_image_embedding_is_limited_by_default(self):
+        items = []
+        for index in range(14):
+            item = candidate(f"Organic Bread {index}")
+            item.update({
+                "id": f"bread-{index}",
+                "image_url": f"https://example.com/bread-{index}.jpg",
+                "embedded_image_base64": "",
+            })
+            items.append(item)
+
+        with patch.object(product_service, "product_image_data_uri", return_value="data:image/png;base64,AAAA") as image_mock:
+            enriched = product_service.embed_product_candidate_images(items)
+
+        self.assertEqual(image_mock.call_count, 12)
+        self.assertEqual(sum(1 for item in enriched if item.get("embedded_image_base64")), 12)
+
     def test_chatgpt_mismatch_is_not_selectable(self):
         item = candidate("Organic Lemon")
         item["chatgpt_analysis"] = {
