@@ -112,9 +112,11 @@ def clean_recipe_record(value):
     return {
         "url": url,
         "name": name,
+        "number": value.get("number"),
         "source_href": source_href,
         "source_display_url": source_display_url,
         "quantity": quantity,
+        "archive_pdf_available": bool(value.get("archive_pdf_available")),
         "base_servings": clean_text(value.get("base_servings")),
         "scaled_servings": clean_text(value.get("scaled_servings")),
         "equipment_items": clean_text_list(value.get("equipment_items")),

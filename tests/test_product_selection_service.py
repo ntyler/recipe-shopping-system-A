@@ -408,11 +408,17 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("data-cookbook-recipe-checkbox", cookbook_template)
         self.assertIn("Equipment", cookbook_template)
         self.assertIn("Instructions", cookbook_template)
+        self.assertIn("data-cookbook-recipe-toggle", cookbook_template)
+        self.assertIn("openRecipeEditor(this)", cookbook_template)
+        self.assertIn("recipe-archive-pdf-btn cookbook-recipe-pdf-btn", cookbook_template)
         self.assertIn("function createCookbook", script)
         self.assertIn("function moveRecipesToCookbook", script)
+        self.assertIn("function toggleCookbookRecipeDetails", script)
+        self.assertIn("restoreCookbookRecipeCollapseState", script)
         self.assertIn("/api/cookbooks/move_recipes", cookbook_template)
         self.assertIn('replaceSectionFromPage(nextPage, "#cookbooksCard")', script)
         self.assertIn(".cookbooks-layout", css)
+        self.assertIn(".cookbook-recipe-details.collapsed", css)
 
     def test_cookbook_move_reassigns_recipes_with_details_between_cookbooks(self):
         from PushShoppingList.services import cookbook_service
@@ -429,6 +435,7 @@ class ProductSelectionServiceTest(unittest.TestCase):
                 "source_href": "https://example.com/chili",
                 "source_display_url": "https://example.com/chili",
                 "quantity": 1,
+                "archive_pdf_available": True,
                 "base_servings": "4 servings",
                 "scaled_servings": "4 servings",
                 "equipment_items": ["Dutch oven"],
@@ -466,6 +473,7 @@ class ProductSelectionServiceTest(unittest.TestCase):
 
             self.assertEqual(dinner["recipes"], [])
             self.assertEqual(baking_recipe["name"], "Skillet Chili")
+            self.assertTrue(baking_recipe["archive_pdf_available"])
             self.assertEqual(baking_recipe["equipment_items"], ["Dutch oven"])
             self.assertEqual(baking_recipe["instruction_items"], ["Simmer until thick."])
             self.assertEqual(baking_recipe["sections"]["MISC"][0]["display_name"], "canned white beans")

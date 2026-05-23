@@ -2309,6 +2309,62 @@ function updateCookbookMoveButton() {
         : "Move Selected";
 }
 
+function cookbookRecipeCollapseStorageKey(recipeKey) {
+    return recipeKey ? `cookbook-recipe-collapse:${recipeKey}` : "";
+}
+
+function setCookbookRecipeCollapsed(card, isCollapsed) {
+    if (!card) {
+        return;
+    }
+
+    const details = card.querySelector("[data-cookbook-recipe-details]");
+    const toggle = card.querySelector("[data-cookbook-recipe-toggle]");
+    const icon = card.querySelector("[data-cookbook-recipe-toggle-icon]");
+
+    card.classList.toggle("cookbook-recipe-collapsed", isCollapsed);
+
+    if (details) {
+        details.classList.toggle("collapsed", isCollapsed);
+    }
+
+    if (toggle) {
+        toggle.setAttribute("aria-expanded", isCollapsed ? "false" : "true");
+    }
+
+    if (icon) {
+        icon.textContent = isCollapsed ? "Show v" : "Hide ^";
+    }
+}
+
+function restoreCookbookRecipeCollapseState() {
+    document.querySelectorAll("[data-cookbook-recipe-card]").forEach(card => {
+        const storageKey = cookbookRecipeCollapseStorageKey(card.dataset.cookbookRecipeKey || "");
+        const savedState = storageKey ? localStorage.getItem(storageKey) : null;
+
+        setCookbookRecipeCollapsed(card, savedState === "collapsed");
+    });
+}
+
+function toggleCookbookRecipeDetails(button) {
+    const card = button ? button.closest("[data-cookbook-recipe-card]") : null;
+
+    if (!card) {
+        return false;
+    }
+
+    const isCollapsed = !card.classList.contains("cookbook-recipe-collapsed");
+    const storageKey = cookbookRecipeCollapseStorageKey(card.dataset.cookbookRecipeKey || "");
+
+    setCookbookRecipeCollapsed(card, isCollapsed);
+
+    if (storageKey) {
+        localStorage.setItem(storageKey, isCollapsed ? "collapsed" : "expanded");
+    }
+
+    return false;
+}
+
 function bindCookbooks() {
     document.querySelectorAll("[data-cookbook-recipe-checkbox]").forEach(checkbox => {
         if (checkbox.dataset.cookbookBound === "1") {
@@ -2326,6 +2382,7 @@ function bindCookbooks() {
     }
 
     updateCookbookMoveButton();
+    restoreCookbookRecipeCollapseState();
 }
 
 async function refreshCookbooksMarkup() {

@@ -115,7 +115,10 @@
                                 {% if cookbook.recipes %}
                                     <div class="cookbook-recipe-list">
                                         {% for recipe in cookbook.recipes %}
-                                            <article class="cookbook-recipe-card">
+                                            {% set recipe_details_id = "cookbook-recipe-details-" ~ cookbook.id ~ "-" ~ loop.index %}
+                                            <article class="cookbook-recipe-card"
+                                                     data-cookbook-recipe-card
+                                                     data-cookbook-recipe-key="{{ cookbook.id }}|{{ recipe.url }}">
                                                 <div class="cookbook-recipe-header">
                                                     <div class="cookbook-recipe-title">
                                                         <a href="{{ recipe.source_href }}"
@@ -128,67 +131,95 @@
                                                             <span>Servings: {{ recipe.base_servings }}{% if recipe.scaled_servings and recipe.scaled_servings != recipe.base_servings %} -> {{ recipe.scaled_servings }}{% endif %}</span>
                                                         {% endif %}
                                                     </div>
-                                                    <button type="button"
-                                                            class="cookbook-remove-recipe-btn"
-                                                            data-cookbook-id="{{ cookbook.id }}"
-                                                            data-recipe-url="{{ recipe.url }}"
-                                                            onclick="removeCookbookRecipe(this)">
-                                                        Remove
-                                                    </button>
+                                                    <div class="cookbook-recipe-actions">
+                                                        <button type="button"
+                                                                class="cookbook-recipe-toggle-btn"
+                                                                data-cookbook-recipe-toggle
+                                                                aria-expanded="true"
+                                                                aria-controls="{{ recipe_details_id }}"
+                                                                onclick="return toggleCookbookRecipeDetails(this)">
+                                                            <span data-cookbook-recipe-toggle-icon>Hide ^</span>
+                                                        </button>
+                                                        <button type="button"
+                                                                class="edit-recipe-btn cookbook-recipe-edit-btn"
+                                                                data-recipe-url="{{ recipe.url }}"
+                                                                onclick="openRecipeEditor(this)">
+                                                            Edit
+                                                        </button>
+                                                        {% if recipe.archive_pdf_available %}
+                                                            <a class="recipe-archive-pdf-btn cookbook-recipe-pdf-btn"
+                                                               href="{{ url_for('recipe_bp.recipe_archive_pdf_route', url=recipe.url) }}"
+                                                               target="_blank"
+                                                               rel="noopener noreferrer">
+                                                                PDF
+                                                            </a>
+                                                        {% endif %}
+                                                        <button type="button"
+                                                                class="cookbook-remove-recipe-btn"
+                                                                data-cookbook-id="{{ cookbook.id }}"
+                                                                data-recipe-url="{{ recipe.url }}"
+                                                                onclick="removeCookbookRecipe(this)">
+                                                            Remove
+                                                        </button>
+                                                    </div>
                                                 </div>
 
-                                                <div class="cookbook-recipe-detail-grid">
-                                                    <section class="cookbook-recipe-detail">
-                                                        <h4>Equipment</h4>
-                                                        {% if recipe.equipment_items %}
-                                                            <ul>
-                                                                {% for equipment_item in recipe.equipment_items %}
-                                                                    <li>{{ equipment_item }}</li>
-                                                                {% endfor %}
-                                                            </ul>
-                                                        {% else %}
-                                                            <div class="cookbook-detail-empty">No equipment found.</div>
-                                                        {% endif %}
-                                                    </section>
-
-                                                    <section class="cookbook-recipe-detail">
-                                                        <h4>Instructions</h4>
-                                                        {% if recipe.instruction_items %}
-                                                            <ol>
-                                                                {% for instruction in recipe.instruction_items %}
-                                                                    <li>{{ instruction }}</li>
-                                                                {% endfor %}
-                                                            </ol>
-                                                        {% else %}
-                                                            <div class="cookbook-detail-empty">No instructions found.</div>
-                                                        {% endif %}
-                                                    </section>
-                                                </div>
-
-                                                <section class="cookbook-recipe-detail cookbook-recipe-ingredients">
-                                                    <h4>Ingredients</h4>
-                                                    {% if recipe["sections"] %}
-                                                        {% for section_name, section_items in recipe["sections"].items() %}
-                                                            <div class="cookbook-ingredient-section">
-                                                                <div class="cookbook-ingredient-section-title">{{ section_name }}</div>
+                                                <div id="{{ recipe_details_id }}"
+                                                     class="cookbook-recipe-details"
+                                                     data-cookbook-recipe-details>
+                                                    <div class="cookbook-recipe-detail-grid">
+                                                        <section class="cookbook-recipe-detail">
+                                                            <h4>Equipment</h4>
+                                                            {% if recipe.equipment_items %}
                                                                 <ul>
-                                                                    {% for recipe_item in section_items %}
-                                                                        {% set display_name = recipe_item.display_name or recipe_item.name %}
-                                                                        {% set quantity_display = recipe_item.quantity_display or recipe_item.base_display or recipe_item.quantity %}
-                                                                        <li>
-                                                                            <span>{{ display_name }}</span>
-                                                                            {% if quantity_display %}
-                                                                                <small>{{ quantity_display }}</small>
-                                                                            {% endif %}
-                                                                        </li>
+                                                                    {% for equipment_item in recipe.equipment_items %}
+                                                                        <li>{{ equipment_item }}</li>
                                                                     {% endfor %}
                                                                 </ul>
-                                                            </div>
-                                                        {% endfor %}
-                                                    {% else %}
-                                                        <div class="cookbook-detail-empty">No ingredients found.</div>
-                                                    {% endif %}
-                                                </section>
+                                                            {% else %}
+                                                                <div class="cookbook-detail-empty">No equipment found.</div>
+                                                            {% endif %}
+                                                        </section>
+
+                                                        <section class="cookbook-recipe-detail">
+                                                            <h4>Instructions</h4>
+                                                            {% if recipe.instruction_items %}
+                                                                <ol>
+                                                                    {% for instruction in recipe.instruction_items %}
+                                                                        <li>{{ instruction }}</li>
+                                                                    {% endfor %}
+                                                                </ol>
+                                                            {% else %}
+                                                                <div class="cookbook-detail-empty">No instructions found.</div>
+                                                            {% endif %}
+                                                        </section>
+                                                    </div>
+
+                                                    <section class="cookbook-recipe-detail cookbook-recipe-ingredients">
+                                                        <h4>Ingredients</h4>
+                                                        {% if recipe["sections"] %}
+                                                            {% for section_name, section_items in recipe["sections"].items() %}
+                                                                <div class="cookbook-ingredient-section">
+                                                                    <div class="cookbook-ingredient-section-title">{{ section_name }}</div>
+                                                                    <ul>
+                                                                        {% for recipe_item in section_items %}
+                                                                            {% set display_name = recipe_item.display_name or recipe_item.name %}
+                                                                            {% set quantity_display = recipe_item.quantity_display or recipe_item.base_display or recipe_item.quantity %}
+                                                                            <li>
+                                                                                <span>{{ display_name }}</span>
+                                                                                {% if quantity_display %}
+                                                                                    <small>{{ quantity_display }}</small>
+                                                                                {% endif %}
+                                                                            </li>
+                                                                        {% endfor %}
+                                                                    </ul>
+                                                                </div>
+                                                            {% endfor %}
+                                                        {% else %}
+                                                            <div class="cookbook-detail-empty">No ingredients found.</div>
+                                                        {% endif %}
+                                                    </section>
+                                                </div>
                                             </article>
                                         {% endfor %}
                                     </div>
