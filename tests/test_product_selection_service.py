@@ -391,6 +391,53 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertGreater(store_options_index, enter_recipe_index)
         self.assertGreater(store_options_index, home_address_index)
 
+    def test_cookbooks_section_sits_between_recipe_log_and_rules(self):
+        index_template = Path("PushShoppingList/templates/index.html").read_text(encoding="utf-8")
+        cookbook_template = Path("PushShoppingList/templates/sections/cookbooks.html").read_text(encoding="utf-8")
+        script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+        css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+        recipe_log_index = index_template.index('{% include "sections/current_recipe_url_log.html" %}')
+        cookbooks_index = index_template.index('{% include "sections/cookbooks.html" %}')
+        rules_index = index_template.index('{% include "sections/rules.html" %}')
+
+        self.assertGreater(cookbooks_index, recipe_log_index)
+        self.assertLess(cookbooks_index, rules_index)
+        self.assertIn('id="cookbooksCard"', cookbook_template)
+        self.assertIn("Move Selected", cookbook_template)
+        self.assertIn("data-cookbook-ingredient-checkbox", cookbook_template)
+        self.assertIn("function createCookbook", script)
+        self.assertIn("function moveIngredientsToCookbook", script)
+        self.assertIn('replaceSectionFromPage(nextPage, "#cookbooksCard")', script)
+        self.assertIn(".cookbooks-layout", css)
+
+    def test_cookbook_move_reassigns_ingredients_between_cookbooks(self):
+        from PushShoppingList.services import cookbook_service
+
+        with TemporaryDirectory() as temp_dir, patch.object(
+            cookbook_service,
+            "COOKBOOKS_FILE",
+            Path(temp_dir) / "cookbooks.json",
+        ):
+            cookbook_service.create_cookbook("Dinner")
+            cookbook_service.create_cookbook("Baking")
+
+            cookbook_service.move_ingredients_to_cookbook(
+                "dinner",
+                ["kosher salt", "ground cumin"],
+            )
+            cookbook_service.move_ingredients_to_cookbook(
+                "baking",
+                ["kosher salt"],
+            )
+
+            data = cookbook_service.load_cookbooks()
+            dinner = next(cookbook for cookbook in data["cookbooks"] if cookbook["id"] == "dinner")
+            baking = next(cookbook for cookbook in data["cookbooks"] if cookbook["id"] == "baking")
+
+            self.assertEqual(dinner["ingredients"], ["ground cumin"])
+            self.assertEqual(baking["ingredients"], ["kosher salt"])
+
     def test_store_radius_toolbar_lives_in_store_options(self):
         home_template = Path("PushShoppingList/templates/sections/home_address.html").read_text(encoding="utf-8")
         store_template = Path("PushShoppingList/templates/sections/store_options.html").read_text(encoding="utf-8")

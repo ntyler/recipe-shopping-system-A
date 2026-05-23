@@ -2449,6 +2449,275 @@ body {
             font-weight: bold;
         }
 
+        .cookbooks-content {
+            margin-top: 12px;
+        }
+
+        .cookbooks-toolbar {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .cookbook-create-form,
+        .cookbook-move-form {
+            display: grid;
+            gap: 7px;
+            margin: 0;
+            min-width: 0;
+        }
+
+        .cookbook-create-form label,
+        .cookbook-move-form label {
+            color: #ddd;
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .cookbook-create-row,
+        .cookbook-move-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .cookbook-create-row input,
+        .cookbook-move-row select {
+            width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
+            padding: 11px 12px;
+            border: 1px solid #555;
+            border-radius: 8px;
+            background: #202425;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .cookbook-create-row input:focus,
+        .cookbook-move-row select:focus {
+            border-color: #00cc66;
+            box-shadow: 0 0 0 3px rgba(0,204,102,0.16);
+        }
+
+        .cookbook-action-btn {
+            width: auto;
+            min-width: 138px;
+            margin: 0;
+            padding: 11px 14px;
+            font-size: 14px;
+            font-weight: 800;
+        }
+
+        .cookbook-add-btn {
+            background: #155999;
+        }
+
+        .cookbook-move-btn {
+            background: #0f766e;
+        }
+
+        .cookbook-action-btn:disabled {
+            background: #343a40;
+            color: #9ca3af;
+            cursor: not-allowed;
+        }
+
+        .cookbook-status {
+            min-height: 18px;
+            margin-bottom: 8px;
+            color: #00ff99;
+            font-size: 13px;
+            font-weight: 800;
+            text-align: center;
+        }
+
+        .cookbook-status.error {
+            color: #ff8a8a;
+        }
+
+        .cookbooks-layout {
+            display: grid;
+            grid-template-columns: minmax(250px, 0.92fr) minmax(0, 1.35fr);
+            gap: 12px;
+            align-items: start;
+        }
+
+        .cookbook-pool,
+        .cookbook-collection {
+            min-width: 0;
+            padding: 12px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            background: #181818;
+        }
+
+        .cookbook-section-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+            color: #00ff99;
+            font-size: 14px;
+            font-weight: 900;
+        }
+
+        .cookbook-section-title span:last-child {
+            color: #9ca3af;
+            font-size: 12px;
+        }
+
+        .cookbook-source-list {
+            display: grid;
+            gap: 8px;
+            max-height: 360px;
+            overflow: auto;
+            padding-right: 4px;
+        }
+
+        .cookbook-source-item {
+            display: grid;
+            grid-template-columns: 22px minmax(0, 1fr);
+            gap: 8px;
+            align-items: center;
+            padding: 9px 10px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            background: #202425;
+            color: #fff;
+            cursor: pointer;
+            box-sizing: border-box;
+        }
+
+        .cookbook-source-item input {
+            margin: 0;
+            transform: scale(1.12);
+            cursor: pointer;
+        }
+
+        .cookbook-source-name {
+            min-width: 0;
+            overflow-wrap: anywhere;
+            font-size: 14px;
+            font-weight: 800;
+        }
+
+        .cookbook-source-item small {
+            grid-column: 2;
+            color: #7dd3fc;
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .cookbook-source-assigned {
+            border-color: rgba(20,184,166,0.58);
+            background: #152522;
+        }
+
+        .cookbook-card-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .cookbook-card {
+            min-width: 0;
+            padding: 12px;
+            border: 1px solid #3d3d3d;
+            border-radius: 8px;
+            background: #121515;
+            box-sizing: border-box;
+        }
+
+        .cookbook-card-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .cookbook-card-header h3 {
+            margin: 0;
+            color: #fff;
+            font-size: 17px;
+            line-height: 1.15;
+            overflow-wrap: anywhere;
+        }
+
+        .cookbook-card-header span {
+            display: block;
+            margin-top: 3px;
+            color: #9ca3af;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .cookbook-delete-btn {
+            width: 34px;
+            min-width: 34px;
+            height: 32px;
+            margin: 0;
+            padding: 0;
+            border-radius: 7px;
+            background: #b00000;
+            font-size: 16px;
+            font-weight: 900;
+        }
+
+        .cookbook-ingredient-list {
+            display: grid;
+            gap: 8px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .cookbook-ingredient-list li {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 8px;
+            align-items: center;
+            padding: 8px 9px;
+            border: 1px solid #2e3333;
+            border-radius: 8px;
+            background: #1b1f20;
+        }
+
+        .cookbook-ingredient-list li span {
+            min-width: 0;
+            overflow-wrap: anywhere;
+            font-size: 14px;
+            font-weight: 800;
+        }
+
+        .cookbook-remove-ingredient-btn {
+            width: auto;
+            margin: 0;
+            padding: 7px 9px;
+            background: #343a40;
+            color: #f8fafc;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .cookbook-empty {
+            padding: 12px;
+            border: 1px dashed #3a3a3a;
+            border-radius: 8px;
+            color: #aaa;
+            font-size: 13px;
+            text-align: center;
+        }
+
         .log-box {
             background: #181818;
             padding: 12px;
@@ -5682,6 +5951,23 @@ body {
             .store-manager-row input[type="checkbox"] {
                 grid-column: 1 / 2;
                 grid-row: 1 / 2;
+            }
+
+            .cookbooks-toolbar,
+            .cookbooks-layout,
+            .cookbook-card-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .cookbook-create-row,
+            .cookbook-move-row,
+            .cookbook-ingredient-list li {
+                grid-template-columns: 1fr;
+            }
+
+            .cookbook-action-btn,
+            .cookbook-remove-ingredient-btn {
+                width: 100%;
             }
 
             .store-manager-brand {

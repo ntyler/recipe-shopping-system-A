@@ -2279,6 +2279,255 @@ async function saveRulesEditor(event) {
     return false;
 }
 
+function setCookbookStatus(message, isError = false) {
+    const status = document.getElementById("cookbookStatus");
+
+    if (!status) {
+        return;
+    }
+
+    status.textContent = message || "";
+    status.classList.toggle("error", Boolean(isError));
+}
+
+function selectedCookbookIngredientCount() {
+    return document.querySelectorAll("[data-cookbook-ingredient-checkbox]:checked").length;
+}
+
+function updateCookbookMoveButton() {
+    const button = document.getElementById("cookbookMoveButton");
+    const select = document.getElementById("cookbookMoveTarget");
+    const selectedCount = selectedCookbookIngredientCount();
+
+    if (!button) {
+        return;
+    }
+
+    button.disabled = selectedCount === 0 || !select || !select.value;
+    button.textContent = selectedCount
+        ? `Move ${selectedCount} Ingredient${selectedCount === 1 ? "" : "s"}`
+        : "Move Selected";
+}
+
+function bindCookbooks() {
+    document.querySelectorAll("[data-cookbook-ingredient-checkbox]").forEach(checkbox => {
+        if (checkbox.dataset.cookbookBound === "1") {
+            return;
+        }
+
+        checkbox.dataset.cookbookBound = "1";
+        checkbox.addEventListener("change", updateCookbookMoveButton);
+    });
+
+    const target = document.getElementById("cookbookMoveTarget");
+    if (target && target.dataset.cookbookBound !== "1") {
+        target.dataset.cookbookBound = "1";
+        target.addEventListener("change", updateCookbookMoveButton);
+    }
+
+    updateCookbookMoveButton();
+}
+
+async function refreshCookbooksMarkup() {
+    const refreshUrl = new URL(window.location.href);
+    refreshUrl.searchParams.set("_refresh", String(Date.now()));
+
+    const response = await fetch(refreshUrl.toString(), {
+        cache: "no-store",
+    });
+
+    if (!response.ok) {
+        throw new Error("Unable to refresh cookbooks.");
+    }
+
+    const html = await response.text();
+    const nextPage = new DOMParser().parseFromString(html, "text/html");
+
+    if (!replaceSectionFromPage(nextPage, "#cookbooksCard")) {
+        throw new Error("Cookbooks section was not found.");
+    }
+
+    restoreCardCollapseState();
+    bindCookbooks();
+}
+
+async function submitCookbookForm(form, options = {}) {
+    const formData = options.formData || new FormData(form);
+    formData.set("ajax", "1");
+
+    const response = await fetch(formActionUrl(form), {
+        method: options.method || form.getAttribute("method") || "POST",
+        headers: {
+            "X-Requested-With": "fetch",
+        },
+        body: formData,
+    });
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+        throw new Error((data && data.error) || "Cookbook update failed.");
+    }
+
+    return data;
+}
+
+async function createCookbook(event) {
+    event.preventDefault();
+
+    const form = event.currentTarget;
+    const button = form ? form.querySelector("button[type='submit']") : null;
+    const originalText = button ? button.textContent : "";
+
+    try {
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Adding...";
+        }
+
+        setCookbookStatus("Adding cookbook...");
+        await submitCookbookForm(form);
+        await refreshCookbooksMarkup();
+        showRecipeQuantityUpdatedMessage("", "", "", "Cookbook added.");
+    } catch (err) {
+        console.warn("Unable to add cookbook.", err);
+        setCookbookStatus(err.message || "Unable to add cookbook.", true);
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = originalText || "Add Cookbook";
+        }
+    }
+
+    return false;
+}
+
+async function moveIngredientsToCookbook(event) {
+    event.preventDefault();
+
+    const form = event.currentTarget;
+    const button = document.getElementById("cookbookMoveButton");
+    const target = document.getElementById("cookbookMoveTarget");
+    const originalText = button ? button.textContent : "";
+    const formData = new FormData();
+
+    if (target) {
+        formData.set("cookbook_id", target.value);
+    }
+
+    document.querySelectorAll("[data-cookbook-ingredient-checkbox]:checked").forEach(checkbox => {
+        formData.append("ingredients", checkbox.value);
+    });
+
+    try {
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Moving...";
+        }
+
+        setCookbookStatus("Moving ingredients...");
+        await submitCookbookForm(form, { formData });
+        await refreshCookbooksMarkup();
+        showRecipeQuantityUpdatedMessage("", "", "", "Ingredients moved.");
+    } catch (err) {
+        console.warn("Unable to move cookbook ingredients.", err);
+        setCookbookStatus(err.message || "Unable to move ingredients.", true);
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = originalText || "Move Selected";
+            updateCookbookMoveButton();
+        }
+    }
+
+    return false;
+}
+
+async function removeCookbookIngredient(button) {
+    if (!button) {
+        return false;
+    }
+
+    const formData = new FormData();
+    formData.set("cookbook_id", button.dataset.cookbookId || "");
+    formData.set("ingredient", button.dataset.ingredient || "");
+
+    const originalText = button.textContent;
+
+    try {
+        button.disabled = true;
+        button.textContent = "Removing...";
+        setCookbookStatus("Removing ingredient...");
+
+        const response = await fetch("/api/cookbooks/remove_ingredient", {
+            method: "POST",
+            headers: {
+                "X-Requested-With": "fetch",
+            },
+            body: formData,
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to remove ingredient.");
+        }
+
+        await refreshCookbooksMarkup();
+        showRecipeQuantityUpdatedMessage("", "", "", "Ingredient removed.");
+    } catch (err) {
+        console.warn("Unable to remove cookbook ingredient.", err);
+        setCookbookStatus(err.message || "Unable to remove ingredient.", true);
+    } finally {
+        button.disabled = false;
+        button.textContent = originalText || "Remove";
+    }
+
+    return false;
+}
+
+async function deleteCookbook(button) {
+    if (!button) {
+        return false;
+    }
+
+    const cookbookId = button.dataset.cookbookId || "";
+    const cookbookName = button.dataset.cookbookName || "this cookbook";
+
+    if (!cookbookId || !window.confirm(`Delete ${cookbookName}?`)) {
+        return false;
+    }
+
+    const originalText = button.textContent;
+
+    try {
+        button.disabled = true;
+        button.textContent = "...";
+        setCookbookStatus("Deleting cookbook...");
+
+        const response = await fetch(`/api/cookbooks/${encodeURIComponent(cookbookId)}`, {
+            method: "DELETE",
+            headers: {
+                "X-Requested-With": "fetch",
+            },
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to delete cookbook.");
+        }
+
+        await refreshCookbooksMarkup();
+        showRecipeQuantityUpdatedMessage("", "", "", "Cookbook deleted.");
+    } catch (err) {
+        console.warn("Unable to delete cookbook.", err);
+        setCookbookStatus(err.message || "Unable to delete cookbook.", true);
+    } finally {
+        button.disabled = false;
+        button.textContent = originalText || "X";
+    }
+
+    return false;
+}
+
 function openRecipeMediaUpload() {
     const input = document.getElementById("recipeMediaUploadInput");
 
@@ -7070,6 +7319,7 @@ async function refreshStoreMarkup(options = {}) {
     replaceSectionFromPage(nextPage, "#home-address-section");
     replaceSectionFromPage(nextPage, "#storeOptionsSection");
     const recipeLogWasRefreshed = replaceSectionFromPage(nextPage, "#currentRecipeUrlLogCard");
+    replaceSectionFromPage(nextPage, "#cookbooksCard");
     replaceSectionFromPage(nextPage, "#foodRestrictionsCard");
     replaceSectionFromPage(nextPage, "#rulesCard");
     replaceSectionFromPage(nextPage, "#sectionView");
@@ -7086,6 +7336,7 @@ async function refreshStoreMarkup(options = {}) {
     restoreItemCheckState();
     bindRecipeQuantityInputs();
     bindRecipeNameInputs();
+    bindCookbooks();
     bindStoreButtons();
     bindSectionHeaderToggles();
     bindRecipeDetailToggles();
@@ -7154,6 +7405,7 @@ document.addEventListener("DOMContentLoaded", function () {
     restoreItemCheckState();
     bindRecipeQuantityInputs();
     bindRecipeNameInputs();
+    bindCookbooks();
     bindStoreButtons();
     bindSectionHeaderToggles();
     bindRecipeDetailToggles();

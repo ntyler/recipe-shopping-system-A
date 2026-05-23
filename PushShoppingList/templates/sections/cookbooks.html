@@ -1,0 +1,138 @@
+<div id="cookbooksCard" class="app-card">
+    <button type="button"
+            class="card-collapse-toggle cookbooks-toggle"
+            data-collapse-toggle="cookbooks"
+            aria-expanded="true"
+            onclick="toggleCardCollapse('cookbooks')">
+        <span>Cookbooks</span>
+        <span class="card-collapse-icon" data-collapse-icon="cookbooks">Hide ^</span>
+    </button>
+
+    <div class="card-collapse-content cookbooks-content"
+         data-collapse-content="cookbooks"
+         data-collapse-default="expanded"
+         data-collapse-mobile-default="expanded">
+        <div class="cookbooks-toolbar">
+            <form id="createCookbookForm"
+                  class="cookbook-create-form"
+                  action="/api/cookbooks"
+                  method="POST"
+                  onsubmit="return createCookbook(event)">
+                <label for="cookbookNameInput">Cookbook name</label>
+                <div class="cookbook-create-row">
+                    <input id="cookbookNameInput"
+                           type="text"
+                           name="name"
+                           placeholder="Dinner, Baking, Meal Prep"
+                           autocomplete="off">
+                    <button type="submit" class="cookbook-action-btn cookbook-add-btn">Add Cookbook</button>
+                </div>
+            </form>
+
+            <form id="moveCookbookIngredientsForm"
+                  class="cookbook-move-form"
+                  action="/api/cookbooks/move_ingredients"
+                  method="POST"
+                  onsubmit="return moveIngredientsToCookbook(event)">
+                <label for="cookbookMoveTarget">Move selected to</label>
+                <div class="cookbook-move-row">
+                    <select id="cookbookMoveTarget"
+                            name="cookbook_id"
+                            onchange="updateCookbookMoveButton()">
+                        {% for cookbook in cookbook_view.cookbooks %}
+                            <option value="{{ cookbook.id }}">{{ cookbook.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <button id="cookbookMoveButton"
+                            type="submit"
+                            class="cookbook-action-btn cookbook-move-btn"
+                            {% if not cookbook_view.cookbooks %}disabled{% endif %}>
+                        Move Selected
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div id="cookbookStatus" class="cookbook-status" aria-live="polite"></div>
+
+        <div class="cookbooks-layout">
+            <section class="cookbook-pool">
+                <div class="cookbook-section-title">
+                    <span>Ingredients</span>
+                    <span>{{ cookbook_view.ingredients | length }}</span>
+                </div>
+
+                {% if cookbook_view.ingredients %}
+                    <div class="cookbook-source-list">
+                        {% for ingredient in cookbook_view.ingredients %}
+                            <label class="cookbook-source-item {% if ingredient.assigned %}cookbook-source-assigned{% endif %}">
+                                <input type="checkbox"
+                                       name="ingredients"
+                                       value="{{ ingredient.name }}"
+                                       form="moveCookbookIngredientsForm"
+                                       data-cookbook-ingredient-checkbox>
+                                <span class="cookbook-source-name">{{ ingredient.name }}</span>
+                                {% if ingredient.cookbook_name %}
+                                    <small>{{ ingredient.cookbook_name }}</small>
+                                {% endif %}
+                            </label>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="cookbook-empty">No ingredients.</div>
+                {% endif %}
+            </section>
+
+            <section class="cookbook-collection">
+                <div class="cookbook-section-title">
+                    <span>Cookbooks</span>
+                    <span>{{ cookbook_view.cookbooks | length }}</span>
+                </div>
+
+                {% if cookbook_view.cookbooks %}
+                    <div class="cookbook-card-grid">
+                        {% for cookbook in cookbook_view.cookbooks %}
+                            <article class="cookbook-card" data-cookbook-id="{{ cookbook.id }}">
+                                <div class="cookbook-card-header">
+                                    <div>
+                                        <h3>{{ cookbook.name }}</h3>
+                                        <span>{{ cookbook.ingredients | length }} ingredient{% if cookbook.ingredients | length != 1 %}s{% endif %}</span>
+                                    </div>
+                                    <button type="button"
+                                            class="cookbook-delete-btn"
+                                            data-cookbook-id="{{ cookbook.id }}"
+                                            data-cookbook-name="{{ cookbook.name }}"
+                                            onclick="deleteCookbook(this)"
+                                            aria-label="Delete {{ cookbook.name }}">
+                                        X
+                                    </button>
+                                </div>
+
+                                {% if cookbook.ingredients %}
+                                    <ul class="cookbook-ingredient-list">
+                                        {% for ingredient in cookbook.ingredients %}
+                                            <li>
+                                                <span>{{ ingredient }}</span>
+                                                <button type="button"
+                                                        class="cookbook-remove-ingredient-btn"
+                                                        data-cookbook-id="{{ cookbook.id }}"
+                                                        data-ingredient="{{ ingredient }}"
+                                                        onclick="removeCookbookIngredient(this)">
+                                                    Remove
+                                                </button>
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                {% else %}
+                                    <div class="cookbook-empty">Empty.</div>
+                                {% endif %}
+                            </article>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="cookbook-empty">No cookbooks.</div>
+                {% endif %}
+            </section>
+        </div>
+    </div>
+</div>
