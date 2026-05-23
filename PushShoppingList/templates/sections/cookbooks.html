@@ -88,9 +88,23 @@
             </section>
 
             <section class="cookbook-collection">
-                <div class="cookbook-section-title">
-                    <span>Cookbooks</span>
-                    <span>{{ cookbook_view.cookbooks | length }}</span>
+                <div class="cookbook-collection-header">
+                    <div class="cookbook-section-title">
+                        <span>Cookbooks</span>
+                        <span>{{ cookbook_view.cookbooks | length }}</span>
+                    </div>
+                    <form id="restoreCookbookRecipesForm"
+                          class="cookbook-restore-form"
+                          action="/api/cookbooks/restore_recipes"
+                          method="POST"
+                          onsubmit="return restoreCookbookRecipes(event)">
+                        <button id="cookbookRestoreButton"
+                                type="submit"
+                                class="cookbook-action-btn cookbook-restore-btn"
+                                disabled>
+                            Add Selected to Recipe Log
+                        </button>
+                    </form>
                 </div>
 
                 {% if cookbook_view.cookbooks %}
@@ -120,6 +134,13 @@
                                                      data-cookbook-recipe-card
                                                      data-cookbook-recipe-key="{{ cookbook.id }}|{{ recipe.url }}">
                                                 <div class="cookbook-recipe-header">
+                                                    <input type="checkbox"
+                                                           class="cookbook-restore-checkbox"
+                                                           name="recipe_urls"
+                                                           value="{{ recipe.url }}"
+                                                           form="restoreCookbookRecipesForm"
+                                                           data-cookbook-restore-checkbox
+                                                           aria-label="Select {{ recipe.name }} for recipe log">
                                                     <div class="cookbook-recipe-title">
                                                         <a href="{{ recipe.source_href }}"
                                                            target="_blank"

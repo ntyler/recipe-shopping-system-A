@@ -136,6 +136,25 @@ def recipe_snapshot_lookup(recipe_rows):
     return lookup
 
 
+def recipe_ingredients_for_record(recipe):
+    ingredients = []
+    seen = set()
+
+    for section_items in (recipe.get("sections") or {}).values():
+        for item in section_items or []:
+            if not isinstance(item, dict):
+                continue
+
+            ingredient = clean_text(item.get("name") or item.get("display_name"))
+            ingredient_key = normalize_text(ingredient)
+
+            if ingredient and ingredient_key not in seen:
+                ingredients.append(ingredient)
+                seen.add(ingredient_key)
+
+    return ingredients
+
+
 def normalize_cookbooks_payload(payload):
     cookbooks = []
     seen_ids = set()
@@ -319,6 +338,45 @@ def remove_recipe_from_cookbook(cookbook_id, recipe_url):
         ]
 
         return save_cookbooks(payload)
+
+
+def cookbook_recipes_for_urls(recipe_urls):
+    selected_keys = []
+    seen_selected = set()
+
+    for recipe_url in recipe_urls:
+        key = recipe_key(recipe_url)
+        if key and key not in seen_selected:
+            selected_keys.append(key)
+            seen_selected.add(key)
+
+    if not selected_keys:
+        raise ValueError("Select at least one cookbook recipe.")
+
+    payload = load_cookbooks()
+    selected_key_set = set(selected_keys)
+    found_recipes = {}
+
+    for cookbook in payload["cookbooks"]:
+        for recipe in cookbook.get("recipes", []):
+            record = clean_recipe_record(recipe)
+            if not record:
+                continue
+
+            key = recipe_key(record["url"])
+            if key in selected_key_set and key not in found_recipes:
+                found_recipes[key] = record
+
+    recipes = [
+        found_recipes[key]
+        for key in selected_keys
+        if key in found_recipes
+    ]
+
+    if not recipes:
+        raise ValueError("Selected cookbook recipes were not found.")
+
+    return recipes
 
 
 def hydrate_recipe(stored_recipe, current_recipes):

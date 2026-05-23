@@ -2633,6 +2633,27 @@ body {
             font-size: 12px;
         }
 
+        .cookbook-collection-header {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 10px;
+            align-items: start;
+            margin-bottom: 10px;
+        }
+
+        .cookbook-collection-header .cookbook-section-title {
+            margin-bottom: 0;
+        }
+
+        .cookbook-restore-form {
+            margin: 0;
+        }
+
+        .cookbook-restore-btn {
+            min-width: 210px;
+            background: #155999;
+        }
+
         .cookbook-source-list {
             display: grid;
             gap: 8px;
@@ -2752,10 +2773,17 @@ body {
 
         .cookbook-recipe-header {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
+            grid-template-columns: 24px minmax(0, 1fr) auto;
             gap: 8px;
             align-items: start;
             margin-bottom: 10px;
+        }
+
+        .cookbook-restore-checkbox {
+            width: 16px;
+            height: 16px;
+            margin: 6px 0 0 0;
+            cursor: pointer;
         }
 
         .cookbook-recipe-title {
@@ -6175,7 +6203,8 @@ body {
 
             .cookbooks-toolbar,
             .cookbooks-layout,
-            .cookbook-card-grid {
+            .cookbook-card-grid,
+            .cookbook-collection-header {
                 grid-template-columns: 1fr;
             }
 
@@ -6195,7 +6224,12 @@ body {
                 flex: 1 1 90px;
             }
 
+            .cookbook-restore-checkbox {
+                margin-top: 0;
+            }
+
             .cookbook-action-btn,
+            .cookbook-restore-btn,
             .cookbook-recipe-toggle-btn,
             .cookbook-remove-recipe-btn {
                 width: 100%;

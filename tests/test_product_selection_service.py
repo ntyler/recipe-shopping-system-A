@@ -409,15 +409,21 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("Equipment", cookbook_template)
         self.assertIn("Instructions", cookbook_template)
         self.assertIn("data-cookbook-recipe-toggle", cookbook_template)
+        self.assertIn("data-cookbook-restore-checkbox", cookbook_template)
+        self.assertIn("restoreCookbookRecipes(event)", cookbook_template)
         self.assertIn("openRecipeEditor(this)", cookbook_template)
         self.assertIn("recipe-archive-pdf-btn cookbook-recipe-pdf-btn", cookbook_template)
+        self.assertIn("/api/cookbooks/restore_recipes", cookbook_template)
         self.assertIn("function createCookbook", script)
         self.assertIn("function moveRecipesToCookbook", script)
         self.assertIn("function toggleCookbookRecipeDetails", script)
+        self.assertIn("function restoreCookbookRecipes", script)
         self.assertIn("restoreCookbookRecipeCollapseState", script)
+        self.assertIn('replaceSectionFromPage(nextPage, "#editItemsSection")', script)
         self.assertIn("/api/cookbooks/move_recipes", cookbook_template)
         self.assertIn('replaceSectionFromPage(nextPage, "#cookbooksCard")', script)
         self.assertIn(".cookbooks-layout", css)
+        self.assertIn(".cookbook-restore-btn", css)
         self.assertIn(".cookbook-recipe-details.collapsed", css)
 
     def test_cookbook_move_reassigns_recipes_with_details_between_cookbooks(self):
@@ -481,6 +487,71 @@ class ProductSelectionServiceTest(unittest.TestCase):
             view = cookbook_service.cookbook_view([])
             baking_view = next(cookbook for cookbook in view["cookbooks"] if cookbook["id"] == "baking")
             self.assertEqual(baking_view["recipes"][0]["sections"]["MISC"][0]["quantity_display"], "2 cans")
+
+    def test_cookbook_restore_adds_recipe_log_and_shopping_items(self):
+        from PushShoppingList.routes import main_routes
+        from PushShoppingList.services import cookbook_service
+        from PushShoppingList.services import recipe_ingredient_service
+        from PushShoppingList.services import recipe_url_service
+        from PushShoppingList.services import shopping_list_service
+
+        with TemporaryDirectory() as temp_dir, patch.object(
+            cookbook_service,
+            "COOKBOOKS_FILE",
+            Path(temp_dir) / "cookbooks.json",
+        ), patch.object(
+            shopping_list_service,
+            "SHOPPING_LIST_FILE",
+            Path(temp_dir) / "shopping_list.txt",
+        ), patch.object(
+            recipe_url_service,
+            "URLS_FILE",
+            Path(temp_dir) / "urls.txt",
+        ), patch.object(
+            recipe_url_service,
+            "RECIPE_INGREDIENTS_FILE",
+            Path(temp_dir) / "recipe_ingredients.json",
+        ), patch.object(
+            recipe_ingredient_service,
+            "RECIPE_INGREDIENTS_FILE",
+            Path(temp_dir) / "recipe_ingredients.json",
+        ), patch.object(main_routes, "sort_ingredients"):
+            recipe_rows = [{
+                "name": "Skillet Chili",
+                "url": "https://example.com/chili",
+                "source_href": "https://example.com/chili",
+                "source_display_url": "https://example.com/chili",
+                "quantity": 2,
+                "archive_pdf_available": True,
+                "equipment_items": ["Dutch oven"],
+                "instruction_items": ["Simmer until thick."],
+                "sections": {
+                    "MISC": [{
+                        "name": "canned white beans",
+                        "display_name": "canned white beans",
+                        "base_display": "2 cans",
+                    }],
+                },
+            }]
+
+            cookbook_service.create_cookbook("Dinner")
+            cookbook_service.move_recipes_to_cookbook(
+                "dinner",
+                ["https://example.com/chili"],
+                recipe_rows,
+            )
+
+            result = main_routes.restore_cookbook_recipes_to_log(["https://example.com/chili"])
+
+            self.assertEqual(result["restored_count"], 1)
+            self.assertEqual(recipe_url_service.read_recipe_urls(), ["https://example.com/chili"])
+            self.assertEqual(shopping_list_service.load_items(), ["canned white beans"])
+
+            recipe_meta = recipe_ingredient_service.load_recipe_ingredients()
+            chili_meta = recipe_meta[recipe_url_service.normalize_recipe_url_key("https://example.com/chili")]
+            self.assertEqual(chili_meta["name"], "Skillet Chili")
+            self.assertEqual(chili_meta["quantity"], 2)
+            self.assertEqual(chili_meta["ingredients"], ["canned white beans"])
 
     def test_store_radius_toolbar_lives_in_store_options(self):
         home_template = Path("PushShoppingList/templates/sections/home_address.html").read_text(encoding="utf-8")

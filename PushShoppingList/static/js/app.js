@@ -2294,6 +2294,10 @@ function selectedCookbookRecipeCount() {
     return document.querySelectorAll("[data-cookbook-recipe-checkbox]:checked").length;
 }
 
+function selectedCookbookRestoreCount() {
+    return document.querySelectorAll("[data-cookbook-restore-checkbox]:checked").length;
+}
+
 function updateCookbookMoveButton() {
     const button = document.getElementById("cookbookMoveButton");
     const select = document.getElementById("cookbookMoveTarget");
@@ -2307,6 +2311,20 @@ function updateCookbookMoveButton() {
     button.textContent = selectedCount
         ? `Move ${selectedCount} Recipe${selectedCount === 1 ? "" : "s"}`
         : "Move Selected";
+}
+
+function updateCookbookRestoreButton() {
+    const button = document.getElementById("cookbookRestoreButton");
+    const selectedCount = selectedCookbookRestoreCount();
+
+    if (!button) {
+        return;
+    }
+
+    button.disabled = selectedCount === 0;
+    button.textContent = selectedCount
+        ? `Add ${selectedCount} to Recipe Log`
+        : "Add Selected to Recipe Log";
 }
 
 function cookbookRecipeCollapseStorageKey(recipeKey) {
@@ -2375,6 +2393,15 @@ function bindCookbooks() {
         checkbox.addEventListener("change", updateCookbookMoveButton);
     });
 
+    document.querySelectorAll("[data-cookbook-restore-checkbox]").forEach(checkbox => {
+        if (checkbox.dataset.cookbookRestoreBound === "1") {
+            return;
+        }
+
+        checkbox.dataset.cookbookRestoreBound = "1";
+        checkbox.addEventListener("change", updateCookbookRestoreButton);
+    });
+
     const target = document.getElementById("cookbookMoveTarget");
     if (target && target.dataset.cookbookBound !== "1") {
         target.dataset.cookbookBound = "1";
@@ -2382,6 +2409,7 @@ function bindCookbooks() {
     }
 
     updateCookbookMoveButton();
+    updateCookbookRestoreButton();
     restoreCookbookRecipeCollapseState();
 }
 
@@ -2493,6 +2521,51 @@ async function moveRecipesToCookbook(event) {
             button.disabled = false;
             button.textContent = originalText || "Move Selected";
             updateCookbookMoveButton();
+        }
+    }
+
+    return false;
+}
+
+async function restoreCookbookRecipes(event) {
+    event.preventDefault();
+
+    const form = event.currentTarget;
+    const button = document.getElementById("cookbookRestoreButton");
+    const originalText = button ? button.textContent : "";
+    const formData = new FormData();
+
+    document.querySelectorAll("[data-cookbook-restore-checkbox]:checked").forEach(checkbox => {
+        formData.append("recipe_urls", checkbox.value);
+    });
+
+    try {
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Adding...";
+        }
+
+        setCookbookStatus("Adding recipes to recipe log...");
+        const data = await submitCookbookForm(form, { formData });
+        await refreshStoreMarkup({
+            cacheBust: true,
+            requireRecipeLog: true,
+        });
+        const restoredCount = data && data.restored_count ? data.restored_count : selectedCookbookRestoreCount();
+        showRecipeQuantityUpdatedMessage(
+            "",
+            "",
+            "",
+            `${restoredCount || "Selected"} recipe${restoredCount === 1 ? "" : "s"} added to recipe log.`
+        );
+    } catch (err) {
+        console.warn("Unable to restore cookbook recipes.", err);
+        setCookbookStatus(err.message || "Unable to add recipes to recipe log.", true);
+    } finally {
+        if (button && button.isConnected) {
+            button.disabled = false;
+            button.textContent = originalText || "Add Selected to Recipe Log";
+            updateCookbookRestoreButton();
         }
     }
 

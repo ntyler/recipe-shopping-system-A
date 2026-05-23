@@ -19,8 +19,10 @@ from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.food_rules_service import shopping_item_food_rule_status
 from PushShoppingList.services.cookbook_service import cookbook_view
 from PushShoppingList.services.cookbook_service import create_cookbook
+from PushShoppingList.services.cookbook_service import cookbook_recipes_for_urls
 from PushShoppingList.services.cookbook_service import delete_cookbook
 from PushShoppingList.services.cookbook_service import move_recipes_to_cookbook
+from PushShoppingList.services.cookbook_service import recipe_ingredients_for_record
 from PushShoppingList.services.cookbook_service import remove_recipe_from_cookbook
 from PushShoppingList.services.home_address_service import load_home_address
 from PushShoppingList.services.home_address_service import save_home_address
@@ -32,11 +34,15 @@ from PushShoppingList.services.item_state_service import load_item_state
 from PushShoppingList.services.item_state_service import save_item_manual_qty
 from PushShoppingList.services.recipe_url_service import recipe_url_rows
 from PushShoppingList.services.recipe_url_service import recipe_url_type
+from PushShoppingList.services.recipe_url_service import add_recipe_urls
 from PushShoppingList.services.recipe_url_service import save_recipe_urls
+from PushShoppingList.services.recipe_url_service import save_recipe_url_name
+from PushShoppingList.services.recipe_url_service import save_recipe_url_quantity
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
 from PushShoppingList.services.recipe_url_service import normalize_recipe_quantity
 from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
 from PushShoppingList.services.recipe_ingredient_service import save_recipe_ingredients
+from PushShoppingList.services.recipe_ingredient_service import save_ingredients_for_recipe
 from PushShoppingList.services.recipe_quantity_service import ingredient_key
 from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
 from PushShoppingList.services.recipe_extract_service import STORE_SECTION_ORDER
@@ -47,6 +53,7 @@ from PushShoppingList.services.recipe_extract_service import scaling_multiplier_
 from PushShoppingList.services.product_selection_service import product_choices_by_item
 from PushShoppingList.services.rules_display_service import load_rules_display
 from PushShoppingList.services.shopping_list_service import load_items
+from PushShoppingList.services.shopping_list_service import add_items
 from PushShoppingList.services.shopping_list_service import save_items
 from PushShoppingList.services.store_settings_service import load_store_settings
 
@@ -996,6 +1003,60 @@ def remove_cookbook_recipe_route():
         return jsonify({"ok": False, "error": str(err)}), 400
 
     return jsonify({"ok": True})
+
+
+@main_bp.route("/api/cookbooks/restore_recipes", methods=["POST"])
+def restore_cookbook_recipes_route():
+    try:
+        result = restore_cookbook_recipes_to_log(request.form.getlist("recipe_urls"))
+    except ValueError as err:
+        return jsonify({"ok": False, "error": str(err)}), 400
+
+    return jsonify({"ok": True, **result})
+
+
+def restore_cookbook_recipes_to_log(recipe_urls):
+    recipes = cookbook_recipes_for_urls(recipe_urls)
+    urls = []
+    ingredients_by_recipe = {}
+    all_ingredients = []
+
+    for recipe in recipes:
+        url = recipe.get("url")
+        ingredients = recipe_ingredients_for_record(recipe)
+
+        if not url:
+            continue
+
+        urls.append(url)
+        ingredients_by_recipe[url] = ingredients
+        all_ingredients.extend(ingredients)
+
+    if not urls:
+        raise ValueError("Selected cookbook recipes were not found.")
+
+    if not all_ingredients:
+        raise ValueError("No ingredients were found for the selected cookbook recipes.")
+
+    add_items(all_ingredients)
+
+    for recipe in recipes:
+        url = recipe.get("url")
+
+        if not url:
+            continue
+
+        save_ingredients_for_recipe(url, ingredients_by_recipe.get(url, []))
+        save_recipe_url_name(url, recipe.get("name", ""))
+        save_recipe_url_quantity(url, recipe.get("quantity", 1))
+
+    add_recipe_urls(urls)
+    sort_ingredients()
+
+    return {
+        "restored_count": len(urls),
+        "ingredient_count": len(all_ingredients),
+    }
 
 
 @main_bp.route("/sort", methods=["POST"])
