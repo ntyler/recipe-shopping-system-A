@@ -3,6 +3,8 @@ import re
 import threading
 from pathlib import Path
 
+from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 COOKBOOKS_FILE = BASE_DIR / "cookbooks.json"
 COOKBOOKS_LOCK = threading.RLock()
@@ -17,8 +19,119 @@ def cookbook_slug(name):
     return slug or "cookbook"
 
 
-def clean_ingredient(value):
+def clean_text(value):
     return " ".join(str(value or "").strip().split())
+
+
+def recipe_key(value):
+    return normalize_recipe_url_key(value)
+
+
+def clean_text_list(value):
+    if isinstance(value, str):
+        return [clean_text(value)] if clean_text(value) else []
+
+    if not isinstance(value, list):
+        return []
+
+    items = []
+    for item in value:
+        text = clean_text(item)
+        if text:
+            items.append(text)
+
+    return items
+
+
+def clean_recipe_sections(value):
+    if not isinstance(value, dict):
+        return {}
+
+    sections = {}
+    allowed_fields = [
+        "name",
+        "display_name",
+        "quantity",
+        "base_quantity",
+        "scaled_quantity",
+        "unit",
+        "base_display",
+        "quantity_display",
+        "url",
+    ]
+
+    for section_name, section_items in value.items():
+        section_name = clean_text(section_name).upper()
+        if not section_name or not isinstance(section_items, list):
+            continue
+
+        cleaned_items = []
+        for item in section_items:
+            if not isinstance(item, dict):
+                continue
+
+            cleaned_item = {}
+            for field in allowed_fields:
+                field_value = item.get(field)
+                if field_value is None:
+                    continue
+                if isinstance(field_value, (int, float)):
+                    cleaned_item[field] = field_value
+                else:
+                    field_value = clean_text(field_value)
+                    if field_value:
+                        cleaned_item[field] = field_value
+
+            if cleaned_item.get("name") or cleaned_item.get("display_name"):
+                cleaned_items.append(cleaned_item)
+
+        if cleaned_items:
+            sections[section_name] = cleaned_items
+
+    return sections
+
+
+def clean_recipe_record(value):
+    if isinstance(value, str):
+        value = {"url": value}
+
+    if not isinstance(value, dict):
+        return None
+
+    url = clean_text(value.get("url"))
+    key = recipe_key(url)
+
+    if not key:
+        return None
+
+    name = clean_text(value.get("name")) or url
+    source_href = clean_text(value.get("source_href")) or url
+    source_display_url = clean_text(value.get("source_display_url")) or url
+    quantity = value.get("quantity") if value.get("quantity") is not None else 1
+
+    return {
+        "url": url,
+        "name": name,
+        "source_href": source_href,
+        "source_display_url": source_display_url,
+        "quantity": quantity,
+        "base_servings": clean_text(value.get("base_servings")),
+        "scaled_servings": clean_text(value.get("scaled_servings")),
+        "equipment_items": clean_text_list(value.get("equipment_items")),
+        "instruction_items": clean_text_list(value.get("instruction_items")),
+        "sections": clean_recipe_sections(value.get("sections")),
+    }
+
+
+def recipe_snapshot_lookup(recipe_rows):
+    lookup = {}
+
+    for recipe in recipe_rows or []:
+        record = clean_recipe_record(recipe)
+        if record:
+            lookup[recipe_key(record["url"])] = record
+
+    return lookup
 
 
 def normalize_cookbooks_payload(payload):
@@ -27,31 +140,36 @@ def normalize_cookbooks_payload(payload):
     raw_cookbooks = payload.get("cookbooks", []) if isinstance(payload, dict) else []
 
     for cookbook in raw_cookbooks:
-        name = str(cookbook.get("name") or "").strip()
+        if not isinstance(cookbook, dict):
+            continue
+
+        name = clean_text(cookbook.get("name"))
 
         if not name:
             continue
 
-        cookbook_id = str(cookbook.get("id") or cookbook_slug(name)).strip()
+        cookbook_id = clean_text(cookbook.get("id")) or cookbook_slug(name)
         if not cookbook_id or cookbook_id in seen_ids:
             cookbook_id = unique_cookbook_id({"cookbooks": cookbooks}, name)
 
         seen_ids.add(cookbook_id)
-        ingredients = []
-        seen_ingredients = set()
+        recipes = []
+        seen_recipes = set()
 
-        for ingredient in cookbook.get("ingredients", []):
-            ingredient = clean_ingredient(ingredient)
-            ingredient_key = normalize_text(ingredient)
+        for recipe in cookbook.get("recipes", []):
+            record = clean_recipe_record(recipe)
+            if not record:
+                continue
 
-            if ingredient and ingredient_key not in seen_ingredients:
-                ingredients.append(ingredient)
-                seen_ingredients.add(ingredient_key)
+            key = recipe_key(record["url"])
+            if key not in seen_recipes:
+                recipes.append(record)
+                seen_recipes.add(key)
 
         cookbooks.append({
             "id": cookbook_id,
             "name": name,
-            "ingredients": ingredients,
+            "recipes": recipes,
         })
 
     return {"cookbooks": cookbooks}
@@ -106,7 +224,7 @@ def find_cookbook(payload, cookbook_id):
 
 
 def create_cookbook(name):
-    name = str(name or "").strip()
+    name = clean_text(name)
 
     if not name:
         raise ValueError("Cookbook name is required.")
@@ -121,7 +239,7 @@ def create_cookbook(name):
         payload["cookbooks"].append({
             "id": unique_cookbook_id(payload, name),
             "name": name,
-            "ingredients": [],
+            "recipes": [],
         })
 
         return save_cookbooks(payload)
@@ -143,20 +261,23 @@ def delete_cookbook(cookbook_id):
         return save_cookbooks(payload)
 
 
-def move_ingredients_to_cookbook(cookbook_id, ingredients):
-    clean_ingredients = []
+def move_recipes_to_cookbook(cookbook_id, recipe_urls, recipe_rows=None):
+    available_recipes = recipe_snapshot_lookup(recipe_rows)
+    selected_recipes = []
     selected_keys = set()
 
-    for ingredient in ingredients:
-        ingredient = clean_ingredient(ingredient)
-        ingredient_key = normalize_text(ingredient)
+    for recipe_url in recipe_urls:
+        key = recipe_key(recipe_url)
+        if not key or key in selected_keys:
+            continue
 
-        if ingredient and ingredient_key not in selected_keys:
-            clean_ingredients.append(ingredient)
-            selected_keys.add(ingredient_key)
+        record = available_recipes.get(key) or clean_recipe_record(recipe_url)
+        if record:
+            selected_recipes.append(record)
+            selected_keys.add(key)
 
-    if not clean_ingredients:
-        raise ValueError("Select at least one ingredient.")
+    if not selected_recipes:
+        raise ValueError("Select at least one recipe.")
 
     with COOKBOOKS_LOCK:
         payload = load_cookbooks()
@@ -166,21 +287,21 @@ def move_ingredients_to_cookbook(cookbook_id, ingredients):
             raise ValueError("Choose a cookbook.")
 
         for cookbook in payload["cookbooks"]:
-            cookbook["ingredients"] = [
-                ingredient
-                for ingredient in cookbook.get("ingredients", [])
-                if normalize_text(ingredient) not in selected_keys
+            cookbook["recipes"] = [
+                recipe
+                for recipe in cookbook.get("recipes", [])
+                if recipe_key(recipe.get("url")) not in selected_keys
             ]
 
-        target["ingredients"].extend(clean_ingredients)
+        target["recipes"].extend(selected_recipes)
         return save_cookbooks(payload)
 
 
-def remove_ingredient_from_cookbook(cookbook_id, ingredient):
-    ingredient_key = normalize_text(ingredient)
+def remove_recipe_from_cookbook(cookbook_id, recipe_url):
+    target_key = recipe_key(recipe_url)
 
-    if not ingredient_key:
-        raise ValueError("Ingredient is required.")
+    if not target_key:
+        raise ValueError("Recipe is required.")
 
     with COOKBOOKS_LOCK:
         payload = load_cookbooks()
@@ -189,33 +310,68 @@ def remove_ingredient_from_cookbook(cookbook_id, ingredient):
         if target is None:
             raise ValueError("Cookbook was not found.")
 
-        target["ingredients"] = [
-            current
-            for current in target.get("ingredients", [])
-            if normalize_text(current) != ingredient_key
+        target["recipes"] = [
+            recipe
+            for recipe in target.get("recipes", [])
+            if recipe_key(recipe.get("url")) != target_key
         ]
 
         return save_cookbooks(payload)
 
 
-def cookbook_view(shopping_items):
+def hydrate_recipe(stored_recipe, current_recipes):
+    stored_recipe = clean_recipe_record(stored_recipe)
+    if not stored_recipe:
+        return None
+
+    current_recipe = current_recipes.get(recipe_key(stored_recipe["url"]))
+    recipe = current_recipe or stored_recipe
+
+    return {
+        **stored_recipe,
+        **recipe,
+    }
+
+
+def cookbook_view(recipe_rows):
     payload = load_cookbooks()
-    ingredient_assignments = {}
+    current_recipes = recipe_snapshot_lookup(recipe_rows)
+    recipe_assignments = {}
+    view_cookbooks = []
 
     for cookbook in payload["cookbooks"]:
-        for ingredient in cookbook.get("ingredients", []):
-            ingredient_assignments[normalize_text(ingredient)] = cookbook.get("name", "")
+        recipes = []
+        for stored_recipe in cookbook.get("recipes", []):
+            recipe = hydrate_recipe(stored_recipe, current_recipes)
+            if not recipe:
+                continue
 
-    ingredients = []
-    for item in shopping_items:
-        item_key = normalize_text(item)
-        ingredients.append({
-            "name": item,
-            "cookbook_name": ingredient_assignments.get(item_key, ""),
-            "assigned": bool(ingredient_assignments.get(item_key)),
+            recipe["cookbook_id"] = cookbook.get("id", "")
+            recipe["cookbook_name"] = cookbook.get("name", "")
+            recipes.append(recipe)
+            recipe_assignments[recipe_key(recipe["url"])] = cookbook.get("name", "")
+
+        view_cookbooks.append({
+            **cookbook,
+            "recipes": recipes,
+        })
+
+    recipes = []
+    for recipe in recipe_rows or []:
+        record = clean_recipe_record(recipe)
+        if not record:
+            continue
+
+        key = recipe_key(record["url"])
+        cookbook_name = recipe_assignments.get(key, "")
+        recipes.append({
+            **record,
+            "number": recipe.get("number"),
+            "cookbook_name": cookbook_name,
+            "assigned": bool(cookbook_name),
         })
 
     return {
-        "cookbooks": payload["cookbooks"],
-        "ingredients": ingredients,
+        "cookbooks": view_cookbooks,
+        "recipes": recipes,
     }

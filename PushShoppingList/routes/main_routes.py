@@ -20,8 +20,8 @@ from PushShoppingList.services.food_rules_service import shopping_item_food_rule
 from PushShoppingList.services.cookbook_service import cookbook_view
 from PushShoppingList.services.cookbook_service import create_cookbook
 from PushShoppingList.services.cookbook_service import delete_cookbook
-from PushShoppingList.services.cookbook_service import move_ingredients_to_cookbook
-from PushShoppingList.services.cookbook_service import remove_ingredient_from_cookbook
+from PushShoppingList.services.cookbook_service import move_recipes_to_cookbook
+from PushShoppingList.services.cookbook_service import remove_recipe_from_cookbook
 from PushShoppingList.services.home_address_service import load_home_address
 from PushShoppingList.services.home_address_service import save_home_address
 from PushShoppingList.services.home_store_location_service import DEFAULT_STORE_SEARCH_RADIUS_MILES
@@ -894,7 +894,7 @@ def index():
         raw_items="\n".join(items),
         items=items,
         current_urls=recipe_log_rows,
-        cookbook_view=cookbook_view(shopping_items_only(items)),
+        cookbook_view=cookbook_view(recipe_rows),
         home_address=load_home_address(),
         nearest_store_results=nearest_store_results,
         nearest_store_locations=nearest_store_results.get("store_locations", {}),
@@ -971,12 +971,13 @@ def delete_cookbook_route(cookbook_id):
     return jsonify({"ok": True})
 
 
-@main_bp.route("/api/cookbooks/move_ingredients", methods=["POST"])
-def move_cookbook_ingredients_route():
+@main_bp.route("/api/cookbooks/move_recipes", methods=["POST"])
+def move_cookbook_recipes_route():
     try:
-        move_ingredients_to_cookbook(
+        move_recipes_to_cookbook(
             request.form.get("cookbook_id", ""),
-            request.form.getlist("ingredients"),
+            request.form.getlist("recipe_urls"),
+            recipe_view_rows(recipe_url_rows()),
         )
     except ValueError as err:
         return jsonify({"ok": False, "error": str(err)}), 400
@@ -984,12 +985,12 @@ def move_cookbook_ingredients_route():
     return jsonify({"ok": True})
 
 
-@main_bp.route("/api/cookbooks/remove_ingredient", methods=["POST"])
-def remove_cookbook_ingredient_route():
+@main_bp.route("/api/cookbooks/remove_recipe", methods=["POST"])
+def remove_cookbook_recipe_route():
     try:
-        remove_ingredient_from_cookbook(
+        remove_recipe_from_cookbook(
             request.form.get("cookbook_id", ""),
-            request.form.get("ingredient", ""),
+            request.form.get("recipe_url", ""),
         )
     except ValueError as err:
         return jsonify({"ok": False, "error": str(err)}), 400

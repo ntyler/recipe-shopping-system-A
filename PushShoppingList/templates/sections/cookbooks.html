@@ -29,11 +29,11 @@
                 </div>
             </form>
 
-            <form id="moveCookbookIngredientsForm"
+            <form id="moveCookbookRecipesForm"
                   class="cookbook-move-form"
-                  action="/api/cookbooks/move_ingredients"
+                  action="/api/cookbooks/move_recipes"
                   method="POST"
-                  onsubmit="return moveIngredientsToCookbook(event)">
+                  onsubmit="return moveRecipesToCookbook(event)">
                 <label for="cookbookMoveTarget">Move selected to</label>
                 <div class="cookbook-move-row">
                     <select id="cookbookMoveTarget"
@@ -58,28 +58,32 @@
         <div class="cookbooks-layout">
             <section class="cookbook-pool">
                 <div class="cookbook-section-title">
-                    <span>Ingredients</span>
-                    <span>{{ cookbook_view.ingredients | length }}</span>
+                    <span>Recipes</span>
+                    <span>{{ cookbook_view.recipes | length }}</span>
                 </div>
 
-                {% if cookbook_view.ingredients %}
-                    <div class="cookbook-source-list">
-                        {% for ingredient in cookbook_view.ingredients %}
-                            <label class="cookbook-source-item {% if ingredient.assigned %}cookbook-source-assigned{% endif %}">
+                {% if cookbook_view.recipes %}
+                    <div class="cookbook-source-list cookbook-recipe-source-list">
+                        {% for recipe in cookbook_view.recipes %}
+                            <label class="cookbook-source-item cookbook-recipe-source-item {% if recipe.assigned %}cookbook-source-assigned{% endif %}">
                                 <input type="checkbox"
-                                       name="ingredients"
-                                       value="{{ ingredient.name }}"
-                                       form="moveCookbookIngredientsForm"
-                                       data-cookbook-ingredient-checkbox>
-                                <span class="cookbook-source-name">{{ ingredient.name }}</span>
-                                {% if ingredient.cookbook_name %}
-                                    <small>{{ ingredient.cookbook_name }}</small>
+                                       name="recipe_urls"
+                                       value="{{ recipe.url }}"
+                                       form="moveCookbookRecipesForm"
+                                       data-cookbook-recipe-checkbox>
+                                <span class="cookbook-source-name">
+                                    {% if recipe.number %}Recipe {{ recipe.number }}: {% endif %}{{ recipe.name }}
+                                </span>
+                                {% if recipe.cookbook_name %}
+                                    <small>{{ recipe.cookbook_name }}</small>
+                                {% else %}
+                                    <small>{{ recipe.source_display_url }}</small>
                                 {% endif %}
                             </label>
                         {% endfor %}
                     </div>
                 {% else %}
-                    <div class="cookbook-empty">No ingredients.</div>
+                    <div class="cookbook-empty">No recipes.</div>
                 {% endif %}
             </section>
 
@@ -96,7 +100,7 @@
                                 <div class="cookbook-card-header">
                                     <div>
                                         <h3>{{ cookbook.name }}</h3>
-                                        <span>{{ cookbook.ingredients | length }} ingredient{% if cookbook.ingredients | length != 1 %}s{% endif %}</span>
+                                        <span>{{ cookbook.recipes | length }} recipe{% if cookbook.recipes | length != 1 %}s{% endif %}</span>
                                     </div>
                                     <button type="button"
                                             class="cookbook-delete-btn"
@@ -108,21 +112,86 @@
                                     </button>
                                 </div>
 
-                                {% if cookbook.ingredients %}
-                                    <ul class="cookbook-ingredient-list">
-                                        {% for ingredient in cookbook.ingredients %}
-                                            <li>
-                                                <span>{{ ingredient }}</span>
-                                                <button type="button"
-                                                        class="cookbook-remove-ingredient-btn"
-                                                        data-cookbook-id="{{ cookbook.id }}"
-                                                        data-ingredient="{{ ingredient }}"
-                                                        onclick="removeCookbookIngredient(this)">
-                                                    Remove
-                                                </button>
-                                            </li>
+                                {% if cookbook.recipes %}
+                                    <div class="cookbook-recipe-list">
+                                        {% for recipe in cookbook.recipes %}
+                                            <article class="cookbook-recipe-card">
+                                                <div class="cookbook-recipe-header">
+                                                    <div class="cookbook-recipe-title">
+                                                        <a href="{{ recipe.source_href }}"
+                                                           target="_blank"
+                                                           rel="noopener noreferrer"
+                                                           title="{{ recipe.source_display_url }}">
+                                                            {% if recipe.number %}Recipe {{ recipe.number }}: {% endif %}{{ recipe.name }}
+                                                        </a>
+                                                        {% if recipe.base_servings %}
+                                                            <span>Servings: {{ recipe.base_servings }}{% if recipe.scaled_servings and recipe.scaled_servings != recipe.base_servings %} -> {{ recipe.scaled_servings }}{% endif %}</span>
+                                                        {% endif %}
+                                                    </div>
+                                                    <button type="button"
+                                                            class="cookbook-remove-recipe-btn"
+                                                            data-cookbook-id="{{ cookbook.id }}"
+                                                            data-recipe-url="{{ recipe.url }}"
+                                                            onclick="removeCookbookRecipe(this)">
+                                                        Remove
+                                                    </button>
+                                                </div>
+
+                                                <div class="cookbook-recipe-detail-grid">
+                                                    <section class="cookbook-recipe-detail">
+                                                        <h4>Equipment</h4>
+                                                        {% if recipe.equipment_items %}
+                                                            <ul>
+                                                                {% for equipment_item in recipe.equipment_items %}
+                                                                    <li>{{ equipment_item }}</li>
+                                                                {% endfor %}
+                                                            </ul>
+                                                        {% else %}
+                                                            <div class="cookbook-detail-empty">No equipment found.</div>
+                                                        {% endif %}
+                                                    </section>
+
+                                                    <section class="cookbook-recipe-detail">
+                                                        <h4>Instructions</h4>
+                                                        {% if recipe.instruction_items %}
+                                                            <ol>
+                                                                {% for instruction in recipe.instruction_items %}
+                                                                    <li>{{ instruction }}</li>
+                                                                {% endfor %}
+                                                            </ol>
+                                                        {% else %}
+                                                            <div class="cookbook-detail-empty">No instructions found.</div>
+                                                        {% endif %}
+                                                    </section>
+                                                </div>
+
+                                                <section class="cookbook-recipe-detail cookbook-recipe-ingredients">
+                                                    <h4>Ingredients</h4>
+                                                    {% if recipe["sections"] %}
+                                                        {% for section_name, section_items in recipe["sections"].items() %}
+                                                            <div class="cookbook-ingredient-section">
+                                                                <div class="cookbook-ingredient-section-title">{{ section_name }}</div>
+                                                                <ul>
+                                                                    {% for recipe_item in section_items %}
+                                                                        {% set display_name = recipe_item.display_name or recipe_item.name %}
+                                                                        {% set quantity_display = recipe_item.quantity_display or recipe_item.base_display or recipe_item.quantity %}
+                                                                        <li>
+                                                                            <span>{{ display_name }}</span>
+                                                                            {% if quantity_display %}
+                                                                                <small>{{ quantity_display }}</small>
+                                                                            {% endif %}
+                                                                        </li>
+                                                                    {% endfor %}
+                                                                </ul>
+                                                            </div>
+                                                        {% endfor %}
+                                                    {% else %}
+                                                        <div class="cookbook-detail-empty">No ingredients found.</div>
+                                                    {% endif %}
+                                                </section>
+                                            </article>
                                         {% endfor %}
-                                    </ul>
+                                    </div>
                                 {% else %}
                                     <div class="cookbook-empty">Empty.</div>
                                 {% endif %}

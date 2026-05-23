@@ -2290,14 +2290,14 @@ function setCookbookStatus(message, isError = false) {
     status.classList.toggle("error", Boolean(isError));
 }
 
-function selectedCookbookIngredientCount() {
-    return document.querySelectorAll("[data-cookbook-ingredient-checkbox]:checked").length;
+function selectedCookbookRecipeCount() {
+    return document.querySelectorAll("[data-cookbook-recipe-checkbox]:checked").length;
 }
 
 function updateCookbookMoveButton() {
     const button = document.getElementById("cookbookMoveButton");
     const select = document.getElementById("cookbookMoveTarget");
-    const selectedCount = selectedCookbookIngredientCount();
+    const selectedCount = selectedCookbookRecipeCount();
 
     if (!button) {
         return;
@@ -2305,12 +2305,12 @@ function updateCookbookMoveButton() {
 
     button.disabled = selectedCount === 0 || !select || !select.value;
     button.textContent = selectedCount
-        ? `Move ${selectedCount} Ingredient${selectedCount === 1 ? "" : "s"}`
+        ? `Move ${selectedCount} Recipe${selectedCount === 1 ? "" : "s"}`
         : "Move Selected";
 }
 
 function bindCookbooks() {
-    document.querySelectorAll("[data-cookbook-ingredient-checkbox]").forEach(checkbox => {
+    document.querySelectorAll("[data-cookbook-recipe-checkbox]").forEach(checkbox => {
         if (checkbox.dataset.cookbookBound === "1") {
             return;
         }
@@ -2401,7 +2401,7 @@ async function createCookbook(event) {
     return false;
 }
 
-async function moveIngredientsToCookbook(event) {
+async function moveRecipesToCookbook(event) {
     event.preventDefault();
 
     const form = event.currentTarget;
@@ -2414,8 +2414,8 @@ async function moveIngredientsToCookbook(event) {
         formData.set("cookbook_id", target.value);
     }
 
-    document.querySelectorAll("[data-cookbook-ingredient-checkbox]:checked").forEach(checkbox => {
-        formData.append("ingredients", checkbox.value);
+    document.querySelectorAll("[data-cookbook-recipe-checkbox]:checked").forEach(checkbox => {
+        formData.append("recipe_urls", checkbox.value);
     });
 
     try {
@@ -2424,13 +2424,13 @@ async function moveIngredientsToCookbook(event) {
             button.textContent = "Moving...";
         }
 
-        setCookbookStatus("Moving ingredients...");
+        setCookbookStatus("Moving recipes...");
         await submitCookbookForm(form, { formData });
         await refreshCookbooksMarkup();
-        showRecipeQuantityUpdatedMessage("", "", "", "Ingredients moved.");
+        showRecipeQuantityUpdatedMessage("", "", "", "Recipes moved.");
     } catch (err) {
-        console.warn("Unable to move cookbook ingredients.", err);
-        setCookbookStatus(err.message || "Unable to move ingredients.", true);
+        console.warn("Unable to move cookbook recipes.", err);
+        setCookbookStatus(err.message || "Unable to move recipes.", true);
     } finally {
         if (button) {
             button.disabled = false;
@@ -2442,23 +2442,23 @@ async function moveIngredientsToCookbook(event) {
     return false;
 }
 
-async function removeCookbookIngredient(button) {
+async function removeCookbookRecipe(button) {
     if (!button) {
         return false;
     }
 
     const formData = new FormData();
     formData.set("cookbook_id", button.dataset.cookbookId || "");
-    formData.set("ingredient", button.dataset.ingredient || "");
+    formData.set("recipe_url", button.dataset.recipeUrl || "");
 
     const originalText = button.textContent;
 
     try {
         button.disabled = true;
         button.textContent = "Removing...";
-        setCookbookStatus("Removing ingredient...");
+        setCookbookStatus("Removing recipe...");
 
-        const response = await fetch("/api/cookbooks/remove_ingredient", {
+        const response = await fetch("/api/cookbooks/remove_recipe", {
             method: "POST",
             headers: {
                 "X-Requested-With": "fetch",
@@ -2468,14 +2468,14 @@ async function removeCookbookIngredient(button) {
         const data = await response.json();
 
         if (!response.ok || !data.ok) {
-            throw new Error((data && data.error) || "Unable to remove ingredient.");
+            throw new Error((data && data.error) || "Unable to remove recipe.");
         }
 
         await refreshCookbooksMarkup();
-        showRecipeQuantityUpdatedMessage("", "", "", "Ingredient removed.");
+        showRecipeQuantityUpdatedMessage("", "", "", "Recipe removed.");
     } catch (err) {
-        console.warn("Unable to remove cookbook ingredient.", err);
-        setCookbookStatus(err.message || "Unable to remove ingredient.", true);
+        console.warn("Unable to remove cookbook recipe.", err);
+        setCookbookStatus(err.message || "Unable to remove recipe.", true);
     } finally {
         button.disabled = false;
         button.textContent = originalText || "Remove";
@@ -2717,10 +2717,22 @@ function toggleCardCollapse(key) {
     if (key === "store-options" && isCollapsed) {
         window.setTimeout(scrollStoreOptionsIntoView, 0);
     }
+
+    if (key === "rules" && isCollapsed) {
+        window.setTimeout(scrollRulesIntoView, 0);
+    }
 }
 
 function scrollStoreOptionsIntoView() {
-    const section = document.getElementById("storeOptionsSection");
+    scrollCardIntoView("storeOptionsSection");
+}
+
+function scrollRulesIntoView() {
+    scrollCardIntoView("rulesCard");
+}
+
+function scrollCardIntoView(cardId) {
+    const section = document.getElementById(cardId);
 
     if (!section) {
         return;

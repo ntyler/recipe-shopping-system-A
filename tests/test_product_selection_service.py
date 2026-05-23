@@ -405,13 +405,16 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertLess(cookbooks_index, rules_index)
         self.assertIn('id="cookbooksCard"', cookbook_template)
         self.assertIn("Move Selected", cookbook_template)
-        self.assertIn("data-cookbook-ingredient-checkbox", cookbook_template)
+        self.assertIn("data-cookbook-recipe-checkbox", cookbook_template)
+        self.assertIn("Equipment", cookbook_template)
+        self.assertIn("Instructions", cookbook_template)
         self.assertIn("function createCookbook", script)
-        self.assertIn("function moveIngredientsToCookbook", script)
+        self.assertIn("function moveRecipesToCookbook", script)
+        self.assertIn("/api/cookbooks/move_recipes", cookbook_template)
         self.assertIn('replaceSectionFromPage(nextPage, "#cookbooksCard")', script)
         self.assertIn(".cookbooks-layout", css)
 
-    def test_cookbook_move_reassigns_ingredients_between_cookbooks(self):
+    def test_cookbook_move_reassigns_recipes_with_details_between_cookbooks(self):
         from PushShoppingList.services import cookbook_service
 
         with TemporaryDirectory() as temp_dir, patch.object(
@@ -419,24 +422,57 @@ class ProductSelectionServiceTest(unittest.TestCase):
             "COOKBOOKS_FILE",
             Path(temp_dir) / "cookbooks.json",
         ):
+            recipe_rows = [{
+                "number": 1,
+                "name": "Skillet Chili",
+                "url": "https://example.com/chili",
+                "source_href": "https://example.com/chili",
+                "source_display_url": "https://example.com/chili",
+                "quantity": 1,
+                "base_servings": "4 servings",
+                "scaled_servings": "4 servings",
+                "equipment_items": ["Dutch oven"],
+                "instruction_items": ["Simmer until thick."],
+                "sections": {
+                    "MISC": [{
+                        "name": "canned white beans",
+                        "display_name": "canned white beans",
+                        "quantity": "2",
+                        "unit": "cans",
+                        "base_display": "2 cans",
+                        "quantity_display": "2 cans",
+                    }],
+                },
+            }]
+
             cookbook_service.create_cookbook("Dinner")
             cookbook_service.create_cookbook("Baking")
 
-            cookbook_service.move_ingredients_to_cookbook(
+            cookbook_service.move_recipes_to_cookbook(
                 "dinner",
-                ["kosher salt", "ground cumin"],
+                ["https://example.com/chili"],
+                recipe_rows,
             )
-            cookbook_service.move_ingredients_to_cookbook(
+            cookbook_service.move_recipes_to_cookbook(
                 "baking",
-                ["kosher salt"],
+                ["https://example.com/chili"],
+                recipe_rows,
             )
 
             data = cookbook_service.load_cookbooks()
             dinner = next(cookbook for cookbook in data["cookbooks"] if cookbook["id"] == "dinner")
             baking = next(cookbook for cookbook in data["cookbooks"] if cookbook["id"] == "baking")
+            baking_recipe = baking["recipes"][0]
 
-            self.assertEqual(dinner["ingredients"], ["ground cumin"])
-            self.assertEqual(baking["ingredients"], ["kosher salt"])
+            self.assertEqual(dinner["recipes"], [])
+            self.assertEqual(baking_recipe["name"], "Skillet Chili")
+            self.assertEqual(baking_recipe["equipment_items"], ["Dutch oven"])
+            self.assertEqual(baking_recipe["instruction_items"], ["Simmer until thick."])
+            self.assertEqual(baking_recipe["sections"]["MISC"][0]["display_name"], "canned white beans")
+
+            view = cookbook_service.cookbook_view([])
+            baking_view = next(cookbook for cookbook in view["cookbooks"] if cookbook["id"] == "baking")
+            self.assertEqual(baking_view["recipes"][0]["sections"]["MISC"][0]["quantity_display"], "2 cans")
 
     def test_store_radius_toolbar_lives_in_store_options(self):
         home_template = Path("PushShoppingList/templates/sections/home_address.html").read_text(encoding="utf-8")
@@ -474,6 +510,15 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("scrollIntoView", script)
         self.assertIn("function adjustStoreSearchRadius", script)
         self.assertIn('document.getElementById("storeSearchRadiusMiles")', script)
+
+    def test_rules_hide_scrolls_back_to_rules_card(self):
+        script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+
+        self.assertIn('key === "rules" && isCollapsed', script)
+        self.assertIn("function scrollRulesIntoView", script)
+        self.assertIn('scrollCardIntoView("rulesCard")', script)
+        self.assertIn("function scrollCardIntoView", script)
+        self.assertIn("scrollIntoView", script)
 
     def test_store_options_toolbar_only_runs_nearest_stores(self):
         home_template = Path("PushShoppingList/templates/sections/home_address.html").read_text(encoding="utf-8")
