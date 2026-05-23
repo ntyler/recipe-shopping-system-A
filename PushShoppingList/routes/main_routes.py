@@ -199,6 +199,7 @@ def recipe_view_rows(recipe_urls):
         recipe_quantity = normalize_recipe_quantity(recipe.get("quantity") or 1)
         recipe_data = load_saved_recipe_output(recipe["url"])
         recipe_meta = recipe_ingredient_data.get(normalize_recipe_url_key(recipe["url"]), {})
+        cover_image = recipe_cover_image_for_view(recipe["url"], recipe_data, recipe_meta)
         use_scaled_meta = multipliers_match(recipe_meta.get("quantity", 1), recipe_quantity)
         scaled_ingredients = recipe_meta.get("scaled_ingredients", {}) if use_scaled_meta else {}
         scaled_servings = recipe_meta.get("scaled_servings") if use_scaled_meta else None
@@ -210,6 +211,7 @@ def recipe_view_rows(recipe_urls):
             "url": recipe["url"],
             "source_href": recipe_source_href(recipe["url"]),
             "source_display_url": recipe_source_display_url(recipe["url"]),
+            "cover_image": cover_image,
             "quantity": recipe_quantity,
             "scaling_options": recipe_log_scaling_options(recipe_data, recipe_quantity),
             "archive_pdf_available": recipe_archive_pdf_exists(recipe["url"]),
@@ -227,9 +229,11 @@ def recipe_view_rows(recipe_urls):
 
 def recipe_url_log_rows(recipe_urls):
     rows = []
+    recipe_ingredient_data = load_recipe_ingredients()
 
     for recipe in recipe_urls:
         recipe_data = load_saved_recipe_output(recipe["url"])
+        recipe_meta = recipe_ingredient_data.get(normalize_recipe_url_key(recipe["url"]), {})
         recipe_quantity = normalize_recipe_quantity(recipe.get("quantity") or 1)
         rows.append({
             **recipe,
@@ -237,11 +241,54 @@ def recipe_url_log_rows(recipe_urls):
             "scaling_options": recipe_log_scaling_options(recipe_data, recipe_quantity),
             "source_href": recipe_source_href(recipe["url"]),
             "source_display_url": recipe_source_display_url(recipe["url"]),
+            "cover_image": recipe_cover_image_for_view(recipe["url"], recipe_data, recipe_meta),
             "food_rule_status": recipe_food_rule_status(recipe_data),
             "archive_pdf_available": recipe_archive_pdf_exists(recipe["url"]),
         })
 
     return rows
+
+
+def recipe_cover_image_for_view(recipe_url, recipe_data, recipe_meta=None):
+    recipe_meta = recipe_meta if isinstance(recipe_meta, dict) else {}
+    candidates = []
+
+    if isinstance(recipe_data, dict):
+        candidates.append(recipe_data.get("cover_image"))
+
+    candidates.append(recipe_meta.get("cover_image"))
+
+    for cover_image in candidates:
+        if not isinstance(cover_image, dict):
+            continue
+
+        src = recipe_cover_image_src(recipe_url, cover_image)
+
+        if not src:
+            continue
+
+        alt = (
+            str(cover_image.get("alt") or "").strip()
+            or str((recipe_data or {}).get("recipe_title") or "").strip()
+            or "Recipe cover image"
+        )
+        return {
+            **cover_image,
+            "src": src,
+            "alt": alt,
+        }
+
+    return {}
+
+
+def recipe_cover_image_src(recipe_url, cover_image):
+    if cover_image.get("path"):
+        try:
+            return url_for("recipe_bp.recipe_cover_image_route", url=recipe_url)
+        except RuntimeError:
+            return ""
+
+    return str(cover_image.get("url") or "").strip()
 
 
 def recipe_log_scaling_options(recipe_data, selected_multiplier):
@@ -1066,7 +1113,7 @@ def restore_cookbook_recipes_to_log(recipe_urls):
         if not url:
             continue
 
-        save_ingredients_for_recipe(url, ingredients_by_recipe.get(url, []))
+        save_ingredients_for_recipe(url, ingredients_by_recipe.get(url, []), recipe)
         save_recipe_url_name(url, recipe.get("name", ""))
         save_recipe_url_quantity(url, recipe.get("quantity", 1))
 

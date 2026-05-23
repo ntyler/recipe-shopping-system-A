@@ -51,6 +51,30 @@ def clean_text_list(value):
     return items
 
 
+def clean_cover_image(value):
+    if not isinstance(value, dict):
+        return {}
+
+    cover_image = {}
+
+    for field in ("url", "path", "mime_type", "alt", "source"):
+        field_value = clean_text(value.get(field))
+
+        if field_value:
+            cover_image[field] = field_value
+
+    for field in ("width", "height"):
+        field_value = value.get(field)
+
+        if isinstance(field_value, (int, float)) and field_value > 0:
+            cover_image[field] = int(field_value)
+
+    if not cover_image.get("url") and not cover_image.get("path"):
+        return {}
+
+    return cover_image
+
+
 def clean_recipe_sections(value):
     if not isinstance(value, dict):
         return {}
@@ -117,7 +141,7 @@ def clean_recipe_record(value):
     source_display_url = clean_text(value.get("source_display_url")) or url
     quantity = value.get("quantity") if value.get("quantity") is not None else 1
 
-    return {
+    record = {
         "url": url,
         "name": name,
         "number": value.get("number"),
@@ -131,6 +155,12 @@ def clean_recipe_record(value):
         "instruction_items": clean_text_list(value.get("instruction_items")),
         "sections": clean_recipe_sections(value.get("sections")),
     }
+    cover_image = clean_cover_image(value.get("cover_image"))
+
+    if cover_image:
+        record["cover_image"] = cover_image
+
+    return record
 
 
 def recipe_snapshot_lookup(recipe_rows):

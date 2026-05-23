@@ -464,6 +464,11 @@ class ProductSelectionServiceTest(unittest.TestCase):
                 "source_display_url": "https://example.com/chili",
                 "quantity": 1,
                 "archive_pdf_available": True,
+                "cover_image": {
+                    "url": "https://example.com/chili.jpg",
+                    "alt": "Skillet Chili",
+                    "source": "structured_data",
+                },
                 "base_servings": "4 servings",
                 "scaled_servings": "4 servings",
                 "equipment_items": ["Dutch oven"],
@@ -502,6 +507,7 @@ class ProductSelectionServiceTest(unittest.TestCase):
             self.assertEqual(dinner["recipes"], [])
             self.assertEqual(baking_recipe["name"], "Skillet Chili")
             self.assertTrue(baking_recipe["archive_pdf_available"])
+            self.assertEqual(baking_recipe["cover_image"]["url"], "https://example.com/chili.jpg")
             self.assertEqual(baking_recipe["equipment_items"], ["Dutch oven"])
             self.assertEqual(baking_recipe["instruction_items"], ["Simmer until thick."])
             self.assertEqual(baking_recipe["sections"]["MISC"][0]["display_name"], "canned white beans")
@@ -607,6 +613,11 @@ class ProductSelectionServiceTest(unittest.TestCase):
                 "source_display_url": "https://example.com/chili",
                 "quantity": 2,
                 "archive_pdf_available": True,
+                "cover_image": {
+                    "url": "https://example.com/chili.jpg",
+                    "alt": "Skillet Chili",
+                    "source": "structured_data",
+                },
                 "equipment_items": ["Dutch oven"],
                 "instruction_items": ["Simmer until thick."],
                 "sections": {
@@ -635,7 +646,54 @@ class ProductSelectionServiceTest(unittest.TestCase):
             chili_meta = recipe_meta[recipe_url_service.normalize_recipe_url_key("https://example.com/chili")]
             self.assertEqual(chili_meta["name"], "Skillet Chili")
             self.assertEqual(chili_meta["quantity"], 2)
+            self.assertEqual(chili_meta["cover_image"]["url"], "https://example.com/chili.jpg")
             self.assertEqual(chili_meta["ingredients"], ["canned white beans"])
+
+    def test_recipe_cover_image_is_extracted_from_recipe_structured_data(self):
+        from PushShoppingList.services.recipe_extract_service import extract_recipe_from_structured_data
+
+        html = """
+        <html><head>
+        <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@type": "Recipe",
+          "name": "Crispy Falafel",
+          "image": [
+            {
+              "@type": "ImageObject",
+              "url": "/images/falafel.jpg",
+              "width": 1200,
+              "height": 800
+            }
+          ],
+          "recipeYield": "4 servings",
+          "recipeIngredient": ["1 cup chickpeas"],
+          "recipeInstructions": [
+            {"@type": "HowToStep", "text": "Bake until crisp."}
+          ]
+        }
+        </script>
+        </head><body></body></html>
+        """
+
+        data = extract_recipe_from_structured_data("https://example.com/recipes/falafel", html)
+
+        self.assertEqual(data["cover_image"]["url"], "https://example.com/images/falafel.jpg")
+        self.assertEqual(data["cover_image"]["alt"], "Crispy Falafel")
+
+    def test_recipe_cover_image_falls_back_to_open_graph_image(self):
+        from PushShoppingList.services.recipe_extract_service import extract_recipe_cover_image_from_html
+
+        html = '<meta property="og:image" content="/covers/finished-dish.jpg">'
+        cover_image = extract_recipe_cover_image_from_html(
+            html,
+            "https://example.com/recipes/dinner",
+            fallback_alt="Dinner",
+        )
+
+        self.assertEqual(cover_image["url"], "https://example.com/covers/finished-dish.jpg")
+        self.assertEqual(cover_image["source"], "html_metadata")
 
     def test_store_radius_toolbar_lives_in_store_options(self):
         home_template = Path("PushShoppingList/templates/sections/home_address.html").read_text(encoding="utf-8")

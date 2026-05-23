@@ -18,12 +18,20 @@
             {% for recipe in current_urls %}
                 <div class="recipe-url-summary-row{% if loop.last %} recipe-url-summary-row-last{% endif %}">
                     <span class="recipe-url-summary-number">Recipe {{ loop.index }}</span>
-                    <a class="recipe-url-summary-name"
-                       href="{{ recipe.source_href }}"
-                       target="_blank"
-                       rel="noopener noreferrer"
-                       title="{{ recipe.source_display_url }}"
-                       data-recipe-url="{{ recipe.url }}">{{ recipe.name }}</a>
+                    <div class="recipe-url-summary-main">
+                        <a class="recipe-url-summary-name"
+                           href="{{ recipe.source_href }}"
+                           target="_blank"
+                           rel="noopener noreferrer"
+                           title="{{ recipe.source_display_url }}"
+                           data-recipe-url="{{ recipe.url }}">{{ recipe.name }}</a>
+                        {% if recipe.cover_image and recipe.cover_image.src %}
+                            <img class="recipe-cover-image recipe-url-summary-cover"
+                                 src="{{ recipe.cover_image.src }}"
+                                 alt="{{ recipe.cover_image.alt or recipe.name }}"
+                                 loading="lazy">
+                        {% endif %}
+                    </div>
                     <div class="recipe-url-summary-actions">
                         {% if recipe.food_rule_status.needs_review %}
                             <button type="button"

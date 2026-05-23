@@ -1,3 +1,5 @@
+import json
+
 from flask import Blueprint
 from flask import abort
 from flask import jsonify
@@ -21,6 +23,8 @@ from PushShoppingList.services.extraction_progress_service import request_cancel
 from PushShoppingList.services.extraction_progress_service import start_progress
 from PushShoppingList.services.recipe_extract_service import extract_recipe_from_upload
 from PushShoppingList.services.recipe_extract_service import extract_recipe_from_url
+from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
+from PushShoppingList.services.recipe_extract_service import recipe_cover_image_file_path
 from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_path
 from PushShoppingList.services.food_review_alternative_service import suggest_food_review_alternatives
 from PushShoppingList.services.recipe_edit_service import create_new_recipe
@@ -31,8 +35,10 @@ from PushShoppingList.services.recipe_edit_service import load_editable_recipe
 from PushShoppingList.services.recipe_edit_service import save_editable_recipe
 from PushShoppingList.services.recipe_edit_service import create_source_url_pdf
 from PushShoppingList.services.recipe_ingredient_service import remove_recipe_and_unused_ingredients
+from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
 from PushShoppingList.services.recipe_ingredient_service import save_ingredients_for_recipe
 from PushShoppingList.services.recipe_url_service import add_recipe_urls
+from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
 from PushShoppingList.services.recipe_url_service import normalize_recipe_quantity
 from PushShoppingList.services.recipe_url_service import remove_recipe_url
 from PushShoppingList.services.recipe_url_service import save_recipe_url_name
@@ -83,7 +89,7 @@ def extract_recipe_route():
 
         if result.get("ok") and ingredients:
             add_items(ingredients)
-            save_ingredients_for_recipe(url, ingredients)
+            save_ingredients_for_recipe(url, ingredients, result)
             if result.get("recipe_title"):
                 save_recipe_url_name(url, result.get("recipe_title"))
             add_recipe_urls([url])
@@ -120,7 +126,7 @@ def upload_recipe_media_route():
         recipe_url = result.get("source_url")
         ingredients = result.get("ingredients", [])
         add_items(ingredients)
-        save_ingredients_for_recipe(recipe_url, ingredients)
+        save_ingredients_for_recipe(recipe_url, ingredients, result)
         if result.get("recipe_title"):
             save_recipe_url_name(recipe_url, result.get("recipe_title"))
         add_recipe_urls([recipe_url])
@@ -193,7 +199,7 @@ def api_extract_recipe_route():
         return jsonify(result), 400
 
     add_items(ingredients)
-    save_ingredients_for_recipe(url, ingredients)
+    save_ingredients_for_recipe(url, ingredients, result)
     if result.get("recipe_title"):
         save_recipe_url_name(url, result.get("recipe_title"))
     add_recipe_urls([url])
@@ -358,6 +364,49 @@ def recipe_archive_pdf_route():
         as_attachment=False,
         download_name=pdf_path.name,
     )
+
+
+@recipe_bp.route("/recipe_cover_image", methods=["GET"])
+def recipe_cover_image_route():
+    url = str(request.args.get("url", "") or "").strip()
+
+    if not url:
+        abort(404)
+
+    cover_image = find_recipe_cover_image(url)
+    image_path = recipe_cover_image_file_path(cover_image)
+
+    if not image_path:
+        abort(404)
+
+    return send_file(
+        image_path,
+        mimetype=cover_image.get("mime_type") if isinstance(cover_image, dict) else None,
+        as_attachment=False,
+        download_name=image_path.name,
+    )
+
+
+def find_recipe_cover_image(url):
+    recipe_key = normalize_recipe_url_key(url)
+
+    for json_path in OUTPUT_FOLDER.glob("*.json"):
+        if json_path.name == "sorted_ingredients.json":
+            continue
+
+        try:
+            data = json.loads(json_path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+
+        if normalize_recipe_url_key(data.get("source_url", "")) == recipe_key:
+            cover_image = data.get("cover_image")
+            if isinstance(cover_image, dict):
+                return cover_image
+
+    recipe_meta = load_recipe_ingredients().get(recipe_key, {})
+    cover_image = recipe_meta.get("cover_image") if isinstance(recipe_meta, dict) else None
+    return cover_image if isinstance(cover_image, dict) else {}
 
 
 @recipe_bp.route("/api/food_review_alternatives", methods=["POST"])

@@ -568,7 +568,8 @@ def update_recipe_ingredient_record(url, quantity, recipe_data):
     data = load_recipe_ingredients()
     key = normalize_recipe_url_key(url)
     existing = data.get(key, {})
-    data[key] = {
+    cover_image = recipe_data.get("cover_image") or existing.get("cover_image")
+    record = {
         "url": url,
         "quantity": quantity,
         "name": existing.get("name"),
@@ -576,6 +577,11 @@ def update_recipe_ingredient_record(url, quantity, recipe_data):
         "scaled_ingredients": existing.get("scaled_ingredients", {}),
         "ingredients": extract_ingredients_from_result(recipe_data),
     }
+
+    if cover_image:
+        record["cover_image"] = cover_image
+
+    data[key] = record
     save_recipe_ingredients(data)
 
 

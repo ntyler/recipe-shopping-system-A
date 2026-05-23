@@ -34,15 +34,17 @@ def save_recipe_ingredients(data):
     )
 
 
-def save_ingredients_for_recipe(url, ingredients):
+def save_ingredients_for_recipe(url, ingredients, recipe_metadata=None):
     url = str(url or "").strip()
 
     if not url:
         return
 
+    recipe_metadata = recipe_metadata if isinstance(recipe_metadata, dict) else {}
     data = load_recipe_ingredients()
     existing = data.get(normalize_recipe_url_key(url), {})
-    data[normalize_recipe_url_key(url)] = {
+    cover_image = recipe_metadata.get("cover_image") or existing.get("cover_image")
+    record = {
         "url": url,
         "quantity": existing.get("quantity", 1),
         "name": existing.get("name"),
@@ -50,6 +52,11 @@ def save_ingredients_for_recipe(url, ingredients):
         "scaled_ingredients": existing.get("scaled_ingredients", {}),
         "ingredients": unique_ingredients(ingredients),
     }
+
+    if cover_image:
+        record["cover_image"] = cover_image
+
+    data[normalize_recipe_url_key(url)] = record
     save_recipe_ingredients(data)
 
 

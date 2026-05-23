@@ -13,6 +13,7 @@ import zipfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from urllib.parse import unquote
+from urllib.parse import urljoin
 from urllib.parse import urlparse
 
 import requests
@@ -557,8 +558,18 @@ def extract_recipe_from_structured_data(recipe_url, html_text):
             "instructions": instructions,
             "nutrition": build_structured_nutrition(recipe.get("nutrition", {})),
         }
+        cover_image = normalize_recipe_cover_image(
+            recipe.get("image"),
+            base_url=recipe_url,
+            fallback_alt=recipe.get("name") or "",
+            source="structured_data",
+        )
+
+        if cover_image:
+            json_data["cover_image"] = cover_image
 
         apply_recipe_scaling_metadata(json_data, html_text)
+        apply_recipe_cover_image_metadata(json_data, html_text, recipe_url)
 
         return json_data
 
@@ -594,6 +605,315 @@ def node_has_recipe_type(node):
         return "Recipe" in node_type
 
     return node_type == "Recipe"
+
+
+def apply_recipe_cover_image_metadata(json_data, html_text=None, recipe_url="", fallback_alt=""):
+    if not isinstance(json_data, dict):
+        return
+
+    fallback_alt = (
+        str(fallback_alt or "").strip()
+        or str(json_data.get("recipe_title") or "").strip()
+        or "Recipe cover image"
+    )
+    cover_image = recipe_cover_image_from_data(
+        json_data,
+        base_url=recipe_url,
+        fallback_alt=fallback_alt,
+    )
+
+    if not cover_image and html_text:
+        cover_image = extract_recipe_cover_image_from_html(
+            html_text,
+            recipe_url,
+            fallback_alt=fallback_alt,
+        )
+
+    if cover_image:
+        if not cover_image.get("alt"):
+            cover_image["alt"] = fallback_alt
+        json_data["cover_image"] = cover_image
+
+
+def recipe_cover_image_from_data(json_data, base_url="", fallback_alt=""):
+    if not isinstance(json_data, dict):
+        return {}
+
+    cover_image = normalize_recipe_cover_image(
+        json_data.get("cover_image"),
+        base_url=base_url,
+        fallback_alt=fallback_alt,
+    )
+
+    if cover_image:
+        return cover_image
+
+    for key in ("image", "images", "image_url", "thumbnail", "thumbnail_url", "thumbnailUrl"):
+        cover_image = normalize_recipe_cover_image(
+            json_data.get(key),
+            base_url=base_url,
+            fallback_alt=fallback_alt,
+            source="extracted_json",
+        )
+
+        if cover_image:
+            return cover_image
+
+    return {}
+
+
+def extract_recipe_cover_image_from_html(html_text, base_url="", fallback_alt=""):
+    if not str(html_text or "").strip():
+        return {}
+
+    soup = BeautifulSoup(html_text or "", "html.parser")
+
+    for tag in soup.find_all("script", attrs={"type": re.compile(r"json", re.I)}):
+        try:
+            payload = json.loads(tag.get_text(strip=True))
+        except Exception:
+            continue
+
+        recipe = find_recipe_node(payload)
+        if recipe:
+            cover_image = normalize_recipe_cover_image(
+                recipe.get("image"),
+                base_url=base_url,
+                fallback_alt=recipe.get("name") or fallback_alt,
+                source="structured_data",
+            )
+
+            if cover_image:
+                return cover_image
+
+        cover_image = find_cover_image_in_json(payload, base_url, fallback_alt)
+        if cover_image:
+            return cover_image
+
+    metadata_selectors = [
+        ('meta[property="og:image"]', "content"),
+        ('meta[property="og:image:url"]', "content"),
+        ('meta[property="og:image:secure_url"]', "content"),
+        ('meta[name="twitter:image"]', "content"),
+        ('meta[name="twitter:image:src"]', "content"),
+        ('meta[property="slick:featured_image"]', "content"),
+        ('link[rel="image_src"]', "href"),
+    ]
+
+    for selector, attribute in metadata_selectors:
+        tag = soup.select_one(selector)
+        value = tag.get(attribute) if tag else ""
+        cover_image = normalize_recipe_cover_image(
+            value,
+            base_url=base_url,
+            fallback_alt=fallback_alt,
+            source="html_metadata",
+        )
+
+        if cover_image:
+            return cover_image
+
+    return {}
+
+
+def find_cover_image_in_json(payload, base_url="", fallback_alt=""):
+    if isinstance(payload, dict):
+        for key in (
+            "image",
+            "images",
+            "featured_image",
+            "thumbnail",
+            "thumbnail_url",
+            "thumbnailUrl",
+            "ogImage",
+        ):
+            cover_image = normalize_recipe_cover_image(
+                payload.get(key),
+                base_url=base_url,
+                fallback_alt=payload.get("name") or payload.get("title") or fallback_alt,
+                source="json_metadata",
+            )
+
+            if cover_image:
+                return cover_image
+
+        for value in payload.values():
+            if isinstance(value, (dict, list)):
+                cover_image = find_cover_image_in_json(value, base_url, fallback_alt)
+                if cover_image:
+                    return cover_image
+
+    if isinstance(payload, list):
+        for item in payload:
+            cover_image = find_cover_image_in_json(item, base_url, fallback_alt)
+            if cover_image:
+                return cover_image
+
+    return {}
+
+
+def normalize_recipe_cover_image(value, base_url="", fallback_alt="", source=""):
+    if value in (None, "", []):
+        return {}
+
+    if isinstance(value, list):
+        candidates = [
+            candidate
+            for candidate in (
+                normalize_recipe_cover_image(
+                    item,
+                    base_url=base_url,
+                    fallback_alt=fallback_alt,
+                    source=source,
+                )
+                for item in value
+            )
+            if candidate
+        ]
+
+        if not candidates:
+            return {}
+
+        return max(candidates, key=cover_image_score)
+
+    if isinstance(value, dict):
+        local_path = clean_cover_image_text(value.get("path"))
+        if local_path:
+            cover_image = {
+                "path": local_path,
+                "alt": clean_cover_image_text(value.get("alt")) or fallback_alt,
+                "source": clean_cover_image_text(value.get("source")) or source or "local_file",
+            }
+            url = clean_cover_image_text(value.get("url"))
+            mime_type = clean_cover_image_text(value.get("mime_type"))
+            if url:
+                cover_image["url"] = absolutize_cover_image_url(url, base_url)
+            if mime_type:
+                cover_image["mime_type"] = mime_type
+            return cover_image
+
+        image_value = first_cover_image_value(
+            value,
+            "url",
+            "contentUrl",
+            "content_url",
+            "thumbnailUrl",
+            "thumbnail_url",
+            "src",
+            "@id",
+        )
+
+        if image_value in (None, "") and value.get("image") is not value:
+            image_value = value.get("image")
+
+        cover_image = normalize_recipe_cover_image(
+            image_value,
+            base_url=base_url,
+            fallback_alt=(
+                clean_cover_image_text(value.get("alt"))
+                or clean_cover_image_text(value.get("name"))
+                or clean_cover_image_text(value.get("caption"))
+                or fallback_alt
+            ),
+            source=clean_cover_image_text(value.get("source")) or source,
+        )
+
+        if not cover_image:
+            return {}
+
+        width = normalize_cover_image_dimension(value.get("width"))
+        height = normalize_cover_image_dimension(value.get("height"))
+        if width:
+            cover_image["width"] = width
+        if height:
+            cover_image["height"] = height
+        return cover_image
+
+    url = absolutize_cover_image_url(clean_cover_image_text(value), base_url)
+
+    if not cover_image_url_looks_usable(url):
+        return {}
+
+    cover_image = {
+        "url": url,
+        "alt": clean_cover_image_text(fallback_alt),
+        "source": clean_cover_image_text(source) or "recipe",
+    }
+    return {key: item for key, item in cover_image.items() if item}
+
+
+def first_cover_image_value(data, *keys):
+    for key in keys:
+        value = data.get(key)
+
+        if value not in (None, "", []):
+            return value
+
+    return ""
+
+
+def clean_cover_image_text(value):
+    return re.sub(r"\s+", " ", str(value or "").strip())
+
+
+def normalize_cover_image_dimension(value):
+    try:
+        number = int(float(str(value).strip()))
+    except (TypeError, ValueError):
+        return None
+
+    return number if number > 0 else None
+
+
+def cover_image_score(cover_image):
+    width = cover_image.get("width") or 0
+    height = cover_image.get("height") or 0
+    area = width * height if width and height else 0
+    return (1 if cover_image.get("path") else 0, area, len(cover_image.get("url") or ""))
+
+
+def absolutize_cover_image_url(url, base_url=""):
+    url = str(url or "").strip()
+
+    if not url:
+        return ""
+
+    if url.startswith("data:image/"):
+        return url
+
+    if base_url:
+        return urljoin(base_url, url)
+
+    return url
+
+
+def cover_image_url_looks_usable(url):
+    url = str(url or "").strip()
+
+    if not url:
+        return False
+
+    if url.startswith("data:image/"):
+        return True
+
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return False
+
+    path = parsed.path.lower()
+    blocked_path_terms = (
+        "favicon",
+        "apple-touch-icon",
+        "/avatar",
+        "/profile",
+        "/author",
+        "/logo",
+    )
+
+    if any(term in path for term in blocked_path_terms):
+        return False
+
+    return not path.endswith(".svg")
 
 
 def normalize_servings(recipe_yield):
@@ -1102,6 +1422,10 @@ def extract_recipe_from_social_video_url(recipe_url, progress_callback=None):
         recipe_url,
         progress_callback=progress_callback,
     )
+    cover_image = (
+        extract_recipe_cover_image_from_html(html_text, recipe_url)
+        or load_social_video_cover_image(recipe_url)
+    )
 
     if not has_meaningful_social_video_text(page_text):
         return {
@@ -1112,6 +1436,8 @@ def extract_recipe_from_social_video_url(recipe_url, progress_callback=None):
         }
 
     local_json_data = extract_recipe_from_social_video_text(recipe_url, page_text)
+    if cover_image:
+        local_json_data["cover_image"] = cover_image
 
     if structured_recipe_data_is_usable(local_json_data):
         archive_social_video_text_pdf(
@@ -1173,6 +1499,8 @@ def extract_recipe_from_social_video_url(recipe_url, progress_callback=None):
         }
 
     json_data["source_url"] = recipe_url
+    if cover_image:
+        json_data["cover_image"] = cover_image
     archive_social_video_text_pdf(
         recipe_url,
         page_text,
@@ -1435,6 +1763,11 @@ def fetch_social_video_text_with_downloader(recipe_url, progress_callback=None):
     if not isinstance(info, dict):
         return None
 
+    save_social_video_cover_image(
+        recipe_url,
+        extract_recipe_cover_image_from_ytdlp_info(info),
+    )
+
     page_text = build_ytdlp_page_text(recipe_url, info)
 
     if has_meaningful_social_video_text(page_text):
@@ -1548,6 +1881,63 @@ def build_ytdlp_page_text(recipe_url, info):
         page_text = page_text[:MAX_PAGE_TEXT_CHARS]
 
     return page_text
+
+
+def extract_recipe_cover_image_from_ytdlp_info(info):
+    if not isinstance(info, dict):
+        return {}
+
+    fallback_alt = clean_recipe_text(info.get("title") or "") or "Recipe video cover image"
+    candidates = []
+    thumbnail = normalize_recipe_cover_image(
+        info.get("thumbnail"),
+        fallback_alt=fallback_alt,
+        source="video_thumbnail",
+    )
+
+    if thumbnail:
+        candidates.append(thumbnail)
+
+    for item in info.get("thumbnails") or []:
+        cover_image = normalize_recipe_cover_image(
+            item,
+            fallback_alt=fallback_alt,
+            source="video_thumbnail",
+        )
+
+        if cover_image:
+            candidates.append(cover_image)
+
+    if not candidates:
+        return {}
+
+    return max(candidates, key=cover_image_score)
+
+
+def social_video_cover_image_path(recipe_url):
+    return RAW_FOLDER / f"{safe_filename(recipe_url)}_COVER_IMAGE.json"
+
+
+def save_social_video_cover_image(recipe_url, cover_image):
+    if not cover_image:
+        return
+
+    social_video_cover_image_path(recipe_url).write_text(
+        json.dumps(cover_image, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+
+def load_social_video_cover_image(recipe_url):
+    cover_path = social_video_cover_image_path(recipe_url)
+
+    if not cover_path.exists():
+        return {}
+
+    try:
+        return normalize_recipe_cover_image(json.loads(cover_path.read_text(encoding="utf-8")))
+    except Exception:
+        return {}
 
 
 def extract_ytdlp_subtitle_text(recipe_url, info):
@@ -3787,6 +4177,13 @@ NUTRITION RULES
 - If no nutrition information is found, return nutrition with all fields as null and other as [].
 
 ========================
+IMAGE RULES
+========================
+- If the page content includes a clear final recipe/product image URL, put it in cover_image.url.
+- Prefer the finished dish or final baked/cooked product over logo, avatar, icon, step-by-step, or ingredient images.
+- If no final recipe image URL is visible in the provided content, set cover_image values to null.
+
+========================
 RECIPE SCALING RULES
 ========================
 - If the page displays recipe scale controls such as "1/2x", "1x", "2x", or "3x", capture them.
@@ -3803,6 +4200,11 @@ FINAL OUTPUT FORMAT
 {{
   "source_url": "{recipe_url}",
   "recipe_title": null,
+  "cover_image": {{
+    "url": null,
+    "alt": null,
+    "source": null
+  }},
   "servings": null,
   "scaling": {{
     "selected_multiplier": 1,
@@ -3983,6 +4385,7 @@ def save_json_response(recipe_url, response_text, html_text=None):
         normalize_extracted_ingredient_fields(json_data)
         normalize_extracted_equipment_fields(json_data)
         apply_recipe_scaling_metadata(json_data, html_text)
+        apply_recipe_cover_image_metadata(json_data, html_text, recipe_url)
 
         json_path.write_text(
             json.dumps(json_data, indent=2, ensure_ascii=False),
@@ -4090,6 +4493,7 @@ def save_extracted_recipe_json(recipe_url, json_data):
     normalize_extracted_ingredient_fields(json_data)
     normalize_extracted_equipment_fields(json_data)
     apply_recipe_scaling_metadata(json_data)
+    apply_recipe_cover_image_metadata(json_data, recipe_url=recipe_url)
 
     json_path = OUTPUT_FOLDER / f"{safe_filename(recipe_url)}.json"
     json_path.write_text(
@@ -4186,6 +4590,15 @@ def extract_recipe_from_upload(file_storage):
         )
         if title:
             json_data["recipe_title"] = title
+        cover_image = extract_recipe_cover_image_from_upload(
+            upload_path,
+            mime_type,
+            filename,
+            recipe_url,
+            fallback_alt=json_data.get("recipe_title") or filename,
+        )
+        if cover_image:
+            json_data["cover_image"] = cover_image
         merge_missing_upload_ingredients(
             recipe_url,
             json_data,
@@ -4222,6 +4635,55 @@ def upload_can_use_openai_file_input(mime_type, filename, upload_path):
         return True
 
     return suffix == ".pdf"
+
+
+def extract_recipe_cover_image_from_upload(upload_path, mime_type, filename, recipe_url, fallback_alt=""):
+    if not str(mime_type or "").startswith("image/"):
+        return {}
+
+    try:
+        relative_path = upload_path.resolve().relative_to(EXTRACTOR_FOLDER.resolve())
+    except ValueError:
+        return {}
+
+    return normalize_recipe_cover_image(
+        {
+            "path": str(relative_path).replace("\\", "/"),
+            "mime_type": mime_type,
+            "alt": fallback_alt or Path(filename or "Uploaded recipe").stem,
+            "source": "uploaded_image",
+        },
+        base_url=recipe_url,
+    )
+
+
+def recipe_cover_image_file_path(cover_image):
+    if not isinstance(cover_image, dict):
+        return None
+
+    stored_path = clean_cover_image_text(cover_image.get("path"))
+
+    if not stored_path:
+        return None
+
+    candidate = Path(stored_path)
+
+    if not candidate.is_absolute():
+        candidate = EXTRACTOR_FOLDER / candidate
+
+    try:
+        candidate = candidate.resolve()
+        base = EXTRACTOR_FOLDER.resolve()
+    except Exception:
+        return None
+
+    if candidate != base and base not in candidate.parents:
+        return None
+
+    if not candidate.is_file():
+        return None
+
+    return candidate
 
 
 def upload_is_word_document(mime_type, filename, upload_path):
@@ -4622,6 +5084,7 @@ def build_extract_result(recipe_url, json_data, extraction_method):
         "ok": True,
         "source_url": recipe_url,
         "recipe_title": json_data.get("recipe_title"),
+        "cover_image": json_data.get("cover_image") or {},
         "servings": json_data.get("servings"),
         "scaling": json_data.get("scaling"),
         "ingredients": ingredients,
@@ -4857,20 +5320,7 @@ def extract_recipe_from_url(recipe_url, progress_callback=None):
                 "ingredients": [],
             }
 
-        ingredients = extract_ingredients_from_result(json_data)
-
-        return {
-            "ok": True,
-            "source_url": recipe_url,
-            "recipe_title": json_data.get("recipe_title"),
-            "servings": json_data.get("servings"),
-            "ingredients": ingredients,
-            "equipment": json_data.get("equipment", []),
-            "instructions": json_data.get("instructions", []),
-            "nutrition": json_data.get("nutrition", {}),
-            "raw": json_data,
-            "extraction_method": "openai",
-        }
+        return build_extract_result(recipe_url, json_data, "openai")
 
     except Exception as exc:
         return {
