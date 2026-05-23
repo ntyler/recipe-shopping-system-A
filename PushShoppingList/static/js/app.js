@@ -7210,6 +7210,7 @@ function updateAddStoreStickyVisibility() {
     const section = document.getElementById("storeOptionsSection");
     const content = document.querySelector('[data-collapse-content="store-options"]');
     const action = document.querySelector(".store-add-sticky-action");
+    const inlineAction = document.querySelector(".store-add-inline-action");
     const modal = document.getElementById("addStoreModal");
 
     if (!section || !content || !action) {
@@ -7221,17 +7222,19 @@ function updateAddStoreStickyVisibility() {
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
     const expanded = !content.classList.contains("collapsed");
     const actionHeight = action.offsetHeight || 68;
+    const inlineRect = inlineAction ? inlineAction.getBoundingClientRect() : null;
     const sectionStarted = sectionRect.top < viewportHeight - actionHeight;
-    const sectionContinuesBelowAction = sectionRect.bottom > viewportHeight + actionHeight;
+    const inlineCanTakeOver = inlineRect
+        ? inlineRect.top <= viewportHeight - actionHeight && inlineRect.bottom > 0
+        : false;
+    const sectionStillVisible = sectionRect.bottom > actionHeight;
     const modalOpen = modal && modal.classList.contains("open");
-    const shouldShow = expanded && sectionStarted && sectionContinuesBelowAction && !modalOpen;
+    const shouldShow = expanded && sectionStarted && sectionStillVisible && !inlineCanTakeOver && !modalOpen;
 
     action.classList.toggle("is-visible", shouldShow);
     action.setAttribute("aria-hidden", shouldShow ? "false" : "true");
 
     if (!shouldShow) {
-        action.style.left = "";
-        action.style.width = "";
         return;
     }
 

@@ -1462,7 +1462,15 @@ body {
             bottom: 0;
             left: 16px;
             z-index: 1180;
-            display: none;
+            display: block;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transform: translate3d(0, 10px, 0);
+            transition:
+                opacity 160ms ease,
+                transform 160ms ease,
+                visibility 0s linear 160ms;
             width: calc(100vw - 32px);
             max-width: 900px;
             margin: 0;
@@ -1474,7 +1482,14 @@ body {
         }
 
         .store-add-sticky-action.is-visible {
-            display: block;
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+            transform: translate3d(0, 0, 0);
+            transition:
+                opacity 160ms ease,
+                transform 160ms ease,
+                visibility 0s;
         }
 
         .store-add-sticky-btn {
