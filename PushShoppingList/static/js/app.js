@@ -2394,6 +2394,158 @@ function resolveCookbookOverwritePrompt(shouldOverwrite) {
     }
 }
 
+const COOKBOOK_RECIPE_SEARCH_SESSION_KEY = "cookbook-recipe-search";
+
+function normalizedCookbookSearchText(value) {
+    return String(value || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+}
+
+function cookbookRecipeSearchTerms() {
+    const input = document.getElementById("cookbookRecipeSearchInput");
+    const query = normalizedCookbookSearchText(input ? input.value : "");
+
+    return query ? query.split(/\s+/).filter(Boolean) : [];
+}
+
+function cookbookCardCollapseStorageKey(cookbookId) {
+    return cookbookId ? `cookbook-card-collapse:${cookbookId}` : "";
+}
+
+function updateCookbookCardCollapseDisplay(card) {
+    if (!card) {
+        return;
+    }
+
+    const isStoredCollapsed = card.dataset.cookbookCollapsed === "1";
+    const searchActive = cookbookRecipeSearchTerms().length > 0;
+    const forceOpenForSearch = searchActive && !card.hidden;
+    const isVisuallyCollapsed = isStoredCollapsed && !forceOpenForSearch;
+    const toggle = card.querySelector("[data-cookbook-toggle]");
+    const icon = card.querySelector("[data-cookbook-toggle-icon]");
+
+    card.classList.toggle("cookbook-card-collapsed", isVisuallyCollapsed);
+    card.classList.toggle("cookbook-card-search-open", forceOpenForSearch);
+
+    if (toggle) {
+        toggle.setAttribute("aria-expanded", isVisuallyCollapsed ? "false" : "true");
+    }
+
+    if (icon) {
+        icon.textContent = isVisuallyCollapsed ? "Show v" : "Hide ^";
+    }
+}
+
+function setCookbookCardCollapsed(card, isCollapsed) {
+    if (!card) {
+        return;
+    }
+
+    card.dataset.cookbookCollapsed = isCollapsed ? "1" : "0";
+    updateCookbookCardCollapseDisplay(card);
+}
+
+function restoreCookbookCardCollapseState() {
+    document.querySelectorAll("[data-cookbook-card]").forEach(card => {
+        const storageKey = cookbookCardCollapseStorageKey(card.dataset.cookbookId || "");
+        const savedState = storageKey ? localStorage.getItem(storageKey) : null;
+
+        setCookbookCardCollapsed(card, savedState === "collapsed");
+    });
+}
+
+function toggleCookbookCard(button) {
+    const card = button ? button.closest("[data-cookbook-card]") : null;
+
+    if (!card) {
+        return false;
+    }
+
+    const isCollapsed = card.dataset.cookbookCollapsed === "1";
+    const storageKey = cookbookCardCollapseStorageKey(card.dataset.cookbookId || "");
+    const nextCollapsed = !isCollapsed;
+
+    setCookbookCardCollapsed(card, nextCollapsed);
+
+    if (storageKey) {
+        localStorage.setItem(storageKey, nextCollapsed ? "collapsed" : "expanded");
+    }
+
+    return false;
+}
+
+function recipeCardMatchesCookbookSearch(recipeCard, terms) {
+    if (!terms.length) {
+        return true;
+    }
+
+    const title = recipeCard.dataset.cookbookRecipeName || recipeCard.textContent || "";
+    const text = normalizedCookbookSearchText(title);
+
+    return terms.every(term => text.includes(term));
+}
+
+function setCookbookRecipeSearchValue(value) {
+    try {
+        sessionStorage.setItem(COOKBOOK_RECIPE_SEARCH_SESSION_KEY, value || "");
+    } catch (err) {
+        // Session storage is optional; search still works without persistence.
+    }
+}
+
+function restoreCookbookRecipeSearchValue() {
+    const input = document.getElementById("cookbookRecipeSearchInput");
+
+    if (!input) {
+        return;
+    }
+
+    try {
+        input.value = sessionStorage.getItem(COOKBOOK_RECIPE_SEARCH_SESSION_KEY) || input.value || "";
+    } catch (err) {
+        input.value = input.value || "";
+    }
+}
+
+function applyCookbookRecipeSearch() {
+    const terms = cookbookRecipeSearchTerms();
+    const searchActive = terms.length > 0;
+    const globalEmpty = document.getElementById("cookbookRecipeSearchEmpty");
+    let visibleRecipes = 0;
+
+    document.querySelectorAll("[data-cookbook-card]").forEach(card => {
+        const recipes = Array.from(card.querySelectorAll("[data-cookbook-recipe-card]"));
+        let matchingRecipes = 0;
+
+        recipes.forEach(recipeCard => {
+            const isMatch = recipeCardMatchesCookbookSearch(recipeCard, terms);
+            recipeCard.hidden = !isMatch;
+            recipeCard.classList.toggle("cookbook-recipe-search-hidden", !isMatch);
+
+            if (isMatch) {
+                matchingRecipes += 1;
+            }
+        });
+
+        visibleRecipes += matchingRecipes;
+        card.hidden = searchActive && matchingRecipes === 0;
+        card.classList.toggle("cookbook-card-search-hidden", Boolean(card.hidden));
+
+        const cardEmpty = card.querySelector("[data-cookbook-search-empty]");
+        if (cardEmpty) {
+            cardEmpty.hidden = !searchActive || matchingRecipes > 0;
+        }
+
+        updateCookbookCardCollapseDisplay(card);
+    });
+
+    if (globalEmpty) {
+        globalEmpty.hidden = !searchActive || visibleRecipes > 0;
+    }
+}
+
 function cookbookRecipeCollapseStorageKey(recipeKey) {
     return recipeKey ? `cookbook-recipe-collapse:${recipeKey}` : "";
 }
@@ -2427,7 +2579,7 @@ function restoreCookbookRecipeCollapseState() {
         const storageKey = cookbookRecipeCollapseStorageKey(card.dataset.cookbookRecipeKey || "");
         const savedState = storageKey ? localStorage.getItem(storageKey) : null;
 
-        setCookbookRecipeCollapsed(card, savedState === "collapsed");
+        setCookbookRecipeCollapsed(card, savedState !== "expanded");
     });
 }
 
@@ -2475,9 +2627,21 @@ function bindCookbooks() {
         target.addEventListener("change", updateCookbookMoveButton);
     }
 
+    const searchInput = document.getElementById("cookbookRecipeSearchInput");
+    if (searchInput && searchInput.dataset.cookbookSearchBound !== "1") {
+        searchInput.dataset.cookbookSearchBound = "1";
+        searchInput.addEventListener("input", () => {
+            setCookbookRecipeSearchValue(searchInput.value);
+            applyCookbookRecipeSearch();
+        });
+    }
+
     updateCookbookMoveButton();
     updateCookbookRestoreButton();
+    restoreCookbookCardCollapseState();
     restoreCookbookRecipeCollapseState();
+    restoreCookbookRecipeSearchValue();
+    applyCookbookRecipeSearch();
 }
 
 async function refreshCookbooksMarkup() {
