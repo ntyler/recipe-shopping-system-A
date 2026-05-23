@@ -411,18 +411,29 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("data-cookbook-recipe-toggle", cookbook_template)
         self.assertIn("data-cookbook-restore-checkbox", cookbook_template)
         self.assertIn("restoreCookbookRecipes(event)", cookbook_template)
+        self.assertIn("openCookbookNameEditor(this)", cookbook_template)
+        self.assertIn("cookbookNameEditorModal", cookbook_template)
+        self.assertIn("cookbookOverwriteModal", cookbook_template)
+        self.assertIn("resolveCookbookOverwritePrompt(false)", cookbook_template)
         self.assertIn("openRecipeEditor(this)", cookbook_template)
         self.assertIn("recipe-archive-pdf-btn cookbook-recipe-pdf-btn", cookbook_template)
         self.assertIn("/api/cookbooks/restore_recipes", cookbook_template)
+        self.assertIn("/rename", script)
+        self.assertIn("cookbook_recipe_exists", script)
         self.assertIn("function createCookbook", script)
         self.assertIn("function moveRecipesToCookbook", script)
         self.assertIn("function toggleCookbookRecipeDetails", script)
         self.assertIn("function restoreCookbookRecipes", script)
+        self.assertIn("function promptCookbookOverwrite", script)
+        self.assertIn("function saveCookbookName", script)
         self.assertIn("restoreCookbookRecipeCollapseState", script)
         self.assertIn('replaceSectionFromPage(nextPage, "#editItemsSection")', script)
         self.assertIn("/api/cookbooks/move_recipes", cookbook_template)
         self.assertIn('replaceSectionFromPage(nextPage, "#cookbooksCard")', script)
         self.assertIn(".cookbooks-layout", css)
+        self.assertIn(".cookbook-edit-btn", css)
+        self.assertIn(".cookbook-name-modal-backdrop", css)
+        self.assertIn(".cookbook-overwrite-list", css)
         self.assertIn(".cookbook-restore-btn", css)
         self.assertIn(".cookbook-recipe-details.collapsed", css)
 
@@ -487,6 +498,68 @@ class ProductSelectionServiceTest(unittest.TestCase):
             view = cookbook_service.cookbook_view([])
             baking_view = next(cookbook for cookbook in view["cookbooks"] if cookbook["id"] == "baking")
             self.assertEqual(baking_view["recipes"][0]["sections"]["MISC"][0]["quantity_display"], "2 cans")
+
+    def test_cookbook_move_requires_overwrite_for_existing_target_recipe(self):
+        from PushShoppingList.services import cookbook_service
+
+        with TemporaryDirectory() as temp_dir, patch.object(
+            cookbook_service,
+            "COOKBOOKS_FILE",
+            Path(temp_dir) / "cookbooks.json",
+        ):
+            cookbook_service.create_cookbook("Dinner")
+            cookbook_service.move_recipes_to_cookbook(
+                "dinner",
+                ["https://example.com/chili"],
+                [{"name": "Skillet Chili", "url": "https://example.com/chili"}],
+            )
+
+            with self.assertRaises(cookbook_service.CookbookRecipeConflict) as err:
+                cookbook_service.move_recipes_to_cookbook(
+                    "dinner",
+                    ["https://example.com/chili"],
+                    [{"name": "Updated Chili", "url": "https://example.com/chili"}],
+                )
+
+            self.assertEqual(err.exception.conflicts[0]["name"], "Updated Chili")
+            data = cookbook_service.load_cookbooks()
+            self.assertEqual(data["cookbooks"][0]["recipes"][0]["name"], "Skillet Chili")
+
+            cookbook_service.move_recipes_to_cookbook(
+                "dinner",
+                ["https://example.com/chili"],
+                [{"name": "Updated Chili", "url": "https://example.com/chili"}],
+                overwrite_existing=True,
+            )
+
+            data = cookbook_service.load_cookbooks()
+            self.assertEqual(data["cookbooks"][0]["recipes"][0]["name"], "Updated Chili")
+
+    def test_cookbook_rename_updates_name_without_losing_recipes(self):
+        from PushShoppingList.services import cookbook_service
+
+        with TemporaryDirectory() as temp_dir, patch.object(
+            cookbook_service,
+            "COOKBOOKS_FILE",
+            Path(temp_dir) / "cookbooks.json",
+        ):
+            cookbook_service.create_cookbook("Dinner")
+            cookbook_service.move_recipes_to_cookbook(
+                "dinner",
+                ["https://example.com/chili"],
+                [{"name": "Skillet Chili", "url": "https://example.com/chili"}],
+            )
+
+            cookbook_service.rename_cookbook("dinner", "Weeknight Dinners")
+
+            data = cookbook_service.load_cookbooks()
+            cookbook = data["cookbooks"][0]
+            self.assertEqual(cookbook["id"], "dinner")
+            self.assertEqual(cookbook["name"], "Weeknight Dinners")
+            self.assertEqual(cookbook["recipes"][0]["name"], "Skillet Chili")
+
+            with self.assertRaises(ValueError):
+                cookbook_service.create_cookbook("Weeknight Dinners")
 
     def test_cookbook_restore_adds_recipe_log_and_shopping_items(self):
         from PushShoppingList.routes import main_routes

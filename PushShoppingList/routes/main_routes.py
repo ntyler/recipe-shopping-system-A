@@ -20,10 +20,12 @@ from PushShoppingList.services.food_rules_service import shopping_item_food_rule
 from PushShoppingList.services.cookbook_service import cookbook_view
 from PushShoppingList.services.cookbook_service import create_cookbook
 from PushShoppingList.services.cookbook_service import cookbook_recipes_for_urls
+from PushShoppingList.services.cookbook_service import CookbookRecipeConflict
 from PushShoppingList.services.cookbook_service import delete_cookbook
 from PushShoppingList.services.cookbook_service import move_recipes_to_cookbook
 from PushShoppingList.services.cookbook_service import recipe_ingredients_for_record
 from PushShoppingList.services.cookbook_service import remove_recipe_from_cookbook
+from PushShoppingList.services.cookbook_service import rename_cookbook
 from PushShoppingList.services.home_address_service import load_home_address
 from PushShoppingList.services.home_address_service import save_home_address
 from PushShoppingList.services.home_store_location_service import DEFAULT_STORE_SEARCH_RADIUS_MILES
@@ -978,6 +980,16 @@ def delete_cookbook_route(cookbook_id):
     return jsonify({"ok": True})
 
 
+@main_bp.route("/api/cookbooks/<cookbook_id>/rename", methods=["POST"])
+def rename_cookbook_route(cookbook_id):
+    try:
+        rename_cookbook(cookbook_id, request.form.get("name", ""))
+    except ValueError as err:
+        return jsonify({"ok": False, "error": str(err)}), 400
+
+    return jsonify({"ok": True})
+
+
 @main_bp.route("/api/cookbooks/move_recipes", methods=["POST"])
 def move_cookbook_recipes_route():
     try:
@@ -985,7 +997,15 @@ def move_cookbook_recipes_route():
             request.form.get("cookbook_id", ""),
             request.form.getlist("recipe_urls"),
             recipe_view_rows(recipe_url_rows()),
+            overwrite_existing=request.form.get("overwrite_existing") == "1",
         )
+    except CookbookRecipeConflict as err:
+        return jsonify({
+            "ok": False,
+            "error": str(err),
+            "conflict": "cookbook_recipe_exists",
+            "conflicts": err.conflicts,
+        })
     except ValueError as err:
         return jsonify({"ok": False, "error": str(err)}), 400
 

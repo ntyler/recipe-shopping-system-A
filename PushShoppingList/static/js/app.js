@@ -2327,6 +2327,73 @@ function updateCookbookRestoreButton() {
         : "Add Selected to Recipe Log";
 }
 
+let pendingCookbookOverwriteResolve = null;
+
+function cookbookOverwriteConflictNames(conflicts) {
+    return (Array.isArray(conflicts) ? conflicts : [])
+        .map(conflict => String((conflict && conflict.name) || "").trim())
+        .filter(Boolean);
+}
+
+function cookbookOverwriteMessage(names, cookbookName) {
+    const count = names.length || 1;
+    const recipeLabel = count === 1 ? "recipe" : "recipes";
+    const targetLabel = cookbookName ? ` in ${cookbookName}` : "";
+
+    return `${count} selected ${recipeLabel} already exists${targetLabel}. Overwrite the saved cookbook ${recipeLabel}?`;
+}
+
+function promptCookbookOverwrite(conflicts, cookbookName) {
+    const modal = document.getElementById("cookbookOverwriteModal");
+    const message = document.getElementById("cookbookOverwriteMessage");
+    const list = document.getElementById("cookbookOverwriteList");
+    const names = cookbookOverwriteConflictNames(conflicts);
+
+    if (!modal || !message || !list) {
+        return Promise.resolve(window.confirm(`${cookbookOverwriteMessage(names, cookbookName)}\n\nOK = Overwrite\nCancel = Cancel`));
+    }
+
+    if (pendingCookbookOverwriteResolve) {
+        pendingCookbookOverwriteResolve(false);
+    }
+
+    message.textContent = cookbookOverwriteMessage(names, cookbookName);
+    list.innerHTML = "";
+    names.forEach(name => {
+        const item = document.createElement("li");
+        item.textContent = name;
+        list.appendChild(item);
+    });
+
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+
+    return new Promise(resolve => {
+        pendingCookbookOverwriteResolve = resolve;
+    });
+}
+
+function resolveCookbookOverwritePrompt(shouldOverwrite) {
+    const modal = document.getElementById("cookbookOverwriteModal");
+    const resolve = pendingCookbookOverwriteResolve;
+
+    pendingCookbookOverwriteResolve = null;
+
+    if (modal) {
+        modal.classList.remove("open");
+        modal.setAttribute("aria-hidden", "true");
+    }
+
+    if (!document.querySelector(".cookbook-name-modal-backdrop.open") && !document.querySelector(".store-add-modal-backdrop.open") && !document.querySelector(".store-edit-form.open")) {
+        document.body.classList.remove("modal-open");
+    }
+
+    if (resolve) {
+        resolve(Boolean(shouldOverwrite));
+    }
+}
+
 function cookbookRecipeCollapseStorageKey(recipeKey) {
     return recipeKey ? `cookbook-recipe-collapse:${recipeKey}` : "";
 }
@@ -2450,7 +2517,10 @@ async function submitCookbookForm(form, options = {}) {
     const data = await response.json();
 
     if (!response.ok || !data.ok) {
-        throw new Error((data && data.error) || "Cookbook update failed.");
+        const error = new Error((data && data.error) || "Cookbook update failed.");
+        error.status = response.status;
+        error.data = data;
+        throw error;
     }
 
     return data;
@@ -2510,7 +2580,35 @@ async function moveRecipesToCookbook(event) {
         }
 
         setCookbookStatus("Moving recipes...");
-        await submitCookbookForm(form, { formData });
+        try {
+            await submitCookbookForm(form, { formData });
+        } catch (err) {
+            const isOverwriteConflict = err.data && err.data.conflict === "cookbook_recipe_exists";
+
+            if (!isOverwriteConflict) {
+                throw err;
+            }
+
+            const targetName = target && target.selectedOptions && target.selectedOptions[0]
+                ? target.selectedOptions[0].textContent.trim()
+                : "";
+            const shouldOverwrite = await promptCookbookOverwrite(err.data.conflicts || [], targetName);
+
+            if (!shouldOverwrite) {
+                setCookbookStatus("Move canceled.");
+                return false;
+            }
+
+            formData.set("overwrite_existing", "1");
+
+            if (button) {
+                button.textContent = "Overwriting...";
+            }
+
+            setCookbookStatus("Overwriting recipe...");
+            await submitCookbookForm(form, { formData });
+        }
+
         await refreshCookbooksMarkup();
         showRecipeQuantityUpdatedMessage("", "", "", "Recipes moved.");
     } catch (err) {
@@ -2609,6 +2707,95 @@ async function removeCookbookRecipe(button) {
     } finally {
         button.disabled = false;
         button.textContent = originalText || "Remove";
+    }
+
+    return false;
+}
+
+function setCookbookNameEditorStatus(message, isError = false) {
+    const status = document.getElementById("cookbookNameEditorStatus");
+
+    if (!status) {
+        return;
+    }
+
+    status.textContent = message || "";
+    status.classList.toggle("error", Boolean(isError));
+}
+
+function openCookbookNameEditor(button) {
+    const modal = document.getElementById("cookbookNameEditorModal");
+    const form = document.getElementById("cookbookNameEditorForm");
+    const input = document.getElementById("cookbookNameEditorInput");
+
+    if (!button || !modal || !form || !input) {
+        return false;
+    }
+
+    const cookbookId = button.dataset.cookbookId || "";
+    const cookbookName = button.dataset.cookbookName || "";
+
+    if (!cookbookId) {
+        return false;
+    }
+
+    form.setAttribute("action", `/api/cookbooks/${encodeURIComponent(cookbookId)}/rename`);
+    input.value = cookbookName;
+    setCookbookNameEditorStatus("");
+
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+
+    window.setTimeout(() => {
+        input.focus();
+        input.select();
+    }, 0);
+
+    return false;
+}
+
+function closeCookbookNameEditor() {
+    const modal = document.getElementById("cookbookNameEditorModal");
+
+    if (modal) {
+        modal.classList.remove("open");
+        modal.setAttribute("aria-hidden", "true");
+    }
+
+    setCookbookNameEditorStatus("");
+
+    if (!document.querySelector(".store-add-modal-backdrop.open") && !document.querySelector(".store-edit-form.open")) {
+        document.body.classList.remove("modal-open");
+    }
+}
+
+async function saveCookbookName(event) {
+    event.preventDefault();
+
+    const form = event.currentTarget;
+    const button = form ? form.querySelector(".cookbook-name-save-btn") : null;
+    const originalText = button ? button.textContent : "";
+
+    try {
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Saving...";
+        }
+
+        setCookbookNameEditorStatus("Saving cookbook name...");
+        await submitCookbookForm(form);
+        closeCookbookNameEditor();
+        await refreshCookbooksMarkup();
+        showRecipeQuantityUpdatedMessage("", "", "", "Cookbook name saved.");
+    } catch (err) {
+        console.warn("Unable to rename cookbook.", err);
+        setCookbookNameEditorStatus(err.message || "Unable to save cookbook name.", true);
+    } finally {
+        if (button && button.isConnected) {
+            button.disabled = false;
+            button.textContent = originalText || "Save Name";
+        }
     }
 
     return false;
@@ -6908,6 +7095,20 @@ function closeAddStoreModalFromBackdrop(event) {
 
 function closeAddStoreModalOnEscape(event) {
     if (event.key === "Escape") {
+        const cookbookOverwriteModal = document.getElementById("cookbookOverwriteModal");
+
+        if (cookbookOverwriteModal && cookbookOverwriteModal.classList.contains("open")) {
+            resolveCookbookOverwritePrompt(false);
+            return;
+        }
+
+        const cookbookNameModal = document.getElementById("cookbookNameEditorModal");
+
+        if (cookbookNameModal && cookbookNameModal.classList.contains("open")) {
+            closeCookbookNameEditor();
+            return;
+        }
+
         const storeEditForm = document.querySelector(".store-edit-form.open");
 
         if (storeEditForm) {

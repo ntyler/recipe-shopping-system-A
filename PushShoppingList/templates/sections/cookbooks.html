@@ -116,14 +116,24 @@
                                         <h3>{{ cookbook.name }}</h3>
                                         <span>{{ cookbook.recipes | length }} recipe{% if cookbook.recipes | length != 1 %}s{% endif %}</span>
                                     </div>
-                                    <button type="button"
-                                            class="cookbook-delete-btn"
-                                            data-cookbook-id="{{ cookbook.id }}"
-                                            data-cookbook-name="{{ cookbook.name }}"
-                                            onclick="deleteCookbook(this)"
-                                            aria-label="Delete {{ cookbook.name }}">
-                                        X
-                                    </button>
+                                    <div class="cookbook-card-actions">
+                                        <button type="button"
+                                                class="cookbook-edit-btn"
+                                                data-cookbook-id="{{ cookbook.id }}"
+                                                data-cookbook-name="{{ cookbook.name }}"
+                                                onclick="openCookbookNameEditor(this)"
+                                                aria-label="Edit {{ cookbook.name }}">
+                                            Edit
+                                        </button>
+                                        <button type="button"
+                                                class="cookbook-delete-btn"
+                                                data-cookbook-id="{{ cookbook.id }}"
+                                                data-cookbook-name="{{ cookbook.name }}"
+                                                onclick="deleteCookbook(this)"
+                                                aria-label="Delete {{ cookbook.name }}">
+                                            X
+                                        </button>
+                                    </div>
                                 </div>
 
                                 {% if cookbook.recipes %}
@@ -254,6 +264,76 @@
                     <div class="cookbook-empty">No cookbooks.</div>
                 {% endif %}
             </section>
+        </div>
+    </div>
+
+    <div id="cookbookNameEditorModal"
+         class="cookbook-name-modal-backdrop"
+         aria-hidden="true"
+         onclick="if (event.target === this) closeCookbookNameEditor()">
+        <div class="cookbook-name-modal" role="dialog" aria-modal="true" aria-labelledby="cookbookNameEditorTitle">
+            <div class="cookbook-name-modal-header">
+                <h2 id="cookbookNameEditorTitle">Edit Cookbook Name</h2>
+                <button type="button"
+                        class="cookbook-name-modal-close"
+                        onclick="closeCookbookNameEditor()"
+                        aria-label="Close cookbook name editor">
+                    Close
+                </button>
+            </div>
+            <form id="cookbookNameEditorForm"
+                  action="/api/cookbooks"
+                  method="POST"
+                  onsubmit="return saveCookbookName(event)">
+                <label for="cookbookNameEditorInput">Cookbook name</label>
+                <input id="cookbookNameEditorInput"
+                       type="text"
+                       name="name"
+                       autocomplete="off"
+                       required>
+                <div id="cookbookNameEditorStatus" class="cookbook-name-modal-status" aria-live="polite"></div>
+                <div class="cookbook-name-modal-actions">
+                    <button type="button"
+                            class="cookbook-name-cancel-btn"
+                            onclick="closeCookbookNameEditor()">
+                        Cancel
+                    </button>
+                    <button type="submit" class="cookbook-name-save-btn">Save Name</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="cookbookOverwriteModal"
+         class="cookbook-name-modal-backdrop cookbook-overwrite-modal-backdrop"
+         aria-hidden="true"
+         onclick="if (event.target === this) resolveCookbookOverwritePrompt(false)">
+        <div class="cookbook-name-modal cookbook-overwrite-modal" role="dialog" aria-modal="true" aria-labelledby="cookbookOverwriteTitle">
+            <div class="cookbook-name-modal-header">
+                <h2 id="cookbookOverwriteTitle">Recipe Already Exists</h2>
+                <button type="button"
+                        class="cookbook-name-modal-close"
+                        onclick="resolveCookbookOverwritePrompt(false)"
+                        aria-label="Cancel overwrite">
+                    Close
+                </button>
+            </div>
+            <p id="cookbookOverwriteMessage" class="cookbook-overwrite-message">
+                This recipe already exists in the selected cookbook.
+            </p>
+            <ul id="cookbookOverwriteList" class="cookbook-overwrite-list"></ul>
+            <div class="cookbook-name-modal-actions">
+                <button type="button"
+                        class="cookbook-name-cancel-btn"
+                        onclick="resolveCookbookOverwritePrompt(false)">
+                    Cancel
+                </button>
+                <button type="button"
+                        class="cookbook-overwrite-save-btn"
+                        onclick="resolveCookbookOverwritePrompt(true)">
+                    Overwrite
+                </button>
+            </div>
         </div>
     </div>
 </div>

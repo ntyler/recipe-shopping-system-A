@@ -10,6 +10,14 @@ COOKBOOKS_FILE = BASE_DIR / "cookbooks.json"
 COOKBOOKS_LOCK = threading.RLock()
 
 
+class CookbookRecipeConflict(ValueError):
+    def __init__(self, conflicts):
+        self.conflicts = conflicts
+        count = len(conflicts)
+        recipe_label = "recipe" if count == 1 else "recipes"
+        super().__init__(f"{count} selected {recipe_label} already exists in this cookbook.")
+
+
 def normalize_text(value):
     return " ".join(str(value or "").strip().lower().split())
 
@@ -282,7 +290,29 @@ def delete_cookbook(cookbook_id):
         return save_cookbooks(payload)
 
 
-def move_recipes_to_cookbook(cookbook_id, recipe_urls, recipe_rows=None):
+def rename_cookbook(cookbook_id, name):
+    name = clean_text(name)
+
+    if not name:
+        raise ValueError("Cookbook name is required.")
+
+    with COOKBOOKS_LOCK:
+        payload = load_cookbooks()
+        target = find_cookbook(payload, cookbook_id)
+
+        if target is None:
+            raise ValueError("Cookbook was not found.")
+
+        name_key = normalize_text(name)
+        for cookbook in payload["cookbooks"]:
+            if cookbook.get("id") != cookbook_id and normalize_text(cookbook.get("name")) == name_key:
+                raise ValueError("A cookbook with that name already exists.")
+
+        target["name"] = name
+        return save_cookbooks(payload)
+
+
+def move_recipes_to_cookbook(cookbook_id, recipe_urls, recipe_rows=None, overwrite_existing=False):
     available_recipes = recipe_snapshot_lookup(recipe_rows)
     selected_recipes = []
     selected_keys = set()
@@ -306,6 +336,27 @@ def move_recipes_to_cookbook(cookbook_id, recipe_urls, recipe_rows=None):
 
         if target is None:
             raise ValueError("Choose a cookbook.")
+
+        target_recipes_by_key = {
+            recipe_key(recipe.get("url")): recipe
+            for recipe in target.get("recipes", [])
+            if recipe_key(recipe.get("url"))
+        }
+        conflicts = []
+
+        if not overwrite_existing:
+            for recipe in selected_recipes:
+                key = recipe_key(recipe.get("url"))
+                existing_recipe = target_recipes_by_key.get(key)
+
+                if existing_recipe:
+                    conflicts.append({
+                        "url": recipe.get("url", ""),
+                        "name": recipe.get("name") or existing_recipe.get("name") or recipe.get("url", ""),
+                    })
+
+        if conflicts:
+            raise CookbookRecipeConflict(conflicts)
 
         for cookbook in payload["cookbooks"]:
             cookbook["recipes"] = [
