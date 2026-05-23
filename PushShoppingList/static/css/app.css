@@ -251,6 +251,44 @@ body {
             display: block;
         }
 
+        #storeOptionsSection .store-options-content.collapsed {
+            display: block;
+            height: 0;
+            margin-top: 0;
+            overflow: visible;
+        }
+
+        #storeOptionsSection .store-options-content.collapsed > :not(.store-manager-list):not(#storeEditModalBackdrop) {
+            display: none;
+        }
+
+        #storeOptionsSection .store-options-content.collapsed .store-manager-list {
+            display: block;
+            height: 0;
+            margin: 0;
+            overflow: visible;
+        }
+
+        #storeOptionsSection .store-options-content.collapsed .store-manager-row {
+            display: block;
+            height: 0;
+            margin: 0;
+            padding: 0;
+            border: 0;
+            background: transparent;
+            box-shadow: none;
+            overflow: visible;
+        }
+
+        #storeOptionsSection .store-options-content.collapsed .store-manager-row > :not(.store-edit-form) {
+            display: none;
+        }
+
+        #storeOptionsSection .store-options-content.collapsed .store-edit-form:not(.open),
+        #storeOptionsSection .store-options-content.collapsed #storeEditModalBackdrop:not(.open) {
+            display: none;
+        }
+
         #storeOptionsSection {
             --store-options-sticky-inset: 10px;
         }
@@ -500,7 +538,7 @@ body {
             outline: none;
         }
 
-        body:not(.active-store-activation-mode) .active-store-card.active-store-inactive {
+        body:not(.active-store-activation-mode):not(.active-store-edit-mode) .active-store-card.active-store-inactive {
             display: none;
         }
 
@@ -536,7 +574,9 @@ body {
         }
 
         body.active-store-activation-mode .selected-stores-map-wrap,
-        body.active-store-activation-mode .active-store-empty {
+        body.active-store-activation-mode .active-store-empty,
+        body.active-store-edit-mode .selected-stores-map-wrap,
+        body.active-store-edit-mode .active-store-empty {
             display: none;
         }
 
@@ -546,8 +586,16 @@ body {
             cursor: pointer;
         }
 
+        body.active-store-edit-mode .active-store-card {
+            border-color: rgba(37, 99, 235, 0.45);
+            background: #111b2a;
+            cursor: pointer;
+        }
+
         body.active-store-activation-mode .active-store-card:hover,
-        body.active-store-activation-mode .active-store-card:focus-visible {
+        body.active-store-activation-mode .active-store-card:focus-visible,
+        body.active-store-edit-mode .active-store-card:hover,
+        body.active-store-edit-mode .active-store-card:focus-visible {
             border-color: #14b8a6;
             background: #102522;
         }
@@ -556,17 +604,28 @@ body {
             box-shadow: 0 0 0 2px rgba(20, 184, 166, 0.2);
         }
 
-        body.active-store-activation-mode .active-store-card.active-store-inactive {
+        body.active-store-activation-mode .active-store-card.active-store-inactive,
+        body.active-store-edit-mode .active-store-card.active-store-inactive {
             border-color: #374151;
             background: #151818;
             box-shadow: none;
             opacity: 0.76;
         }
 
-        body.active-store-activation-mode .active-store-card.active-store-inactive .store-logo {
+        body.active-store-activation-mode .active-store-card.active-store-inactive .store-logo,
+        body.active-store-edit-mode .active-store-card.active-store-inactive .store-logo {
             filter: grayscale(0.9);
             opacity: 0.56;
             box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35);
+        }
+
+        body.active-store-edit-mode .active-store-card.active-store-unavailable {
+            color: #e5e7eb;
+        }
+
+        body.active-store-edit-mode .active-store-card.active-store-unavailable .store-logo {
+            filter: none;
+            opacity: 1;
         }
 
         body.active-store-activation-mode .active-store-card.saving {
@@ -594,7 +653,8 @@ body {
             color: #9ca3af;
         }
 
-        body.active-store-activation-mode .active-store-card.active-store-inactive .active-store-name {
+        body.active-store-activation-mode .active-store-card.active-store-inactive .active-store-name,
+        body.active-store-edit-mode .active-store-card.active-store-inactive .active-store-name {
             color: #9ca3af;
         }
 

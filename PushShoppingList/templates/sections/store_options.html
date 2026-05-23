@@ -430,6 +430,13 @@
                         onclick="setActiveStoreIconMode('activation', { persist: true })">
                     Store Selection Mode
                 </button>
+                <button type="button"
+                        class="active-store-mode-toggle"
+                        data-active-store-mode-toggle="edit"
+                        aria-pressed="false"
+                        onclick="setActiveStoreIconMode('edit', { persist: true })">
+                    Edit Mode
+                </button>
             </div>
         </div>
         <div class="active-store-shelf-shell" aria-label="Store carousel">
@@ -460,6 +467,7 @@
                         {% endif %}
                     {% endif %}
                     {% set store_tile_map_title = "Open " ~ store.label ~ " address in Maps" if active_google_maps_url else store_tile_title %}
+                    {% set store_edit_title = "Edit " ~ store.label %}
                     {% if store_enabled and selected_store and selected_store.latitude is defined and selected_store.latitude is not none and selected_store.longitude is defined and selected_store.longitude is not none %}
                         {% set _ = active_store_map_locations.append({
                             "store_key": store_key,
@@ -482,6 +490,7 @@
                        data-store-title="{{ store_tile_title }}"
                        data-map-title="{{ store_tile_map_title }}"
                        data-activation-title="{{ store_activation_title }}"
+                       data-edit-title="{{ store_edit_title }}"
                        target="_blank"
                        rel="noopener noreferrer"
                        onclick="return openActiveStoreIcon(this, event);"

@@ -3022,30 +3022,39 @@ function restoreStoreOptionsDisplaySettings() {
 }
 
 function setActiveStoreIconMode(mode, options = {}) {
-    const allowedModes = new Set(["store", "map", "activation"]);
+    const allowedModes = new Set(["store", "map", "activation", "edit"]);
     const nextMode = allowedModes.has(mode) ? mode : "store";
 
     document.body.classList.toggle("active-store-map-mode", nextMode === "map");
     document.body.classList.toggle("active-store-activation-mode", nextMode === "activation");
+    document.body.classList.toggle("active-store-edit-mode", nextMode === "edit");
     document.querySelectorAll("[data-active-store-mode-toggle]").forEach(button => {
         const active = button.dataset.activeStoreModeToggle === nextMode;
         button.classList.toggle("active", active);
         button.setAttribute("aria-pressed", active ? "true" : "false");
     });
     document.querySelectorAll("[data-active-store-heading-label]").forEach(label => {
-        label.textContent = nextMode === "activation" ? "All stores" : "Active stores";
+        label.textContent = (nextMode === "activation" || nextMode === "edit") ? "All stores" : "Active stores";
     });
     document.querySelectorAll(".active-store-card").forEach(card => {
         const storeTitle = card.dataset.storeTitle || card.getAttribute("title") || "";
         const mapTitle = card.dataset.mapTitle || storeTitle;
         const activationTitle = card.dataset.activationTitle || storeTitle;
-        const title = nextMode === "activation"
+        const editTitle = card.dataset.editTitle || storeTitle;
+        const storeKey = card.dataset.storeKey || "";
+        const title = nextMode === "edit"
+            ? editTitle
+            : (nextMode === "activation"
             ? activationTitle
-            : (nextMode === "map" ? mapTitle : storeTitle);
+            : (nextMode === "map" ? mapTitle : storeTitle));
         const storeUrl = card.dataset.storeUrl || card.getAttribute("href") || "";
 
-        if (storeUrl) {
+        if (nextMode === "edit") {
+            card.setAttribute("href", `#store-edit-${storeKey}`);
+            card.removeAttribute("target");
+        } else if (storeUrl) {
             card.setAttribute("href", storeUrl);
+            card.setAttribute("target", "_blank");
         }
         if (title) {
             card.setAttribute("title", title);
@@ -3075,7 +3084,10 @@ function activeStoreCardName(card) {
 }
 
 function activeStoreCardIsEligibleForSearch(card) {
-    if (document.body.classList.contains("active-store-activation-mode")) {
+    if (
+        document.body.classList.contains("active-store-activation-mode") ||
+        document.body.classList.contains("active-store-edit-mode")
+    ) {
         return true;
     }
 
@@ -3187,6 +3199,15 @@ function restoreStoreOptionsListSort() {
 }
 
 function openActiveStoreIcon(link, event) {
+    if (document.body.classList.contains("active-store-edit-mode")) {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+
+        return openStoreEditModal(`store-edit-${link ? link.dataset.storeKey || "" : ""}`, link);
+    }
+
     if (document.body.classList.contains("active-store-activation-mode")) {
         if (event) {
             event.preventDefault();
