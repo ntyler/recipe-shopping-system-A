@@ -8,6 +8,8 @@
       "original_text": "2 - 2½ cups green enchilada sauce (homemade or canned)",
       "quantity": null,
       "unit": null,
+      "base_quantity": null,
+      "base_unit": null,
       "ingredient": "green enchilada sauce",
       "preparation": "homemade or canned",
       "optional": false,
@@ -19,139 +21,125 @@
       "original_text": "14 ounces young green jackfruit (in brine, not syrup, drained and rinsed)",
       "quantity": "14",
       "unit": "ounces",
+      "base_quantity": "14",
+      "base_unit": "ounces",
       "ingredient": "young green jackfruit",
       "preparation": "in brine, not syrup, drained and rinsed, drained and rinsed)",
       "optional": false,
       "store_section": "MISC",
-      "store_section_order": 19,
-      "base_quantity": "14",
-      "base_unit": "ounces"
+      "store_section_order": 19
     },
     {
       "section": null,
       "original_text": "15 ounces canned white beans (drained and rinsed*)",
       "quantity": "15",
       "unit": "ounces",
+      "base_quantity": "15",
+      "base_unit": "ounces",
       "ingredient": "canned white beans",
       "preparation": "drained and rinsed*",
       "optional": false,
       "store_section": "MISC",
-      "store_section_order": 19,
-      "base_quantity": "15",
-      "base_unit": "ounces"
+      "store_section_order": 19
     },
     {
       "section": null,
       "original_text": "4 ounces cream cheese (room temperature)",
       "quantity": "4",
       "unit": "ounces",
+      "base_quantity": "4",
+      "base_unit": "ounces",
       "ingredient": "cream cheese",
       "preparation": "room temperature",
       "optional": false,
       "store_section": "DAIRY & EGGS",
-      "store_section_order": 3,
-      "base_quantity": "4",
-      "base_unit": "ounces"
+      "store_section_order": 3
     },
     {
       "section": null,
       "original_text": "4 ounces diced green chiles (canned)",
       "quantity": "4",
       "unit": "ounces",
+      "base_quantity": "4",
+      "base_unit": "ounces",
       "ingredient": "green chiles",
       "preparation": "diced, canned",
       "optional": false,
       "store_section": "MISC",
-      "store_section_order": 19,
-      "base_quantity": "4",
-      "base_unit": "ounces"
+      "store_section_order": 19
     },
     {
       "section": null,
       "original_text": "8 ounces Monterey jack cheese (shredded (2 cups))",
       "quantity": "8",
       "unit": "ounces",
-      "ingredient": "Monterey jack cheese )",
+      "base_quantity": "8",
+      "base_unit": "ounces",
+      "ingredient": "Monterey jack cheese",
       "preparation": null,
       "optional": false,
       "store_section": "DAIRY & EGGS",
-      "store_section_order": 3,
-      "base_quantity": "8",
-      "base_unit": "ounces"
+      "store_section_order": 3
     },
     {
       "section": null,
       "original_text": "½ teaspoon ground cumin",
       "quantity": "½",
       "unit": "teaspoon",
+      "base_quantity": "½",
+      "base_unit": "teaspoon",
       "ingredient": "ground cumin",
       "preparation": null,
       "optional": false,
       "store_section": "SPICES & SEASONINGS",
-      "store_section_order": 12,
-      "base_quantity": "½",
-      "base_unit": "teaspoon"
+      "store_section_order": 12
     },
     {
       "section": null,
       "original_text": "⅓ cup Cilantro (roughly chopped)",
       "quantity": "⅓",
       "unit": "cup",
+      "base_quantity": "⅓",
+      "base_unit": "cup",
       "ingredient": "Cilantro",
       "preparation": "chopped, roughly chopped",
       "optional": false,
       "store_section": "PRODUCE",
-      "store_section_order": 1,
-      "base_quantity": "⅓",
-      "base_unit": "cup"
+      "store_section_order": 1
     },
     {
       "section": null,
       "original_text": "½ teaspoon kosher salt",
       "quantity": "½",
       "unit": "teaspoon",
+      "base_quantity": "½",
+      "base_unit": "teaspoon",
       "ingredient": "kosher salt",
       "preparation": null,
       "optional": false,
       "store_section": "SPICES & SEASONINGS",
-      "store_section_order": 12,
-      "base_quantity": "½",
-      "base_unit": "teaspoon"
+      "store_section_order": 12
     },
     {
       "section": null,
       "original_text": "12  flour or corn tortillas (6 inches or so)",
       "quantity": "12",
       "unit": null,
+      "base_quantity": "12",
+      "base_unit": null,
       "ingredient": "flour OR corn tortillas",
       "preparation": null,
       "optional": false,
       "store_section": "BAKING",
-      "store_section_order": 7,
-      "base_quantity": "12"
+      "store_section_order": 7
     }
   ],
   "equipment": [
-    {
-      "name": "cutting board",
-      "category": "prep"
-    },
-    {
-      "name": "knife",
-      "category": "prep"
-    },
-    {
-      "name": "mixing bowl",
-      "category": "prep"
-    },
-    {
-      "name": "oven",
-      "category": "appliance"
-    },
-    {
-      "name": "rolling pin",
-      "category": "prep"
-    }
+    "cutting board",
+    "knife",
+    "mixing bowl",
+    "oven",
+    "rolling pin"
   ],
   "instructions": [
     {
@@ -160,9 +148,7 @@
       "instruction": "Preheat oven to 350F. Spread 1 cup of enchilada sauce across the bottom of a 9x13 baking dish. Set aside.",
       "temperature": null,
       "time": null,
-      "equipment_used": [
-        "oven"
-      ]
+      "equipment_used": []
     },
     {
       "section": null,
@@ -170,10 +156,7 @@
       "instruction": "Drain and rinse the jackfruit, then use your hands to break it apart to \"shred\" it. Roughly chop or break apart the firm base; any \"seeds\" are fine to use as they are.",
       "temperature": null,
       "time": null,
-      "equipment_used": [
-        "cutting board",
-        "knife"
-      ]
+      "equipment_used": []
     },
     {
       "section": null,
@@ -181,9 +164,7 @@
       "instruction": "In a large mixing bowl, combine shredded jackfruit, white beans, green chiles, 1 cup shredded cheese, cumin, cilantro, and salt.",
       "temperature": null,
       "time": null,
-      "equipment_used": [
-        "mixing bowl"
-      ]
+      "equipment_used": []
     },
     {
       "section": null,
@@ -199,9 +180,7 @@
       "instruction": "Place a tortilla flat on a work surface, and place approximately ⅓ cup of filling in the center. Take one edge of the tortilla and roll it around the filling. Place the rolled tortilla in the baking dish, seam side down. Continue until all enchiladas are formed.",
       "temperature": null,
       "time": null,
-      "equipment_used": [
-        "rolling pin"
-      ]
+      "equipment_used": []
     },
     {
       "section": null,
@@ -217,9 +196,7 @@
       "instruction": "Bake for 25-30 minutes until bubbly and the cheese is melted. Broil for 1-2 minutes for extra golden cheese. Let the enchiladas rest for 5-10 minutes before serving.",
       "temperature": null,
       "time": null,
-      "equipment_used": [
-        "oven"
-      ]
+      "equipment_used": []
     },
     {
       "section": null,
@@ -237,19 +214,15 @@
     "protein": "22 g",
     "fat": "23 g",
     "saturated_fat": "13 g",
-    "polyunsaturated_fat": null,
-    "monounsaturated_fat": null,
-    "trans_fat": null,
     "cholesterol": "53 mg",
     "sodium": "1863 mg",
-    "potassium": null,
     "fiber": "8 g",
-    "sugar": "11 g",
-    "vitamin_a": null,
-    "vitamin_c": null,
-    "calcium": null,
-    "iron": null,
-    "other": []
+    "sugar": "11 g"
+  },
+  "cover_image": {
+    "url": "https://www.forkinthekitchen.com/wp-content/uploads/2025/04/250402.green_.enchiladas.vegetarian-4473-500x500.jpg",
+    "alt": "Enchiladas Verde with Jackfruit and White Beans (Vegetarian)",
+    "source": "structured_data"
   },
   "scaling": {
     "selected_multiplier": 1.0,

@@ -334,6 +334,13 @@
     "iron": null,
     "other": []
   },
+  "cover_image": {
+    "url": "https://food.fnr.sndimg.com/content/dam/images/food/fullset/2004/4/13/1/sd1e01_homemade_ho_hos.jpg.rend.hgtvcom.1280.1280.suffix/1386101456282.webp",
+    "alt": "Homemade Ho-Hos",
+    "source": "structured_data",
+    "width": 1280,
+    "height": 1280
+  },
   "scaling": {
     "selected_multiplier": 1.0,
     "base_multiplier": 1.0,
