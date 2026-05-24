@@ -3650,6 +3650,79 @@ function showView(viewName) {
     updateViewSwitcherStickyOffset();
 }
 
+function jumpToRecipeViewRecipe(button) {
+    const recipeUrl = button ? button.dataset.recipeUrl || "" : "";
+
+    if (!recipeUrl) {
+        return false;
+    }
+
+    showView("recipe");
+
+    window.setTimeout(() => {
+        const target = document.querySelector(`[data-recipe-view-url="${cssEscape(recipeUrl)}"]`);
+
+        if (!target) {
+            return;
+        }
+
+        const toggle = target.querySelector("[data-recipe-card-toggle]");
+
+        if (toggle && typeof setRecipeCardCollapsed === "function") {
+            setRecipeCardCollapsed(target, toggle, false);
+            localStorage.setItem(`recipe-card-collapsed:${toggle.dataset.recipeCardKey || recipeUrl}`, "0");
+        } else {
+            target.classList.remove("recipe-view-collapsed");
+        }
+
+        scrollRecipeJumpTargetIntoView(target);
+    }, 0);
+
+    return false;
+}
+
+function jumpToCurrentRecipeLog(button) {
+    const recipeUrl = button ? button.dataset.recipeUrl || "" : "";
+
+    if (!recipeUrl) {
+        return false;
+    }
+
+    const content = document.querySelector('[data-collapse-content="recipe-url-log"]');
+
+    if (content && content.classList.contains("collapsed")) {
+        toggleCardCollapse("recipe-url-log");
+    }
+
+    window.setTimeout(() => {
+        const target = document.querySelector(`[data-current-recipe-row][data-recipe-url="${cssEscape(recipeUrl)}"]`)
+            || document.getElementById("currentRecipeUrlLogCard");
+
+        scrollRecipeJumpTargetIntoView(target);
+    }, 0);
+
+    return false;
+}
+
+function scrollRecipeJumpTargetIntoView(target) {
+    if (!target) {
+        return;
+    }
+
+    target.classList.remove("recipe-jump-highlight");
+    void target.offsetWidth;
+    target.classList.add("recipe-jump-highlight");
+    target.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+        inline: "nearest",
+    });
+
+    window.setTimeout(() => {
+        target.classList.remove("recipe-jump-highlight");
+    }, 1400);
+}
+
 function updateViewSwitcherStickyOffset() {
     const switcher = document.getElementById("viewSwitcherSticky");
     const height = switcher ? Math.ceil(switcher.getBoundingClientRect().height) : 0;
@@ -7097,6 +7170,8 @@ function setSectionCollapsed(header, icon, collapsed) {
 }
 
 function bindRecipeDetailToggles() {
+    bindRecipeCardToggles();
+
     document.querySelectorAll(".detail-toggle").forEach(button => {
         const key = button.dataset.detailKey;
         const content = document.querySelector(`[data-detail-content="${cssEscape(key)}"]`);
@@ -7144,6 +7219,33 @@ function bindRecipeDetailToggles() {
             }
         });
     });
+}
+
+function bindRecipeCardToggles() {
+    document.querySelectorAll("[data-recipe-card-toggle]").forEach(button => {
+        const card = button.closest("[data-recipe-view-card]");
+        const key = button.dataset.recipeCardKey || (card ? card.dataset.recipeCardKey : "");
+
+        if (!card || !key || button.dataset.recipeCardToggleBound === "1") {
+            return;
+        }
+
+        button.dataset.recipeCardToggleBound = "1";
+        const collapsed = localStorage.getItem(`recipe-card-collapsed:${key}`) === "1";
+        setRecipeCardCollapsed(card, button, collapsed);
+
+        button.addEventListener("click", () => {
+            const shouldCollapse = !card.classList.contains("recipe-view-collapsed");
+            setRecipeCardCollapsed(card, button, shouldCollapse);
+            localStorage.setItem(`recipe-card-collapsed:${key}`, shouldCollapse ? "1" : "0");
+        });
+    });
+}
+
+function setRecipeCardCollapsed(card, button, collapsed) {
+    card.classList.toggle("recipe-view-collapsed", collapsed);
+    button.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    button.textContent = collapsed ? "Show v" : "Hide ^";
 }
 
 function bindRecipeTaskChecks() {

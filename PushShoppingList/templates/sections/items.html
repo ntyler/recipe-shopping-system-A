@@ -183,10 +183,18 @@
     <h2 class="items-title">Items by Recipe</h2>
     {% if recipe_view_rows %}
         {% for recipe in recipe_view_rows %}
-            <div class="recipe-view-card">
+            <div class="recipe-view-card"
+                 data-recipe-view-card
+                 data-recipe-card-key="{{ recipe.url }}"
+                 data-recipe-view-url="{{ recipe.url }}">
                 <div class="recipe-view-title">
                     <div class="recipe-view-title-main">
-                        Recipe {{ recipe.number }}:
+                        <button type="button"
+                                class="recipe-view-number recipe-jump-link"
+                                data-recipe-url="{{ recipe.url }}"
+                                onclick="return jumpToCurrentRecipeLog(this)">
+                            Recipe {{ recipe.number }}:
+                        </button>
                         <a href="{{ recipe.source_href }}"
                            target="_blank"
                            rel="noopener noreferrer"
@@ -203,6 +211,13 @@
                                 Food Review ({{ recipe.food_rule_status.count }})
                             </button>
                         {% endif %}
+                        <button type="button"
+                                class="recipe-view-collapse-btn"
+                                data-recipe-card-toggle
+                                data-recipe-card-key="{{ recipe.url }}"
+                                aria-expanded="true">
+                            Hide ^
+                        </button>
                         <button type="button"
                                 class="edit-recipe-btn recipe-view-edit-btn"
                                 data-recipe-url="{{ recipe.url }}"
