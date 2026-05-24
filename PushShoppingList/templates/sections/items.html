@@ -203,6 +203,13 @@
                                 Food Review ({{ recipe.food_rule_status.count }})
                             </button>
                         {% endif %}
+                        <button type="button"
+                                class="edit-recipe-btn recipe-view-edit-btn"
+                                data-recipe-url="{{ recipe.url }}"
+                                aria-label="Edit {{ recipe.name }}"
+                                onclick="openRecipeEditor(this)">
+                            Edit
+                        </button>
                         {% if recipe.archive_pdf_available %}
                             <a class="recipe-archive-pdf-btn recipe-url-summary-pdf recipe-view-pdf-btn"
                                href="{{ url_for('recipe_bp.recipe_archive_pdf_route', url=recipe.url) }}"
