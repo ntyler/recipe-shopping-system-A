@@ -3474,6 +3474,163 @@ function restoreViewBehaviorSettings() {
     showView(localStorage.getItem("shopping-view") || "section");
 }
 
+const SCREEN_PREVIEW_MODE_KEY = "screen-preview-mode";
+const SCREEN_PREVIEW_WIDTH_KEY = "screen-preview-custom-width";
+const SCREEN_PREVIEW_HEIGHT_KEY = "screen-preview-custom-height";
+const SCREEN_PREVIEW_DEFAULTS = {
+    live: { label: "Live", width: 0, height: 0 },
+    phone: { label: "Phone", width: 390, height: 844 },
+    computer: { label: "Computer", width: 1280, height: 900 },
+    custom: { label: "Custom", width: 430, height: 860 },
+};
+
+function isScreenPreviewFrame() {
+    return new URLSearchParams(window.location.search).get("screen_preview_frame") === "1";
+}
+
+function restoreScreenSettings() {
+    if (isScreenPreviewFrame()) {
+        document.body.classList.add("screen-preview-frame-page");
+        return;
+    }
+
+    const customWidth = screenPreviewStoredNumber(SCREEN_PREVIEW_WIDTH_KEY, SCREEN_PREVIEW_DEFAULTS.custom.width);
+    const customHeight = screenPreviewStoredNumber(SCREEN_PREVIEW_HEIGHT_KEY, SCREEN_PREVIEW_DEFAULTS.custom.height);
+    const widthInput = document.getElementById("screenCustomWidth");
+    const heightInput = document.getElementById("screenCustomHeight");
+
+    if (widthInput) {
+        widthInput.value = String(customWidth);
+    }
+
+    if (heightInput) {
+        heightInput.value = String(customHeight);
+    }
+
+    setScreenPreviewMode(localStorage.getItem(SCREEN_PREVIEW_MODE_KEY) || "live", { persist: false });
+}
+
+function screenPreviewStoredNumber(key, fallback) {
+    return clampScreenPreviewNumber(localStorage.getItem(key), fallback);
+}
+
+function clampScreenPreviewNumber(value, fallback) {
+    const parsed = Number.parseInt(value, 10);
+
+    if (!Number.isFinite(parsed)) {
+        return fallback;
+    }
+
+    return Math.max(320, Math.min(1920, parsed));
+}
+
+function screenPreviewDimensions(mode) {
+    const normalizedMode = screenPreviewMode(mode);
+
+    if (normalizedMode === "custom") {
+        return {
+            ...SCREEN_PREVIEW_DEFAULTS.custom,
+            width: screenPreviewStoredNumber(SCREEN_PREVIEW_WIDTH_KEY, SCREEN_PREVIEW_DEFAULTS.custom.width),
+            height: Math.max(480, Math.min(1400, screenPreviewStoredNumber(
+                SCREEN_PREVIEW_HEIGHT_KEY,
+                SCREEN_PREVIEW_DEFAULTS.custom.height
+            ))),
+        };
+    }
+
+    return SCREEN_PREVIEW_DEFAULTS[normalizedMode] || SCREEN_PREVIEW_DEFAULTS.live;
+}
+
+function screenPreviewMode(mode) {
+    return Object.prototype.hasOwnProperty.call(SCREEN_PREVIEW_DEFAULTS, mode) ? mode : "live";
+}
+
+function setScreenPreviewMode(mode, options = {}) {
+    const normalizedMode = screenPreviewMode(mode);
+    const isLive = normalizedMode === "live";
+    const dimensions = screenPreviewDimensions(normalizedMode);
+    const stage = document.getElementById("screenPreviewStage");
+    const frame = document.getElementById("screenPreviewFrame");
+    const label = document.getElementById("screenPreviewLabel");
+    const size = document.getElementById("screenPreviewSize");
+
+    document.body.classList.toggle("screen-preview-active", !isLive);
+    document.body.dataset.screenPreviewMode = normalizedMode;
+    document.querySelectorAll("[data-screen-mode-button]").forEach(button => {
+        const active = button.dataset.screenModeButton === normalizedMode;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+
+    if (stage) {
+        stage.hidden = isLive;
+    }
+
+    if (label) {
+        label.textContent = dimensions.label;
+    }
+
+    if (size) {
+        size.textContent = isLive ? "Auto" : `${dimensions.width} x ${dimensions.height}`;
+    }
+
+    document.documentElement.style.setProperty("--screen-preview-width", `${Math.max(1, dimensions.width)}px`);
+    document.documentElement.style.setProperty("--screen-preview-height", `${Math.max(1, dimensions.height)}px`);
+
+    if (!isLive && frame) {
+        const previewUrl = screenPreviewUrl();
+        if (frame.dataset.previewSrc !== previewUrl) {
+            frame.src = previewUrl;
+            frame.dataset.previewSrc = previewUrl;
+        }
+    }
+
+    if (options.persist !== false) {
+        localStorage.setItem(SCREEN_PREVIEW_MODE_KEY, normalizedMode);
+    }
+
+    window.setTimeout(updateAddStoreStickyVisibility, 80);
+}
+
+function screenPreviewUrl() {
+    const url = new URL(window.location.href);
+    url.searchParams.set("screen_preview_frame", "1");
+    return url.toString();
+}
+
+function applyCustomScreenPreview() {
+    const widthInput = document.getElementById("screenCustomWidth");
+    const heightInput = document.getElementById("screenCustomHeight");
+    const width = clampScreenPreviewNumber(widthInput ? widthInput.value : "", SCREEN_PREVIEW_DEFAULTS.custom.width);
+    const height = Math.max(480, Math.min(1400, clampScreenPreviewNumber(
+        heightInput ? heightInput.value : "",
+        SCREEN_PREVIEW_DEFAULTS.custom.height
+    )));
+
+    localStorage.setItem(SCREEN_PREVIEW_WIDTH_KEY, String(width));
+    localStorage.setItem(SCREEN_PREVIEW_HEIGHT_KEY, String(height));
+
+    if (widthInput) {
+        widthInput.value = String(width);
+    }
+
+    if (heightInput) {
+        heightInput.value = String(height);
+    }
+
+    setScreenPreviewMode("custom");
+}
+
+function refreshScreenPreview() {
+    const frame = document.getElementById("screenPreviewFrame");
+    const stage = document.getElementById("screenPreviewStage");
+
+    if (frame && stage && !stage.hidden) {
+        frame.src = screenPreviewUrl();
+        frame.dataset.previewSrc = frame.src;
+    }
+}
+
 function storeOptionsDisplayBodyClass(kind) {
     return kind === "maps" ? "store-maps-hidden" : "store-addresses-hidden";
 }
@@ -7872,6 +8029,7 @@ async function refreshStoreMarkup(options = {}) {
     bindSectionHeaderToggles();
     bindRecipeDetailToggles();
     bindRecipeTaskChecks();
+    decorateRecipeCoverImages();
     updateViewSwitcherStickyOffset();
     restoreStoreOptionsDisplaySettings();
     restoreActiveStoreIconMode();
@@ -7904,6 +8062,119 @@ function replaceSectionFromPage(nextPage, selector) {
     return false;
 }
 
+function ensureRecipeImageLightbox() {
+    let lightbox = document.getElementById("recipeImageLightbox");
+
+    if (lightbox) {
+        return lightbox;
+    }
+
+    lightbox = document.createElement("div");
+    lightbox.id = "recipeImageLightbox";
+    lightbox.className = "recipe-image-lightbox";
+    lightbox.setAttribute("aria-hidden", "true");
+    lightbox.innerHTML = `
+        <div class="recipe-image-lightbox-content"
+             role="dialog"
+             aria-modal="true"
+             aria-label="Enlarged recipe image">
+            <button type="button"
+                    class="recipe-image-lightbox-close"
+                    onclick="closeRecipeImageLightbox()">Close</button>
+            <img id="recipeImageLightboxImage" alt="">
+        </div>
+    `;
+    lightbox.addEventListener("click", event => {
+        if (
+            event.target === lightbox ||
+            event.target.classList.contains("recipe-image-lightbox-content")
+        ) {
+            closeRecipeImageLightbox();
+        }
+    });
+    document.body.appendChild(lightbox);
+
+    return lightbox;
+}
+
+function openRecipeImageLightbox(image) {
+    if (!image || !image.src) {
+        return;
+    }
+
+    const lightbox = ensureRecipeImageLightbox();
+    const lightboxImage = document.getElementById("recipeImageLightboxImage");
+
+    if (!lightboxImage) {
+        return;
+    }
+
+    lightboxImage.src = image.currentSrc || image.src;
+    lightboxImage.alt = image.alt || "Recipe image";
+    lightbox.classList.add("open");
+    lightbox.setAttribute("aria-hidden", "false");
+    document.body.classList.add("image-lightbox-open");
+
+    const closeButton = lightbox.querySelector(".recipe-image-lightbox-close");
+    if (closeButton) {
+        closeButton.focus({ preventScroll: true });
+    }
+}
+
+function closeRecipeImageLightbox() {
+    const lightbox = document.getElementById("recipeImageLightbox");
+    const lightboxImage = document.getElementById("recipeImageLightboxImage");
+
+    if (!lightbox) {
+        return;
+    }
+
+    lightbox.classList.remove("open");
+    lightbox.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("image-lightbox-open");
+
+    if (lightboxImage) {
+        lightboxImage.removeAttribute("src");
+        lightboxImage.alt = "";
+    }
+}
+
+function handleRecipeCoverImageClick(event) {
+    const image = event.target.closest ? event.target.closest(".recipe-cover-image") : null;
+
+    if (!image) {
+        return;
+    }
+
+    event.preventDefault();
+    openRecipeImageLightbox(image);
+}
+
+function handleRecipeCoverImageKeydown(event) {
+    const image = event.target.closest ? event.target.closest(".recipe-cover-image") : null;
+
+    if (!image || (event.key !== "Enter" && event.key !== " ")) {
+        return;
+    }
+
+    event.preventDefault();
+    openRecipeImageLightbox(image);
+}
+
+function closeRecipeImageLightboxOnEscape(event) {
+    if (event.key === "Escape") {
+        closeRecipeImageLightbox();
+    }
+}
+
+function decorateRecipeCoverImages() {
+    document.querySelectorAll(".recipe-cover-image").forEach(image => {
+        image.tabIndex = 0;
+        image.setAttribute("role", "button");
+        image.setAttribute("aria-label", `Enlarge ${image.alt || "recipe image"}`);
+    });
+}
+
 function buildAddressSummaryFromForm(form) {
     const streetInput = form.querySelector('[name="address_street"]');
     const apartmentInput = form.querySelector('[name="address_apartment"]');
@@ -7930,6 +8201,7 @@ function buildAddressSummaryFromForm(form) {
 
 document.addEventListener("DOMContentLoaded", function () {
     restoreScroll();
+    restoreScreenSettings();
     restoreCardCollapseState();
     restoreOpenStorePanels();
     restoreViewBehaviorSettings();
@@ -7948,7 +8220,10 @@ document.addEventListener("DOMContentLoaded", function () {
     restoreStoreOptionsListSort();
     initStoreLocationMaps();
     startExtractionProgressPolling();
+    document.addEventListener("click", handleRecipeCoverImageClick);
+    document.addEventListener("keydown", handleRecipeCoverImageKeydown);
     document.addEventListener("keydown", closeAddStoreModalOnEscape);
+    document.addEventListener("keydown", closeRecipeImageLightboxOnEscape);
     updateAddStoreStickyVisibility();
 });
 

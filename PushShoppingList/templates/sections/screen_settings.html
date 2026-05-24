@@ -1,0 +1,88 @@
+<section id="screenSettingsCard" class="app-card screen-settings-card">
+    <button type="button"
+            class="card-collapse-toggle screen-settings-toggle"
+            data-collapse-toggle="screen-settings"
+            aria-expanded="true"
+            onclick="toggleCardCollapse('screen-settings')">
+        <span>Screen Settings</span>
+        <span class="card-collapse-icon" data-collapse-icon="screen-settings">Hide ^</span>
+    </button>
+
+    <div class="card-collapse-content screen-settings-content"
+         data-collapse-content="screen-settings"
+         data-collapse-default="expanded"
+         data-collapse-mobile-default="collapsed">
+        <div class="screen-settings-grid">
+            <div class="screen-mode-group" role="group" aria-label="Screen mode">
+                <button type="button"
+                        class="screen-mode-btn active"
+                        data-screen-mode-button="live"
+                        onclick="setScreenPreviewMode('live')">
+                    Live
+                </button>
+                <button type="button"
+                        class="screen-mode-btn"
+                        data-screen-mode-button="phone"
+                        onclick="setScreenPreviewMode('phone')">
+                    Phone
+                </button>
+                <button type="button"
+                        class="screen-mode-btn"
+                        data-screen-mode-button="computer"
+                        onclick="setScreenPreviewMode('computer')">
+                    Computer
+                </button>
+                <button type="button"
+                        class="screen-mode-btn"
+                        data-screen-mode-button="custom"
+                        onclick="setScreenPreviewMode('custom')">
+                    Custom
+                </button>
+            </div>
+
+            <div class="screen-custom-grid">
+                <label for="screenCustomWidth">
+                    <span>Width</span>
+                    <input id="screenCustomWidth"
+                           type="number"
+                           min="320"
+                           max="1920"
+                           step="1"
+                           value="430"
+                           inputmode="numeric"
+                           onchange="applyCustomScreenPreview()">
+                </label>
+                <label for="screenCustomHeight">
+                    <span>Height</span>
+                    <input id="screenCustomHeight"
+                           type="number"
+                           min="480"
+                           max="1400"
+                           step="1"
+                           value="860"
+                           inputmode="numeric"
+                           onchange="applyCustomScreenPreview()">
+                </label>
+                <button type="button"
+                        class="screen-preview-refresh-btn"
+                        onclick="refreshScreenPreview()">
+                    Refresh Preview
+                </button>
+            </div>
+        </div>
+
+        <div id="screenPreviewStage" class="screen-preview-stage" hidden>
+            <div class="screen-preview-toolbar">
+                <span id="screenPreviewLabel">Live</span>
+                <span id="screenPreviewSize">Auto</span>
+            </div>
+            <div class="screen-preview-device-scroll">
+                <div id="screenPreviewDevice" class="screen-preview-device">
+                    <iframe id="screenPreviewFrame"
+                            title="Screen preview"
+                            loading="lazy"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>

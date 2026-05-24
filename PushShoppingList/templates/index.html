@@ -13,6 +13,8 @@
 
 <h1>Shopping List</h1>
 
+{% include "sections/screen_settings.html" %}
+
 {% if message %}
 <div class="message">{{ message }}</div>
 {% endif %}
@@ -21,15 +23,17 @@
 {% include "sections/products_overlay.html" %}
 {% include "sections/item_qty_modal.html" %}
 
-{% include "sections/enter_recipe_links.html" %}
-{% include "sections/edit_items.html" %}
-{% include "sections/current_recipe_url_log.html" %}
-{% include "sections/cookbooks.html" %}
-{% include "sections/rules.html" %}
-{% include "sections/home_address.html" %}
-{% include "sections/store_options.html" %}
-{% include "sections/view_behavior.html" %}
-{% include "sections/items.html" %}
+<main id="appContent" class="app-content">
+    {% include "sections/enter_recipe_links.html" %}
+    {% include "sections/edit_items.html" %}
+    {% include "sections/current_recipe_url_log.html" %}
+    {% include "sections/cookbooks.html" %}
+    {% include "sections/rules.html" %}
+    {% include "sections/home_address.html" %}
+    {% include "sections/store_options.html" %}
+    {% include "sections/view_behavior.html" %}
+    {% include "sections/items.html" %}
+</main>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="{{ url_for('static', filename='js/app.js', v=app_js_version) }}"></script>

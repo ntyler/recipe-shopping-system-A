@@ -695,6 +695,38 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertEqual(cover_image["url"], "https://example.com/covers/finished-dish.jpg")
         self.assertEqual(cover_image["source"], "html_metadata")
 
+    def test_screen_settings_section_is_available_at_top_of_page(self):
+        index_template = Path("PushShoppingList/templates/index.html").read_text(encoding="utf-8")
+        screen_template = Path("PushShoppingList/templates/sections/screen_settings.html").read_text(encoding="utf-8")
+        css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+        script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+
+        self.assertLess(
+            index_template.index('{% include "sections/screen_settings.html" %}'),
+            index_template.index('<main id="appContent"'),
+        )
+        self.assertIn("Screen Settings", screen_template)
+        self.assertIn('data-screen-mode-button="phone"', screen_template)
+        self.assertIn('id="screenPreviewFrame"', screen_template)
+        self.assertIn("body.screen-preview-active #appContent", css)
+        self.assertIn("screen_preview_frame", script)
+        self.assertIn("setScreenPreviewMode", script)
+
+    def test_recipe_cover_images_can_open_lightbox(self):
+        current_recipe_template = Path(
+            "PushShoppingList/templates/sections/current_recipe_url_log.html"
+        ).read_text(encoding="utf-8")
+        cookbook_template = Path("PushShoppingList/templates/sections/cookbooks.html").read_text(encoding="utf-8")
+        css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+        script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+
+        self.assertIn("recipe-cover-image recipe-url-summary-cover", current_recipe_template)
+        self.assertIn("recipe-cover-image cookbook-recipe-cover", cookbook_template)
+        self.assertIn("recipe-image-lightbox", css)
+        self.assertIn("openRecipeImageLightbox", script)
+        self.assertIn("handleRecipeCoverImageClick", script)
+        self.assertIn("decorateRecipeCoverImages", script)
+
     def test_store_radius_toolbar_lives_in_store_options(self):
         home_template = Path("PushShoppingList/templates/sections/home_address.html").read_text(encoding="utf-8")
         store_template = Path("PushShoppingList/templates/sections/store_options.html").read_text(encoding="utf-8")
