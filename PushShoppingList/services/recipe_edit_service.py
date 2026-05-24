@@ -19,6 +19,7 @@ from PushShoppingList.services.recipe_extract_service import normalize_recipe_sc
 from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_path
 from PushShoppingList.services.recipe_extract_service import safe_filename
 from PushShoppingList.services.recipe_extract_service import write_recipe_page_pdf
+from PushShoppingList.services.purchase_mapping_service import apply_purchase_mapping_to_ingredient
 from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
 from PushShoppingList.services.recipe_ingredient_service import recipe_ingredients_for_key
 from PushShoppingList.services.recipe_ingredient_service import remove_unused_ingredients_from_shopping_list
@@ -589,11 +590,12 @@ def normalize_edit_ingredients(ingredients):
     if not isinstance(ingredients, list):
         return []
 
-    return [
-        {
+    rows = [
+        apply_purchase_mapping_to_ingredient({
             "section": item.get("section") or "",
             "original_text": item.get("original_text") or "",
             "quantity": item.get("quantity") or "",
+            "recipe_qty": item.get("recipe_qty") or item.get("quantity") or "",
             "unit": item.get("unit") or "",
             "base_quantity": item.get("base_quantity") or item.get("quantity") or "",
             "base_unit": item.get("base_unit") or item.get("unit") or "",
@@ -601,10 +603,13 @@ def normalize_edit_ingredients(ingredients):
             "preparation": item.get("preparation") or "",
             "optional": bool(item.get("optional")),
             "store_section": item.get("store_section") or classify_store_section(item.get("ingredient") or ""),
-        }
+            "purchasable_item": item.get("purchasable_item") or item.get("buy_as") or "",
+            "purchase_group": item.get("purchase_group") or "",
+        })
         for item in ingredients
         if isinstance(item, dict)
     ]
+    return rows
 
 
 def normalize_text_rows(value):
@@ -706,10 +711,11 @@ def sanitize_ingredients(value):
         base_quantity = nullable_string(item.get("base_quantity"))
         base_unit = nullable_string(item.get("base_unit"))
 
-        ingredients.append({
+        row = {
             "section": nullable_string(item.get("section")),
             "original_text": original_text,
             "quantity": nullable_string(item.get("quantity")),
+            "recipe_qty": nullable_string(item.get("recipe_qty") or item.get("quantity")),
             "unit": nullable_string(item.get("unit")),
             "base_quantity": base_quantity or nullable_string(item.get("quantity")),
             "base_unit": base_unit or nullable_string(item.get("unit")),
@@ -718,7 +724,10 @@ def sanitize_ingredients(value):
             "optional": bool(item.get("optional")),
             "store_section": store_section,
             "store_section_order": STORE_SECTION_ORDER.get(store_section, STORE_SECTION_ORDER["MISC"]),
-        })
+            "purchasable_item": nullable_string(item.get("purchasable_item") or item.get("buy_as")),
+            "purchase_group": nullable_string(item.get("purchase_group")),
+        }
+        ingredients.append(apply_purchase_mapping_to_ingredient(row))
 
     return ingredients
 

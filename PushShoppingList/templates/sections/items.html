@@ -16,7 +16,12 @@
                 </div>
             {% else %}
                 {% set item_key = normalize(item) %}
+                {% set purchase_mapping = purchase_mappings.get(item_key, {}) if purchase_mappings else {} %}
+                {% set purchasable_item = purchase_mapping.get('purchasable_item', item) %}
+                {% set purchase_group = purchase_mapping.get('purchase_group', purchasable_item) %}
+                {% set purchase_key = purchase_mapping.get('purchase_group_key', item_key) %}
                 {% set state = item_state.get(item_key, {}) %}
+                {% set purchase_state = item_state.get(purchase_key, {}) if purchase_key else state %}
                 {% set food_status = food_rule_status(item) %}
 
                 <div class="row {% if state.get('checked') %}row-checked{% endif %}" data-key="{{ item_key }}">
@@ -32,9 +37,13 @@
                                 <span class="food-rule-marker" title="{{ food_status.marker }}">Food Review</span>
                             {% endif %}
                         </div>
+                        {% if purchasable_item and normalize(purchasable_item) != item_key %}
+                            <div class="source-line item-buy-as-line">Buy as: {{ purchasable_item }}</div>
+                        {% endif %}
                         {% if item_quantities.get(item_key) %}
                             <div class="source-line item-qty-line">{{ item_quantities.get(item_key) }}</div>
                         {% endif %}
+                        {% set product_choice_key = purchase_key %}
                         {% include "sections/product_choice_line.html" %}
                     </div>
 
@@ -43,17 +52,17 @@
                             {% set store = available_stores.get(store_key) %}
                             {% if store %}
                                 <button type="button"
-                                        class="store-btn {% if state.get('store') == store_key %}active{% endif %}"
+                                        class="store-btn {% if purchase_state.get('store') == store_key %}active{% endif %}"
                                         data-store="{{ store_key }}"
                                         data-store-url="{{ store.url }}"
-                                        data-item-key="{{ item_key }}">
+                                        data-item-key="{{ purchase_key }}">
                                     {{ store.label }}
                                 </button>
                             {% endif %}
                         {% endfor %}
 
                         <form method="POST" action="/find_products" class="product-search-form" onsubmit="saveScroll()">
-                            <input type="hidden" name="item" value="{{ item }}">
+                            <input type="hidden" name="item" value="{{ purchase_group }}">
                             <button type="submit" class="product-search-btn">Products</button>
                         </form>
 
@@ -61,6 +70,9 @@
                                 class="edit-qty-btn"
                                 data-item-key="{{ item_key }}"
                                 data-item-name="{{ item }}"
+                                data-buy-as="{{ purchasable_item }}"
+                                data-purchase-group="{{ purchase_group }}"
+                                data-purchase-group-key="{{ purchase_key }}"
                                 data-current-qty="{{ recipe_item_quantities.get(item_key, '') }}"
                                 data-recipe-qty-sources='{{ recipe_item_quantity_sources.get(item_key, [])|tojson }}'
                                 data-manual-qty="{{ state.get('manual_qty', '') }}"
@@ -102,7 +114,12 @@
 
                 {% for item in section["items"] %}
                     {% set item_key = normalize(item) %}
+                    {% set purchase_mapping = purchase_mappings.get(item_key, {}) if purchase_mappings else {} %}
+                    {% set purchasable_item = purchase_mapping.get('purchasable_item', item) %}
+                    {% set purchase_group = purchase_mapping.get('purchase_group', purchasable_item) %}
+                    {% set purchase_key = purchase_mapping.get('purchase_group_key', item_key) %}
                     {% set state = item_state.get(item_key, {}) %}
+                    {% set purchase_state = item_state.get(purchase_key, {}) if purchase_key else state %}
                     {% set food_status = food_rule_status(item) %}
                     <div class="row" data-key="{{ item_key }}">
                         <div class="item">
@@ -113,9 +130,13 @@
                                     <span class="food-rule-marker" title="{{ food_status.marker }}">Food Review</span>
                                 {% endif %}
                             </div>
+                            {% if purchasable_item and normalize(purchasable_item) != item_key %}
+                                <div class="source-line item-buy-as-line">Buy as: {{ purchasable_item }}</div>
+                            {% endif %}
                             {% if item_quantities.get(item_key) %}
                                 <div class="source-line item-qty-line">{{ item_quantities.get(item_key) }}</div>
                             {% endif %}
+                            {% set product_choice_key = purchase_key %}
                             {% include "sections/product_choice_line.html" %}
                         </div>
 
@@ -124,10 +145,10 @@
                                 {% set store = available_stores.get(store_key) %}
                                 {% if store %}
                                     <button type="button"
-                                            class="store-btn {% if state.get('store') == store_key %}active{% endif %}"
+                                            class="store-btn {% if purchase_state.get('store') == store_key %}active{% endif %}"
                                             data-store="{{ store_key }}"
                                             data-store-url="{{ store.url }}"
-                                            data-item-key="{{ item_key }}">
+                                            data-item-key="{{ purchase_key }}">
                                         {{ store.label }}
                                     </button>
                                 {% endif %}
@@ -137,6 +158,9 @@
                                     class="edit-qty-btn"
                                     data-item-key="{{ item_key }}"
                                     data-item-name="{{ item }}"
+                                    data-buy-as="{{ purchasable_item }}"
+                                    data-purchase-group="{{ purchase_group }}"
+                                    data-purchase-group-key="{{ purchase_key }}"
                                     data-current-qty="{{ recipe_item_quantities.get(item_key, '') }}"
                                     data-recipe-qty-sources='{{ recipe_item_quantity_sources.get(item_key, [])|tojson }}'
                                     data-manual-qty="{{ state.get('manual_qty', '') }}"
@@ -311,7 +335,11 @@
                             {% for recipe_item in section_items %}
                                 {% set display_name = recipe_item.display_name or recipe_item.name %}
                                 {% set item_key = normalize(display_name) %}
+                                {% set purchasable_item = recipe_item.purchasable_item or recipe_item.buy_as or display_name %}
+                                {% set purchase_group = recipe_item.purchase_group or purchasable_item %}
+                                {% set purchase_key = recipe_item.purchase_group_key or normalize(purchase_group) %}
                                 {% set state = item_state.get(item_key, {}) %}
+                                {% set purchase_state = item_state.get(purchase_key, {}) if purchase_key else state %}
                                 {% set food_status = food_rule_status(display_name) %}
 
                                 <div class="row" data-key="{{ item_key }}">
@@ -323,6 +351,9 @@
                                                 <span class="food-rule-marker" title="{{ food_status.marker }}">Food Review</span>
                                             {% endif %}
                                         </div>
+                                        {% if purchasable_item and normalize(purchasable_item) != item_key %}
+                                            <div class="source-line item-buy-as-line">Buy as: {{ purchasable_item }}</div>
+                                        {% endif %}
 
                                         <div class="source-line item-qty-line">
                                             {% if state.get('manual_qty') %}
@@ -341,6 +372,7 @@
                                                 </span>
                                             {% endif %}
                                         </div>
+                                        {% set product_choice_key = purchase_key %}
                                         {% include "sections/product_choice_line.html" %}
                                     </div>
 
@@ -349,17 +381,17 @@
                                             {% set store = available_stores.get(store_key) %}
                                             {% if store %}
                                                 <button type="button"
-                                                        class="store-btn {% if state.get('store') == store_key %}active{% endif %}"
+                                                        class="store-btn {% if purchase_state.get('store') == store_key %}active{% endif %}"
                                                         data-store="{{ store_key }}"
                                                         data-store-url="{{ store.url }}"
-                                                        data-item-key="{{ item_key }}">
+                                                        data-item-key="{{ purchase_key }}">
                                                     {{ store.label }}
                                                 </button>
                                             {% endif %}
                                         {% endfor %}
 
                                         <form method="POST" action="/find_products" class="product-search-form" onsubmit="saveScroll()">
-                                            <input type="hidden" name="item" value="{{ display_name }}">
+                                            <input type="hidden" name="item" value="{{ purchase_group }}">
                                             <button type="submit" class="product-search-btn">Products</button>
                                         </form>
 
@@ -367,6 +399,9 @@
                                                 class="edit-qty-btn"
                                                 data-item-key="{{ item_key }}"
                                                 data-item-name="{{ display_name }}"
+                                                data-buy-as="{{ purchasable_item }}"
+                                                data-purchase-group="{{ purchase_group }}"
+                                                data-purchase-group-key="{{ purchase_key }}"
                                                 data-current-qty="{{ recipe_item.quantity_display or recipe_item.base_display or '' }}"
                                                 data-recipe-qty-sources='{{ [{"label": "Recipe " ~ recipe.number, "ingredient": recipe_item.name or display_name, "default_quantity": recipe_item.base_display or "", "default_quantity_value": recipe_item.base_quantity or "", "default_unit": recipe_item.unit or "", "recipe_number": recipe.number, "recipe_quantity": recipe.quantity, "scaling_options": recipe.scaling_options, "url": recipe.url, "quantity": recipe_item.quantity_display or recipe_item.base_display or ""}]|tojson }}'
                                                 data-manual-qty="{{ state.get('manual_qty', '') }}"

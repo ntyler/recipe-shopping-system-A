@@ -67,6 +67,7 @@ def api_suggest_food_rules_route():
     result = suggest_food_rules_from_prompt(
         data.get("prompt", ""),
         data.get("food_rules"),
+        data.get("section"),
     )
     status = 200 if result.get("ok") else 400
 

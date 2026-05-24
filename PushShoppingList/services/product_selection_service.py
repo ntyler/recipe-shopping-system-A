@@ -31,6 +31,10 @@ from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.home_address_service import load_home_address
 from PushShoppingList.services.item_state_service import load_item_state
 from PushShoppingList.services.item_state_service import save_item_store
+from PushShoppingList.services.purchase_mapping_service import display_quantity_for_purchase_group
+from PushShoppingList.services.purchase_mapping_service import purchase_group_records_for_items
+from PushShoppingList.services.purchase_mapping_service import purchase_mapping_for_item
+from PushShoppingList.services.purchase_mapping_service import purchase_mapping_for_recipe_ingredient
 from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
 from PushShoppingList.services.recipe_quantity_service import format_quantity_display
 from PushShoppingList.services.recipe_quantity_service import load_saved_recipe_output
@@ -359,12 +363,12 @@ def product_worker_count(total_downloads=None):
 
 
 def load_item_quantity_context(items=None):
+    item_state = load_item_state()
     item_keys = {
-        normalize_item_key(item)
+        purchase_mapping_for_item(item, item_state=item_state)["purchase_group_key"]
         for item in (items or load_items())
         if str(item or "").strip() and not is_section_header(item)
     }
-    quantity_values = {}
     quantity_sources = {}
     recipe_meta = load_recipe_ingredients()
 
@@ -388,8 +392,11 @@ def load_item_quantity_context(items=None):
                 continue
 
             item_key = normalize_item_key(name)
+            purchase_mapping = purchase_mapping_for_recipe_ingredient(ingredient, item_state=item_state)
+            purchase_group_key = purchase_mapping["purchase_group_key"]
             if item_keys and item_key not in item_keys:
-                continue
+                if purchase_group_key not in item_keys:
+                    continue
 
             scaled_value = (
                 scaled_ingredients.get(name)
@@ -411,44 +418,68 @@ def load_item_quantity_context(items=None):
             if not display:
                 continue
 
-            quantity_values.setdefault(item_key, []).append(display)
-            quantity_sources.setdefault(item_key, []).append({
+            quantity_sources.setdefault(purchase_group_key, []).append({
                 "label": recipe_label,
                 "ingredient": name,
+                "recipe_ingredient": name,
+                "item_key": item_key,
+                "purchasable_item": purchase_mapping["purchasable_item"],
+                "purchase_group": purchase_mapping["purchase_group"],
+                "purchase_group_key": purchase_group_key,
                 "quantity": display,
                 "recipe_quantity": recipe_quantity,
                 "url": recipe.get("url", ""),
             })
 
-    for item_key, state in load_item_state().items():
+    for item_key, state in item_state.items():
         normalized_key = normalize_item_key(item_key)
-        if item_keys and normalized_key not in item_keys:
+        if not isinstance(state, dict):
             continue
 
-        if not isinstance(state, dict):
+        purchase_mapping = purchase_mapping_for_item(item_key, item_state=item_state)
+        purchase_group_key = purchase_mapping["purchase_group_key"]
+        if item_keys and normalized_key not in item_keys and purchase_group_key not in item_keys:
             continue
 
         manual_qty = clean_text(state.get("manual_qty"))
         if not manual_qty:
             continue
 
-        quantity_values[normalized_key] = [manual_qty]
-        quantity_sources[normalized_key] = [{
+        quantity_sources[purchase_group_key] = [
+            source
+            for source in quantity_sources.get(purchase_group_key, [])
+            if normalize_item_key(source.get("item_key")) != normalized_key
+        ]
+        quantity_sources.setdefault(purchase_group_key, []).append({
             "label": "Manual quantity",
             "ingredient": item_key,
+            "recipe_ingredient": item_key,
+            "item_key": normalized_key,
+            "purchasable_item": purchase_mapping["purchasable_item"],
+            "purchase_group": purchase_mapping["purchase_group"],
+            "purchase_group_key": purchase_group_key,
             "quantity": manual_qty,
             "manual": True,
-        }]
+        })
 
     return {
         item_key: {
-            "display": summarized,
-            "sources": quantity_sources.get(item_key, []),
+            "display": display_quantity_for_purchase_group(summarized, first_purchase_group(sources)),
+            "sources": sources,
         }
-        for item_key, values in quantity_values.items()
-        for summarized in [summarize_quantity_values(values)]
+        for item_key, sources in quantity_sources.items()
+        for summarized in [summarize_quantity_values([source.get("quantity", "") for source in sources])]
         if summarized
     }
+
+
+def first_purchase_group(sources):
+    for source in sources or []:
+        purchase_group = clean_text(source.get("purchase_group"))
+        if purchase_group:
+            return purchase_group
+
+    return ""
 
 
 def quantities_match(left, right):
@@ -1275,7 +1306,13 @@ def hydrate_store_result_best_product(store_result, best, ingredient, viable=Tru
 
 
 def product_choice_for_item(item_key, store_key=None):
-    choice = product_choices_by_item().get(normalize_item_key(item_key), {})
+    item_key = normalize_item_key(item_key)
+    choices = product_choices_by_item()
+    choice = choices.get(item_key, {})
+
+    if not choice:
+        purchase_key = purchase_mapping_for_item(item_key, item_state=load_item_state())["purchase_group_key"]
+        choice = choices.get(purchase_key, {})
 
     if store_key and choice:
         return product_choice_for_store(choice, store_key)
@@ -1419,10 +1456,16 @@ def find_store_result(choice, store_key):
 
 def grab_best_products(items=None, job_id=None):
     shopping_items = items if items is not None else load_items()
-    ingredients = [
+    raw_ingredients = [
         str(item or "").strip()
         for item in shopping_items
         if str(item or "").strip() and not is_section_header(item)
+    ]
+    item_state = load_item_state()
+    purchase_records = purchase_group_records_for_items(raw_ingredients, item_state=item_state)
+    ingredients = [
+        record["purchase_group"]
+        for record in purchase_records
     ]
     store_settings = load_store_settings()
     stores = store_settings.get("stores", {})
@@ -1443,9 +1486,10 @@ def grab_best_products(items=None, job_id=None):
     max_workers = product_worker_count(len(downloads))
     planner_stage = agent_stage(
         "Planner Agent",
-        message="Built ingredient/store search plan from current shopping list.",
+        message="Built purchasable item/store search plan from current shopping list.",
         metadata={
-            "ingredient_count": len(ingredients),
+            "ingredient_count": len(raw_ingredients),
+            "purchase_group_count": len(ingredients),
             "enabled_stores": enabled_stores,
             "download_count": len(downloads),
             "max_workers": max_workers,
@@ -8704,6 +8748,8 @@ def select_product_choice(item_key, product_id, store_key=""):
     product_id = str(product_id or "").strip()
     store_key = str(store_key or "").strip()
     state = load_product_choices()
+    purchase_key = purchase_mapping_for_item(item_key, item_state=load_item_state())["purchase_group_key"]
+    item_key = purchase_key or item_key
     record = state.get("items", {}).get(item_key)
 
     if not record:

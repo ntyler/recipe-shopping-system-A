@@ -34,6 +34,10 @@ from PushShoppingList.services.home_store_location_service import load_nearest_s
 from PushShoppingList.services.home_store_location_service import resolve_nearest_stores_for_home_address
 from PushShoppingList.services.item_state_service import load_item_state
 from PushShoppingList.services.item_state_service import save_item_manual_qty
+from PushShoppingList.services.item_state_service import save_item_purchase_mapping
+from PushShoppingList.services.purchase_mapping_service import purchase_mapping_for_item
+from PushShoppingList.services.purchase_mapping_service import purchase_mapping_for_recipe_ingredient
+from PushShoppingList.services.purchase_mapping_service import purchase_mapping_lookup_for_items
 from PushShoppingList.services.recipe_url_service import recipe_url_rows
 from PushShoppingList.services.recipe_url_service import recipe_url_type
 from PushShoppingList.services.recipe_url_service import add_recipe_urls
@@ -45,6 +49,7 @@ from PushShoppingList.services.recipe_url_service import normalize_recipe_quanti
 from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
 from PushShoppingList.services.recipe_ingredient_service import save_recipe_ingredients
 from PushShoppingList.services.recipe_ingredient_service import save_ingredients_for_recipe
+from PushShoppingList.services.recipe_ingredient_service import update_saved_recipe_purchase_mapping
 from PushShoppingList.services.recipe_quantity_service import ingredient_key
 from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
 from PushShoppingList.services.recipe_extract_service import STORE_SECTION_ORDER
@@ -421,6 +426,10 @@ def recipe_quantity_sources_lookup(recipe_rows):
                 sources.setdefault(key, []).append({
                     "label": recipe_label,
                     "ingredient": str(item.get("name") or display_name).strip(),
+                    "recipe_ingredient": str(item.get("name") or display_name).strip(),
+                    "purchasable_item": str(item.get("purchasable_item") or item.get("buy_as") or display_name).strip(),
+                    "purchase_group": str(item.get("purchase_group") or item.get("purchasable_item") or item.get("buy_as") or display_name).strip(),
+                    "purchase_group_key": str(item.get("purchase_group_key") or key).strip(),
                     "default_quantity": str(item.get("base_display") or "").strip(),
                     "default_quantity_value": str(item.get("base_quantity") or "").strip(),
                     "default_unit": str(item.get("unit") or "").strip(),
@@ -644,9 +653,16 @@ def build_recipe_sections(recipe_data, recipe_quantity=1, scaled_ingredients=Non
             base_display = alternative["base_display"]
             quantity_display = alternative["scaled_display"] if not multipliers_match(recipe_quantity, 1) else alternative["base_display"]
 
+        purchase_mapping = purchase_mapping_for_recipe_ingredient(ingredient)
+
         sections[section].append({
             "name": name,
             "display_name": display_name,
+            "purchasable_item": purchase_mapping["purchasable_item"],
+            "buy_as": purchase_mapping["buy_as"],
+            "purchase_group": purchase_mapping["purchase_group"],
+            "purchase_group_key": purchase_mapping["purchase_group_key"],
+            "purchase_is_mapped": purchase_mapping["is_mapped"],
             "quantity": ingredient.get("quantity"),
             "base_quantity": ingredient.get("quantity"),
             "scaled_quantity": scaled_quantity or fallback_quantity,
@@ -896,7 +912,10 @@ def build_store_view(items, item_state, available_stores, enabled_stores):
     buckets["unselected"] = {}
 
     for item, section in item_sections.items():
-        selected_store = item_state.get(normalize(item), {}).get("store")
+        purchase_mapping = purchase_mapping_for_item(item, item_state=item_state)
+        purchase_state = item_state.get(purchase_mapping["purchase_group_key"], {})
+        item_specific_state = item_state.get(normalize(item), {})
+        selected_store = purchase_state.get("store") or item_specific_state.get("store")
         bucket_key = selected_store if selected_store in store_keys else "unselected"
         buckets[bucket_key].setdefault(section, []).append(item)
 
@@ -937,6 +956,7 @@ def index():
     recipe_rows = recipe_view_rows(recipe_urls)
     product_choices = product_choices_by_item()
     nearest_store_results = load_nearest_store_results()
+    purchase_mappings = purchase_mapping_lookup_for_items(shopping_items_only(items), item_state)
     recipe_item_quantities = recipe_quantity_lookup(recipe_rows)
     recipe_item_quantity_sources = recipe_quantity_sources_lookup(recipe_rows)
     item_quantities = apply_manual_item_quantities(
@@ -960,6 +980,7 @@ def index():
         available_stores=store_settings["stores"],
         enabled_stores=store_settings["enabled_stores"],
         shopping_items=shopping_items_only(items),
+        purchase_mappings=purchase_mappings,
         item_state=item_state,
         item_quantities=item_quantities,
         recipe_item_quantities=recipe_item_quantities,
@@ -1664,18 +1685,25 @@ def abbreviate_us_state(state):
 def save_item_qty_route():
     item_key = normalize(request.form.get("item_key", ""))
     manual_qty = str(request.form.get("manual_qty", "") or "").strip()
+    purchasable_item = str(request.form.get("purchasable_item", "") or "").strip()
 
     if item_key:
         save_item_manual_qty(item_key, manual_qty)
+        save_item_purchase_mapping(item_key, purchasable_item)
+        update_saved_recipe_purchase_mapping(item_key, purchasable_item)
 
     if (
         request.headers.get("X-Requested-With") == "fetch"
         or request.form.get("ajax") == "1"
     ):
+        purchase_mapping = purchase_mapping_for_item(item_key, item_state=load_item_state())
         return jsonify({
             "ok": True,
             "item_key": item_key,
             "manual_qty": manual_qty,
+            "purchasable_item": purchase_mapping["purchasable_item"],
+            "purchase_group": purchase_mapping["purchase_group"],
+            "purchase_group_key": purchase_mapping["purchase_group_key"],
         })
 
     return redirect("/")

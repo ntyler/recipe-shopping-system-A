@@ -72,6 +72,7 @@ def update_recipe_ingredient_quantity(url, ingredient_name, quantity, unit):
             continue
 
         item["quantity"] = quantity or None
+        item["recipe_qty"] = quantity or None
         item["unit"] = unit or None
         updated_item = item
         break

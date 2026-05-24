@@ -1868,7 +1868,7 @@ async function addFoodRestrictionsWithChatGPT(button) {
         }
 
         await refreshStoreMarkup({ cacheBust: true });
-        showRecipeQuantityUpdatedMessage("", "", "", "Food restrictions added.");
+        showRecipeQuantityUpdatedMessage("", "", "", data.message || "Food restrictions added.");
     } catch (err) {
         console.warn("Unable to add food restrictions with ChatGPT.", err);
         setFoodRestrictionsStatus(err.message || "Unable to add food restrictions.", true);
@@ -2097,14 +2097,44 @@ function renderRulesFoodRestrictionsEditor(container, foodRules) {
         <section class="rules-editor-section">
             <div class="rules-editor-section-heading">
                 <h3>Required</h3>
-                <button type="button" class="rules-editor-small-btn" onclick="addRulesFoodRuleRow('require')">Add Required</button>
+                <div class="rules-editor-food-heading-actions">
+                    <div class="rules-editor-food-ai">
+                        <input type="text"
+                               data-rules-food-prompt="require"
+                               aria-label="Ask ChatGPT to add a required food rule"
+                               placeholder="Required prompt"
+                               onkeydown="return submitRulesFoodRulePrompt(event, 'require', this)">
+                        <button type="button"
+                                class="rules-editor-small-btn rules-editor-ai-btn"
+                                data-rules-food-ai-button
+                                onclick="suggestRulesFoodRule('require', this)">
+                            Ask ChatGPT
+                        </button>
+                    </div>
+                    <button type="button" class="rules-editor-small-btn" onclick="addRulesFoodRuleRow('require')">Add Required</button>
+                </div>
             </div>
             <div id="rulesFoodRequireRows" class="rules-editor-row-list" data-rules-food-list="require"></div>
         </section>
         <section class="rules-editor-section">
             <div class="rules-editor-section-heading">
                 <h3>Avoid</h3>
-                <button type="button" class="rules-editor-small-btn" onclick="addRulesFoodRuleRow('avoid')">Add Avoid</button>
+                <div class="rules-editor-food-heading-actions">
+                    <div class="rules-editor-food-ai">
+                        <input type="text"
+                               data-rules-food-prompt="avoid"
+                               aria-label="Ask ChatGPT to add an avoid food rule"
+                               placeholder="Avoid prompt"
+                               onkeydown="return submitRulesFoodRulePrompt(event, 'avoid', this)">
+                        <button type="button"
+                                class="rules-editor-small-btn rules-editor-ai-btn"
+                                data-rules-food-ai-button
+                                onclick="suggestRulesFoodRule('avoid', this)">
+                            Ask ChatGPT
+                        </button>
+                    </div>
+                    <button type="button" class="rules-editor-small-btn" onclick="addRulesFoodRuleRow('avoid')">Add Avoid</button>
+                </div>
             </div>
             <div id="rulesFoodAvoidRows" class="rules-editor-row-list" data-rules-food-list="avoid"></div>
         </section>
@@ -2112,6 +2142,103 @@ function renderRulesFoodRestrictionsEditor(container, foodRules) {
 
     (foodRules.require || []).forEach(rule => addRulesFoodRuleRow("require", rule));
     (foodRules.avoid || []).forEach(rule => addRulesFoodRuleRow("avoid", rule));
+}
+
+function submitRulesFoodRulePrompt(event, section, input) {
+    if (!event || event.key !== "Enter") {
+        return true;
+    }
+
+    event.preventDefault();
+    const wrapper = input ? input.closest(".rules-editor-food-ai") : null;
+    const button = wrapper ? wrapper.querySelector("[data-rules-food-ai-button]") : null;
+    suggestRulesFoodRule(section, button);
+    return false;
+}
+
+async function suggestRulesFoodRule(section, button) {
+    const promptInput = document.querySelector(`[data-rules-food-prompt="${section}"]`);
+    const prompt = promptInput ? promptInput.value.trim() : "";
+    const originalText = button ? button.textContent : "";
+    const sectionLabel = section === "require" ? "required" : "avoid";
+
+    if (!prompt) {
+        setRulesEditorStatus(`Enter a ${sectionLabel} food rule prompt.`, true);
+        if (promptInput) {
+            promptInput.focus();
+        }
+        return false;
+    }
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Asking...";
+    }
+
+    setRulesEditorStatus("Asking ChatGPT...");
+
+    try {
+        const response = await fetch("/api/food_rules/suggest", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "fetch",
+            },
+            body: JSON.stringify({
+                prompt: rulesFoodSuggestionPrompt(prompt, section),
+                section,
+                food_rules: collectRulesFoodRestrictions(),
+            }),
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to add food restrictions.");
+        }
+
+        const incomingRules = data.added || data.food_rules || { require: [], avoid: [] };
+        const changes = mergeRulesFoodRulesIntoEditor(incomingRules);
+        updateRulesEditorFoodData(data.food_rules || collectRulesFoodRestrictions());
+
+        if (promptInput) {
+            promptInput.value = "";
+        }
+
+        if (changes.added || changes.updated) {
+            const parts = [];
+            if (changes.added) {
+                parts.push(`${changes.added} added`);
+            }
+            if (changes.updated) {
+                parts.push(`${changes.updated} updated`);
+            }
+            setRulesEditorStatus(`ChatGPT food rules ${parts.join(", ")}.`);
+        } else {
+            setRulesEditorStatus(data.message || "No food restriction updates were needed.");
+        }
+    } catch (err) {
+        console.warn("Unable to add rules food restriction with ChatGPT.", err);
+        setRulesEditorStatus(err.message || "Unable to add food restrictions.", true);
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = originalText || "Ask ChatGPT";
+        }
+    }
+
+    return false;
+}
+
+function rulesFoodSuggestionPrompt(prompt, section) {
+    if (section === "require") {
+        return `Add this to the required food rules: ${prompt}`;
+    }
+
+    if (section === "avoid") {
+        return `Add this to the avoid food rules: ${prompt}`;
+    }
+
+    return prompt;
 }
 
 function addRulesFoodRuleRow(section, rule = {}) {
@@ -2144,6 +2271,111 @@ function addRulesFoodRuleRow(section, rule = {}) {
     `;
     list.appendChild(row);
     return false;
+}
+
+function mergeRulesFoodRulesIntoEditor(foodRules) {
+    const changes = {
+        added: 0,
+        updated: 0,
+    };
+    const rules = foodRules || {};
+
+    ["require", "avoid"].forEach(section => {
+        const sectionRules = Array.isArray(rules[section]) ? rules[section] : [];
+        sectionRules.forEach(rule => {
+            const change = upsertRulesFoodRuleRow(section, rule);
+
+            if (change === "added") {
+                changes.added += 1;
+            } else if (change === "updated") {
+                changes.updated += 1;
+            }
+        });
+    });
+
+    return changes;
+}
+
+function upsertRulesFoodRuleRow(section, rule) {
+    const list = document.querySelector(`[data-rules-food-list="${section}"]`);
+    const label = String(rule && rule.label ? rule.label : "").trim();
+    const incomingTerms = Array.isArray(rule && rule.terms)
+        ? splitFoodRestrictionTerms(rule.terms.join(", "))
+        : splitFoodRestrictionTerms(rule && rule.terms ? rule.terms : "");
+
+    if (!list || !label || !incomingTerms.length) {
+        return "";
+    }
+
+    const matchingRow = findMatchingRulesFoodRow(list, label, incomingTerms);
+
+    if (!matchingRow) {
+        addRulesFoodRuleRow(section, {
+            label,
+            terms: incomingTerms,
+        });
+        return "added";
+    }
+
+    const labelInput = matchingRow.querySelector("[data-rules-food-label]");
+    const termsInput = matchingRow.querySelector("[data-rules-food-terms]");
+    const existingTerms = splitFoodRestrictionTerms(termsInput ? termsInput.value : "");
+    const mergedTerms = sortedUniqueFoodTerms(existingTerms.concat(incomingTerms));
+
+    if (labelInput) {
+        labelInput.value = labelInput.value.trim() || label;
+    }
+
+    if (termsInput) {
+        termsInput.value = mergedTerms.join(", ");
+    }
+
+    return "updated";
+}
+
+function findMatchingRulesFoodRow(list, label, terms) {
+    const normalizedLabel = normalizeRulesFoodText(label);
+    const normalizedTerms = sortedUniqueFoodTerms(terms).join("|");
+    const rows = [...list.querySelectorAll("[data-rules-food-row]")];
+
+    return rows.find(row => {
+        const labelInput = row.querySelector("[data-rules-food-label]");
+        const termsInput = row.querySelector("[data-rules-food-terms]");
+        const existingLabel = normalizeRulesFoodText(labelInput ? labelInput.value : "");
+        const existingTerms = sortedUniqueFoodTerms(
+            splitFoodRestrictionTerms(termsInput ? termsInput.value : "")
+        ).join("|");
+
+        return (
+            (normalizedLabel && existingLabel === normalizedLabel) ||
+            (normalizedTerms && existingTerms === normalizedTerms)
+        );
+    });
+}
+
+function sortedUniqueFoodTerms(terms) {
+    return splitFoodRestrictionTerms(Array.isArray(terms) ? terms.join(", ") : terms)
+        .sort((left, right) => left.localeCompare(right));
+}
+
+function normalizeRulesFoodText(value) {
+    return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function updateRulesEditorFoodData(foodRules) {
+    const script = document.getElementById("rulesEditorData");
+
+    if (!script || !foodRules) {
+        return;
+    }
+
+    try {
+        const data = JSON.parse(script.textContent || "{}");
+        data.food_rules = foodRules;
+        script.textContent = JSON.stringify(data);
+    } catch (err) {
+        console.warn("Unable to update rules editor food data.", err);
+    }
 }
 
 function collectRulesTextRows() {
@@ -5108,6 +5340,9 @@ function addRecipeIngredientRow(item = {}) {
         <button type="button" class="recipe-edit-remove-row" aria-label="Remove ingredient" onclick="removeRecipeEditRow(this)">X</button>
         <input type="hidden" data-field="base_quantity" value="${escapeAttribute(baseQuantity || "")}">
         <input type="hidden" data-field="base_unit" value="${escapeAttribute(baseUnit || "")}">
+        <input type="hidden" data-field="recipe_qty" value="${escapeAttribute(item.recipe_qty || item.quantity || "")}">
+        <input type="hidden" data-field="purchasable_item" value="${escapeAttribute(item.purchasable_item || item.buy_as || "")}">
+        <input type="hidden" data-field="purchase_group" value="${escapeAttribute(item.purchase_group || "")}">
     `;
     wrap.appendChild(row);
     bindRecipeIngredientBaseTracking(row);
@@ -5139,9 +5374,14 @@ function updateRecipeIngredientBaseFromManualEdit(row) {
     const unitInput = row.querySelector('[data-field="unit"]');
     const baseQuantityInput = row.querySelector('[data-field="base_quantity"]');
     const baseUnitInput = row.querySelector('[data-field="base_unit"]');
+    const recipeQtyInput = row.querySelector('[data-field="recipe_qty"]');
 
     if (quantityInput && baseQuantityInput) {
         baseQuantityInput.value = quantityInput.value.trim();
+    }
+
+    if (quantityInput && recipeQtyInput) {
+        recipeQtyInput.value = quantityInput.value.trim();
     }
 
     if (unitInput && baseUnitInput) {
@@ -6246,6 +6486,7 @@ function openItemQtyEditor(button) {
     const modal = document.getElementById("itemQtyModal");
     const keyInput = document.getElementById("itemQtyKeyInput");
     const manualInput = document.getElementById("itemQtyManualInput");
+    const buyAsInput = document.getElementById("itemQtyBuyAsInput");
     const nameDisplay = document.getElementById("itemQtyName");
     const titleNameDisplay = document.getElementById("itemQtyTitleName");
     const currentDisplay = document.getElementById("itemQtyCurrent");
@@ -6258,9 +6499,13 @@ function openItemQtyEditor(button) {
     const itemName = button.dataset.itemName || "";
     const currentQty = button.dataset.currentQty || "";
     const manualQty = button.dataset.manualQty || "";
+    const buyAs = button.dataset.buyAs || button.dataset.purchaseGroup || itemName;
 
     keyInput.value = button.dataset.itemKey || "";
     manualInput.value = manualQty;
+    if (buyAsInput) {
+        buyAsInput.value = buyAs;
+    }
     nameDisplay.textContent = itemName;
     if (titleNameDisplay) {
         titleNameDisplay.textContent = itemName ? itemName : "";
@@ -6490,6 +6735,7 @@ function syncOpenItemQtyEditor(itemKey) {
     const sourceButton = document.querySelector(`.edit-qty-btn[data-item-key="${cssEscape(itemKey)}"]`);
     const currentDisplay = document.getElementById("itemQtyCurrent");
     const sourcesDisplay = document.getElementById("itemQtySources");
+    const buyAsInput = document.getElementById("itemQtyBuyAsInput");
 
     if (!sourceButton || !currentDisplay) {
         return;
@@ -6498,6 +6744,9 @@ function syncOpenItemQtyEditor(itemKey) {
     const currentQty = sourceButton.dataset.currentQty || "";
     currentDisplay.textContent = currentQty || "No recipe amount found.";
     currentDisplay.classList.toggle("muted", !currentQty);
+    if (buyAsInput) {
+        buyAsInput.value = sourceButton.dataset.buyAs || sourceButton.dataset.purchaseGroup || sourceButton.dataset.itemName || "";
+    }
     renderItemQtySources(sourcesDisplay, sourceButton.dataset.recipeQtySources, itemKey);
 }
 

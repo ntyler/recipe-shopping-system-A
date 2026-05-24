@@ -12,8 +12,24 @@
             <input type="hidden" id="itemQtyKeyInput" name="item_key">
 
             <div class="item-qty-field">
-                <label>Ingredient</label>
+                <label>Recipe Ingredient</label>
                 <div id="itemQtyName" class="item-qty-readonly"></div>
+            </div>
+
+            <div class="item-qty-field">
+                <label for="itemQtyBuyAsInput">Buy As</label>
+                <input id="itemQtyBuyAsInput"
+                       name="purchasable_item"
+                       type="text"
+                       list="itemQtyBuyAsOptions"
+                       placeholder="e.g. eggs, garlic, parmesan cheese">
+                <datalist id="itemQtyBuyAsOptions">
+                    <option value="eggs"></option>
+                    <option value="garlic"></option>
+                    <option value="butter"></option>
+                    <option value="parmesan cheese"></option>
+                    <option value="lemons"></option>
+                </datalist>
             </div>
 
             <div class="item-qty-field">

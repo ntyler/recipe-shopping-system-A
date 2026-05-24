@@ -20,6 +20,8 @@ import requests
 from bs4 import BeautifulSoup
 from openai import OpenAI
 
+from PushShoppingList.services.purchase_mapping_service import apply_purchase_mapping_to_ingredient
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 PROJECT_DIR = BASE_DIR.parent
@@ -941,6 +943,7 @@ def build_structured_ingredients(raw_ingredients):
             "section": None,
             "original_text": original_text,
             "quantity": parsed["quantity"],
+            "recipe_qty": parsed["quantity"],
             "unit": parsed["unit"],
             "ingredient": ingredient,
             "preparation": parsed["preparation"],
@@ -948,6 +951,7 @@ def build_structured_ingredients(raw_ingredients):
             "store_section": store_section,
             "store_section_order": STORE_SECTION_ORDER[store_section],
         })
+        apply_purchase_mapping_to_ingredient(ingredient_rows[-1])
         seen.add(key)
 
     return ingredient_rows
@@ -4419,6 +4423,7 @@ def normalize_extracted_ingredient_fields(json_data):
             if item.get("base_unit") in (None, "") and item.get("unit") not in (None, ""):
                 item["base_unit"] = item.get("unit")
 
+            apply_purchase_mapping_to_ingredient(item)
             continue
 
         parsed = parse_structured_ingredient_line(original_text)
@@ -4445,6 +4450,8 @@ def normalize_extracted_ingredient_fields(json_data):
 
         if item.get("base_unit") in (None, "") and item.get("unit") not in (None, ""):
             item["base_unit"] = item.get("unit")
+
+        apply_purchase_mapping_to_ingredient(item)
 
 
 def normalize_extracted_equipment_fields(json_data):

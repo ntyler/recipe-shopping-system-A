@@ -6,6 +6,7 @@ from PushShoppingList.services.recipe_extract_service import (
     extract_ingredients_from_result,
     normalize_ingredient_for_shopping_list,
 )
+from PushShoppingList.services.purchase_mapping_service import apply_purchase_mapping_to_ingredient
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
 from PushShoppingList.services.shopping_list_service import load_items
 from PushShoppingList.services.shopping_list_service import save_items
@@ -142,6 +143,58 @@ def unique_ingredients(ingredients):
             seen.add(key)
 
     return unique_items
+
+
+def update_saved_recipe_purchase_mapping(ingredient_name, purchasable_item):
+    target_key = ingredient_key(ingredient_name)
+    changed_paths = []
+
+    if not target_key:
+        return changed_paths
+
+    for json_path in OUTPUT_FOLDER.glob("*.json"):
+        if json_path.name == "sorted_ingredients.json":
+            continue
+
+        try:
+            json_data = json.loads(json_path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+
+        changed = False
+        for item in json_data.get("ingredients", []) or []:
+            if not isinstance(item, dict):
+                continue
+
+            current_name = item.get("ingredient") or item.get("original_text") or ""
+            if ingredient_key(current_name) != target_key:
+                continue
+
+            before = (
+                item.get("purchasable_item"),
+                item.get("purchase_group"),
+                item.get("ingredient"),
+                item.get("original_text"),
+            )
+            apply_purchase_mapping_to_ingredient(item, purchasable_item=purchasable_item)
+            after = (
+                item.get("purchasable_item"),
+                item.get("purchase_group"),
+                item.get("ingredient"),
+                item.get("original_text"),
+            )
+            changed = changed or before != after
+
+        if not changed:
+            continue
+
+        json_path.write_text(
+            json.dumps(json_data, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        changed_paths.append(str(json_path))
+
+    return changed_paths
 
 
 def ingredient_key(text):

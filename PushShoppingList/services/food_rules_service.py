@@ -140,8 +140,9 @@ def update_food_rules(rules):
     return save_food_rules(rules)
 
 
-def suggest_food_rules_from_prompt(prompt, current_rules=None):
+def suggest_food_rules_from_prompt(prompt, current_rules=None, section=None):
     prompt = str(prompt or "").strip()
+    section = normalize_rule_section(section)
 
     if not prompt:
         return {
@@ -170,7 +171,7 @@ def suggest_food_rules_from_prompt(prompt, current_rules=None):
                 },
                 {
                     "role": "user",
-                    "content": build_food_rule_prompt(prompt, current_rules),
+                    "content": build_food_rule_prompt(prompt, current_rules, section),
                 },
             ],
             response_format={"type": "json_object"},
@@ -187,8 +188,10 @@ def suggest_food_rules_from_prompt(prompt, current_rules=None):
 
     if not additions["require"] and not additions["avoid"]:
         return {
-            "ok": False,
-            "error": "ChatGPT did not return any usable food restriction rules.",
+            "ok": True,
+            "food_rules": current_rules,
+            "added": additions,
+            "message": "No food restriction updates were needed.",
         }
 
     merged = merge_food_rules(current_rules, additions)
@@ -198,13 +201,29 @@ def suggest_food_rules_from_prompt(prompt, current_rules=None):
         "ok": True,
         "food_rules": saved,
         "added": additions,
+        "message": "Food restrictions updated.",
     }
 
 
-def build_food_rule_prompt(prompt, current_rules):
+def build_food_rule_prompt(prompt, current_rules, section=None):
+    section = normalize_rule_section(section)
+    section_instruction = ""
+
+    if section == "require":
+        section_instruction = (
+            "\nTarget list: require. Treat the request as something products must have. "
+            "Return require rules unless the user clearly asks to avoid something.\n"
+        )
+    elif section == "avoid":
+        section_instruction = (
+            "\nTarget list: avoid. Treat the request as something products must not contain. "
+            "Return avoid rules unless the user clearly asks for a required quality.\n"
+        )
+
     return f"""
 Add food restriction rules from this user request:
 {prompt}
+{section_instruction}
 
 Existing rules:
 {json.dumps(current_rules, ensure_ascii=False)}
@@ -217,7 +236,8 @@ Rules:
 - Create short labels, for example "no carrageenan" or "must be organic".
 - Terms must be lowercase product-label search terms.
 - Include common label variants and synonyms only when they are directly relevant.
-- Do not duplicate an existing rule.
+- If an existing rule already covers the request, return that existing rule with any useful missing terms.
+- Do not create duplicate rules with different labels for the same terms.
 - Return ONLY valid JSON.
 
 Output shape:
@@ -398,6 +418,18 @@ def merge_food_rule(existing_rules, incoming_rule):
 
 def normalize_rule_label(value):
     return " ".join(str(value or "").strip().lower().split())
+
+
+def normalize_rule_section(value):
+    section = str(value or "").strip().lower()
+
+    if section in {"require", "required", "must_have", "must-have", "must have"}:
+        return "require"
+
+    if section in {"avoid", "avoids", "avoid_rules", "avoid-rules"}:
+        return "avoid"
+
+    return None
 
 
 def normalize_rule_terms(value):

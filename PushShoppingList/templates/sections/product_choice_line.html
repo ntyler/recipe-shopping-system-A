@@ -1,14 +1,15 @@
-{% set product_choice = product_choices.get(item_key, {}) if product_choices else {} %}
+{% set product_choice_lookup_key = product_choice_key if product_choice_key is defined and product_choice_key else item_key %}
+{% set product_choice = product_choices.get(product_choice_lookup_key, {}) if product_choices else {} %}
 {% set selected_product = product_choice.get("selected_product") if product_choice else None %}
 {% set store_product_results = product_choice.get("store_results_list", []) if product_choice else [] %}
 {% if store_product_results %}
     {% for store_result in store_product_results %}
         {% set best_product = store_result.get("best_product") %}
-        <div class="source-line product-link-line best-product-line" data-product-item-key="{{ item_key }}" data-product-store-key="{{ store_result.get("store_key") }}">
+        <div class="source-line product-link-line best-product-line" data-product-item-key="{{ product_choice_lookup_key }}" data-product-store-key="{{ store_result.get("store_key") }}">
             <span class="best-product-store">{{ store_result.get("store_name") }}</span>
             <button type="button"
                     class="product-alternatives-btn"
-                    data-item-key="{{ item_key }}"
+                    data-item-key="{{ product_choice_lookup_key }}"
                     data-store-key="{{ store_result.get("store_key") }}"
                     onclick="openProductAlternatives(this)">
                 Alternatives
@@ -28,7 +29,7 @@
                 {% endif %}
                 <button type="button"
                         class="bulk-prompt-btn bulk-row-prompt-btn best-product-prompt-btn"
-                        data-item-key="{{ item_key }}"
+                        data-item-key="{{ product_choice_lookup_key }}"
                         data-store-key="{{ store_result.get("store_key") }}"
                         data-product-id="{{ best_product.get("id") }}"
                         data-product-name="{{ best_product.get("product_name") }}"
@@ -51,11 +52,11 @@
         </div>
     {% endfor %}
 {% elif selected_product %}
-    <div class="source-line product-link-line best-product-line" data-product-item-key="{{ item_key }}">
+    <div class="source-line product-link-line best-product-line" data-product-item-key="{{ product_choice_lookup_key }}">
         <span class="best-product-store">{{ selected_product.get("store_name") }}</span>
         <button type="button"
                 class="product-alternatives-btn"
-                data-item-key="{{ item_key }}"
+                data-item-key="{{ product_choice_lookup_key }}"
                 data-store-key="{{ selected_product.get("store_key") }}"
                 onclick="openProductAlternatives(this)">
             Alternatives
@@ -74,7 +75,7 @@
         {% endif %}
         <button type="button"
                 class="bulk-prompt-btn bulk-row-prompt-btn best-product-prompt-btn"
-                data-item-key="{{ item_key }}"
+                data-item-key="{{ product_choice_lookup_key }}"
                 data-store-key="{{ selected_product.get("store_key") }}"
                 data-product-id="{{ selected_product.get("id") }}"
                 data-product-name="{{ selected_product.get("product_name") }}"
@@ -93,11 +94,11 @@
         {% endif %}
     </div>
 {% elif product_choice and product_choice.get("skip_reasons") %}
-    <div class="source-line product-link-line best-product-line product-skip-line" data-product-item-key="{{ item_key }}">
+    <div class="source-line product-link-line best-product-line product-skip-line" data-product-item-key="{{ product_choice_lookup_key }}">
         <span>No valid product selected.</span>
         <button type="button"
                 class="product-alternatives-btn"
-                data-item-key="{{ item_key }}"
+                data-item-key="{{ product_choice_lookup_key }}"
                 onclick="openProductAlternatives(this)">
             Alternatives
         </button>
