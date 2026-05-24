@@ -65,7 +65,7 @@
                                 data-recipe-qty-sources='{{ recipe_item_quantity_sources.get(item_key, [])|tojson }}'
                                 data-manual-qty="{{ state.get('manual_qty', '') }}"
                                 onclick="openItemQtyEditor(this)">
-                            EDIT
+                            Edit
                         </button>
                     </div>
                 </div>
@@ -141,7 +141,7 @@
                                     data-recipe-qty-sources='{{ recipe_item_quantity_sources.get(item_key, [])|tojson }}'
                                     data-manual-qty="{{ state.get('manual_qty', '') }}"
                                     onclick="openItemQtyEditor(this)">
-                                EDIT
+                                Edit
                             </button>
                         </div>
                     </div>
@@ -371,7 +371,7 @@
                                                 data-recipe-qty-sources='{{ [{"label": "Recipe " ~ recipe.number, "ingredient": recipe_item.name or display_name, "default_quantity": recipe_item.base_display or "", "default_quantity_value": recipe_item.base_quantity or "", "default_unit": recipe_item.unit or "", "recipe_number": recipe.number, "recipe_quantity": recipe.quantity, "scaling_options": recipe.scaling_options, "url": recipe.url, "quantity": recipe_item.quantity_display or recipe_item.base_display or ""}]|tojson }}'
                                                 data-manual-qty="{{ state.get('manual_qty', '') }}"
                                                 onclick="openItemQtyEditor(this)">
-                                            EDIT
+                                            Edit
                                         </button>
                                     </div>
                                 </div>

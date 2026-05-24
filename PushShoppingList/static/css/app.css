@@ -6885,6 +6885,7 @@ body {
                 flex-wrap: wrap;
                 gap: 8px;
                 align-items: center;
+                position: relative;
             }
 
             #sectionView .row {
@@ -6895,6 +6896,8 @@ body {
             .item {
                 min-width: 0;
                 flex: 1 0 100%;
+                padding-right: 84px;
+                box-sizing: border-box;
             }
 
             .item-actions {
@@ -6919,6 +6922,24 @@ body {
                 padding: 10px 6px;
                 font-size: 15px;
                 text-align: center;
+            }
+
+            .edit-qty-btn {
+                position: absolute;
+                top: 10px;
+                right: 10px;
+                width: 84px;
+                min-width: 84px;
+                max-width: 84px;
+                height: 38px;
+                padding: 8px 10px;
+                background: #155999;
+                color: #fff;
+            }
+
+            .edit-qty-btn:hover,
+            .edit-qty-btn:focus {
+                background: #1f6fbd;
             }
 
             .product-search-form,
