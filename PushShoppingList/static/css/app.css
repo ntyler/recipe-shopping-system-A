@@ -2377,6 +2377,11 @@ body {
             flex: 0 0 auto;
         }
 
+        .recipe-view-cover {
+            width: min(280px, 100%);
+            margin: 2px 0 14px;
+        }
+
         .recipe-view-card.recipe-view-collapsed {
             padding-bottom: 0;
         }

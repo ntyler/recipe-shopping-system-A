@@ -238,6 +238,13 @@
                     </div>
                 </div>
 
+                {% if recipe.cover_image and recipe.cover_image.src %}
+                    <img class="recipe-cover-image recipe-view-cover"
+                         src="{{ recipe.cover_image.src }}"
+                         alt="{{ recipe.cover_image.alt or recipe.name }}"
+                         loading="lazy">
+                {% endif %}
+
                 {% if recipe.base_servings %}
                     <div class="recipe-meta">
                         Servings:
