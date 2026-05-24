@@ -2185,7 +2185,7 @@ async function suggestRulesFoodRule(section, button) {
                 "X-Requested-With": "fetch",
             },
             body: JSON.stringify({
-                prompt: rulesFoodSuggestionPrompt(prompt, section),
+                prompt,
                 section,
                 food_rules: collectRulesFoodRestrictions(),
             }),
@@ -2196,26 +2196,14 @@ async function suggestRulesFoodRule(section, button) {
             throw new Error((data && data.error) || "Unable to add food restrictions.");
         }
 
-        const incomingRules = data.added || data.food_rules || { require: [], avoid: [] };
-        const changes = mergeRulesFoodRulesIntoEditor(incomingRules);
+        mergeRulesFoodRulesIntoEditor(data.added || { require: [], avoid: [] });
         updateRulesEditorFoodData(data.food_rules || collectRulesFoodRestrictions());
 
         if (promptInput) {
             promptInput.value = "";
         }
 
-        if (changes.added || changes.updated) {
-            const parts = [];
-            if (changes.added) {
-                parts.push(`${changes.added} added`);
-            }
-            if (changes.updated) {
-                parts.push(`${changes.updated} updated`);
-            }
-            setRulesEditorStatus(`ChatGPT food rules ${parts.join(", ")}.`);
-        } else {
-            setRulesEditorStatus(data.message || "No food restriction updates were needed.");
-        }
+        setRulesEditorStatus(data.message || rulesFoodChangesMessage(data.changes));
     } catch (err) {
         console.warn("Unable to add rules food restriction with ChatGPT.", err);
         setRulesEditorStatus(err.message || "Unable to add food restrictions.", true);
@@ -2227,18 +2215,6 @@ async function suggestRulesFoodRule(section, button) {
     }
 
     return false;
-}
-
-function rulesFoodSuggestionPrompt(prompt, section) {
-    if (section === "require") {
-        return `Add this to the required food rules: ${prompt}`;
-    }
-
-    if (section === "avoid") {
-        return `Add this to the avoid food rules: ${prompt}`;
-    }
-
-    return prompt;
 }
 
 function addRulesFoodRuleRow(section, rule = {}) {
@@ -2277,6 +2253,7 @@ function mergeRulesFoodRulesIntoEditor(foodRules) {
     const changes = {
         added: 0,
         updated: 0,
+        matched: 0,
     };
     const rules = foodRules || {};
 
@@ -2289,6 +2266,8 @@ function mergeRulesFoodRulesIntoEditor(foodRules) {
                 changes.added += 1;
             } else if (change === "updated") {
                 changes.updated += 1;
+            } else if (change === "matched") {
+                changes.matched += 1;
             }
         });
     });
@@ -2321,6 +2300,7 @@ function upsertRulesFoodRuleRow(section, rule) {
     const termsInput = matchingRow.querySelector("[data-rules-food-terms]");
     const existingTerms = splitFoodRestrictionTerms(termsInput ? termsInput.value : "");
     const mergedTerms = sortedUniqueFoodTerms(existingTerms.concat(incomingTerms));
+    const termsChanged = mergedTerms.join("|") !== sortedUniqueFoodTerms(existingTerms).join("|");
 
     if (labelInput) {
         labelInput.value = labelInput.value.trim() || label;
@@ -2330,7 +2310,29 @@ function upsertRulesFoodRuleRow(section, rule) {
         termsInput.value = mergedTerms.join(", ");
     }
 
-    return "updated";
+    return termsChanged ? "updated" : "matched";
+}
+
+function rulesFoodChangesMessage(changes) {
+    const list = Array.isArray(changes) ? changes : [];
+
+    if (!list.length) {
+        return "ChatGPT did not add or update any food restriction rules.";
+    }
+
+    const first = list[0] || {};
+    const label = first.label || "this rule";
+    const section = first.section === "require" ? "Required" : "Avoid";
+
+    if (first.action === "added") {
+        return `ChatGPT added a new ${section} rule: ${label}.`;
+    }
+
+    if (first.action === "updated_existing") {
+        return `ChatGPT found the existing ${section} rule '${label}' and updated it.`;
+    }
+
+    return `ChatGPT found the existing ${section} rule '${label}' already meets this requirement.`;
 }
 
 function findMatchingRulesFoodRow(list, label, terms) {

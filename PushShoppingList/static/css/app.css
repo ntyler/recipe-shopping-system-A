@@ -381,6 +381,22 @@ body {
             min-width: 0;
         }
 
+        .store-manager-url .store-detail-line {
+            display: grid;
+            grid-template-columns: 112px minmax(0, 1fr);
+            align-items: baseline;
+            gap: 8px;
+            margin-top: 3px;
+        }
+
+        .store-manager-url .store-detail-label {
+            margin-right: 0;
+        }
+
+        .store-manager-url .store-detail-link {
+            justify-self: start;
+        }
+
         .store-options-collapsed-summary {
             display: none;
             margin-top: 12px;
@@ -7240,12 +7256,25 @@ body {
             }
 
             .recipe-url-summary-row {
-                grid-template-columns: 80px minmax(0, 1fr);
+                grid-template-columns: 1fr;
                 align-items: start;
+                gap: 6px;
+            }
+
+            .recipe-url-summary-number {
+                grid-column: 1 / -1;
+                grid-row: 1;
+                align-self: start;
+            }
+
+            .recipe-url-summary-main {
+                grid-column: 1 / -1;
+                grid-row: 2;
             }
 
             .recipe-url-summary-actions {
-                grid-column: 2 / 3;
+                grid-column: 1 / -1;
+                grid-row: 3;
                 justify-self: start;
                 justify-content: flex-start;
                 flex-wrap: wrap;

@@ -187,21 +187,35 @@ def suggest_food_rules_from_prompt(prompt, current_rules=None, section=None):
     additions = normalize_food_rules(data)
 
     if not additions["require"] and not additions["avoid"]:
+        existing_rule = find_existing_food_rule_for_prompt(prompt, current_rules, section)
+
+        if existing_rule:
+            change = food_rule_change("matched_existing", existing_rule["section"], existing_rule["rule"])
+            return {
+                "ok": True,
+                "food_rules": current_rules,
+                "added": additions,
+                "changes": [change],
+                "message": food_rule_suggestion_message([change], prompt, section),
+            }
+
         return {
             "ok": True,
             "food_rules": current_rules,
             "added": additions,
-            "message": "No food restriction updates were needed.",
+            "changes": [],
+            "message": "ChatGPT did not add or update any food restriction rules.",
         }
 
-    merged = merge_food_rules(current_rules, additions)
+    merged, changes = merge_food_rules_with_changes(current_rules, additions)
     saved = save_food_rules(merged)
 
     return {
         "ok": True,
         "food_rules": saved,
         "added": additions,
-        "message": "Food restrictions updated.",
+        "changes": changes,
+        "message": food_rule_suggestion_message(changes, prompt, section),
     }
 
 
@@ -385,35 +399,170 @@ def normalize_food_rules(rules):
 
 
 def merge_food_rules(current_rules, additions):
-    merged = normalize_food_rules(current_rules)
-    additions = normalize_food_rules(additions)
-
-    for section in ("require", "avoid"):
-        for rule in additions[section]:
-            merge_food_rule(merged[section], rule)
-
+    merged, _changes = merge_food_rules_with_changes(current_rules, additions)
     return merged
 
 
-def merge_food_rule(existing_rules, incoming_rule):
+def merge_food_rules_with_changes(current_rules, additions):
+    merged = normalize_food_rules(current_rules)
+    additions = normalize_food_rules(additions)
+    changes = []
+
+    for section in ("require", "avoid"):
+        for rule in additions[section]:
+            change = merge_food_rule(merged[section], rule, section)
+
+            if change:
+                changes.append(change)
+
+    return merged, changes
+
+
+def merge_food_rule(existing_rules, incoming_rule, section=None):
     incoming_label = normalize_rule_label(incoming_rule.get("label"))
     incoming_terms = normalize_rule_terms(incoming_rule.get("terms"))
 
     if not incoming_label or not incoming_terms:
-        return
+        return None
 
     for rule in existing_rules:
         existing_label = normalize_rule_label(rule.get("label"))
         existing_terms = set(normalize_rule_terms(rule.get("terms")))
 
         if existing_label == incoming_label or existing_terms == set(incoming_terms):
+            added_terms = sorted(set(incoming_terms) - existing_terms)
             rule["terms"] = sorted(existing_terms | set(incoming_terms))
-            return
+            action = "updated_existing" if added_terms else "matched_existing"
+            return food_rule_change(action, section, rule, added_terms)
 
-    existing_rules.append({
+    new_rule = {
         "label": incoming_rule["label"],
         "terms": incoming_terms,
-    })
+    }
+    existing_rules.append(new_rule)
+    return food_rule_change("added", section, new_rule)
+
+
+def food_rule_change(action, section, rule, added_terms=None):
+    return {
+        "action": action,
+        "section": normalize_rule_section(section) or section or "",
+        "label": str(rule.get("label", "") or "").strip(),
+        "terms": normalize_rule_terms(rule.get("terms", [])),
+        "added_terms": normalize_rule_terms(added_terms or []),
+    }
+
+
+def food_rule_suggestion_message(changes, prompt="", section=None):
+    changes = relevant_food_rule_changes(changes, prompt, section)
+
+    if not changes:
+        return "ChatGPT did not add or update any food restriction rules."
+
+    if len(changes) == 1:
+        change = changes[0]
+        section_label = food_rule_section_label(change.get("section"))
+        label = change.get("label") or "unnamed rule"
+
+        if change.get("action") == "added":
+            return f"ChatGPT added a new {section_label} rule: {label}."
+
+        if change.get("action") == "updated_existing":
+            added_terms = change.get("added_terms") or []
+            terms_text = f" Added terms: {', '.join(added_terms)}." if added_terms else ""
+            return f"ChatGPT found the existing {section_label} rule '{label}' and updated it.{terms_text}"
+
+        return f"ChatGPT found the existing {section_label} rule '{label}' already meets this requirement."
+
+    added = [change for change in changes if change.get("action") == "added"]
+    updated = [change for change in changes if change.get("action") == "updated_existing"]
+    matched = [change for change in changes if change.get("action") == "matched_existing"]
+
+    if matched and not added and not updated:
+        return "ChatGPT found existing rules that already meet this: " + food_rule_label_list(matched) + "."
+
+    parts = []
+    if added:
+        parts.append(f"added {len(added)} new")
+    if updated:
+        parts.append(f"updated {len(updated)} existing")
+    if matched:
+        parts.append(f"found {len(matched)} already covered")
+
+    return "ChatGPT " + ", ".join(parts) + " food restriction rules: " + food_rule_label_list(changes) + "."
+
+
+def relevant_food_rule_changes(changes, prompt="", section=None):
+    changes = [change for change in changes if isinstance(change, dict)]
+    target_section = normalize_rule_section(section)
+
+    if target_section:
+        changes = [
+            change for change in changes
+            if normalize_rule_section(change.get("section")) == target_section
+        ]
+
+    if len(changes) <= 1:
+        return changes
+
+    prompt_text = normalize_rule_label(prompt)
+    matching = [
+        change for change in changes
+        if food_rule_change_matches_prompt(change, prompt_text)
+    ]
+
+    return matching or changes
+
+
+def food_rule_change_matches_prompt(change, prompt_text):
+    if not prompt_text:
+        return False
+
+    label = normalize_rule_label(change.get("label"))
+
+    if label and (label in prompt_text or prompt_text in label):
+        return True
+
+    for term in normalize_rule_terms(change.get("terms")):
+        if len(term) >= 3 and term in prompt_text:
+            return True
+
+    return False
+
+
+def food_rule_label_list(changes):
+    labels = [change.get("label") or "unnamed rule" for change in changes[:4]]
+
+    if len(changes) > 4:
+        labels.append(f"{len(changes) - 4} more")
+
+    return ", ".join(labels)
+
+
+def food_rule_section_label(section):
+    return "Required" if normalize_rule_section(section) == "require" else "Avoid"
+
+
+def find_existing_food_rule_for_prompt(prompt, current_rules, section=None):
+    prompt_text = normalize_rule_label(prompt)
+
+    if not prompt_text:
+        return None
+
+    rules = normalize_food_rules(current_rules)
+    sections = [normalize_rule_section(section)] if normalize_rule_section(section) else ["require", "avoid"]
+
+    for rule_section in sections:
+        for rule in rules.get(rule_section, []):
+            change = food_rule_change("matched_existing", rule_section, rule)
+
+            if food_rule_change_matches_prompt(change, prompt_text):
+                return {
+                    "section": rule_section,
+                    "rule": rule,
+                }
+
+    return None
 
 
 def normalize_rule_label(value):

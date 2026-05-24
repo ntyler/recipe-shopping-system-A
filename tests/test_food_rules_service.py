@@ -31,7 +31,8 @@ class FoodRulesServiceTests(unittest.TestCase):
         }
 
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}), \
-             patch.object(food_rules_service, "get_openai_client", return_value=fake_client):
+             patch.object(food_rules_service, "get_openai_client", return_value=fake_client), \
+             patch.object(food_rules_service, "save_food_rules", side_effect=food_rules_service.normalize_food_rules):
             result = food_rules_service.suggest_food_rules_from_prompt(
                 "no citric acid",
                 current_rules,
@@ -41,7 +42,80 @@ class FoodRulesServiceTests(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertEqual(result["food_rules"], current_rules)
         self.assertEqual(result["added"], {"require": [], "avoid": []})
-        self.assertEqual(result["message"], "No food restriction updates were needed.")
+        self.assertEqual(result["changes"][0]["action"], "matched_existing")
+        self.assertEqual(result["changes"][0]["label"], "no citric acid")
+        self.assertEqual(
+            result["message"],
+            "ChatGPT found the existing Avoid rule 'no citric acid' already meets this requirement.",
+        )
+
+    def test_chatgpt_existing_rule_message_names_rule(self):
+        fake_client = FakeOpenAIClient('{"require": [{"label": "must be organic", "terms": ["organic"]}], "avoid": []}')
+        current_rules = {
+            "require": [{"label": "must be organic", "terms": ["organic"]}],
+            "avoid": [],
+        }
+
+        with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}), \
+             patch.object(food_rules_service, "get_openai_client", return_value=fake_client), \
+             patch.object(food_rules_service, "save_food_rules", side_effect=food_rules_service.normalize_food_rules):
+            result = food_rules_service.suggest_food_rules_from_prompt(
+                "must be organic",
+                current_rules,
+                "require",
+            )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["changes"][0]["action"], "matched_existing")
+        self.assertEqual(result["changes"][0]["label"], "must be organic")
+        self.assertEqual(
+            result["message"],
+            "ChatGPT found the existing Required rule 'must be organic' already meets this requirement.",
+        )
+
+    def test_chatgpt_added_rule_message_names_rule(self):
+        fake_client = FakeOpenAIClient('{"require": [{"label": "must be gluten free", "terms": ["gluten free"]}], "avoid": []}')
+        current_rules = {"require": [], "avoid": []}
+
+        with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}), \
+             patch.object(food_rules_service, "get_openai_client", return_value=fake_client), \
+             patch.object(food_rules_service, "save_food_rules", side_effect=food_rules_service.normalize_food_rules):
+            result = food_rules_service.suggest_food_rules_from_prompt(
+                "must be gluten free",
+                current_rules,
+                "require",
+            )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["changes"][0]["action"], "added")
+        self.assertEqual(
+            result["message"],
+            "ChatGPT added a new Required rule: must be gluten free.",
+        )
+
+    def test_chatgpt_updated_rule_message_names_rule_and_terms(self):
+        fake_client = FakeOpenAIClient('{"require": [], "avoid": [{"label": "no citric acid", "terms": ["citric acid", "citric acid monohydrate"]}]}')
+        current_rules = {
+            "require": [],
+            "avoid": [{"label": "no citric acid", "terms": ["citric acid"]}],
+        }
+
+        with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}), \
+             patch.object(food_rules_service, "get_openai_client", return_value=fake_client), \
+             patch.object(food_rules_service, "save_food_rules", side_effect=food_rules_service.normalize_food_rules):
+            result = food_rules_service.suggest_food_rules_from_prompt(
+                "avoid citric acid variants",
+                current_rules,
+                "avoid",
+            )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["changes"][0]["action"], "updated_existing")
+        self.assertEqual(result["changes"][0]["added_terms"], ["citric acid monohydrate"])
+        self.assertEqual(
+            result["message"],
+            "ChatGPT found the existing Avoid rule 'no citric acid' and updated it. Added terms: citric acid monohydrate.",
+        )
 
     def test_merge_food_rules_updates_matching_rule_terms(self):
         merged = food_rules_service.merge_food_rules(

@@ -23,7 +23,10 @@
       "preparation": "room temperature",
       "optional": false,
       "store_section": "DAIRY & EGGS",
-      "store_section_order": 3
+      "store_section_order": 3,
+      "recipe_qty": "1",
+      "purchasable_item": "eggs",
+      "purchase_group": "eggs X"
     },
     {
       "section": null,

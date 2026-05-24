@@ -13,7 +13,10 @@
       "optional": false,
       "store_section": "DAIRY & EGGS",
       "store_section_order": 3,
-      "base_quantity": "5"
+      "base_quantity": "5",
+      "recipe_qty": "5",
+      "purchasable_item": "eggs",
+      "purchase_group": "eggs X"
     },
     {
       "section": null,
