@@ -218,6 +218,20 @@
                                 aria-expanded="true">
                             Hide ^
                         </button>
+                        <div class="recipe-quantity-control recipe-view-quantity">
+                            <select class="recipe-quantity-input recipe-scaling-select"
+                                    data-recipe-number="{{ recipe.number }}"
+                                    data-recipe-url="{{ recipe.url }}"
+                                    aria-label="Recipe {{ recipe.number }} amount"
+                                    onchange="saveRecipeQuantity(this)">
+                                {% for option in recipe.scaling_options %}
+                                    <option value="{{ option.value }}"
+                                            {% if option.selected %}selected{% endif %}>
+                                        {{ option.label }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
                         <button type="button"
                                 class="edit-recipe-btn recipe-view-edit-btn"
                                 data-recipe-url="{{ recipe.url }}"
@@ -235,6 +249,15 @@
                                 PDF
                             </a>
                         {% endif %}
+                        <form method="POST"
+                              action="{{ url_for('recipe_bp.remove_recipe_route') }}"
+                              class="remove-recipe-form recipe-view-remove-form"
+                              onsubmit="saveScroll(); return confirm('Remove this recipe URL?');">
+                            <input type="hidden" name="url" value="{{ recipe.url }}">
+                            <button type="submit"
+                                    class="remove-recipe-btn recipe-view-remove"
+                                    aria-label="Remove recipe {{ recipe.number }}">X</button>
+                        </form>
                     </div>
                 </div>
 

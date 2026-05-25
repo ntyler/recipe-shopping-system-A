@@ -2375,6 +2375,7 @@ body {
             justify-content: flex-end;
             gap: 8px;
             flex: 0 0 auto;
+            flex-wrap: wrap;
         }
 
         .recipe-view-cover {
@@ -2400,6 +2401,19 @@ body {
             font-size: 12px;
         }
 
+        .recipe-view-quantity,
+        .recipe-view-remove-form {
+            flex: 0 0 auto;
+        }
+
+        .recipe-view-remove {
+            width: 34px;
+            min-width: 34px;
+            height: 32px;
+            margin: 0;
+            padding: 0;
+        }
+
         .recipe-view-collapse-btn {
             flex: 0 0 auto;
             width: auto;
@@ -2422,10 +2436,18 @@ body {
 
         .recipe-view-edit-btn {
             flex: 0 0 auto;
+            width: auto;
+            min-width: 64px;
             height: 32px;
             padding: 0 12px;
             font-size: 13px;
             font-weight: 800;
+        }
+
+        .recipe-view-title-actions .recipe-view-edit-btn {
+            flex: 0 0 auto;
+            width: auto;
+            min-width: 64px;
         }
 
         .recipe-view-title a:not(.recipe-view-pdf-btn) {
