@@ -165,19 +165,24 @@
                                                          data-cookbook-recipe-name="{{ recipe.name }}"
                                                          data-cookbook-recipe-key="{{ cookbook.id }}|{{ recipe.url }}">
                                                     <div class="cookbook-recipe-header">
-                                                        <input type="checkbox"
-                                                               class="cookbook-restore-checkbox"
-                                                               name="recipe_urls"
-                                                               value="{{ recipe.url }}"
-                                                               form="restoreCookbookRecipesForm"
-                                                               data-cookbook-restore-checkbox
-                                                               aria-label="Select {{ recipe.name }} for recipe log">
+                                                        <div class="cookbook-recipe-select">
+                                                            <input type="checkbox"
+                                                                   class="cookbook-restore-checkbox"
+                                                                   name="recipe_urls"
+                                                                   value="{{ recipe.url }}"
+                                                                   form="restoreCookbookRecipesForm"
+                                                                   data-cookbook-restore-checkbox
+                                                                   aria-label="Select {{ recipe.name }} for recipe log">
+                                                            {% if recipe.number %}
+                                                                <span class="cookbook-recipe-number">Recipe {{ recipe.number }}:</span>
+                                                            {% endif %}
+                                                        </div>
                                                         <div class="cookbook-recipe-title">
                                                             <a href="{{ recipe.source_href }}"
                                                                target="_blank"
                                                                rel="noopener noreferrer"
                                                                title="{{ recipe.source_display_url }}">
-                                                                {% if recipe.number %}Recipe {{ recipe.number }}: {% endif %}{{ recipe.name }}
+                                                                {{ recipe.name }}
                                                             </a>
                                                             {% if recipe.cover_image and recipe.cover_image.src %}
                                                                 <img class="recipe-cover-image cookbook-recipe-cover"
@@ -186,7 +191,7 @@
                                                                      loading="lazy">
                                                             {% endif %}
                                                             {% if recipe.base_servings %}
-                                                                <span>Servings: {{ recipe.base_servings }}{% if recipe.scaled_servings and recipe.scaled_servings != recipe.base_servings %} -> {{ recipe.scaled_servings }}{% endif %}</span>
+                                                                <span class="cookbook-recipe-servings">Servings: {{ recipe.base_servings }}{% if recipe.scaled_servings and recipe.scaled_servings != recipe.base_servings %} -> {{ recipe.scaled_servings }}{% endif %}</span>
                                                             {% endif %}
                                                         </div>
                                                         <div class="cookbook-recipe-actions">

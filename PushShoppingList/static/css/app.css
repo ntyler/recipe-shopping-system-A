@@ -3399,29 +3399,46 @@ body {
 
         .cookbook-recipe-header {
             display: grid;
-            grid-template-columns: 24px minmax(0, 1fr) auto;
+            grid-template-columns: 92px minmax(0, 1fr) auto;
             gap: 8px;
             align-items: start;
             margin-bottom: 10px;
         }
 
+        .cookbook-recipe-select {
+            display: grid;
+            grid-template-columns: 18px minmax(0, 1fr);
+            gap: 8px;
+            align-items: center;
+            min-width: 0;
+            color: #00ff99;
+            font-size: 13px;
+            font-weight: 900;
+            line-height: 1.15;
+        }
+
         .cookbook-restore-checkbox {
             width: 16px;
             height: 16px;
-            margin: 6px 0 0 0;
+            margin: 0;
             cursor: pointer;
+        }
+
+        .cookbook-recipe-number {
+            min-width: 0;
+            overflow-wrap: normal;
         }
 
         .cookbook-recipe-title {
             min-width: 0;
             display: grid;
-            gap: 3px;
+            gap: 6px;
         }
 
         .cookbook-recipe-title a {
             color: #fff;
             text-decoration: none;
-            font-size: 14px;
+            font-size: 15px;
             font-weight: 800;
             overflow-wrap: anywhere;
         }
@@ -3431,9 +3448,9 @@ body {
             text-decoration: underline;
         }
 
-        .cookbook-recipe-title span {
+        .cookbook-recipe-servings {
             color: #9ca3af;
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 800;
         }
 
@@ -7003,6 +7020,28 @@ body {
             .recipe-edit-ingredient-row select {
                 min-width: 0;
             }
+
+            .cookbook-recipe-header {
+                grid-template-columns: minmax(0, 1fr);
+                gap: 8px;
+            }
+
+            .cookbook-recipe-select {
+                grid-row: 1;
+            }
+
+            .cookbook-recipe-title {
+                grid-row: 2;
+            }
+
+            .cookbook-recipe-actions {
+                grid-row: 3;
+                justify-content: stretch;
+            }
+
+            .cookbook-recipe-actions > * {
+                flex: 1 1 90px;
+            }
         }
 
         @media (max-width: 650px) {
@@ -7082,13 +7121,27 @@ body {
 
             .cookbook-create-row,
             .cookbook-move-row,
-            .cookbook-recipe-header,
             .cookbook-recipe-detail-grid,
             .cookbook-ingredient-section li {
                 grid-template-columns: 1fr;
             }
 
+            .cookbook-recipe-header {
+                grid-template-columns: minmax(0, 1fr);
+                gap: 8px;
+            }
+
+            .cookbook-recipe-select {
+                grid-template-columns: 18px minmax(0, 1fr);
+                grid-row: 1;
+            }
+
+            .cookbook-recipe-title {
+                grid-row: 2;
+            }
+
             .cookbook-recipe-actions {
+                grid-row: 3;
                 justify-content: stretch;
             }
 
