@@ -3504,15 +3504,16 @@ body {
             justify-content: flex-end;
             flex-wrap: wrap;
             gap: 7px;
+            margin-left: auto;
             min-width: 0;
         }
 
         .cookbook-recipe-toggle-btn {
             width: auto;
-            min-width: 64px;
-            height: 32px;
+            min-width: 54px;
+            height: 30px;
             margin: 0;
-            padding: 0 9px;
+            padding: 0 7px;
             border-radius: 6px;
             background: #2a2f31;
             color: #e5e7eb;
@@ -3530,22 +3531,30 @@ body {
         .cookbook-recipe-edit-btn,
         .cookbook-recipe-pdf-btn {
             width: auto;
-            min-width: 64px;
-            height: 32px;
+            min-width: 54px;
+            height: 30px;
             margin: 0;
             padding: 0 9px;
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .recipe-archive-pdf-btn.cookbook-recipe-pdf-btn {
+            min-width: 40px;
+            height: 30px;
+            padding: 0 7px;
         }
 
         .cookbook-remove-recipe-btn {
-            width: auto;
-            min-width: 64px;
-            height: 32px;
+            width: 38px;
+            min-width: 38px;
+            height: 30px;
             margin: 0;
-            padding: 0 9px;
+            padding: 0;
             background: #b00000;
             color: #fff;
-            font-size: 12px;
-            font-weight: 800;
+            font-size: 16px;
+            font-weight: 900;
         }
 
         .cookbook-remove-recipe-btn:hover,
@@ -7117,8 +7126,9 @@ body {
             }
 
             .cookbook-recipe-actions {
-                justify-content: flex-start;
-                width: auto;
+                justify-content: flex-end;
+                width: 100%;
+                margin-left: auto;
             }
 
             .cookbook-recipe-actions > * {
@@ -7217,8 +7227,9 @@ body {
             }
 
             .cookbook-recipe-actions {
-                justify-content: flex-start;
-                width: auto;
+                justify-content: flex-end;
+                width: 100%;
+                margin-left: auto;
             }
 
             .cookbook-recipe-actions > * {
@@ -7259,7 +7270,20 @@ body {
             .cookbook-recipe-pdf-btn,
             .cookbook-remove-recipe-btn {
                 width: auto;
-                min-width: 64px;
+            }
+
+            .cookbook-recipe-toggle-btn,
+            .cookbook-recipe-edit-btn {
+                min-width: 54px;
+            }
+
+            .cookbook-recipe-pdf-btn {
+                min-width: 40px;
+            }
+
+            .cookbook-remove-recipe-btn {
+                width: 38px;
+                min-width: 38px;
             }
 
             .cookbook-name-modal-actions {
