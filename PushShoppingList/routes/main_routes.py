@@ -296,6 +296,45 @@ def recipe_cover_image_src(recipe_url, cover_image):
     return str(cover_image.get("url") or "").strip()
 
 
+def cookbook_cover_image_for_view(recipe):
+    if not isinstance(recipe, dict):
+        return {}
+
+    cover_image = recipe.get("cover_image")
+
+    if not isinstance(cover_image, dict):
+        return {}
+
+    if cover_image.get("src"):
+        alt = str(cover_image.get("alt") or recipe.get("name") or "Recipe cover image").strip()
+        return {
+            **cover_image,
+            "alt": alt,
+        }
+
+    return recipe_cover_image_for_view(
+        recipe.get("url", ""),
+        {
+            "recipe_title": recipe.get("name"),
+            "cover_image": cover_image,
+        },
+        {"cover_image": cover_image},
+    )
+
+
+def cookbook_view_for_render(recipe_rows):
+    view = cookbook_view(recipe_rows)
+
+    for cookbook in view.get("cookbooks", []):
+        for recipe in cookbook.get("recipes", []):
+            recipe["cover_image"] = cookbook_cover_image_for_view(recipe)
+
+    for recipe in view.get("recipes", []):
+        recipe["cover_image"] = cookbook_cover_image_for_view(recipe)
+
+    return view
+
+
 def recipe_log_scaling_options(recipe_data, selected_multiplier):
     scaling = recipe_scaling_from_data(recipe_data, default_to_common=True)
     options = scaling.get("available_multipliers", [])
@@ -970,7 +1009,7 @@ def index():
         raw_items="\n".join(items),
         items=items,
         current_urls=recipe_log_rows,
-        cookbook_view=cookbook_view(recipe_rows),
+        cookbook_view=cookbook_view_for_render(recipe_rows),
         home_address=load_home_address(),
         nearest_store_results=nearest_store_results,
         nearest_store_locations=nearest_store_results.get("store_locations", {}),

@@ -516,6 +516,44 @@ class ProductSelectionServiceTest(unittest.TestCase):
             baking_view = next(cookbook for cookbook in view["cookbooks"] if cookbook["id"] == "baking")
             self.assertEqual(baking_view["recipes"][0]["sections"]["MISC"][0]["quantity_display"], "2 cans")
 
+    def test_cookbook_view_for_render_adds_cover_image_src_for_saved_recipes(self):
+        from PushShoppingList.app import create_app
+        from PushShoppingList.routes import main_routes
+        from PushShoppingList.services import cookbook_service
+
+        with TemporaryDirectory() as temp_dir, patch.object(
+            cookbook_service,
+            "COOKBOOKS_FILE",
+            Path(temp_dir) / "cookbooks.json",
+        ):
+            recipe_rows = [{
+                "name": "Skillet Chili",
+                "url": "https://example.com/chili",
+                "source_href": "https://example.com/chili",
+                "source_display_url": "https://example.com/chili",
+                "cover_image": {
+                    "url": "https://example.com/chili.jpg",
+                    "alt": "Skillet Chili",
+                },
+            }]
+
+            cookbook_service.create_cookbook("Dinner")
+            cookbook_service.move_recipes_to_cookbook(
+                "dinner",
+                ["https://example.com/chili"],
+                recipe_rows,
+            )
+
+            app = create_app()
+            app.config["TESTING"] = True
+            with app.test_request_context("/"):
+                view = main_routes.cookbook_view_for_render([])
+
+            dinner = view["cookbooks"][0]
+            recipe = dinner["recipes"][0]
+            self.assertEqual(recipe["cover_image"]["src"], "https://example.com/chili.jpg")
+            self.assertEqual(recipe["cover_image"]["alt"], "Skillet Chili")
+
     def test_cookbook_move_requires_overwrite_for_existing_target_recipe(self):
         from PushShoppingList.services import cookbook_service
 
@@ -722,6 +760,10 @@ class ProductSelectionServiceTest(unittest.TestCase):
 
         self.assertIn("recipe-cover-image recipe-url-summary-cover", current_recipe_template)
         self.assertIn("recipe-cover-image cookbook-recipe-cover", cookbook_template)
+        self.assertLess(
+            cookbook_template.index("cookbook-recipe-servings"),
+            cookbook_template.index("recipe-cover-image cookbook-recipe-cover"),
+        )
         self.assertIn("recipe-image-lightbox", css)
         self.assertIn("openRecipeImageLightbox", script)
         self.assertIn("handleRecipeCoverImageClick", script)

@@ -467,11 +467,15 @@ def hydrate_recipe(stored_recipe, current_recipes):
 
     current_recipe = current_recipes.get(recipe_key(stored_recipe["url"]))
     recipe = current_recipe or stored_recipe
-
-    return {
+    hydrated_recipe = {
         **stored_recipe,
         **recipe,
     }
+
+    if not hydrated_recipe.get("cover_image") and stored_recipe.get("cover_image"):
+        hydrated_recipe["cover_image"] = stored_recipe["cover_image"]
+
+    return hydrated_recipe
 
 
 def cookbook_view(recipe_rows):
