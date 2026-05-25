@@ -344,21 +344,6 @@ def rename_cookbook(cookbook_id, name):
 
 def move_recipes_to_cookbook(cookbook_id, recipe_urls, recipe_rows=None, overwrite_existing=False):
     available_recipes = recipe_snapshot_lookup(recipe_rows)
-    selected_recipes = []
-    selected_keys = set()
-
-    for recipe_url in recipe_urls:
-        key = recipe_key(recipe_url)
-        if not key or key in selected_keys:
-            continue
-
-        record = available_recipes.get(key) or clean_recipe_record(recipe_url)
-        if record:
-            selected_recipes.append(record)
-            selected_keys.add(key)
-
-    if not selected_recipes:
-        raise ValueError("Select at least one recipe.")
 
     with COOKBOOKS_LOCK:
         payload = load_cookbooks()
@@ -366,6 +351,33 @@ def move_recipes_to_cookbook(cookbook_id, recipe_urls, recipe_rows=None, overwri
 
         if target is None:
             raise ValueError("Choose a cookbook.")
+
+        stored_recipes = {}
+        for cookbook in payload["cookbooks"]:
+            for recipe in cookbook.get("recipes", []):
+                record = clean_recipe_record(recipe)
+                if not record:
+                    continue
+
+                key = recipe_key(record["url"])
+                if key and key not in stored_recipes:
+                    stored_recipes[key] = record
+
+        selected_recipes = []
+        selected_keys = set()
+
+        for recipe_url in recipe_urls:
+            key = recipe_key(recipe_url)
+            if not key or key in selected_keys:
+                continue
+
+            record = available_recipes.get(key) or stored_recipes.get(key) or clean_recipe_record(recipe_url)
+            if record:
+                selected_recipes.append(record)
+                selected_keys.add(key)
+
+        if not selected_recipes:
+            raise ValueError("Select at least one recipe.")
 
         target_recipes_by_key = {
             recipe_key(recipe.get("url")): recipe

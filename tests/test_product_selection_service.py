@@ -410,6 +410,7 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("Instructions", cookbook_template)
         self.assertIn("data-cookbook-recipe-toggle", cookbook_template)
         self.assertIn("data-cookbook-restore-checkbox", cookbook_template)
+        self.assertGreaterEqual(cookbook_template.count("data-cookbook-recipe-checkbox"), 2)
         self.assertIn("restoreCookbookRecipes(event)", cookbook_template)
         self.assertIn("openCookbookNameEditor(this)", cookbook_template)
         self.assertIn("cookbookNameEditorModal", cookbook_template)
@@ -515,6 +516,65 @@ class ProductSelectionServiceTest(unittest.TestCase):
             view = cookbook_service.cookbook_view([])
             baking_view = next(cookbook for cookbook in view["cookbooks"] if cookbook["id"] == "baking")
             self.assertEqual(baking_view["recipes"][0]["sections"]["MISC"][0]["quantity_display"], "2 cans")
+
+    def test_cookbook_move_preserves_saved_recipe_when_not_in_recipe_log(self):
+        from PushShoppingList.services import cookbook_service
+
+        with TemporaryDirectory() as temp_dir, patch.object(
+            cookbook_service,
+            "COOKBOOKS_FILE",
+            Path(temp_dir) / "cookbooks.json",
+        ):
+            recipe_rows = [{
+                "number": 1,
+                "name": "Skillet Chili",
+                "url": "https://example.com/chili",
+                "source_href": "https://example.com/chili",
+                "source_display_url": "https://example.com/chili",
+                "quantity": 1,
+                "archive_pdf_available": True,
+                "cover_image": {
+                    "url": "https://example.com/chili.jpg",
+                    "alt": "Skillet Chili",
+                },
+                "base_servings": "4 servings",
+                "equipment_items": ["Dutch oven"],
+                "instruction_items": ["Simmer until thick."],
+                "sections": {
+                    "MISC": [{
+                        "name": "canned white beans",
+                        "display_name": "canned white beans",
+                        "quantity_display": "2 cans",
+                    }],
+                },
+            }]
+
+            cookbook_service.create_cookbook("Dinner")
+            cookbook_service.create_cookbook("Baking")
+            cookbook_service.move_recipes_to_cookbook(
+                "dinner",
+                ["https://example.com/chili"],
+                recipe_rows,
+            )
+
+            cookbook_service.move_recipes_to_cookbook(
+                "baking",
+                ["https://example.com/chili"],
+                [],
+            )
+
+            data = cookbook_service.load_cookbooks()
+            dinner = next(cookbook for cookbook in data["cookbooks"] if cookbook["id"] == "dinner")
+            baking = next(cookbook for cookbook in data["cookbooks"] if cookbook["id"] == "baking")
+            moved_recipe = baking["recipes"][0]
+
+            self.assertEqual(dinner["recipes"], [])
+            self.assertEqual(moved_recipe["name"], "Skillet Chili")
+            self.assertTrue(moved_recipe["archive_pdf_available"])
+            self.assertEqual(moved_recipe["cover_image"]["url"], "https://example.com/chili.jpg")
+            self.assertEqual(moved_recipe["equipment_items"], ["Dutch oven"])
+            self.assertEqual(moved_recipe["instruction_items"], ["Simmer until thick."])
+            self.assertEqual(moved_recipe["sections"]["MISC"][0]["quantity_display"], "2 cans")
 
     def test_cookbook_view_for_render_adds_cover_image_src_for_saved_recipes(self):
         from PushShoppingList.app import create_app
