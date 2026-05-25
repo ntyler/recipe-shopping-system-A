@@ -755,17 +755,27 @@ class ProductSelectionServiceTest(unittest.TestCase):
             "PushShoppingList/templates/sections/current_recipe_url_log.html"
         ).read_text(encoding="utf-8")
         cookbook_template = Path("PushShoppingList/templates/sections/cookbooks.html").read_text(encoding="utf-8")
+        items_template = Path("PushShoppingList/templates/sections/items.html").read_text(encoding="utf-8")
         css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
         script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
 
         self.assertIn("recipe-cover-image recipe-url-summary-cover", current_recipe_template)
         self.assertIn("recipe-cover-image cookbook-recipe-cover", cookbook_template)
+        self.assertIn("recipe-cover-image recipe-view-cover", items_template)
         self.assertIn("recipe-url-summary-header", current_recipe_template)
         self.assertIn("recipe-url-summary-servings", current_recipe_template)
         self.assertIn("cookbook-recipe-summary", cookbook_template)
         self.assertLess(
-            cookbook_template.index("recipe-cover-image cookbook-recipe-cover"),
+            current_recipe_template.index("recipe-url-summary-servings"),
+            current_recipe_template.index("recipe-cover-image recipe-url-summary-cover"),
+        )
+        self.assertLess(
             cookbook_template.index("cookbook-recipe-servings"),
+            cookbook_template.index("recipe-cover-image cookbook-recipe-cover"),
+        )
+        self.assertLess(
+            items_template.index('class="recipe-meta"'),
+            items_template.index("recipe-cover-image recipe-view-cover"),
         )
         self.assertIn("recipe-image-lightbox", css)
         self.assertIn("openRecipeImageLightbox", script)
