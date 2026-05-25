@@ -264,6 +264,28 @@ body {
             background: #107C10;
         }
 
+        .extract-btn,
+        .recipe-media-upload-btn,
+        .save-btn,
+        .clear-btn,
+        .address-save-btn,
+        .location-address-btn,
+        .nearest-stores-btn,
+        .sort-store-list-btn,
+        .store-display-toggle,
+        .save-recipe-qty-btn,
+        .create-recipe-btn,
+        .view-action-btn,
+        .view-toggle-btn {
+            height: 32px;
+            min-height: 32px;
+            padding: 2px 12px;
+            font-size: 13px;
+            font-weight: 800;
+            line-height: 1.1;
+            text-align: center;
+        }
+
         .recipe-media-upload-status {
             min-height: 18px;
             margin-top: 8px;
@@ -522,14 +544,15 @@ body {
             align-items: center;
             justify-content: center;
             width: 100%;
-            min-height: 44px;
+            height: 32px;
+            min-height: 32px;
             margin: 0;
-            padding: 9px 12px;
+            padding: 2px 12px;
             border: 1px solid #333;
             border-radius: 8px;
             background: #263238;
             color: #d1d5db;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 800;
             line-height: 1.15;
             text-align: center;
@@ -2091,8 +2114,11 @@ body {
             width: auto;
             min-width: 190px;
             margin-top: 0;
-            padding: 11px 16px;
-            font-size: 15px;
+            height: 32px;
+            min-height: 32px;
+            padding: 2px 12px;
+            font-size: 13px;
+            line-height: 1.1;
         }
 
         .view-action-form {
@@ -2132,8 +2158,11 @@ body {
 
         .view-toggle-btn {
             width: auto;
-            padding: 10px 18px;
-            font-size: 15px;
+            height: 32px;
+            min-height: 32px;
+            padding: 2px 12px;
+            font-size: 13px;
+            line-height: 1.1;
             background: #333;
             margin-top: 0;
         }
@@ -4291,8 +4320,11 @@ body {
             width: auto;
             min-width: 120px;
             margin-top: 4px;
-            padding: 9px 14px;
-            font-size: 14px;
+            height: 32px;
+            min-height: 32px;
+            padding: 2px 12px;
+            font-size: 13px;
+            line-height: 1.1;
         }
 
         .recipe-log-action-row {
@@ -4310,12 +4342,15 @@ body {
         .create-recipe-btn {
             width: 100%;
             margin: 0;
-            padding: 12px 14px;
+            height: 32px;
+            min-height: 32px;
+            padding: 2px 12px;
             border-radius: 8px;
             background: #155da8;
             color: #fff;
-            font-size: 16px;
+            font-size: 13px;
             font-weight: 800;
+            line-height: 1.1;
         }
 
         .create-recipe-btn:hover,
@@ -4522,10 +4557,13 @@ body {
         .save-recipe-qty-btn {
             width: 100%;
             margin-top: 12px;
-            padding: 12px 14px;
+            height: 32px;
+            min-height: 32px;
+            padding: 2px 12px;
             background: #107C10;
-            font-size: 16px;
-            font-weight: 700;
+            font-size: 13px;
+            font-weight: 800;
+            line-height: 1.1;
         }
 
         .save-recipe-qty-btn:disabled {
@@ -5901,15 +5939,21 @@ body {
         .grab-products-btn {
             background: #0f766e;
             margin-top: 0;
-            font-size: 15px;
-            padding: 11px;
+            height: 32px;
+            min-height: 32px;
+            padding: 2px 12px;
+            font-size: 13px;
+            line-height: 1.1;
         }
 
         .clear-products-btn {
             background: #7f1d1d;
             margin-top: 0;
-            font-size: 15px;
-            padding: 11px;
+            height: 32px;
+            min-height: 32px;
+            padding: 2px 12px;
+            font-size: 13px;
+            line-height: 1.1;
         }
 
 
@@ -6924,9 +6968,10 @@ body {
             }
 
             .store-display-toggle {
-                min-height: 54px;
-                padding: 8px 7px;
-                font-size: 14px;
+                height: 32px;
+                min-height: 32px;
+                padding: 2px 7px;
+                font-size: 12px;
             }
 
             body :where(input, select, textarea) {
@@ -7647,8 +7692,11 @@ body {
             }
 
             .save-recipe-qty-btn {
-                padding: 11px 14px;
-                font-size: 17px;
+                height: 32px;
+                min-height: 32px;
+                padding: 2px 12px;
+                font-size: 13px;
+                line-height: 1.1;
             }
 
             .recipe-edit-backdrop {
