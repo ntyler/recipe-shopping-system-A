@@ -3927,6 +3927,11 @@ body {
             display: flex;
         }
 
+        .rules-editor-backdrop[data-active-section="food_restrictions"].open {
+            align-items: flex-start;
+            padding-top: 0;
+        }
+
         .rules-editor-dialog {
             width: min(940px, 96vw);
             max-height: 92vh;
@@ -3938,6 +3943,10 @@ body {
             background: #111;
             color: #fff;
             box-shadow: 0 18px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .rules-editor-backdrop[data-active-section="food_restrictions"] .rules-editor-dialog {
+            max-height: 100vh;
         }
 
         .rules-editor-dialog form {
@@ -3956,10 +3965,20 @@ body {
             background: #151515;
         }
 
+        .rules-editor-backdrop[data-active-section="food_restrictions"] .rules-editor-header {
+            position: sticky;
+            top: 0;
+            z-index: 8;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            align-items: stretch;
+        }
+
         .rules-editor-header h2 {
             margin: 0;
             font-size: 24px;
             line-height: 1.1;
+            align-self: center;
         }
 
         .rules-editor-close {
@@ -3967,6 +3986,17 @@ body {
             min-width: 100px;
             margin: 0;
             background: #2a2f31;
+        }
+
+        .rules-editor-backdrop[data-active-section="food_restrictions"] .rules-editor-close {
+            width: 100%;
+            min-width: 0;
+            min-height: 32px;
+            padding: 7px 12px;
+            border-radius: 7px;
+            font-size: 13px;
+            font-weight: 800;
+            line-height: 1.2;
         }
 
         .rules-editor-status {

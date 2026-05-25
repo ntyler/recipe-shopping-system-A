@@ -1921,6 +1921,7 @@ function openRulesEditor(section) {
     }
 
     activeRulesEditorSection = section;
+    modal.dataset.activeSection = section || "";
     setRulesEditorStatus("");
 
     const data = rulesEditorData();
@@ -1957,6 +1958,7 @@ function closeRulesEditor() {
     if (modal) {
         modal.classList.remove("open");
         modal.setAttribute("aria-hidden", "true");
+        delete modal.dataset.activeSection;
         document.body.classList.remove("modal-open");
     }
 
