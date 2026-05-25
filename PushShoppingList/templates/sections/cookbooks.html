@@ -182,6 +182,9 @@
                                                                title="{{ recipe.source_display_url }}">
                                                                 {{ recipe.name }}
                                                             </a>
+                                                            {% if recipe.base_servings %}
+                                                                <span class="cookbook-recipe-servings">Servings: {{ recipe.base_servings }}{% if recipe.scaled_servings and recipe.scaled_servings != recipe.base_servings %} -> {{ recipe.scaled_servings }}{% endif %}</span>
+                                                            {% endif %}
                                                         </div>
                                                         <div class="cookbook-recipe-actions">
                                                             <button type="button"
@@ -216,9 +219,6 @@
                                                         </div>
                                                     </div>
                                                     <div class="cookbook-recipe-summary">
-                                                        {% if recipe.base_servings %}
-                                                            <span class="cookbook-recipe-servings">Servings: {{ recipe.base_servings }}{% if recipe.scaled_servings and recipe.scaled_servings != recipe.base_servings %} -> {{ recipe.scaled_servings }}{% endif %}</span>
-                                                        {% endif %}
                                                         {% if recipe.cover_image and recipe.cover_image.src %}
                                                             <img class="recipe-cover-image cookbook-recipe-cover"
                                                                  src="{{ recipe.cover_image.src }}"

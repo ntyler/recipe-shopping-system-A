@@ -774,7 +774,7 @@ class ProductSelectionServiceTest(unittest.TestCase):
             cookbook_template.index("recipe-cover-image cookbook-recipe-cover"),
         )
         self.assertLess(
-            items_template.index('class="recipe-meta"'),
+            items_template.index("recipe-view-title-servings"),
             items_template.index("recipe-cover-image recipe-view-cover"),
         )
         self.assertIn("recipe-image-lightbox", css)

@@ -2391,7 +2391,17 @@ body {
 
         .recipe-view-title-main {
             min-width: 0;
+            display: grid;
+            gap: 4px;
             overflow-wrap: anywhere;
+        }
+
+        .recipe-view-title-line {
+            min-width: 0;
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+            flex-wrap: wrap;
         }
 
         .recipe-jump-link {
@@ -2539,6 +2549,11 @@ body {
             color: #aaa;
             margin: 4px 0 12px 0;
             font-size: 14px;
+        }
+
+        .recipe-view-title-servings {
+            margin: 0;
+            font-weight: 400;
         }
 
         .recipe-detail-box {
@@ -3462,6 +3477,8 @@ body {
         }
 
         .cookbook-recipe-servings {
+            flex-basis: 100%;
+            margin-left: 26px;
             color: #9ca3af;
             font-size: 12px;
             font-weight: 800;
@@ -4296,14 +4313,21 @@ body {
         }
 
         .recipe-url-summary-title {
-            display: flex;
-            align-items: baseline;
-            gap: 4px;
+            display: grid;
+            gap: 3px;
             min-width: 0;
             color: #00cc66;
             font-size: 16px;
             font-weight: 800;
             line-height: 1.25;
+        }
+
+        .recipe-url-summary-title-line {
+            min-width: 0;
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+            flex-wrap: wrap;
         }
 
         .recipe-url-summary-main {
@@ -4403,6 +4427,7 @@ body {
         .recipe-url-summary-servings {
             color: #aaa;
             font-size: 14px;
+            font-weight: 400;
         }
 
         .recipe-url-summary-food-review {
@@ -7632,7 +7657,6 @@ body {
             }
 
             .recipe-url-summary-title {
-                display: grid;
                 grid-template-columns: minmax(0, 1fr);
                 gap: 3px;
             }
@@ -7666,18 +7690,21 @@ body {
             }
 
             .recipe-view-title-main {
-                display: contents;
+                grid-row: 1;
+            }
+
+            .recipe-view-title-line {
+                display: grid;
+                gap: 3px;
             }
 
             .recipe-view-number {
                 display: block;
-                grid-row: 1;
-                margin-bottom: 2px;
+                margin-bottom: 0;
             }
 
             .recipe-view-title-main a:not(.recipe-view-pdf-btn) {
                 display: block;
-                grid-row: 2;
                 min-width: 0;
                 overflow-wrap: anywhere;
                 line-height: 1.18;
@@ -7685,7 +7712,7 @@ body {
 
             .recipe-view-title-actions {
                 display: flex;
-                grid-row: 3;
+                grid-row: 2;
                 width: 100%;
                 min-width: 0;
                 justify-content: flex-start;

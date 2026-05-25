@@ -21,18 +21,29 @@
                      data-recipe-url="{{ recipe.url }}">
                     <div class="recipe-url-summary-header">
                         <div class="recipe-url-summary-title">
-                            <button type="button"
-                                    class="recipe-url-summary-number recipe-jump-link"
-                                    data-recipe-url="{{ recipe.url }}"
-                                    onclick="return jumpToRecipeViewRecipe(this)">
-                                Recipe {{ loop.index }}:
-                            </button>
-                            <a class="recipe-url-summary-name"
-                               href="{{ recipe.source_href }}"
-                               target="_blank"
-                               rel="noopener noreferrer"
-                               title="{{ recipe.source_display_url }}"
-                               data-recipe-url="{{ recipe.url }}">{{ recipe.name }}</a>
+                            <div class="recipe-url-summary-title-line">
+                                <button type="button"
+                                        class="recipe-url-summary-number recipe-jump-link"
+                                        data-recipe-url="{{ recipe.url }}"
+                                        onclick="return jumpToRecipeViewRecipe(this)">
+                                    Recipe {{ loop.index }}:
+                                </button>
+                                <a class="recipe-url-summary-name"
+                                   href="{{ recipe.source_href }}"
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   title="{{ recipe.source_display_url }}"
+                                   data-recipe-url="{{ recipe.url }}">{{ recipe.name }}</a>
+                            </div>
+                            {% if recipe.base_servings %}
+                                <div class="recipe-url-summary-servings">
+                                    Servings:
+                                    <span>{{ recipe.base_servings }}</span>
+                                    {% if recipe.quantity != 1 and recipe.scaled_servings %}
+                                        <span>-> {{ recipe.scaled_servings }}</span>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
                         </div>
                         <div class="recipe-url-summary-actions">
                             {% if recipe.food_rule_status.needs_review %}
@@ -84,15 +95,6 @@
                         </div>
                     </div>
                     <div class="recipe-url-summary-main">
-                        {% if recipe.base_servings %}
-                            <div class="recipe-url-summary-servings">
-                                Servings:
-                                <span>{{ recipe.base_servings }}</span>
-                                {% if recipe.quantity != 1 and recipe.scaled_servings %}
-                                    <span>-> {{ recipe.scaled_servings }}</span>
-                                {% endif %}
-                            </div>
-                        {% endif %}
                         {% if recipe.cover_image and recipe.cover_image.src %}
                             <img class="recipe-cover-image recipe-url-summary-cover"
                                  src="{{ recipe.cover_image.src }}"
