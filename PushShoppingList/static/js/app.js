@@ -3784,6 +3784,7 @@ function restoreViewBehaviorSettings() {
 const SCREEN_PREVIEW_MODE_KEY = "screen-preview-mode";
 const SCREEN_PREVIEW_WIDTH_KEY = "screen-preview-custom-width";
 const SCREEN_PREVIEW_HEIGHT_KEY = "screen-preview-custom-height";
+const SCREEN_PREVIEW_PHONE_ORIENTATION_KEY = "screen-preview-phone-orientation";
 const SCREEN_PREVIEW_DEFAULTS = {
     live: { label: "Live", width: 0, height: 0 },
     phone: { label: "Phone", width: 390, height: 844 },
@@ -3834,6 +3835,20 @@ function clampScreenPreviewNumber(value, fallback) {
 function screenPreviewDimensions(mode) {
     const normalizedMode = screenPreviewMode(mode);
 
+    if (normalizedMode === "phone") {
+        const orientation = screenPreviewPhoneOrientation();
+        const phone = SCREEN_PREVIEW_DEFAULTS.phone;
+        const isLandscape = orientation === "landscape";
+
+        return {
+            ...phone,
+            label: isLandscape ? "Phone Landscape" : "Phone Portrait",
+            width: isLandscape ? phone.height : phone.width,
+            height: isLandscape ? phone.width : phone.height,
+            orientation,
+        };
+    }
+
     if (normalizedMode === "custom") {
         return {
             ...SCREEN_PREVIEW_DEFAULTS.custom,
@@ -3846,6 +3861,12 @@ function screenPreviewDimensions(mode) {
     }
 
     return SCREEN_PREVIEW_DEFAULTS[normalizedMode] || SCREEN_PREVIEW_DEFAULTS.live;
+}
+
+function screenPreviewPhoneOrientation() {
+    return localStorage.getItem(SCREEN_PREVIEW_PHONE_ORIENTATION_KEY) === "landscape"
+        ? "landscape"
+        : "portrait";
 }
 
 function screenPreviewMode(mode) {
@@ -3863,11 +3884,13 @@ function setScreenPreviewMode(mode, options = {}) {
 
     document.body.classList.toggle("screen-preview-active", !isLive);
     document.body.dataset.screenPreviewMode = normalizedMode;
+    document.body.dataset.screenPhoneOrientation = screenPreviewPhoneOrientation();
     document.querySelectorAll("[data-screen-mode-button]").forEach(button => {
         const active = button.dataset.screenModeButton === normalizedMode;
         button.classList.toggle("active", active);
         button.setAttribute("aria-pressed", active ? "true" : "false");
     });
+    updatePhoneOrientationControl(normalizedMode);
 
     if (stage) {
         stage.hidden = isLive;
@@ -3897,6 +3920,35 @@ function setScreenPreviewMode(mode, options = {}) {
     }
 
     window.setTimeout(updateAddStoreStickyVisibility, 80);
+}
+
+function updatePhoneOrientationControl(mode) {
+    const button = document.getElementById("screenPhoneRotateBtn");
+
+    if (!button) {
+        return;
+    }
+
+    const orientation = screenPreviewPhoneOrientation();
+    const isPhone = mode === "phone";
+    const isLandscape = orientation === "landscape";
+
+    button.disabled = !isPhone;
+    button.classList.toggle("active", isPhone && isLandscape);
+    button.setAttribute("aria-pressed", isPhone && isLandscape ? "true" : "false");
+    button.setAttribute(
+        "aria-label",
+        isLandscape ? "Rotate phone preview to portrait" : "Rotate phone preview to landscape"
+    );
+    button.title = isPhone
+        ? (isLandscape ? "Rotate phone preview to portrait" : "Rotate phone preview to landscape")
+        : "Select Phone to rotate the preview.";
+}
+
+function rotatePhonePreview() {
+    const nextOrientation = screenPreviewPhoneOrientation() === "landscape" ? "portrait" : "landscape";
+    localStorage.setItem(SCREEN_PREVIEW_PHONE_ORIENTATION_KEY, nextOrientation);
+    setScreenPreviewMode("phone");
 }
 
 function screenPreviewUrl() {

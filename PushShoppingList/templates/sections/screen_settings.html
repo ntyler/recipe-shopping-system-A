@@ -13,30 +13,40 @@
          data-collapse-default="expanded"
          data-collapse-mobile-default="collapsed">
         <div class="screen-settings-grid">
-            <div class="screen-mode-group" role="group" aria-label="Screen mode">
+            <div class="screen-mode-panel">
+                <div class="screen-mode-group" role="group" aria-label="Screen mode">
+                    <button type="button"
+                            class="screen-mode-btn active"
+                            data-screen-mode-button="live"
+                            onclick="setScreenPreviewMode('live')">
+                        Live
+                    </button>
+                    <button type="button"
+                            class="screen-mode-btn"
+                            data-screen-mode-button="phone"
+                            onclick="setScreenPreviewMode('phone')">
+                        Phone
+                    </button>
+                    <button type="button"
+                            class="screen-mode-btn"
+                            data-screen-mode-button="computer"
+                            onclick="setScreenPreviewMode('computer')">
+                        Computer
+                    </button>
+                    <button type="button"
+                            class="screen-mode-btn"
+                            data-screen-mode-button="custom"
+                            onclick="setScreenPreviewMode('custom')">
+                        Custom
+                    </button>
+                </div>
+
                 <button type="button"
-                        class="screen-mode-btn active"
-                        data-screen-mode-button="live"
-                        onclick="setScreenPreviewMode('live')">
-                    Live
-                </button>
-                <button type="button"
-                        class="screen-mode-btn"
-                        data-screen-mode-button="phone"
-                        onclick="setScreenPreviewMode('phone')">
-                    Phone
-                </button>
-                <button type="button"
-                        class="screen-mode-btn"
-                        data-screen-mode-button="computer"
-                        onclick="setScreenPreviewMode('computer')">
-                    Computer
-                </button>
-                <button type="button"
-                        class="screen-mode-btn"
-                        data-screen-mode-button="custom"
-                        onclick="setScreenPreviewMode('custom')">
-                    Custom
+                        id="screenPhoneRotateBtn"
+                        class="screen-phone-rotate-btn"
+                        onclick="rotatePhonePreview()"
+                        disabled>
+                    Rotate Phone
                 </button>
             </div>
 
