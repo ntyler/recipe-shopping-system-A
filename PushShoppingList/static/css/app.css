@@ -4107,14 +4107,20 @@ body {
         .rules-editor-actions {
             display: grid;
             grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-            gap: 10px;
-            padding: 14px 20px 18px;
+            gap: 8px;
+            padding: 10px 20px;
             border-top: 1px solid #5d5648;
             background: #151515;
         }
 
         .rules-editor-actions button {
             margin: 0;
+            min-height: 32px;
+            padding: 7px 12px;
+            border-radius: 7px;
+            font-size: 13px;
+            font-weight: 800;
+            line-height: 1.2;
         }
 
         .rules-editor-cancel {
@@ -7386,7 +7392,7 @@ body {
 
             .rules-editor-actions {
                 grid-template-columns: 1fr;
-                padding: 14px;
+                padding: 10px 14px;
             }
 
             .food-restrictions-ai-row,
