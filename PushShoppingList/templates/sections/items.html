@@ -222,7 +222,9 @@
                             <select class="recipe-quantity-input recipe-scaling-select"
                                     data-recipe-number="{{ recipe.number }}"
                                     data-recipe-url="{{ recipe.url }}"
-                                    aria-label="Recipe {{ recipe.number }} amount">
+                                    data-inline-quantity-save="1"
+                                    aria-label="Recipe {{ recipe.number }} amount"
+                                    onchange="return handleRecipeQuantitySelectChange(this)">
                                 {% for option in recipe.scaling_options %}
                                     <option value="{{ option.value }}"
                                             {% if option.selected %}selected{% endif %}>

@@ -4357,21 +4357,30 @@ function bindRecipeQuantityInputs() {
             });
         }
 
-        input.addEventListener("change", () => {
-            normalizeRecipeQuantityInput(input);
-            if (input.dataset.manualQuantitySaveOnly !== "1") {
-                saveRecipeQuantity(input, {
-                    message: false,
-                    cacheBust: true,
-                });
-            }
-        });
+        if (input.dataset.inlineQuantitySave !== "1") {
+            input.addEventListener("change", () => handleRecipeQuantitySelectChange(input));
+        }
 
         input.addEventListener("blur", () => {
             normalizeRecipeQuantityInput(input);
         });
     });
 
+}
+
+function handleRecipeQuantitySelectChange(input) {
+    normalizeRecipeQuantityInput(input);
+
+    if (input.dataset.manualQuantitySaveOnly === "1") {
+        return false;
+    }
+
+    saveRecipeQuantity(input, {
+        message: false,
+        cacheBust: true,
+    });
+
+    return false;
 }
 
 function bindRecipeNameInputs() {
