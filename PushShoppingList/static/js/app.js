@@ -5426,7 +5426,7 @@ function addRecipeIngredientRow(item = {}) {
         : item.unit || "";
     row.className = "recipe-edit-ingredient-row";
     row.innerHTML = `
-        <label>
+        <label class="recipe-edit-ingredient-name-label">
             <span class="recipe-edit-food-warning food-rule-marker"
                   role="button"
                   tabindex="0"
@@ -5436,31 +5436,40 @@ function addRecipeIngredientRow(item = {}) {
             <span>Ingredient</span>
             <input type="text" data-field="ingredient" value="${escapeAttribute(item.ingredient || "")}">
         </label>
-        <label>
+        <label class="recipe-edit-qty-label">
             <span>Qty</span>
             <input type="text" data-field="quantity" value="${escapeAttribute(item.quantity || "")}">
         </label>
-        <label>
+        <label class="recipe-edit-unit-label">
             <span>Unit</span>
             <input type="text" data-field="unit" value="${escapeAttribute(item.unit || "")}">
         </label>
-        <label>
+        <label class="recipe-edit-original-text-label">
             <span>Original Text</span>
             <input type="text" data-field="original_text" value="${escapeAttribute(item.original_text || "")}">
         </label>
-        <label>
+        <label class="recipe-edit-buy-as-label">
+            <span>Buy As</span>
+            <input type="text"
+                   data-field="purchasable_item"
+                   list="itemQtyBuyAsOptions"
+                   placeholder="e.g. eggs"
+                   value="${escapeAttribute(item.purchasable_item || item.buy_as || "")}"
+                   oninput="syncRecipeIngredientPurchaseGroup(this)">
+        </label>
+        <label class="recipe-edit-preparation-label">
             <span>Preparation</span>
             <input type="text" data-field="preparation" value="${escapeAttribute(item.preparation || "")}">
         </label>
-        <label>
+        <label class="recipe-edit-section-label">
             <span>Section</span>
             <input type="text" data-field="section" value="${escapeAttribute(item.section || "")}">
         </label>
-        <label>
+        <label class="recipe-edit-store-section-label">
             <span>Store Section</span>
             <select data-field="store_section">${recipeStoreSectionOptions(item.store_section || "")}</select>
         </label>
-        <label class="recipe-edit-check-label">
+        <label class="recipe-edit-check-label recipe-edit-optional-label">
             <span>Optional</span>
             <input type="checkbox" data-field="optional" ${item.optional ? "checked" : ""}>
         </label>
@@ -5468,13 +5477,21 @@ function addRecipeIngredientRow(item = {}) {
         <input type="hidden" data-field="base_quantity" value="${escapeAttribute(baseQuantity || "")}">
         <input type="hidden" data-field="base_unit" value="${escapeAttribute(baseUnit || "")}">
         <input type="hidden" data-field="recipe_qty" value="${escapeAttribute(item.recipe_qty || item.quantity || "")}">
-        <input type="hidden" data-field="purchasable_item" value="${escapeAttribute(item.purchasable_item || item.buy_as || "")}">
         <input type="hidden" data-field="purchase_group" value="${escapeAttribute(item.purchase_group || "")}">
     `;
     wrap.appendChild(row);
     bindRecipeIngredientBaseTracking(row);
     bindRecipeIngredientFoodRuleWarning(row);
     updateRecipeIngredientFoodRuleWarning(row);
+}
+
+function syncRecipeIngredientPurchaseGroup(input) {
+    const row = input ? input.closest(".recipe-edit-ingredient-row") : null;
+    const purchaseGroupInput = row ? row.querySelector('[data-field="purchase_group"]') : null;
+
+    if (purchaseGroupInput) {
+        purchaseGroupInput.value = "";
+    }
 }
 
 function bindRecipeIngredientBaseTracking(row) {
