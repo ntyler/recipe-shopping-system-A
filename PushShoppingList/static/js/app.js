@@ -6493,11 +6493,12 @@ async function saveRecipeQuantity(input, options = {}) {
         const data = await response.json();
         input.dataset.lastSavedValue = String(quantity);
         input.classList.add("saved");
+        syncRecipeQuantityInputs(url, quantity, input);
         updateRecipeQuantityDisplays(url, quantity, data);
 
         if (options.refresh !== false) {
             try {
-                await refreshStoreMarkup();
+                await refreshStoreMarkup({ cacheBust: options.cacheBust === true });
             } catch (refreshErr) {
                 console.warn("Unable to refresh recipe quantities in the background.", refreshErr);
             }
@@ -6527,6 +6528,27 @@ async function saveRecipeQuantity(input, options = {}) {
     }
 
     return null;
+}
+
+function syncRecipeQuantityInputs(recipeUrl, quantity, sourceInput = null) {
+    if (!recipeUrl) {
+        return;
+    }
+
+    const normalizedQuantity = String(parseRecipeScaleMultiplier(quantity) || 1);
+
+    document.querySelectorAll(`.recipe-quantity-input[data-recipe-url="${cssEscape(recipeUrl)}"]`).forEach(input => {
+        if (input !== sourceInput) {
+            input.value = normalizedQuantity;
+        }
+
+        input.dataset.lastSavedValue = normalizedQuantity;
+        input.classList.add("saved");
+
+        window.setTimeout(() => {
+            input.classList.remove("saved");
+        }, 700);
+    });
 }
 
 function setRecipeQuantityControlSaving(input, isSaving) {
