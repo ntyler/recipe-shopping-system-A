@@ -4359,6 +4359,12 @@ function bindRecipeQuantityInputs() {
 
         input.addEventListener("change", () => {
             normalizeRecipeQuantityInput(input);
+            if (input.dataset.manualQuantitySaveOnly !== "1") {
+                saveRecipeQuantity(input, {
+                    message: false,
+                    cacheBust: true,
+                });
+            }
         });
 
         input.addEventListener("blur", () => {
@@ -6136,6 +6142,7 @@ function normalizeRecipeEditorSnapshot(recipe) {
             quantity: String(item.quantity || "").trim(),
             unit: String(item.unit || "").trim(),
             original_text: String(item.original_text || "").trim(),
+            purchasable_item: String(item.purchasable_item || item.buy_as || "").trim(),
             preparation: String(item.preparation || "").trim(),
             section: String(item.section || "").trim(),
             store_section: String(item.store_section || "").trim(),
@@ -6255,6 +6262,7 @@ function changedRecipeIngredientLines(previousIngredients, nextIngredients) {
 
         const amountChanged = previous.quantity !== item.quantity || previous.unit !== item.unit;
         const sectionChanged = previous.store_section !== item.store_section;
+        const buyAsChanged = previous.purchasable_item !== item.purchasable_item;
         const detailsChanged = [
             "original_text",
             "preparation",
@@ -6266,6 +6274,8 @@ function changedRecipeIngredientLines(previousIngredients, nextIngredients) {
             lines.push(`${name}: ${formatRecipeIngredientAmount(previous) || "(blank)"} -> ${formatRecipeIngredientAmount(item) || "(blank)"}`);
         } else if (sectionChanged) {
             lines.push(`${name} store section: ${previous.store_section || "(blank)"} -> ${item.store_section || "(blank)"}`);
+        } else if (buyAsChanged) {
+            lines.push(`${name} Buy As: ${previous.purchasable_item || "(blank)"} -> ${item.purchasable_item || "(blank)"}`);
         } else if (detailsChanged) {
             lines.push(`${name}: ingredient details updated`);
         }
@@ -6483,6 +6493,10 @@ async function saveRecipeQuantity(input, options = {}) {
 
     const url = input.dataset.recipeUrl || "";
     const quantity = normalizeRecipeQuantityInput(input);
+
+    if (!url) {
+        return null;
+    }
 
     if (!options.force && recipeMultipliersMatch(input.dataset.lastSavedValue, quantity) && !input.dataset.savePending) {
         return { skipped: true };
@@ -6779,6 +6793,7 @@ function renderItemQtySources(container, sourcesJson, itemKey = "") {
         quantityInput.dataset.recipeNumber = source.recipe_number || "";
         quantityInput.dataset.lastSavedValue = String(parseRecipeScaleMultiplier(source.recipe_quantity) || 1);
         quantityInput.dataset.itemKey = itemKey;
+        quantityInput.dataset.manualQuantitySaveOnly = "1";
         quantityInput.title = source.quantity ? `Ingredient qty: ${source.quantity}` : "";
 
         quantityInput.addEventListener("change", () => {
