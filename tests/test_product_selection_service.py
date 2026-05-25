@@ -760,9 +760,12 @@ class ProductSelectionServiceTest(unittest.TestCase):
 
         self.assertIn("recipe-cover-image recipe-url-summary-cover", current_recipe_template)
         self.assertIn("recipe-cover-image cookbook-recipe-cover", cookbook_template)
+        self.assertIn("recipe-url-summary-header", current_recipe_template)
+        self.assertIn("recipe-url-summary-servings", current_recipe_template)
+        self.assertIn("cookbook-recipe-summary", cookbook_template)
         self.assertLess(
-            cookbook_template.index("cookbook-recipe-servings"),
             cookbook_template.index("recipe-cover-image cookbook-recipe-cover"),
+            cookbook_template.index("cookbook-recipe-servings"),
         )
         self.assertIn("recipe-image-lightbox", css)
         self.assertIn("openRecipeImageLightbox", script)

@@ -165,7 +165,7 @@
                                                          data-cookbook-recipe-name="{{ recipe.name }}"
                                                          data-cookbook-recipe-key="{{ cookbook.id }}|{{ recipe.url }}">
                                                     <div class="cookbook-recipe-header">
-                                                        <div class="cookbook-recipe-select">
+                                                        <div class="cookbook-recipe-title">
                                                             <input type="checkbox"
                                                                    class="cookbook-restore-checkbox"
                                                                    name="recipe_urls"
@@ -176,23 +176,12 @@
                                                             {% if recipe.number %}
                                                                 <span class="cookbook-recipe-number">Recipe {{ recipe.number }}:</span>
                                                             {% endif %}
-                                                        </div>
-                                                        <div class="cookbook-recipe-title">
                                                             <a href="{{ recipe.source_href }}"
                                                                target="_blank"
                                                                rel="noopener noreferrer"
                                                                title="{{ recipe.source_display_url }}">
                                                                 {{ recipe.name }}
                                                             </a>
-                                                            {% if recipe.base_servings %}
-                                                                <span class="cookbook-recipe-servings">Servings: {{ recipe.base_servings }}{% if recipe.scaled_servings and recipe.scaled_servings != recipe.base_servings %} -> {{ recipe.scaled_servings }}{% endif %}</span>
-                                                            {% endif %}
-                                                            {% if recipe.cover_image and recipe.cover_image.src %}
-                                                                <img class="recipe-cover-image cookbook-recipe-cover"
-                                                                     src="{{ recipe.cover_image.src }}"
-                                                                     alt="{{ recipe.cover_image.alt or recipe.name }}"
-                                                                     loading="lazy">
-                                                            {% endif %}
                                                         </div>
                                                         <div class="cookbook-recipe-actions">
                                                             <button type="button"
@@ -225,6 +214,17 @@
                                                                 Remove
                                                             </button>
                                                         </div>
+                                                    </div>
+                                                    <div class="cookbook-recipe-summary">
+                                                        {% if recipe.cover_image and recipe.cover_image.src %}
+                                                            <img class="recipe-cover-image cookbook-recipe-cover"
+                                                                 src="{{ recipe.cover_image.src }}"
+                                                                 alt="{{ recipe.cover_image.alt or recipe.name }}"
+                                                                 loading="lazy">
+                                                        {% endif %}
+                                                        {% if recipe.base_servings %}
+                                                            <span class="cookbook-recipe-servings">Servings: {{ recipe.base_servings }}{% if recipe.scaled_servings and recipe.scaled_servings != recipe.base_servings %} -> {{ recipe.scaled_servings }}{% endif %}</span>
+                                                        {% endif %}
                                                     </div>
 
                                                     <div id="{{ recipe_details_id }}"

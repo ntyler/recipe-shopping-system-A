@@ -19,73 +19,86 @@
                 <div class="recipe-url-summary-row{% if loop.last %} recipe-url-summary-row-last{% endif %}"
                      data-current-recipe-row
                      data-recipe-url="{{ recipe.url }}">
-                    <button type="button"
-                            class="recipe-url-summary-number recipe-jump-link"
-                            data-recipe-url="{{ recipe.url }}"
-                            onclick="return jumpToRecipeViewRecipe(this)">
-                        Recipe {{ loop.index }}
-                    </button>
+                    <div class="recipe-url-summary-header">
+                        <div class="recipe-url-summary-title">
+                            <button type="button"
+                                    class="recipe-url-summary-number recipe-jump-link"
+                                    data-recipe-url="{{ recipe.url }}"
+                                    onclick="return jumpToRecipeViewRecipe(this)">
+                                Recipe {{ loop.index }}:
+                            </button>
+                            <a class="recipe-url-summary-name"
+                               href="{{ recipe.source_href }}"
+                               target="_blank"
+                               rel="noopener noreferrer"
+                               title="{{ recipe.source_display_url }}"
+                               data-recipe-url="{{ recipe.url }}">{{ recipe.name }}</a>
+                        </div>
+                        <div class="recipe-url-summary-actions">
+                            {% if recipe.food_rule_status.needs_review %}
+                                <button type="button"
+                                        class="food-rule-marker recipe-log-food-review-btn recipe-url-summary-food-review"
+                                        data-recipe-url="{{ recipe.url }}"
+                                        title="{{ recipe.food_rule_status.marker }}"
+                                        aria-label="Food Review: {{ recipe.food_rule_status.count }} item{% if recipe.food_rule_status.count != 1 %}s{% endif %} need review"
+                                        onclick="openRecipeEditor(this, { scrollToFoodReview: true })">
+                                    Food Review ({{ recipe.food_rule_status.count }})
+                                </button>
+                            {% endif %}
+                            <div class="recipe-quantity-control recipe-url-summary-quantity">
+                                <select class="recipe-quantity-input recipe-scaling-select"
+                                        data-recipe-number="{{ loop.index }}"
+                                        data-recipe-url="{{ recipe.url }}"
+                                        aria-label="Recipe {{ loop.index }} amount">
+                                    {% for option in recipe.scaling_options %}
+                                        <option value="{{ option.value }}"
+                                                {% if option.selected %}selected{% endif %}>
+                                            {{ option.label }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <button type="button"
+                                    class="edit-recipe-btn recipe-url-summary-edit"
+                                    data-recipe-url="{{ recipe.url }}"
+                                    onclick="openRecipeEditor(this)">
+                                Edit
+                            </button>
+                            {% if recipe.archive_pdf_available %}
+                                <a class="recipe-archive-pdf-btn recipe-url-summary-pdf"
+                                   href="{{ url_for('recipe_bp.recipe_archive_pdf_route', url=recipe.url) }}"
+                                   target="_blank"
+                                   rel="noopener noreferrer">
+                                    PDF
+                                </a>
+                            {% endif %}
+                            <form method="POST"
+                                  action="{{ url_for('recipe_bp.remove_recipe_route') }}"
+                                  class="remove-recipe-form recipe-url-summary-remove-form"
+                                  onsubmit="saveScroll(); return confirm('Remove this recipe URL?');">
+                                <input type="hidden" name="url" value="{{ recipe.url }}">
+                                <button type="submit"
+                                        class="remove-recipe-btn recipe-url-summary-remove"
+                                        aria-label="Remove recipe {{ loop.index }}">X</button>
+                            </form>
+                        </div>
+                    </div>
                     <div class="recipe-url-summary-main">
-                        <a class="recipe-url-summary-name"
-                           href="{{ recipe.source_href }}"
-                           target="_blank"
-                           rel="noopener noreferrer"
-                           title="{{ recipe.source_display_url }}"
-                           data-recipe-url="{{ recipe.url }}">{{ recipe.name }}</a>
                         {% if recipe.cover_image and recipe.cover_image.src %}
                             <img class="recipe-cover-image recipe-url-summary-cover"
                                  src="{{ recipe.cover_image.src }}"
                                  alt="{{ recipe.cover_image.alt or recipe.name }}"
                                  loading="lazy">
                         {% endif %}
-                    </div>
-                    <div class="recipe-url-summary-actions">
-                        {% if recipe.food_rule_status.needs_review %}
-                            <button type="button"
-                                    class="food-rule-marker recipe-log-food-review-btn recipe-url-summary-food-review"
-                                    data-recipe-url="{{ recipe.url }}"
-                                    title="{{ recipe.food_rule_status.marker }}"
-                                    aria-label="Food Review: {{ recipe.food_rule_status.count }} item{% if recipe.food_rule_status.count != 1 %}s{% endif %} need review"
-                                    onclick="openRecipeEditor(this, { scrollToFoodReview: true })">
-                                Food Review ({{ recipe.food_rule_status.count }})
-                            </button>
+                        {% if recipe.base_servings %}
+                            <div class="recipe-url-summary-servings">
+                                Servings:
+                                <span>{{ recipe.base_servings }}</span>
+                                {% if recipe.quantity != 1 and recipe.scaled_servings %}
+                                    <span>-> {{ recipe.scaled_servings }}</span>
+                                {% endif %}
+                            </div>
                         {% endif %}
-                        <div class="recipe-quantity-control recipe-url-summary-quantity">
-                            <select class="recipe-quantity-input recipe-scaling-select"
-                                    data-recipe-number="{{ loop.index }}"
-                                    data-recipe-url="{{ recipe.url }}"
-                                    aria-label="Recipe {{ loop.index }} amount">
-                                {% for option in recipe.scaling_options %}
-                                    <option value="{{ option.value }}"
-                                            {% if option.selected %}selected{% endif %}>
-                                        {{ option.label }}
-                                    </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <button type="button"
-                                class="edit-recipe-btn recipe-url-summary-edit"
-                                data-recipe-url="{{ recipe.url }}"
-                                onclick="openRecipeEditor(this)">
-                            Edit
-                        </button>
-                        {% if recipe.archive_pdf_available %}
-                            <a class="recipe-archive-pdf-btn recipe-url-summary-pdf"
-                               href="{{ url_for('recipe_bp.recipe_archive_pdf_route', url=recipe.url) }}"
-                               target="_blank"
-                               rel="noopener noreferrer">
-                                PDF
-                            </a>
-                        {% endif %}
-                        <form method="POST"
-                              action="{{ url_for('recipe_bp.remove_recipe_route') }}"
-                              class="remove-recipe-form recipe-url-summary-remove-form"
-                              onsubmit="saveScroll(); return confirm('Remove this recipe URL?');">
-                            <input type="hidden" name="url" value="{{ recipe.url }}">
-                            <button type="submit"
-                                    class="remove-recipe-btn recipe-url-summary-remove"
-                                    aria-label="Remove recipe {{ loop.index }}">X</button>
-                        </form>
                     </div>
                 </div>
             {% endfor %}

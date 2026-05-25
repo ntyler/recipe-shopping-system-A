@@ -240,6 +240,8 @@ def recipe_url_log_rows(recipe_urls):
         recipe_data = load_saved_recipe_output(recipe["url"])
         recipe_meta = recipe_ingredient_data.get(normalize_recipe_url_key(recipe["url"]), {})
         recipe_quantity = normalize_recipe_quantity(recipe.get("quantity") or 1)
+        use_scaled_meta = multipliers_match(recipe_meta.get("quantity", 1), recipe_quantity)
+        scaled_servings = recipe_meta.get("scaled_servings") if use_scaled_meta else None
         rows.append({
             **recipe,
             "quantity": recipe_quantity,
@@ -249,6 +251,8 @@ def recipe_url_log_rows(recipe_urls):
             "cover_image": recipe_cover_image_for_view(recipe["url"], recipe_data, recipe_meta),
             "food_rule_status": recipe_food_rule_status(recipe_data),
             "archive_pdf_available": recipe_archive_pdf_exists(recipe["url"]),
+            "base_servings": recipe_data.get("servings"),
+            "scaled_servings": scaled_servings or scale_servings(recipe_data.get("servings"), recipe_quantity),
         })
 
     return rows

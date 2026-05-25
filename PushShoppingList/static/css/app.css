@@ -2896,6 +2896,7 @@ body {
 
         .cookbooks-content {
             margin-top: 12px;
+            container-type: inline-size;
         }
 
         .cookbooks-toolbar {
@@ -3398,9 +3399,10 @@ body {
         }
 
         .cookbook-recipe-header {
-            display: grid;
-            grid-template-columns: 92px minmax(0, 1fr) auto;
+            display: flex;
+            flex-wrap: wrap;
             gap: 8px;
+            justify-content: space-between;
             align-items: start;
             margin-bottom: 10px;
         }
@@ -3426,16 +3428,27 @@ body {
 
         .cookbook-recipe-number {
             min-width: 0;
+            flex: 0 0 auto;
+            color: #00ff99;
+            font-weight: 900;
             overflow-wrap: normal;
+            white-space: nowrap;
         }
 
         .cookbook-recipe-title {
+            flex: 1 1 240px;
             min-width: 0;
-            display: grid;
-            gap: 6px;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            flex-wrap: wrap;
+            color: #00ff99;
+            line-height: 1.2;
         }
 
         .cookbook-recipe-title a {
+            flex: 1 1 180px;
+            min-width: 0;
             color: #fff;
             text-decoration: none;
             font-size: 15px;
@@ -3454,14 +3467,21 @@ body {
             font-weight: 800;
         }
 
+        .cookbook-recipe-summary {
+            display: grid;
+            gap: 6px;
+            justify-items: start;
+            margin: 0 0 10px 26px;
+        }
+
         .cookbook-recipe-cover {
             width: min(220px, 100%);
             max-height: none;
-            margin-top: 2px;
             justify-self: start;
         }
 
         .cookbook-recipe-actions {
+            flex: 0 1 auto;
             display: inline-flex;
             align-items: center;
             justify-content: flex-end;
@@ -3559,6 +3579,13 @@ body {
         .cookbook-recipe-ingredients {
             display: grid;
             gap: 8px;
+        }
+
+        @container (max-width: 860px) {
+            .cookbooks-layout,
+            .cookbook-card-grid {
+                grid-template-columns: minmax(0, 1fr);
+            }
         }
 
         .cookbook-ingredient-section {
@@ -4240,9 +4267,9 @@ body {
 
         .recipe-url-summary-row {
             display: grid;
-            grid-template-columns: 96px minmax(0, 1fr) auto;
+            grid-template-columns: minmax(0, 1fr);
             gap: 10px;
-            align-items: center;
+            align-items: start;
             padding-bottom: 8px;
             border-bottom: 1px solid #2d2d2d;
             scroll-margin-top: 12px;
@@ -4260,10 +4287,30 @@ body {
             white-space: nowrap;
         }
 
+        .recipe-url-summary-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .recipe-url-summary-title {
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+            min-width: 0;
+            color: #00cc66;
+            font-size: 16px;
+            font-weight: 800;
+            line-height: 1.25;
+        }
+
         .recipe-url-summary-main {
             min-width: 0;
             display: grid;
             gap: 7px;
+            justify-items: start;
             align-items: start;
         }
 
@@ -4350,7 +4397,12 @@ body {
         }
 
         .recipe-url-summary-cover {
-            max-height: 124px;
+            width: min(280px, 100%);
+        }
+
+        .recipe-url-summary-servings {
+            color: #aaa;
+            font-size: 14px;
         }
 
         .recipe-url-summary-food-review {
@@ -4360,11 +4412,11 @@ body {
         }
 
         .recipe-url-summary-actions {
+            flex: 0 1 auto;
             display: inline-flex;
             align-items: center;
             justify-content: flex-end;
             gap: 8px;
-            justify-self: end;
             width: auto;
         }
 
@@ -7023,21 +7075,16 @@ body {
             }
 
             .cookbook-recipe-header {
-                grid-template-columns: minmax(0, 1fr);
                 gap: 8px;
             }
 
-            .cookbook-recipe-select {
-                grid-row: 1;
-            }
-
             .cookbook-recipe-title {
-                grid-row: 2;
+                flex-basis: 100%;
             }
 
             .cookbook-recipe-actions {
-                grid-row: 3;
                 justify-content: stretch;
+                width: 100%;
             }
 
             .cookbook-recipe-actions > * {
@@ -7128,26 +7175,24 @@ body {
             }
 
             .cookbook-recipe-header {
-                grid-template-columns: minmax(0, 1fr);
                 gap: 8px;
             }
 
-            .cookbook-recipe-select {
-                grid-template-columns: 18px minmax(0, 1fr);
-                grid-row: 1;
-            }
-
             .cookbook-recipe-title {
-                grid-row: 2;
+                flex-basis: 100%;
             }
 
             .cookbook-recipe-actions {
-                grid-row: 3;
                 justify-content: stretch;
+                width: 100%;
             }
 
             .cookbook-recipe-actions > * {
                 flex: 1 1 90px;
+            }
+
+            .cookbook-recipe-summary {
+                margin-left: 0;
             }
 
             .cookbook-card-actions {
@@ -7579,20 +7624,20 @@ body {
                 gap: 6px;
             }
 
-            .recipe-url-summary-number {
-                grid-column: 1 / -1;
-                grid-row: 1;
-                align-self: start;
+            .recipe-url-summary-header {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr);
+                gap: 8px;
+                align-items: start;
             }
 
-            .recipe-url-summary-main {
-                grid-column: 1 / -1;
-                grid-row: 2;
+            .recipe-url-summary-title {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr);
+                gap: 3px;
             }
 
             .recipe-url-summary-actions {
-                grid-column: 1 / -1;
-                grid-row: 3;
                 justify-self: start;
                 justify-content: flex-start;
                 flex-wrap: wrap;
