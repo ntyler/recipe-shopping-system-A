@@ -3917,6 +3917,11 @@ body {
             font-weight: 800;
         }
 
+        .rules-editor-status:empty {
+            min-height: 0;
+            padding-top: 0;
+        }
+
         .rules-editor-status.error {
             color: #ffb4b4;
         }
@@ -3927,6 +3932,10 @@ body {
             display: grid;
             gap: 12px;
             padding: 16px 20px;
+        }
+
+        .rules-editor-fields:has([data-rules-food-list]) {
+            padding-top: 0;
         }
 
         .rules-editor-section {
