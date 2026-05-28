@@ -71,14 +71,25 @@
                                        value="{{ recipe.url }}"
                                        form="moveCookbookRecipesForm"
                                        data-cookbook-recipe-checkbox>
-                                <span class="cookbook-source-name">
-                                    {% if recipe.number %}Recipe {{ recipe.number }}: {% endif %}{{ recipe.name }}
+                                <span class="cookbook-source-body">
+                                    <span class="cookbook-source-name">
+                                        {% if recipe.number %}Recipe {{ recipe.number }}: {% endif %}{{ recipe.name }}
+                                    </span>
+                                    {% if recipe.base_servings %}
+                                        <span class="cookbook-source-servings">Servings: {{ recipe.base_servings }}{% if recipe.scaled_servings and recipe.scaled_servings != recipe.base_servings %} -> {{ recipe.scaled_servings }}{% endif %}</span>
+                                    {% endif %}
+                                    {% if recipe.cover_image and recipe.cover_image.src %}
+                                        <img class="recipe-cover-image cookbook-source-cover"
+                                             src="{{ recipe.cover_image.src }}"
+                                             alt="{{ recipe.cover_image.alt or recipe.name }}"
+                                             loading="lazy">
+                                    {% endif %}
+                                    {% if recipe.cookbook_name %}
+                                        <small>{{ recipe.cookbook_name }}</small>
+                                    {% else %}
+                                        <small>{{ recipe.source_display_url }}</small>
+                                    {% endif %}
                                 </span>
-                                {% if recipe.cookbook_name %}
-                                    <small>{{ recipe.cookbook_name }}</small>
-                                {% else %}
-                                    <small>{{ recipe.source_display_url }}</small>
-                                {% endif %}
                             </label>
                         {% endfor %}
                     </div>

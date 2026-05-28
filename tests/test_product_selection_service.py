@@ -421,6 +421,8 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("resolveCookbookOverwritePrompt(false)", cookbook_template)
         self.assertIn("openRecipeEditor(this)", cookbook_template)
         self.assertIn("recipe-archive-pdf-btn cookbook-recipe-pdf-btn", cookbook_template)
+        self.assertIn("cookbook-source-servings", cookbook_template)
+        self.assertIn("recipe-cover-image cookbook-source-cover", cookbook_template)
         self.assertIn("/api/cookbooks/restore_recipes", cookbook_template)
         self.assertIn("/rename", script)
         self.assertIn("cookbook_recipe_exists", script)
@@ -448,6 +450,7 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn(".cookbook-recipe-search", css)
         self.assertIn(".cookbook-restore-btn", css)
         self.assertIn(".cookbook-recipe-details.collapsed", css)
+        self.assertIn(".cookbook-source-cover", css)
 
     def test_cookbook_move_reassigns_recipes_with_details_between_cookbooks(self):
         from PushShoppingList.services import cookbook_service
@@ -820,11 +823,16 @@ class ProductSelectionServiceTest(unittest.TestCase):
         script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
 
         self.assertIn("recipe-cover-image recipe-url-summary-cover", current_recipe_template)
+        self.assertIn("recipe-cover-image cookbook-source-cover", cookbook_template)
         self.assertIn("recipe-cover-image cookbook-recipe-cover", cookbook_template)
         self.assertIn("recipe-cover-image recipe-view-cover", items_template)
         self.assertIn("recipe-url-summary-header", current_recipe_template)
         self.assertIn("recipe-url-summary-servings", current_recipe_template)
         self.assertIn("cookbook-recipe-summary", cookbook_template)
+        self.assertLess(
+            cookbook_template.index("cookbook-source-servings"),
+            cookbook_template.index("recipe-cover-image cookbook-source-cover"),
+        )
         self.assertLess(
             current_recipe_template.index("recipe-url-summary-servings"),
             current_recipe_template.index("recipe-cover-image recipe-url-summary-cover"),

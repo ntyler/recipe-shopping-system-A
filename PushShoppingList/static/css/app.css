@@ -3093,7 +3093,7 @@ body {
             display: grid;
             grid-template-columns: 22px minmax(0, 1fr);
             gap: 8px;
-            align-items: center;
+            align-items: start;
             padding: 9px 10px;
             border: 1px solid #333;
             border-radius: 8px;
@@ -3109,15 +3109,35 @@ body {
             cursor: pointer;
         }
 
+        .cookbook-source-body {
+            min-width: 0;
+            display: grid;
+            gap: 6px;
+            justify-items: start;
+        }
+
         .cookbook-source-name {
             min-width: 0;
             overflow-wrap: anywhere;
             font-size: 14px;
             font-weight: 800;
+            line-height: 1.2;
+        }
+
+        .cookbook-source-servings {
+            color: #9ca3af;
+            font-size: 12px;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+
+        .cookbook-source-cover {
+            width: min(200px, 100%);
+            max-height: none;
+            justify-self: start;
         }
 
         .cookbook-source-item small {
-            grid-column: 2;
             color: #7dd3fc;
             font-size: 11px;
             font-weight: 800;
@@ -4308,6 +4328,47 @@ body {
             padding-bottom: 8px;
             border-bottom: 1px solid #2d2d2d;
             scroll-margin-top: 12px;
+            transition: background 120ms ease, border-color 120ms ease, opacity 120ms ease;
+        }
+
+        .recipe-url-collapsed-summary.is-saving .recipe-url-summary-row {
+            opacity: 0.74;
+        }
+
+        .recipe-url-summary-row.is-dragging {
+            opacity: 0.58;
+            background: #17211f;
+            border-color: #12d6c5;
+        }
+
+        body.recipe-url-dragging,
+        body.recipe-url-dragging * {
+            cursor: grabbing !important;
+        }
+
+        .recipe-url-drag-handle {
+            flex: 0 0 auto;
+            width: 32px;
+            min-width: 32px;
+            height: 32px;
+            margin: 0;
+            padding: 0;
+            border: 1px solid #3f4a4a;
+            border-radius: 6px;
+            background: #202829;
+            color: #cbd5e1;
+            font-size: 18px;
+            font-weight: 800;
+            line-height: 1;
+            cursor: grab;
+            touch-action: none;
+        }
+
+        .recipe-url-drag-handle:hover,
+        .recipe-url-drag-handle:focus {
+            background: #263435;
+            color: #fff;
+            outline: none;
         }
 
         .recipe-url-summary-row:last-child,
@@ -4331,6 +4392,7 @@ body {
         }
 
         .recipe-url-summary-title {
+            flex: 1 1 auto;
             display: grid;
             gap: 3px;
             min-width: 0;

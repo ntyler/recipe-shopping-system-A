@@ -14,16 +14,26 @@
          data-collapse-default="expanded"
          data-collapse-mobile-default="collapsed">
         {% if current_urls %}
-        <div class="recipe-url-collapsed-summary" aria-label="Current recipe URL summary">
+        <div class="recipe-url-collapsed-summary"
+             data-recipe-url-sort-list
+             aria-label="Current recipe URL summary">
             {% for recipe in current_urls %}
                 <div class="recipe-url-summary-row{% if loop.last %} recipe-url-summary-row-last{% endif %}"
                      data-current-recipe-row
-                     data-recipe-url="{{ recipe.url }}">
+                     data-recipe-url="{{ recipe.url }}"
+                     draggable="true">
                     <div class="recipe-url-summary-header">
+                        <button type="button"
+                                class="recipe-url-drag-handle"
+                                data-recipe-drag-handle
+                                aria-label="Reorder recipe {{ loop.index }}">
+                            <span aria-hidden="true">&#9776;</span>
+                        </button>
                         <div class="recipe-url-summary-title">
                             <div class="recipe-url-summary-title-line">
                                 <button type="button"
                                         class="recipe-url-summary-number recipe-jump-link"
+                                        data-recipe-index-label
                                         data-recipe-url="{{ recipe.url }}"
                                         onclick="return jumpToRecipeViewRecipe(this)">
                                     Recipe {{ loop.index }}:

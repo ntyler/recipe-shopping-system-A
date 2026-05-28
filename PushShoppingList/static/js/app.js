@@ -4344,6 +4344,210 @@ function restoreItemCheckState() {
     });
 }
 
+function bindRecipeUrlLogDragAndDrop() {
+    const list = document.querySelector("[data-recipe-url-sort-list]");
+
+    if (!list || list.dataset.dragBound === "1") {
+        return;
+    }
+
+    list.dataset.dragBound = "1";
+    list.dataset.savedOrder = recipeUrlOrder(list).join("\n");
+
+    list.querySelectorAll("[data-current-recipe-row]").forEach(row => {
+        const handle = row.querySelector("[data-recipe-drag-handle]");
+        row.setAttribute("draggable", "true");
+
+        if (handle) {
+            handle.addEventListener("pointerdown", () => {
+                row.dataset.dragHandleActive = "1";
+            });
+            handle.addEventListener("pointerup", () => {
+                delete row.dataset.dragHandleActive;
+            });
+            handle.addEventListener("blur", () => {
+                delete row.dataset.dragHandleActive;
+            });
+        }
+
+        row.addEventListener("dragstart", event => {
+            if (row.dataset.dragHandleActive !== "1") {
+                event.preventDefault();
+                return;
+            }
+
+            row.classList.add("is-dragging");
+            row.setAttribute("aria-grabbed", "true");
+            list.classList.add("is-dragging");
+            document.body.classList.add("recipe-url-dragging");
+
+            if (event.dataTransfer) {
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("text/plain", row.dataset.recipeUrl || "");
+            }
+        });
+
+        row.addEventListener("dragend", () => {
+            const changed = list.dataset.savedOrder !== recipeUrlOrder(list).join("\n");
+
+            row.classList.remove("is-dragging");
+            row.setAttribute("aria-grabbed", "false");
+            delete row.dataset.dragHandleActive;
+            list.classList.remove("is-dragging");
+            document.body.classList.remove("recipe-url-dragging");
+            updateRecipeUrlOrderNumbers(list);
+
+            if (changed) {
+                saveRecipeUrlOrder(list);
+            }
+        });
+    });
+
+    list.addEventListener("dragover", event => {
+        const draggingRow = list.querySelector("[data-current-recipe-row].is-dragging");
+        const targetRow = event.target.closest("[data-current-recipe-row]");
+
+        if (!draggingRow || !targetRow || targetRow === draggingRow || targetRow.parentElement !== list) {
+            return;
+        }
+
+        event.preventDefault();
+
+        if (event.dataTransfer) {
+            event.dataTransfer.dropEffect = "move";
+        }
+
+        const rect = targetRow.getBoundingClientRect();
+        const shouldPlaceAfter = event.clientY > rect.top + rect.height / 2;
+        list.insertBefore(draggingRow, shouldPlaceAfter ? targetRow.nextElementSibling : targetRow);
+        updateRecipeUrlOrderNumbers(list);
+    });
+
+    list.addEventListener("drop", event => {
+        if (list.querySelector("[data-current-recipe-row].is-dragging")) {
+            event.preventDefault();
+        }
+    });
+}
+
+function recipeUrlOrder(list) {
+    return [...list.querySelectorAll("[data-current-recipe-row]")]
+        .map(row => row.dataset.recipeUrl || "")
+        .filter(Boolean);
+}
+
+function updateRecipeUrlOrderNumbers(list) {
+    const rows = [...list.querySelectorAll("[data-current-recipe-row]")];
+
+    rows.forEach((row, index) => {
+        const recipeNumber = index + 1;
+        const numberLabel = row.querySelector("[data-recipe-index-label]");
+        const quantityInput = row.querySelector(".recipe-quantity-input");
+        const removeButton = row.querySelector(".recipe-url-summary-remove");
+
+        row.classList.toggle("recipe-url-summary-row-last", index === rows.length - 1);
+
+        if (numberLabel) {
+            numberLabel.textContent = `Recipe ${recipeNumber}:`;
+        }
+
+        if (quantityInput) {
+            quantityInput.dataset.recipeNumber = String(recipeNumber);
+            quantityInput.setAttribute("aria-label", `Recipe ${recipeNumber} amount`);
+        }
+
+        if (removeButton) {
+            removeButton.setAttribute("aria-label", `Remove recipe ${recipeNumber}`);
+        }
+    });
+}
+
+async function saveRecipeUrlOrder(list) {
+    const urls = recipeUrlOrder(list);
+
+    if (!urls.length || list.dataset.savePending === "1") {
+        return;
+    }
+
+    list.dataset.savePending = "1";
+    list.classList.add("is-saving");
+
+    try {
+        await postRecipeUrlOrder(urls);
+
+        list.dataset.savedOrder = urls.join("\n");
+        showRecipeQuantityUpdatedMessage("", "", "", "Recipe order updated.");
+        await refreshStoreMarkup({
+            cacheBust: true,
+            scrollX: window.scrollX,
+            scrollY: window.scrollY,
+        });
+    } catch (err) {
+        console.warn("Unable to save recipe URL order.", err);
+        alert(err.message || "Unable to save recipe order.");
+    } finally {
+        list.classList.remove("is-saving");
+        delete list.dataset.savePending;
+    }
+}
+
+async function postRecipeUrlOrder(urls) {
+    const endpoints = ["/api/recipe_urls/reorder"];
+    const hostname = window.location.hostname;
+
+    if (
+        window.location.port !== "5000"
+        && ["127.0.0.1", "localhost"].includes(hostname)
+    ) {
+        endpoints.push(`${window.location.protocol}//${hostname}:5000/api/recipe_urls/reorder`);
+    }
+
+    let lastError = null;
+
+    for (const endpoint of endpoints) {
+        try {
+            return await postRecipeUrlOrderToEndpoint(endpoint, urls);
+        } catch (err) {
+            lastError = err;
+
+            if (!err.canTryNextRecipeOrderEndpoint) {
+                break;
+            }
+        }
+    }
+
+    throw lastError || new Error("Unable to save recipe order.");
+}
+
+async function postRecipeUrlOrderToEndpoint(endpoint, urls) {
+    const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ urls }),
+    });
+    const contentType = response.headers.get("content-type") || "";
+    const data = contentType.includes("application/json")
+        ? await response.json()
+        : null;
+
+    if (!response.ok || !data || !data.ok) {
+        const error = new Error(
+            (data && data.error)
+            || (
+                response.status === 404
+                    ? "Recipe reorder is not available on this running server."
+                    : "Unable to save recipe order."
+            )
+        );
+        error.canTryNextRecipeOrderEndpoint = response.status === 404 || !contentType.includes("application/json");
+        throw error;
+    }
+
+    return data;
+}
+
 function bindRecipeQuantityInputs() {
     document.querySelectorAll(".recipe-quantity-input").forEach(input => {
         if (input.dataset.quantityBound === "1") {
@@ -8492,6 +8696,7 @@ async function refreshStoreMarkup(options = {}) {
     restoreOpenStorePanels();
     restoreViewBehaviorSettings();
     restoreItemCheckState();
+    bindRecipeUrlLogDragAndDrop();
     bindRecipeQuantityInputs();
     bindRecipeNameInputs();
     bindCookbooks();
@@ -8676,6 +8881,7 @@ document.addEventListener("DOMContentLoaded", function () {
     restoreOpenStorePanels();
     restoreViewBehaviorSettings();
     restoreItemCheckState();
+    bindRecipeUrlLogDragAndDrop();
     bindRecipeQuantityInputs();
     bindRecipeNameInputs();
     bindCookbooks();

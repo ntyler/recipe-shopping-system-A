@@ -7,14 +7,15 @@
       "section": null,
       "original_text": "5 eggs",
       "quantity": "5",
+      "recipe_qty": "5",
       "unit": null,
+      "base_quantity": "5",
+      "base_unit": null,
       "ingredient": "egg",
       "preparation": null,
       "optional": false,
       "store_section": "DAIRY & EGGS",
       "store_section_order": 3,
-      "base_quantity": "5",
-      "recipe_qty": "5",
       "purchasable_item": "eggs",
       "purchase_group": "eggs X"
     },
@@ -22,191 +23,205 @@
       "section": null,
       "original_text": "2 yolks",
       "quantity": "2",
+      "recipe_qty": "2",
       "unit": null,
+      "base_quantity": "2",
+      "base_unit": null,
       "ingredient": "yolks",
       "preparation": null,
       "optional": false,
       "store_section": "DAIRY & EGGS",
       "store_section_order": 3,
-      "base_quantity": "2"
+      "purchasable_item": "eggs",
+      "purchase_group": "eggs"
     },
     {
       "section": null,
       "original_text": "3/4 cup brown sugar",
       "quantity": "3/4",
+      "recipe_qty": "3/4",
       "unit": "cup",
+      "base_quantity": "3/4",
+      "base_unit": "cup",
       "ingredient": "brown sugar",
       "preparation": null,
       "optional": false,
       "store_section": "BAKING",
       "store_section_order": 7,
-      "base_quantity": "3/4",
-      "base_unit": "cup"
+      "purchasable_item": "brown sugar",
+      "purchase_group": "brown sugar"
     },
     {
       "section": null,
       "original_text": "1 teaspoon vanilla extract",
       "quantity": "1",
+      "recipe_qty": "1",
       "unit": "teaspoon",
+      "base_quantity": "1",
+      "base_unit": "teaspoon",
       "ingredient": "vanilla extract",
       "preparation": null,
       "optional": false,
       "store_section": "BAKING",
       "store_section_order": 7,
-      "base_quantity": "1",
-      "base_unit": "teaspoon"
+      "purchasable_item": "vanilla extract",
+      "purchase_group": "vanilla extract"
     },
     {
       "section": null,
       "original_text": "3/4 cup all-purpose flour",
       "quantity": "3/4",
+      "recipe_qty": "3/4",
       "unit": "cup",
+      "base_quantity": "3/4",
+      "base_unit": "cup",
       "ingredient": "all-purpose flour",
       "preparation": null,
       "optional": false,
       "store_section": "BAKING",
       "store_section_order": 7,
-      "base_quantity": "3/4",
-      "base_unit": "cup"
+      "purchasable_item": "all-purpose flour",
+      "purchase_group": "all-purpose flour"
     },
     {
       "section": null,
       "original_text": "6 tablespoons Dutch-processed cocoa powder",
       "quantity": "6",
+      "recipe_qty": "6",
       "unit": "tablespoons",
+      "base_quantity": "6",
+      "base_unit": "tablespoons",
       "ingredient": "Dutch-processed cocoa powder",
       "preparation": null,
       "optional": false,
       "store_section": "BAKING",
       "store_section_order": 7,
-      "base_quantity": "6",
-      "base_unit": "tablespoons"
+      "purchasable_item": "Dutch-processed cocoa powder",
+      "purchase_group": "Dutch-processed cocoa powder"
     },
     {
       "section": null,
       "original_text": "1/4 teaspoon baking powder",
       "quantity": "1/4",
+      "recipe_qty": "1/4",
       "unit": "teaspoon",
+      "base_quantity": "1/4",
+      "base_unit": "teaspoon",
       "ingredient": "baking powder",
       "preparation": null,
       "optional": false,
       "store_section": "BAKING",
       "store_section_order": 7,
-      "base_quantity": "1/4",
-      "base_unit": "teaspoon"
+      "purchasable_item": "baking powder",
+      "purchase_group": "baking powder"
     },
     {
       "section": null,
       "original_text": "1/4 cup clarified butter, warm",
       "quantity": "1/4",
+      "recipe_qty": "1/4",
       "unit": "cup",
+      "base_quantity": "1/4",
+      "base_unit": "cup",
       "ingredient": "clarified butter",
       "preparation": "warm",
       "optional": false,
       "store_section": "DAIRY & EGGS",
       "store_section_order": 3,
-      "base_quantity": "1/4",
-      "base_unit": "cup"
+      "purchasable_item": "clarified butter",
+      "purchase_group": "clarified butter"
     },
     {
       "section": null,
       "original_text": "3 cups confectioners' sugar",
       "quantity": "3",
+      "recipe_qty": "3",
       "unit": "cups",
+      "base_quantity": "3",
+      "base_unit": "cups",
       "ingredient": "confectioners' sugar",
       "preparation": null,
       "optional": false,
       "store_section": "BAKING",
       "store_section_order": 7,
-      "base_quantity": "3",
-      "base_unit": "cups"
+      "purchasable_item": "confectioners' sugar",
+      "purchase_group": "confectioners' sugar"
     },
     {
       "section": null,
       "original_text": "1 cup butter",
       "quantity": "1",
+      "recipe_qty": "1",
       "unit": "cup",
+      "base_quantity": "1",
+      "base_unit": "cup",
       "ingredient": "butter",
       "preparation": null,
       "optional": false,
       "store_section": "DAIRY & EGGS",
       "store_section_order": 3,
-      "base_quantity": "1",
-      "base_unit": "cup"
+      "purchasable_item": "butter",
+      "purchase_group": "butter"
     },
     {
       "section": null,
       "original_text": "1 to 2 tablespoons heavy cream",
       "quantity": "1 to 2",
+      "recipe_qty": "1 to 2",
       "unit": "tablespoons",
+      "base_quantity": "1 to 2",
+      "base_unit": "tablespoons",
       "ingredient": "heavy cream",
       "preparation": null,
       "optional": false,
       "store_section": "DAIRY & EGGS",
       "store_section_order": 3,
-      "base_quantity": "1 to 2",
-      "base_unit": "tablespoons"
+      "purchasable_item": "heavy cream",
+      "purchase_group": "heavy cream"
     },
     {
       "section": null,
       "original_text": "12 ounces semisweet chocolate, chopped",
       "quantity": "12",
+      "recipe_qty": "12",
       "unit": "ounces",
+      "base_quantity": "12",
+      "base_unit": "ounces",
       "ingredient": "semisweet chocolate",
       "preparation": "chopped",
       "optional": false,
       "store_section": "BAKING",
       "store_section_order": 7,
-      "base_quantity": "12",
-      "base_unit": "ounces"
+      "purchasable_item": "semisweet chocolate",
+      "purchase_group": "semisweet chocolate"
     },
     {
       "section": null,
       "original_text": "2 ounces cocoa butter or 1/4 cup vegetable oil",
       "quantity": "2",
+      "recipe_qty": "2",
       "unit": "ounces",
+      "base_quantity": "2",
+      "base_unit": "ounces",
       "ingredient": "cocoa butter OR vegetable oil",
       "preparation": null,
       "optional": false,
       "store_section": "BAKING",
       "store_section_order": 7,
-      "base_quantity": "2",
-      "base_unit": "ounces"
+      "purchasable_item": "cocoa butter OR vegetable oil",
+      "purchase_group": "cocoa butter OR vegetable oil"
     }
   ],
   "equipment": [
-    {
-      "name": "cutting board",
-      "category": "prep"
-    },
-    {
-      "name": "knife",
-      "category": "prep"
-    },
-    {
-      "name": "mixing bowl",
-      "category": "prep"
-    },
-    {
-      "name": "oven",
-      "category": "appliance"
-    },
-    {
-      "name": "rolling pin",
-      "category": "prep"
-    },
-    {
-      "name": "saucepan",
-      "category": "cookware"
-    },
-    {
-      "name": "spatula",
-      "category": "utensil"
-    },
-    {
-      "name": "whisk",
-      "category": "utensil"
-    }
+    "cutting board",
+    "knife",
+    "mixing bowl",
+    "oven",
+    "rolling pin",
+    "saucepan",
+    "spatula",
+    "whisk",
+    "dxfghsdfgh"
   ],
   "instructions": [
     {
@@ -215,9 +230,7 @@
       "instruction": "Preheat the oven to 350 degrees F.",
       "temperature": null,
       "time": null,
-      "equipment_used": [
-        "oven"
-      ]
+      "equipment_used": []
     },
     {
       "section": null,
@@ -225,9 +238,7 @@
       "instruction": "To make the Cake: Butter the jelly roll pan and line it with parchment paper; then butter the paper to assure release.",
       "temperature": null,
       "time": null,
-      "equipment_used": [
-        "rolling pin"
-      ]
+      "equipment_used": []
     },
     {
       "section": null,
@@ -235,9 +246,7 @@
       "instruction": "Bring a saucepan of water to a simmer.",
       "temperature": null,
       "time": null,
-      "equipment_used": [
-        "saucepan"
-      ]
+      "equipment_used": []
     },
     {
       "section": null,
@@ -245,10 +254,7 @@
       "instruction": "In the bowl from a standing mixer, combine the eggs, yolks, sugar, vanilla in a bowl and whisk briefly. Set the bowl over the simmering water and stir until warm and the sugar looks dissolved. Attach the bowl to the standing mixer fitted with a whisk, and whip until light and fluffy, about 6 minutes.",
       "temperature": null,
       "time": null,
-      "equipment_used": [
-        "mixing bowl",
-        "whisk"
-      ]
+      "equipment_used": []
     },
     {
       "section": null,
@@ -272,10 +278,7 @@
       "instruction": "Immediately pour the batter into the prepared pans dividing equally and smooth the tops with a spatula. Bake until lightly browned and it starts to pull away from the edges of the pan, about 14 to 16 minutes.",
       "temperature": null,
       "time": null,
-      "equipment_used": [
-        "oven",
-        "spatula"
-      ]
+      "equipment_used": []
     },
     {
       "section": null,
@@ -283,9 +286,7 @@
       "instruction": "Remove the cakes from the oven and let sit in the pan for 1 minute. Run a knife along the edge to release the cake then flip it out onto parchment paper. Brush the paper (the one you lined the pan with) with water and let soak for 2 minutes. Peel it off the cake. Trim dry edges from the cake. Let cool covered with plastic wrap.",
       "temperature": null,
       "time": null,
-      "equipment_used": [
-        "oven"
-      ]
+      "equipment_used": []
     },
     {
       "section": null,
@@ -301,16 +302,20 @@
       "instruction": "Spread the sponge cakes with a thin layer of the filling, leaving a 1/4-inch space at the far edge. Roll the cake tightly on the long side until you have rolled a 1 1/2-inch thick log. Cut the log off from the remaining sheet of cake and place seam side-down. Repeat with remaining cake. Chill the logs for 30 minutes; then cut into 2 1/2-inch sections.",
       "temperature": null,
       "time": null,
-      "equipment_used": [
-        "cutting board",
-        "knife",
-        "rolling pin"
-      ]
+      "equipment_used": []
     },
     {
       "section": null,
       "step_number": 11,
       "instruction": "To make the Glaze: Melt the 2 ingredients together in the top of a double boiler or a bowl set over barely simmering water, stirring occasionally. Line a cookie sheet with parchment paper or a nonstick baking mat. One at a time, gently drop the cake rolls into the hot chocolate. Lift out with a fork and let excess chocolate drip back into the bowl. Place on the cookie sheet and let set at room temperature until the coating is firm, about 1 to 2 hours.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": []
+    },
+    {
+      "section": null,
+      "step_number": 12,
+      "instruction": "cdfrthgncvgnhbdvfcgh",
       "temperature": null,
       "time": null,
       "equipment_used": []
@@ -323,19 +328,16 @@
     "protein": "5g",
     "fat": "36g",
     "saturated_fat": "19g",
-    "polyunsaturated_fat": null,
-    "monounsaturated_fat": null,
-    "trans_fat": null,
     "cholesterol": "121mg",
     "sodium": "43mg",
-    "potassium": null,
     "fiber": "3g",
     "sugar": "54g",
-    "vitamin_a": null,
-    "vitamin_c": null,
-    "calcium": null,
-    "iron": null,
-    "other": []
+    "other": [
+      {
+        "label": "zxcfv",
+        "value": "asdvfg"
+      }
+    ]
   },
   "cover_image": {
     "url": "https://food.fnr.sndimg.com/content/dam/images/food/fullset/2004/4/13/1/sd1e01_homemade_ho_hos.jpg.rend.hgtvcom.1280.1280.suffix/1386101456282.webp",

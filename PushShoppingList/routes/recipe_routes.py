@@ -38,10 +38,12 @@ from PushShoppingList.services.recipe_ingredient_service import remove_recipe_an
 from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
 from PushShoppingList.services.recipe_ingredient_service import save_ingredients_for_recipe
 from PushShoppingList.services.recipe_url_service import add_recipe_urls
+from PushShoppingList.services.recipe_url_service import load_recipe_urls
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
 from PushShoppingList.services.recipe_url_service import normalize_recipe_quantity
 from PushShoppingList.services.recipe_url_service import remove_recipe_url
 from PushShoppingList.services.recipe_url_service import save_recipe_url_name
+from PushShoppingList.services.recipe_url_service import save_recipe_urls
 from PushShoppingList.services.recipe_quantity_service import update_recipe_ingredient_quantity
 from PushShoppingList.services.recipe_quantity_service import update_recipe_quantity
 from PushShoppingList.services.shopping_list_service import add_items
@@ -276,6 +278,55 @@ def api_recipe_name_route():
         "ok": True,
         "url": url,
         "name": name,
+    })
+
+
+@recipe_bp.route("/api/recipe_urls/reorder", methods=["POST"])
+def api_reorder_recipe_urls_route():
+    data = request.get_json(silent=True) or {}
+    requested_urls = data.get("urls") if isinstance(data.get("urls"), list) else []
+
+    if not requested_urls:
+        return jsonify({
+            "ok": False,
+            "error": "Recipe URL order is required.",
+        }), 400
+
+    current_urls = load_recipe_urls()
+    current_by_key = {
+        normalize_recipe_url_key(url): url
+        for url in current_urls
+    }
+    ordered_urls = []
+    seen = set()
+
+    for url in requested_urls:
+        key = normalize_recipe_url_key(url)
+
+        if not key or key in seen or key not in current_by_key:
+            continue
+
+        ordered_urls.append(current_by_key[key])
+        seen.add(key)
+
+    for url in current_urls:
+        key = normalize_recipe_url_key(url)
+
+        if key and key not in seen:
+            ordered_urls.append(url)
+            seen.add(key)
+
+    if current_urls and not ordered_urls:
+        return jsonify({
+            "ok": False,
+            "error": "No current recipe URLs matched the requested order.",
+        }), 400
+
+    save_recipe_urls(ordered_urls)
+
+    return jsonify({
+        "ok": True,
+        "urls": ordered_urls,
     })
 
 
