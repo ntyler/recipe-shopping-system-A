@@ -5039,6 +5039,14 @@ body {
             text-transform: uppercase;
         }
 
+        .recipe-edit-label-line {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            min-height: 22px;
+        }
+
         .recipe-edit-dialog input,
         .recipe-edit-dialog textarea,
         .recipe-edit-dialog select {
@@ -5153,6 +5161,61 @@ body {
             align-self: flex-start;
             margin-top: 2px;
             cursor: pointer;
+        }
+
+        .recipe-edit-choice-review {
+            display: grid;
+            gap: 7px;
+            padding: 8px;
+            border: 1px solid #4f5b46;
+            border-radius: 6px;
+            background: #101615;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+            letter-spacing: 0;
+            text-transform: none;
+        }
+
+        .recipe-edit-choice-review[hidden] {
+            display: none;
+        }
+
+        .recipe-edit-choice-review.active {
+            border-color: #fbbf24;
+            box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.28);
+        }
+
+        .recipe-edit-choice-prompt {
+            color: #fbbf24;
+            font-size: 12px;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+
+        .recipe-edit-choice-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .recipe-edit-choice-option {
+            min-height: 30px;
+            padding: 5px 9px;
+            border: 1px solid #5e6a57;
+            border-radius: 6px;
+            background: #1d2523;
+            color: #f3f4f6;
+            font-size: 12px;
+            font-weight: 800;
+            line-height: 1.15;
+            cursor: pointer;
+        }
+
+        .recipe-edit-choice-option:hover,
+        .recipe-edit-choice-option:focus {
+            border-color: #fbbf24;
+            background: #26312d;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.24);
         }
 
         .recipe-edit-review-target {

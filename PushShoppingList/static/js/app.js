@@ -5413,6 +5413,11 @@ async function openFoodReviewAlternatives(marker) {
         return false;
     }
 
+    if (marker.dataset.reviewKind === "ingredient_choice") {
+        focusIngredientChoiceReview(row);
+        return false;
+    }
+
     activeFoodReviewRow = row;
     activeFoodReviewAlternatives = [];
     showFoodReviewAlternativesModal();
@@ -5648,14 +5653,20 @@ function addRecipeIngredientRow(item = {}) {
     row.className = "recipe-edit-ingredient-row";
     row.innerHTML = `
         <label class="recipe-edit-ingredient-name-label">
-            <span class="recipe-edit-food-warning food-rule-marker"
-                  role="button"
-                  tabindex="0"
-                  onclick="openFoodReviewAlternatives(this)"
-                  onkeydown="openFoodReviewAlternativesFromKey(event, this)"
-                  hidden>Food Review</span>
-            <span>Ingredient</span>
+            <span class="recipe-edit-label-line">
+                <span>Ingredient</span>
+                <span class="recipe-edit-food-warning food-rule-marker"
+                      role="button"
+                      tabindex="0"
+                      onclick="openFoodReviewAlternatives(this)"
+                      onkeydown="openFoodReviewAlternativesFromKey(event, this)"
+                      hidden>Food Review</span>
+            </span>
             <input type="text" data-field="ingredient" value="${escapeAttribute(item.ingredient || "")}">
+            <span class="recipe-edit-choice-review" data-ingredient-choice-review hidden>
+                <span class="recipe-edit-choice-prompt">Pick one option</span>
+                <span class="recipe-edit-choice-options" data-ingredient-choice-options></span>
+            </span>
         </label>
         <label class="recipe-edit-qty-label">
             <span>Qty</span>
@@ -5760,7 +5771,7 @@ function currentRecipeEditScaleMultiplier() {
 }
 
 function bindRecipeIngredientFoodRuleWarning(row) {
-    row.querySelectorAll('[data-field="ingredient"], [data-field="original_text"], [data-field="preparation"]').forEach(input => {
+    row.querySelectorAll('[data-field="ingredient"], [data-field="original_text"], [data-field="purchasable_item"], [data-field="preparation"]').forEach(input => {
         input.addEventListener("input", () => updateRecipeIngredientFoodRuleWarning(row));
     });
 }
@@ -5781,14 +5792,27 @@ function updateRecipeIngredientFoodRuleWarning(row) {
         preparationInput ? preparationInput.value : "",
     ].join(" ").toLowerCase();
     const blockedBy = recipeFoodRuleIssues(text);
+    const ingredientChoiceReview = ingredientChoiceReviewFromRow(row);
     const isReviewed = row.dataset.foodReviewState === "reviewed";
 
-    marker.classList.toggle("reviewed", blockedBy.length === 0 && isReviewed);
+    renderIngredientChoiceReview(row, ingredientChoiceReview);
+    marker.classList.toggle("reviewed", !ingredientChoiceReview && blockedBy.length === 0 && isReviewed);
+
+    if (ingredientChoiceReview) {
+        marker.hidden = false;
+        marker.textContent = "Food Review";
+        marker.title = "Pick one ingredient option.";
+        marker.dataset.reviewKind = "ingredient_choice";
+        marker.dataset.blockedBy = JSON.stringify(blockedBy);
+        marker.tabIndex = 0;
+        return;
+    }
 
     if (blockedBy.length) {
         marker.hidden = false;
         marker.textContent = "Food Review";
         marker.title = `Food rule review: ${blockedBy.join("; ")}`;
+        marker.dataset.reviewKind = "food_rule";
         marker.dataset.blockedBy = JSON.stringify(blockedBy);
         marker.tabIndex = 0;
         return;
@@ -5798,6 +5822,7 @@ function updateRecipeIngredientFoodRuleWarning(row) {
         marker.hidden = false;
         marker.textContent = "Reviewed";
         marker.title = "Reviewed with a ChatGPT alternative.";
+        marker.dataset.reviewKind = "reviewed";
         marker.dataset.blockedBy = "[]";
         marker.tabIndex = 0;
         return;
@@ -5806,8 +5831,161 @@ function updateRecipeIngredientFoodRuleWarning(row) {
     marker.hidden = true;
     marker.textContent = "Food Review";
     marker.title = "";
+    delete marker.dataset.reviewKind;
     marker.dataset.blockedBy = JSON.stringify(blockedBy);
     marker.tabIndex = -1;
+}
+
+function ingredientChoiceReviewFromRow(row) {
+    const ingredientInput = row.querySelector('[data-field="ingredient"]');
+    const purchasableInput = row.querySelector('[data-field="purchasable_item"]');
+    const originalTextInput = row.querySelector('[data-field="original_text"]');
+    const primaryCandidates = [
+        ["ingredient", ingredientInput ? ingredientInput.value : ""],
+        ["purchasable_item", purchasableInput ? purchasableInput.value : ""],
+    ];
+    const primaryReview = primaryCandidates
+        .map(([field, value]) => ingredientChoiceReviewFromText(value, field))
+        .find(Boolean);
+
+    if (primaryReview) {
+        return primaryReview;
+    }
+
+    const hasNamedIngredient = primaryCandidates.some(([, value]) => String(value || "").trim());
+
+    if (!hasNamedIngredient) {
+        return ingredientChoiceReviewFromText(originalTextInput ? originalTextInput.value : "", "original_text");
+    }
+
+    return null;
+}
+
+function ingredientChoiceReviewFromText(value, sourceField) {
+    const text = String(value || "").trim();
+    const choiceText = text.replace(/\([^)]*\)/g, " ");
+
+    if (!/\s+\bor\b\s+/i.test(choiceText)) {
+        return null;
+    }
+
+    const options = uniqueIngredientChoiceOptions(
+        choiceText.split(/\s+\bor\b\s+/i).map(cleanIngredientChoiceOption)
+    );
+
+    if (options.length < 2 || options.length > 4) {
+        return null;
+    }
+
+    return {
+        sourceField,
+        options,
+    };
+}
+
+function cleanIngredientChoiceOption(value) {
+    return String(value || "")
+        .replace(/\([^)]*\)/g, " ")
+        .replace(/^[\s,;:/-]+/, "")
+        .replace(/^[\d\s./]+/, "")
+        .replace(/^(?:cups?|tablespoons?|tbsp\.?|teaspoons?|tsp\.?|ounces?|oz\.?|pounds?|lbs?\.?|grams?|g|kilograms?|kg|milliliters?|ml|liters?|l|pinch(?:es)?|dash(?:es)?|cloves?|slices?|cans?|packages?|pkg\.?)\b\s+/i, "")
+        .replace(/\b(?:divided|optional|to taste|as needed)\b/gi, " ")
+        .replace(/^[\s,;:/-]+|[\s,;:/-]+$/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+function uniqueIngredientChoiceOptions(options) {
+    const seen = new Set();
+    const cleaned = [];
+
+    options.forEach(option => {
+        const value = String(option || "").trim();
+        const key = normalizeFoodKey(value);
+
+        if (!value || value.length < 2 || !key || seen.has(key)) {
+            return;
+        }
+
+        seen.add(key);
+        cleaned.push(value);
+    });
+
+    return cleaned;
+}
+
+function renderIngredientChoiceReview(row, review) {
+    const panel = row.querySelector("[data-ingredient-choice-review]");
+    const optionsWrap = row.querySelector("[data-ingredient-choice-options]");
+
+    if (!panel || !optionsWrap) {
+        return;
+    }
+
+    if (!review) {
+        panel.hidden = true;
+        panel.dataset.sourceField = "";
+        optionsWrap.innerHTML = "";
+        return;
+    }
+
+    panel.hidden = false;
+    panel.dataset.sourceField = review.sourceField || "";
+    optionsWrap.innerHTML = review.options.map(option => `
+        <button type="button"
+                class="recipe-edit-choice-option"
+                data-ingredient-choice-option="${escapeAttribute(option)}"
+                data-ingredient-choice-source="${escapeAttribute(review.sourceField || "")}"
+                onclick="return selectRecipeIngredientChoice(this, event)">
+            ${escapeHtml(option)}
+        </button>
+    `).join("");
+}
+
+function focusIngredientChoiceReview(row) {
+    const panel = row.querySelector("[data-ingredient-choice-review]");
+    const firstOption = panel ? panel.querySelector("[data-ingredient-choice-option]") : null;
+
+    if (panel) {
+        panel.classList.add("active");
+        setTimeout(() => panel.classList.remove("active"), 1400);
+    }
+
+    if (firstOption) {
+        firstOption.focus();
+    }
+}
+
+function selectRecipeIngredientChoice(button, event = null) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const row = button ? button.closest(".recipe-edit-ingredient-row") : null;
+    const option = button ? button.dataset.ingredientChoiceOption || "" : "";
+
+    if (!row || !option) {
+        return false;
+    }
+
+    setRowFieldValue(row, "ingredient", option);
+    setRowFieldValue(row, "purchasable_item", option);
+
+    if (button.dataset.ingredientChoiceSource === "original_text") {
+        setRowFieldValue(row, "original_text", option);
+    }
+
+    const purchaseGroupInput = row.querySelector('[data-field="purchase_group"]');
+
+    if (purchaseGroupInput) {
+        purchaseGroupInput.value = "";
+    }
+
+    delete row.dataset.foodReviewState;
+    updateRecipeIngredientFoodRuleWarning(row);
+    showRecipeQuantityUpdatedMessage("", "", "", "Ingredient option selected. Save Recipe to keep it.");
+    return false;
 }
 
 function recipeFoodRuleIssues(text) {
