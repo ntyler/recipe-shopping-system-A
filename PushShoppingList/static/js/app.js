@@ -4930,6 +4930,8 @@ let recipeEditOriginalSnapshot = null;
 let recipeEditScalingOptions = [];
 let activeFoodReviewRow = null;
 let activeFoodReviewAlternatives = [];
+let recipeEditDraggedRow = null;
+let recipeEditPointerDrag = null;
 
 async function openRecipeEditor(button, options = {}) {
     const url = button ? button.dataset.recipeUrl || "" : "";
@@ -5413,7 +5415,10 @@ async function openFoodReviewAlternatives(marker) {
         return false;
     }
 
+    expandRecipeIngredientRow(row);
+
     if (marker.dataset.reviewKind === "ingredient_choice") {
+        await waitForNextPaint();
         focusIngredientChoiceReview(row);
         return false;
     }
@@ -5669,6 +5674,28 @@ function recipeIngredientIconName(item = {}) {
     return "basket";
 }
 
+function recipeIngredientBadgesHtml(item = {}) {
+    const badges = [];
+    const ingredient = String(item.ingredient || "").trim();
+    const purchasable = String(item.purchasable_item || item.buy_as || "").trim();
+    const section = String(item.store_section || item.section || "").toUpperCase();
+    const pantryText = `${ingredient} ${purchasable} ${section}`.toUpperCase();
+
+    if (item.optional) {
+        badges.push(["Optional", "optional"]);
+    }
+
+    if (pantryText.includes("BEAN") || pantryText.includes("LEGUME") || pantryText.includes("SPICE")) {
+        badges.push(["Pantry Staple", "pantry"]);
+    } else if (ingredient && purchasable && !/\s+\bor\b\s+/i.test(ingredient)) {
+        badges.push(["Best Match", "best"]);
+    }
+
+    return badges.map(([label, kind]) => (
+        `<span class="recipe-edit-ingredient-badge ${escapeAttribute(kind)}">${escapeHtml(label)}</span>`
+    )).join("");
+}
+
 function addRecipeIngredientRow(item = {}) {
     const wrap = document.getElementById("recipeEditIngredients");
 
@@ -5686,11 +5713,12 @@ function addRecipeIngredientRow(item = {}) {
     row.className = "recipe-edit-ingredient-row";
     row.innerHTML = `
         <span class="recipe-edit-row-handle" aria-hidden="true">${recipeEditSvgIcon("drag")}</span>
-        <label class="recipe-edit-ingredient-name-label">
+        <span class="recipe-edit-row-number" data-ingredient-row-number></span>
+        <div class="recipe-edit-ingredient-name-label">
             <span class="sr-only">Ingredient</span>
             <span class="recipe-edit-ingredient-title-line">
-                ${recipeEditSvgIcon(recipeIngredientIconName(item))}
                 <input type="text" data-field="ingredient" value="${escapeAttribute(item.ingredient || "")}">
+                <span class="recipe-edit-ingredient-badges" data-ingredient-badges>${recipeIngredientBadgesHtml(item)}</span>
                 <span class="recipe-edit-food-warning food-rule-marker"
                       role="button"
                       tabindex="0"
@@ -5698,11 +5726,19 @@ function addRecipeIngredientRow(item = {}) {
                       onkeydown="openFoodReviewAlternativesFromKey(event, this)"
                       hidden>Food Review</span>
             </span>
+            <label class="recipe-edit-preparation-inline">
+                <span class="sr-only">Preparation</span>
+                <input type="text" data-field="preparation" value="${escapeAttribute(item.preparation || "")}" placeholder="-">
+            </label>
+            <label class="recipe-edit-original-text-label">
+                <span>Original Recipe Text</span>
+                <input type="text" data-field="original_text" value="${escapeAttribute(item.original_text || "")}">
+            </label>
             <span class="recipe-edit-choice-review" data-ingredient-choice-review hidden>
                 <span class="recipe-edit-choice-prompt">Pick one option</span>
                 <span class="recipe-edit-choice-options" data-ingredient-choice-options></span>
             </span>
-        </label>
+        </div>
         <label class="recipe-edit-qty-label">
             <span>Qty</span>
             <input type="text" data-field="quantity" value="${escapeAttribute(item.quantity || "")}">
@@ -5710,10 +5746,6 @@ function addRecipeIngredientRow(item = {}) {
         <label class="recipe-edit-unit-label">
             <span>Unit</span>
             <input type="text" data-field="unit" value="${escapeAttribute(item.unit || "")}">
-        </label>
-        <label class="recipe-edit-original-text-label">
-            <span>Original Text</span>
-            <input type="text" data-field="original_text" value="${escapeAttribute(item.original_text || "")}">
         </label>
         <label class="recipe-edit-buy-as-label">
             <span>Buy As</span>
@@ -5724,14 +5756,6 @@ function addRecipeIngredientRow(item = {}) {
                    value="${escapeAttribute(item.purchasable_item || item.buy_as || "")}"
                    oninput="syncRecipeIngredientPurchaseGroup(this)">
         </label>
-        <label class="recipe-edit-preparation-label">
-            <span>Preparation</span>
-            <input type="text" data-field="preparation" value="${escapeAttribute(item.preparation || "")}">
-        </label>
-        <label class="recipe-edit-section-label">
-            <span>Section</span>
-            <input type="text" data-field="section" value="${escapeAttribute(item.section || "")}">
-        </label>
         <label class="recipe-edit-store-section-label">
             <span>Store Section</span>
             <select data-field="store_section">${recipeStoreSectionOptions(item.store_section || "")}</select>
@@ -5740,7 +5764,24 @@ function addRecipeIngredientRow(item = {}) {
             <span>Optional</span>
             <input type="checkbox" data-field="optional" ${item.optional ? "checked" : ""}>
         </label>
-        <button type="button" class="recipe-edit-remove-row" aria-label="Remove ingredient" onclick="removeRecipeEditRow(this)">${recipeEditSvgIcon("trash")}</button>
+        <div class="recipe-edit-row-menu-wrap">
+            <button type="button"
+                    class="recipe-edit-row-menu-btn"
+                    aria-label="Ingredient actions"
+                    aria-haspopup="true"
+                    aria-expanded="false"
+                    onclick="return toggleRecipeEditRowMenu(this, event)">
+                <span aria-hidden="true"></span>
+            </button>
+            <div class="recipe-edit-row-menu" hidden>
+                <button type="button" onclick="duplicateRecipeIngredientRow(this)">Duplicate</button>
+                <button type="button" class="recipe-edit-row-collapse-toggle" onclick="toggleRecipeIngredientRowCollapsed(this)">Collapse</button>
+                <button type="button" onclick="moveRecipeEditRow(this, -1)">Move Up</button>
+                <button type="button" onclick="moveRecipeEditRow(this, 1)">Move Down</button>
+                <button type="button" class="delete" onclick="removeRecipeEditRow(this)">Delete</button>
+            </div>
+        </div>
+        <input type="hidden" data-field="section" value="${escapeAttribute(item.section || "")}">
         <input type="hidden" data-field="base_quantity" value="${escapeAttribute(baseQuantity || "")}">
         <input type="hidden" data-field="base_unit" value="${escapeAttribute(baseUnit || "")}">
         <input type="hidden" data-field="recipe_qty" value="${escapeAttribute(item.recipe_qty || item.quantity || "")}">
@@ -5749,7 +5790,629 @@ function addRecipeIngredientRow(item = {}) {
     wrap.appendChild(row);
     bindRecipeIngredientBaseTracking(row);
     bindRecipeIngredientFoodRuleWarning(row);
+    bindRecipeIngredientSummaryUpdates(row);
+    bindRecipeEditDragAndDrop(row);
     updateRecipeIngredientFoodRuleWarning(row);
+    updateRecipeIngredientRowIndexes();
+    return row;
+}
+
+function bindRecipeIngredientSummaryUpdates(row) {
+    row.querySelectorAll('[data-field="ingredient"], [data-field="purchasable_item"], [data-field="store_section"], [data-field="optional"]').forEach(input => {
+        const eventName = input.type === "checkbox" || input.tagName === "SELECT" ? "change" : "input";
+        input.addEventListener(eventName, () => updateRecipeIngredientSummary(row));
+    });
+}
+
+function updateRecipeIngredientSummary(row) {
+    const badges = row ? row.querySelector("[data-ingredient-badges]") : null;
+
+    if (badges) {
+        badges.innerHTML = recipeIngredientBadgesHtml(fieldValuesFromRow(row));
+    }
+}
+
+function updateRecipeIngredientRowIndexes() {
+    const rows = [...document.querySelectorAll("#recipeEditIngredients .recipe-edit-ingredient-row")];
+    const count = document.getElementById("recipeEditIngredientCount");
+
+    rows.forEach((row, index) => {
+        const number = row.querySelector("[data-ingredient-row-number]");
+
+        if (number) {
+            number.textContent = String(index + 1);
+        }
+    });
+
+    if (count) {
+        count.textContent = `(${rows.length})`;
+    }
+}
+
+function toggleRecipeEditRowMenu(button, event = null) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const row = recipeEditActionRowFromButton(button);
+    const menu = row ? row.querySelector(".recipe-edit-row-menu") : null;
+    const shouldOpen = menu ? menu.hidden : false;
+
+    closeRecipeEditRowMenus();
+
+    if (menu && shouldOpen) {
+        updateRecipeIngredientRowCollapseToggle(row);
+        menu.hidden = false;
+        button.setAttribute("aria-expanded", "true");
+    }
+
+    return false;
+}
+
+function toggleRecipeEditSectionMenu(button, event = null) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const wrap = button ? button.closest(".recipe-edit-section-menu-wrap") : null;
+    const menu = wrap ? wrap.querySelector(".recipe-edit-section-menu") : null;
+    const shouldOpen = menu ? menu.hidden : false;
+
+    closeRecipeEditRowMenus();
+
+    if (menu && shouldOpen) {
+        menu.hidden = false;
+        button.setAttribute("aria-expanded", "true");
+    }
+
+    return false;
+}
+
+function recipeEditActionRowFromButton(button) {
+    return button
+        ? button.closest(recipeEditMovableRowSelector())
+        : null;
+}
+
+function toggleRecipeIngredientRowMenu(button, event = null) {
+    return toggleRecipeEditRowMenu(button, event);
+}
+
+function recipeEditMovableRowSelector() {
+    return ".recipe-edit-ingredient-row, .recipe-edit-equipment-row, .recipe-edit-instruction-row, .recipe-edit-nutrition-row";
+}
+
+function recipeEditMoveSelectorForRow(row) {
+    if (!row) {
+        return "";
+    }
+
+    if (row.classList.contains("recipe-edit-ingredient-row")) {
+        return ".recipe-edit-ingredient-row";
+    }
+
+    if (row.classList.contains("recipe-edit-equipment-row")) {
+        return ".recipe-edit-equipment-row";
+    }
+
+    if (row.classList.contains("recipe-edit-instruction-row")) {
+        return ".recipe-edit-instruction-row";
+    }
+
+    if (row.classList.contains("recipe-edit-nutrition-row")) {
+        return ".recipe-edit-nutrition-row";
+    }
+
+    return ".recipe-edit-text-row";
+}
+
+function bindRecipeEditDragAndDrop(row) {
+    const handle = row ? row.querySelector(".recipe-edit-row-handle") : null;
+
+    if (!row || !handle || row.dataset.recipeEditDragBound === "true") {
+        return;
+    }
+
+    row.dataset.recipeEditDragBound = "true";
+    row.classList.add("recipe-edit-row-draggable");
+    handle.draggable = true;
+    handle.removeAttribute("aria-hidden");
+    handle.setAttribute("role", "button");
+    handle.setAttribute("tabindex", "0");
+    handle.setAttribute("aria-label", "Drag to reorder");
+    handle.setAttribute("title", "Drag to reorder");
+
+    handle.addEventListener("dragstart", event => {
+        recipeEditDraggedRow = row;
+        closeRecipeEditRowMenus();
+        row.classList.add("recipe-edit-row-dragging");
+
+        if (event.dataTransfer) {
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("text/plain", recipeEditMoveSelectorForRow(row));
+
+            try {
+                event.dataTransfer.setDragImage(row, 24, 24);
+            } catch (err) {
+                // Some browsers only allow visible elements as drag images.
+            }
+        }
+    });
+
+    handle.addEventListener("dragend", () => {
+        clearRecipeEditDragState();
+    });
+
+    handle.addEventListener("pointerdown", event => {
+        startRecipeEditPointerDrag(row, handle, event);
+    });
+
+    handle.addEventListener("pointermove", event => {
+        moveRecipeEditPointerDrag(event);
+    });
+
+    handle.addEventListener("pointerup", event => {
+        endRecipeEditPointerDrag(event);
+    });
+
+    handle.addEventListener("pointercancel", event => {
+        endRecipeEditPointerDrag(event, true);
+    });
+
+    row.addEventListener("dragover", event => {
+        if (!recipeEditCanDropOnRow(recipeEditDraggedRow, row)) {
+            return;
+        }
+
+        event.preventDefault();
+
+        if (event.dataTransfer) {
+            event.dataTransfer.dropEffect = "move";
+        }
+
+        updateRecipeEditDropIndicator(row, recipeEditDropShouldInsertAfter(event, row));
+    });
+
+    row.addEventListener("dragleave", event => {
+        if (!row.contains(event.relatedTarget)) {
+            row.classList.remove("recipe-edit-row-drop-before", "recipe-edit-row-drop-after");
+        }
+    });
+
+    row.addEventListener("drop", event => {
+        if (!recipeEditCanDropOnRow(recipeEditDraggedRow, row)) {
+            return;
+        }
+
+        event.preventDefault();
+        dropRecipeEditRow(recipeEditDraggedRow, row, recipeEditDropShouldInsertAfter(event, row));
+    });
+}
+
+function startRecipeEditPointerDrag(row, handle, event) {
+    if (!event || event.pointerType === "mouse" || (event.button !== undefined && event.button !== 0)) {
+        return;
+    }
+
+    closeRecipeEditRowMenus();
+    recipeEditPointerDrag = {
+        active: false,
+        handle,
+        insertAfter: false,
+        pointerId: event.pointerId,
+        row,
+        startX: event.clientX,
+        startY: event.clientY,
+        targetRow: null,
+    };
+
+    row.classList.add("recipe-edit-row-dragging");
+
+    try {
+        handle.setPointerCapture(event.pointerId);
+    } catch (err) {
+        // Pointer capture is not supported in every embedded browser.
+    }
+
+    event.preventDefault();
+}
+
+function moveRecipeEditPointerDrag(event) {
+    const drag = recipeEditPointerDrag;
+
+    if (!drag || !event || drag.pointerId !== event.pointerId) {
+        return;
+    }
+
+    const movement = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
+
+    if (!drag.active && movement < 6) {
+        return;
+    }
+
+    drag.active = true;
+    event.preventDefault();
+    autoScrollRecipeEditDialogForDrag(event.clientY);
+
+    const targetRow = recipeEditDropTargetFromPoint(event.clientX, event.clientY, drag.row);
+
+    if (!recipeEditCanDropOnRow(drag.row, targetRow)) {
+        drag.targetRow = null;
+        clearRecipeEditDropIndicators();
+        return;
+    }
+
+    drag.targetRow = targetRow;
+    drag.insertAfter = recipeEditDropShouldInsertAfter(event, targetRow);
+    updateRecipeEditDropIndicator(targetRow, drag.insertAfter);
+}
+
+function endRecipeEditPointerDrag(event, cancelled = false) {
+    const drag = recipeEditPointerDrag;
+
+    if (!drag || (event && drag.pointerId !== event.pointerId)) {
+        return;
+    }
+
+    try {
+        drag.handle.releasePointerCapture(drag.pointerId);
+    } catch (err) {
+        // Pointer capture may already be released.
+    }
+
+    if (!cancelled && drag.active && recipeEditCanDropOnRow(drag.row, drag.targetRow)) {
+        dropRecipeEditRow(drag.row, drag.targetRow, drag.insertAfter);
+    } else {
+        clearRecipeEditDragState();
+    }
+}
+
+function recipeEditDropTargetFromPoint(clientX, clientY, draggedRow) {
+    const target = document.elementFromPoint(clientX, clientY);
+    const selector = recipeEditMoveSelectorForRow(draggedRow);
+
+    return target ? target.closest(selector) : null;
+}
+
+function autoScrollRecipeEditDialogForDrag(clientY) {
+    const dialog = document.querySelector(".recipe-edit-dialog");
+
+    if (!dialog) {
+        return;
+    }
+
+    const rect = dialog.getBoundingClientRect();
+    const threshold = 72;
+
+    if (clientY < rect.top + threshold) {
+        dialog.scrollTop -= 18;
+    } else if (clientY > rect.bottom - threshold) {
+        dialog.scrollTop += 18;
+    }
+}
+
+function recipeEditCanDropOnRow(draggedRow, targetRow) {
+    return Boolean(
+        draggedRow
+        && targetRow
+        && draggedRow !== targetRow
+        && draggedRow.parentElement === targetRow.parentElement
+        && recipeEditMoveSelectorForRow(draggedRow) === recipeEditMoveSelectorForRow(targetRow)
+    );
+}
+
+function recipeEditDropShouldInsertAfter(event, row) {
+    const rect = row.getBoundingClientRect();
+    const pointerY = event && typeof event.clientY === "number"
+        ? event.clientY
+        : rect.top + (rect.height / 2);
+    const splitOffset = Math.min(rect.height / 2, 96);
+
+    return pointerY > rect.top + splitOffset;
+}
+
+function updateRecipeEditDropIndicator(row, insertAfter) {
+    clearRecipeEditDropIndicators();
+    row.classList.toggle("recipe-edit-row-drop-before", !insertAfter);
+    row.classList.toggle("recipe-edit-row-drop-after", insertAfter);
+}
+
+function clearRecipeEditDropIndicators() {
+    document.querySelectorAll(".recipe-edit-row-drop-before, .recipe-edit-row-drop-after").forEach(row => {
+        row.classList.remove("recipe-edit-row-drop-before", "recipe-edit-row-drop-after");
+    });
+}
+
+function clearRecipeEditDragState() {
+    clearRecipeEditDropIndicators();
+
+    if (recipeEditDraggedRow) {
+        recipeEditDraggedRow.classList.remove("recipe-edit-row-dragging");
+    }
+
+    if (recipeEditPointerDrag && recipeEditPointerDrag.row) {
+        recipeEditPointerDrag.row.classList.remove("recipe-edit-row-dragging");
+    }
+
+    document.querySelectorAll(".recipe-edit-row-dragging").forEach(row => {
+        row.classList.remove("recipe-edit-row-dragging");
+    });
+
+    recipeEditDraggedRow = null;
+    recipeEditPointerDrag = null;
+}
+
+function dropRecipeEditRow(draggedRow, targetRow, insertAfter) {
+    if (!recipeEditCanDropOnRow(draggedRow, targetRow)) {
+        clearRecipeEditDragState();
+        return false;
+    }
+
+    if (insertAfter) {
+        targetRow.after(draggedRow);
+    } else {
+        targetRow.before(draggedRow);
+    }
+
+    updateRecipeEditRowOrder(draggedRow);
+    clearRecipeEditDragState();
+    return true;
+}
+
+function updateRecipeEditRowOrder(row) {
+    closeRecipeEditRowMenus();
+
+    if (!row) {
+        return;
+    }
+
+    if (row.classList.contains("recipe-edit-ingredient-row")) {
+        updateRecipeIngredientRowIndexes();
+    }
+    if (row.classList.contains("recipe-edit-equipment-row")) {
+        updateRecipeEquipmentRowNumbers();
+    }
+    if (row.classList.contains("recipe-edit-instruction-row")) {
+        updateRecipeInstructionStepNumbers();
+    }
+}
+
+function recipeEditAdjacentMovableRow(row, direction) {
+    const selector = recipeEditMoveSelectorForRow(row);
+    let sibling = direction < 0 ? row.previousElementSibling : row.nextElementSibling;
+
+    while (sibling && !sibling.matches(selector)) {
+        sibling = direction < 0 ? sibling.previousElementSibling : sibling.nextElementSibling;
+    }
+
+    return sibling;
+}
+
+function closeRecipeEditRowMenus() {
+    document.querySelectorAll(".recipe-edit-row-menu").forEach(menu => {
+        menu.hidden = true;
+    });
+    document.querySelectorAll(".recipe-edit-row-menu-btn").forEach(button => {
+        button.setAttribute("aria-expanded", "false");
+    });
+}
+
+function closeRecipeIngredientRowMenus() {
+    closeRecipeEditRowMenus();
+}
+
+async function confirmDeleteRecipeFromEditor(button, event = null) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const urlInput = document.getElementById("recipeEditOriginalUrl");
+    const titleInput = document.getElementById("recipeEditTitleInput");
+    const url = urlInput ? urlInput.value.trim() : "";
+    const title = titleInput ? titleInput.value.trim() : "";
+
+    if (!url) {
+        setRecipeEditStatus("Unable to delete recipe: missing recipe URL.", true);
+        return false;
+    }
+
+    const label = title || "this recipe";
+    const shouldDelete = window.confirm(`Delete ${label}? This will remove it from the recipe log and shopping list.`);
+
+    if (!shouldDelete) {
+        closeRecipeEditRowMenus();
+        return false;
+    }
+
+    const originalText = button ? button.textContent : "";
+
+    try {
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Deleting...";
+        }
+
+        setRecipeEditStatus("Deleting recipe...");
+        const formData = new FormData();
+        formData.append("url", url);
+
+        const response = await fetch("/remove_recipe", {
+            method: "POST",
+            body: formData,
+        });
+
+        if (!response.ok) {
+            throw new Error("Unable to delete recipe.");
+        }
+
+        window.location.href = "/";
+    } catch (err) {
+        console.warn("Unable to delete recipe from editor.", err);
+        setRecipeEditStatus(err.message || "Unable to delete recipe.", true);
+
+        if (button) {
+            button.disabled = false;
+            button.textContent = originalText || "Delete Recipe";
+        }
+    }
+
+    return false;
+}
+
+function duplicateRecipeIngredientRow(button) {
+    const row = button ? button.closest(".recipe-edit-ingredient-row") : null;
+
+    if (!row) {
+        return false;
+    }
+
+    const duplicate = addRecipeIngredientRow(fieldValuesFromRow(row));
+    row.after(duplicate);
+    closeRecipeEditRowMenus();
+    updateRecipeIngredientRowIndexes();
+    return false;
+}
+
+function isRecipeIngredientRowCollapsed(row) {
+    const list = row ? row.closest("#recipeEditIngredients") : null;
+
+    if (!row) {
+        return false;
+    }
+
+    if (row.classList.contains("recipe-edit-row-collapsed")) {
+        return true;
+    }
+
+    return Boolean(
+        list
+        && list.classList.contains("recipe-edit-ingredients-collapsed")
+        && !row.classList.contains("recipe-edit-row-expanded")
+    );
+}
+
+function setRecipeIngredientRowCollapsed(row, collapsed) {
+    const list = row ? row.closest("#recipeEditIngredients") : null;
+
+    if (!row || !row.classList.contains("recipe-edit-ingredient-row")) {
+        return;
+    }
+
+    if (collapsed) {
+        row.classList.add("recipe-edit-row-collapsed");
+        row.classList.remove("recipe-edit-row-expanded");
+    } else {
+        row.classList.remove("recipe-edit-row-collapsed");
+
+        if (list && list.classList.contains("recipe-edit-ingredients-collapsed")) {
+            row.classList.add("recipe-edit-row-expanded");
+        } else {
+            row.classList.remove("recipe-edit-row-expanded");
+        }
+    }
+
+    updateRecipeIngredientRowCollapseToggle(row);
+}
+
+function expandRecipeIngredientRow(row) {
+    setRecipeIngredientRowCollapsed(row, false);
+}
+
+function toggleRecipeIngredientRowCollapsed(button) {
+    const row = recipeEditActionRowFromButton(button);
+
+    if (!row || !row.classList.contains("recipe-edit-ingredient-row")) {
+        return false;
+    }
+
+    setRecipeIngredientRowCollapsed(row, !isRecipeIngredientRowCollapsed(row));
+    closeRecipeEditRowMenus();
+    return false;
+}
+
+function updateRecipeIngredientRowCollapseToggle(row) {
+    const button = row ? row.querySelector(".recipe-edit-row-collapse-toggle") : null;
+
+    if (!button) {
+        return;
+    }
+
+    button.textContent = isRecipeIngredientRowCollapsed(row) ? "Expand" : "Collapse";
+}
+
+function moveRecipeEditRow(button, direction) {
+    const row = recipeEditActionRowFromButton(button);
+
+    if (!row) {
+        return false;
+    }
+
+    const sibling = recipeEditAdjacentMovableRow(row, direction);
+
+    if (direction < 0 && sibling) {
+        sibling.before(row);
+    } else if (direction > 0 && sibling) {
+        sibling.after(row);
+    }
+
+    updateRecipeEditRowOrder(row);
+    return false;
+}
+
+function moveRecipeIngredientRow(button, direction) {
+    return moveRecipeEditRow(button, direction);
+}
+
+function toggleRecipeIngredientsCollapsed(button) {
+    const list = document.getElementById("recipeEditIngredients");
+    const label = button ? button.querySelector("span:last-child") : null;
+    const icon = button ? button.querySelector(".recipe-edit-button-icon") : null;
+
+    if (!list) {
+        return false;
+    }
+
+    const collapsed = list.classList.toggle("recipe-edit-ingredients-collapsed");
+
+    list.querySelectorAll(".recipe-edit-ingredient-row").forEach(row => {
+        row.classList.remove("recipe-edit-row-collapsed");
+        row.classList.remove("recipe-edit-row-expanded");
+        updateRecipeIngredientRowCollapseToggle(row);
+    });
+
+    if (label) {
+        label.textContent = collapsed ? "Expand All" : "Collapse All";
+    }
+
+    if (icon) {
+        icon.textContent = collapsed ? "v" : "^";
+    }
+
+    return false;
+}
+
+function autoSortRecipeIngredients() {
+    const list = document.getElementById("recipeEditIngredients");
+
+    if (!list) {
+        return false;
+    }
+
+    [...list.querySelectorAll(".recipe-edit-ingredient-row")]
+        .sort((left, right) => {
+            const leftValues = fieldValuesFromRow(left);
+            const rightValues = fieldValuesFromRow(right);
+            const leftKey = `${leftValues.store_section || ""} ${leftValues.ingredient || ""}`.toLowerCase();
+            const rightKey = `${rightValues.store_section || ""} ${rightValues.ingredient || ""}`.toLowerCase();
+            return leftKey.localeCompare(rightKey);
+        })
+        .forEach(row => list.appendChild(row));
+
+    updateRecipeIngredientRowIndexes();
+    return false;
 }
 
 function syncRecipeIngredientPurchaseGroup(input) {
@@ -5906,7 +6569,9 @@ function ingredientChoiceReviewFromText(value, sourceField) {
     }
 
     const options = uniqueIngredientChoiceOptions(
-        choiceText.split(/\s+\bor\b\s+/i).map(cleanIngredientChoiceOption)
+        expandIngredientChoiceSharedNouns(
+            choiceText.split(/\s+\bor\b\s+/i).map(cleanIngredientChoiceOption)
+        )
     );
 
     if (options.length < 2 || options.length > 4) {
@@ -5929,6 +6594,36 @@ function cleanIngredientChoiceOption(value) {
         .replace(/^[\s,;:/-]+|[\s,;:/-]+$/g, "")
         .replace(/\s+/g, " ")
         .trim();
+}
+
+function expandIngredientChoiceSharedNouns(options) {
+    const cleaned = options
+        .map(option => String(option || "").trim())
+        .filter(Boolean);
+
+    if (cleaned.some(option => /\btortillas?\b/i.test(option))) {
+        return cleaned.map(normalizeTortillaChoiceOption);
+    }
+
+    return cleaned;
+}
+
+function normalizeTortillaChoiceOption(option) {
+    const cleaned = String(option || "")
+        .replace(/\bflower\b/gi, "flour")
+        .replace(/\btortillas\b/gi, "tortilla")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    if (!cleaned) {
+        return "";
+    }
+
+    if (/\btortilla\b/i.test(cleaned)) {
+        return cleaned;
+    }
+
+    return `${cleaned} tortilla`;
 }
 
 function uniqueIngredientChoiceOptions(options) {
@@ -6078,23 +6773,53 @@ function addRecipeEquipmentRow(value = "") {
     row.className = "recipe-edit-text-row recipe-edit-equipment-row";
     row.innerHTML = `
         <span class="recipe-edit-row-handle" aria-hidden="true">${recipeEditSvgIcon("drag")}</span>
+        <span class="recipe-edit-row-number" data-equipment-row-number></span>
         <label>
             <span class="sr-only">Equipment</span>
             <input type="text" data-field="text" value="${escapeAttribute(value || "")}">
         </label>
-        <button type="button" class="recipe-edit-remove-row" aria-label="Remove equipment" onclick="removeRecipeEditRow(this)">${recipeEditSvgIcon("trash")}</button>
+        <div class="recipe-edit-row-menu-wrap">
+            <button type="button"
+                    class="recipe-edit-row-menu-btn"
+                    aria-label="Equipment actions"
+                    aria-haspopup="true"
+                    aria-expanded="false"
+                    onclick="return toggleRecipeEditRowMenu(this, event)">
+                <span aria-hidden="true"></span>
+            </button>
+            <div class="recipe-edit-row-menu" hidden>
+                <button type="button" onclick="moveRecipeEditRow(this, -1)">Move Up</button>
+                <button type="button" onclick="moveRecipeEditRow(this, 1)">Move Down</button>
+                <button type="button" class="delete" onclick="removeRecipeEditRow(this)">Delete</button>
+            </div>
+        </div>
     `;
     wrap.appendChild(row);
+    bindRecipeEditDragAndDrop(row);
+    updateRecipeEquipmentRowNumbers();
+    return row;
 }
 
 function recipeEquipmentHeaderHtml() {
     return `
         <div class="recipe-edit-equipment-header" aria-hidden="true">
             <span></span>
+            <span>#</span>
             <span>Equipment</span>
             <span></span>
         </div>
     `;
+}
+
+function updateRecipeEquipmentRowNumbers() {
+    [...document.querySelectorAll("#recipeEditEquipment .recipe-edit-equipment-row")]
+        .forEach((row, index) => {
+            const number = row.querySelector("[data-equipment-row-number]");
+
+            if (number) {
+                number.textContent = String(index + 1);
+            }
+        });
 }
 
 function addRecipeInstructionRow(value = "", stepNumber = null) {
@@ -6117,22 +6842,40 @@ function addRecipeInstructionRow(value = "", stepNumber = null) {
         <span class="recipe-edit-row-handle" aria-hidden="true">${recipeEditSvgIcon("drag")}</span>
         <label class="recipe-edit-step-number">
             <span class="sr-only">Step #</span>
-            <input type="number" min="1" step="0.1" data-field="step_number" value="${escapeAttribute(nextStepNumber)}">
+            <span class="recipe-edit-row-number" data-instruction-row-number></span>
+            <input type="hidden" data-field="step_number" value="${escapeAttribute(nextStepNumber)}">
         </label>
         <label class="recipe-edit-step-text">
             <span class="sr-only">Instructions</span>
             <textarea data-field="text" rows="3">${escapeHtml(instruction || "")}</textarea>
         </label>
-        <button type="button" class="recipe-edit-remove-row" aria-label="Remove step" onclick="removeRecipeEditRow(this)">${recipeEditSvgIcon("trash")}</button>
+        <div class="recipe-edit-row-menu-wrap">
+            <button type="button"
+                    class="recipe-edit-row-menu-btn"
+                    aria-label="Instruction actions"
+                    aria-haspopup="true"
+                    aria-expanded="false"
+                    onclick="return toggleRecipeEditRowMenu(this, event)">
+                <span aria-hidden="true"></span>
+            </button>
+            <div class="recipe-edit-row-menu" hidden>
+                <button type="button" onclick="moveRecipeEditRow(this, -1)">Move Up</button>
+                <button type="button" onclick="moveRecipeEditRow(this, 1)">Move Down</button>
+                <button type="button" class="delete" onclick="removeRecipeEditRow(this)">Delete</button>
+            </div>
+        </div>
     `;
     wrap.appendChild(row);
+    bindRecipeEditDragAndDrop(row);
+    updateRecipeInstructionStepNumbers();
+    return row;
 }
 
 function recipeInstructionsHeaderHtml() {
     return `
         <div class="recipe-edit-instructions-header" aria-hidden="true">
             <span></span>
-            <span>Step #</span>
+            <span>#</span>
             <span>Instructions</span>
             <span></span>
         </div>
@@ -6146,6 +6889,23 @@ function nextRecipeInstructionNumber() {
     return Math.max(0, ...stepNumbers) + 1;
 }
 
+function updateRecipeInstructionStepNumbers() {
+    [...document.querySelectorAll("#recipeEditInstructions .recipe-edit-instruction-row")]
+        .forEach((row, index) => {
+            const input = row.querySelector('[data-field="step_number"]');
+            const number = row.querySelector("[data-instruction-row-number]");
+            const value = String(index + 1);
+
+            if (input) {
+                input.value = value;
+            }
+
+            if (number) {
+                number.textContent = value;
+            }
+        });
+}
+
 function addRecipeNutritionRow(item = {}) {
     const wrap = document.getElementById("recipeEditNutrition");
 
@@ -6156,16 +6916,31 @@ function addRecipeNutritionRow(item = {}) {
     const row = document.createElement("div");
     row.className = "recipe-edit-nutrition-row";
     row.innerHTML = `
-        ${recipeEditSvgIcon("nutrition")}
+        <span class="recipe-edit-row-handle" aria-hidden="true">${recipeEditSvgIcon("drag")}</span>
         <label>
             <input type="text" data-field="key" aria-label="Nutrition label" value="${escapeAttribute(item.key || "")}">
         </label>
         <label>
             <input type="text" data-field="value" aria-label="Nutrition value" value="${escapeAttribute(item.value || "")}">
         </label>
-        <button type="button" class="recipe-edit-remove-row" aria-label="Remove nutrition" onclick="removeRecipeEditRow(this)">${recipeEditSvgIcon("trash")}</button>
+        <div class="recipe-edit-row-menu-wrap">
+            <button type="button"
+                    class="recipe-edit-row-menu-btn"
+                    aria-label="Nutrition actions"
+                    aria-haspopup="true"
+                    aria-expanded="false"
+                    onclick="return toggleRecipeEditRowMenu(this, event)">
+                <span aria-hidden="true"></span>
+            </button>
+            <div class="recipe-edit-row-menu" hidden>
+                <button type="button" onclick="moveRecipeEditRow(this, -1)">Move Up</button>
+                <button type="button" onclick="moveRecipeEditRow(this, 1)">Move Down</button>
+                <button type="button" class="delete" onclick="removeRecipeEditRow(this)">Delete</button>
+            </div>
+        </div>
     `;
     wrap.appendChild(row);
+    bindRecipeEditDragAndDrop(row);
     return row;
 }
 
@@ -6259,10 +7034,24 @@ function normalizeNutritionKey(value) {
 }
 
 function removeRecipeEditRow(button) {
-    const row = button ? button.closest(".recipe-edit-ingredient-row, .recipe-edit-text-row, .recipe-edit-nutrition-row") : null;
+    const row = button ? button.closest(recipeEditMovableRowSelector()) : null;
 
     if (row) {
+        const wasIngredient = row.classList.contains("recipe-edit-ingredient-row");
+        const wasEquipment = row.classList.contains("recipe-edit-equipment-row");
+        const wasInstruction = row.classList.contains("recipe-edit-instruction-row");
         row.remove();
+        closeRecipeEditRowMenus();
+
+        if (wasIngredient) {
+            updateRecipeIngredientRowIndexes();
+        }
+        if (wasEquipment) {
+            updateRecipeEquipmentRowNumbers();
+        }
+        if (wasInstruction) {
+            updateRecipeInstructionStepNumbers();
+        }
     }
 }
 

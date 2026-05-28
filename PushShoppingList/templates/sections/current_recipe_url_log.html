@@ -143,10 +143,6 @@
                     <h2 id="recipeEditTitle">Edit Recipe</h2>
                     <p>Manage and optimize the ingredients in this recipe.</p>
                 </div>
-                <button type="button" class="recipe-edit-close" onclick="closeRecipeEditor()">
-                    <span class="recipe-edit-button-icon" aria-hidden="true">&times;</span>
-                    <span>Close</span>
-                </button>
             </div>
 
             <input type="hidden" name="original_url" id="recipeEditOriginalUrl">
@@ -222,14 +218,24 @@
                     <div class="recipe-edit-section-title">
                         <span class="recipe-edit-panel-icon recipe-edit-panel-icon-ingredients" aria-hidden="true"></span>
                         <div>
-                            <h3>Ingredients</h3>
+                            <h3 id="recipeEditIngredientsTitle">Ingredients <span id="recipeEditIngredientCount"></span></h3>
                             <p>Add, edit, and organize recipe ingredients.</p>
                         </div>
                     </div>
-                    <button type="button" onclick="addRecipeIngredientRow()">
-                        <span class="recipe-edit-button-icon" aria-hidden="true">+</span>
-                        <span>Add Ingredient</span>
-                    </button>
+                    <div class="recipe-edit-section-actions recipe-edit-ingredient-actions">
+                        <button type="button" onclick="addRecipeIngredientRow()">
+                            <span class="recipe-edit-button-icon" aria-hidden="true">+</span>
+                            <span>Add Ingredient</span>
+                        </button>
+                        <button type="button" onclick="toggleRecipeIngredientsCollapsed(this)">
+                            <span class="recipe-edit-button-icon" aria-hidden="true">^</span>
+                            <span>Collapse All</span>
+                        </button>
+                        <button type="button" onclick="autoSortRecipeIngredients()">
+                            <span class="recipe-edit-button-icon" aria-hidden="true">=</span>
+                            <span>Auto Sort</span>
+                        </button>
+                    </div>
                 </div>
                 <div id="recipeEditIngredients" class="recipe-edit-ingredients"></div>
             </section>
@@ -250,6 +256,8 @@
                 </div>
                 <div id="recipeEditEquipment" class="recipe-edit-equipment">
                     <div class="recipe-edit-equipment-header" aria-hidden="true">
+                        <span></span>
+                        <span>#</span>
                         <span>Equipment</span>
                         <span></span>
                     </div>
@@ -265,14 +273,34 @@
                             <p>Step-by-step cooking directions.</p>
                         </div>
                     </div>
-                    <button type="button" onclick="addRecipeInstructionRow()">
-                        <span class="recipe-edit-button-icon" aria-hidden="true">+</span>
-                        <span>Add Instructions</span>
-                    </button>
+                    <div class="recipe-edit-section-actions recipe-edit-instructions-actions">
+                        <button type="button" onclick="addRecipeInstructionRow()">
+                            <span class="recipe-edit-button-icon" aria-hidden="true">+</span>
+                            <span>Add Instructions</span>
+                        </button>
+                        <div class="recipe-edit-section-menu-wrap">
+                            <button type="button"
+                                    class="recipe-edit-row-menu-btn recipe-edit-section-menu-btn"
+                                    aria-label="Recipe actions"
+                                    aria-haspopup="true"
+                                    aria-expanded="false"
+                                    onclick="return toggleRecipeEditSectionMenu(this, event)">
+                                <span aria-hidden="true"></span>
+                            </button>
+                            <div class="recipe-edit-row-menu recipe-edit-section-menu" hidden>
+                                <button type="button"
+                                        class="delete"
+                                        onclick="return confirmDeleteRecipeFromEditor(this, event)">
+                                    Delete Recipe
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div id="recipeEditInstructions" class="recipe-edit-instructions">
                     <div class="recipe-edit-instructions-header" aria-hidden="true">
-                        <span>Step #</span>
+                        <span></span>
+                        <span>#</span>
                         <span>Instructions</span>
                         <span></span>
                     </div>
@@ -311,7 +339,12 @@
             </section>
 
             <div class="recipe-edit-actions">
-                <button type="button" class="recipe-edit-cancel" onclick="closeRecipeEditor()">Cancel</button>
+                <button type="button" class="recipe-edit-cancel" onclick="closeRecipeEditor()">Cancel/Close</button>
+                <button type="button"
+                        class="recipe-edit-delete"
+                        onclick="return confirmDeleteRecipeFromEditor(this, event)">
+                    <span>Delete</span>
+                </button>
                 <button type="submit" class="recipe-edit-save">
                     <span class="recipe-edit-button-icon" aria-hidden="true">▣</span>
                     <span>Save Recipe</span>

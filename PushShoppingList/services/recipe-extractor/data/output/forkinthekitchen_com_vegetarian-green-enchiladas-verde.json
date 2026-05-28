@@ -7,6 +7,7 @@
       "section": null,
       "original_text": "2 - 2½ cups green enchilada sauce (homemade or canned)",
       "quantity": null,
+      "recipe_qty": null,
       "unit": null,
       "base_quantity": null,
       "base_unit": null,
@@ -14,12 +15,15 @@
       "preparation": "homemade or canned",
       "optional": false,
       "store_section": "SAUCES & CONDIMENTS",
-      "store_section_order": 9
+      "store_section_order": 9,
+      "purchasable_item": "green enchilada sauce",
+      "purchase_group": "green enchilada sauce"
     },
     {
       "section": null,
       "original_text": "14 ounces young green jackfruit (in brine, not syrup, drained and rinsed)",
       "quantity": "14",
+      "recipe_qty": "14",
       "unit": "ounces",
       "base_quantity": "14",
       "base_unit": "ounces",
@@ -27,12 +31,15 @@
       "preparation": "in brine, not syrup, drained and rinsed, drained and rinsed)",
       "optional": false,
       "store_section": "MISC",
-      "store_section_order": 19
+      "store_section_order": 19,
+      "purchasable_item": "young green jackfruit",
+      "purchase_group": "young green jackfruit"
     },
     {
       "section": null,
       "original_text": "15 ounces canned white beans (drained and rinsed*)",
       "quantity": "15",
+      "recipe_qty": "15",
       "unit": "ounces",
       "base_quantity": "15",
       "base_unit": "ounces",
@@ -40,12 +47,15 @@
       "preparation": "drained and rinsed*",
       "optional": false,
       "store_section": "MISC",
-      "store_section_order": 19
+      "store_section_order": 19,
+      "purchasable_item": "canned white beans",
+      "purchase_group": "canned white beans"
     },
     {
       "section": null,
       "original_text": "4 ounces cream cheese (room temperature)",
       "quantity": "4",
+      "recipe_qty": "4",
       "unit": "ounces",
       "base_quantity": "4",
       "base_unit": "ounces",
@@ -53,12 +63,15 @@
       "preparation": "room temperature",
       "optional": false,
       "store_section": "DAIRY & EGGS",
-      "store_section_order": 3
+      "store_section_order": 3,
+      "purchasable_item": "cream cheese",
+      "purchase_group": "cream cheese"
     },
     {
       "section": null,
       "original_text": "4 ounces diced green chiles (canned)",
       "quantity": "4",
+      "recipe_qty": "4",
       "unit": "ounces",
       "base_quantity": "4",
       "base_unit": "ounces",
@@ -66,12 +79,15 @@
       "preparation": "diced, canned",
       "optional": false,
       "store_section": "MISC",
-      "store_section_order": 19
+      "store_section_order": 19,
+      "purchasable_item": "green chiles",
+      "purchase_group": "green chiles"
     },
     {
       "section": null,
       "original_text": "8 ounces Monterey jack cheese (shredded (2 cups))",
       "quantity": "8",
+      "recipe_qty": "8",
       "unit": "ounces",
       "base_quantity": "8",
       "base_unit": "ounces",
@@ -79,12 +95,15 @@
       "preparation": null,
       "optional": false,
       "store_section": "DAIRY & EGGS",
-      "store_section_order": 3
+      "store_section_order": 3,
+      "purchasable_item": "Monterey jack cheese",
+      "purchase_group": "Monterey jack cheese"
     },
     {
       "section": null,
       "original_text": "½ teaspoon ground cumin",
       "quantity": "½",
+      "recipe_qty": "½",
       "unit": "teaspoon",
       "base_quantity": "½",
       "base_unit": "teaspoon",
@@ -92,12 +111,15 @@
       "preparation": null,
       "optional": false,
       "store_section": "SPICES & SEASONINGS",
-      "store_section_order": 12
+      "store_section_order": 12,
+      "purchasable_item": "ground cumin",
+      "purchase_group": "ground cumin"
     },
     {
       "section": null,
       "original_text": "⅓ cup Cilantro (roughly chopped)",
       "quantity": "⅓",
+      "recipe_qty": "⅓",
       "unit": "cup",
       "base_quantity": "⅓",
       "base_unit": "cup",
@@ -105,12 +127,15 @@
       "preparation": "chopped, roughly chopped",
       "optional": false,
       "store_section": "PRODUCE",
-      "store_section_order": 1
+      "store_section_order": 1,
+      "purchasable_item": "Cilantro",
+      "purchase_group": "Cilantro"
     },
     {
       "section": null,
       "original_text": "½ teaspoon kosher salt",
       "quantity": "½",
+      "recipe_qty": "½",
       "unit": "teaspoon",
       "base_quantity": "½",
       "base_unit": "teaspoon",
@@ -118,20 +143,25 @@
       "preparation": null,
       "optional": false,
       "store_section": "SPICES & SEASONINGS",
-      "store_section_order": 12
+      "store_section_order": 12,
+      "purchasable_item": "kosher salt",
+      "purchase_group": "kosher salt"
     },
     {
       "section": null,
       "original_text": "12  flour or corn tortillas (6 inches or so)",
       "quantity": "12",
+      "recipe_qty": "12",
       "unit": null,
       "base_quantity": "12",
       "base_unit": null,
-      "ingredient": "flour OR corn tortillas",
+      "ingredient": "flour tortilla",
       "preparation": null,
       "optional": false,
       "store_section": "BAKING",
-      "store_section_order": 7
+      "store_section_order": 7,
+      "purchasable_item": "flour tortilla",
+      "purchase_group": "flour tortilla"
     }
   ],
   "equipment": [
