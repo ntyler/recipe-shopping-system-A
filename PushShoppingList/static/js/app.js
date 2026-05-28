@@ -5636,6 +5636,39 @@ function setRowFieldValue(row, field, value) {
     }
 }
 
+function recipeEditSvgIcon(name) {
+    const icons = {
+        drag: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><circle cx="9" cy="5" r="1.5"></circle><circle cx="15" cy="5" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="19" r="1.5"></circle><circle cx="15" cy="19" r="1.5"></circle></svg>',
+        leaf: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M5 19c8 0 14-6 14-14C11 5 5 11 5 19Z"></path><path d="M5 19c3-4 7-7 12-10"></path></svg>',
+        jar: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M8 4h8l-1 3H9L8 4Z"></path><path d="M7 9h10l1 10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L7 9Z"></path><path d="M9 13h6"></path></svg>',
+        basket: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M7 9 10 4"></path><path d="m17 9-3-5"></path><path d="M4 9h16l-2 10H6L4 9Z"></path><path d="M9 13v3"></path><path d="M15 13v3"></path></svg>',
+        search: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4 4"></path></svg>',
+        nutrition: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M12 21c4-4 8-8 8-12a8 8 0 0 0-16 0c0 4 4 8 8 12Z"></path><path d="M12 8v5"></path><path d="M9.5 10.5h5"></path></svg>',
+        trash: '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 7h16"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M6 7l1 14h10l1-14"></path><path d="M9 7V4h6v3"></path></svg>',
+    };
+    const icon = icons[name] || icons.basket;
+
+    return `<span class="recipe-edit-inline-icon recipe-edit-inline-icon-${escapeAttribute(name)}" aria-hidden="true">${icon}</span>`;
+}
+
+function recipeIngredientIconName(item = {}) {
+    const section = String(item.store_section || item.section || "").toUpperCase();
+
+    if (section.includes("PRODUCE")) {
+        return "leaf";
+    }
+
+    if (section.includes("SPICE") || section.includes("SEASON")) {
+        return "jar";
+    }
+
+    if (section.includes("BAKING")) {
+        return "search";
+    }
+
+    return "basket";
+}
+
 function addRecipeIngredientRow(item = {}) {
     const wrap = document.getElementById("recipeEditIngredients");
 
@@ -5652,9 +5685,12 @@ function addRecipeIngredientRow(item = {}) {
         : item.unit || "";
     row.className = "recipe-edit-ingredient-row";
     row.innerHTML = `
+        <span class="recipe-edit-row-handle" aria-hidden="true">${recipeEditSvgIcon("drag")}</span>
         <label class="recipe-edit-ingredient-name-label">
-            <span class="recipe-edit-label-line">
-                <span>Ingredient</span>
+            <span class="sr-only">Ingredient</span>
+            <span class="recipe-edit-ingredient-title-line">
+                ${recipeEditSvgIcon(recipeIngredientIconName(item))}
+                <input type="text" data-field="ingredient" value="${escapeAttribute(item.ingredient || "")}">
                 <span class="recipe-edit-food-warning food-rule-marker"
                       role="button"
                       tabindex="0"
@@ -5662,7 +5698,6 @@ function addRecipeIngredientRow(item = {}) {
                       onkeydown="openFoodReviewAlternativesFromKey(event, this)"
                       hidden>Food Review</span>
             </span>
-            <input type="text" data-field="ingredient" value="${escapeAttribute(item.ingredient || "")}">
             <span class="recipe-edit-choice-review" data-ingredient-choice-review hidden>
                 <span class="recipe-edit-choice-prompt">Pick one option</span>
                 <span class="recipe-edit-choice-options" data-ingredient-choice-options></span>
@@ -5705,7 +5740,7 @@ function addRecipeIngredientRow(item = {}) {
             <span>Optional</span>
             <input type="checkbox" data-field="optional" ${item.optional ? "checked" : ""}>
         </label>
-        <button type="button" class="recipe-edit-remove-row" aria-label="Remove ingredient" onclick="removeRecipeEditRow(this)">X</button>
+        <button type="button" class="recipe-edit-remove-row" aria-label="Remove ingredient" onclick="removeRecipeEditRow(this)">${recipeEditSvgIcon("trash")}</button>
         <input type="hidden" data-field="base_quantity" value="${escapeAttribute(baseQuantity || "")}">
         <input type="hidden" data-field="base_unit" value="${escapeAttribute(baseUnit || "")}">
         <input type="hidden" data-field="recipe_qty" value="${escapeAttribute(item.recipe_qty || item.quantity || "")}">
@@ -5795,6 +5830,7 @@ function updateRecipeIngredientFoodRuleWarning(row) {
     const ingredientChoiceReview = ingredientChoiceReviewFromRow(row);
     const isReviewed = row.dataset.foodReviewState === "reviewed";
 
+    row.classList.toggle("has-ingredient-choice-review", Boolean(ingredientChoiceReview));
     renderIngredientChoiceReview(row, ingredientChoiceReview);
     marker.classList.toggle("reviewed", !ingredientChoiceReview && blockedBy.length === 0 && isReviewed);
 
@@ -6041,11 +6077,12 @@ function addRecipeEquipmentRow(value = "") {
     const row = document.createElement("div");
     row.className = "recipe-edit-text-row recipe-edit-equipment-row";
     row.innerHTML = `
+        <span class="recipe-edit-row-handle" aria-hidden="true">${recipeEditSvgIcon("drag")}</span>
         <label>
             <span class="sr-only">Equipment</span>
             <input type="text" data-field="text" value="${escapeAttribute(value || "")}">
         </label>
-        <button type="button" class="recipe-edit-remove-row" aria-label="Remove equipment" onclick="removeRecipeEditRow(this)">X</button>
+        <button type="button" class="recipe-edit-remove-row" aria-label="Remove equipment" onclick="removeRecipeEditRow(this)">${recipeEditSvgIcon("trash")}</button>
     `;
     wrap.appendChild(row);
 }
@@ -6053,6 +6090,7 @@ function addRecipeEquipmentRow(value = "") {
 function recipeEquipmentHeaderHtml() {
     return `
         <div class="recipe-edit-equipment-header" aria-hidden="true">
+            <span></span>
             <span>Equipment</span>
             <span></span>
         </div>
@@ -6076,6 +6114,7 @@ function addRecipeInstructionRow(value = "", stepNumber = null) {
     const row = document.createElement("div");
     row.className = "recipe-edit-text-row recipe-edit-instruction-row";
     row.innerHTML = `
+        <span class="recipe-edit-row-handle" aria-hidden="true">${recipeEditSvgIcon("drag")}</span>
         <label class="recipe-edit-step-number">
             <span class="sr-only">Step #</span>
             <input type="number" min="1" step="0.1" data-field="step_number" value="${escapeAttribute(nextStepNumber)}">
@@ -6084,7 +6123,7 @@ function addRecipeInstructionRow(value = "", stepNumber = null) {
             <span class="sr-only">Instructions</span>
             <textarea data-field="text" rows="3">${escapeHtml(instruction || "")}</textarea>
         </label>
-        <button type="button" class="recipe-edit-remove-row" aria-label="Remove step" onclick="removeRecipeEditRow(this)">X</button>
+        <button type="button" class="recipe-edit-remove-row" aria-label="Remove step" onclick="removeRecipeEditRow(this)">${recipeEditSvgIcon("trash")}</button>
     `;
     wrap.appendChild(row);
 }
@@ -6092,6 +6131,7 @@ function addRecipeInstructionRow(value = "", stepNumber = null) {
 function recipeInstructionsHeaderHtml() {
     return `
         <div class="recipe-edit-instructions-header" aria-hidden="true">
+            <span></span>
             <span>Step #</span>
             <span>Instructions</span>
             <span></span>
@@ -6116,13 +6156,14 @@ function addRecipeNutritionRow(item = {}) {
     const row = document.createElement("div");
     row.className = "recipe-edit-nutrition-row";
     row.innerHTML = `
+        ${recipeEditSvgIcon("nutrition")}
         <label>
             <input type="text" data-field="key" aria-label="Nutrition label" value="${escapeAttribute(item.key || "")}">
         </label>
         <label>
             <input type="text" data-field="value" aria-label="Nutrition value" value="${escapeAttribute(item.value || "")}">
         </label>
-        <button type="button" class="recipe-edit-remove-row" aria-label="Remove nutrition" onclick="removeRecipeEditRow(this)">X</button>
+        <button type="button" class="recipe-edit-remove-row" aria-label="Remove nutrition" onclick="removeRecipeEditRow(this)">${recipeEditSvgIcon("trash")}</button>
     `;
     wrap.appendChild(row);
     return row;
@@ -6131,6 +6172,7 @@ function addRecipeNutritionRow(item = {}) {
 function recipeNutritionHeaderHtml() {
     return `
         <div class="recipe-edit-nutrition-header" aria-hidden="true">
+            <span></span>
             <span>Label</span>
             <span>Value</span>
             <span></span>
