@@ -6271,6 +6271,34 @@ function closeRecipeEditRowMenus() {
     });
 }
 
+function recipeEditRowMenuIsOpen() {
+    return Boolean(document.querySelector(".recipe-edit-row-menu:not([hidden])"));
+}
+
+function handleRecipeEditRowMenuOutsideClick(event) {
+    if (!recipeEditRowMenuIsOpen()) {
+        return;
+    }
+
+    const target = event ? event.target : null;
+
+    if (
+        target
+        && typeof target.closest === "function"
+        && target.closest(".recipe-edit-row-menu, .recipe-edit-row-menu-btn")
+    ) {
+        return;
+    }
+
+    closeRecipeEditRowMenus();
+}
+
+function handleRecipeEditRowMenuScrollOrResize() {
+    if (recipeEditRowMenuIsOpen()) {
+        closeRecipeEditRowMenus();
+    }
+}
+
 function closeRecipeIngredientRowMenus() {
     closeRecipeEditRowMenus();
 }
@@ -10219,6 +10247,10 @@ document.addEventListener("DOMContentLoaded", function () {
     initStoreLocationMaps();
     startExtractionProgressPolling();
     document.addEventListener("click", handleRecipeCoverImageClick);
+    document.addEventListener("click", handleRecipeEditRowMenuOutsideClick);
+    document.addEventListener("scroll", handleRecipeEditRowMenuScrollOrResize, true);
+    document.addEventListener("wheel", handleRecipeEditRowMenuScrollOrResize, { passive: true, capture: true });
+    document.addEventListener("touchmove", handleRecipeEditRowMenuScrollOrResize, { passive: true, capture: true });
     document.addEventListener("keydown", handleRecipeCoverImageKeydown);
     document.addEventListener("keydown", closeAddStoreModalOnEscape);
     document.addEventListener("keydown", closeRecipeImageLightboxOnEscape);
@@ -10228,6 +10260,7 @@ document.addEventListener("DOMContentLoaded", function () {
 window.addEventListener("resize", updateRecipeEditStickyOffsets);
 window.addEventListener("resize", updateViewSwitcherStickyOffset);
 window.addEventListener("resize", invalidateStoreLocationMaps);
+window.addEventListener("resize", handleRecipeEditRowMenuScrollOrResize);
 window.addEventListener("resize", scheduleAddStoreStickyVisibilityUpdate);
 window.addEventListener("scroll", scheduleAddStoreStickyVisibilityUpdate, { passive: true });
 
