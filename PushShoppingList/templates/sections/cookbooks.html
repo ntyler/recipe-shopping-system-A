@@ -163,14 +163,16 @@
                                                         onclick="closeRecipeEditRowMenus(); openCookbookNameEditor(this); return false;">
                                                     Edit
                                                 </button>
-                                                <button type="button"
-                                                        class="delete"
-                                                        data-cookbook-id="{{ cookbook.id }}"
-                                                        data-cookbook-name="{{ cookbook.name }}"
-                                                        onclick="closeRecipeEditRowMenus(); deleteCookbook(this); return false;"
-                                                        aria-label="Delete {{ cookbook.name }}">
-                                                    Delete
-                                                </button>
+                                                {% if not cookbook.is_unclassified %}
+                                                    <button type="button"
+                                                            class="delete"
+                                                            data-cookbook-id="{{ cookbook.id }}"
+                                                            data-cookbook-name="{{ cookbook.name }}"
+                                                            onclick="closeRecipeEditRowMenus(); deleteCookbook(this); return false;"
+                                                            aria-label="Delete {{ cookbook.name }}">
+                                                        Delete
+                                                    </button>
+                                                {% endif %}
                                             </div>
                                         </div>
                                     </div>

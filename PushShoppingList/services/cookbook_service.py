@@ -293,6 +293,52 @@ def find_cookbook_by_name(payload, name):
     return None
 
 
+def is_unclassified_cookbook(cookbook):
+    cookbook = cookbook or {}
+    unclassified_key = normalize_text(UNCLASSIFIED_COOKBOOK_NAME)
+
+    return (
+        normalize_text(cookbook.get("name")) == unclassified_key
+        or normalize_text(cookbook.get("id")) == unclassified_key
+    )
+
+
+def ensure_unclassified_cookbook(payload):
+    unclassified = find_cookbook_by_name(payload, UNCLASSIFIED_COOKBOOK_NAME)
+
+    if unclassified is None:
+        unclassified = {
+            "id": unique_cookbook_id(payload, UNCLASSIFIED_COOKBOOK_NAME),
+            "name": UNCLASSIFIED_COOKBOOK_NAME,
+            "recipes": [],
+        }
+        payload.setdefault("cookbooks", []).append(unclassified)
+
+    unclassified.setdefault("recipes", [])
+    return unclassified
+
+
+def add_recipe_to_unclassified(payload, recipe):
+    record = clean_recipe_record(recipe)
+
+    if not record:
+        return False
+
+    unclassified = ensure_unclassified_cookbook(payload)
+    key = recipe_key(record.get("url"))
+    existing_keys = {
+        recipe_key(item.get("url"))
+        for item in unclassified.get("recipes", [])
+        if recipe_key(item.get("url"))
+    }
+
+    if key and key not in existing_keys:
+        unclassified.setdefault("recipes", []).append(record)
+        return True
+
+    return False
+
+
 def recipe_cookbook_assignments():
     payload = load_cookbooks()
     assignments = {}
@@ -308,6 +354,7 @@ def recipe_cookbook_assignments():
                 assignments[key] = {
                     "cookbook_id": cookbook_id,
                     "cookbook_name": cookbook_name,
+                    "cookbook_is_unclassified": is_unclassified_cookbook(cookbook),
                 }
 
     return assignments
@@ -348,12 +395,7 @@ def ensure_unclassified_cookbook_for_recipes(recipes):
                 continue
 
             if unclassified is None:
-                unclassified = {
-                    "id": unique_cookbook_id(payload, UNCLASSIFIED_COOKBOOK_NAME),
-                    "name": UNCLASSIFIED_COOKBOOK_NAME,
-                    "recipes": [],
-                }
-                payload["cookbooks"].append(unclassified)
+                unclassified = ensure_unclassified_cookbook(payload)
 
             unclassified.setdefault("recipes", []).append(record)
             assigned_keys.add(key)
@@ -378,28 +420,36 @@ def create_cookbook(name):
         if any(normalize_text(cookbook.get("name")) == name_key for cookbook in payload["cookbooks"]):
             raise ValueError("A cookbook with that name already exists.")
 
-        payload["cookbooks"].append({
+        new_cookbook = {
             "id": unique_cookbook_id(payload, name),
             "name": name,
             "recipes": [],
-        })
+        }
+        payload["cookbooks"].append(new_cookbook)
 
-        return save_cookbooks(payload)
+        saved = save_cookbooks(payload)
+        return find_cookbook(saved, new_cookbook["id"]) or new_cookbook
 
 
 def delete_cookbook(cookbook_id):
     with COOKBOOKS_LOCK:
         payload = load_cookbooks()
-        next_cookbooks = [
+        target = find_cookbook(payload, cookbook_id)
+
+        if target is None:
+            raise ValueError("Cookbook was not found.")
+
+        if is_unclassified_cookbook(target):
+            raise ValueError("The unclassified cookbook cannot be deleted.")
+
+        for recipe in target.get("recipes", []):
+            add_recipe_to_unclassified(payload, recipe)
+
+        payload["cookbooks"] = [
             cookbook
             for cookbook in payload["cookbooks"]
             if cookbook.get("id") != cookbook_id
         ]
-
-        if len(next_cookbooks) == len(payload["cookbooks"]):
-            raise ValueError("Cookbook was not found.")
-
-        payload["cookbooks"] = next_cookbooks
         return save_cookbooks(payload)
 
 
@@ -507,11 +557,20 @@ def remove_recipe_from_cookbook(cookbook_id, recipe_url):
         if target is None:
             raise ValueError("Cookbook was not found.")
 
+        removed_recipes = [
+            recipe
+            for recipe in target.get("recipes", [])
+            if recipe_key(recipe.get("url")) == target_key
+        ]
         target["recipes"] = [
             recipe
             for recipe in target.get("recipes", [])
             if recipe_key(recipe.get("url")) != target_key
         ]
+
+        if not is_unclassified_cookbook(target):
+            for recipe in removed_recipes:
+                add_recipe_to_unclassified(payload, recipe)
 
         return save_cookbooks(payload)
 
@@ -593,6 +652,7 @@ def cookbook_view(recipe_rows):
 
         view_cookbooks.append({
             **cookbook,
+            "is_unclassified": is_unclassified_cookbook(cookbook),
             "recipes": recipes,
         })
 

@@ -4385,6 +4385,24 @@ body {
             grid-template-columns: minmax(150px, 0.85fr) minmax(0, 1.15fr);
         }
 
+        .rules-editor-food-row-menu-wrap {
+            position: relative;
+            display: inline-flex;
+            justify-self: end;
+            align-items: center;
+            justify-content: flex-end;
+        }
+
+        .rules-editor-food-row-menu-btn {
+            width: 38px;
+            min-width: 38px;
+            height: 44px;
+        }
+
+        .rules-editor-food-row-menu {
+            min-width: 128px;
+        }
+
         .rules-editor-delete-btn {
             width: 44px;
             min-width: 44px;
@@ -4537,6 +4555,8 @@ body {
             gap: 7px;
             justify-items: start;
             align-items: start;
+            max-width: calc(100% - 44px);
+            margin-left: 44px;
         }
 
         .recipe-url-summary-name {
@@ -4640,6 +4660,33 @@ body {
             font-weight: 800;
             line-height: 1.2;
             box-sizing: border-box;
+        }
+
+        .recipe-url-summary-cookbook-menu-wrap {
+            position: relative;
+            display: inline-flex;
+            flex: 0 0 auto;
+            margin: -5px -6px -5px 0;
+        }
+
+        .recipe-url-summary-cookbook-menu-btn {
+            width: 28px;
+            min-width: 28px;
+            height: 28px;
+        }
+
+        .recipe-url-summary-cookbook-menu {
+            min-width: 210px;
+            max-height: min(320px, calc(100vh - 24px));
+        }
+
+        .recipe-url-summary-cookbook-menu-label {
+            padding: 8px 13px 5px;
+            color: #8d98aa;
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
         }
 
         .recipe-url-summary-cookbook-label {
@@ -7984,6 +8031,10 @@ body {
                 width: 100%;
             }
 
+            .rules-editor-food-row-menu-wrap {
+                justify-self: end;
+            }
+
             .rules-editor-actions {
                 grid-template-columns: 1fr;
                 padding: 10px 14px;
@@ -8018,6 +8069,11 @@ body {
                 grid-template-columns: minmax(0, 1fr);
                 gap: 3px;
                 padding-right: 4px;
+            }
+
+            .recipe-url-summary-main {
+                max-width: calc(100% - 40px);
+                margin-left: 40px;
             }
 
             .recipe-url-summary-actions {
@@ -10324,6 +10380,11 @@ body {
 .recipe-edit-row-menu button:focus {
     background: #1e2b3d;
     outline: none;
+}
+
+.recipe-edit-row-menu button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
 }
 
 .recipe-edit-row-menu button.delete {

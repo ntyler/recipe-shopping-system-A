@@ -2240,12 +2240,23 @@ function addRulesFoodRuleRow(section, rule = {}) {
             <span>Terms</span>
             <textarea rows="2" data-rules-food-terms>${escapeHtml(Array.isArray(rule.terms) ? rule.terms.join(", ") : (rule.terms || ""))}</textarea>
         </label>
-        <button type="button"
-                class="rules-editor-delete-btn"
-                onclick="removeRulesEditorRow(this)"
-                aria-label="Remove food rule">
-            X
-        </button>
+        <div class="rules-editor-food-row-menu-wrap recipe-edit-row-menu-wrap">
+            <button type="button"
+                    class="recipe-edit-row-menu-btn rules-editor-food-row-menu-btn"
+                    aria-label="Food restriction rule actions"
+                    aria-haspopup="true"
+                    aria-expanded="false"
+                    onclick="return toggleRecipeEditRowMenu(this, event)">
+                <span aria-hidden="true"></span>
+            </button>
+            <div class="recipe-edit-row-menu rules-editor-food-row-menu" hidden>
+                <button type="button"
+                        class="delete"
+                        onclick="removeRulesEditorRow(this); closeRecipeEditRowMenus(); return false;">
+                    Delete
+                </button>
+            </div>
+        </div>
     `;
     list.appendChild(row);
     return false;
@@ -2956,6 +2967,135 @@ async function createCookbook(event) {
     return false;
 }
 
+async function submitCookbookApi(url, formData = new FormData(), method = "POST") {
+    formData.set("ajax", "1");
+
+    const response = await fetch(url, {
+        method,
+        headers: {
+            "X-Requested-With": "fetch",
+        },
+        body: formData,
+    });
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+        const error = new Error((data && data.error) || "Cookbook update failed.");
+        error.status = response.status;
+        error.data = data;
+        throw error;
+    }
+
+    return data;
+}
+
+function recipeLogCookbookActionData(button) {
+    const row = button ? button.closest(".recipe-url-summary-row") : null;
+
+    return {
+        recipeUrl: (button && button.dataset.recipeUrl) || (row && row.dataset.recipeUrl) || "",
+        cookbookId: button ? button.dataset.cookbookId || "" : "",
+        cookbookName: button ? button.dataset.cookbookName || "" : "",
+    };
+}
+
+async function moveRecipeUrlToCookbook(recipeUrl, cookbookId) {
+    const formData = new FormData();
+    formData.set("cookbook_id", cookbookId || "");
+    formData.set("overwrite_existing", "1");
+    formData.append("recipe_urls", recipeUrl || "");
+
+    return submitCookbookApi("/api/cookbooks/move_recipes", formData);
+}
+
+async function finishRecipeLogCookbookChange(message) {
+    await refreshStoreMarkup({
+        cacheBust: true,
+        requireRecipeLog: true,
+    });
+    showRecipeQuantityUpdatedMessage("", "", "", message || "Cookbook updated.");
+}
+
+async function moveRecipeLogCookbook(button) {
+    const { recipeUrl, cookbookId, cookbookName } = recipeLogCookbookActionData(button);
+
+    if (!recipeUrl || !cookbookId) {
+        return false;
+    }
+
+    const originalText = button ? button.textContent : "";
+
+    try {
+        closeRecipeEditRowMenus();
+
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Moving...";
+        }
+
+        await moveRecipeUrlToCookbook(recipeUrl, cookbookId);
+        await finishRecipeLogCookbookChange(`Recipe moved to ${cookbookName || "cookbook"}.`);
+    } catch (err) {
+        console.warn("Unable to move recipe cookbook.", err);
+        setCookbookStatus(err.message || "Unable to move recipe.", true);
+        window.alert(err.message || "Unable to move recipe.");
+    } finally {
+        if (button && button.isConnected) {
+            button.disabled = false;
+            button.textContent = originalText || "Move";
+        }
+    }
+
+    return false;
+}
+
+async function deleteRecipeLogCookbookAssignment(button) {
+    return moveRecipeLogCookbook(button);
+}
+
+async function createRecipeLogCookbook(button) {
+    const { recipeUrl } = recipeLogCookbookActionData(button);
+    const name = window.prompt("New cookbook name");
+
+    if (!recipeUrl || !name || !name.trim()) {
+        return false;
+    }
+
+    const originalText = button ? button.textContent : "";
+
+    try {
+        closeRecipeEditRowMenus();
+
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Creating...";
+        }
+
+        const formData = new FormData();
+        formData.set("name", name.trim());
+        const data = await submitCookbookApi("/api/cookbooks", formData);
+        const cookbook = data.cookbook || {};
+
+        if (!cookbook.id) {
+            throw new Error("Cookbook was created, but its id was not returned.");
+        }
+
+        await moveRecipeUrlToCookbook(recipeUrl, cookbook.id);
+        await finishRecipeLogCookbookChange(`Recipe moved to ${cookbook.name || name.trim()}.`);
+    } catch (err) {
+        console.warn("Unable to create recipe cookbook.", err);
+        setCookbookStatus(err.message || "Unable to create cookbook.", true);
+        window.alert(err.message || "Unable to create cookbook.");
+    } finally {
+        if (button && button.isConnected) {
+            button.disabled = false;
+            button.textContent = originalText || "Create New Cookbook";
+        }
+    }
+
+    return false;
+}
+
 async function moveRecipesToCookbook(event) {
     event.preventDefault();
 
@@ -3009,7 +3149,10 @@ async function moveRecipesToCookbook(event) {
             await submitCookbookForm(form, { formData });
         }
 
-        await refreshCookbooksMarkup();
+        await refreshStoreMarkup({
+            cacheBust: true,
+            requireRecipeLog: true,
+        });
         showRecipeQuantityUpdatedMessage("", "", "", "Recipes moved.");
     } catch (err) {
         console.warn("Unable to move cookbook recipes.", err);
@@ -3099,7 +3242,10 @@ async function removeCookbookRecipe(button) {
             throw new Error((data && data.error) || "Unable to remove recipe.");
         }
 
-        await refreshCookbooksMarkup();
+        await refreshStoreMarkup({
+            cacheBust: true,
+            requireRecipeLog: true,
+        });
         showRecipeQuantityUpdatedMessage("", "", "", "Recipe removed.");
     } catch (err) {
         console.warn("Unable to remove cookbook recipe.", err);
@@ -3186,7 +3332,10 @@ async function saveCookbookName(event) {
         setCookbookNameEditorStatus("Saving cookbook name...");
         await submitCookbookForm(form);
         closeCookbookNameEditor();
-        await refreshCookbooksMarkup();
+        await refreshStoreMarkup({
+            cacheBust: true,
+            requireRecipeLog: true,
+        });
         showRecipeQuantityUpdatedMessage("", "", "", "Cookbook name saved.");
     } catch (err) {
         console.warn("Unable to rename cookbook.", err);
@@ -3232,7 +3381,10 @@ async function deleteCookbook(button) {
             throw new Error((data && data.error) || "Unable to delete cookbook.");
         }
 
-        await refreshCookbooksMarkup();
+        await refreshStoreMarkup({
+            cacheBust: true,
+            requireRecipeLog: true,
+        });
         showRecipeQuantityUpdatedMessage("", "", "", "Cookbook deleted.");
     } catch (err) {
         console.warn("Unable to delete cookbook.", err);
@@ -5845,8 +5997,9 @@ function toggleRecipeEditRowMenu(button, event = null) {
         event.stopPropagation();
     }
 
+    const wrap = button ? button.closest(".recipe-edit-row-menu-wrap") : null;
     const row = recipeEditActionRowFromButton(button);
-    const menu = row ? row.querySelector(".recipe-edit-row-menu") : null;
+    const menu = wrap ? wrap.querySelector(".recipe-edit-row-menu") : (row ? row.querySelector(".recipe-edit-row-menu") : null);
     const shouldOpen = menu ? menu.hidden : false;
 
     closeRecipeEditRowMenus();
@@ -5937,7 +6090,7 @@ function toggleRecipeIngredientRowMenu(button, event = null) {
 }
 
 function recipeEditMovableRowSelector() {
-    return ".recipe-edit-ingredient-row, .recipe-edit-equipment-row, .recipe-edit-instruction-row, .recipe-edit-nutrition-row, .recipe-url-summary-row, .store-manager-row, .recipe-view-card, .cookbook-card, .cookbook-recipe-card, .rules-group";
+    return ".recipe-edit-ingredient-row, .recipe-edit-equipment-row, .recipe-edit-instruction-row, .recipe-edit-nutrition-row, .recipe-url-summary-row, .store-manager-row, .recipe-view-card, .cookbook-card, .cookbook-recipe-card, .rules-group, .rules-editor-food-row";
 }
 
 function recipeEditMoveSelectorForRow(row) {

@@ -14,6 +14,15 @@
          data-collapse-default="expanded"
          data-collapse-mobile-default="collapsed">
         {% if current_urls %}
+        {% set unclassified_cookbook = namespace(id="", name="unclassified") %}
+        {% if cookbook_view and cookbook_view.cookbooks %}
+            {% for cookbook in cookbook_view.cookbooks %}
+                {% if cookbook.is_unclassified %}
+                    {% set unclassified_cookbook.id = cookbook.id %}
+                    {% set unclassified_cookbook.name = cookbook.name %}
+                {% endif %}
+            {% endfor %}
+        {% endif %}
         <div class="recipe-url-collapsed-summary"
              data-recipe-url-sort-list
              aria-label="Current recipe URL summary">
@@ -142,6 +151,47 @@
                             <div class="recipe-url-summary-cookbook">
                                 <span class="recipe-url-summary-cookbook-label">Cookbook:</span>
                                 <span class="recipe-url-summary-cookbook-name">{{ recipe.cookbook_name }}</span>
+                                <div class="recipe-url-summary-cookbook-menu-wrap recipe-edit-row-menu-wrap">
+                                    <button type="button"
+                                            class="recipe-edit-row-menu-btn recipe-url-summary-cookbook-menu-btn"
+                                            aria-label="Cookbook actions for recipe {{ loop.index }}"
+                                            aria-haspopup="true"
+                                            aria-expanded="false"
+                                            onclick="return toggleRecipeEditRowMenu(this, event)">
+                                        <span aria-hidden="true"></span>
+                                    </button>
+                                    <div class="recipe-edit-row-menu recipe-url-summary-cookbook-menu" hidden>
+                                        <button type="button"
+                                                data-recipe-url="{{ recipe.url }}"
+                                                onclick="return createRecipeLogCookbook(this)">
+                                            Create New Cookbook
+                                        </button>
+                                        {% if cookbook_view and cookbook_view.cookbooks %}
+                                            <div class="recipe-url-summary-cookbook-menu-label">Move To</div>
+                                            {% for cookbook in cookbook_view.cookbooks %}
+                                                {% if cookbook.id != recipe.cookbook_id %}
+                                                    <button type="button"
+                                                            data-recipe-url="{{ recipe.url }}"
+                                                            data-cookbook-id="{{ cookbook.id }}"
+                                                            data-cookbook-name="{{ cookbook.name }}"
+                                                            onclick="return moveRecipeLogCookbook(this)">
+                                                        {{ cookbook.name }}
+                                                    </button>
+                                                {% endif %}
+                                            {% endfor %}
+                                        {% endif %}
+                                        {% if unclassified_cookbook.id and not recipe.cookbook_is_unclassified %}
+                                            <button type="button"
+                                                    class="delete"
+                                                    data-recipe-url="{{ recipe.url }}"
+                                                    data-cookbook-id="{{ unclassified_cookbook.id }}"
+                                                    data-cookbook-name="{{ unclassified_cookbook.name }}"
+                                                    onclick="return deleteRecipeLogCookbookAssignment(this)">
+                                                Delete
+                                            </button>
+                                        {% endif %}
+                                    </div>
+                                </div>
                             </div>
                         {% endif %}
                     </div>

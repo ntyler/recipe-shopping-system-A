@@ -242,6 +242,7 @@ def apply_cookbook_assignments_to_recipe_rows(rows, cookbook_assignments):
         cookbook_assignment = cookbook_assignments.get(recipe_key, {})
         row["cookbook_id"] = cookbook_assignment.get("cookbook_id", "")
         row["cookbook_name"] = cookbook_assignment.get("cookbook_name", "")
+        row["cookbook_is_unclassified"] = cookbook_assignment.get("cookbook_is_unclassified", False)
 
     return rows
 
@@ -272,6 +273,7 @@ def recipe_url_log_rows(recipe_urls, cookbook_assignments=None):
             "scaled_servings": scaled_servings or scale_servings(recipe_data.get("servings"), recipe_quantity),
             "cookbook_id": cookbook_assignment.get("cookbook_id", ""),
             "cookbook_name": cookbook_assignment.get("cookbook_name", ""),
+            "cookbook_is_unclassified": cookbook_assignment.get("cookbook_is_unclassified", False),
         })
 
     return rows
@@ -1097,11 +1099,17 @@ def save_list():
 @main_bp.route("/api/cookbooks", methods=["POST"])
 def create_cookbook_route():
     try:
-        create_cookbook(request.form.get("name", ""))
+        cookbook = create_cookbook(request.form.get("name", ""))
     except ValueError as err:
         return jsonify({"ok": False, "error": str(err)}), 400
 
-    return jsonify({"ok": True})
+    return jsonify({
+        "ok": True,
+        "cookbook": {
+            "id": cookbook.get("id", ""),
+            "name": cookbook.get("name", ""),
+        },
+    })
 
 
 @main_bp.route("/api/cookbooks/<cookbook_id>", methods=["DELETE"])
@@ -1109,7 +1117,8 @@ def delete_cookbook_route(cookbook_id):
     try:
         delete_cookbook(cookbook_id)
     except ValueError as err:
-        return jsonify({"ok": False, "error": str(err)}), 404
+        status = 400 if "cannot be deleted" in str(err).lower() else 404
+        return jsonify({"ok": False, "error": str(err)}), status
 
     return jsonify({"ok": True})
 
