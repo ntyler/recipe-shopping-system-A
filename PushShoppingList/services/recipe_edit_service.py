@@ -4,6 +4,7 @@ import uuid
 from urllib.parse import urlparse
 
 from PushShoppingList.services.food_rules_service import load_food_rules
+from PushShoppingList.services.ingredient_text_review_service import annotate_ingredients_for_food_review
 from PushShoppingList.services.recipe_extract_service import MODEL
 from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
 from PushShoppingList.services.recipe_extract_service import STORE_SECTION_ORDER
@@ -127,7 +128,9 @@ def load_editable_recipe(url):
             "recipe_title": recipe_data.get("recipe_title") or "",
             "servings": recipe_data.get("servings") or "",
             "scaling": scaling,
-            "ingredients": normalize_edit_ingredients(recipe_data.get("ingredients", [])),
+            "ingredients": annotate_ingredients_for_food_review(
+                normalize_edit_ingredients(recipe_data.get("ingredients", []))
+            ),
             "equipment": normalize_text_rows(recipe_data.get("equipment", [])),
             "instructions": normalize_instruction_rows(recipe_data.get("instructions", [])),
             "nutrition": normalize_nutrition_rows(

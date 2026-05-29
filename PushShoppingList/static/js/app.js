@@ -5062,6 +5062,7 @@ function populateRecipeEditor(recipe, originalUrl) {
 function updateRecipeEditorPdfControls(recipe) {
     const pdfPathInput = document.getElementById("recipeEditPdfPath");
     const pdfButton = document.getElementById("recipeEditPdfButton");
+    const pdfMenuButton = document.getElementById("recipeEditPdfMenuButton");
     const deletePdfButton = document.getElementById("recipeEditDeletePdfButton");
     const sourceUrl = recipe && recipe.source_url ? recipe.source_url : "";
     const pdfPath = recipe && recipe.pdf_path ? recipe.pdf_path : "";
@@ -5071,10 +5072,12 @@ function updateRecipeEditorPdfControls(recipe) {
         pdfPathInput.value = pdfPath;
     }
 
-    if (pdfButton) {
-        pdfButton.hidden = !hasPdf;
-        pdfButton.href = hasPdf ? recipeArchivePdfUrl(sourceUrl) : "#";
-    }
+    [pdfButton, pdfMenuButton].forEach((button) => {
+        if (button) {
+            button.hidden = !hasPdf;
+            button.href = hasPdf ? recipeArchivePdfUrl(sourceUrl) : "#";
+        }
+    });
 
     if (deletePdfButton) {
         deletePdfButton.hidden = !hasPdf;
@@ -5417,7 +5420,7 @@ async function openFoodReviewAlternatives(marker) {
 
     expandRecipeIngredientRow(row);
 
-    if (marker.dataset.reviewKind === "ingredient_choice") {
+    if (marker.dataset.reviewKind === "ingredient_choice" || marker.dataset.reviewKind === "ingredient_text_choice") {
         await waitForNextPaint();
         focusIngredientChoiceReview(row);
         return false;
@@ -5718,13 +5721,15 @@ function addRecipeIngredientRow(item = {}) {
             <span class="sr-only">Ingredient</span>
             <span class="recipe-edit-ingredient-title-line">
                 <input type="text" data-field="ingredient" value="${escapeAttribute(item.ingredient || "")}">
-                <span class="recipe-edit-ingredient-badges" data-ingredient-badges>${recipeIngredientBadgesHtml(item)}</span>
-                <span class="recipe-edit-food-warning food-rule-marker"
-                      role="button"
-                      tabindex="0"
-                      onclick="openFoodReviewAlternatives(this)"
-                      onkeydown="openFoodReviewAlternativesFromKey(event, this)"
-                      hidden>Food Review</span>
+                <span class="recipe-edit-ingredient-markers">
+                    <span class="recipe-edit-ingredient-badges" data-ingredient-badges>${recipeIngredientBadgesHtml(item)}</span>
+                    <span class="recipe-edit-food-warning food-rule-marker"
+                          role="button"
+                          tabindex="0"
+                          onclick="openFoodReviewAlternatives(this)"
+                          onkeydown="openFoodReviewAlternativesFromKey(event, this)"
+                          hidden>Food Review</span>
+                </span>
             </span>
             <label class="recipe-edit-preparation-inline">
                 <span class="sr-only">Preparation</span>
@@ -5787,6 +5792,11 @@ function addRecipeIngredientRow(item = {}) {
         <input type="hidden" data-field="recipe_qty" value="${escapeAttribute(item.recipe_qty || item.quantity || "")}">
         <input type="hidden" data-field="purchase_group" value="${escapeAttribute(item.purchase_group || "")}">
     `;
+    const ingredientTextReview = normalizeIngredientTextReview(item.food_review || null);
+    if (ingredientTextReview) {
+        row.dataset.ingredientTextReview = JSON.stringify(ingredientTextReview);
+        row.dataset.ingredientTextReviewKey = ingredientTextReview.text_key || ingredientTextReviewKeyFromItem(item);
+    }
     wrap.appendChild(row);
     bindRecipeIngredientBaseTracking(row);
     bindRecipeIngredientFoodRuleWarning(row);
@@ -5844,6 +5854,7 @@ function toggleRecipeEditRowMenu(button, event = null) {
     if (menu && shouldOpen) {
         updateRecipeIngredientRowCollapseToggle(row);
         menu.hidden = false;
+        positionRecipeEditPopupMenu(menu, button);
         button.setAttribute("aria-expanded", "true");
     }
 
@@ -5864,10 +5875,55 @@ function toggleRecipeEditSectionMenu(button, event = null) {
 
     if (menu && shouldOpen) {
         menu.hidden = false;
+        positionRecipeEditPopupMenu(menu, button);
         button.setAttribute("aria-expanded", "true");
     }
 
     return false;
+}
+
+function positionRecipeEditPopupMenu(menu, button) {
+    if (!menu || !button) {
+        return;
+    }
+
+    const margin = 8;
+    const gap = 6;
+    const dialog = button.closest(".recipe-edit-dialog");
+    const dialogRect = dialog
+        ? dialog.getBoundingClientRect()
+        : { top: 0, bottom: window.innerHeight };
+
+    menu.classList.add("recipe-edit-floating-menu");
+    menu.style.left = "0px";
+    menu.style.top = "0px";
+    menu.style.right = "auto";
+
+    const buttonRect = button.getBoundingClientRect();
+    const menuRect = menu.getBoundingClientRect();
+    const menuWidth = menuRect.width;
+    const menuHeight = menuRect.height;
+    const topLimit = Math.max(margin, dialogRect.top + margin);
+    const bottomLimit = Math.min(window.innerHeight - margin, dialogRect.bottom - margin);
+    const rightLimit = window.innerWidth - margin;
+
+    let left = buttonRect.right - menuWidth;
+    left = Math.max(margin, Math.min(left, rightLimit - menuWidth));
+
+    let top = buttonRect.bottom + gap;
+    const hasRoomAbove = buttonRect.top - gap - menuHeight >= topLimit;
+    const spillsBelow = top + menuHeight > bottomLimit;
+
+    if (spillsBelow && hasRoomAbove) {
+        top = buttonRect.top - menuHeight - gap;
+    } else if (spillsBelow) {
+        top = bottomLimit - menuHeight;
+    }
+
+    top = Math.max(topLimit, Math.min(top, window.innerHeight - menuHeight - margin));
+
+    menu.style.left = `${Math.round(left)}px`;
+    menu.style.top = `${Math.round(top)}px`;
 }
 
 function recipeEditActionRowFromButton(button) {
@@ -6193,6 +6249,10 @@ function recipeEditAdjacentMovableRow(row, direction) {
 function closeRecipeEditRowMenus() {
     document.querySelectorAll(".recipe-edit-row-menu").forEach(menu => {
         menu.hidden = true;
+        menu.classList.remove("recipe-edit-floating-menu");
+        menu.style.left = "";
+        menu.style.top = "";
+        menu.style.right = "";
     });
     document.querySelectorAll(".recipe-edit-row-menu-btn").forEach(button => {
         button.setAttribute("aria-expanded", "false");
@@ -6491,6 +6551,7 @@ function updateRecipeIngredientFoodRuleWarning(row) {
     ].join(" ").toLowerCase();
     const blockedBy = recipeFoodRuleIssues(text);
     const ingredientChoiceReview = ingredientChoiceReviewFromRow(row);
+    const ingredientTextReview = ingredientTextReviewFromRow(row);
     const isReviewed = row.dataset.foodReviewState === "reviewed";
 
     row.classList.toggle("has-ingredient-choice-review", Boolean(ingredientChoiceReview));
@@ -6500,8 +6561,20 @@ function updateRecipeIngredientFoodRuleWarning(row) {
     if (ingredientChoiceReview) {
         marker.hidden = false;
         marker.textContent = "Food Review";
-        marker.title = "Pick one ingredient option.";
-        marker.dataset.reviewKind = "ingredient_choice";
+        marker.title = ingredientChoiceReview.reason || "Pick one ingredient option.";
+        marker.dataset.reviewKind = ingredientChoiceReview.sourceField === "ingredient_text_review"
+            ? "ingredient_text_choice"
+            : "ingredient_choice";
+        marker.dataset.blockedBy = JSON.stringify(blockedBy);
+        marker.tabIndex = 0;
+        return;
+    }
+
+    if (ingredientTextReview) {
+        marker.hidden = false;
+        marker.textContent = "Food Review";
+        marker.title = ingredientTextReview.reason || "This ingredient may need review before shopping.";
+        marker.dataset.reviewKind = "ingredient_text";
         marker.dataset.blockedBy = JSON.stringify(blockedBy);
         marker.tabIndex = 0;
         return;
@@ -6536,6 +6609,17 @@ function updateRecipeIngredientFoodRuleWarning(row) {
 }
 
 function ingredientChoiceReviewFromRow(row) {
+    const ingredientTextReview = ingredientTextReviewFromRow(row);
+
+    if (ingredientTextReview && Array.isArray(ingredientTextReview.options) && ingredientTextReview.options.length) {
+        return {
+            sourceField: "ingredient_text_review",
+            prompt: ingredientTextReview.prompt || "Pick grocery item",
+            reason: ingredientTextReview.reason || "",
+            options: ingredientTextReview.options,
+        };
+    }
+
     const ingredientInput = row.querySelector('[data-field="ingredient"]');
     const purchasableInput = row.querySelector('[data-field="purchasable_item"]');
     const originalTextInput = row.querySelector('[data-field="original_text"]');
@@ -6558,6 +6642,80 @@ function ingredientChoiceReviewFromRow(row) {
     }
 
     return null;
+}
+
+function normalizeIngredientTextReview(value) {
+    if (!value || typeof value !== "object" || !value.needs_review) {
+        return null;
+    }
+
+    const options = Array.isArray(value.options)
+        ? value.options
+            .map(normalizeIngredientChoiceOptionData)
+            .filter(option => option.ingredient)
+        : [];
+
+    if (!options.length) {
+        return null;
+    }
+
+    return {
+        needs_review: true,
+        kind: value.kind || "ingredient_text",
+        reason: String(value.reason || "").trim(),
+        prompt: String(value.prompt || "Pick grocery item").trim(),
+        options,
+        source: String(value.source || "chatgpt").trim(),
+        text_key: String(value.text_key || "").trim(),
+    };
+}
+
+function ingredientTextReviewFromRow(row) {
+    if (!row || !row.dataset.ingredientTextReview) {
+        return null;
+    }
+
+    try {
+        const review = normalizeIngredientTextReview(JSON.parse(row.dataset.ingredientTextReview));
+        const expectedKey = row.dataset.ingredientTextReviewKey || "";
+        const currentKey = ingredientTextReviewKeyFromRow(row);
+
+        if (!review || (expectedKey && currentKey && expectedKey !== currentKey)) {
+            return null;
+        }
+
+        return review;
+    } catch (err) {
+        return null;
+    }
+}
+
+function ingredientTextReviewKeyFromRow(row) {
+    if (!row) {
+        return "";
+    }
+
+    const ingredientInput = row.querySelector('[data-field="ingredient"]');
+    const originalTextInput = row.querySelector('[data-field="original_text"]');
+    const preparationInput = row.querySelector('[data-field="preparation"]');
+
+    return normalizeIngredientTextReviewKey([
+        ingredientInput ? ingredientInput.value : "",
+        originalTextInput ? originalTextInput.value : "",
+        preparationInput ? preparationInput.value : "",
+    ].join(" "));
+}
+
+function ingredientTextReviewKeyFromItem(item = {}) {
+    return normalizeIngredientTextReviewKey([
+        item.ingredient || "",
+        item.original_text || "",
+        item.preparation || "",
+    ].join(" "));
+}
+
+function normalizeIngredientTextReviewKey(value) {
+    return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 function ingredientChoiceReviewFromText(value, sourceField) {
@@ -6660,17 +6818,86 @@ function renderIngredientChoiceReview(row, review) {
         return;
     }
 
+    const options = (review.options || [])
+        .map(normalizeIngredientChoiceOptionData)
+        .filter(option => option.ingredient);
+
     panel.hidden = false;
     panel.dataset.sourceField = review.sourceField || "";
-    optionsWrap.innerHTML = review.options.map(option => `
-        <button type="button"
-                class="recipe-edit-choice-option"
-                data-ingredient-choice-option="${escapeAttribute(option)}"
-                data-ingredient-choice-source="${escapeAttribute(review.sourceField || "")}"
-                onclick="return selectRecipeIngredientChoice(this, event)">
-            ${escapeHtml(option)}
-        </button>
-    `).join("");
+    const prompt = panel.querySelector(".recipe-edit-choice-prompt");
+
+    if (prompt) {
+        prompt.textContent = review.prompt || "Pick one option";
+    }
+
+    optionsWrap.innerHTML = options.map((option, index) => {
+        const optionData = recipeIngredientChoiceDataAttributes(option, review);
+        const canCreateIngredient = review.sourceField === "ingredient_text_review" && index > 0;
+
+        return `
+            <span class="recipe-edit-choice-row">
+                <button type="button"
+                        class="recipe-edit-choice-option"
+                        ${optionData}
+                        onclick="return selectRecipeIngredientChoice(this, event)">
+                    ${escapeHtml(option.ingredient)}
+                </button>
+                ${canCreateIngredient ? `
+                    <button type="button"
+                            class="recipe-edit-choice-create"
+                            ${optionData}
+                            onclick="return createIngredientFromFoodReviewChoice(this, event)">
+                        Create Ingredient
+                    </button>
+                ` : ""}
+            </span>
+        `;
+    }).join("");
+}
+
+function recipeIngredientChoiceDataAttributes(option, review) {
+    return `
+        data-ingredient-choice-option="${escapeAttribute(option.ingredient)}"
+        data-ingredient-choice-buy-as="${escapeAttribute(option.purchasable_item || option.ingredient)}"
+        data-ingredient-choice-quantity="${escapeAttribute(option.quantity || "")}"
+        data-ingredient-choice-unit="${escapeAttribute(option.unit || "")}"
+        data-ingredient-choice-original-text="${escapeAttribute(option.original_text || "")}"
+        data-ingredient-choice-preparation="${escapeAttribute(option.preparation || "")}"
+        data-ingredient-choice-store-section="${escapeAttribute(option.store_section || "")}"
+        data-ingredient-choice-source="${escapeAttribute(review.sourceField || "")}"
+        title="${escapeAttribute(option.reason || review.reason || "")}"
+    `;
+}
+
+function normalizeIngredientChoiceOptionData(option) {
+    if (typeof option === "string") {
+        const ingredient = option.trim();
+        return {
+            ingredient,
+            purchasable_item: ingredient,
+            reason: "",
+        };
+    }
+
+    if (!option || typeof option !== "object") {
+        return {
+            ingredient: "",
+            purchasable_item: "",
+            reason: "",
+        };
+    }
+
+    const ingredient = String(option.ingredient || option.name || "").trim();
+    return {
+        ingredient,
+        purchasable_item: String(option.purchasable_item || option.buy_as || ingredient).trim(),
+        quantity: String(option.quantity || "").trim(),
+        unit: String(option.unit || "").trim(),
+        original_text: String(option.original_text || "").trim(),
+        preparation: String(option.preparation || "").trim(),
+        store_section: String(option.store_section || "").trim(),
+        reason: String(option.reason || "").trim(),
+    };
 }
 
 function focusIngredientChoiceReview(row) {
@@ -6695,16 +6922,34 @@ function selectRecipeIngredientChoice(button, event = null) {
 
     const row = button ? button.closest(".recipe-edit-ingredient-row") : null;
     const option = button ? button.dataset.ingredientChoiceOption || "" : "";
+    const buyAs = button ? button.dataset.ingredientChoiceBuyAs || option : option;
+    const source = button ? button.dataset.ingredientChoiceSource || "" : "";
 
     if (!row || !option) {
         return false;
     }
 
     setRowFieldValue(row, "ingredient", option);
-    setRowFieldValue(row, "purchasable_item", option);
+    setRowFieldValue(row, "purchasable_item", buyAs);
 
     if (button.dataset.ingredientChoiceSource === "original_text") {
         setRowFieldValue(row, "original_text", option);
+    } else if (source === "ingredient_text_review") {
+        const quantity = button.dataset.ingredientChoiceQuantity || "";
+        const unit = button.dataset.ingredientChoiceUnit || "";
+        const originalText = button.dataset.ingredientChoiceOriginalText || "";
+
+        if (quantity) {
+            setRowFieldValue(row, "quantity", quantity);
+        }
+
+        if (unit) {
+            setRowFieldValue(row, "unit", unit);
+        }
+
+        if (originalText) {
+            setRowFieldValue(row, "original_text", originalText);
+        }
     }
 
     const purchaseGroupInput = row.querySelector('[data-field="purchase_group"]');
@@ -6717,6 +6962,62 @@ function selectRecipeIngredientChoice(button, event = null) {
     updateRecipeIngredientFoodRuleWarning(row);
     showRecipeQuantityUpdatedMessage("", "", "", "Ingredient option selected. Save Recipe to keep it.");
     return false;
+}
+
+function createIngredientFromFoodReviewChoice(button, event = null) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const row = button ? button.closest(".recipe-edit-ingredient-row") : null;
+    const option = button ? button.dataset.ingredientChoiceOption || "" : "";
+
+    if (!row || !option) {
+        return false;
+    }
+
+    const newIngredient = recipeIngredientFromChoiceButton(button, row);
+    const newRow = addRecipeIngredientRow(newIngredient);
+
+    if (newRow) {
+        row.after(newRow);
+        expandRecipeIngredientRow(newRow);
+        updateRecipeIngredientRowIndexes();
+        const ingredientInput = newRow.querySelector('[data-field="ingredient"]');
+
+        if (ingredientInput) {
+            ingredientInput.focus();
+        }
+    }
+
+    showRecipeQuantityUpdatedMessage("", "", "", "Ingredient row created. Save Recipe to keep it.");
+    return false;
+}
+
+function recipeIngredientFromChoiceButton(button, sourceRow) {
+    const ingredient = button.dataset.ingredientChoiceOption || "";
+    const purchasable = button.dataset.ingredientChoiceBuyAs || ingredient;
+    const quantity = button.dataset.ingredientChoiceQuantity || "";
+    const unit = button.dataset.ingredientChoiceUnit || "";
+    const originalText = button.dataset.ingredientChoiceOriginalText || [quantity, unit, ingredient]
+        .filter(Boolean)
+        .join(" ");
+    const sourceStoreSection = sourceRow ? sourceRow.querySelector('[data-field="store_section"]') : null;
+    const storeSection = button.dataset.ingredientChoiceStoreSection
+        || (sourceStoreSection ? sourceStoreSection.value : "");
+
+    return {
+        ingredient,
+        original_text: originalText || ingredient,
+        quantity,
+        unit,
+        preparation: button.dataset.ingredientChoicePreparation || "",
+        purchasable_item: purchasable,
+        buy_as: purchasable,
+        store_section: storeSection,
+        optional: false,
+    };
 }
 
 function recipeFoodRuleIssues(text) {

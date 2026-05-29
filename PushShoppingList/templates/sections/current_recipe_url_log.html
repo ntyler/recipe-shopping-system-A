@@ -143,6 +143,16 @@
                     <h2 id="recipeEditTitle">Edit Recipe</h2>
                     <p>Manage and optimize the ingredients in this recipe.</p>
                 </div>
+                <a id="recipeEditPdfButton"
+                   class="recipe-edit-pdf-button recipe-edit-header-pdf-button recipe-edit-modal-header-pdf-button"
+                   href="#"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   aria-label="Download recipe PDF"
+                   hidden>
+                    <span class="recipe-edit-button-icon" aria-hidden="true">Ã¢â€ â€œ</span>
+                    <span>PDF</span>
+                </a>
             </div>
 
             <input type="hidden" name="original_url" id="recipeEditOriginalUrl">
@@ -152,8 +162,47 @@
 
             <section class="recipe-edit-info-panel">
                 <div class="recipe-edit-panel-heading">
-                    <span class="recipe-edit-panel-icon recipe-edit-panel-icon-info" aria-hidden="true"></span>
-                    <h3>Recipe Information</h3>
+                    <div class="recipe-edit-panel-title">
+                        <span class="recipe-edit-panel-icon recipe-edit-panel-icon-info" aria-hidden="true"></span>
+                        <h3>Recipe Information</h3>
+                    </div>
+                    <div class="recipe-edit-info-actions">
+                        <a id="recipeEditPdfButtonPanel"
+                           class="recipe-edit-pdf-button recipe-edit-header-pdf-button"
+                           href="#"
+                           target="_blank"
+                           rel="noopener noreferrer"
+                           hidden>
+                            <span class="recipe-edit-button-icon" aria-hidden="true">â†“</span>
+                            <span>PDF</span>
+                        </a>
+                        <div class="recipe-edit-section-menu-wrap recipe-edit-info-menu-wrap">
+                            <button type="button"
+                                    class="recipe-edit-row-menu-btn recipe-edit-section-menu-btn"
+                                    aria-label="PDF actions"
+                                    aria-haspopup="true"
+                                    aria-expanded="false"
+                                    onclick="return toggleRecipeEditSectionMenu(this, event)">
+                                <span aria-hidden="true"></span>
+                            </button>
+                            <div class="recipe-edit-row-menu recipe-edit-section-menu recipe-edit-info-menu" hidden>
+                                <a id="recipeEditPdfMenuButton"
+                                   class="recipe-edit-menu-link"
+                                   href="#"
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   hidden>
+                                    Download PDF
+                                </a>
+                                <button type="button"
+                                        id="recipeEditCreatePdfButton"
+                                        class="recipe-edit-create-pdf-button"
+                                        onclick="return createRecipeEditorPdf(this)">
+                                    Create PDF
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="recipe-edit-grid">
                     <label>
@@ -176,15 +225,14 @@
                         <span>Servings</span>
                         <input type="text" name="servings" id="recipeEditServings">
                     </label>
-                    <div class="recipe-edit-amount-actions">
-                        <label>
-                            <span>Recipe Amount</span>
-                            <select name="scaling_multiplier"
-                                    id="recipeEditScaleMultiplier"
-                                    onchange="applyRecipeScaleMultiplier(this)"></select>
-                        </label>
-                        <div class="recipe-edit-pdf-actions">
-                            <a id="recipeEditPdfButton"
+                    <label>
+                        <span>Recipe Amount</span>
+                        <select name="scaling_multiplier"
+                                id="recipeEditScaleMultiplier"
+                                onchange="applyRecipeScaleMultiplier(this)"></select>
+                    </label>
+                    <template id="recipeEditLegacyPdfActions" hidden>
+                            <a id="recipeEditPdfButtonLegacy"
                                class="recipe-edit-pdf-button"
                                href="#"
                                target="_blank"
@@ -194,22 +242,13 @@
                                 <span>PDF</span>
                             </a>
                             <button type="button"
-                                    id="recipeEditCreatePdfButton"
+                                    id="recipeEditCreatePdfButtonLegacy"
                                     class="recipe-edit-create-pdf-button"
                                     onclick="createRecipeEditorPdf(this)">
                                 <span class="recipe-edit-button-icon" aria-hidden="true">↗</span>
                                 <span>Create PDF</span>
                             </button>
-                            <button type="button"
-                                    id="recipeEditDeletePdfButton"
-                                    class="recipe-edit-delete-pdf-button"
-                                    aria-label="Delete PDF"
-                                    onclick="deleteRecipeEditorPdf(this)"
-                                    hidden>
-                                <span class="recipe-edit-button-icon" aria-hidden="true">&times;</span>
-                            </button>
-                        </div>
-                    </div>
+                    </template>
                 </div>
             </section>
 
@@ -339,16 +378,16 @@
             </section>
 
             <div class="recipe-edit-actions">
-                <button type="button" class="recipe-edit-cancel" onclick="closeRecipeEditor()">Cancel/Close</button>
+                <button type="submit" class="recipe-edit-save">
+                    <span class="recipe-edit-button-icon" aria-hidden="true">▣</span>
+                    <span>Save Recipe</span>
+                </button>
                 <button type="button"
                         class="recipe-edit-delete"
                         onclick="return confirmDeleteRecipeFromEditor(this, event)">
                     <span>Delete</span>
                 </button>
-                <button type="submit" class="recipe-edit-save">
-                    <span class="recipe-edit-button-icon" aria-hidden="true">▣</span>
-                    <span>Save Recipe</span>
-                </button>
+                <button type="button" class="recipe-edit-cancel" onclick="closeRecipeEditor()">Cancel</button>
             </div>
         </form>
     </div>
