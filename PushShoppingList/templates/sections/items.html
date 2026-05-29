@@ -216,6 +216,24 @@
                                 </span>
                             </div>
                         {% endif %}
+                        <div class="recipe-view-title-amount">
+                            <span class="recipe-view-title-amount-label">Amount:</span>
+                            <div class="recipe-quantity-control recipe-view-quantity">
+                                <select class="recipe-quantity-input recipe-scaling-select"
+                                        data-recipe-number="{{ recipe.number }}"
+                                        data-recipe-url="{{ recipe.url }}"
+                                        data-inline-quantity-save="1"
+                                        aria-label="Recipe {{ recipe.number }} amount"
+                                        onchange="return handleRecipeQuantitySelectChange(this)">
+                                    {% for option in recipe.scaling_options %}
+                                        <option value="{{ option.value }}"
+                                                {% if option.selected %}selected{% endif %}>
+                                            {{ option.label }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
                     </div>
                     <div class="recipe-view-title-actions">
                         {% if recipe.food_rule_status.needs_review %}
@@ -235,47 +253,44 @@
                                 aria-expanded="true">
                             Hide ^
                         </button>
-                        <div class="recipe-quantity-control recipe-view-quantity">
-                            <select class="recipe-quantity-input recipe-scaling-select"
-                                    data-recipe-number="{{ recipe.number }}"
-                                    data-recipe-url="{{ recipe.url }}"
-                                    data-inline-quantity-save="1"
-                                    aria-label="Recipe {{ recipe.number }} amount"
-                                    onchange="return handleRecipeQuantitySelectChange(this)">
-                                {% for option in recipe.scaling_options %}
-                                    <option value="{{ option.value }}"
-                                            {% if option.selected %}selected{% endif %}>
-                                        {{ option.label }}
-                                    </option>
-                                {% endfor %}
-                            </select>
+                        <div class="recipe-view-title-menu-wrap recipe-edit-row-menu-wrap">
+                            <button type="button"
+                                    class="recipe-edit-row-menu-btn recipe-view-title-menu-btn"
+                                    aria-label="Recipe {{ recipe.number }} actions"
+                                    aria-haspopup="true"
+                                    aria-expanded="false"
+                                    onclick="return toggleRecipeEditRowMenu(this, event)">
+                                <span aria-hidden="true"></span>
+                            </button>
+                            <div class="recipe-edit-row-menu recipe-view-title-menu" hidden>
+                                <button type="button"
+                                        data-recipe-url="{{ recipe.url }}"
+                                        onclick="openRecipeEditor(this); closeRecipeEditRowMenus(); return false;">
+                                    Edit
+                                </button>
+                                {% if recipe.archive_pdf_available %}
+                                    <a class="recipe-edit-menu-link recipe-view-menu-pdf"
+                                       href="{{ url_for('recipe_bp.recipe_archive_pdf_route', url=recipe.url) }}"
+                                       target="_blank"
+                                       rel="noopener noreferrer"
+                                       title="{{ recipe.name }}"
+                                       aria-label="Open PDF for {{ recipe.name }}">
+                                        PDF
+                                    </a>
+                                {% endif %}
+                                <form method="POST"
+                                      action="{{ url_for('recipe_bp.remove_recipe_route') }}"
+                                      class="remove-recipe-form recipe-view-remove-form recipe-view-menu-form"
+                                      onsubmit="saveScroll(); return confirm('Remove this recipe URL?');">
+                                    <input type="hidden" name="url" value="{{ recipe.url }}">
+                                    <button type="submit"
+                                            class="delete recipe-view-remove recipe-view-menu-delete"
+                                            aria-label="Remove recipe {{ recipe.number }}">
+                                        Delete
+                                    </button>
+                                </form>
+                            </div>
                         </div>
-                        <button type="button"
-                                class="edit-recipe-btn recipe-view-edit-btn"
-                                data-recipe-url="{{ recipe.url }}"
-                                aria-label="Edit {{ recipe.name }}"
-                                onclick="openRecipeEditor(this)">
-                            Edit
-                        </button>
-                        {% if recipe.archive_pdf_available %}
-                            <a class="recipe-archive-pdf-btn recipe-url-summary-pdf recipe-view-pdf-btn"
-                               href="{{ url_for('recipe_bp.recipe_archive_pdf_route', url=recipe.url) }}"
-                               target="_blank"
-                               rel="noopener noreferrer"
-                               title="{{ recipe.name }}"
-                               aria-label="Open PDF for {{ recipe.name }}">
-                                PDF
-                            </a>
-                        {% endif %}
-                        <form method="POST"
-                              action="{{ url_for('recipe_bp.remove_recipe_route') }}"
-                              class="remove-recipe-form recipe-view-remove-form"
-                              onsubmit="saveScroll(); return confirm('Remove this recipe URL?');">
-                            <input type="hidden" name="url" value="{{ recipe.url }}">
-                            <button type="submit"
-                                    class="remove-recipe-btn recipe-view-remove"
-                                    aria-label="Remove recipe {{ recipe.number }}">X</button>
-                        </form>
                     </div>
                 </div>
 

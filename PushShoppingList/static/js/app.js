@@ -5937,7 +5937,7 @@ function toggleRecipeIngredientRowMenu(button, event = null) {
 }
 
 function recipeEditMovableRowSelector() {
-    return ".recipe-edit-ingredient-row, .recipe-edit-equipment-row, .recipe-edit-instruction-row, .recipe-edit-nutrition-row";
+    return ".recipe-edit-ingredient-row, .recipe-edit-equipment-row, .recipe-edit-instruction-row, .recipe-edit-nutrition-row, .recipe-url-summary-row, .store-manager-row, .recipe-view-card, .cookbook-card, .cookbook-recipe-card";
 }
 
 function recipeEditMoveSelectorForRow(row) {
@@ -5959,6 +5959,10 @@ function recipeEditMoveSelectorForRow(row) {
 
     if (row.classList.contains("recipe-edit-nutrition-row")) {
         return ".recipe-edit-nutrition-row";
+    }
+
+    if (row.classList.contains("recipe-url-summary-row")) {
+        return ".recipe-url-summary-row";
     }
 
     return ".recipe-edit-text-row";
@@ -6232,6 +6236,14 @@ function updateRecipeEditRowOrder(row) {
     }
     if (row.classList.contains("recipe-edit-instruction-row")) {
         updateRecipeInstructionStepNumbers();
+    }
+    if (row.classList.contains("recipe-url-summary-row")) {
+        const list = row.closest("[data-recipe-url-sort-list]");
+
+        if (list) {
+            updateRecipeUrlOrderNumbers(list);
+            saveRecipeUrlOrder(list);
+        }
     }
 }
 

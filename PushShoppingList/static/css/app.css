@@ -922,7 +922,7 @@ body {
             justify-content: flex-end;
             gap: 8px;
             width: auto;
-            min-width: 92px;
+            min-width: 38px;
             margin: 0;
             flex-wrap: nowrap;
             box-sizing: border-box;
@@ -930,6 +930,39 @@ body {
 
         .store-action-row .store-delete-form {
             margin: 0;
+        }
+
+        .store-action-menu-wrap {
+            position: relative;
+            display: inline-flex;
+            flex: 0 0 auto;
+        }
+
+        .store-action-menu {
+            min-width: 142px;
+        }
+
+        .store-action-menu .store-action-menu-form {
+            display: block;
+            width: 100%;
+            justify-self: stretch;
+            grid-column: auto;
+            grid-row: auto;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        .store-action-menu .store-action-menu-delete {
+            display: block;
+            width: 100%;
+            min-width: 0;
+            height: auto;
+            min-height: 34px;
+            padding: 8px 13px;
+            text-align: left;
+            border-radius: 0;
+            background: transparent;
         }
 
         .store-edit-btn,
@@ -2556,6 +2589,60 @@ body {
             font-weight: 400;
         }
 
+        .recipe-view-title-amount {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 2px;
+            color: #aaa;
+            font-size: 14px;
+            font-weight: 400;
+        }
+
+        .recipe-view-title-amount-label {
+            flex: 0 0 auto;
+        }
+
+        .recipe-view-title-menu-wrap {
+            position: relative;
+            display: inline-flex;
+            flex: 0 0 auto;
+        }
+
+        .recipe-view-title-menu {
+            min-width: 142px;
+        }
+
+        .recipe-view-title-menu .recipe-view-menu-form,
+        .recipe-view-title-menu .recipe-view-remove-form,
+        .recipe-view-title-actions .recipe-view-title-menu .recipe-view-menu-form,
+        .recipe-view-title-actions .recipe-view-title-menu .recipe-view-remove-form {
+            display: block;
+            width: 100%;
+            flex: none;
+            justify-self: stretch;
+            grid-column: auto;
+            grid-row: auto;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        .recipe-view-title-menu .recipe-view-menu-delete,
+        .recipe-view-title-actions .recipe-view-title-menu .recipe-view-menu-delete,
+        .recipe-view-title-actions .recipe-view-title-menu .recipe-view-remove {
+            display: block;
+            width: 100%;
+            min-width: 0;
+            max-width: none;
+            height: auto;
+            min-height: 34px;
+            padding: 8px 13px;
+            text-align: left;
+            border-radius: 0;
+            background: transparent;
+        }
+
         .recipe-detail-box {
             background: #202425;
             border: 1px solid #333;
@@ -3219,28 +3306,25 @@ body {
             outline: none;
         }
 
-        .cookbook-edit-btn {
-            width: auto;
-            min-width: 52px;
-            height: 32px;
-            margin: 0;
-            padding: 0 10px;
-            border-radius: 7px;
-            background: #155999;
-            font-size: 12px;
-            font-weight: 900;
+        .cookbook-card-menu-wrap,
+        .cookbook-recipe-menu-wrap {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            flex: 0 0 auto;
         }
 
-        .cookbook-delete-btn {
+        .cookbook-card-menu-btn {
             width: 34px;
             min-width: 34px;
             height: 32px;
-            margin: 0;
-            padding: 0;
-            border-radius: 7px;
-            background: #b00000;
-            font-size: 16px;
-            font-weight: 900;
+            border-color: #34455f;
+            background: #101923;
+        }
+
+        .cookbook-card-menu,
+        .cookbook-recipe-menu {
+            min-width: 134px;
         }
 
         .cookbook-name-modal-backdrop {
@@ -3548,39 +3632,12 @@ body {
             outline: none;
         }
 
-        .cookbook-recipe-edit-btn,
-        .cookbook-recipe-pdf-btn {
-            width: auto;
-            min-width: 54px;
+        .cookbook-recipe-menu-btn {
+            width: 34px;
+            min-width: 34px;
             height: 30px;
-            margin: 0;
-            padding: 0 9px;
-            font-size: 13px;
-            font-weight: 800;
-        }
-
-        .recipe-archive-pdf-btn.cookbook-recipe-pdf-btn {
-            min-width: 40px;
-            height: 30px;
-            padding: 0 7px;
-        }
-
-        .cookbook-remove-recipe-btn {
-            width: 38px;
-            min-width: 38px;
-            height: 30px;
-            margin: 0;
-            padding: 0;
-            background: #b00000;
-            color: #fff;
-            font-size: 16px;
-            font-weight: 900;
-        }
-
-        .cookbook-remove-recipe-btn:hover,
-        .cookbook-remove-recipe-btn:focus-visible {
-            background: #cc0000;
-            outline: none;
+            border-color: #34455f;
+            background: #101923;
         }
 
         .cookbook-recipe-details {
@@ -4347,28 +4404,45 @@ body {
         }
 
         .recipe-url-drag-handle {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             flex: 0 0 auto;
             width: 32px;
             min-width: 32px;
             height: 32px;
             margin: 0;
             padding: 0;
-            border: 1px solid #3f4a4a;
-            border-radius: 6px;
-            background: #202829;
-            color: #cbd5e1;
-            font-size: 18px;
-            font-weight: 800;
-            line-height: 1;
+            border: 0;
+            border-radius: 7px;
+            background: transparent;
+            color: #9ca3af;
             cursor: grab;
             touch-action: none;
         }
 
         .recipe-url-drag-handle:hover,
         .recipe-url-drag-handle:focus {
-            background: #263435;
-            color: #fff;
+            background: rgba(31, 41, 55, 0.72);
+            color: #e5e7eb;
             outline: none;
+        }
+
+        .recipe-url-drag-dots {
+            display: grid;
+            grid-template-columns: repeat(2, 4px);
+            grid-auto-rows: 4px;
+            gap: 4px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .recipe-url-drag-dots span {
+            display: block;
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: currentColor;
         }
 
         .recipe-url-summary-row:last-child,
@@ -4510,6 +4584,20 @@ body {
             font-weight: 400;
         }
 
+        .recipe-url-summary-amount {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 2px;
+            color: #aaa;
+            font-size: 14px;
+            font-weight: 400;
+        }
+
+        .recipe-url-summary-amount-label {
+            flex: 0 0 auto;
+        }
+
         .recipe-url-summary-food-review {
             justify-self: end;
             margin: 0;
@@ -4527,6 +4615,40 @@ body {
 
         .recipe-url-summary-quantity {
             flex: 0 0 auto;
+        }
+
+        .recipe-url-summary-menu-wrap {
+            position: relative;
+            display: inline-flex;
+            flex: 0 0 auto;
+        }
+
+        .recipe-url-summary-menu {
+            min-width: 142px;
+        }
+
+        .recipe-url-summary-menu .recipe-url-summary-menu-form,
+        .recipe-url-summary-menu .recipe-url-summary-remove-form {
+            display: block;
+            width: 100%;
+            justify-self: stretch;
+            grid-column: auto;
+            grid-row: auto;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        .recipe-url-summary-menu .recipe-url-summary-remove {
+            display: block;
+            width: 100%;
+            min-width: 0;
+            height: auto;
+            min-height: 34px;
+            padding: 8px 13px;
+            text-align: left;
+            border-radius: 0;
+            background: transparent;
         }
 
         .recipe-url-summary-edit {
@@ -7352,13 +7474,21 @@ body {
             }
 
             .cookbook-recipe-actions {
-                justify-content: flex-end;
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) auto;
+                align-items: center;
+                justify-content: stretch;
                 width: 100%;
                 margin-left: auto;
             }
 
-            .cookbook-recipe-actions > * {
-                flex: 0 0 auto;
+            .cookbook-recipe-actions > .cookbook-recipe-toggle-btn {
+                width: 100%;
+                min-width: 0;
+            }
+
+            .cookbook-recipe-actions > .cookbook-recipe-menu-wrap {
+                justify-self: end;
             }
 
             .cookbook-recipe-summary {
@@ -7366,14 +7496,21 @@ body {
             }
 
             .cookbook-card-actions {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) auto;
+                align-items: center;
                 width: 100%;
                 gap: 6px;
                 justify-content: stretch;
-                flex-wrap: wrap;
             }
 
-            .cookbook-card-actions > * {
-                flex: 1 1 64px;
+            .cookbook-card-actions > .cookbook-card-toggle-btn {
+                width: 100%;
+                min-width: 0;
+            }
+
+            .cookbook-card-actions > .cookbook-card-menu-wrap {
+                justify-self: end;
             }
 
             .cookbook-recipe-search {
@@ -7388,27 +7525,6 @@ body {
             .cookbook-restore-btn,
             .cookbook-card-toggle-btn {
                 width: 100%;
-            }
-
-            .cookbook-recipe-toggle-btn,
-            .cookbook-recipe-edit-btn,
-            .cookbook-recipe-pdf-btn,
-            .cookbook-remove-recipe-btn {
-                width: auto;
-            }
-
-            .cookbook-recipe-toggle-btn,
-            .cookbook-recipe-edit-btn {
-                min-width: 54px;
-            }
-
-            .cookbook-recipe-pdf-btn {
-                min-width: 40px;
-            }
-
-            .cookbook-remove-recipe-btn {
-                width: 38px;
-                min-width: 38px;
             }
 
             .cookbook-name-modal-actions {
@@ -7808,28 +7924,39 @@ body {
             }
 
             .recipe-url-summary-row {
+                position: relative;
                 grid-template-columns: 1fr;
                 align-items: start;
                 gap: 6px;
+                padding-right: 46px;
             }
 
             .recipe-url-summary-header {
                 display: grid;
-                grid-template-columns: minmax(0, 1fr);
+                grid-template-columns: 32px minmax(0, 1fr);
                 gap: 8px;
                 align-items: start;
             }
 
             .recipe-url-summary-title {
+                grid-column: 2;
                 grid-template-columns: minmax(0, 1fr);
                 gap: 3px;
+                padding-right: 4px;
             }
 
             .recipe-url-summary-actions {
+                grid-column: 2;
                 justify-self: start;
                 justify-content: flex-start;
                 flex-wrap: wrap;
                 width: 100%;
+            }
+
+            .recipe-url-summary-menu-wrap {
+                position: absolute;
+                top: 6px;
+                right: 6px;
             }
 
             .recipe-url-summary-save-qty {
@@ -7879,9 +8006,9 @@ body {
                 grid-row: 2;
                 width: 100%;
                 min-width: 0;
-                justify-content: flex-start;
+                justify-content: flex-end;
                 gap: 5px;
-                flex-wrap: nowrap;
+                flex-wrap: wrap;
             }
 
             .recipe-view-collapse-btn {

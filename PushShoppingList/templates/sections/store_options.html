@@ -110,19 +110,32 @@
                     </div>
 
                     <div class="store-action-row">
-                        <button type="button"
-                                class="store-edit-btn edit-recipe-btn recipe-url-summary-edit"
-                                onclick="return openStoreEditModal('store-edit-{{ store_key }}', this)">
-                            Edit
-                        </button>
-                        <form method="POST"
-                              action="/delete_store/{{ store_key }}"
-                              class="remove-recipe-form recipe-url-summary-remove-form store-delete-form"
-                              onsubmit="return deleteStore(event, 'Delete {{ store.label }}?');">
-                            <button type="submit"
-                                    class="store-delete-btn remove-recipe-btn recipe-url-summary-remove"
-                                    aria-label="Delete {{ store.label }}">X</button>
-                        </form>
+                        <div class="store-action-menu-wrap recipe-edit-row-menu-wrap">
+                            <button type="button"
+                                    class="recipe-edit-row-menu-btn store-action-menu-btn"
+                                    aria-label="{{ store.label }} actions"
+                                    aria-haspopup="true"
+                                    aria-expanded="false"
+                                    onclick="return toggleRecipeEditRowMenu(this, event)">
+                                <span aria-hidden="true"></span>
+                            </button>
+                            <div class="recipe-edit-row-menu store-action-menu" hidden>
+                                <button type="button"
+                                        onclick="closeRecipeEditRowMenus(); return openStoreEditModal('store-edit-{{ store_key }}', this)">
+                                    Edit
+                                </button>
+                                <form method="POST"
+                                      action="/delete_store/{{ store_key }}"
+                                      class="store-delete-form store-action-menu-form"
+                                      onsubmit="return deleteStore(event, 'Delete {{ store.label }}?');">
+                                    <button type="submit"
+                                            class="delete store-action-menu-delete"
+                                            aria-label="Delete {{ store.label }}">
+                                        Delete
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="store-location-details">

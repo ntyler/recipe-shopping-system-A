@@ -147,22 +147,32 @@
                                                 onclick="return toggleCookbookCard(this)">
                                             <span data-cookbook-toggle-icon>Hide ^</span>
                                         </button>
-                                        <button type="button"
-                                                class="cookbook-edit-btn"
-                                                data-cookbook-id="{{ cookbook.id }}"
-                                                data-cookbook-name="{{ cookbook.name }}"
-                                                onclick="openCookbookNameEditor(this)"
-                                                aria-label="Edit {{ cookbook.name }}">
-                                            Edit
-                                        </button>
-                                        <button type="button"
-                                                class="cookbook-delete-btn"
-                                                data-cookbook-id="{{ cookbook.id }}"
-                                                data-cookbook-name="{{ cookbook.name }}"
-                                                onclick="deleteCookbook(this)"
-                                                aria-label="Delete {{ cookbook.name }}">
-                                            X
-                                        </button>
+                                        <div class="cookbook-card-menu-wrap recipe-edit-row-menu-wrap">
+                                            <button type="button"
+                                                    class="recipe-edit-row-menu-btn cookbook-card-menu-btn"
+                                                    aria-label="{{ cookbook.name }} actions"
+                                                    aria-haspopup="true"
+                                                    aria-expanded="false"
+                                                    onclick="return toggleRecipeEditRowMenu(this, event)">
+                                                <span aria-hidden="true"></span>
+                                            </button>
+                                            <div class="recipe-edit-row-menu cookbook-card-menu" hidden>
+                                                <button type="button"
+                                                        data-cookbook-id="{{ cookbook.id }}"
+                                                        data-cookbook-name="{{ cookbook.name }}"
+                                                        onclick="closeRecipeEditRowMenus(); openCookbookNameEditor(this); return false;">
+                                                    Edit
+                                                </button>
+                                                <button type="button"
+                                                        class="delete"
+                                                        data-cookbook-id="{{ cookbook.id }}"
+                                                        data-cookbook-name="{{ cookbook.name }}"
+                                                        onclick="closeRecipeEditRowMenus(); deleteCookbook(this); return false;"
+                                                        aria-label="Delete {{ cookbook.name }}">
+                                                    Delete
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -207,28 +217,40 @@
                                                                     onclick="return toggleCookbookRecipeDetails(this)">
                                                                 <span data-cookbook-recipe-toggle-icon>Hide ^</span>
                                                             </button>
-                                                            <button type="button"
-                                                                    class="edit-recipe-btn cookbook-recipe-edit-btn"
-                                                                    data-recipe-url="{{ recipe.url }}"
-                                                                    onclick="openRecipeEditor(this)">
-                                                                Edit
-                                                            </button>
-                                                            {% if recipe.archive_pdf_available %}
-                                                                <a class="recipe-archive-pdf-btn cookbook-recipe-pdf-btn"
-                                                                   href="{{ url_for('recipe_bp.recipe_archive_pdf_route', url=recipe.url) }}"
-                                                                   target="_blank"
-                                                                   rel="noopener noreferrer">
-                                                                    PDF
-                                                                </a>
-                                                            {% endif %}
-                                                            <button type="button"
-                                                                    class="cookbook-remove-recipe-btn"
-                                                                    data-cookbook-id="{{ cookbook.id }}"
-                                                                    data-recipe-url="{{ recipe.url }}"
-                                                                    aria-label="Remove {{ recipe.name }} from cookbook"
-                                                                    onclick="removeCookbookRecipe(this)">
-                                                                X
-                                                            </button>
+                                                            <div class="cookbook-recipe-menu-wrap recipe-edit-row-menu-wrap">
+                                                                <button type="button"
+                                                                        class="recipe-edit-row-menu-btn cookbook-recipe-menu-btn"
+                                                                        aria-label="{{ recipe.name }} actions"
+                                                                        aria-haspopup="true"
+                                                                        aria-expanded="false"
+                                                                        onclick="return toggleRecipeEditRowMenu(this, event)">
+                                                                    <span aria-hidden="true"></span>
+                                                                </button>
+                                                                <div class="recipe-edit-row-menu cookbook-recipe-menu" hidden>
+                                                                    <button type="button"
+                                                                            data-recipe-url="{{ recipe.url }}"
+                                                                            onclick="closeRecipeEditRowMenus(); openRecipeEditor(this); return false;">
+                                                                        Edit
+                                                                    </button>
+                                                                    {% if recipe.archive_pdf_available %}
+                                                                        <a class="recipe-edit-menu-link cookbook-recipe-menu-pdf"
+                                                                           href="{{ url_for('recipe_bp.recipe_archive_pdf_route', url=recipe.url) }}"
+                                                                           target="_blank"
+                                                                           rel="noopener noreferrer"
+                                                                           onclick="closeRecipeEditRowMenus()">
+                                                                            PDF
+                                                                        </a>
+                                                                    {% endif %}
+                                                                    <button type="button"
+                                                                            class="delete"
+                                                                            data-cookbook-id="{{ cookbook.id }}"
+                                                                            data-recipe-url="{{ recipe.url }}"
+                                                                            aria-label="Remove {{ recipe.name }} from cookbook"
+                                                                            onclick="closeRecipeEditRowMenus(); removeCookbookRecipe(this); return false;">
+                                                                        Delete
+                                                                    </button>
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                     <div class="cookbook-recipe-summary">
