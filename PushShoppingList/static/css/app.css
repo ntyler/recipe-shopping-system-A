@@ -4646,9 +4646,12 @@ body {
         }
 
         .recipe-url-summary-cookbook {
-            display: inline-flex;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
             align-items: center;
-            gap: 6px;
+            column-gap: 6px;
+            row-gap: 2px;
+            width: min(280px, 100%);
             max-width: min(280px, 100%);
             margin-top: 8px;
             padding: 6px 9px;
@@ -4666,6 +4669,9 @@ body {
             position: relative;
             display: inline-flex;
             flex: 0 0 auto;
+            grid-column: 2;
+            grid-row: 1 / span 2;
+            align-self: center;
             margin: -5px -6px -5px 0;
         }
 
@@ -4690,14 +4696,17 @@ body {
         }
 
         .recipe-url-summary-cookbook-label {
+            grid-column: 1;
             color: #8dddbd;
             text-transform: uppercase;
             letter-spacing: 0.03em;
         }
 
         .recipe-url-summary-cookbook-name {
+            grid-column: 1;
             min-width: 0;
-            overflow-wrap: anywhere;
+            overflow-wrap: break-word;
+            word-break: normal;
         }
 
         .recipe-url-summary-servings {
@@ -4743,6 +4752,13 @@ body {
             position: relative;
             display: inline-flex;
             flex: 0 0 auto;
+        }
+
+        #currentRecipeUrlLogCard .recipe-url-summary-menu-btn {
+            width: 32px;
+            min-width: 32px;
+            height: 32px;
+            min-height: 32px;
         }
 
         .recipe-url-summary-menu {
@@ -8086,7 +8102,7 @@ body {
 
             .recipe-url-summary-menu-wrap {
                 position: absolute;
-                top: 6px;
+                top: 0;
                 right: 6px;
             }
 
@@ -9061,6 +9077,35 @@ body {
     font-size: 12px;
     font-weight: 750;
     letter-spacing: 0.02em;
+}
+
+.recipe-edit-cookbook-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    color: #c4ccd8;
+    font-size: 12px;
+    font-weight: 750;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.recipe-edit-readonly-field {
+    min-height: 40px;
+    border: 1px solid #263447;
+    border-radius: 7px;
+    background: linear-gradient(180deg, #0b121c, #080e16);
+    color: #8ff5a1;
+    padding: 10px 13px;
+    font-size: 15px;
+    line-height: 1.25;
+    text-transform: none;
+    overflow-wrap: anywhere;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+.recipe-edit-readonly-field.muted {
+    color: #8b95a4;
 }
 
 .recipe-edit-dialog input,
@@ -10254,6 +10299,13 @@ body {
     background: transparent;
 }
 
+#currentRecipeUrlLogCard .recipe-url-summary-menu-btn.recipe-edit-row-menu-btn {
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+    min-height: 32px;
+}
+
 .recipe-edit-section-menu-wrap {
     position: relative;
     display: inline-flex;
@@ -10737,9 +10789,20 @@ body {
         font-size: 10px;
     }
 
+    .recipe-edit-cookbook-field {
+        gap: 5px;
+        font-size: 10px;
+    }
+
     .recipe-edit-dialog input,
     .recipe-edit-dialog textarea,
     .recipe-edit-dialog select {
+        min-height: 32px;
+        padding: 6px 8px;
+        font-size: 13px;
+    }
+
+    .recipe-edit-readonly-field {
         min-height: 32px;
         padding: 6px 8px;
         font-size: 13px;

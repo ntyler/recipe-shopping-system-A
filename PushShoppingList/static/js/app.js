@@ -5162,6 +5162,7 @@ function populateRecipeEditor(recipe, originalUrl) {
     setValue("recipeEditSourceUrl", recipe.source_display_url || recipe.source_url || originalUrl);
     setValue("recipeEditQuantity", recipe.quantity || "1");
     setValue("recipeEditServings", recipe.servings || "");
+    setRecipeEditorCookbook(recipe);
     populateRecipeScalingControls(recipe.scaling || {}, recipe.servings || "");
     updateRecipeEditorPdfControls(recipe);
 
@@ -5209,6 +5210,21 @@ function populateRecipeEditor(recipe, originalUrl) {
     }
 
     updateRecipeEditStickyOffsets();
+}
+
+function setRecipeEditorCookbook(recipe) {
+    const cookbookName = document.getElementById("recipeEditCookbookName");
+    const name = recipe && recipe.cookbook_name
+        ? String(recipe.cookbook_name).trim()
+        : "";
+
+    if (!cookbookName) {
+        return;
+    }
+
+    cookbookName.textContent = name || "No cookbook assigned.";
+    cookbookName.classList.toggle("muted", !name);
+    cookbookName.title = name || "";
 }
 
 function updateRecipeEditorPdfControls(recipe) {

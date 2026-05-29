@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 
 from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.cookbook_service import ensure_unclassified_cookbook_for_recipes
+from PushShoppingList.services.cookbook_service import recipe_cookbook_assignments
 from PushShoppingList.services.ingredient_text_review_service import annotate_ingredients_for_food_review
 from PushShoppingList.services.recipe_extract_service import MODEL
 from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
@@ -121,6 +122,7 @@ def load_editable_recipe(url):
     url = str(url or "").strip()
     recipe_data = load_recipe_output(url) or {"source_url": url}
     meta = load_recipe_ingredients().get(normalize_recipe_url_key(url), {})
+    cookbook_assignment = recipe_cookbook_assignments().get(normalize_recipe_url_key(url), {})
     pdf = editable_recipe_pdf_info(url)
     scaling = normalize_recipe_scaling_metadata(recipe_data.get("scaling"))
     if recipe_data.get("servings") and not scaling.get("base_servings"):
@@ -134,6 +136,9 @@ def load_editable_recipe(url):
             "type": recipe_url_type(url),
             "display_name": meta.get("name") or recipe_data.get("recipe_title") or "",
             "quantity": normalize_recipe_quantity(meta.get("quantity", 1)),
+            "cookbook_id": cookbook_assignment.get("cookbook_id", ""),
+            "cookbook_name": cookbook_assignment.get("cookbook_name", ""),
+            "cookbook_is_unclassified": cookbook_assignment.get("cookbook_is_unclassified", False),
             "recipe_title": recipe_data.get("recipe_title") or "",
             "servings": recipe_data.get("servings") or "",
             "scaling": scaling,
