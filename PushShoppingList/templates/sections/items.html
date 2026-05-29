@@ -234,6 +234,25 @@
                                 </select>
                             </div>
                         </div>
+                        {% if recipe.cover_image and recipe.cover_image.src %}
+                            <div class="recipe-view-title-media">
+                                <img class="recipe-cover-image recipe-view-cover"
+                                     src="{{ recipe.cover_image.src }}"
+                                     alt="{{ recipe.cover_image.alt or recipe.name }}"
+                                     loading="lazy">
+                                {% if recipe.cookbook_name %}
+                                    <div class="recipe-url-summary-cookbook recipe-view-cookbook">
+                                        <span class="recipe-url-summary-cookbook-label">Cookbook:</span>
+                                        <span class="recipe-url-summary-cookbook-name">{{ recipe.cookbook_name }}</span>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        {% elif recipe.cookbook_name %}
+                            <div class="recipe-url-summary-cookbook recipe-view-cookbook">
+                                <span class="recipe-url-summary-cookbook-label">Cookbook:</span>
+                                <span class="recipe-url-summary-cookbook-name">{{ recipe.cookbook_name }}</span>
+                            </div>
+                        {% endif %}
                     </div>
                     <div class="recipe-view-title-actions">
                         {% if recipe.food_rule_status.needs_review %}
@@ -293,13 +312,6 @@
                         </div>
                     </div>
                 </div>
-
-                {% if recipe.cover_image and recipe.cover_image.src %}
-                    <img class="recipe-cover-image recipe-view-cover"
-                         src="{{ recipe.cover_image.src }}"
-                         alt="{{ recipe.cover_image.alt or recipe.name }}"
-                         loading="lazy">
-                {% endif %}
 
                 <button type="button"
                         class="detail-toggle"

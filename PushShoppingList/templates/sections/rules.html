@@ -33,7 +33,22 @@
             <section class="rules-group">
                 <div class="rules-group-header">
                     <h3>Home And Stores</h3>
-                    <button type="button" class="rules-edit-btn" onclick="openRulesEditor('home_stores')">Edit</button>
+                    <div class="rules-group-menu-wrap recipe-edit-row-menu-wrap">
+                        <button type="button"
+                                class="recipe-edit-row-menu-btn rules-group-menu-btn"
+                                aria-label="Home And Stores actions"
+                                aria-haspopup="true"
+                                aria-expanded="false"
+                                onclick="return toggleRecipeEditRowMenu(this, event)">
+                            <span aria-hidden="true"></span>
+                        </button>
+                        <div class="recipe-edit-row-menu rules-group-menu" hidden>
+                            <button type="button"
+                                    onclick="openRulesEditor('home_stores'); closeRecipeEditRowMenus(); return false;">
+                                Edit
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 <ul class="rules-list">
                     <li>
@@ -56,7 +71,22 @@
             <section class="rules-group">
                 <div class="rules-group-header">
                     <h3>Best Product Ranking</h3>
-                    <button type="button" class="rules-edit-btn" onclick="openRulesEditor('best_product_ranking')">Edit</button>
+                    <div class="rules-group-menu-wrap recipe-edit-row-menu-wrap">
+                        <button type="button"
+                                class="recipe-edit-row-menu-btn rules-group-menu-btn"
+                                aria-label="Best Product Ranking actions"
+                                aria-haspopup="true"
+                                aria-expanded="false"
+                                onclick="return toggleRecipeEditRowMenu(this, event)">
+                            <span aria-hidden="true"></span>
+                        </button>
+                        <div class="recipe-edit-row-menu rules-group-menu" hidden>
+                            <button type="button"
+                                    onclick="openRulesEditor('best_product_ranking'); closeRecipeEditRowMenus(); return false;">
+                                Edit
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 <ul class="rules-list">
                     {% for row in ranking_rule_rows %}
@@ -71,7 +101,22 @@
             <section class="rules-group">
                 <div class="rules-group-header">
                     <h3>Saved Product Choices</h3>
-                    <button type="button" class="rules-edit-btn" onclick="openRulesEditor('saved_product_choices')">Edit</button>
+                    <div class="rules-group-menu-wrap recipe-edit-row-menu-wrap">
+                        <button type="button"
+                                class="recipe-edit-row-menu-btn rules-group-menu-btn"
+                                aria-label="Saved Product Choices actions"
+                                aria-haspopup="true"
+                                aria-expanded="false"
+                                onclick="return toggleRecipeEditRowMenu(this, event)">
+                            <span aria-hidden="true"></span>
+                        </button>
+                        <div class="recipe-edit-row-menu rules-group-menu" hidden>
+                            <button type="button"
+                                    onclick="openRulesEditor('saved_product_choices'); closeRecipeEditRowMenus(); return false;">
+                                Edit
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 <ul class="rules-list">
                     {% for row in saved_choice_rule_rows %}
@@ -86,7 +131,22 @@
             <section class="rules-group">
                 <div class="rules-group-header">
                     <h3>Food Restriction Rules</h3>
-                    <button type="button" class="rules-edit-btn" onclick="openRulesEditor('food_restrictions')">Edit</button>
+                    <div class="rules-group-menu-wrap recipe-edit-row-menu-wrap">
+                        <button type="button"
+                                class="recipe-edit-row-menu-btn rules-group-menu-btn"
+                                aria-label="Food Restriction Rules actions"
+                                aria-haspopup="true"
+                                aria-expanded="false"
+                                onclick="return toggleRecipeEditRowMenu(this, event)">
+                            <span aria-hidden="true"></span>
+                        </button>
+                        <div class="recipe-edit-row-menu rules-group-menu" hidden>
+                            <button type="button"
+                                    onclick="openRulesEditor('food_restrictions'); closeRecipeEditRowMenus(); return false;">
+                                Edit
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 <div class="rules-subgroup">
                     <div class="rules-subtitle">Required</div>

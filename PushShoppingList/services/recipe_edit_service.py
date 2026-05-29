@@ -4,6 +4,7 @@ import uuid
 from urllib.parse import urlparse
 
 from PushShoppingList.services.food_rules_service import load_food_rules
+from PushShoppingList.services.cookbook_service import ensure_unclassified_cookbook_for_recipes
 from PushShoppingList.services.ingredient_text_review_service import annotate_ingredients_for_food_review
 from PushShoppingList.services.recipe_extract_service import MODEL
 from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
@@ -94,6 +95,14 @@ def create_new_recipe():
     save_recipe_url_quantity(source_url, 1)
     save_recipe_url_name(source_url, "New Recipe")
     update_recipe_ingredient_record(source_url, 1, recipe_data)
+    ensure_unclassified_cookbook_for_recipes([{
+        "url": source_url,
+        "name": "New Recipe",
+        "source_href": source_url,
+        "source_display_url": source_url,
+        "quantity": 1,
+        "base_servings": "",
+    }])
 
     result = load_editable_recipe(source_url)
     result["url"] = source_url

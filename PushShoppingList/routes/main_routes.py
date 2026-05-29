@@ -22,8 +22,10 @@ from PushShoppingList.services.cookbook_service import create_cookbook
 from PushShoppingList.services.cookbook_service import cookbook_recipes_for_urls
 from PushShoppingList.services.cookbook_service import CookbookRecipeConflict
 from PushShoppingList.services.cookbook_service import delete_cookbook
+from PushShoppingList.services.cookbook_service import ensure_unclassified_cookbook_for_recipes
 from PushShoppingList.services.cookbook_service import move_recipes_to_cookbook
 from PushShoppingList.services.cookbook_service import recipe_ingredients_for_record
+from PushShoppingList.services.cookbook_service import recipe_cookbook_assignments
 from PushShoppingList.services.cookbook_service import remove_recipe_from_cookbook
 from PushShoppingList.services.cookbook_service import rename_cookbook
 from PushShoppingList.services.home_address_service import load_home_address
@@ -232,16 +234,31 @@ def recipe_view_rows(recipe_urls):
     return rows
 
 
-def recipe_url_log_rows(recipe_urls):
+def apply_cookbook_assignments_to_recipe_rows(rows, cookbook_assignments):
+    cookbook_assignments = cookbook_assignments or {}
+
+    for row in rows:
+        recipe_key = normalize_recipe_url_key(row.get("url", ""))
+        cookbook_assignment = cookbook_assignments.get(recipe_key, {})
+        row["cookbook_id"] = cookbook_assignment.get("cookbook_id", "")
+        row["cookbook_name"] = cookbook_assignment.get("cookbook_name", "")
+
+    return rows
+
+
+def recipe_url_log_rows(recipe_urls, cookbook_assignments=None):
     rows = []
     recipe_ingredient_data = load_recipe_ingredients()
+    cookbook_assignments = cookbook_assignments or {}
 
     for recipe in recipe_urls:
+        recipe_key = normalize_recipe_url_key(recipe["url"])
         recipe_data = load_saved_recipe_output(recipe["url"])
-        recipe_meta = recipe_ingredient_data.get(normalize_recipe_url_key(recipe["url"]), {})
+        recipe_meta = recipe_ingredient_data.get(recipe_key, {})
         recipe_quantity = normalize_recipe_quantity(recipe.get("quantity") or 1)
         use_scaled_meta = multipliers_match(recipe_meta.get("quantity", 1), recipe_quantity)
         scaled_servings = recipe_meta.get("scaled_servings") if use_scaled_meta else None
+        cookbook_assignment = cookbook_assignments.get(recipe_key, {})
         rows.append({
             **recipe,
             "quantity": recipe_quantity,
@@ -253,6 +270,8 @@ def recipe_url_log_rows(recipe_urls):
             "archive_pdf_available": recipe_archive_pdf_exists(recipe["url"]),
             "base_servings": recipe_data.get("servings"),
             "scaled_servings": scaled_servings or scale_servings(recipe_data.get("servings"), recipe_quantity),
+            "cookbook_id": cookbook_assignment.get("cookbook_id", ""),
+            "cookbook_name": cookbook_assignment.get("cookbook_name", ""),
         })
 
     return rows
@@ -994,9 +1013,13 @@ def index():
     items = load_items()
     store_settings = load_store_settings()
     recipe_urls = recipe_url_rows()
-    recipe_log_rows = recipe_url_log_rows(recipe_urls)
     item_state = load_item_state()
     recipe_rows = recipe_view_rows(recipe_urls)
+    ensure_unclassified_cookbook_for_recipes(recipe_rows)
+    cookbook_assignments = recipe_cookbook_assignments()
+    apply_cookbook_assignments_to_recipe_rows(recipe_rows, cookbook_assignments)
+    recipe_log_rows = recipe_url_log_rows(recipe_urls, cookbook_assignments)
+    rendered_cookbook_view = cookbook_view_for_render(recipe_rows)
     product_choices = product_choices_by_item()
     nearest_store_results = load_nearest_store_results()
     purchase_mappings = purchase_mapping_lookup_for_items(shopping_items_only(items), item_state)
@@ -1013,7 +1036,7 @@ def index():
         raw_items="\n".join(items),
         items=items,
         current_urls=recipe_log_rows,
-        cookbook_view=cookbook_view_for_render(recipe_rows),
+        cookbook_view=rendered_cookbook_view,
         home_address=load_home_address(),
         nearest_store_results=nearest_store_results,
         nearest_store_locations=nearest_store_results.get("store_locations", {}),

@@ -8,6 +8,7 @@ from PushShoppingList.services.recipe_url_service import normalize_recipe_url_ke
 BASE_DIR = Path(__file__).resolve().parent.parent
 COOKBOOKS_FILE = BASE_DIR / "cookbooks.json"
 COOKBOOKS_LOCK = threading.RLock()
+UNCLASSIFIED_COOKBOOK_NAME = "unclassified"
 
 
 class CookbookRecipeConflict(ValueError):
@@ -280,6 +281,88 @@ def find_cookbook(payload, cookbook_id):
             return cookbook
 
     return None
+
+
+def find_cookbook_by_name(payload, name):
+    name_key = normalize_text(name)
+
+    for cookbook in payload.get("cookbooks", []):
+        if normalize_text(cookbook.get("name")) == name_key:
+            return cookbook
+
+    return None
+
+
+def recipe_cookbook_assignments():
+    payload = load_cookbooks()
+    assignments = {}
+
+    for cookbook in payload.get("cookbooks", []):
+        cookbook_id = cookbook.get("id", "")
+        cookbook_name = cookbook.get("name", "")
+
+        for recipe in cookbook.get("recipes", []):
+            key = recipe_key(recipe.get("url"))
+
+            if key and key not in assignments:
+                assignments[key] = {
+                    "cookbook_id": cookbook_id,
+                    "cookbook_name": cookbook_name,
+                }
+
+    return assignments
+
+
+def ensure_unclassified_cookbook_for_recipes(recipes):
+    recipe_records = []
+    seen_keys = set()
+
+    for recipe in recipes or []:
+        record = clean_recipe_record(recipe)
+        if not record:
+            continue
+
+        key = recipe_key(record.get("url"))
+        if key and key not in seen_keys:
+            recipe_records.append(record)
+            seen_keys.add(key)
+
+    if not recipe_records:
+        return load_cookbooks()
+
+    with COOKBOOKS_LOCK:
+        payload = load_cookbooks()
+        assigned_keys = {
+            recipe_key(recipe.get("url"))
+            for cookbook in payload.get("cookbooks", [])
+            for recipe in cookbook.get("recipes", [])
+            if recipe_key(recipe.get("url"))
+        }
+        unclassified = find_cookbook_by_name(payload, UNCLASSIFIED_COOKBOOK_NAME)
+        changed = False
+
+        for record in recipe_records:
+            key = recipe_key(record.get("url"))
+
+            if not key or key in assigned_keys:
+                continue
+
+            if unclassified is None:
+                unclassified = {
+                    "id": unique_cookbook_id(payload, UNCLASSIFIED_COOKBOOK_NAME),
+                    "name": UNCLASSIFIED_COOKBOOK_NAME,
+                    "recipes": [],
+                }
+                payload["cookbooks"].append(unclassified)
+
+            unclassified.setdefault("recipes", []).append(record)
+            assigned_keys.add(key)
+            changed = True
+
+        if changed:
+            return save_cookbooks(payload)
+
+        return payload
 
 
 def create_cookbook(name):

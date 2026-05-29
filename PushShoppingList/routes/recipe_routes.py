@@ -26,6 +26,7 @@ from PushShoppingList.services.recipe_extract_service import extract_recipe_from
 from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
 from PushShoppingList.services.recipe_extract_service import recipe_cover_image_file_path
 from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_path
+from PushShoppingList.services.cookbook_service import ensure_unclassified_cookbook_for_recipes
 from PushShoppingList.services.food_review_alternative_service import suggest_food_review_alternatives
 from PushShoppingList.services.recipe_edit_service import create_new_recipe
 from PushShoppingList.services.recipe_edit_service import create_editable_recipe_pdf
@@ -51,6 +52,22 @@ from PushShoppingList.services.shopping_list_service import add_items
 recipe_bp = Blueprint("recipe_bp", __name__)
 
 NO_INGREDIENTS_ERROR = "No ingredients were found for this recipe URL."
+
+
+def ensure_recipe_has_default_cookbook(url, recipe_metadata=None):
+    recipe_metadata = recipe_metadata if isinstance(recipe_metadata, dict) else {}
+    recipe_title = str(recipe_metadata.get("recipe_title") or recipe_metadata.get("name") or "").strip()
+
+    ensure_unclassified_cookbook_for_recipes([{
+        "url": url,
+        "name": recipe_title or url,
+        "source_href": url,
+        "source_display_url": url,
+        "quantity": 1,
+        "archive_pdf_available": bool(recipe_metadata.get("archive_pdf_available")),
+        "base_servings": recipe_metadata.get("servings", ""),
+        "cover_image": recipe_metadata.get("cover_image") or {},
+    }])
 
 
 @recipe_bp.route("/extract_recipe", methods=["POST"])
@@ -95,6 +112,7 @@ def extract_recipe_route():
             if result.get("recipe_title"):
                 save_recipe_url_name(url, result.get("recipe_title"))
             add_recipe_urls([url])
+            ensure_recipe_has_default_cookbook(url, result)
             extracted_any = True
             mark_url_done(job_id, urls, index, len(ingredients))
         else:
@@ -132,6 +150,7 @@ def upload_recipe_media_route():
         if result.get("recipe_title"):
             save_recipe_url_name(recipe_url, result.get("recipe_title"))
         add_recipe_urls([recipe_url])
+        ensure_recipe_has_default_cookbook(recipe_url, result)
         sort_ingredients()
     elif result.get("ok"):
         result = {
@@ -205,6 +224,7 @@ def api_extract_recipe_route():
     if result.get("recipe_title"):
         save_recipe_url_name(url, result.get("recipe_title"))
     add_recipe_urls([url])
+    ensure_recipe_has_default_cookbook(url, result)
     progress = mark_url_done(job_id, urls, index, len(ingredients))
     finish_batch_if_ready(job_id, progress)
 
