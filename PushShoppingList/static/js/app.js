@@ -5382,6 +5382,11 @@ function populateRecipeEditor(recipe, originalUrl) {
         source_url: recipe.source_url || originalUrl,
         quantity: recipe.quantity || "1",
         servings: recipe.servings || "",
+        level: recipe.level || "",
+        total_time: recipe.total_time || "",
+        prep_time: recipe.prep_time || "",
+        inactive_time: recipe.inactive_time || "",
+        cook_time: recipe.cook_time || "",
         scaling: recipe.scaling || {},
         ingredients: recipe.ingredients || [],
         equipment: recipe.equipment || [],
@@ -5395,6 +5400,11 @@ function populateRecipeEditor(recipe, originalUrl) {
     setValue("recipeEditSourceUrl", recipe.source_display_url || recipe.source_url || originalUrl);
     setValue("recipeEditQuantity", recipe.quantity || "1");
     setValue("recipeEditServings", recipe.servings || "");
+    setValue("recipeEditLevel", recipe.level || "");
+    setValue("recipeEditTotalTime", recipe.total_time || "");
+    setValue("recipeEditPrepTime", recipe.prep_time || "");
+    setValue("recipeEditInactiveTime", recipe.inactive_time || "");
+    setValue("recipeEditCookTime", recipe.cook_time || "");
     setRecipeEditorCookbook(recipe, originalUrl);
     populateRecipeScalingControls(recipe.scaling || {}, recipe.servings || "");
     updateRecipeEditorPdfControls(recipe);
@@ -6429,8 +6439,12 @@ function positionRecipeEditPopupMenu(menu, button) {
     menu.style.left = "0px";
     menu.style.top = "0px";
     menu.style.right = "auto";
+    menu.style.minWidth = "";
 
     const buttonRect = button.getBoundingClientRect();
+    if (menu.classList.contains("recipe-edit-cookbook-menu")) {
+        menu.style.minWidth = `${Math.ceil(buttonRect.width)}px`;
+    }
     const menuRect = menu.getBoundingClientRect();
     const menuWidth = menuRect.width;
     const menuHeight = menuRect.height;
@@ -8290,6 +8304,11 @@ function normalizeRecipeEditorSnapshot(recipe) {
         source_url: String(recipe.source_url || "").trim(),
         quantity: String(parseRecipeScaleMultiplier(recipe.quantity || "1") || 1),
         servings: String(recipe.servings || "").trim(),
+        level: String(recipe.level || "").trim(),
+        total_time: String(recipe.total_time || "").trim(),
+        prep_time: String(recipe.prep_time || "").trim(),
+        inactive_time: String(recipe.inactive_time || "").trim(),
+        cook_time: String(recipe.cook_time || "").trim(),
         scaling: normalizeRecipeScalingSnapshot(recipe.scaling || {}),
         ingredients: (recipe.ingredients || []).map(item => ({
             ingredient: String(item.ingredient || "").trim(),
@@ -8344,6 +8363,11 @@ function buildRecipeSaveProgressItems(recipe) {
         ["Source URL", "source_url"],
         ["Quantity", "quantity"],
         ["Servings", "servings"],
+        ["Level", "level"],
+        ["Total", "total_time"],
+        ["Prep", "prep_time"],
+        ["Inactive", "inactive_time"],
+        ["Cook", "cook_time"],
     ].forEach(([label, key]) => {
         if (previous[key] !== next[key]) {
             detailLines.push(`${label}: ${previous[key] || "(blank)"} -> ${next[key] || "(blank)"}`);
@@ -8547,6 +8571,11 @@ function collectRecipeEditorPayload() {
             source_url: sourceUrl,
             quantity,
             servings: document.getElementById("recipeEditServings").value.trim(),
+            level: document.getElementById("recipeEditLevel").value.trim(),
+            total_time: document.getElementById("recipeEditTotalTime").value.trim(),
+            prep_time: document.getElementById("recipeEditPrepTime").value.trim(),
+            inactive_time: document.getElementById("recipeEditInactiveTime").value.trim(),
+            cook_time: document.getElementById("recipeEditCookTime").value.trim(),
             scaling: collectRecipeScalingPayload(),
             ingredients: collectRecipeIngredientRows(),
             equipment: collectRecipeTextRows("#recipeEditEquipment .recipe-edit-text-row"),

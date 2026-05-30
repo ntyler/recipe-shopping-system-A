@@ -530,6 +530,7 @@ def apply_recipe_scaling_metadata(json_data, html_text=None):
 
 def extract_recipe_from_structured_data(recipe_url, html_text):
     soup = BeautifulSoup(html_text, "html.parser")
+    page_text = soup.get_text(" ", strip=True)
 
     for tag in soup.find_all("script", attrs={"type": "application/ld+json"}):
         try:
@@ -555,6 +556,7 @@ def extract_recipe_from_structured_data(recipe_url, html_text):
             "source_url": recipe_url,
             "recipe_title": recipe.get("name"),
             "servings": normalize_servings(recipe.get("recipeYield")),
+            **extract_recipe_info_metadata(recipe, page_text),
             "ingredients": ingredients,
             "equipment": equipment,
             "instructions": instructions,
@@ -607,6 +609,132 @@ def node_has_recipe_type(node):
         return "Recipe" in node_type
 
     return node_type == "Recipe"
+
+
+def extract_recipe_info_metadata(recipe, page_text=""):
+    recipe = recipe if isinstance(recipe, dict) else {}
+    text_values = extract_recipe_info_from_text(page_text)
+
+    return {
+        "level": clean_recipe_info_value(
+            recipe.get("recipeDifficulty")
+            or recipe.get("difficulty")
+            or recipe.get("level")
+            or text_values.get("level")
+        ),
+        "total_time": clean_recipe_info_value(
+            format_recipe_duration(recipe.get("totalTime"))
+            or text_values.get("total_time")
+        ),
+        "prep_time": clean_recipe_info_value(
+            format_recipe_duration(recipe.get("prepTime"))
+            or text_values.get("prep_time")
+        ),
+        "inactive_time": clean_recipe_info_value(
+            format_recipe_duration(recipe.get("inactiveTime"))
+            or recipe.get("inactive_time")
+            or text_values.get("inactive_time")
+        ),
+        "cook_time": clean_recipe_info_value(
+            format_recipe_duration(recipe.get("cookTime"))
+            or text_values.get("cook_time")
+        ),
+    }
+
+
+def apply_recipe_info_metadata(json_data, html_text=None):
+    if not isinstance(json_data, dict):
+        return
+
+    page_text = ""
+    if html_text:
+        page_text = BeautifulSoup(html_text, "html.parser").get_text(" ", strip=True)
+    text_values = extract_recipe_info_from_text(page_text)
+
+    for key in ("level", "total_time", "prep_time", "inactive_time", "cook_time"):
+        if not str(json_data.get(key) or "").strip() and text_values.get(key):
+            json_data[key] = text_values[key]
+
+
+def extract_recipe_info_from_text(text):
+    text = re.sub(r"\s+", " ", str(text or "")).strip()
+    if not text:
+        return {}
+
+    fields = {
+        "level": "Level",
+        "total_time": "Total",
+        "prep_time": "Prep",
+        "inactive_time": "Inactive",
+        "cook_time": "Cook",
+    }
+    stop_labels = r"Level|Total|Prep|Inactive|Cook|Yield|Nutrition Info|Save Recipe|Ingredients|Directions"
+    result = {}
+
+    for key, label in fields.items():
+        match = re.search(
+            rf"\b{re.escape(label)}:\s*(.*?)(?=\s+(?:{stop_labels})\b\s*:|"
+            rf"\s+(?:Nutrition Info|Save Recipe|Ingredients|Directions)\b|$)",
+            text,
+            re.IGNORECASE,
+        )
+        if match:
+            value = clean_recipe_info_value(match.group(1))
+            if value:
+                result[key] = value
+
+    return result
+
+
+def clean_recipe_info_value(value):
+    value = str(value or "").strip()
+    if not value:
+        return ""
+
+    value = re.sub(r"\s+", " ", value)
+    value = re.sub(r"\s+(?:Yield|Nutrition Info|Save Recipe|Ingredients|Directions)\b.*$", "", value, flags=re.I)
+    return value.strip(" :-")
+
+
+def format_recipe_duration(value):
+    value = str(value or "").strip()
+    if not value:
+        return ""
+
+    match = re.fullmatch(
+        r"P(?:(?P<years>\d+(?:\.\d+)?)Y)?(?:(?P<months>\d+(?:\.\d+)?)M)?(?:(?P<days>\d+(?:\.\d+)?)D)?"
+        r"(?:T(?:(?P<hours>\d+(?:\.\d+)?)H)?(?:(?P<minutes>\d+(?:\.\d+)?)M)?(?:(?P<seconds>\d+(?:\.\d+)?)S)?)?",
+        value,
+        re.IGNORECASE,
+    )
+    if not match:
+        return clean_recipe_info_value(value)
+
+    parts = []
+    days = duration_number(match.group("days"))
+    hours = duration_number(match.group("hours"))
+    minutes = duration_number(match.group("minutes"))
+
+    if days:
+        parts.append(f"{days:g} day" + ("" if days == 1 else "s"))
+    if hours:
+        parts.append(f"{hours:g} hr")
+    if minutes:
+        parts.append(f"{minutes:g} min")
+
+    return " ".join(parts)
+
+
+def duration_number(value):
+    if value is None:
+        return 0
+
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return 0
+
+    return int(number) if number.is_integer() else number
 
 
 def apply_recipe_cover_image_metadata(json_data, html_text=None, recipe_url="", fallback_alt=""):
@@ -4199,6 +4327,14 @@ RECIPE SCALING RULES
 - If the page does not show scale controls, use these default options: 1/2x, 1x, 2x, 3x.
 
 ========================
+RECIPE INFO RULES
+========================
+- Extract recipe difficulty/level and timing only if shown on the page.
+- Use the visible labels when available: Level, Total, Prep, Inactive, Cook.
+- Preserve the displayed wording, such as "Intermediate", "1 hr 55 min", or "30 min".
+- If a value is missing, use null.
+
+========================
 FINAL OUTPUT FORMAT
 ========================
 {{
@@ -4210,6 +4346,11 @@ FINAL OUTPUT FORMAT
     "source": null
   }},
   "servings": null,
+  "level": null,
+  "total_time": null,
+  "prep_time": null,
+  "inactive_time": null,
+  "cook_time": null,
   "scaling": {{
     "selected_multiplier": 1,
     "base_multiplier": 1,
@@ -4388,6 +4529,7 @@ def save_json_response(recipe_url, response_text, html_text=None):
         json_data = json.loads(cleaned)
         normalize_extracted_ingredient_fields(json_data)
         normalize_extracted_equipment_fields(json_data)
+        apply_recipe_info_metadata(json_data, html_text)
         apply_recipe_scaling_metadata(json_data, html_text)
         apply_recipe_cover_image_metadata(json_data, html_text, recipe_url)
 
@@ -4499,6 +4641,7 @@ def structured_recipe_data_is_usable(json_data):
 def save_extracted_recipe_json(recipe_url, json_data):
     normalize_extracted_ingredient_fields(json_data)
     normalize_extracted_equipment_fields(json_data)
+    apply_recipe_info_metadata(json_data)
     apply_recipe_scaling_metadata(json_data)
     apply_recipe_cover_image_metadata(json_data, recipe_url=recipe_url)
 

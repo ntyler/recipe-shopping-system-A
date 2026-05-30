@@ -15,10 +15,12 @@ from PushShoppingList.services.cookbook_service import recipe_cookbook_assignmen
 from PushShoppingList.services.ingredient_text_review_service import annotate_ingredients_for_food_review
 from PushShoppingList.services.recipe_extract_service import MODEL
 from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
+from PushShoppingList.services.recipe_extract_service import RAW_FOLDER
 from PushShoppingList.services.recipe_extract_service import STORE_SECTION_ORDER
 from PushShoppingList.services.recipe_extract_service import build_video_text_pdf_html
 from PushShoppingList.services.recipe_extract_service import classify_store_section
 from PushShoppingList.services.recipe_extract_service import clean_json_response
+from PushShoppingList.services.recipe_extract_service import extract_recipe_info_from_text
 from PushShoppingList.services.recipe_extract_service import extract_ingredients_from_result
 from PushShoppingList.services.recipe_extract_service import fetch_recipe_page
 from PushShoppingList.services.recipe_extract_service import get_openai_client
@@ -92,6 +94,11 @@ def create_new_recipe():
         "source_url": source_url,
         "recipe_title": "New Recipe",
         "servings": "",
+        "level": "",
+        "total_time": "",
+        "prep_time": "",
+        "inactive_time": "",
+        "cook_time": "",
         "ingredients": [],
         "equipment": [],
         "instructions": [],
@@ -135,6 +142,7 @@ def load_editable_recipe(url):
     scaling = normalize_recipe_scaling_metadata(recipe_data.get("scaling"))
     if recipe_data.get("servings") and not scaling.get("base_servings"):
         scaling["base_servings"] = str(recipe_data.get("servings") or "").strip()
+    recipe_info = recipe_information_fields(recipe_data, url)
 
     return {
         "ok": True,
@@ -149,6 +157,7 @@ def load_editable_recipe(url):
             "cookbook_is_unclassified": cookbook_assignment.get("cookbook_is_unclassified", False),
             "recipe_title": recipe_data.get("recipe_title") or "",
             "servings": recipe_data.get("servings") or "",
+            **recipe_info,
             "scaling": scaling,
             "ingredients": annotate_ingredients_for_food_review(
                 normalize_edit_ingredients(recipe_data.get("ingredients", []))
@@ -181,6 +190,56 @@ def editable_recipe_source_display_url(url):
         return str(recipe_archive_pdf_path(url))
 
     return url
+
+
+def recipe_information_fields(recipe_data, url=""):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    parsed = {}
+
+    if not all(recipe_info_value(recipe_data, key) for key in recipe_information_keys()):
+        parsed = extract_recipe_info_from_saved_text(url)
+
+    return {
+        key: recipe_info_value(recipe_data, key) or parsed.get(key, "")
+        for key in recipe_information_keys()
+    }
+
+
+def recipe_information_keys():
+    return ("level", "total_time", "prep_time", "inactive_time", "cook_time")
+
+
+def recipe_info_value(recipe_data, key):
+    aliases = {
+        "level": ("level", "difficulty", "recipe_difficulty"),
+        "total_time": ("total_time", "total", "recipe_total_time"),
+        "prep_time": ("prep_time", "prep", "recipe_prep_time"),
+        "inactive_time": ("inactive_time", "inactive", "recipe_inactive_time"),
+        "cook_time": ("cook_time", "cook", "recipe_cook_time"),
+    }
+
+    for alias in aliases.get(key, (key,)):
+        value = str(recipe_data.get(alias) or "").strip()
+        if value:
+            return value
+
+    return ""
+
+
+def extract_recipe_info_from_saved_text(url):
+    url = str(url or "").strip()
+    if not url:
+        return {}
+
+    text_path = RAW_FOLDER / f"{safe_filename(url)}_PAGE_TEXT.txt"
+
+    if not text_path.exists():
+        return {}
+
+    try:
+        return extract_recipe_info_from_text(text_path.read_text(encoding="utf-8", errors="ignore"))
+    except OSError:
+        return {}
 
 
 def create_editable_recipe_pdf(url):
@@ -299,6 +358,11 @@ def save_editable_recipe(original_url, payload):
         "source_url": source_url,
         "recipe_title": str(payload.get("recipe_title") or "").strip(),
         "servings": str(payload.get("servings") or "").strip(),
+        "level": str(payload.get("level") or "").strip(),
+        "total_time": str(payload.get("total_time") or "").strip(),
+        "prep_time": str(payload.get("prep_time") or "").strip(),
+        "inactive_time": str(payload.get("inactive_time") or "").strip(),
+        "cook_time": str(payload.get("cook_time") or "").strip(),
         "scaling": normalize_recipe_scaling_metadata(
             payload.get("scaling") or existing_data.get("scaling")
         ),

@@ -61,7 +61,8 @@
                                 <span></span><span></span><span></span>
                             </span>
                         </button>
-                        <div class="recipe-url-summary-title">
+                        <div class="recipe-url-summary-title"
+                             onclick="return toggleCurrentRecipeUrlSummary(this, event)">
                             <div class="recipe-url-summary-heading">
                                 <div class="recipe-url-summary-title-toggle"
                                      data-recipe-url-summary-toggle
@@ -369,10 +370,30 @@
                                 id="recipeEditScaleMultiplier"
                                 onchange="applyRecipeScaleMultiplier(this)"></select>
                     </label>
+                    <label>
+                        <span>Level</span>
+                        <input type="text" name="level" id="recipeEditLevel">
+                    </label>
+                    <label>
+                        <span>Total</span>
+                        <input type="text" name="total_time" id="recipeEditTotalTime">
+                    </label>
+                    <label>
+                        <span>Prep</span>
+                        <input type="text" name="prep_time" id="recipeEditPrepTime">
+                    </label>
+                    <label>
+                        <span>Inactive</span>
+                        <input type="text" name="inactive_time" id="recipeEditInactiveTime">
+                    </label>
+                    <label>
+                        <span>Cook</span>
+                        <input type="text" name="cook_time" id="recipeEditCookTime">
+                    </label>
                     <div id="recipeEditCookbookField"
-                         class="recipe-edit-cookbook-field recipe-edit-wide"
+                         class="recipe-edit-cookbook-field"
                          data-recipe-edit-cookbook-field>
-                        <span class="recipe-edit-cookbook-label">Cookbook:</span>
+                        <span class="recipe-edit-cookbook-label">Cookbook</span>
                         <div class="recipe-url-summary-cookbook-value recipe-edit-cookbook-value recipe-url-summary-cookbook-menu-wrap recipe-edit-row-menu-wrap muted">
                             <button type="button"
                                     class="recipe-url-summary-cookbook-select recipe-edit-cookbook-select"
