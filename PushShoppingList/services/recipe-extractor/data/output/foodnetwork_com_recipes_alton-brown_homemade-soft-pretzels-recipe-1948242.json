@@ -177,27 +177,51 @@
   "equipment": [
     {
       "name": "baking sheet",
-      "category": "cookware"
+      "category": "cookware",
+      "equipment": "baking sheet",
+      "text": "baking sheet",
+      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_equipment_1_263160481e05.png",
+      "equipment_image_generated_at": "2026-05-30T08:52:15.703840+00:00"
     },
     {
       "name": "oven",
-      "category": "appliance"
+      "category": "appliance",
+      "equipment": "oven",
+      "text": "oven",
+      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_equipment_2_5cccd7eb2618.png",
+      "equipment_image_generated_at": "2026-05-30T08:52:33.391130+00:00"
     },
     {
       "name": "pot",
-      "category": "cookware"
+      "category": "cookware",
+      "equipment": "pot",
+      "text": "pot",
+      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_equipment_3_dc603931b4ca.png",
+      "equipment_image_generated_at": "2026-05-30T08:52:48.933055+00:00"
     },
     {
       "name": "rolling pin",
-      "category": "prep"
+      "category": "prep",
+      "equipment": "rolling pin",
+      "text": "rolling pin",
+      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_equipment_4_f3a497ecbafb.png",
+      "equipment_image_generated_at": "2026-05-30T08:53:05.182269+00:00"
     },
     {
       "name": "saucepan",
-      "category": "cookware"
+      "category": "cookware",
+      "equipment": "saucepan",
+      "text": "saucepan",
+      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_equipment_5_afede1dda4a9.png",
+      "equipment_image_generated_at": "2026-05-30T08:53:21.184412+00:00"
     },
     {
       "name": "spatula",
-      "category": "utensil"
+      "category": "utensil",
+      "equipment": "spatula",
+      "text": "spatula",
+      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_equipment_6_cc60e76c2aea.png",
+      "equipment_image_generated_at": "2026-05-30T08:53:38.072007+00:00"
     }
   ],
   "instructions": [
