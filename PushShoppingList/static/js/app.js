@@ -9918,7 +9918,8 @@ function setRecipeImagesVisibleFromMenu(button, visible) {
         expandRecipeCardForImageGeneration(card);
     }
 
-    setRecipeImageContainersVisible(card.querySelectorAll(".recipe-view-body-media, [data-equipment-image-panel], [data-step-image-panel]"), visible);
+    keepRecipeCoverImagesVisible(card);
+    setRecipeImageContainersVisible(card.querySelectorAll("[data-equipment-image-panel], [data-step-image-panel]"), visible);
     return false;
 }
 
@@ -9944,8 +9945,35 @@ function setRecipeDetailImagesVisibleFromMenu(button, visible) {
 
 function setRecipeImageContainersVisible(containers, visible) {
     [...containers].forEach(container => {
+        if (recipeImageContainerMustStayVisible(container)) {
+            container.classList.remove("recipe-image-visibility-hidden");
+            container.setAttribute("aria-hidden", "false");
+            return;
+        }
+
         container.classList.toggle("recipe-image-visibility-hidden", !visible);
         container.setAttribute("aria-hidden", visible ? "false" : "true");
+    });
+}
+
+function recipeImageContainerMustStayVisible(container) {
+    return Boolean(
+        container &&
+        (
+            container.classList.contains("recipe-view-body-media") ||
+            container.classList.contains("recipe-cover-image")
+        )
+    );
+}
+
+function keepRecipeCoverImagesVisible(scope = document) {
+    if (!scope || !scope.querySelectorAll) {
+        return;
+    }
+
+    scope.querySelectorAll(".recipe-view-body-media, .recipe-cover-image").forEach(element => {
+        element.classList.remove("recipe-image-visibility-hidden");
+        element.setAttribute("aria-hidden", "false");
     });
 }
 
@@ -9995,6 +10023,58 @@ function toggleRecipeViewCardFromMenu(button) {
     setRecipeCardCollapsed(card, toggle, shouldCollapse, { animate: true });
     localStorage.setItem(`recipe-card-collapsed:${key}`, shouldCollapse ? "1" : "0");
     updateRecipeViewCardCollapseMenuToggle(card);
+    closeRecipeEditRowMenus();
+    card.scrollIntoView({
+        behavior: "auto",
+        block: "nearest",
+        inline: "nearest",
+    });
+    return false;
+}
+
+function setRecipeViewCardEverythingCollapsed(button, collapsed) {
+    const card = button ? button.closest("[data-recipe-view-card]") : null;
+    const toggle = card ? card.querySelector("[data-recipe-card-toggle]") : null;
+    const key = card ? (card.dataset.recipeCardKey || (toggle ? toggle.dataset.recipeCardKey : "")) : "";
+
+    if (!card || !key) {
+        closeRecipeEditRowMenus();
+        return false;
+    }
+
+    if (!collapsed) {
+        setRecipeCardCollapsed(card, toggle, false, { animate: true });
+        localStorage.setItem(`recipe-card-collapsed:${key}`, "0");
+    }
+
+    card.querySelectorAll(".detail-toggle, .nutrition-toggle").forEach(detailToggle => {
+        const parts = recipeDetailSectionParts(detailToggle);
+
+        if (!parts.content) {
+            return;
+        }
+
+        setRecipeDetailSectionCollapsed(detailToggle, collapsed);
+        localStorage.setItem(parts.storageKey, collapsed ? "1" : "0");
+    });
+
+    card.querySelectorAll('.collapsible-header[data-collapse-scope="recipe-section"]').forEach(header => {
+        const title = header.querySelector(".header-title");
+        const collapseKey = header.dataset.collapseKey || (title ? normalizeSectionKey(title.textContent) : "");
+        const icon = header.querySelector(".header-toggle-icon");
+
+        setSectionCollapsed(header, icon, collapsed);
+
+        if (collapseKey) {
+            localStorage.setItem(`section-collapsed:${collapseKey}`, collapsed ? "1" : "0");
+        }
+    });
+
+    if (collapsed) {
+        setRecipeCardCollapsed(card, toggle, true, { animate: true });
+        localStorage.setItem(`recipe-card-collapsed:${key}`, "1");
+    }
+
     closeRecipeEditRowMenus();
     card.scrollIntoView({
         behavior: "auto",
@@ -10057,6 +10137,8 @@ function handleRecipeViewCardTitleKeydown(button, event) {
 function setRecipeCardCollapsed(card, button, collapsed, options = {}) {
     const wasCollapsed = card.classList.contains("recipe-view-collapsed");
     card.classList.toggle("recipe-view-collapsed", collapsed);
+    keepRecipeCoverImagesVisible(card);
+
     if (button) {
         button.setAttribute("aria-expanded", collapsed ? "false" : "true");
         button.textContent = collapsed ? "Show v" : "Hide ^";
@@ -11422,6 +11504,7 @@ document.addEventListener("DOMContentLoaded", function () {
     bindSectionHeaderToggles();
     bindRecipeDetailToggles();
     bindRecipeTaskChecks();
+    keepRecipeCoverImagesVisible();
     updateRecipeEditStickyOffsets();
     updateViewSwitcherStickyOffset();
     restoreStoreOptionsDisplaySettings();
