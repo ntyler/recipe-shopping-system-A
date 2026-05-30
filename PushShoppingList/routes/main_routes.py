@@ -207,6 +207,7 @@ def recipe_view_rows(recipe_urls):
         recipe_data = load_saved_recipe_output(recipe["url"])
         recipe_meta = recipe_ingredient_data.get(normalize_recipe_url_key(recipe["url"]), {})
         cover_image = recipe_cover_image_for_view(recipe["url"], recipe_data, recipe_meta)
+        nutrition_summary = recipe_view_nutrition_summary(recipe_data.get("nutrition", {}))
         use_scaled_meta = multipliers_match(recipe_meta.get("quantity", 1), recipe_quantity)
         scaled_ingredients = recipe_meta.get("scaled_ingredients", {}) if use_scaled_meta else {}
         scaled_servings = recipe_meta.get("scaled_servings") if use_scaled_meta else None
@@ -225,6 +226,8 @@ def recipe_view_rows(recipe_urls):
             "food_rule_status": recipe_food_rule_status(recipe_data),
             "base_servings": recipe_data.get("servings"),
             "scaled_servings": scaled_servings or scale_servings(recipe_data.get("servings"), recipe_quantity),
+            "serving_basis": nutrition_summary["serving_basis"],
+            "calories": nutrition_summary["calories"],
             "equipment_items": normalize_text_list(recipe_data.get("equipment", [])),
             "instruction_items": normalize_instruction_items(recipe_data.get("instructions", [])),
             "nutrition_items": normalize_nutrition_items(recipe_data.get("nutrition", {})),
@@ -232,6 +235,16 @@ def recipe_view_rows(recipe_urls):
         })
 
     return rows
+
+
+def recipe_view_nutrition_summary(nutrition):
+    if not isinstance(nutrition, dict):
+        return {"serving_basis": "", "calories": ""}
+
+    return {
+        "serving_basis": clean_display_text(nutrition.get("serving_basis")),
+        "calories": clean_display_text(nutrition.get("calories")),
+    }
 
 
 def apply_cookbook_assignments_to_recipe_rows(rows, cookbook_assignments):
