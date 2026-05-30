@@ -5348,6 +5348,16 @@ function openRecipeEditorSection(button, sectionKey) {
     return false;
 }
 
+function openIngredientFoodReviewFromRecipeView(button) {
+    const ingredientName = button ? button.dataset.ingredientName || "" : "";
+
+    closeRecipeEditRowMenus();
+    openRecipeEditor(button, {
+        scrollToIngredient: ingredientName,
+    });
+    return false;
+}
+
 function closeRecipeEditor() {
     const modal = document.getElementById("recipeEditModal");
 
@@ -9576,6 +9586,87 @@ async function generateRecipeStepImage(button) {
     return false;
 }
 
+async function generateRecipeEquipmentImage(button) {
+    const panel = button ? button.closest("[data-equipment-image-panel]") : null;
+    const status = panel ? panel.querySelector("[data-equipment-image-status]") : null;
+    const image = panel ? panel.querySelector(".recipe-equipment-image") : null;
+    const download = panel ? panel.querySelector("[data-equipment-image-download]") : null;
+    const recipeUrl = panel ? panel.dataset.recipeUrl || "" : "";
+    const equipmentIndex = panel ? panel.dataset.equipmentIndex || "" : "";
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 120000);
+
+    if (!panel || !button || !recipeUrl || !equipmentIndex) {
+        if (status) {
+            status.textContent = "This equipment item could not be found.";
+            status.classList.remove("empty");
+        }
+        return false;
+    }
+
+    button.disabled = true;
+    panel.classList.add("generating");
+    if (status) {
+        status.textContent = "Generating equipment image...";
+        status.classList.remove("empty");
+    }
+
+    try {
+        const response = await fetch("/api/recipe_equipment_image", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                url: recipeUrl,
+                equipment_index: equipmentIndex,
+            }),
+            signal: controller.signal,
+        });
+        let data = {};
+        try {
+            data = await response.json();
+        } catch (err) {
+            data = {};
+        }
+
+        if (!response.ok || !data.ok || !data.equipment_image_url) {
+            throw new Error((data && data.error) || "Unable to generate this equipment image.");
+        }
+
+        if (image) {
+            image.src = data.equipment_image_url;
+            image.hidden = false;
+        }
+
+        if (download) {
+            download.href = data.equipment_image_url;
+            download.hidden = false;
+        }
+
+        if (status) {
+            status.textContent = "";
+            status.classList.add("empty");
+        }
+
+        button.textContent = "Regenerate";
+    } catch (err) {
+        const timedOut = err && err.name === "AbortError";
+        if (status) {
+            status.textContent = timedOut
+                ? "Image generation timed out. Please try again."
+                : (err.message || "Image generation failed. Please try again.");
+            status.classList.remove("empty");
+        }
+    } finally {
+        window.clearTimeout(timeout);
+        panel.classList.remove("generating");
+        button.disabled = false;
+    }
+
+    return false;
+}
+
 async function generateAllRecipeInstructionImagesFromMenu(button, options = {}) {
     const header = button ? button.closest(".recipe-detail-header") : null;
     const toggle = header ? header.querySelector(".detail-toggle") : null;
@@ -9620,9 +9711,61 @@ async function generateAllRecipeInstructionImagesFromMenu(button, options = {}) 
     return false;
 }
 
+async function generateAllRecipeEquipmentImagesFromMenu(button, options = {}) {
+    const header = button ? button.closest(".recipe-detail-header") : null;
+    const toggle = header ? header.querySelector(".detail-toggle") : null;
+    const parts = recipeDetailSectionParts(toggle);
+
+    if (!parts.content) {
+        closeRecipeEditRowMenus();
+        return false;
+    }
+
+    const equipmentButtons = [...parts.content.querySelectorAll("[data-equipment-image-generate]")]
+        .filter(equipmentButton => !options.missingOnly || recipeEquipmentImageIsMissing(equipmentButton));
+
+    closeRecipeEditRowMenus();
+
+    if (!equipmentButtons.length) {
+        return false;
+    }
+
+    if (toggle) {
+        setRecipeDetailSectionCollapsed(toggle, false);
+        localStorage.setItem(parts.storageKey, "0");
+    }
+
+    const firstPanel = equipmentButtons[0].closest("[data-equipment-image-panel]");
+    if (firstPanel) {
+        firstPanel.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+            inline: "nearest",
+        });
+    }
+
+    for (const equipmentButton of equipmentButtons) {
+        if (equipmentButton.disabled) {
+            continue;
+        }
+
+        await generateRecipeEquipmentImage(equipmentButton);
+    }
+
+    return false;
+}
+
 function recipeStepImageIsMissing(button) {
     const panel = button ? button.closest("[data-step-image-panel]") : null;
     const image = panel ? panel.querySelector(".recipe-step-image") : null;
+    const src = image ? String(image.getAttribute("src") || "").trim() : "";
+
+    return !src || image.hidden;
+}
+
+function recipeEquipmentImageIsMissing(button) {
+    const panel = button ? button.closest("[data-equipment-image-panel]") : null;
+    const image = panel ? panel.querySelector(".recipe-equipment-image") : null;
     const src = image ? String(image.getAttribute("src") || "").trim() : "";
 
     return !src || image.hidden;

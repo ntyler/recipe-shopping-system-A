@@ -303,7 +303,10 @@ def save_editable_recipe(original_url, payload):
             payload.get("scaling") or existing_data.get("scaling")
         ),
         "ingredients": sanitize_ingredients(payload.get("ingredients", [])),
-        "equipment": sanitize_text_list(payload.get("equipment", [])),
+        "equipment": sanitize_equipment_list(
+            payload.get("equipment", []),
+            existing_data.get("equipment", []),
+        ),
         "instructions": sanitize_instruction_list(
             payload.get("instructions", []),
             existing_data.get("instructions", []),
@@ -476,6 +479,101 @@ def generate_recipe_step_image(payload):
     }
 
 
+def generate_recipe_equipment_image(payload):
+    payload = payload if isinstance(payload, dict) else {}
+    url = str(payload.get("url") or payload.get("recipe_url") or "").strip()
+    requested_index = payload.get("equipment_index") or payload.get("equipment_number")
+
+    if not url:
+        return {"ok": False, "error": "Recipe URL is required."}
+
+    if not os.getenv("OPENAI_API_KEY"):
+        return {"ok": False, "error": "Image generation is not set up yet."}
+
+    recipe_data = load_recipe_output(url)
+    if not recipe_data:
+        return {"ok": False, "error": "Recipe data was not found."}
+
+    recipe_title = str(recipe_data.get("recipe_title") or "").strip()
+    if not recipe_title:
+        return {"ok": False, "error": "Add a recipe title before generating an equipment image."}
+
+    equipment_items = normalize_equipment_records(recipe_data.get("equipment", []))
+    target_index, target_equipment = find_equipment_for_index(equipment_items, requested_index)
+
+    if target_equipment is None:
+        return {"ok": False, "error": "Equipment item was not found."}
+
+    equipment_text = str(
+        target_equipment.get("equipment")
+        or target_equipment.get("text")
+        or target_equipment.get("name")
+        or ""
+    ).strip()
+    if not equipment_text:
+        return {"ok": False, "error": "Add equipment text before generating an image."}
+
+    prompt = build_recipe_equipment_image_prompt(
+        recipe_title=recipe_title,
+        servings=str(recipe_data.get("servings") or "").strip(),
+        ingredients=recipe_step_image_prompt_ingredients(recipe_data.get("ingredients", [])),
+        equipment_item_number=target_index + 1,
+        equipment_item=equipment_text,
+    )
+
+    try:
+        image_bytes = request_recipe_step_image_bytes(prompt)
+    except TimeoutError:
+        return {
+            "ok": False,
+            "error": "Image generation timed out. Please try again.",
+        }
+    except Exception:
+        return {
+            "ok": False,
+            "error": "Image generation failed. Please try again.",
+        }
+
+    if not image_bytes:
+        return {
+            "ok": False,
+            "error": "Image generation did not return an image. Please try again.",
+        }
+
+    equipment_image_url = save_recipe_equipment_image_file(url, target_index + 1, image_bytes)
+    generated_at = datetime.now(timezone.utc).isoformat()
+    target_equipment["equipment_image_url"] = equipment_image_url
+    target_equipment["equipment_image_generated_at"] = generated_at
+
+    equipment_items[target_index] = {
+        **target_equipment,
+        "equipment": equipment_text,
+        "text": equipment_text,
+    }
+    recipe_data["equipment"] = equipment_items
+    save_recipe_output(url, recipe_data)
+
+    return {
+        "ok": True,
+        "url": url,
+        "equipment_index": target_index + 1,
+        "equipment_image_url": equipment_image_url,
+        "equipment_image_generated_at": generated_at,
+    }
+
+
+def find_equipment_for_index(equipment_items, requested_index):
+    try:
+        index = int(float(requested_index)) - 1
+    except (TypeError, ValueError):
+        index = -1
+
+    if 0 <= index < len(equipment_items):
+        return index, equipment_items[index]
+
+    return -1, None
+
+
 def find_instruction_for_step(instructions, requested_step):
     requested_key = instruction_match_step_key(requested_step)
 
@@ -534,6 +632,45 @@ Visual requirements:
 - No labels
 - Make the cooking action visually clear
 - Final step should show the finished dish if the instruction is about serving or garnish
+"""
+
+
+def build_recipe_equipment_image_prompt(
+    recipe_title,
+    servings,
+    ingredients,
+    equipment_item_number,
+    equipment_item,
+):
+    return f"""Generate a realistic cookbook-style image for one recipe equipment item.
+
+Recipe title:
+{recipe_title}
+
+Servings:
+{servings or "Not specified"}
+
+Ingredients:
+{ingredients or "Not specified"}
+
+Equipment item number:
+{equipment_item_number}
+
+Equipment item:
+{equipment_item}
+
+Visual requirements:
+- Show only this specific equipment item
+- Make the equipment visually clear and easy to identify
+- It should look ready to use for this recipe
+- Include actual recipe ingredients nearby only if they help communicate scale or use
+- Bright natural kitchen lighting
+- Realistic food photography
+- Clean kitchen counter background
+- High-end cookbook style
+- No text inside the image
+- No numbered badges
+- No labels
 """
 
 
@@ -634,6 +771,15 @@ def save_recipe_step_image_file(recipe_url, step_number, image_bytes):
     STEP_IMAGE_FOLDER.mkdir(parents=True, exist_ok=True)
     step_key = safe_filename(str(step_number or "step"))
     filename = f"{safe_filename(recipe_url)}_step_{step_key}_{uuid.uuid4().hex[:12]}.png"
+    image_path = STEP_IMAGE_FOLDER / filename
+    image_path.write_bytes(image_bytes)
+    return f"{STEP_IMAGE_URL_PREFIX}/{filename}"
+
+
+def save_recipe_equipment_image_file(recipe_url, equipment_index, image_bytes):
+    STEP_IMAGE_FOLDER.mkdir(parents=True, exist_ok=True)
+    equipment_key = safe_filename(str(equipment_index or "equipment"))
+    filename = f"{safe_filename(recipe_url)}_equipment_{equipment_key}_{uuid.uuid4().hex[:12]}.png"
     image_path = STEP_IMAGE_FOLDER / filename
     image_path.write_bytes(image_bytes)
     return f"{STEP_IMAGE_URL_PREFIX}/{filename}"
@@ -905,6 +1051,41 @@ def normalize_text_rows(value):
     return rows
 
 
+def normalize_equipment_records(value):
+    if isinstance(value, str):
+        value = value.splitlines()
+
+    if not isinstance(value, list):
+        value = normalize_text_rows(value)
+
+    records = []
+    for index, item in enumerate(value, start=1):
+        record = dict(item) if isinstance(item, dict) else {}
+        if isinstance(item, dict):
+            text = str(item.get("equipment") or item.get("text") or item.get("name") or "").strip()
+            equipment_image_url = str(item.get("equipment_image_url") or item.get("image_url") or "").strip()
+            equipment_image_generated_at = str(
+                item.get("equipment_image_generated_at") or item.get("image_generated_at") or ""
+            ).strip()
+        else:
+            text = str(item or "").strip()
+            equipment_image_url = ""
+            equipment_image_generated_at = ""
+
+        if not text:
+            continue
+
+        record.update({
+            "equipment": text,
+            "text": text,
+            "equipment_image_url": equipment_image_url,
+            "equipment_image_generated_at": equipment_image_generated_at,
+        })
+        records.append(record)
+
+    return records
+
+
 def normalize_instruction_rows(value):
     return sorted(
         normalize_instruction_records(value),
@@ -991,11 +1172,68 @@ def sanitize_text_list(value):
     if not isinstance(value, list):
         return []
 
-    return [
-        str(item or "").strip()
-        for item in value
-        if str(item or "").strip()
-    ]
+    rows = []
+    for item in value:
+        if isinstance(item, dict):
+            text = str(item.get("equipment") or item.get("text") or item.get("name") or "").strip()
+        else:
+            text = str(item or "").strip()
+
+        if text:
+            rows.append(text)
+
+    return rows
+
+
+def sanitize_equipment_list(value, existing_value=None):
+    if isinstance(value, str):
+        value = value.splitlines()
+
+    if not isinstance(value, list):
+        return []
+
+    existing_rows = normalize_equipment_records(existing_value or [])
+    existing_by_text = {
+        instruction_match_text_key(item.get("equipment") or item.get("text")): item
+        for item in existing_rows
+        if instruction_match_text_key(item.get("equipment") or item.get("text"))
+    }
+    equipment = []
+
+    for index, item in enumerate(value):
+        if isinstance(item, dict):
+            text = str(item.get("equipment") or item.get("text") or item.get("name") or "").strip()
+            equipment_image_url = nullable_string(item.get("equipment_image_url") or item.get("image_url"))
+            equipment_image_generated_at = nullable_string(
+                item.get("equipment_image_generated_at") or item.get("image_generated_at")
+            )
+        else:
+            text = str(item or "").strip()
+            equipment_image_url = ""
+            equipment_image_generated_at = ""
+
+        if not text:
+            continue
+
+        existing = existing_by_text.get(instruction_match_text_key(text))
+        if existing is None and index < len(existing_rows):
+            existing = existing_rows[index]
+        existing = existing or {}
+        equipment_image_url = equipment_image_url or nullable_string(existing.get("equipment_image_url")) or ""
+        equipment_image_generated_at = (
+            equipment_image_generated_at
+            or nullable_string(existing.get("equipment_image_generated_at"))
+            or ""
+        )
+
+        equipment.append({
+            "equipment": text,
+            "text": text,
+            "equipment_image_url": equipment_image_url,
+            "equipment_image_generated_at": equipment_image_generated_at,
+        })
+
+    return equipment
 
 
 def sanitize_instruction_list(value, existing_value=None):

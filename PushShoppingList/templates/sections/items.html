@@ -428,6 +428,14 @@
                                 Edit
                             </button>
                             <button type="button"
+                                    onclick="return generateAllRecipeEquipmentImagesFromMenu(this)">
+                                Generate All Images
+                            </button>
+                            <button type="button"
+                                    onclick="return generateAllRecipeEquipmentImagesFromMenu(this, { missingOnly: true })">
+                                Generate All Missing Images
+                            </button>
+                            <button type="button"
                                     onclick="return resetRecipeDetailCheckboxesFromMenu(this)">
                                 Reset Checkboxes
                             </button>
@@ -439,12 +447,44 @@
                     {% if recipe.equipment_items %}
                         <ul class="recipe-detail-list recipe-equipment-list">
                             {% for equipment_item in recipe.equipment_items %}
-                                <li>
+                                <li class="recipe-equipment-item"
+                                    data-recipe-equipment-number="{{ equipment_item.number }}">
                                     <div class="recipe-task-row recipe-equipment-task-row">
                                         <input type="checkbox"
                                                class="recipe-task-check"
                                                data-task-key="equipment|{{ recipe.url }}|{{ loop.index }}">
-                                        <span class="recipe-task-text">{{ equipment_item }}</span>
+                                        <span class="recipe-task-text">{{ equipment_item.text }}</span>
+                                    </div>
+                                    <div class="recipe-step-image-panel recipe-equipment-image-panel"
+                                         data-equipment-image-panel
+                                         data-recipe-url="{{ recipe.url }}"
+                                         data-equipment-index="{{ equipment_item.number }}">
+                                        <div class="recipe-step-image-status{% if equipment_item.equipment_image_url %} empty{% endif %}"
+                                             data-equipment-image-status>
+                                            {% if not equipment_item.equipment_image_url %}
+                                                No image generated for this equipment.
+                                            {% endif %}
+                                        </div>
+                                        <img class="recipe-step-image recipe-equipment-image"
+                                             {% if equipment_item.equipment_image_url %}src="{{ equipment_item.equipment_image_url }}"{% endif %}
+                                             alt="Recipe {{ recipe.number }} equipment {{ equipment_item.number }} image"
+                                             loading="lazy"
+                                             {% if not equipment_item.equipment_image_url %}hidden{% endif %}>
+                                        <div class="recipe-step-image-actions">
+                                            <button type="button"
+                                                    class="recipe-step-image-btn"
+                                                    data-equipment-image-generate
+                                                    onclick="return generateRecipeEquipmentImage(this)">
+                                                {% if equipment_item.equipment_image_url %}Regenerate{% else %}Generate Image{% endif %}
+                                            </button>
+                                            <a class="recipe-step-image-download"
+                                               data-equipment-image-download
+                                               href="{{ equipment_item.equipment_image_url or '#' }}"
+                                               download
+                                               {% if not equipment_item.equipment_image_url %}hidden{% endif %}>
+                                                Download
+                                            </a>
+                                        </div>
                                     </div>
                                 </li>
                             {% endfor %}
@@ -642,14 +682,22 @@
                                 {% set state = item_state.get(item_key, {}) %}
                                 {% set purchase_state = item_state.get(purchase_key, {}) if purchase_key else state %}
                                 {% set food_status = food_rule_status(display_name) %}
+                                {% set text_review = recipe_item.food_review or {} %}
 
                                 <div class="row" data-key="{{ item_key }}">
                                     <div class="item">
                                         <div class="item-main-line">
                                             <input type="checkbox" class="item-check">
                                             <span class="item-text">{{ display_name }}</span>
-                                            {% if food_status.needs_review %}
-                                                <span class="food-rule-marker" title="{{ food_status.marker }}">Food Review</span>
+                                            {% if food_status.needs_review or text_review.needs_review %}
+                                                <button type="button"
+                                                        class="food-rule-marker recipe-ingredient-food-review-btn"
+                                                        title="{{ text_review.reason or food_status.marker }}"
+                                                        data-recipe-url="{{ recipe.url }}"
+                                                        data-ingredient-name="{{ recipe_item.name or display_name }}"
+                                                        onclick="return openIngredientFoodReviewFromRecipeView(this)">
+                                                    Food Review
+                                                </button>
                                             {% endif %}
                                         </div>
                                         {% if purchasable_item and normalize(purchasable_item) != item_key %}

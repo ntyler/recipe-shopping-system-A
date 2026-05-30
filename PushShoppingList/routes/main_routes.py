@@ -34,6 +34,8 @@ from PushShoppingList.services.home_store_location_service import DEFAULT_STORE_
 from PushShoppingList.services.home_store_location_service import format_store_search_radius
 from PushShoppingList.services.home_store_location_service import load_nearest_store_results
 from PushShoppingList.services.home_store_location_service import resolve_nearest_stores_for_home_address
+from PushShoppingList.services.ingredient_text_review_service import fallback_ingredient_text_review
+from PushShoppingList.services.ingredient_text_review_service import normalize_ingredient_text_review
 from PushShoppingList.services.item_state_service import load_item_state
 from PushShoppingList.services.item_state_service import save_item_manual_qty
 from PushShoppingList.services.item_state_service import save_item_purchase_mapping
@@ -228,7 +230,7 @@ def recipe_view_rows(recipe_urls):
             "scaled_servings": scaled_servings or scale_servings(recipe_data.get("servings"), recipe_quantity),
             "serving_basis": nutrition_summary["serving_basis"],
             "calories": nutrition_summary["calories"],
-            "equipment_items": normalize_text_list(recipe_data.get("equipment", [])),
+            "equipment_items": normalize_equipment_items(recipe_data.get("equipment", [])),
             "instruction_items": normalize_instruction_items(recipe_data.get("instructions", [])),
             "nutrition_items": normalize_nutrition_items(recipe_data.get("nutrition", {})),
             "sections": sections,
@@ -734,6 +736,7 @@ def build_recipe_sections(recipe_data, recipe_quantity=1, scaled_ingredients=Non
             quantity_display = alternative["scaled_display"] if not multipliers_match(recipe_quantity, 1) else alternative["base_display"]
 
         purchase_mapping = purchase_mapping_for_recipe_ingredient(ingredient)
+        food_review = recipe_view_ingredient_food_review(ingredient)
 
         sections[section].append({
             "name": name,
@@ -750,6 +753,7 @@ def build_recipe_sections(recipe_data, recipe_quantity=1, scaled_ingredients=Non
             "base_display": base_display,
             "quantity_display": quantity_display,
             "url": recipe_data.get("source_url"),
+            "food_review": food_review,
         })
 
     return {
@@ -757,6 +761,18 @@ def build_recipe_sections(recipe_data, recipe_quantity=1, scaled_ingredients=Non
         for section, items in sections.items()
         if items
     }
+
+
+def recipe_view_ingredient_food_review(ingredient):
+    if not isinstance(ingredient, dict):
+        return {}
+
+    review = ingredient.get("food_review")
+    if not review:
+        review = fallback_ingredient_text_review(ingredient)
+
+    normalized = normalize_ingredient_text_review(review, ingredient)
+    return normalized if isinstance(normalized, dict) else {}
 
 
 def scale_servings(servings, multiplier):
@@ -891,12 +907,44 @@ def normalize_text_list(value):
         if isinstance(item, str):
             text = item.strip()
         elif isinstance(item, dict):
-            text = str(item.get("name") or item.get("text") or "").strip()
+            text = str(item.get("name") or item.get("text") or item.get("equipment") or "").strip()
         else:
             text = str(item or "").strip()
 
         if text:
             items.append(text)
+
+    return items
+
+
+def normalize_equipment_items(value):
+    if isinstance(value, str):
+        value = value.splitlines()
+
+    if not isinstance(value, list):
+        value = normalize_text_list(value)
+
+    items = []
+    for index, item in enumerate(value, start=1):
+        if isinstance(item, dict):
+            text = clean_display_text(item.get("equipment") or item.get("text") or item.get("name") or "")
+            equipment_image_url = clean_display_text(item.get("equipment_image_url") or item.get("image_url") or "")
+            equipment_image_generated_at = clean_display_text(
+                item.get("equipment_image_generated_at") or item.get("image_generated_at") or ""
+            )
+        else:
+            text = clean_display_text(item)
+            equipment_image_url = ""
+            equipment_image_generated_at = ""
+
+        if text:
+            items.append({
+                "number": index,
+                "text": text,
+                "equipment": text,
+                "equipment_image_url": equipment_image_url,
+                "equipment_image_generated_at": equipment_image_generated_at,
+            })
 
     return items
 
