@@ -53,6 +53,25 @@
     </div>
 
     <div class="view-control-section">
+        <div class="view-control-title">Image Tools</div>
+        <div class="view-control-row">
+            <button type="button"
+                    class="grab-products-btn view-action-btn"
+                    data-recipe-image-global-btn
+                    onclick="return generateAllRecipeImagesFromViewBehavior(this)">
+                Generate All Images
+            </button>
+
+            <button type="button"
+                    class="grab-products-btn view-action-btn"
+                    data-recipe-image-global-btn
+                    onclick="return generateAllRecipeImagesFromViewBehavior(this, { missingOnly: true })">
+                Generate All Missing Images
+            </button>
+        </div>
+    </div>
+
+    <div class="view-control-section">
         <div class="view-control-title">Reset Tools</div>
         <div class="view-control-row">
             <form class="view-action-form" method="POST" action="/reset_checks" onsubmit="return resetItemChecks(event);">

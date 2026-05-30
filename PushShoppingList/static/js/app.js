@@ -9771,6 +9771,140 @@ function recipeEquipmentImageIsMissing(button) {
     return !src || image.hidden;
 }
 
+async function generateRecipeImagesFromMenu(button, options = {}) {
+    const card = button ? button.closest("[data-recipe-view-card]") : null;
+
+    closeRecipeEditRowMenus();
+
+    if (!card) {
+        return false;
+    }
+
+    await generateRecipeImagesInCard(card, options);
+    return false;
+}
+
+async function generateAllRecipeImagesFromViewBehavior(button, options = {}) {
+    const allButtons = [...document.querySelectorAll("[data-recipe-image-global-btn]")];
+    const originalLabel = button ? button.textContent : "";
+
+    if (typeof showView === "function") {
+        showView("recipe");
+    }
+
+    closeRecipeEditRowMenus();
+
+    allButtons.forEach(globalButton => {
+        globalButton.disabled = true;
+    });
+
+    if (button) {
+        button.textContent = options.missingOnly ? "Generating Missing..." : "Generating Images...";
+    }
+
+    try {
+        const cards = [...document.querySelectorAll("[data-recipe-view-card]")];
+
+        for (const card of cards) {
+            await generateRecipeImagesInCard(card, options);
+        }
+    } finally {
+        allButtons.forEach(globalButton => {
+            globalButton.disabled = false;
+        });
+
+        if (button) {
+            button.textContent = originalLabel;
+        }
+    }
+
+    return false;
+}
+
+async function generateRecipeImagesInCard(card, options = {}) {
+    if (!card) {
+        return false;
+    }
+
+    expandRecipeCardForImageGeneration(card);
+
+    const buttons = recipeImageGenerateButtons(card, options);
+
+    if (!buttons.length) {
+        return false;
+    }
+
+    const firstPanel = buttons[0].closest("[data-equipment-image-panel], [data-step-image-panel]");
+    if (firstPanel) {
+        firstPanel.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+            inline: "nearest",
+        });
+    }
+
+    for (const imageButton of buttons) {
+        if (imageButton.disabled) {
+            continue;
+        }
+
+        if (imageButton.matches("[data-equipment-image-generate]")) {
+            await generateRecipeEquipmentImage(imageButton);
+        } else {
+            await generateRecipeStepImage(imageButton);
+        }
+    }
+
+    return false;
+}
+
+function recipeImageGenerateButtons(card, options = {}) {
+    return [...card.querySelectorAll("[data-equipment-image-generate], [data-step-image-generate]")]
+        .filter(imageButton => {
+            if (!options.missingOnly) {
+                return true;
+            }
+
+            if (imageButton.matches("[data-equipment-image-generate]")) {
+                return recipeEquipmentImageIsMissing(imageButton);
+            }
+
+            return recipeStepImageIsMissing(imageButton);
+        });
+}
+
+function expandRecipeCardForImageGeneration(card) {
+    if (!card) {
+        return;
+    }
+
+    const toggle = card.querySelector("[data-recipe-card-toggle]");
+    const key = card.dataset.recipeCardKey || (toggle ? toggle.dataset.recipeCardKey : "");
+
+    if (card.classList.contains("recipe-view-collapsed")) {
+        setRecipeCardCollapsed(card, toggle, false, { animate: true });
+
+        if (key) {
+            localStorage.setItem(`recipe-card-collapsed:${key}`, "0");
+        }
+    }
+
+    card.querySelectorAll(".detail-toggle").forEach(detailToggle => {
+        const detailKey = detailToggle.dataset.detailKey || "";
+
+        if (!detailKey.startsWith("equipment|") && !detailKey.startsWith("instructions|")) {
+            return;
+        }
+
+        const parts = recipeDetailSectionParts(detailToggle);
+        setRecipeDetailSectionCollapsed(detailToggle, false);
+
+        if (parts.storageKey) {
+            localStorage.setItem(parts.storageKey, "0");
+        }
+    });
+}
+
 function updateRecipeDetailMenuToggleForButton(button) {
     const header = button ? button.closest(".recipe-detail-header") : null;
     const toggle = header ? header.querySelector(".detail-toggle, .nutrition-toggle") : null;

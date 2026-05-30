@@ -250,6 +250,22 @@
                                     </a>
                                 {% endif %}
                                 <button type="button"
+                                        onclick="return generateRecipeImagesFromMenu(this)">
+                                    Generate All Images
+                                </button>
+                                <button type="button"
+                                        onclick="return generateRecipeImagesFromMenu(this, { missingOnly: true })">
+                                    Generate All Missing Images
+                                </button>
+                                <button type="button"
+                                        onclick="return setRecipeImagesVisibleFromMenu(this, true)">
+                                    Show All Images
+                                </button>
+                                <button type="button"
+                                        onclick="return setRecipeImagesVisibleFromMenu(this, false)">
+                                    Hide All Images
+                                </button>
+                                <button type="button"
                                         class="recipe-view-card-collapse-menu-toggle"
                                         onclick="return toggleRecipeViewCardFromMenu(this)">
                                     Collapse
@@ -436,6 +452,14 @@
                                 Generate All Missing Images
                             </button>
                             <button type="button"
+                                    onclick="return setRecipeDetailImagesVisibleFromMenu(this, true)">
+                                Show All Images
+                            </button>
+                            <button type="button"
+                                    onclick="return setRecipeDetailImagesVisibleFromMenu(this, false)">
+                                Hide All Images
+                            </button>
+                            <button type="button"
                                     onclick="return resetRecipeDetailCheckboxesFromMenu(this)">
                                 Reset Checkboxes
                             </button>
@@ -525,6 +549,14 @@
                             <button type="button"
                                     onclick="return generateAllRecipeInstructionImagesFromMenu(this, { missingOnly: true })">
                                 Generate All Missing Images
+                            </button>
+                            <button type="button"
+                                    onclick="return setRecipeDetailImagesVisibleFromMenu(this, true)">
+                                Show All Images
+                            </button>
+                            <button type="button"
+                                    onclick="return setRecipeDetailImagesVisibleFromMenu(this, false)">
+                                Hide All Images
                             </button>
                             <button type="button"
                                     onclick="return resetRecipeDetailCheckboxesFromMenu(this)">
