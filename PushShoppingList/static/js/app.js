@@ -3862,6 +3862,10 @@ function jumpToCurrentRecipeLog(button, event = null) {
 
     const recipeUrl = button ? button.dataset.recipeUrl || "" : "";
 
+    return jumpToCurrentRecipeLogUrl(recipeUrl);
+}
+
+function jumpToCurrentRecipeLogUrl(recipeUrl) {
     if (!recipeUrl) {
         return false;
     }
@@ -9422,6 +9426,7 @@ function toggleRecipeViewCardFromMenu(button) {
     const card = recipeEditActionRowFromButton(button);
     const toggle = card ? card.querySelector("[data-recipe-card-toggle]") : null;
     const key = card ? (card.dataset.recipeCardKey || (toggle ? toggle.dataset.recipeCardKey : "")) : "";
+    const recipeUrl = card ? (card.dataset.recipeViewUrl || key) : "";
 
     if (!card || !key) {
         return false;
@@ -9432,7 +9437,7 @@ function toggleRecipeViewCardFromMenu(button) {
     localStorage.setItem(`recipe-card-collapsed:${key}`, shouldCollapse ? "1" : "0");
     updateRecipeViewCardCollapseMenuToggle(card);
     closeRecipeEditRowMenus();
-    return false;
+    return jumpToCurrentRecipeLogUrl(recipeUrl);
 }
 
 function toggleRecipeViewCardFromTitle(button, event = null) {

@@ -212,6 +212,12 @@ body {
             font-size: 14px;
         }
 
+        .recipe-entry-heading,
+        .recipe-entry-helper,
+        .edit-items-heading {
+            text-align: right;
+        }
+
         .recipe-url-box,
         .edit-items-box {
             background: #202425;
