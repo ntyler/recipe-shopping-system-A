@@ -368,51 +368,49 @@
                     <div id="recipeEditCookbookField"
                          class="recipe-edit-cookbook-field recipe-edit-wide"
                          data-recipe-edit-cookbook-field>
-                        <span>Cookbook</span>
-                        <div class="recipe-edit-readonly-field recipe-edit-cookbook-value muted">
-                            <span id="recipeEditCookbookName" class="recipe-edit-cookbook-name">No cookbook assigned.</span>
-                            <div class="recipe-url-summary-cookbook-menu-wrap recipe-edit-row-menu-wrap recipe-edit-cookbook-menu-wrap">
+                        <span class="recipe-edit-cookbook-label">Cookbook:</span>
+                        <div class="recipe-url-summary-cookbook-value recipe-edit-cookbook-value recipe-url-summary-cookbook-menu-wrap recipe-edit-row-menu-wrap muted">
+                            <button type="button"
+                                    class="recipe-url-summary-cookbook-select recipe-edit-cookbook-select"
+                                    aria-label="Cookbook actions"
+                                    aria-haspopup="true"
+                                    aria-expanded="false"
+                                    onclick="return toggleRecipeEditRowMenu(this, event)">
+                                <span id="recipeEditCookbookName" class="recipe-url-summary-cookbook-name recipe-edit-cookbook-name">No cookbook assigned.</span>
+                                <span class="recipe-url-summary-cookbook-chevron" aria-hidden="true"></span>
+                            </button>
+                            <div class="recipe-edit-row-menu recipe-url-summary-cookbook-menu recipe-edit-cookbook-menu" hidden>
                                 <button type="button"
-                                        class="recipe-edit-row-menu-btn recipe-url-summary-cookbook-menu-btn recipe-edit-cookbook-menu-btn"
-                                        aria-label="Cookbook actions"
-                                        aria-haspopup="true"
-                                        aria-expanded="false"
-                                        onclick="return toggleRecipeEditRowMenu(this, event)">
-                                    <span aria-hidden="true"></span>
+                                        data-recipe-edit-cookbook-action
+                                        onclick="return createRecipeLogCookbook(this)">
+                                    Create New Cookbook
                                 </button>
-                                <div class="recipe-edit-row-menu recipe-url-summary-cookbook-menu recipe-edit-cookbook-menu" hidden>
-                                    <button type="button"
-                                            data-recipe-edit-cookbook-action
-                                            onclick="return createRecipeLogCookbook(this)">
-                                        Create New Cookbook
-                                    </button>
-                                    {% if cookbook_view and cookbook_view.cookbooks %}
-                                        <div class="recipe-url-summary-cookbook-menu-label">Move To</div>
-                                        {% for cookbook in cookbook_view.cookbooks %}
-                                            <button type="button"
-                                                    data-recipe-edit-cookbook-action
-                                                    data-recipe-edit-cookbook-option
-                                                    data-cookbook-id="{{ cookbook.id }}"
-                                                    data-cookbook-name="{{ cookbook.name }}"
-                                                    data-cookbook-unclassified="{% if cookbook.is_unclassified %}1{% else %}0{% endif %}"
-                                                    onclick="return moveRecipeLogCookbook(this)">
-                                                {{ cookbook.name }}
-                                            </button>
-                                        {% endfor %}
-                                    {% endif %}
-                                    {% if unclassified_cookbook.id %}
+                                {% if cookbook_view and cookbook_view.cookbooks %}
+                                    <div class="recipe-url-summary-cookbook-menu-label">Move To</div>
+                                    {% for cookbook in cookbook_view.cookbooks %}
                                         <button type="button"
-                                                class="delete"
                                                 data-recipe-edit-cookbook-action
-                                                data-recipe-edit-cookbook-delete
-                                                data-cookbook-id="{{ unclassified_cookbook.id }}"
-                                                data-cookbook-name="{{ unclassified_cookbook.name }}"
-                                                data-cookbook-unclassified="1"
-                                                onclick="return deleteRecipeLogCookbookAssignment(this)">
-                                            Delete
+                                                data-recipe-edit-cookbook-option
+                                                data-cookbook-id="{{ cookbook.id }}"
+                                                data-cookbook-name="{{ cookbook.name }}"
+                                                data-cookbook-unclassified="{% if cookbook.is_unclassified %}1{% else %}0{% endif %}"
+                                                onclick="return moveRecipeLogCookbook(this)">
+                                            {{ cookbook.name }}
                                         </button>
-                                    {% endif %}
-                                </div>
+                                    {% endfor %}
+                                {% endif %}
+                                {% if unclassified_cookbook.id %}
+                                    <button type="button"
+                                            class="delete"
+                                            data-recipe-edit-cookbook-action
+                                            data-recipe-edit-cookbook-delete
+                                            data-cookbook-id="{{ unclassified_cookbook.id }}"
+                                            data-cookbook-name="{{ unclassified_cookbook.name }}"
+                                            data-cookbook-unclassified="1"
+                                            onclick="return deleteRecipeLogCookbookAssignment(this)">
+                                        Delete
+                                    </button>
+                                {% endif %}
                             </div>
                         </div>
                     </div>

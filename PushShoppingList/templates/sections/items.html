@@ -192,7 +192,7 @@
             {% endfor %}
         {% endif %}
         {% for recipe in recipe_view_rows %}
-            <div class="recipe-view-card"
+            <div class="recipe-view-card{% if recipe.cover_image and recipe.cover_image.src %} recipe-view-card-with-cover{% endif %}"
                  data-recipe-view-card
                  data-recipe-card-key="{{ recipe.url }}"
                  data-recipe-view-url="{{ recipe.url }}">
