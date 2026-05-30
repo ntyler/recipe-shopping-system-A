@@ -2523,6 +2523,7 @@ body {
             cursor: pointer;
             white-space: nowrap;
             text-decoration: none;
+            justify-self: start;
             box-shadow: none;
             appearance: none;
         }
@@ -2542,6 +2543,9 @@ body {
 
         .recipe-view-name {
             min-width: 0;
+            justify-self: start;
+            width: fit-content;
+            max-width: 100%;
             color: #ddd;
             font: inherit;
             font-weight: 800;
@@ -3011,7 +3015,6 @@ body {
         .recipe-detail-header-with-menu .detail-toggle,
         .recipe-detail-header-with-menu .nutrition-toggle {
             padding-right: 52px;
-            border-right: 1px solid #333;
             border-top-right-radius: 8px;
             border-bottom-right-radius: 8px;
         }
@@ -3032,12 +3035,8 @@ body {
             height: 100%;
             min-height: 38px;
             border: 0;
-            border-left: 1px solid #333;
             background: transparent;
-            border-top-left-radius: 0;
-            border-bottom-left-radius: 0;
-            border-top-right-radius: 8px;
-            border-bottom-right-radius: 8px;
+            border-radius: 7px;
         }
 
         .recipe-view-detail-menu {
@@ -4902,6 +4901,9 @@ body {
 
         .recipe-url-summary-name {
             min-width: 0;
+            justify-self: start;
+            width: fit-content;
+            max-width: 100%;
             color: #d8d8d8;
             font-weight: 700;
             line-height: 1.3;

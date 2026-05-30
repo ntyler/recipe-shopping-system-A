@@ -9506,6 +9506,22 @@ function toggleRecipeViewCardFromMenu(button) {
     return false;
 }
 
+function setAllRecipeViewCardsCollapsed(collapsed) {
+    document.querySelectorAll("[data-recipe-view-card]").forEach(card => {
+        const toggle = card.querySelector("[data-recipe-card-toggle]");
+        const key = card.dataset.recipeCardKey || (toggle ? toggle.dataset.recipeCardKey : "");
+
+        setRecipeCardCollapsed(card, toggle, collapsed, { animate: true });
+
+        if (key) {
+            localStorage.setItem(`recipe-card-collapsed:${key}`, collapsed ? "1" : "0");
+        }
+    });
+
+    closeRecipeEditRowMenus();
+    return false;
+}
+
 function toggleRecipeViewCardFromTitle(button, event = null) {
     if (eventStartedInNestedInteractive(event, button)) {
         return true;
