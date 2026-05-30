@@ -10413,6 +10413,15 @@ body {
     font-size: 18px;
 }
 
+.recipe-edit-equipment-row .recipe-edit-row-handle,
+.recipe-edit-instruction-row .recipe-edit-row-handle,
+.recipe-edit-nutrition-row .recipe-edit-row-handle,
+.recipe-edit-equipment-row .recipe-edit-row-menu-wrap,
+.recipe-edit-instruction-row .recipe-edit-row-menu-wrap,
+.recipe-edit-nutrition-row .recipe-edit-row-menu-wrap {
+    align-self: start;
+}
+
 .recipe-edit-equipment-row label,
 .recipe-edit-step-text {
     min-width: 0;
@@ -11098,6 +11107,72 @@ body {
     min-height: 42px;
 }
 
+@media (min-width: 1181px) {
+    .recipe-edit-ingredient-row,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review {
+        align-items: start;
+    }
+
+    .recipe-edit-ingredient-row .recipe-edit-row-handle,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review .recipe-edit-row-handle,
+    .recipe-edit-ingredient-row .recipe-edit-row-number,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review .recipe-edit-row-number,
+    .recipe-edit-ingredient-row .recipe-edit-row-menu-wrap,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review .recipe-edit-row-menu-wrap {
+        grid-row: 1 / 5;
+    }
+
+    .recipe-edit-ingredient-row .recipe-edit-ingredient-name-label,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review .recipe-edit-ingredient-name-label {
+        display: contents;
+    }
+
+    .recipe-edit-ingredient-row .recipe-edit-ingredient-title-line,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review .recipe-edit-ingredient-title-line {
+        grid-column: 3 / 9;
+        grid-row: 1;
+        align-self: start;
+        width: 100%;
+        min-width: 0;
+        padding-right: 8px;
+    }
+
+    .recipe-edit-ingredient-row .recipe-edit-preparation-inline,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review .recipe-edit-preparation-inline {
+        grid-column: 3 / 4;
+        grid-row: 2;
+        min-width: 0;
+    }
+
+    .recipe-edit-ingredient-row label.recipe-edit-original-text-label,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review label.recipe-edit-original-text-label {
+        grid-column: 3 / 4;
+        grid-row: 3;
+        min-width: 0;
+    }
+
+    .recipe-edit-ingredient-row .recipe-edit-choice-review,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review .recipe-edit-choice-review {
+        grid-column: 3 / 4;
+        grid-row: 4;
+        min-width: 0;
+    }
+
+    .recipe-edit-ingredient-row label.recipe-edit-qty-label,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review label.recipe-edit-qty-label,
+    .recipe-edit-ingredient-row label.recipe-edit-unit-label,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review label.recipe-edit-unit-label,
+    .recipe-edit-ingredient-row label.recipe-edit-buy-as-label,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review label.recipe-edit-buy-as-label,
+    .recipe-edit-ingredient-row label.recipe-edit-store-section-label,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review label.recipe-edit-store-section-label,
+    .recipe-edit-ingredient-row label.recipe-edit-optional-label,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review label.recipe-edit-optional-label {
+        grid-row: 2 / 5;
+        align-self: start;
+    }
+}
+
 .recipe-edit-row-menu-btn {
     position: relative;
     width: 38px;
@@ -11150,6 +11225,13 @@ body {
 .recipe-edit-row-menu-btn span {
     top: 50%;
     transform: translate(-50%, -50%);
+}
+
+.recipe-edit-ingredient-row .recipe-edit-row-menu-btn span,
+.recipe-edit-equipment-row .recipe-edit-row-menu-btn span,
+.recipe-edit-instruction-row .recipe-edit-row-menu-btn span,
+.recipe-edit-nutrition-row .recipe-edit-row-menu-btn span {
+    top: 12px;
 }
 
 .recipe-edit-row-menu-btn span::before,
@@ -11402,7 +11484,7 @@ body {
 .recipe-edit-instruction-row .recipe-edit-row-menu-wrap,
 .recipe-edit-nutrition-row .recipe-edit-row-menu-wrap {
     position: relative;
-    align-self: center;
+    align-self: start;
     justify-self: end;
 }
 
