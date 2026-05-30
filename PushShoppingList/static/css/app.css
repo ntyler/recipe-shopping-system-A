@@ -2673,12 +2673,12 @@ body {
             min-width: 64px;
         }
 
-        .recipe-view-title a:not(.recipe-view-pdf-btn) {
+        .recipe-view-title a:not(.recipe-view-pdf-btn):not(.recipe-jump-link) {
             color: #ddd;
             text-decoration: none;
         }
 
-        .recipe-view-title a:not(.recipe-view-pdf-btn):hover {
+        .recipe-view-title a:not(.recipe-view-pdf-btn):not(.recipe-jump-link):hover {
             color: #00cc66;
             text-decoration: underline;
         }
