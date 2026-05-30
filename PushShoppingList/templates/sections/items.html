@@ -197,20 +197,31 @@
                  data-recipe-card-key="{{ recipe.url }}"
                  data-recipe-view-url="{{ recipe.url }}">
                 <div class="recipe-view-title">
-                    <button type="button"
-                            class="recipe-view-title-main recipe-view-title-toggle"
-                            data-recipe-card-title-toggle
-                            data-recipe-card-key="{{ recipe.url }}"
-                            aria-expanded="true"
-                            onclick="return toggleRecipeViewCardFromTitle(this, event)">
+                    <div class="recipe-view-title-main recipe-view-title-toggle"
+                         data-recipe-card-title-toggle
+                         data-recipe-card-key="{{ recipe.url }}"
+                         role="button"
+                         tabindex="0"
+                         aria-expanded="true"
+                         onclick="return toggleRecipeViewCardFromTitle(this, event)"
+                         onkeydown="return handleRecipeViewCardTitleKeydown(this, event)">
                         <span class="recipe-view-title-line">
-                            <span class="recipe-view-number recipe-jump-link">
+                            <a class="recipe-view-number recipe-jump-link"
+                               href="#currentRecipeUrlLogCard"
+                               data-recipe-url="{{ recipe.url }}"
+                               aria-label="Jump to Recipe {{ recipe.number }} in Current Recipes"
+                               onclick="return jumpToCurrentRecipeLog(this, event)">
                                 Recipe {{ recipe.number }}:
-                            </span>
-                            <span class="recipe-view-name"
-                                  title="{{ recipe.source_display_url }}">{{ recipe.name }}</span>
+                            </a>
+                            <a class="recipe-view-name recipe-view-name-link"
+                               href="{{ recipe.url or recipe.source_display_url }}"
+                               target="_blank"
+                               rel="noopener noreferrer"
+                               title="{{ recipe.source_display_url }}">
+                                {{ recipe.name }}
+                            </a>
                         </span>
-                    </button>
+                    </div>
                     <div class="recipe-view-title-actions">
                         <div class="recipe-view-title-menu-wrap recipe-edit-row-menu-wrap">
                             <button type="button"
@@ -269,34 +280,36 @@
                 <div class="recipe-view-body-meta">
                     {% if recipe.base_servings %}
                         <div class="recipe-meta recipe-view-title-servings">
-                            Servings:
-                            <span class="recipe-servings-base">
-                                {{ recipe.base_servings }}
-                            </span>
-                            <span class="recipe-servings-scaled"
-                                  data-recipe-url="{{ recipe.url }}"
-                                  data-base-servings="{{ recipe.base_servings or "" }}">
-                                {% if recipe.quantity != 1 and recipe.scaled_servings %}
-                                    -> {{ recipe.scaled_servings }}
-                                {% endif %}
+                            <span class="recipe-view-meta-label">Servings:</span>
+                            <span class="recipe-view-meta-value">
+                                <span class="recipe-servings-base">
+                                    {{ recipe.base_servings }}
+                                </span>
+                                <span class="recipe-servings-scaled"
+                                      data-recipe-url="{{ recipe.url }}"
+                                      data-base-servings="{{ recipe.base_servings or "" }}">
+                                    {% if recipe.quantity != 1 and recipe.scaled_servings %}
+                                        -> {{ recipe.scaled_servings }}
+                                    {% endif %}
+                                </span>
                             </span>
                         </div>
                     {% endif %}
                     {% if recipe.serving_basis %}
                         <div class="recipe-meta recipe-view-summary-line recipe-view-serving-basis">
-                            <span>Serving Basis:</span>
-                            <span>{{ recipe.serving_basis }}</span>
+                            <span class="recipe-view-meta-label">Serving Basis:</span>
+                            <span class="recipe-view-meta-value">{{ recipe.serving_basis }}</span>
                         </div>
                     {% endif %}
                     {% if recipe.calories %}
                         <div class="recipe-meta recipe-view-summary-line recipe-view-calories">
-                            <span>Calories:</span>
-                            <span>{{ recipe.calories }}</span>
+                            <span class="recipe-view-meta-label">Calories:</span>
+                            <span class="recipe-view-meta-value">{{ recipe.calories }}</span>
                         </div>
                     {% endif %}
                     <div class="recipe-view-title-amount">
-                        <span class="recipe-view-title-amount-label">Amount:</span>
-                        <div class="recipe-quantity-control recipe-view-quantity">
+                        <span class="recipe-view-title-amount-label recipe-view-meta-label">Amount:</span>
+                        <div class="recipe-quantity-control recipe-view-quantity recipe-view-meta-value">
                             <select class="recipe-quantity-input recipe-scaling-select"
                                     data-recipe-number="{{ recipe.number }}"
                                     data-recipe-url="{{ recipe.url }}"

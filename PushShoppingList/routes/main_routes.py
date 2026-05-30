@@ -286,6 +286,7 @@ def recipe_url_log_rows(recipe_urls, cookbook_assignments=None):
             "base_servings": recipe_data.get("servings"),
             "scaled_servings": scaled_servings or scale_servings(recipe_data.get("servings"), recipe_quantity),
             "serving_basis": nutrition_summary["serving_basis"],
+            "calories": nutrition_summary["calories"],
             "cookbook_id": cookbook_assignment.get("cookbook_id", ""),
             "cookbook_name": cookbook_assignment.get("cookbook_name", ""),
             "cookbook_is_unclassified": cookbook_assignment.get("cookbook_is_unclassified", False),

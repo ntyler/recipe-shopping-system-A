@@ -5,14 +5,17 @@
             aria-expanded="false"
             onclick="toggleCardCollapse('home-address')">
         <span>Home Address</span>
-        <span class="card-collapse-icon" data-collapse-icon="home-address">Show v</span>
+        <span class="card-collapse-icon card-collapse-switch"
+              data-collapse-icon="home-address"
+              data-collapse-state="collapsed"
+              aria-hidden="true"></span>
     </button>
 
     <div class="card-collapse-content home-address-content collapsed"
          data-collapse-content="home-address"
          data-collapse-default="collapsed">
         <p class="helper-text">
-            This address is used by <strong>Run Find Nearest Stores</strong> and <strong>update_home_stores.py</strong>, then saved into
+            This address is used by <strong>Nearest Stores</strong> and <strong>update_home_stores.py</strong>, then saved into
             <strong>PushShoppingList/shopping_stores_Results.json</strong>.
         </p>
 

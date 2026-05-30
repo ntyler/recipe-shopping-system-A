@@ -2990,12 +2990,15 @@ async function submitCookbookApi(url, formData = new FormData(), method = "POST"
 }
 
 function recipeLogCookbookActionData(button) {
-    const row = button ? button.closest(".recipe-url-summary-row, .recipe-view-card") : null;
+    const row = button
+        ? button.closest(".recipe-url-summary-row, .recipe-view-card, .recipe-edit-cookbook-field")
+        : null;
 
     return {
         recipeUrl: (button && button.dataset.recipeUrl) || (row && (row.dataset.recipeUrl || row.dataset.recipeViewUrl)) || "",
         cookbookId: button ? button.dataset.cookbookId || "" : "",
         cookbookName: button ? button.dataset.cookbookName || "" : "",
+        cookbookIsUnclassified: Boolean(button && button.dataset.cookbookUnclassified === "1"),
     };
 }
 
@@ -3017,7 +3020,7 @@ async function finishRecipeLogCookbookChange(message) {
 }
 
 async function moveRecipeLogCookbook(button) {
-    const { recipeUrl, cookbookId, cookbookName } = recipeLogCookbookActionData(button);
+    const { recipeUrl, cookbookId, cookbookName, cookbookIsUnclassified } = recipeLogCookbookActionData(button);
 
     if (!recipeUrl || !cookbookId) {
         return false;
@@ -3035,6 +3038,7 @@ async function moveRecipeLogCookbook(button) {
 
         await moveRecipeUrlToCookbook(recipeUrl, cookbookId);
         await finishRecipeLogCookbookChange(`Recipe moved to ${cookbookName || "cookbook"}.`);
+        updateRecipeEditorCookbookAssignment(recipeUrl, cookbookId, cookbookName, cookbookIsUnclassified);
     } catch (err) {
         console.warn("Unable to move recipe cookbook.", err);
         setCookbookStatus(err.message || "Unable to move recipe.", true);
@@ -3082,6 +3086,7 @@ async function createRecipeLogCookbook(button) {
 
         await moveRecipeUrlToCookbook(recipeUrl, cookbook.id);
         await finishRecipeLogCookbookChange(`Recipe moved to ${cookbook.name || name.trim()}.`);
+        updateRecipeEditorCookbookAssignment(recipeUrl, cookbook.id, cookbook.name || name.trim(), false);
     } catch (err) {
         console.warn("Unable to create recipe cookbook.", err);
         setCookbookStatus(err.message || "Unable to create cookbook.", true);
@@ -3557,8 +3562,6 @@ function setRecipeFileLoadingSummary(message) {
 
 function toggleCardCollapse(key) {
     const content = document.querySelector(`[data-collapse-content="${key}"]`);
-    const icon = document.querySelector(`[data-collapse-icon="${key}"]`);
-    const toggle = document.querySelector(`[data-collapse-toggle="${key}"]`);
 
     if (!content) {
         return;
@@ -3572,13 +3575,7 @@ function toggleCardCollapse(key) {
         card.classList.toggle("card-collapsed", isCollapsed);
     }
 
-    if (icon) {
-        icon.textContent = isCollapsed ? "Show v" : "Hide ^";
-    }
-
-    if (toggle) {
-        toggle.setAttribute("aria-expanded", isCollapsed ? "false" : "true");
-    }
+    updateCardCollapseToggleState(key, isCollapsed);
 
     window.setTimeout(initStoreLocationMaps, 0);
     scheduleAddStoreStickyVisibilityUpdate();
@@ -3589,6 +3586,24 @@ function toggleCardCollapse(key) {
 
     if (key === "rules" && isCollapsed) {
         window.setTimeout(scrollRulesIntoView, 0);
+    }
+}
+
+function updateCardCollapseToggleState(key, isCollapsed) {
+    const icon = document.querySelector(`[data-collapse-icon="${key}"]`);
+    const toggle = document.querySelector(`[data-collapse-toggle="${key}"]`);
+
+    if (icon) {
+        icon.dataset.collapseState = isCollapsed ? "collapsed" : "expanded";
+
+        if (!icon.classList.contains("card-collapse-switch")) {
+            icon.textContent = isCollapsed ? "Show v" : "Hide ^";
+        }
+    }
+
+    if (toggle) {
+        toggle.setAttribute("aria-expanded", isCollapsed ? "false" : "true");
+        toggle.classList.toggle("card-collapse-toggle-collapsed", isCollapsed);
     }
 }
 
@@ -3714,8 +3729,6 @@ function syncStoreEditFormDefaults(form) {
 function restoreCardCollapseState() {
     document.querySelectorAll("[data-collapse-content]").forEach(content => {
         const key = content.dataset.collapseContent;
-        const icon = document.querySelector(`[data-collapse-icon="${key}"]`);
-        const toggle = document.querySelector(`[data-collapse-toggle="${key}"]`);
         const savedState = localStorage.getItem(`card-collapse:${key}`);
         const shouldCollapse = savedState
             ? savedState === "collapsed"
@@ -3728,13 +3741,7 @@ function restoreCardCollapseState() {
             card.classList.toggle("card-collapsed", shouldCollapse);
         }
 
-        if (icon) {
-            icon.textContent = shouldCollapse ? "Show v" : "Hide ^";
-        }
-
-        if (toggle) {
-            toggle.setAttribute("aria-expanded", shouldCollapse ? "false" : "true");
-        }
+        updateCardCollapseToggleState(key, shouldCollapse);
     });
 
     scheduleAddStoreStickyVisibilityUpdate();
@@ -3804,7 +3811,21 @@ function showView(viewName) {
     updateViewSwitcherStickyOffset();
 }
 
-function jumpToRecipeViewRecipe(button) {
+function eventStartedInNestedInteractive(event, container) {
+    if (!event || !event.target || !event.target.closest || !container) {
+        return false;
+    }
+
+    const interactive = event.target.closest("a, button, input, select, textarea, label, [role='button'], [contenteditable='true']");
+    return Boolean(interactive && interactive !== container);
+}
+
+function jumpToRecipeViewRecipe(button, event = null) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
     const recipeUrl = button ? button.dataset.recipeUrl || "" : "";
 
     if (!recipeUrl) {
@@ -3833,7 +3854,12 @@ function jumpToRecipeViewRecipe(button) {
     return false;
 }
 
-function jumpToCurrentRecipeLog(button) {
+function jumpToCurrentRecipeLog(button, event = null) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
     const recipeUrl = button ? button.dataset.recipeUrl || "" : "";
 
     if (!recipeUrl) {
@@ -3949,6 +3975,12 @@ function isScreenPreviewFrame() {
 function restoreScreenSettings() {
     if (isScreenPreviewFrame()) {
         document.body.classList.add("screen-preview-frame-page");
+        const params = new URLSearchParams(window.location.search);
+        const mode = screenPreviewMode(params.get("screen_preview_mode") || "live");
+        const width = clampScreenPreviewNumber(params.get("screen_preview_width"), window.innerWidth || SCREEN_PREVIEW_DEFAULTS.phone.width);
+
+        document.body.dataset.screenPreviewMode = mode;
+        document.body.classList.toggle("screen-preview-mobile-frame", mode === "phone" || width <= 650);
         return;
     }
 
@@ -4103,7 +4135,12 @@ function rotatePhonePreview() {
 
 function screenPreviewUrl() {
     const url = new URL(window.location.href);
+    const mode = screenPreviewMode(localStorage.getItem(SCREEN_PREVIEW_MODE_KEY) || "live");
+    const dimensions = screenPreviewDimensions(mode);
+
     url.searchParams.set("screen_preview_frame", "1");
+    url.searchParams.set("screen_preview_mode", mode);
+    url.searchParams.set("screen_preview_width", String(dimensions.width || window.innerWidth || 0));
     return url.toString();
 }
 
@@ -4595,10 +4632,15 @@ function setCurrentRecipeUrlSummaryCollapsed(row, collapsed) {
         titleToggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
     }
 
+    updateCurrentRecipeUrlSummaryCollapseMenuToggle(row);
     return true;
 }
 
 function toggleCurrentRecipeUrlSummary(button, event = null) {
+    if (eventStartedInNestedInteractive(event, button)) {
+        return true;
+    }
+
     if (event) {
         event.preventDefault();
         event.stopPropagation();
@@ -4617,6 +4659,57 @@ function toggleCurrentRecipeUrlSummary(button, event = null) {
     localStorage.setItem(storageKey, shouldCollapse ? "1" : "0");
     closeRecipeEditRowMenus();
     return false;
+}
+
+function handleCurrentRecipeUrlSummaryTitleKeydown(button, event) {
+    if (!event || (event.key !== "Enter" && event.key !== " ")) {
+        return true;
+    }
+
+    return toggleCurrentRecipeUrlSummary(button, event);
+}
+
+function toggleCurrentRecipeUrlSummaryFromMenu(button) {
+    const row = recipeEditActionRowFromButton(button);
+    const storageKey = recipeUrlSummaryCollapseStorageKey(row);
+
+    if (!row || !storageKey) {
+        return false;
+    }
+
+    const shouldCollapse = !row.classList.contains("recipe-url-summary-collapsed");
+
+    setCurrentRecipeUrlSummaryCollapsed(row, shouldCollapse);
+    localStorage.setItem(storageKey, shouldCollapse ? "1" : "0");
+    closeRecipeEditRowMenus();
+    return false;
+}
+
+function setAllCurrentRecipeUrlSummariesCollapsed(collapsed) {
+    document.querySelectorAll("[data-current-recipe-row]").forEach(row => {
+        const storageKey = recipeUrlSummaryCollapseStorageKey(row);
+
+        setCurrentRecipeUrlSummaryCollapsed(row, collapsed);
+
+        if (storageKey) {
+            localStorage.setItem(storageKey, collapsed ? "1" : "0");
+        }
+    });
+
+    closeRecipeEditRowMenus();
+    return false;
+}
+
+function updateCurrentRecipeUrlSummaryCollapseMenuToggle(row) {
+    const button = row && row.classList.contains("recipe-url-summary-row")
+        ? row.querySelector(".recipe-url-summary-collapse-menu-toggle")
+        : null;
+
+    if (!button) {
+        return;
+    }
+
+    button.textContent = row.classList.contains("recipe-url-summary-collapsed") ? "Expand" : "Collapse";
 }
 
 function bindCurrentRecipeUrlSummaryToggles() {
@@ -5271,7 +5364,7 @@ function populateRecipeEditor(recipe, originalUrl) {
     setValue("recipeEditSourceUrl", recipe.source_display_url || recipe.source_url || originalUrl);
     setValue("recipeEditQuantity", recipe.quantity || "1");
     setValue("recipeEditServings", recipe.servings || "");
-    setRecipeEditorCookbook(recipe);
+    setRecipeEditorCookbook(recipe, originalUrl);
     populateRecipeScalingControls(recipe.scaling || {}, recipe.servings || "");
     updateRecipeEditorPdfControls(recipe);
 
@@ -5321,19 +5414,70 @@ function populateRecipeEditor(recipe, originalUrl) {
     updateRecipeEditStickyOffsets();
 }
 
-function setRecipeEditorCookbook(recipe) {
+function recipeEditorCurrentUrl() {
+    const input = document.getElementById("recipeEditOriginalUrl");
+    return input ? String(input.value || "").trim() : "";
+}
+
+function updateRecipeEditorCookbookAssignment(recipeUrl, cookbookId, cookbookName, cookbookIsUnclassified = false) {
+    const modal = document.getElementById("recipeEditModal");
+    const currentUrl = recipeEditorCurrentUrl();
+
+    if (!modal || !modal.classList.contains("open") || !currentUrl || currentUrl !== recipeUrl) {
+        return;
+    }
+
+    setRecipeEditorCookbook({
+        source_url: recipeUrl,
+        cookbook_id: cookbookId || "",
+        cookbook_name: cookbookName || "",
+        cookbook_is_unclassified: Boolean(cookbookIsUnclassified),
+    }, recipeUrl);
+}
+
+function setRecipeEditorCookbook(recipe, fallbackUrl = "") {
+    const field = document.getElementById("recipeEditCookbookField");
     const cookbookName = document.getElementById("recipeEditCookbookName");
+    const value = field ? field.querySelector(".recipe-edit-cookbook-value") : null;
     const name = recipe && recipe.cookbook_name
         ? String(recipe.cookbook_name).trim()
         : "";
+    const cookbookId = recipe && recipe.cookbook_id
+        ? String(recipe.cookbook_id).trim()
+        : "";
+    const recipeUrl = recipe && recipe.source_url
+        ? String(recipe.source_url).trim()
+        : String(fallbackUrl || "").trim();
+    const isUnclassified = Boolean(recipe && recipe.cookbook_is_unclassified);
 
-    if (!cookbookName) {
+    if (!field || !cookbookName) {
         return;
     }
+
+    field.dataset.recipeUrl = recipeUrl;
+    field.dataset.currentCookbookId = cookbookId;
+    field.dataset.currentCookbookName = name;
 
     cookbookName.textContent = name || "No cookbook assigned.";
     cookbookName.classList.toggle("muted", !name);
     cookbookName.title = name || "";
+
+    if (value) {
+        value.classList.toggle("muted", !name);
+    }
+
+    field.querySelectorAll("[data-recipe-edit-cookbook-action]").forEach(button => {
+        button.dataset.recipeUrl = recipeUrl;
+    });
+
+    field.querySelectorAll("[data-recipe-edit-cookbook-option]").forEach(button => {
+        const optionId = button.dataset.cookbookId || "";
+        button.hidden = Boolean(cookbookId && optionId === cookbookId);
+    });
+
+    field.querySelectorAll("[data-recipe-edit-cookbook-delete]").forEach(button => {
+        button.hidden = !name || isUnclassified;
+    });
 }
 
 function updateRecipeEditorPdfControls(recipe) {
@@ -6131,6 +6275,7 @@ function toggleRecipeEditRowMenu(button, event = null) {
 
     if (menu && shouldOpen) {
         updateRecipeIngredientRowCollapseToggle(row);
+        updateCurrentRecipeUrlSummaryCollapseMenuToggle(row);
         updateRecipeViewCardCollapseMenuToggle(row);
         updateRecipeDetailMenuToggleForButton(button);
         if (row) {
@@ -6220,7 +6365,7 @@ function toggleRecipeIngredientRowMenu(button, event = null) {
 }
 
 function recipeEditMovableRowSelector() {
-    return ".recipe-edit-ingredient-row, .recipe-edit-equipment-row, .recipe-edit-instruction-row, .recipe-edit-nutrition-row, .recipe-url-summary-row, .store-manager-row, .recipe-view-card, .cookbook-card, .cookbook-recipe-card, .rules-group, .rules-editor-food-row";
+    return ".recipe-edit-ingredient-row, .recipe-edit-equipment-row, .recipe-edit-instruction-row, .recipe-edit-nutrition-row, .recipe-edit-cookbook-field, .recipe-url-summary-row, .store-manager-row, .recipe-view-card, .cookbook-card, .cookbook-recipe-card, .rules-group, .rules-editor-food-row";
 }
 
 function recipeEditMoveSelectorForRow(row) {
@@ -9291,6 +9436,10 @@ function toggleRecipeViewCardFromMenu(button) {
 }
 
 function toggleRecipeViewCardFromTitle(button, event = null) {
+    if (eventStartedInNestedInteractive(event, button)) {
+        return true;
+    }
+
     if (event) {
         event.preventDefault();
         event.stopPropagation();
@@ -9310,6 +9459,14 @@ function toggleRecipeViewCardFromTitle(button, event = null) {
     localStorage.setItem(`recipe-card-collapsed:${key}`, shouldCollapse ? "1" : "0");
     closeRecipeEditRowMenus();
     return false;
+}
+
+function handleRecipeViewCardTitleKeydown(button, event) {
+    if (!event || (event.key !== "Enter" && event.key !== " ")) {
+        return true;
+    }
+
+    return toggleRecipeViewCardFromTitle(button, event);
 }
 
 function setRecipeCardCollapsed(card, button, collapsed) {
