@@ -4909,17 +4909,25 @@ body {
 
         .recipe-url-summary-cookbook {
             display: grid;
+            grid-template-columns: var(--recipe-meta-label-width) minmax(0, 1fr);
+            align-items: center;
+            column-gap: 8px;
+            color: #aaa;
+            font-size: 14px;
+            font-weight: 400;
+        }
+
+        .recipe-url-summary-cookbook-value {
+            display: grid;
             grid-template-columns: minmax(0, 1fr) auto;
             align-items: center;
             column-gap: 6px;
-            row-gap: 2px;
-            width: min(280px, 100%);
-            max-width: min(280px, 100%);
-            margin-top: 8px;
-            padding: 6px 9px;
-            border: 1px solid #244f42;
+            width: min(170px, 100%);
+            min-height: 34px;
+            padding: 4px 5px 4px 9px;
+            border: 1px solid #0f8f7a;
             border-radius: 7px;
-            background: rgba(12, 48, 36, 0.55);
+            background: rgba(8, 66, 51, 0.68);
             color: #b8f7dc;
             font-size: 12px;
             font-weight: 800;
@@ -4932,9 +4940,9 @@ body {
             display: inline-flex;
             flex: 0 0 auto;
             grid-column: 2;
-            grid-row: 1 / span 2;
             align-self: center;
-            margin: -5px -6px -5px 0;
+            justify-self: end;
+            margin: -3px -3px -3px 0;
         }
 
         .recipe-url-summary-cookbook-menu-btn {
@@ -4958,10 +4966,9 @@ body {
         }
 
         .recipe-url-summary-cookbook-label {
-            grid-column: 1;
-            color: #8dddbd;
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
+            color: #aaa;
+            text-transform: none;
+            letter-spacing: 0;
         }
 
         .recipe-url-summary-cookbook-name {

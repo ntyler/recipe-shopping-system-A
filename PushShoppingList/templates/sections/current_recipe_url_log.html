@@ -131,6 +131,55 @@
                                         </select>
                                     </div>
                                 </div>
+                                {% if recipe.cookbook_name %}
+                                    <div class="recipe-url-summary-cookbook">
+                                        <span class="recipe-url-summary-cookbook-label recipe-url-summary-meta-label">Cookbook:</span>
+                                        <div class="recipe-url-summary-cookbook-value recipe-url-summary-meta-value">
+                                            <span class="recipe-url-summary-cookbook-name">{{ recipe.cookbook_name }}</span>
+                                            <div class="recipe-url-summary-cookbook-menu-wrap recipe-edit-row-menu-wrap">
+                                                <button type="button"
+                                                        class="recipe-edit-row-menu-btn recipe-url-summary-cookbook-menu-btn"
+                                                        aria-label="Cookbook actions for recipe {{ loop.index }}"
+                                                        aria-haspopup="true"
+                                                        aria-expanded="false"
+                                                        onclick="return toggleRecipeEditRowMenu(this, event)">
+                                                    <span aria-hidden="true"></span>
+                                                </button>
+                                                <div class="recipe-edit-row-menu recipe-url-summary-cookbook-menu" hidden>
+                                                    <button type="button"
+                                                            data-recipe-url="{{ recipe.url }}"
+                                                            onclick="return createRecipeLogCookbook(this)">
+                                                        Create New Cookbook
+                                                    </button>
+                                                    {% if cookbook_view and cookbook_view.cookbooks %}
+                                                        <div class="recipe-url-summary-cookbook-menu-label">Move To</div>
+                                                        {% for cookbook in cookbook_view.cookbooks %}
+                                                            {% if cookbook.id != recipe.cookbook_id %}
+                                                                <button type="button"
+                                                                        data-recipe-url="{{ recipe.url }}"
+                                                                        data-cookbook-id="{{ cookbook.id }}"
+                                                                        data-cookbook-name="{{ cookbook.name }}"
+                                                                        onclick="return moveRecipeLogCookbook(this)">
+                                                                    {{ cookbook.name }}
+                                                                </button>
+                                                            {% endif %}
+                                                        {% endfor %}
+                                                    {% endif %}
+                                                    {% if unclassified_cookbook.id and not recipe.cookbook_is_unclassified %}
+                                                        <button type="button"
+                                                                class="delete"
+                                                                data-recipe-url="{{ recipe.url }}"
+                                                                data-cookbook-id="{{ unclassified_cookbook.id }}"
+                                                                data-cookbook-name="{{ unclassified_cookbook.name }}"
+                                                                onclick="return deleteRecipeLogCookbookAssignment(this)">
+                                                            Delete
+                                                        </button>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endif %}
                             </div>
                         </div>
                         <div class="recipe-url-summary-actions">
@@ -196,53 +245,6 @@
                         </div>
                     </div>
                     <div class="recipe-url-summary-main">
-                        {% if recipe.cookbook_name %}
-                            <div class="recipe-url-summary-cookbook">
-                                <span class="recipe-url-summary-cookbook-label">Cookbook:</span>
-                                <span class="recipe-url-summary-cookbook-name">{{ recipe.cookbook_name }}</span>
-                                <div class="recipe-url-summary-cookbook-menu-wrap recipe-edit-row-menu-wrap">
-                                    <button type="button"
-                                            class="recipe-edit-row-menu-btn recipe-url-summary-cookbook-menu-btn"
-                                            aria-label="Cookbook actions for recipe {{ loop.index }}"
-                                            aria-haspopup="true"
-                                            aria-expanded="false"
-                                            onclick="return toggleRecipeEditRowMenu(this, event)">
-                                        <span aria-hidden="true"></span>
-                                    </button>
-                                    <div class="recipe-edit-row-menu recipe-url-summary-cookbook-menu" hidden>
-                                        <button type="button"
-                                                data-recipe-url="{{ recipe.url }}"
-                                                onclick="return createRecipeLogCookbook(this)">
-                                            Create New Cookbook
-                                        </button>
-                                        {% if cookbook_view and cookbook_view.cookbooks %}
-                                            <div class="recipe-url-summary-cookbook-menu-label">Move To</div>
-                                            {% for cookbook in cookbook_view.cookbooks %}
-                                                {% if cookbook.id != recipe.cookbook_id %}
-                                                    <button type="button"
-                                                            data-recipe-url="{{ recipe.url }}"
-                                                            data-cookbook-id="{{ cookbook.id }}"
-                                                            data-cookbook-name="{{ cookbook.name }}"
-                                                            onclick="return moveRecipeLogCookbook(this)">
-                                                        {{ cookbook.name }}
-                                                    </button>
-                                                {% endif %}
-                                            {% endfor %}
-                                        {% endif %}
-                                        {% if unclassified_cookbook.id and not recipe.cookbook_is_unclassified %}
-                                            <button type="button"
-                                                    class="delete"
-                                                    data-recipe-url="{{ recipe.url }}"
-                                                    data-cookbook-id="{{ unclassified_cookbook.id }}"
-                                                    data-cookbook-name="{{ unclassified_cookbook.name }}"
-                                                    onclick="return deleteRecipeLogCookbookAssignment(this)">
-                                                Delete
-                                            </button>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </div>
-                        {% endif %}
                         {% if recipe.cover_image and recipe.cover_image.src %}
                             <img class="recipe-cover-image recipe-url-summary-cover"
                                  src="{{ recipe.cover_image.src }}"
