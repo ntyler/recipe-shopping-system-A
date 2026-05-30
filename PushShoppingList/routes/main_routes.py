@@ -902,18 +902,35 @@ def normalize_text_list(value):
 
 
 def normalize_instruction_items(value):
+    if isinstance(value, str):
+        value = value.splitlines()
+
     if not isinstance(value, list):
-        return normalize_text_list(value)
+        value = normalize_text_list(value)
 
     items = []
-    for item in value:
+    for index, item in enumerate(value, start=1):
         if isinstance(item, dict):
             text = clean_display_text(item.get("instruction") or item.get("text") or "")
+            step_number = item.get("step_number") or index
+            step_image_url = clean_display_text(item.get("step_image_url") or item.get("image_url") or "")
+            step_image_generated_at = clean_display_text(
+                item.get("step_image_generated_at") or item.get("image_generated_at") or ""
+            )
         else:
             text = clean_display_text(item)
+            step_number = index
+            step_image_url = ""
+            step_image_generated_at = ""
 
         if text:
-            items.append(text)
+            items.append({
+                "step_number": step_number,
+                "text": text,
+                "instruction": text,
+                "step_image_url": step_image_url,
+                "step_image_generated_at": step_image_generated_at,
+            })
 
     return items
 

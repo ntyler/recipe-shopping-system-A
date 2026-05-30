@@ -1,7 +1,13 @@
+import base64
 import json
 import os
 import uuid
+from datetime import datetime
+from datetime import timezone
+from pathlib import Path
 from urllib.parse import urlparse
+
+import requests
 
 from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.cookbook_service import ensure_unclassified_cookbook_for_recipes
@@ -76,6 +82,8 @@ NUTRITION_ESTIMATE_FIELDS = [
     for field in DEFAULT_MANUAL_NUTRITION_FIELDS
     if field != "serving_basis"
 ]
+STEP_IMAGE_FOLDER = Path(__file__).resolve().parents[1] / "static" / "generated" / "recipe_steps"
+STEP_IMAGE_URL_PREFIX = "/static/generated/recipe_steps"
 
 
 def create_new_recipe():
@@ -296,7 +304,10 @@ def save_editable_recipe(original_url, payload):
         ),
         "ingredients": sanitize_ingredients(payload.get("ingredients", [])),
         "equipment": sanitize_text_list(payload.get("equipment", [])),
-        "instructions": sanitize_instruction_list(payload.get("instructions", [])),
+        "instructions": sanitize_instruction_list(
+            payload.get("instructions", []),
+            existing_data.get("instructions", []),
+        ),
         "nutrition": sanitize_nutrition(payload.get("nutrition", [])),
     }
     if recipe_data["servings"] and not recipe_data["scaling"].get("base_servings"):
@@ -381,6 +392,251 @@ def estimate_recipe_nutrition(payload):
         "ok": True,
         "nutrition": rows,
     }
+
+
+def generate_recipe_step_image(payload):
+    payload = payload if isinstance(payload, dict) else {}
+    url = str(payload.get("url") or payload.get("recipe_url") or "").strip()
+    requested_step = payload.get("step_number")
+
+    if not url:
+        return {"ok": False, "error": "Recipe URL is required."}
+
+    if not os.getenv("OPENAI_API_KEY"):
+        return {"ok": False, "error": "Image generation is not set up yet."}
+
+    recipe_data = load_recipe_output(url)
+    if not recipe_data:
+        return {"ok": False, "error": "Recipe data was not found."}
+
+    recipe_title = str(recipe_data.get("recipe_title") or "").strip()
+    if not recipe_title:
+        return {"ok": False, "error": "Add a recipe title before generating a step image."}
+
+    instructions = sorted(
+        normalize_instruction_records(recipe_data.get("instructions", [])),
+        key=lambda item: item["step_number"],
+    )
+    target_index, target_instruction = find_instruction_for_step(instructions, requested_step)
+
+    if target_instruction is None:
+        return {"ok": False, "error": "Instruction step was not found."}
+
+    instruction_text = str(target_instruction.get("instruction") or target_instruction.get("text") or "").strip()
+    if not instruction_text:
+        return {"ok": False, "error": "Add instruction text before generating a step image."}
+
+    prompt = build_recipe_step_image_prompt(
+        recipe_title=recipe_title,
+        servings=str(recipe_data.get("servings") or "").strip(),
+        ingredients=recipe_step_image_prompt_ingredients(recipe_data.get("ingredients", [])),
+        equipment=recipe_step_image_prompt_equipment(recipe_data.get("equipment", [])),
+        step_number=target_instruction.get("step_number"),
+        instruction_step=instruction_text,
+    )
+
+    try:
+        image_bytes = request_recipe_step_image_bytes(prompt)
+    except TimeoutError:
+        return {
+            "ok": False,
+            "error": "Image generation timed out. Please try again.",
+        }
+    except Exception:
+        return {
+            "ok": False,
+            "error": "Image generation failed. Please try again.",
+        }
+
+    if not image_bytes:
+        return {
+            "ok": False,
+            "error": "Image generation did not return an image. Please try again.",
+        }
+
+    step_image_url = save_recipe_step_image_file(url, target_instruction.get("step_number"), image_bytes)
+    generated_at = datetime.now(timezone.utc).isoformat()
+    target_instruction["step_image_url"] = step_image_url
+    target_instruction["step_image_generated_at"] = generated_at
+
+    instructions[target_index] = {
+        **target_instruction,
+        "instruction": instruction_text,
+        "text": instruction_text,
+    }
+    recipe_data["instructions"] = instructions
+    save_recipe_output(url, recipe_data)
+
+    return {
+        "ok": True,
+        "url": url,
+        "step_number": target_instruction.get("step_number"),
+        "step_image_url": step_image_url,
+        "step_image_generated_at": generated_at,
+    }
+
+
+def find_instruction_for_step(instructions, requested_step):
+    requested_key = instruction_match_step_key(requested_step)
+
+    for index, instruction in enumerate(instructions):
+        if instruction_match_step_key(instruction.get("step_number")) == requested_key:
+            return index, instruction
+
+    try:
+        requested_index = int(float(requested_step)) - 1
+    except (TypeError, ValueError):
+        requested_index = -1
+
+    if 0 <= requested_index < len(instructions):
+        return requested_index, instructions[requested_index]
+
+    return -1, None
+
+
+def build_recipe_step_image_prompt(
+    recipe_title,
+    servings,
+    ingredients,
+    equipment,
+    step_number,
+    instruction_step,
+):
+    return f"""Generate a realistic cookbook-style image for one recipe instruction step.
+
+Recipe title:
+{recipe_title}
+
+Servings:
+{servings or "Not specified"}
+
+Ingredients:
+{ingredients or "Not specified"}
+
+Equipment:
+{equipment or "Not specified"}
+
+Step number:
+{step_number}
+
+Instruction step:
+{instruction_step}
+
+Visual requirements:
+- Show only this specific cooking step
+- Use the actual ingredients from the recipe
+- Bright natural kitchen lighting
+- Realistic food photography
+- Clean kitchen counter background
+- High-end cookbook style
+- No text inside the image
+- No numbered badges
+- No labels
+- Make the cooking action visually clear
+- Final step should show the finished dish if the instruction is about serving or garnish
+"""
+
+
+def recipe_step_image_prompt_ingredients(ingredients):
+    if not isinstance(ingredients, list):
+        return ""
+
+    rows = []
+    for item in ingredients:
+        if not isinstance(item, dict):
+            text = str(item or "").strip()
+            if text:
+                rows.append(f"- {text}")
+            continue
+
+        name = str(item.get("ingredient") or item.get("original_text") or "").strip()
+        quantity = str(item.get("quantity") or item.get("recipe_qty") or "").strip()
+        unit = str(item.get("unit") or "").strip()
+        preparation = str(item.get("preparation") or "").strip()
+        text = " ".join(part for part in [quantity, unit, name] if part).strip()
+        if preparation:
+            text = f"{text}, {preparation}" if text else preparation
+
+        if text:
+            rows.append(f"- {text}")
+
+    return "\n".join(rows[:80])
+
+
+def recipe_step_image_prompt_equipment(equipment):
+    rows = normalize_text_rows(equipment)
+    return "\n".join(f"- {item}" for item in rows[:40])
+
+
+def request_recipe_step_image_bytes(prompt):
+    timeout_seconds = int(os.getenv("OPENAI_STEP_IMAGE_TIMEOUT_SECONDS", "90"))
+    model = os.getenv("OPENAI_STEP_IMAGE_MODEL", "gpt-image-1")
+    size = os.getenv("OPENAI_STEP_IMAGE_SIZE", "1024x1024")
+    quality = os.getenv("OPENAI_STEP_IMAGE_QUALITY", "medium")
+
+    client = get_openai_client()
+    if hasattr(client, "with_options"):
+        client = client.with_options(timeout=timeout_seconds)
+
+    try:
+        response = client.images.generate(
+            model=model,
+            prompt=prompt,
+            size=size,
+            quality=quality,
+            n=1,
+        )
+    except Exception as exc:
+        if "timeout" in str(exc).lower() or "timed out" in str(exc).lower():
+            raise TimeoutError() from exc
+        raise
+
+    image_record = first_openai_image_record(response)
+    if not image_record:
+        return b""
+
+    b64_json = openai_image_field(image_record, "b64_json")
+    if b64_json:
+        encoded = str(b64_json).split(",", 1)[-1]
+        return base64.b64decode(encoded)
+
+    image_url = openai_image_field(image_record, "url")
+    if image_url:
+        try:
+            result = requests.get(image_url, timeout=timeout_seconds)
+            result.raise_for_status()
+        except requests.Timeout as exc:
+            raise TimeoutError() from exc
+        return result.content
+
+    return b""
+
+
+def first_openai_image_record(response):
+    data = getattr(response, "data", None)
+    if data is None and isinstance(response, dict):
+        data = response.get("data")
+
+    if not data:
+        return None
+
+    return data[0]
+
+
+def openai_image_field(image_record, field_name):
+    if isinstance(image_record, dict):
+        return image_record.get(field_name)
+
+    return getattr(image_record, field_name, None)
+
+
+def save_recipe_step_image_file(recipe_url, step_number, image_bytes):
+    STEP_IMAGE_FOLDER.mkdir(parents=True, exist_ok=True)
+    step_key = safe_filename(str(step_number or "step"))
+    filename = f"{safe_filename(recipe_url)}_step_{step_key}_{uuid.uuid4().hex[:12]}.png"
+    image_path = STEP_IMAGE_FOLDER / filename
+    image_path.write_bytes(image_bytes)
+    return f"{STEP_IMAGE_URL_PREFIX}/{filename}"
 
 
 def recipe_nutrition_serving_basis(nutrition_rows):
@@ -650,31 +906,10 @@ def normalize_text_rows(value):
 
 
 def normalize_instruction_rows(value):
-    if not isinstance(value, list):
-        return [
-            {
-                "step_number": index,
-                "instruction": text,
-            }
-            for index, text in enumerate(normalize_text_rows(value), start=1)
-        ]
-
-    rows = []
-    for index, item in enumerate(value, start=1):
-        if isinstance(item, dict):
-            text = str(item.get("instruction") or item.get("text") or "").strip()
-            step_number = normalize_step_number(item.get("step_number"), index)
-        else:
-            text = str(item or "").strip()
-            step_number = index
-
-        if text:
-            rows.append({
-                "step_number": step_number,
-                "instruction": text,
-            })
-
-    return sorted(rows, key=lambda item: item["step_number"])
+    return sorted(
+        normalize_instruction_records(value),
+        key=lambda item: item["step_number"],
+    )
 
 
 def normalize_nutrition_rows(nutrition, include_defaults=False):
@@ -763,35 +998,120 @@ def sanitize_text_list(value):
     ]
 
 
-def sanitize_instruction_list(value):
+def sanitize_instruction_list(value, existing_value=None):
     if isinstance(value, str):
         value = value.splitlines()
 
     if not isinstance(value, list):
         return []
 
+    existing_rows = normalize_instruction_records(existing_value or [])
+    existing_by_step = {
+        instruction_match_step_key(item.get("step_number")): item
+        for item in existing_rows
+    }
+    existing_by_text = {
+        instruction_match_text_key(item.get("instruction")): item
+        for item in existing_rows
+        if instruction_match_text_key(item.get("instruction"))
+    }
     instructions = []
     for index, item in enumerate(value, start=1):
         if isinstance(item, dict):
             text = str(item.get("instruction") or item.get("text") or "").strip()
             step_number = normalize_step_number(item.get("step_number"), index)
+            step_image_url = nullable_string(item.get("step_image_url") or item.get("image_url"))
+            step_image_generated_at = nullable_string(
+                item.get("step_image_generated_at") or item.get("image_generated_at")
+            )
         else:
             text = str(item or "").strip()
             step_number = index
+            step_image_url = ""
+            step_image_generated_at = ""
 
         if not text:
             continue
+
+        existing = (
+            existing_by_step.get(instruction_match_step_key(step_number))
+            or existing_by_text.get(instruction_match_text_key(text))
+            or {}
+        )
+        step_image_url = step_image_url or nullable_string(existing.get("step_image_url")) or ""
+        step_image_generated_at = (
+            step_image_generated_at
+            or nullable_string(existing.get("step_image_generated_at"))
+            or ""
+        )
 
         instructions.append({
             "section": None,
             "step_number": step_number,
             "instruction": text,
+            "text": text,
             "temperature": None,
             "time": None,
             "equipment_used": [],
+            "step_image_url": step_image_url,
+            "step_image_generated_at": step_image_generated_at,
         })
 
     return sorted(instructions, key=lambda item: item["step_number"])
+
+
+def normalize_instruction_records(value):
+    if isinstance(value, str):
+        value = value.splitlines()
+
+    if not isinstance(value, list):
+        value = normalize_text_rows(value)
+
+    records = []
+    for index, item in enumerate(value, start=1):
+        record = dict(item) if isinstance(item, dict) else {}
+        if isinstance(item, dict):
+            text = str(item.get("instruction") or item.get("text") or "").strip()
+            step_number = normalize_step_number(item.get("step_number"), index)
+            step_image_url = str(item.get("step_image_url") or item.get("image_url") or "").strip()
+            step_image_generated_at = str(
+                item.get("step_image_generated_at") or item.get("image_generated_at") or ""
+            ).strip()
+        else:
+            text = str(item or "").strip()
+            step_number = index
+            step_image_url = ""
+            step_image_generated_at = ""
+
+        if not text:
+            continue
+
+        record.update({
+            "step_number": step_number,
+            "instruction": text,
+            "text": text,
+            "step_image_url": step_image_url,
+            "step_image_generated_at": step_image_generated_at,
+        })
+        records.append(record)
+
+    return records
+
+
+def instruction_match_step_key(value):
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return str(value or "").strip()
+
+    if number.is_integer():
+        return str(int(number))
+
+    return f"{number:g}"
+
+
+def instruction_match_text_key(value):
+    return " ".join(str(value or "").strip().lower().split())
 
 
 def normalize_step_number(value, fallback):
