@@ -196,7 +196,8 @@
                  data-recipe-view-card
                  data-recipe-card-key="{{ recipe.url }}"
                  data-recipe-view-url="{{ recipe.url }}">
-                <div class="recipe-view-title">
+                <div class="recipe-view-title"
+                     onclick="return toggleRecipeViewCardFromTitle(this, event)">
                     <div class="recipe-view-title-main recipe-view-title-toggle"
                          data-recipe-card-title-toggle
                          data-recipe-card-key="{{ recipe.url }}"
