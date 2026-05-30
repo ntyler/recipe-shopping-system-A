@@ -2982,12 +2982,24 @@ body {
         .recipe-url-log-header {
             display: flex;
             align-items: stretch;
-            gap: 8px;
+            gap: 0;
+            border: 1px solid #333;
+            border-radius: 8px;
+            background: #181818;
+            overflow: visible;
         }
 
         .recipe-url-log-header .card-collapse-toggle {
             flex: 1 1 auto;
             min-width: 0;
+            border: 0;
+            border-radius: 7px 0 0 7px;
+            background: transparent;
+        }
+
+        .recipe-url-log-header .card-collapse-toggle:hover,
+        .recipe-url-log-header .card-collapse-toggle:focus-visible {
+            background: #222;
         }
 
         .recipe-url-log-menu-wrap {
@@ -3004,8 +3016,10 @@ body {
             height: auto;
             min-height: 46px;
             margin: 0;
-            border: 1px solid #333;
-            background: #181818;
+            border: 0;
+            border-left: 1px solid #333;
+            border-radius: 0 7px 7px 0;
+            background: transparent;
         }
 
         .recipe-url-log-menu {
