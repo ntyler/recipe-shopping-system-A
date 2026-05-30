@@ -3342,6 +3342,15 @@ body {
             display: none;
         }
 
+        button.food-rule-marker {
+            width: auto;
+            min-width: 0;
+            min-height: 22px;
+            margin: 0;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
         .sr-only {
             position: absolute;
             width: 1px;
