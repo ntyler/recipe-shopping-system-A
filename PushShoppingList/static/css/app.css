@@ -4942,6 +4942,52 @@ body {
             width: min(280px, 100%);
         }
 
+        @media (min-width: 651px) {
+            .recipe-url-summary-row-with-cover:not(.recipe-url-summary-collapsed) {
+                grid-template-columns: 32px minmax(220px, 1fr) minmax(190px, 280px) auto;
+                column-gap: 8px;
+                row-gap: 0;
+                align-items: start;
+            }
+
+            .recipe-url-summary-row-with-cover:not(.recipe-url-summary-collapsed) .recipe-url-summary-header {
+                display: contents;
+            }
+
+            .recipe-url-summary-row-with-cover:not(.recipe-url-summary-collapsed) .recipe-url-drag-handle {
+                grid-column: 1;
+                grid-row: 1;
+            }
+
+            .recipe-url-summary-row-with-cover:not(.recipe-url-summary-collapsed) .recipe-url-summary-title {
+                grid-column: 2;
+                grid-row: 1;
+                min-width: 0;
+            }
+
+            .recipe-url-summary-row-with-cover:not(.recipe-url-summary-collapsed) .recipe-url-summary-main {
+                grid-column: 3;
+                grid-row: 1;
+                align-self: center;
+                justify-self: start;
+                width: 100%;
+                max-width: none;
+                margin-left: 0;
+            }
+
+            .recipe-url-summary-row-with-cover:not(.recipe-url-summary-collapsed) .recipe-url-summary-cover {
+                width: 100%;
+                max-width: 280px;
+            }
+
+            .recipe-url-summary-row-with-cover:not(.recipe-url-summary-collapsed) .recipe-url-summary-actions {
+                grid-column: 4;
+                grid-row: 1;
+                align-self: start;
+                justify-self: end;
+            }
+        }
+
         .recipe-url-summary-cookbook {
             display: grid;
             grid-template-columns: var(--recipe-meta-label-width) minmax(0, 1fr);

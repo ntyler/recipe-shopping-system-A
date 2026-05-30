@@ -47,7 +47,7 @@
              data-recipe-url-sort-list
              aria-label="Current recipe URL summary">
             {% for recipe in current_urls %}
-                <div class="recipe-url-summary-row{% if loop.last %} recipe-url-summary-row-last{% endif %}"
+                <div class="recipe-url-summary-row{% if recipe.cover_image and recipe.cover_image.src %} recipe-url-summary-row-with-cover{% endif %}{% if loop.last %} recipe-url-summary-row-last{% endif %}"
                      data-current-recipe-row
                      data-recipe-url="{{ recipe.url }}"
                      draggable="true">
