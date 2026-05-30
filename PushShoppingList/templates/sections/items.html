@@ -427,6 +427,10 @@
                                     onclick="return openRecipeEditorSection(this, 'equipment')">
                                 Edit
                             </button>
+                            <button type="button"
+                                    onclick="return resetRecipeDetailCheckboxesFromMenu(this)">
+                                Reset Checkboxes
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -473,6 +477,10 @@
                                     data-recipe-url="{{ recipe.url }}"
                                     onclick="return openRecipeEditorSection(this, 'instructions')">
                                 Edit
+                            </button>
+                            <button type="button"
+                                    onclick="return resetRecipeDetailCheckboxesFromMenu(this)">
+                                Reset Checkboxes
                             </button>
                         </div>
                     </div>
@@ -564,6 +572,10 @@
                                         data-recipe-url="{{ recipe.url }}"
                                         onclick="return openRecipeEditorSection(this, 'ingredients')">
                                     Edit
+                                </button>
+                                <button type="button"
+                                        onclick="return resetRecipeDetailCheckboxesFromMenu(this)">
+                                    Reset Checkboxes
                                 </button>
                             </div>
                         </div>
