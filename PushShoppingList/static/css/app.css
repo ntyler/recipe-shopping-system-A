@@ -4918,13 +4918,11 @@ body {
         }
 
         .recipe-url-summary-cookbook-value {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
-            align-items: center;
-            column-gap: 6px;
+            position: relative;
+            display: block;
             width: min(170px, 100%);
             min-height: 34px;
-            padding: 4px 5px 4px 9px;
+            padding: 0;
             border: 1px solid #0f8f7a;
             border-radius: 7px;
             background: rgba(8, 66, 51, 0.68);
@@ -4935,20 +4933,43 @@ body {
             box-sizing: border-box;
         }
 
-        .recipe-url-summary-cookbook-menu-wrap {
-            position: relative;
-            display: inline-flex;
-            flex: 0 0 auto;
-            grid-column: 2;
-            align-self: center;
-            justify-self: end;
-            margin: -3px -3px -3px 0;
+        .recipe-url-summary-cookbook-select {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 16px;
+            align-items: center;
+            column-gap: 6px;
+            width: 100%;
+            min-height: 32px;
+            margin: 0;
+            padding: 5px 8px;
+            border: 0;
+            border-radius: 6px;
+            background: transparent;
+            color: inherit;
+            font: inherit;
+            line-height: inherit;
+            text-align: left;
+            box-shadow: none;
         }
 
-        .recipe-url-summary-cookbook-menu-btn {
-            width: 28px;
-            min-width: 28px;
-            height: 28px;
+        .recipe-url-summary-cookbook-select:hover,
+        .recipe-url-summary-cookbook-select:focus-visible {
+            background: rgba(15, 143, 122, 0.18);
+            outline: none;
+        }
+
+        .recipe-url-summary-cookbook-chevron {
+            justify-self: center;
+            width: 0;
+            height: 0;
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+            border-top: 5px solid #d6fff5;
+            pointer-events: none;
+        }
+
+        .recipe-url-summary-cookbook-menu-wrap {
+            justify-self: start;
         }
 
         .recipe-url-summary-cookbook-menu {
