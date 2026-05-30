@@ -6815,6 +6815,37 @@ function closeRecipeEditRowMenus() {
     document.querySelectorAll(".recipe-edit-row-menu-btn").forEach(button => {
         button.setAttribute("aria-expanded", "false");
     });
+    closeRecipeViewGenerateSubmenus();
+}
+
+function closeRecipeViewGenerateSubmenus(scope = document) {
+    scope.querySelectorAll(".recipe-view-generate-submenu").forEach(menu => {
+        menu.hidden = true;
+    });
+    scope.querySelectorAll(".recipe-view-generate-submenu-toggle").forEach(button => {
+        button.setAttribute("aria-expanded", "false");
+    });
+}
+
+function toggleRecipeViewGenerateSubmenu(button, event = null) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const row = button ? button.closest(".recipe-view-generate-submenu-row") : null;
+    const menu = row ? row.querySelector(".recipe-view-generate-submenu") : null;
+    const parentMenu = button ? button.closest(".recipe-view-global-menu") : null;
+    const shouldOpen = menu ? menu.hidden : false;
+
+    closeRecipeViewGenerateSubmenus(parentMenu || document);
+
+    if (menu && shouldOpen) {
+        menu.hidden = false;
+        button.setAttribute("aria-expanded", "true");
+    }
+
+    return false;
 }
 
 function recipeEditRowMenuIsOpen() {
@@ -9886,8 +9917,18 @@ async function generateRecipeImagesInCard(card, options = {}) {
 }
 
 function recipeImageGenerateButtons(card, options = {}) {
+    const scope = options.imageScope || options.scope || "all";
+
     return [...card.querySelectorAll("[data-equipment-image-generate], [data-step-image-generate]")]
         .filter(imageButton => {
+            if (scope === "equipment" && !imageButton.matches("[data-equipment-image-generate]")) {
+                return false;
+            }
+
+            if (scope === "instructions" && !imageButton.matches("[data-step-image-generate]")) {
+                return false;
+            }
+
             if (!options.missingOnly) {
                 return true;
             }
