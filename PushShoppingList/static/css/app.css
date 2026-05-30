@@ -3006,6 +3006,10 @@ body {
             pointer-events: none;
         }
 
+        .recipe-image-visibility-hidden {
+            display: none !important;
+        }
+
         .recipe-task-check {
             margin-top: 3px;
             transform: scale(1.15);

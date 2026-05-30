@@ -9905,6 +9905,50 @@ function expandRecipeCardForImageGeneration(card) {
     });
 }
 
+function setRecipeImagesVisibleFromMenu(button, visible) {
+    const card = button ? button.closest("[data-recipe-view-card]") : null;
+
+    closeRecipeEditRowMenus();
+
+    if (!card) {
+        return false;
+    }
+
+    if (visible) {
+        expandRecipeCardForImageGeneration(card);
+    }
+
+    setRecipeImageContainersVisible(card.querySelectorAll(".recipe-view-body-media, [data-equipment-image-panel], [data-step-image-panel]"), visible);
+    return false;
+}
+
+function setRecipeDetailImagesVisibleFromMenu(button, visible) {
+    const header = button ? button.closest(".recipe-detail-header") : null;
+    const toggle = header ? header.querySelector(".detail-toggle") : null;
+    const parts = recipeDetailSectionParts(toggle);
+
+    closeRecipeEditRowMenus();
+
+    if (!parts.content) {
+        return false;
+    }
+
+    if (visible && toggle) {
+        setRecipeDetailSectionCollapsed(toggle, false);
+        localStorage.setItem(parts.storageKey, "0");
+    }
+
+    setRecipeImageContainersVisible(parts.content.querySelectorAll("[data-equipment-image-panel], [data-step-image-panel]"), visible);
+    return false;
+}
+
+function setRecipeImageContainersVisible(containers, visible) {
+    [...containers].forEach(container => {
+        container.classList.toggle("recipe-image-visibility-hidden", !visible);
+        container.setAttribute("aria-hidden", visible ? "false" : "true");
+    });
+}
+
 function updateRecipeDetailMenuToggleForButton(button) {
     const header = button ? button.closest(".recipe-detail-header") : null;
     const toggle = header ? header.querySelector(".detail-toggle, .nutrition-toggle") : null;
