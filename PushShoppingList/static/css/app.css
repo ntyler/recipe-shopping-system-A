@@ -2467,6 +2467,7 @@ body {
         }
 
         .recipe-view-title-main {
+            --recipe-meta-label-width: 102px;
             min-width: 0;
             display: grid;
             gap: 4px;
@@ -2497,10 +2498,10 @@ body {
 
         .recipe-view-title-line {
             min-width: 0;
-            display: flex;
+            display: grid;
+            grid-template-columns: var(--recipe-meta-label-width) minmax(0, 1fr);
             align-items: baseline;
-            gap: 4px;
-            flex-wrap: wrap;
+            column-gap: 8px;
         }
 
         .recipe-jump-link {
@@ -2539,6 +2540,7 @@ body {
         }
 
         .recipe-view-name {
+            min-width: 0;
             color: #ddd;
             font: inherit;
             font-weight: 800;
