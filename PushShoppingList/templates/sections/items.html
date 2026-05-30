@@ -695,14 +695,11 @@
 
                     <div class="detail-content collapsed" data-detail-content="ingredients|{{ recipe.url }}">
                         {% for section_name, section_items in recipe["sections"].items() %}
-                            <div class="store-section-header collapsible-header"
-                                 data-collapse-scope="recipe-section"
-                                 data-collapse-key="recipe-section|{{ recipe.url }}|{{ section_name }}">
+                            <div class="store-section-header">
                                 <span class="header-title">
                                     {{ section_name }}
                                     <span class="header-count">({{ section_items|length }})</span>
                                 </span>
-                                <span class="header-toggle-icon">Hide ^</span>
                             </div>
 
                             {% for recipe_item in section_items %}

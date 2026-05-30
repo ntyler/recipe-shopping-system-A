@@ -213,35 +213,67 @@
   "equipment": [
     {
       "name": "cutting board",
-      "category": "prep"
+      "category": "prep",
+      "equipment": "cutting board",
+      "text": "cutting board",
+      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_homemade-ho-hos-recipe-2013817_equipment_1_e956f037bdcc.png",
+      "equipment_image_generated_at": "2026-05-30T20:51:56.576592+00:00"
     },
     {
       "name": "knife",
-      "category": "prep"
+      "category": "prep",
+      "equipment": "knife",
+      "text": "knife",
+      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_homemade-ho-hos-recipe-2013817_equipment_2_0312ff6e582d.png",
+      "equipment_image_generated_at": "2026-05-30T20:52:12.914947+00:00"
     },
     {
       "name": "mixing bowl",
-      "category": "prep"
+      "category": "prep",
+      "equipment": "mixing bowl",
+      "text": "mixing bowl",
+      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_homemade-ho-hos-recipe-2013817_equipment_3_5a91048553a8.png",
+      "equipment_image_generated_at": "2026-05-30T20:52:29.614048+00:00"
     },
     {
       "name": "oven",
-      "category": "appliance"
+      "category": "appliance",
+      "equipment": "oven",
+      "text": "oven",
+      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_homemade-ho-hos-recipe-2013817_equipment_4_6f205014c6f2.png",
+      "equipment_image_generated_at": "2026-05-30T20:52:46.393467+00:00"
     },
     {
       "name": "rolling pin",
-      "category": "prep"
+      "category": "prep",
+      "equipment": "rolling pin",
+      "text": "rolling pin",
+      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_homemade-ho-hos-recipe-2013817_equipment_5_332e5ed004f7.png",
+      "equipment_image_generated_at": "2026-05-30T20:53:03.138769+00:00"
     },
     {
       "name": "saucepan",
-      "category": "cookware"
+      "category": "cookware",
+      "equipment": "saucepan",
+      "text": "saucepan",
+      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_homemade-ho-hos-recipe-2013817_equipment_6_335a7ee8c0e1.png",
+      "equipment_image_generated_at": "2026-05-30T20:53:17.589915+00:00"
     },
     {
       "name": "spatula",
-      "category": "utensil"
+      "category": "utensil",
+      "equipment": "spatula",
+      "text": "spatula",
+      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_homemade-ho-hos-recipe-2013817_equipment_7_55f7e56cace1.png",
+      "equipment_image_generated_at": "2026-05-30T20:53:33.432778+00:00"
     },
     {
       "name": "whisk",
-      "category": "utensil"
+      "category": "utensil",
+      "equipment": "whisk",
+      "text": "whisk",
+      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_homemade-ho-hos-recipe-2013817_equipment_8_dad20c32814d.png",
+      "equipment_image_generated_at": "2026-05-30T20:53:49.613610+00:00"
     }
   ],
   "instructions": [

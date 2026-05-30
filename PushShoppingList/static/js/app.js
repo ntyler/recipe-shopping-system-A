@@ -6196,6 +6196,27 @@ function recipeIngredientBadgesHtml(item = {}) {
     )).join("");
 }
 
+function resizeRecipeIngredientNameField(field) {
+    if (!field || field.tagName !== "TEXTAREA") {
+        return;
+    }
+
+    field.style.height = "auto";
+    field.style.height = `${field.scrollHeight + 4}px`;
+}
+
+function bindRecipeIngredientNameField(row) {
+    const field = row ? row.querySelector('textarea[data-field="ingredient"]') : null;
+
+    if (!field) {
+        return;
+    }
+
+    field.addEventListener("input", () => resizeRecipeIngredientNameField(field));
+    field.addEventListener("focus", () => resizeRecipeIngredientNameField(field));
+    window.requestAnimationFrame(() => resizeRecipeIngredientNameField(field));
+}
+
 function addRecipeIngredientRow(item = {}) {
     const wrap = document.getElementById("recipeEditIngredients");
 
@@ -6217,7 +6238,7 @@ function addRecipeIngredientRow(item = {}) {
         <div class="recipe-edit-ingredient-name-label">
             <span class="sr-only">Ingredient</span>
             <span class="recipe-edit-ingredient-title-line">
-                <input type="text" data-field="ingredient" value="${escapeAttribute(item.ingredient || "")}">
+                <textarea data-field="ingredient" rows="1">${escapeHtml(item.ingredient || "")}</textarea>
                 <span class="recipe-edit-ingredient-markers">
                     <span class="recipe-edit-ingredient-badges" data-ingredient-badges>${recipeIngredientBadgesHtml(item)}</span>
                     <span class="recipe-edit-food-warning food-rule-marker"
@@ -6295,6 +6316,7 @@ function addRecipeIngredientRow(item = {}) {
         row.dataset.ingredientTextReviewKey = ingredientTextReview.text_key || ingredientTextReviewKeyFromItem(item);
     }
     wrap.appendChild(row);
+    bindRecipeIngredientNameField(row);
     bindRecipeIngredientBaseTracking(row);
     bindRecipeIngredientFoodRuleWarning(row);
     bindRecipeIngredientSummaryUpdates(row);

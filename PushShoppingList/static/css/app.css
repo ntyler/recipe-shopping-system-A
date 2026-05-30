@@ -8049,6 +8049,7 @@ body {
             }
 
             .recipe-edit-ingredient-row input,
+            .recipe-edit-ingredient-row textarea,
             .recipe-edit-ingredient-row select {
                 min-width: 0;
             }
@@ -8704,7 +8705,13 @@ body {
 
             .recipe-view-title-line {
                 display: grid;
+                grid-template-columns: minmax(0, 1fr);
                 gap: 3px;
+            }
+
+            .recipe-view-number,
+            .recipe-view-name {
+                grid-column: 1;
             }
 
             .recipe-view-number {
@@ -10020,7 +10027,7 @@ body {
     color: #facc15;
 }
 
-.recipe-edit-ingredient-name-label input[data-field="ingredient"] {
+.recipe-edit-ingredient-name-label [data-field="ingredient"] {
     min-height: 34px;
     border-color: transparent;
     background: transparent;
@@ -10031,7 +10038,7 @@ body {
     line-height: 1.18;
 }
 
-.recipe-edit-ingredient-name-label input[data-field="ingredient"]:focus {
+.recipe-edit-ingredient-name-label [data-field="ingredient"]:focus {
     border-color: #5b8cff;
     background: #0c1420;
     padding: 7px 9px;
@@ -10738,7 +10745,7 @@ body {
     max-width: 100%;
 }
 
-.recipe-edit-ingredient-name-label input[data-field="ingredient"] {
+.recipe-edit-ingredient-name-label [data-field="ingredient"] {
     flex: 0 1 auto;
     width: 100%;
     min-width: 0;
@@ -10753,7 +10760,16 @@ body {
     line-height: 1.2;
 }
 
-.recipe-edit-ingredient-name-label input[data-field="ingredient"]:focus {
+.recipe-edit-ingredient-name-label textarea[data-field="ingredient"] {
+    display: block;
+    height: auto;
+    resize: none;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.recipe-edit-ingredient-name-label [data-field="ingredient"]:focus {
     border: 1px solid #5b8cff;
     border-radius: 6px;
     background: #0b121c;
@@ -11246,7 +11262,7 @@ body {
         flex-direction: column;
     }
 
-    .recipe-edit-ingredient-name-label input[data-field="ingredient"] {
+    .recipe-edit-ingredient-name-label [data-field="ingredient"] {
         width: 100%;
     }
 
@@ -11542,6 +11558,7 @@ body {
     }
 
     .recipe-edit-ingredient-row input,
+    .recipe-edit-ingredient-row textarea,
     .recipe-edit-ingredient-row select {
         width: 100%;
         max-width: 100%;
@@ -11549,7 +11566,7 @@ body {
         box-sizing: border-box;
     }
 
-    .recipe-edit-ingredient-name-label input[data-field="ingredient"] {
+    .recipe-edit-ingredient-name-label [data-field="ingredient"] {
         min-width: 0;
     }
 
