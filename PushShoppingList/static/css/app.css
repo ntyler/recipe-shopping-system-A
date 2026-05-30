@@ -5003,8 +5003,8 @@ body {
             border: 1px solid #555;
             border-radius: 6px;
             background: #202425;
-            color: #fff;
-            font-size: 13px;
+            color: #aaa;
+            font-size: 14px;
             font-weight: 400;
             line-height: 1.2;
             box-sizing: border-box;
@@ -5138,6 +5138,15 @@ body {
 
         .recipe-url-summary-quantity {
             flex: 0 0 auto;
+        }
+
+        .recipe-url-summary-quantity .recipe-quantity-input,
+        .recipe-view-quantity .recipe-quantity-input {
+            color: #aaa;
+            font-size: 14px;
+            font-weight: 400;
+            line-height: 1.2;
+            text-align: left;
         }
 
         .recipe-url-summary-amount .recipe-url-summary-quantity,
@@ -8492,6 +8501,16 @@ body {
                 grid-template-columns: minmax(0, 1fr);
                 gap: 3px;
                 padding-right: 4px;
+            }
+
+            .recipe-url-summary-title-line {
+                grid-template-columns: minmax(0, 1fr);
+                row-gap: 2px;
+            }
+
+            .recipe-url-summary-number,
+            .recipe-url-summary-name {
+                grid-column: 1;
             }
 
             .recipe-url-summary-main {
