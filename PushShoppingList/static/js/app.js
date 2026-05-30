@@ -9451,6 +9451,50 @@ function toggleRecipeDetailSectionFromMenu(button) {
     return toggleRecipeDetailSection(toggle);
 }
 
+function resetRecipeDetailCheckboxesFromMenu(button) {
+    const header = button ? button.closest(".recipe-detail-header") : null;
+    const toggle = header ? header.querySelector(".detail-toggle") : null;
+    const parts = recipeDetailSectionParts(toggle);
+
+    if (!parts.content) {
+        closeRecipeEditRowMenus();
+        return false;
+    }
+
+    parts.content.querySelectorAll(".recipe-task-check").forEach(checkbox => {
+        const key = checkbox.dataset.taskKey || "";
+        const taskRow = checkbox.closest(".recipe-task-row");
+        const taskText = taskRow ? taskRow.querySelector(".recipe-task-text") : null;
+
+        checkbox.checked = false;
+        if (taskText) {
+            taskText.classList.remove("checked-item-text");
+        }
+        if (key) {
+            localStorage.removeItem(`recipe-task-checked:${key}`);
+        }
+    });
+
+    parts.content.querySelectorAll(".row[data-key]").forEach(row => {
+        const checkbox = row.querySelector(".item-check");
+        const itemText = row.querySelector(".item-text");
+
+        if (checkbox) {
+            checkbox.checked = false;
+        }
+        row.classList.remove("row-checked");
+        if (itemText) {
+            itemText.classList.remove("checked-item-text");
+        }
+        if (row.dataset.key) {
+            localStorage.removeItem(`item-checked:${row.dataset.key}`);
+        }
+    });
+
+    closeRecipeEditRowMenus();
+    return false;
+}
+
 function updateRecipeDetailMenuToggleForButton(button) {
     const header = button ? button.closest(".recipe-detail-header") : null;
     const toggle = header ? header.querySelector(".detail-toggle, .nutrition-toggle") : null;
@@ -9640,6 +9684,20 @@ function resetItemChecks(event) {
             itemText.classList.remove("checked-item-text");
         }
         localStorage.removeItem(`item-checked:${row.dataset.key}`);
+    });
+
+    document.querySelectorAll(".recipe-task-check").forEach(checkbox => {
+        const key = checkbox.dataset.taskKey || "";
+        const taskRow = checkbox.closest(".recipe-task-row");
+        const taskText = taskRow ? taskRow.querySelector(".recipe-task-text") : null;
+
+        checkbox.checked = false;
+        if (taskText) {
+            taskText.classList.remove("checked-item-text");
+        }
+        if (key) {
+            localStorage.removeItem(`recipe-task-checked:${key}`);
+        }
     });
 
     return false;
