@@ -100,4 +100,42 @@
             Recipe View
         </button>
     </div>
+    <div class="recipe-view-global-menu-wrap recipe-edit-row-menu-wrap">
+        <button type="button"
+                class="recipe-edit-row-menu-btn recipe-view-global-menu-btn"
+                aria-label="Recipe View actions"
+                aria-haspopup="true"
+                aria-expanded="false"
+                onclick="return toggleRecipeEditRowMenu(this, event)">
+            <span aria-hidden="true"></span>
+        </button>
+        <div class="recipe-edit-row-menu recipe-view-global-menu" hidden>
+            <button type="button"
+                    data-recipe-image-global-btn
+                    onclick="return generateAllRecipeImagesFromViewBehavior(this)">
+                Generate All Images
+            </button>
+            <button type="button"
+                    data-recipe-image-global-btn
+                    onclick="return generateAllRecipeImagesFromViewBehavior(this, { missingOnly: true })">
+                Generate All Missing Images
+            </button>
+            <button type="button"
+                    onclick="return setAllRecipeImagesVisibleFromMenu(this, true)">
+                Show All Images
+            </button>
+            <button type="button"
+                    onclick="return setAllRecipeImagesVisibleFromMenu(this, false)">
+                Hide All Images
+            </button>
+            <button type="button"
+                    onclick="return setAllRecipeViewEverythingCollapsed(false)">
+                Expand Everything
+            </button>
+            <button type="button"
+                    onclick="return setAllRecipeViewEverythingCollapsed(true)">
+                Collapse Everything
+            </button>
+        </div>
+    </div>
 </div>
