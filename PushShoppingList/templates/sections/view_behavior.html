@@ -109,9 +109,9 @@
                 onclick="return toggleRecipeEditRowMenu(this, event)">
             <span aria-hidden="true"></span>
         </button>
-        <div class="recipe-edit-row-menu recipe-view-global-menu" hidden>
-            <div class="recipe-view-menu-section">
-                <div class="recipe-view-menu-section-title">Recipe Display</div>
+        <div class="recipe-edit-row-menu overflow-menu recipe-view-global-menu" hidden>
+            <div class="overflow-menu-section recipe-view-menu-section">
+                <div class="overflow-menu-section-title recipe-view-menu-section-title">Recipe Display</div>
                 <button type="button"
                         onclick="return setAllRecipeImagesVisibleFromMenu(this, true)">
                     Show All Images
@@ -129,8 +129,8 @@
                     Collapse Everything
                 </button>
             </div>
-            <div class="recipe-view-menu-section">
-                <div class="recipe-view-menu-section-title">Generate Images</div>
+            <div class="overflow-menu-section recipe-view-menu-section">
+                <div class="overflow-menu-section-title recipe-view-menu-section-title">Generate Images</div>
                 <div class="recipe-view-generate-submenu-row">
                     <button type="button"
                             class="recipe-view-generate-submenu-toggle"
@@ -139,8 +139,8 @@
                             onclick="return toggleRecipeViewGenerateSubmenu(this, event)">
                         Generate All Images
                     </button>
-                    <div class="recipe-view-generate-submenu" hidden>
-                        <div class="recipe-view-menu-section-title">Generate By Section</div>
+                    <div class="overflow-submenu recipe-view-generate-submenu" hidden>
+                        <div class="overflow-menu-section-title recipe-view-menu-section-title">Generate By Section</div>
                         <button type="button"
                                 data-recipe-image-global-btn
                                 onclick="return generateAllRecipeImagesFromViewBehavior(this, { imageScope: 'all' })">
@@ -166,8 +166,8 @@
                             onclick="return toggleRecipeViewGenerateSubmenu(this, event)">
                         Generate Missing Images
                     </button>
-                    <div class="recipe-view-generate-submenu" hidden>
-                        <div class="recipe-view-menu-section-title">Generate By Section</div>
+                    <div class="overflow-submenu recipe-view-generate-submenu" hidden>
+                        <div class="overflow-menu-section-title recipe-view-menu-section-title">Generate By Section</div>
                         <button type="button"
                                 data-recipe-image-global-btn
                                 onclick="return generateAllRecipeImagesFromViewBehavior(this, { missingOnly: true, imageScope: 'all' })">
