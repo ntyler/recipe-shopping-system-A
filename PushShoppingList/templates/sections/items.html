@@ -474,19 +474,6 @@
                     </div>
                 {% endif %}
 
-                {% if recipe.food_rule_status.needs_review %}
-                    <div class="recipe-view-body-actions">
-                        <button type="button"
-                                class="food-rule-marker recipe-log-food-review-btn recipe-view-food-review-btn"
-                                data-recipe-url="{{ recipe.url }}"
-                                title="{{ recipe.food_rule_status.marker }}"
-                                aria-label="Food Review: {{ recipe.food_rule_status.count }} item{% if recipe.food_rule_status.count != 1 %}s{% endif %} need review"
-                                onclick="openRecipeEditor(this, { scrollToFoodReview: true })">
-                            Food Review ({{ recipe.food_rule_status.count }})
-                        </button>
-                    </div>
-                {% endif %}
-
                 <div class="recipe-detail-header recipe-detail-header-with-menu">
                     <button type="button"
                             class="detail-toggle"

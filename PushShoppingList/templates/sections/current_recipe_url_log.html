@@ -62,32 +62,53 @@
                             </span>
                         </button>
                         <div class="recipe-url-summary-title">
-                            <div class="recipe-url-summary-title-toggle"
-                                 data-recipe-url-summary-toggle
-                                 data-recipe-url="{{ recipe.url }}"
-                                 role="button"
-                                 tabindex="0"
-                                 aria-expanded="true"
-                                 onclick="return toggleCurrentRecipeUrlSummary(this, event)"
-                                 onkeydown="return handleCurrentRecipeUrlSummaryTitleKeydown(this, event)">
-                                <span class="recipe-url-summary-title-line">
-                                    <a class="recipe-url-summary-number recipe-jump-link"
-                                       href="#recipeView"
-                                       data-recipe-url="{{ recipe.url }}"
-                                       data-recipe-index-label
-                                       onclick="return jumpToRecipeViewRecipe(this, event)">
-                                        Recipe {{ loop.index }}:
-                                    </a>
-                                    <a class="recipe-url-summary-name recipe-url-summary-name-link"
-                                       href="{{ recipe.url or recipe.source_display_url }}"
-                                       target="_blank"
-                                       rel="noopener noreferrer"
-                                       title="{{ recipe.source_display_url }}"
-                                       onclick="event.stopPropagation()"
-                                       data-recipe-url="{{ recipe.url }}">{{ recipe.name }}</a>
-                                </span>
+                            <div class="recipe-url-summary-heading">
+                                <div class="recipe-url-summary-title-toggle"
+                                     data-recipe-url-summary-toggle
+                                     data-recipe-url="{{ recipe.url }}"
+                                     role="button"
+                                     tabindex="0"
+                                     aria-expanded="true"
+                                     onclick="return toggleCurrentRecipeUrlSummary(this, event)"
+                                     onkeydown="return handleCurrentRecipeUrlSummaryTitleKeydown(this, event)">
+                                    <span class="recipe-url-summary-title-line">
+                                        <a class="recipe-url-summary-number recipe-jump-link"
+                                           href="#recipeView"
+                                           data-recipe-url="{{ recipe.url }}"
+                                           data-recipe-index-label
+                                           onclick="return jumpToRecipeViewRecipe(this, event)">
+                                            Recipe {{ loop.index }}:
+                                        </a>
+                                        <a class="recipe-url-summary-name recipe-url-summary-name-link"
+                                           href="{{ recipe.url or recipe.source_display_url }}"
+                                           target="_blank"
+                                           rel="noopener noreferrer"
+                                           title="{{ recipe.source_display_url }}"
+                                           onclick="event.stopPropagation()"
+                                           data-recipe-url="{{ recipe.url }}">{{ recipe.name }}</a>
+                                    </span>
+                                </div>
+                                {% if recipe.food_rule_status.needs_review %}
+                                    <button type="button"
+                                            class="food-rule-marker recipe-log-food-review-btn recipe-url-summary-food-review"
+                                            data-recipe-url="{{ recipe.url }}"
+                                            title="{{ recipe.food_rule_status.marker }}"
+                                            aria-label="Food Review: {{ recipe.food_rule_status.count }} item{% if recipe.food_rule_status.count != 1 %}s{% endif %} need review"
+                                            onclick="event.stopPropagation(); openRecipeEditor(this, { scrollToFoodReview: true }); return false;">
+                                        Food Review ({{ recipe.food_rule_status.count }})
+                                    </button>
+                                {% endif %}
                             </div>
-                            <div class="recipe-url-summary-meta">
+                            <div class="recipe-url-summary-body">
+                                {% if recipe.cover_image and recipe.cover_image.src %}
+                                    <div class="recipe-url-summary-main">
+                                        <img class="recipe-cover-image recipe-url-summary-cover"
+                                             src="{{ recipe.cover_image.src }}"
+                                             alt="{{ recipe.cover_image.alt or recipe.name }}"
+                                             loading="lazy">
+                                    </div>
+                                {% endif %}
+                                <div class="recipe-url-summary-meta">
                                 {% if recipe.base_servings %}
                                     <div class="recipe-url-summary-servings">
                                         <span class="recipe-url-summary-meta-label">Servings:</span>
@@ -174,27 +195,10 @@
                                         </div>
                                     </div>
                                 {% endif %}
-                            </div>
-                            {% if recipe.cover_image and recipe.cover_image.src %}
-                                <div class="recipe-url-summary-main">
-                                    <img class="recipe-cover-image recipe-url-summary-cover"
-                                         src="{{ recipe.cover_image.src }}"
-                                         alt="{{ recipe.cover_image.alt or recipe.name }}"
-                                         loading="lazy">
                                 </div>
-                            {% endif %}
+                            </div>
                         </div>
                         <div class="recipe-url-summary-actions">
-                            {% if recipe.food_rule_status.needs_review %}
-                                <button type="button"
-                                        class="food-rule-marker recipe-log-food-review-btn recipe-url-summary-food-review"
-                                        data-recipe-url="{{ recipe.url }}"
-                                        title="{{ recipe.food_rule_status.marker }}"
-                                        aria-label="Food Review: {{ recipe.food_rule_status.count }} item{% if recipe.food_rule_status.count != 1 %}s{% endif %} need review"
-                                        onclick="openRecipeEditor(this, { scrollToFoodReview: true })">
-                                    Food Review ({{ recipe.food_rule_status.count }})
-                                </button>
-                            {% endif %}
                             <div class="recipe-url-summary-menu-wrap recipe-edit-row-menu-wrap">
                                 <button type="button"
                                         class="recipe-edit-row-menu-btn recipe-url-summary-menu-btn"
