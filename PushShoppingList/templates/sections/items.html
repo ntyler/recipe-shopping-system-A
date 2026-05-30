@@ -214,13 +214,25 @@
                                onclick="return jumpToCurrentRecipeLog(this, event)">
                                 Recipe {{ recipe.number }}:
                             </a>
-                            <a class="recipe-view-name recipe-view-name-link"
-                               href="{{ recipe.url or recipe.source_display_url }}"
-                               target="_blank"
-                               rel="noopener noreferrer"
-                               title="{{ recipe.source_display_url }}">
-                                {{ recipe.name }}
-                            </a>
+                            <span class="recipe-view-name-group">
+                                <a class="recipe-view-name recipe-view-name-link"
+                                   href="{{ recipe.url or recipe.source_display_url }}"
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   title="{{ recipe.source_display_url }}">
+                                    {{ recipe.name }}
+                                </a>
+                                {% if recipe.food_rule_status.needs_review %}
+                                    <button type="button"
+                                            class="food-rule-marker recipe-log-food-review-btn recipe-view-title-food-review-btn"
+                                            data-recipe-url="{{ recipe.url }}"
+                                            title="{{ recipe.food_rule_status.marker }}"
+                                            aria-label="Food Review: {{ recipe.food_rule_status.count }} item{% if recipe.food_rule_status.count != 1 %}s{% endif %} need review"
+                                            onclick="event.stopPropagation(); openRecipeEditor(this, { scrollToFoodReview: true }); return false;">
+                                        Food Review ({{ recipe.food_rule_status.count }})
+                                    </button>
+                                {% endif %}
+                            </span>
                         </span>
                     </div>
                     <div class="recipe-view-title-actions">

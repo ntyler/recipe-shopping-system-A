@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import patch
 
+from PushShoppingList.routes import main_routes
 from PushShoppingList.services import ingredient_text_review_service
 
 
@@ -68,6 +69,31 @@ class IngredientTextReviewServiceTests(unittest.TestCase):
         self.assertEqual(review["options"][1]["quantity"], "1")
         self.assertEqual(review["options"][1]["unit"], "tablespoon")
         self.assertEqual(review["options"][1]["original_text"], "1 tablespoon water")
+
+    def test_recipe_food_rule_status_includes_ingredient_text_review(self):
+        recipe = {
+            "ingredients": [{
+                "ingredient": "large egg yolk beaten with 1 tablespoon water",
+                "original_text": "1 large egg yolk beaten with 1 tablespoon water",
+                "food_review": {
+                    "needs_review": True,
+                    "reason": "The text combines egg wash prep with the grocery item.",
+                    "prompt": "Pick grocery item",
+                    "options": [{
+                        "ingredient": "egg yolk",
+                        "purchasable_item": "eggs",
+                        "reason": "Egg yolk is the item to buy.",
+                    }],
+                },
+            }],
+        }
+
+        status = main_routes.recipe_food_rule_status(recipe)
+
+        self.assertTrue(status["needs_review"])
+        self.assertEqual(status["count"], 1)
+        self.assertIn("large egg yolk beaten with 1 tablespoon water", status["marker"])
+        self.assertIn("egg wash prep", status["marker"])
 
 
 class FakeOpenAIClient:

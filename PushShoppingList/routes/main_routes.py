@@ -446,12 +446,16 @@ def recipe_food_rule_status(recipe_data):
             continue
 
         status = shopping_item_food_rule_status(text)
-        if not status.get("needs_review"):
-            continue
-
-        issue_text = status.get("marker", "").replace("Food rule review: ", "")
         label = name or "Ingredient"
-        flagged_items.append(f"{label}: {issue_text}" if issue_text else label)
+
+        if status.get("needs_review"):
+            issue_text = status.get("marker", "").replace("Food rule review: ", "")
+            flagged_items.append(f"{label}: {issue_text}" if issue_text else label)
+
+        text_review = recipe_view_ingredient_food_review(ingredient) if isinstance(ingredient, dict) else {}
+        if text_review.get("needs_review"):
+            issue_text = str(text_review.get("reason") or "").strip()
+            flagged_items.append(f"{label}: {issue_text}" if issue_text else label)
 
     seen = set()
     unique_items = []

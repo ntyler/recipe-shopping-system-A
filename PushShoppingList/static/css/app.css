@@ -2683,6 +2683,29 @@ body {
             text-decoration: none;
         }
 
+        .recipe-view-name-group {
+            min-width: 0;
+            max-width: 100%;
+            justify-self: start;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .recipe-view-name-group .recipe-view-name {
+            flex: 1 1 auto;
+            width: auto;
+            overflow-wrap: anywhere;
+        }
+
+        .recipe-view-title-line .recipe-view-title-food-review-btn {
+            flex: 0 0 auto;
+            min-height: 20px;
+            padding: 2px 7px;
+            font-size: 11px;
+        }
+
         .recipe-view-name-link:hover,
         .recipe-view-name-link:focus-visible {
             color: #7dd3fc;
@@ -8839,7 +8862,7 @@ body {
             }
 
             .recipe-view-number,
-            .recipe-view-name {
+            .recipe-view-name-group {
                 grid-column: 1;
             }
 
@@ -10827,12 +10850,14 @@ body {
 .recipe-edit-ingredient-row .recipe-edit-row-handle {
     grid-column: 1 / 2;
     grid-row: 1 / 3;
+    align-self: start;
     color: #7f8da0;
 }
 
 .recipe-edit-row-number {
     grid-column: 2 / 3;
     grid-row: 1 / 3;
+    align-self: start;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -11021,7 +11046,7 @@ body {
     grid-column: 9 / 10;
     grid-row: 1 / 3;
     position: relative;
-    align-self: center;
+    align-self: start;
     justify-self: center;
 }
 
