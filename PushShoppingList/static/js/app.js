@@ -9495,6 +9495,87 @@ function resetRecipeDetailCheckboxesFromMenu(button) {
     return false;
 }
 
+async function generateRecipeStepImage(button) {
+    const panel = button ? button.closest("[data-step-image-panel]") : null;
+    const status = panel ? panel.querySelector("[data-step-image-status]") : null;
+    const image = panel ? panel.querySelector(".recipe-step-image") : null;
+    const download = panel ? panel.querySelector("[data-step-image-download]") : null;
+    const recipeUrl = panel ? panel.dataset.recipeUrl || "" : "";
+    const stepNumber = panel ? panel.dataset.stepNumber || "" : "";
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 120000);
+
+    if (!panel || !button || !recipeUrl || !stepNumber) {
+        if (status) {
+            status.textContent = "This instruction step could not be found.";
+            status.classList.remove("empty");
+        }
+        return false;
+    }
+
+    button.disabled = true;
+    panel.classList.add("generating");
+    if (status) {
+        status.textContent = "Generating step image...";
+        status.classList.remove("empty");
+    }
+
+    try {
+        const response = await fetch("/api/recipe_step_image", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                url: recipeUrl,
+                step_number: stepNumber,
+            }),
+            signal: controller.signal,
+        });
+        let data = {};
+        try {
+            data = await response.json();
+        } catch (err) {
+            data = {};
+        }
+
+        if (!response.ok || !data.ok || !data.step_image_url) {
+            throw new Error((data && data.error) || "Unable to generate this step image.");
+        }
+
+        if (image) {
+            image.src = data.step_image_url;
+            image.hidden = false;
+        }
+
+        if (download) {
+            download.href = data.step_image_url;
+            download.hidden = false;
+        }
+
+        if (status) {
+            status.textContent = "";
+            status.classList.add("empty");
+        }
+
+        button.textContent = "Regenerate";
+    } catch (err) {
+        const timedOut = err && err.name === "AbortError";
+        if (status) {
+            status.textContent = timedOut
+                ? "Image generation timed out. Please try again."
+                : (err.message || "Image generation failed. Please try again.");
+            status.classList.remove("empty");
+        }
+    } finally {
+        window.clearTimeout(timeout);
+        panel.classList.remove("generating");
+        button.disabled = false;
+    }
+
+    return false;
+}
+
 function updateRecipeDetailMenuToggleForButton(button) {
     const header = button ? button.closest(".recipe-detail-header") : null;
     const toggle = header ? header.querySelector(".detail-toggle, .nutrition-toggle") : null;

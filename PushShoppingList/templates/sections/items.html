@@ -490,12 +490,44 @@
                     {% if recipe.instruction_items %}
                         <ol class="recipe-detail-list recipe-instruction-list">
                             {% for instruction in recipe.instruction_items %}
-                                <li>
+                                <li class="recipe-instruction-step"
+                                    data-recipe-step-number="{{ instruction.step_number }}">
                                     <div class="recipe-task-row recipe-instruction-task-row">
                                         <input type="checkbox"
                                                class="recipe-task-check"
                                                data-task-key="instruction|{{ recipe.url }}|{{ loop.index }}">
-                                        <span class="recipe-task-text">{{ instruction }}</span>
+                                        <span class="recipe-task-text">{{ instruction.text }}</span>
+                                    </div>
+                                    <div class="recipe-step-image-panel"
+                                         data-step-image-panel
+                                         data-recipe-url="{{ recipe.url }}"
+                                         data-step-number="{{ instruction.step_number }}">
+                                        <div class="recipe-step-image-status{% if instruction.step_image_url %} empty{% endif %}"
+                                             data-step-image-status>
+                                            {% if not instruction.step_image_url %}
+                                                No image generated for this step.
+                                            {% endif %}
+                                        </div>
+                                        <img class="recipe-step-image"
+                                             {% if instruction.step_image_url %}src="{{ instruction.step_image_url }}"{% endif %}
+                                             alt="Recipe {{ recipe.number }} step {{ instruction.step_number }} image"
+                                             loading="lazy"
+                                             {% if not instruction.step_image_url %}hidden{% endif %}>
+                                        <div class="recipe-step-image-actions">
+                                            <button type="button"
+                                                    class="recipe-step-image-btn"
+                                                    data-step-image-generate
+                                                    onclick="return generateRecipeStepImage(this)">
+                                                {% if instruction.step_image_url %}Regenerate{% else %}Generate Image{% endif %}
+                                            </button>
+                                            <a class="recipe-step-image-download"
+                                               data-step-image-download
+                                               href="{{ instruction.step_image_url or '#' }}"
+                                               download
+                                               {% if not instruction.step_image_url %}hidden{% endif %}>
+                                                Download
+                                            </a>
+                                        </div>
                                     </div>
                                 </li>
                             {% endfor %}

@@ -2931,6 +2931,81 @@ body {
             text-align: right;
         }
 
+        .recipe-step-image-panel {
+            margin: 6px 0 16px calc(3ch + 44px);
+            max-width: min(420px, 100%);
+            padding: 10px;
+            border: 1px solid #27384a;
+            border-radius: 8px;
+            background: #101820;
+            box-sizing: border-box;
+        }
+
+        .recipe-step-image-status {
+            color: #9aa4ad;
+            font-size: 13px;
+            line-height: 1.35;
+        }
+
+        .recipe-step-image-status.empty {
+            display: none;
+        }
+
+        .recipe-step-image {
+            display: block;
+            width: min(360px, 100%);
+            aspect-ratio: 1 / 1;
+            object-fit: cover;
+            border: 1px solid #385371;
+            border-radius: 8px;
+            background: #07111d;
+        }
+
+        .recipe-step-image[hidden] {
+            display: none;
+        }
+
+        .recipe-step-image-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+
+        .recipe-step-image-btn,
+        .recipe-step-image-download {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: auto;
+            min-width: 112px;
+            min-height: 32px;
+            margin: 0;
+            padding: 7px 12px;
+            border: 1px solid #3b82f6;
+            border-radius: 7px;
+            background: #115e9f;
+            color: #fff;
+            font-size: 12px;
+            font-weight: 800;
+            line-height: 1.2;
+            text-decoration: none;
+            box-sizing: border-box;
+        }
+
+        .recipe-step-image-download {
+            min-width: 92px;
+            border-color: #445260;
+            background: #1d252c;
+        }
+
+        .recipe-step-image-btn:disabled,
+        .recipe-step-image-panel.generating .recipe-step-image-download {
+            opacity: 0.65;
+            pointer-events: none;
+        }
+
         .recipe-task-check {
             margin-top: 3px;
             transform: scale(1.15);
@@ -9031,6 +9106,17 @@ body {
 
             .recipe-instruction-task-row .recipe-task-text {
                 display: block;
+            }
+
+            .recipe-step-image-panel {
+                margin-left: 36px;
+                max-width: calc(100% - 36px);
+            }
+
+            .recipe-step-image-btn,
+            .recipe-step-image-download {
+                flex: 1 1 120px;
+                min-width: 0;
             }
 
             .recipe-equipment-task-row {
