@@ -5298,6 +5298,9 @@ async function openRecipeEditor(button, options = {}) {
     const targetIngredient = options && typeof options === "object"
         ? String(options.ingredient || options.scrollToIngredient || "").trim()
         : "";
+    const targetSection = options && typeof options === "object"
+        ? String(options.section || options.scrollToSection || "").trim()
+        : "";
 
     if (!url || !modal) {
         return;
@@ -5329,11 +5332,20 @@ async function openRecipeEditor(button, options = {}) {
         } else if (targetIngredient) {
             await waitForNextPaint();
             scrollRecipeEditorToIngredient(targetIngredient);
+        } else if (targetSection) {
+            await waitForNextPaint();
+            scrollRecipeEditorToSection(targetSection);
         }
     } catch (err) {
         console.warn("Unable to open recipe editor.", err);
         setRecipeEditStatus("Unable to load recipe.", true);
     }
+}
+
+function openRecipeEditorSection(button, sectionKey) {
+    closeRecipeEditRowMenus();
+    openRecipeEditor(button, { scrollToSection: sectionKey });
+    return false;
 }
 
 function closeRecipeEditor() {
@@ -5823,6 +5835,56 @@ function scrollRecipeEditorToIngredient(ingredientName) {
     }
 
     setTimeout(() => row.classList.remove("recipe-edit-review-target"), 3000);
+    return true;
+}
+
+function scrollRecipeEditorToSection(sectionKey) {
+    const normalized = String(sectionKey || "").trim().toLowerCase().replace(/[^a-z]+/g, "");
+    const selector = {
+        ingredients: ".recipe-edit-ingredients-section",
+        equipment: ".recipe-edit-equipment-section",
+        instructions: ".recipe-edit-instructions-section",
+        nutrition: ".recipe-edit-nutrition-section",
+    }[normalized];
+    const section = selector ? document.querySelector(selector) : null;
+
+    if (!section) {
+        setRecipeEditStatus("Recipe section not found.", true);
+        return false;
+    }
+
+    document.querySelectorAll(".recipe-edit-review-target").forEach(element => {
+        element.classList.remove("recipe-edit-review-target");
+    });
+    section.classList.add("recipe-edit-review-target");
+    section.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+        inline: "nearest",
+    });
+
+    const focusTarget = section.querySelector(
+        ".recipe-edit-ingredient-row input, " +
+        ".recipe-edit-equipment-row input, " +
+        ".recipe-edit-instruction-row textarea, " +
+        ".recipe-edit-nutrition-row input, " +
+        "input, textarea, select"
+    );
+
+    if (focusTarget) {
+        setTimeout(() => {
+            try {
+                focusTarget.focus({ preventScroll: true });
+                if (typeof focusTarget.select === "function") {
+                    focusTarget.select();
+                }
+            } catch (err) {
+                focusTarget.focus();
+            }
+        }, 250);
+    }
+
+    setTimeout(() => section.classList.remove("recipe-edit-review-target"), 3000);
     return true;
 }
 

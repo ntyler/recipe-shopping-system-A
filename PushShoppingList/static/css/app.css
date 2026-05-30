@@ -215,7 +215,7 @@ body {
         .recipe-entry-heading,
         .recipe-entry-helper,
         .edit-items-heading {
-            text-align: right;
+            text-align: left;
         }
 
         .recipe-url-box,
@@ -2924,6 +2924,10 @@ body {
             margin-top: 0;
         }
 
+        .recipe-detail-header-with-menu {
+            grid-template-columns: minmax(0, 1fr) auto;
+        }
+
         .detail-toggle,
         .nutrition-toggle {
             width: 100%;
@@ -2943,6 +2947,13 @@ body {
             justify-content: flex-start;
         }
 
+        .recipe-detail-header-with-menu .detail-toggle,
+        .recipe-detail-header-with-menu .nutrition-toggle {
+            border-right: 0;
+            border-top-right-radius: 0;
+            border-bottom-right-radius: 0;
+        }
+
         .recipe-detail-menu-wrap {
             position: relative;
             display: inline-flex;
@@ -2957,6 +2968,10 @@ body {
             min-height: 38px;
             border-color: #333;
             background: #181818;
+            border-top-left-radius: 0;
+            border-bottom-left-radius: 0;
+            border-top-right-radius: 8px;
+            border-bottom-right-radius: 8px;
         }
 
         .recipe-view-detail-menu {
@@ -4922,9 +4937,9 @@ body {
         .recipe-url-summary-cookbook-value {
             position: relative;
             display: block;
-            width: 66px;
+            width: max-content;
             min-width: 66px;
-            max-width: 66px;
+            max-width: min(220px, 100%);
             min-height: 30px;
             padding: 0;
             border: 1px solid #555;
@@ -4999,8 +5014,6 @@ body {
         .recipe-url-summary-cookbook-name {
             grid-column: 1;
             min-width: 0;
-            overflow: hidden;
-            text-overflow: ellipsis;
             white-space: nowrap;
             overflow-wrap: normal;
             word-break: normal;

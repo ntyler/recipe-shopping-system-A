@@ -325,63 +325,61 @@
                             </select>
                         </div>
                     </div>
-                </div>
-
-                {% if recipe.cover_image and recipe.cover_image.src or recipe.cookbook_name %}
-                    <div class="recipe-view-title-media recipe-view-body-media">
-                        {% if recipe.cover_image and recipe.cover_image.src %}
-                            <img class="recipe-cover-image recipe-view-cover"
-                                 src="{{ recipe.cover_image.src }}"
-                                 alt="{{ recipe.cover_image.alt or recipe.name }}"
-                                 loading="lazy">
-                        {% endif %}
-                        {% if recipe.cookbook_name %}
-                            <div class="recipe-url-summary-cookbook recipe-view-cookbook">
-                                <span class="recipe-url-summary-cookbook-label">Cookbook:</span>
-                                <span class="recipe-url-summary-cookbook-name">{{ recipe.cookbook_name }}</span>
-                                <div class="recipe-url-summary-cookbook-menu-wrap recipe-edit-row-menu-wrap">
+                    {% if recipe.cookbook_name %}
+                        <div class="recipe-url-summary-cookbook recipe-view-cookbook">
+                            <span class="recipe-url-summary-cookbook-label recipe-view-meta-label">Cookbook:</span>
+                            <div class="recipe-url-summary-cookbook-value recipe-view-cookbook-value recipe-view-meta-value recipe-url-summary-cookbook-menu-wrap recipe-edit-row-menu-wrap">
+                                <button type="button"
+                                        class="recipe-url-summary-cookbook-select recipe-view-cookbook-select"
+                                        aria-label="Cookbook actions for recipe {{ recipe.number }}"
+                                        aria-haspopup="true"
+                                        aria-expanded="false"
+                                        onclick="return toggleRecipeEditRowMenu(this, event)">
+                                    <span class="recipe-url-summary-cookbook-name recipe-view-cookbook-name">{{ recipe.cookbook_name }}</span>
+                                    <span class="recipe-url-summary-cookbook-chevron" aria-hidden="true"></span>
+                                </button>
+                                <div class="recipe-edit-row-menu recipe-url-summary-cookbook-menu recipe-view-cookbook-menu" hidden>
                                     <button type="button"
-                                            class="recipe-edit-row-menu-btn recipe-url-summary-cookbook-menu-btn"
-                                            aria-label="Cookbook actions for recipe {{ recipe.number }}"
-                                            aria-haspopup="true"
-                                            aria-expanded="false"
-                                            onclick="return toggleRecipeEditRowMenu(this, event)">
-                                        <span aria-hidden="true"></span>
+                                            data-recipe-url="{{ recipe.url }}"
+                                            onclick="return createRecipeLogCookbook(this)">
+                                        Create New Cookbook
                                     </button>
-                                    <div class="recipe-edit-row-menu recipe-url-summary-cookbook-menu" hidden>
+                                    {% if cookbook_view and cookbook_view.cookbooks %}
+                                        <div class="recipe-url-summary-cookbook-menu-label">Move To</div>
+                                        {% for cookbook in cookbook_view.cookbooks %}
+                                            {% if cookbook.id != recipe.cookbook_id %}
+                                                <button type="button"
+                                                        data-recipe-url="{{ recipe.url }}"
+                                                        data-cookbook-id="{{ cookbook.id }}"
+                                                        data-cookbook-name="{{ cookbook.name }}"
+                                                        onclick="return moveRecipeLogCookbook(this)">
+                                                    {{ cookbook.name }}
+                                                </button>
+                                            {% endif %}
+                                        {% endfor %}
+                                    {% endif %}
+                                    {% if unclassified_cookbook.id and not recipe.cookbook_is_unclassified %}
                                         <button type="button"
+                                                class="delete"
                                                 data-recipe-url="{{ recipe.url }}"
-                                                onclick="return createRecipeLogCookbook(this)">
-                                            Create New Cookbook
+                                                data-cookbook-id="{{ unclassified_cookbook.id }}"
+                                                data-cookbook-name="{{ unclassified_cookbook.name }}"
+                                                onclick="return deleteRecipeLogCookbookAssignment(this)">
+                                            Delete
                                         </button>
-                                        {% if cookbook_view and cookbook_view.cookbooks %}
-                                            <div class="recipe-url-summary-cookbook-menu-label">Move To</div>
-                                            {% for cookbook in cookbook_view.cookbooks %}
-                                                {% if cookbook.id != recipe.cookbook_id %}
-                                                    <button type="button"
-                                                            data-recipe-url="{{ recipe.url }}"
-                                                            data-cookbook-id="{{ cookbook.id }}"
-                                                            data-cookbook-name="{{ cookbook.name }}"
-                                                            onclick="return moveRecipeLogCookbook(this)">
-                                                        {{ cookbook.name }}
-                                                    </button>
-                                                {% endif %}
-                                            {% endfor %}
-                                        {% endif %}
-                                        {% if unclassified_cookbook.id and not recipe.cookbook_is_unclassified %}
-                                            <button type="button"
-                                                    class="delete"
-                                                    data-recipe-url="{{ recipe.url }}"
-                                                    data-cookbook-id="{{ unclassified_cookbook.id }}"
-                                                    data-cookbook-name="{{ unclassified_cookbook.name }}"
-                                                    onclick="return deleteRecipeLogCookbookAssignment(this)">
-                                                Delete
-                                            </button>
-                                        {% endif %}
-                                    </div>
+                                    {% endif %}
                                 </div>
                             </div>
-                        {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+
+                {% if recipe.cover_image and recipe.cover_image.src %}
+                    <div class="recipe-view-title-media recipe-view-body-media">
+                        <img class="recipe-cover-image recipe-view-cover"
+                             src="{{ recipe.cover_image.src }}"
+                             alt="{{ recipe.cover_image.alt or recipe.name }}"
+                             loading="lazy">
                     </div>
                 {% endif %}
 
@@ -398,13 +396,30 @@
                     </div>
                 {% endif %}
 
-                <div class="recipe-detail-header">
+                <div class="recipe-detail-header recipe-detail-header-with-menu">
                     <button type="button"
                             class="detail-toggle"
                             data-detail-key="equipment|{{ recipe.url }}"
                             aria-expanded="false">
                         <span>Equipment</span>
                     </button>
+                    <div class="recipe-detail-menu-wrap recipe-edit-row-menu-wrap">
+                        <button type="button"
+                                class="recipe-edit-row-menu-btn recipe-detail-menu-btn"
+                                aria-label="Equipment actions for recipe {{ recipe.number }}"
+                                aria-haspopup="true"
+                                aria-expanded="false"
+                                onclick="return toggleRecipeEditRowMenu(this, event)">
+                            <span aria-hidden="true"></span>
+                        </button>
+                        <div class="recipe-edit-row-menu recipe-view-detail-menu" hidden>
+                            <button type="button"
+                                    data-recipe-url="{{ recipe.url }}"
+                                    onclick="return openRecipeEditorSection(this, 'equipment')">
+                                Edit
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="detail-content collapsed" data-detail-content="equipment|{{ recipe.url }}">
@@ -428,13 +443,30 @@
 
                 <div class="recipe-divider"></div>
 
-                <div class="recipe-detail-header">
+                <div class="recipe-detail-header recipe-detail-header-with-menu">
                     <button type="button"
                             class="detail-toggle"
                             data-detail-key="instructions|{{ recipe.url }}"
                             aria-expanded="false">
                         <span>Instructions</span>
                     </button>
+                    <div class="recipe-detail-menu-wrap recipe-edit-row-menu-wrap">
+                        <button type="button"
+                                class="recipe-edit-row-menu-btn recipe-detail-menu-btn"
+                                aria-label="Instructions actions for recipe {{ recipe.number }}"
+                                aria-haspopup="true"
+                                aria-expanded="false"
+                                onclick="return toggleRecipeEditRowMenu(this, event)">
+                            <span aria-hidden="true"></span>
+                        </button>
+                        <div class="recipe-edit-row-menu recipe-view-detail-menu" hidden>
+                            <button type="button"
+                                    data-recipe-url="{{ recipe.url }}"
+                                    onclick="return openRecipeEditorSection(this, 'instructions')">
+                                Edit
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="detail-content collapsed" data-detail-content="instructions|{{ recipe.url }}">
@@ -458,13 +490,30 @@
 
                 <div class="recipe-divider"></div>
 
-                <div class="recipe-detail-header">
+                <div class="recipe-detail-header recipe-detail-header-with-menu">
                     <button type="button"
                             class="nutrition-toggle"
                             data-nutrition-key="nutrition|{{ recipe.url }}"
                             aria-expanded="false">
                         <span>Nutrition</span>
                     </button>
+                    <div class="recipe-detail-menu-wrap recipe-edit-row-menu-wrap">
+                        <button type="button"
+                                class="recipe-edit-row-menu-btn recipe-detail-menu-btn"
+                                aria-label="Nutrition actions for recipe {{ recipe.number }}"
+                                aria-haspopup="true"
+                                aria-expanded="false"
+                                onclick="return toggleRecipeEditRowMenu(this, event)">
+                            <span aria-hidden="true"></span>
+                        </button>
+                        <div class="recipe-edit-row-menu recipe-view-detail-menu" hidden>
+                            <button type="button"
+                                    data-recipe-url="{{ recipe.url }}"
+                                    onclick="return openRecipeEditorSection(this, 'nutrition')">
+                                Edit
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="nutrition-content collapsed" data-nutrition-content="nutrition|{{ recipe.url }}">
@@ -485,13 +534,30 @@
                 {% if recipe["sections"] %}
                     <div class="recipe-divider"></div>
 
-                    <div class="recipe-detail-header">
+                    <div class="recipe-detail-header recipe-detail-header-with-menu">
                         <button type="button"
                                 class="detail-toggle"
                                 data-detail-key="ingredients|{{ recipe.url }}"
                                 aria-expanded="false">
                             <span>Ingredients</span>
                         </button>
+                        <div class="recipe-detail-menu-wrap recipe-edit-row-menu-wrap">
+                            <button type="button"
+                                    class="recipe-edit-row-menu-btn recipe-detail-menu-btn"
+                                    aria-label="Ingredients actions for recipe {{ recipe.number }}"
+                                    aria-haspopup="true"
+                                    aria-expanded="false"
+                                    onclick="return toggleRecipeEditRowMenu(this, event)">
+                                <span aria-hidden="true"></span>
+                            </button>
+                            <div class="recipe-edit-row-menu recipe-view-detail-menu" hidden>
+                                <button type="button"
+                                        data-recipe-url="{{ recipe.url }}"
+                                        onclick="return openRecipeEditorSection(this, 'ingredients')">
+                                    Edit
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="detail-content collapsed" data-detail-content="ingredients|{{ recipe.url }}">
