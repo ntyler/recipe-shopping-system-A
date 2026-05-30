@@ -197,20 +197,20 @@
                  data-recipe-card-key="{{ recipe.url }}"
                  data-recipe-view-url="{{ recipe.url }}">
                 <div class="recipe-view-title">
-                    <div class="recipe-view-title-main">
-                        <div class="recipe-view-title-line">
-                            <button type="button"
-                                    class="recipe-view-number recipe-jump-link"
-                                    data-recipe-url="{{ recipe.url }}"
-                                    onclick="return jumpToCurrentRecipeLog(this)">
+                    <button type="button"
+                            class="recipe-view-title-main recipe-view-title-toggle"
+                            data-recipe-card-title-toggle
+                            data-recipe-card-key="{{ recipe.url }}"
+                            aria-expanded="true"
+                            onclick="return toggleRecipeViewCardFromTitle(this, event)">
+                        <span class="recipe-view-title-line">
+                            <span class="recipe-view-number recipe-jump-link">
                                 Recipe {{ recipe.number }}:
-                            </button>
-                            <a href="{{ recipe.source_href }}"
-                               target="_blank"
-                               rel="noopener noreferrer"
-                               title="{{ recipe.source_display_url }}">{{ recipe.name }}</a>
-                        </div>
-                    </div>
+                            </span>
+                            <span class="recipe-view-name"
+                                  title="{{ recipe.source_display_url }}">{{ recipe.name }}</span>
+                        </span>
+                    </button>
                     <div class="recipe-view-title-actions">
                         <div class="recipe-view-title-menu-wrap recipe-edit-row-menu-wrap">
                             <button type="button"
@@ -392,23 +392,6 @@
                             aria-expanded="false">
                         <span>Equipment</span>
                     </button>
-                    <div class="recipe-detail-menu-wrap recipe-edit-row-menu-wrap">
-                        <button type="button"
-                                class="recipe-edit-row-menu-btn recipe-detail-menu-btn"
-                                aria-label="Equipment actions"
-                                aria-haspopup="true"
-                                aria-expanded="false"
-                                onclick="return toggleRecipeEditRowMenu(this, event)">
-                            <span aria-hidden="true"></span>
-                        </button>
-                        <div class="recipe-edit-row-menu recipe-view-detail-menu" hidden>
-                            <button type="button"
-                                    class="recipe-detail-menu-toggle"
-                                    onclick="return toggleRecipeDetailSectionFromMenu(this)">
-                                Expand
-                            </button>
-                        </div>
-                    </div>
                 </div>
 
                 <div class="detail-content collapsed" data-detail-content="equipment|{{ recipe.url }}">
@@ -439,23 +422,6 @@
                             aria-expanded="false">
                         <span>Instructions</span>
                     </button>
-                    <div class="recipe-detail-menu-wrap recipe-edit-row-menu-wrap">
-                        <button type="button"
-                                class="recipe-edit-row-menu-btn recipe-detail-menu-btn"
-                                aria-label="Instructions actions"
-                                aria-haspopup="true"
-                                aria-expanded="false"
-                                onclick="return toggleRecipeEditRowMenu(this, event)">
-                            <span aria-hidden="true"></span>
-                        </button>
-                        <div class="recipe-edit-row-menu recipe-view-detail-menu" hidden>
-                            <button type="button"
-                                    class="recipe-detail-menu-toggle"
-                                    onclick="return toggleRecipeDetailSectionFromMenu(this)">
-                                Expand
-                            </button>
-                        </div>
-                    </div>
                 </div>
 
                 <div class="detail-content collapsed" data-detail-content="instructions|{{ recipe.url }}">
@@ -486,23 +452,6 @@
                             aria-expanded="false">
                         <span>Nutrition</span>
                     </button>
-                    <div class="recipe-detail-menu-wrap recipe-edit-row-menu-wrap">
-                        <button type="button"
-                                class="recipe-edit-row-menu-btn recipe-detail-menu-btn"
-                                aria-label="Nutrition actions"
-                                aria-haspopup="true"
-                                aria-expanded="false"
-                                onclick="return toggleRecipeEditRowMenu(this, event)">
-                            <span aria-hidden="true"></span>
-                        </button>
-                        <div class="recipe-edit-row-menu recipe-view-detail-menu" hidden>
-                            <button type="button"
-                                    class="recipe-detail-menu-toggle"
-                                    onclick="return toggleRecipeDetailSectionFromMenu(this)">
-                                Expand
-                            </button>
-                        </div>
-                    </div>
                 </div>
 
                 <div class="nutrition-content collapsed" data-nutrition-content="nutrition|{{ recipe.url }}">
@@ -530,23 +479,6 @@
                                 aria-expanded="false">
                             <span>Ingredients</span>
                         </button>
-                        <div class="recipe-detail-menu-wrap recipe-edit-row-menu-wrap">
-                            <button type="button"
-                                    class="recipe-edit-row-menu-btn recipe-detail-menu-btn"
-                                    aria-label="Ingredients actions"
-                                    aria-haspopup="true"
-                                    aria-expanded="false"
-                                    onclick="return toggleRecipeEditRowMenu(this, event)">
-                                <span aria-hidden="true"></span>
-                            </button>
-                            <div class="recipe-edit-row-menu recipe-view-detail-menu" hidden>
-                                <button type="button"
-                                        class="recipe-detail-menu-toggle"
-                                        onclick="return toggleRecipeDetailSectionFromMenu(this)">
-                                    Expand
-                                </button>
-                            </div>
-                        </div>
                     </div>
 
                     <div class="detail-content collapsed" data-detail-content="ingredients|{{ recipe.url }}">

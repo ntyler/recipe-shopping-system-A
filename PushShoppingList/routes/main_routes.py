@@ -269,6 +269,7 @@ def recipe_url_log_rows(recipe_urls, cookbook_assignments=None):
         recipe_key = normalize_recipe_url_key(recipe["url"])
         recipe_data = load_saved_recipe_output(recipe["url"])
         recipe_meta = recipe_ingredient_data.get(recipe_key, {})
+        nutrition_summary = recipe_view_nutrition_summary(recipe_data.get("nutrition", {}))
         recipe_quantity = normalize_recipe_quantity(recipe.get("quantity") or 1)
         use_scaled_meta = multipliers_match(recipe_meta.get("quantity", 1), recipe_quantity)
         scaled_servings = recipe_meta.get("scaled_servings") if use_scaled_meta else None
@@ -284,6 +285,7 @@ def recipe_url_log_rows(recipe_urls, cookbook_assignments=None):
             "archive_pdf_available": recipe_archive_pdf_exists(recipe["url"]),
             "base_servings": recipe_data.get("servings"),
             "scaled_servings": scaled_servings or scale_servings(recipe_data.get("servings"), recipe_quantity),
+            "serving_basis": nutrition_summary["serving_basis"],
             "cookbook_id": cookbook_assignment.get("cookbook_id", ""),
             "cookbook_name": cookbook_assignment.get("cookbook_name", ""),
             "cookbook_is_unclassified": cookbook_assignment.get("cookbook_is_unclassified", False),

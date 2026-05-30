@@ -42,44 +42,53 @@
                             </span>
                         </button>
                         <div class="recipe-url-summary-title">
-                            <div class="recipe-url-summary-title-line">
-                                <button type="button"
-                                        class="recipe-url-summary-number recipe-jump-link"
-                                        data-recipe-index-label
-                                        data-recipe-url="{{ recipe.url }}"
-                                        onclick="return jumpToRecipeViewRecipe(this)">
+                            <button type="button"
+                                    class="recipe-url-summary-title-toggle"
+                                    data-recipe-url-summary-toggle
+                                    data-recipe-url="{{ recipe.url }}"
+                                    aria-expanded="true"
+                                    onclick="return toggleCurrentRecipeUrlSummary(this, event)">
+                                <span class="recipe-url-summary-title-line">
+                                    <span class="recipe-url-summary-number recipe-jump-link"
+                                          data-recipe-index-label>
                                     Recipe {{ loop.index }}:
-                                </button>
-                                <a class="recipe-url-summary-name"
-                                   href="{{ recipe.source_href }}"
-                                   target="_blank"
-                                   rel="noopener noreferrer"
-                                   title="{{ recipe.source_display_url }}"
-                                   data-recipe-url="{{ recipe.url }}">{{ recipe.name }}</a>
-                            </div>
-                            {% if recipe.base_servings %}
-                                <div class="recipe-url-summary-servings">
-                                    Servings:
-                                    <span>{{ recipe.base_servings }}</span>
-                                    {% if recipe.quantity != 1 and recipe.scaled_servings %}
-                                        <span>-> {{ recipe.scaled_servings }}</span>
-                                    {% endif %}
-                                </div>
-                            {% endif %}
-                            <div class="recipe-url-summary-amount">
-                                <span class="recipe-url-summary-amount-label">Amount:</span>
-                                <div class="recipe-quantity-control recipe-url-summary-quantity">
-                                    <select class="recipe-quantity-input recipe-scaling-select"
-                                            data-recipe-number="{{ loop.index }}"
-                                            data-recipe-url="{{ recipe.url }}"
-                                            aria-label="Recipe {{ loop.index }} amount">
-                                        {% for option in recipe.scaling_options %}
-                                            <option value="{{ option.value }}"
-                                                    {% if option.selected %}selected{% endif %}>
-                                                {{ option.label }}
-                                            </option>
-                                        {% endfor %}
-                                    </select>
+                                    </span>
+                                    <span class="recipe-url-summary-name"
+                                          title="{{ recipe.source_display_url }}"
+                                          data-recipe-url="{{ recipe.url }}">{{ recipe.name }}</span>
+                                </span>
+                            </button>
+                            <div class="recipe-url-summary-meta">
+                                {% if recipe.base_servings %}
+                                    <div class="recipe-url-summary-servings">
+                                        Servings:
+                                        <span>{{ recipe.base_servings }}</span>
+                                        {% if recipe.quantity != 1 and recipe.scaled_servings %}
+                                            <span>-> {{ recipe.scaled_servings }}</span>
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
+                                {% if recipe.serving_basis %}
+                                    <div class="recipe-url-summary-serving-basis">
+                                        <span>Serving Basis:</span>
+                                        <span>{{ recipe.serving_basis }}</span>
+                                    </div>
+                                {% endif %}
+                                <div class="recipe-url-summary-amount">
+                                    <span class="recipe-url-summary-amount-label">Amount:</span>
+                                    <div class="recipe-quantity-control recipe-url-summary-quantity">
+                                        <select class="recipe-quantity-input recipe-scaling-select"
+                                                data-recipe-number="{{ loop.index }}"
+                                                data-recipe-url="{{ recipe.url }}"
+                                                aria-label="Recipe {{ loop.index }} amount">
+                                            {% for option in recipe.scaling_options %}
+                                                <option value="{{ option.value }}"
+                                                        {% if option.selected %}selected{% endif %}>
+                                                    {{ option.label }}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                         </div>

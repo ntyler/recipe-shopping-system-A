@@ -4578,6 +4578,60 @@ function bindRecipeUrlLogDragAndDrop() {
     });
 }
 
+function recipeUrlSummaryCollapseStorageKey(row) {
+    const recipeUrl = row ? row.dataset.recipeUrl || "" : "";
+    return recipeUrl ? `recipe-url-summary-collapsed:${recipeUrl}` : "";
+}
+
+function setCurrentRecipeUrlSummaryCollapsed(row, collapsed) {
+    if (!row) {
+        return false;
+    }
+
+    row.classList.toggle("recipe-url-summary-collapsed", collapsed);
+    const titleToggle = row.querySelector("[data-recipe-url-summary-toggle]");
+
+    if (titleToggle) {
+        titleToggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    }
+
+    return true;
+}
+
+function toggleCurrentRecipeUrlSummary(button, event = null) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const row = button ? button.closest("[data-current-recipe-row]") : null;
+    const storageKey = recipeUrlSummaryCollapseStorageKey(row);
+
+    if (!row || !storageKey) {
+        return false;
+    }
+
+    const shouldCollapse = !row.classList.contains("recipe-url-summary-collapsed");
+
+    setCurrentRecipeUrlSummaryCollapsed(row, shouldCollapse);
+    localStorage.setItem(storageKey, shouldCollapse ? "1" : "0");
+    closeRecipeEditRowMenus();
+    return false;
+}
+
+function bindCurrentRecipeUrlSummaryToggles() {
+    document.querySelectorAll("[data-current-recipe-row]").forEach(row => {
+        const titleToggle = row.querySelector("[data-recipe-url-summary-toggle]");
+        const storageKey = recipeUrlSummaryCollapseStorageKey(row);
+
+        if (!titleToggle || !storageKey) {
+            return;
+        }
+
+        setCurrentRecipeUrlSummaryCollapsed(row, localStorage.getItem(storageKey) === "1");
+    });
+}
+
 function recipeUrlOrder(list) {
     return [...list.querySelectorAll("[data-current-recipe-row]")]
         .map(row => row.dataset.recipeUrl || "")
@@ -6079,6 +6133,9 @@ function toggleRecipeEditRowMenu(button, event = null) {
         updateRecipeIngredientRowCollapseToggle(row);
         updateRecipeViewCardCollapseMenuToggle(row);
         updateRecipeDetailMenuToggleForButton(button);
+        if (row) {
+            row.classList.add("recipe-edit-menu-open");
+        }
         menu.hidden = false;
         positionRecipeEditPopupMenu(menu, button);
         button.setAttribute("aria-expanded", "true");
@@ -6503,6 +6560,9 @@ function closeRecipeEditRowMenus() {
         menu.style.left = "";
         menu.style.top = "";
         menu.style.right = "";
+    });
+    document.querySelectorAll(recipeEditMovableRowSelector()).forEach(row => {
+        row.classList.remove("recipe-edit-menu-open");
     });
     document.querySelectorAll(".recipe-edit-row-menu-btn").forEach(button => {
         button.setAttribute("aria-expanded", "false");
@@ -9230,11 +9290,37 @@ function toggleRecipeViewCardFromMenu(button) {
     return false;
 }
 
+function toggleRecipeViewCardFromTitle(button, event = null) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const card = button ? button.closest("[data-recipe-view-card]") : null;
+    const toggle = card ? card.querySelector("[data-recipe-card-toggle]") : null;
+    const key = card ? (card.dataset.recipeCardKey || button.dataset.recipeCardKey || "") : "";
+
+    if (!card || !key) {
+        return false;
+    }
+
+    const shouldCollapse = !card.classList.contains("recipe-view-collapsed");
+
+    setRecipeCardCollapsed(card, toggle, shouldCollapse);
+    localStorage.setItem(`recipe-card-collapsed:${key}`, shouldCollapse ? "1" : "0");
+    closeRecipeEditRowMenus();
+    return false;
+}
+
 function setRecipeCardCollapsed(card, button, collapsed) {
     card.classList.toggle("recipe-view-collapsed", collapsed);
     if (button) {
         button.setAttribute("aria-expanded", collapsed ? "false" : "true");
         button.textContent = collapsed ? "Show v" : "Hide ^";
+    }
+    const titleToggle = card.querySelector("[data-recipe-card-title-toggle]");
+    if (titleToggle) {
+        titleToggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
     }
     updateRecipeViewCardCollapseMenuToggle(card);
 }
@@ -10367,6 +10453,7 @@ async function refreshStoreMarkup(options = {}) {
     restoreViewBehaviorSettings();
     restoreItemCheckState();
     bindRecipeUrlLogDragAndDrop();
+    bindCurrentRecipeUrlSummaryToggles();
     bindRecipeQuantityInputs();
     bindRecipeNameInputs();
     bindCookbooks();
@@ -10552,6 +10639,7 @@ document.addEventListener("DOMContentLoaded", function () {
     restoreViewBehaviorSettings();
     restoreItemCheckState();
     bindRecipeUrlLogDragAndDrop();
+    bindCurrentRecipeUrlSummaryToggles();
     bindRecipeQuantityInputs();
     bindRecipeNameInputs();
     bindCookbooks();
