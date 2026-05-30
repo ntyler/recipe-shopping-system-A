@@ -9477,7 +9477,7 @@ function bindRecipeCardToggles() {
         if (toggle) {
             toggle.addEventListener("click", () => {
                 const shouldCollapse = !card.classList.contains("recipe-view-collapsed");
-                setRecipeCardCollapsed(card, toggle, shouldCollapse);
+                setRecipeCardCollapsed(card, toggle, shouldCollapse, { animate: true });
                 localStorage.setItem(`recipe-card-collapsed:${key}`, shouldCollapse ? "1" : "0");
             });
         }
@@ -9488,18 +9488,22 @@ function toggleRecipeViewCardFromMenu(button) {
     const card = recipeEditActionRowFromButton(button);
     const toggle = card ? card.querySelector("[data-recipe-card-toggle]") : null;
     const key = card ? (card.dataset.recipeCardKey || (toggle ? toggle.dataset.recipeCardKey : "")) : "";
-    const recipeUrl = card ? (card.dataset.recipeViewUrl || key) : "";
 
     if (!card || !key) {
         return false;
     }
 
     const shouldCollapse = !card.classList.contains("recipe-view-collapsed");
-    setRecipeCardCollapsed(card, toggle, shouldCollapse);
+    setRecipeCardCollapsed(card, toggle, shouldCollapse, { animate: true });
     localStorage.setItem(`recipe-card-collapsed:${key}`, shouldCollapse ? "1" : "0");
     updateRecipeViewCardCollapseMenuToggle(card);
     closeRecipeEditRowMenus();
-    return jumpToCurrentRecipeLogUrl(recipeUrl);
+    card.scrollIntoView({
+        behavior: "auto",
+        block: "nearest",
+        inline: "nearest",
+    });
+    return false;
 }
 
 function toggleRecipeViewCardFromTitle(button, event = null) {
@@ -9522,7 +9526,7 @@ function toggleRecipeViewCardFromTitle(button, event = null) {
 
     const shouldCollapse = !card.classList.contains("recipe-view-collapsed");
 
-    setRecipeCardCollapsed(card, toggle, shouldCollapse);
+    setRecipeCardCollapsed(card, toggle, shouldCollapse, { animate: true });
     localStorage.setItem(`recipe-card-collapsed:${key}`, shouldCollapse ? "1" : "0");
     closeRecipeEditRowMenus();
     return false;
@@ -9536,7 +9540,8 @@ function handleRecipeViewCardTitleKeydown(button, event) {
     return toggleRecipeViewCardFromTitle(button, event);
 }
 
-function setRecipeCardCollapsed(card, button, collapsed) {
+function setRecipeCardCollapsed(card, button, collapsed, options = {}) {
+    const wasCollapsed = card.classList.contains("recipe-view-collapsed");
     card.classList.toggle("recipe-view-collapsed", collapsed);
     if (button) {
         button.setAttribute("aria-expanded", collapsed ? "false" : "true");
@@ -9547,6 +9552,24 @@ function setRecipeCardCollapsed(card, button, collapsed) {
         titleToggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
     }
     updateRecipeViewCardCollapseMenuToggle(card);
+
+    if (options && options.animate && wasCollapsed !== collapsed) {
+        pulseRecipeViewCard(card);
+    }
+}
+
+function pulseRecipeViewCard(card) {
+    if (!card) {
+        return;
+    }
+
+    card.classList.remove("recipe-view-state-pulse");
+    void card.offsetWidth;
+    card.classList.add("recipe-view-state-pulse");
+
+    window.setTimeout(() => {
+        card.classList.remove("recipe-view-state-pulse");
+    }, 1000);
 }
 
 function bindRecipeTaskChecks() {

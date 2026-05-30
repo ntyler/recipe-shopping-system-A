@@ -2420,6 +2420,24 @@ body {
             scroll-margin-top: calc(var(--view-switcher-sticky-offset, 0px) + 12px);
         }
 
+        .recipe-view-card.recipe-view-state-pulse {
+            animation: recipe-view-state-pulse 0.9s ease-out 1;
+        }
+
+        @keyframes recipe-view-state-pulse {
+            0% {
+                border-color: #00cc66;
+                background: #1d2a23;
+                box-shadow: 0 0 0 2px rgba(0, 204, 102, 0.5), 0 0 26px rgba(0, 204, 102, 0.34), 0 8px 24px rgba(0,0,0,0.25);
+            }
+
+            100% {
+                border-color: #2d2d2d;
+                background: #1b1b1b;
+                box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+            }
+        }
+
         .recipe-view-card.recipe-edit-menu-open {
             position: relative;
             z-index: 15000;
