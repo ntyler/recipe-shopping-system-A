@@ -2685,7 +2685,7 @@ body {
         @media (min-width: 651px) {
             .recipe-view-card-with-cover:not(.recipe-view-collapsed) {
                 display: grid;
-                grid-template-columns: minmax(220px, 340px) minmax(190px, 280px) minmax(0, 1fr);
+                grid-template-columns: minmax(190px, 280px) minmax(220px, 340px) minmax(0, 1fr);
                 column-gap: 16px;
                 align-items: start;
             }
@@ -2695,13 +2695,13 @@ body {
             }
 
             .recipe-view-card-with-cover:not(.recipe-view-collapsed) .recipe-view-body-meta {
-                grid-column: 1;
+                grid-column: 2;
                 grid-row: 2;
                 margin-bottom: 12px;
             }
 
             .recipe-view-card-with-cover:not(.recipe-view-collapsed) .recipe-view-body-media {
-                grid-column: 2;
+                grid-column: 1;
                 grid-row: 2;
                 align-self: start;
                 justify-self: start;
