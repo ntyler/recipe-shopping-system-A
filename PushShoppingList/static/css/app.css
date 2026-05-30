@@ -2669,7 +2669,7 @@ body {
             padding-bottom: 0;
         }
 
-        .recipe-view-card.recipe-view-collapsed > :not(.recipe-view-title) {
+        .recipe-view-card.recipe-view-collapsed > :not(.recipe-view-title):not(.recipe-view-body-media) {
             display: none;
         }
 
@@ -2678,9 +2678,16 @@ body {
             border-radius: 12px;
         }
 
-        .recipe-view-card.recipe-view-collapsed .recipe-view-title-media,
+        .recipe-view-card.recipe-view-collapsed.recipe-view-card-with-cover .recipe-view-title {
+            margin-bottom: 10px;
+        }
+
         .recipe-view-card.recipe-view-collapsed .recipe-view-cookbook {
             display: none;
+        }
+
+        .recipe-view-card.recipe-view-collapsed .recipe-view-body-media {
+            display: grid;
         }
 
         .recipe-view-food-review-btn {
@@ -3006,7 +3013,7 @@ body {
             pointer-events: none;
         }
 
-        .recipe-image-visibility-hidden {
+        .recipe-image-visibility-hidden:not(.recipe-view-body-media):not(.recipe-cover-image) {
             display: none !important;
         }
 
