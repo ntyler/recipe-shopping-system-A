@@ -6835,7 +6835,7 @@ function toggleRecipeViewGenerateSubmenu(button, event = null) {
 
     const row = button ? button.closest(".recipe-view-generate-submenu-row") : null;
     const menu = row ? row.querySelector(".recipe-view-generate-submenu") : null;
-    const parentMenu = button ? button.closest(".recipe-view-global-menu") : null;
+    const parentMenu = button ? button.closest(".recipe-view-global-menu, .recipe-view-title-menu") : null;
     const shouldOpen = menu ? menu.hidden : false;
 
     closeRecipeViewGenerateSubmenus(parentMenu || document);

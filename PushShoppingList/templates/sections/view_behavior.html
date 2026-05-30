@@ -110,74 +110,82 @@
             <span aria-hidden="true"></span>
         </button>
         <div class="recipe-edit-row-menu recipe-view-global-menu" hidden>
-            <div class="recipe-view-generate-submenu-row">
+            <div class="recipe-view-menu-section">
+                <div class="recipe-view-menu-section-title">Recipe Display</div>
                 <button type="button"
-                        class="recipe-view-generate-submenu-toggle"
-                        aria-haspopup="true"
-                        aria-expanded="false"
-                        onclick="return toggleRecipeViewGenerateSubmenu(this, event)">
-                    Generate All Images
+                        onclick="return setAllRecipeImagesVisibleFromMenu(this, true)">
+                    Show All Images
                 </button>
-                <div class="recipe-view-generate-submenu" hidden>
+                <button type="button"
+                        onclick="return setAllRecipeImagesVisibleFromMenu(this, false)">
+                    Hide All Images
+                </button>
+                <button type="button"
+                        onclick="return setAllRecipeViewEverythingCollapsed(false)">
+                    Expand Everything
+                </button>
+                <button type="button"
+                        onclick="return setAllRecipeViewEverythingCollapsed(true)">
+                    Collapse Everything
+                </button>
+            </div>
+            <div class="recipe-view-menu-section">
+                <div class="recipe-view-menu-section-title">Generate Images</div>
+                <div class="recipe-view-generate-submenu-row">
                     <button type="button"
-                            data-recipe-image-global-btn
-                            onclick="return generateAllRecipeImagesFromViewBehavior(this, { imageScope: 'all' })">
-                        For Everything
+                            class="recipe-view-generate-submenu-toggle"
+                            aria-haspopup="true"
+                            aria-expanded="false"
+                            onclick="return toggleRecipeViewGenerateSubmenu(this, event)">
+                        Generate All Images
                     </button>
+                    <div class="recipe-view-generate-submenu" hidden>
+                        <div class="recipe-view-menu-section-title">Generate By Section</div>
+                        <button type="button"
+                                data-recipe-image-global-btn
+                                onclick="return generateAllRecipeImagesFromViewBehavior(this, { imageScope: 'all' })">
+                            All Recipe Images
+                        </button>
+                        <button type="button"
+                                data-recipe-image-global-btn
+                                onclick="return generateAllRecipeImagesFromViewBehavior(this, { imageScope: 'equipment' })">
+                            Equipment Images
+                        </button>
+                        <button type="button"
+                                data-recipe-image-global-btn
+                                onclick="return generateAllRecipeImagesFromViewBehavior(this, { imageScope: 'instructions' })">
+                            Instruction Step Images
+                        </button>
+                    </div>
+                </div>
+                <div class="recipe-view-generate-submenu-row">
                     <button type="button"
-                            data-recipe-image-global-btn
-                            onclick="return generateAllRecipeImagesFromViewBehavior(this, { imageScope: 'equipment' })">
-                        For Equipment
+                            class="recipe-view-generate-submenu-toggle"
+                            aria-haspopup="true"
+                            aria-expanded="false"
+                            onclick="return toggleRecipeViewGenerateSubmenu(this, event)">
+                        Generate Missing Images
                     </button>
-                    <button type="button"
-                            data-recipe-image-global-btn
-                            onclick="return generateAllRecipeImagesFromViewBehavior(this, { imageScope: 'instructions' })">
-                        For Instructions
-                    </button>
+                    <div class="recipe-view-generate-submenu" hidden>
+                        <div class="recipe-view-menu-section-title">Generate By Section</div>
+                        <button type="button"
+                                data-recipe-image-global-btn
+                                onclick="return generateAllRecipeImagesFromViewBehavior(this, { missingOnly: true, imageScope: 'all' })">
+                            All Recipe Images
+                        </button>
+                        <button type="button"
+                                data-recipe-image-global-btn
+                                onclick="return generateAllRecipeImagesFromViewBehavior(this, { missingOnly: true, imageScope: 'equipment' })">
+                            Equipment Images
+                        </button>
+                        <button type="button"
+                                data-recipe-image-global-btn
+                                onclick="return generateAllRecipeImagesFromViewBehavior(this, { missingOnly: true, imageScope: 'instructions' })">
+                            Instruction Step Images
+                        </button>
+                    </div>
                 </div>
             </div>
-            <div class="recipe-view-generate-submenu-row">
-                <button type="button"
-                        class="recipe-view-generate-submenu-toggle"
-                        aria-haspopup="true"
-                        aria-expanded="false"
-                        onclick="return toggleRecipeViewGenerateSubmenu(this, event)">
-                    Generate All Missing Images
-                </button>
-                <div class="recipe-view-generate-submenu" hidden>
-                    <button type="button"
-                            data-recipe-image-global-btn
-                            onclick="return generateAllRecipeImagesFromViewBehavior(this, { missingOnly: true, imageScope: 'all' })">
-                        For Everything
-                    </button>
-                    <button type="button"
-                            data-recipe-image-global-btn
-                            onclick="return generateAllRecipeImagesFromViewBehavior(this, { missingOnly: true, imageScope: 'equipment' })">
-                        For Equipment
-                    </button>
-                    <button type="button"
-                            data-recipe-image-global-btn
-                            onclick="return generateAllRecipeImagesFromViewBehavior(this, { missingOnly: true, imageScope: 'instructions' })">
-                        For Instructions
-                    </button>
-                </div>
-            </div>
-            <button type="button"
-                    onclick="return setAllRecipeImagesVisibleFromMenu(this, true)">
-                Show All Images
-            </button>
-            <button type="button"
-                    onclick="return setAllRecipeImagesVisibleFromMenu(this, false)">
-                Hide All Images
-            </button>
-            <button type="button"
-                    onclick="return setAllRecipeViewEverythingCollapsed(false)">
-                Expand Everything
-            </button>
-            <button type="button"
-                    onclick="return setAllRecipeViewEverythingCollapsed(true)">
-                Collapse Everything
-            </button>
         </div>
     </div>
 </div>

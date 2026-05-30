@@ -234,69 +234,123 @@
                                 <span aria-hidden="true"></span>
                             </button>
                             <div class="recipe-edit-row-menu recipe-view-title-menu" hidden>
-                                <button type="button"
-                                        data-recipe-url="{{ recipe.url }}"
-                                        onclick="openRecipeEditor(this); closeRecipeEditRowMenus(); return false;">
-                                    Edit
-                                </button>
-                                {% if recipe.archive_pdf_available %}
-                                    <a class="recipe-edit-menu-link recipe-view-menu-pdf"
-                                       href="{{ url_for('recipe_bp.recipe_archive_pdf_route', url=recipe.url) }}"
-                                       target="_blank"
-                                       rel="noopener noreferrer"
-                                       title="{{ recipe.name }}"
-                                       aria-label="Open PDF for {{ recipe.name }}">
-                                        PDF
-                                    </a>
-                                {% endif %}
-                                <button type="button"
-                                        onclick="return generateRecipeImagesFromMenu(this)">
-                                    Generate All Images
-                                </button>
-                                <button type="button"
-                                        onclick="return generateRecipeImagesFromMenu(this, { missingOnly: true })">
-                                    Generate All Missing Images
-                                </button>
-                                <button type="button"
-                                        onclick="return setRecipeImagesVisibleFromMenu(this, true)">
-                                    Show All Images
-                                </button>
-                                <button type="button"
-                                        onclick="return setRecipeImagesVisibleFromMenu(this, false)">
-                                    Hide All Images
-                                </button>
-                                <button type="button"
-                                        class="recipe-view-card-collapse-menu-toggle"
-                                        onclick="return toggleRecipeViewCardFromMenu(this)">
-                                    Collapse
-                                </button>
-                                <button type="button"
-                                        onclick="return setRecipeViewCardEverythingCollapsed(this, false)">
-                                    Expand Everything
-                                </button>
-                                <button type="button"
-                                        onclick="return setRecipeViewCardEverythingCollapsed(this, true)">
-                                    Collapse Everything
-                                </button>
-                                <button type="button"
-                                        onclick="moveRecipeEditRow(this, -1); return false;">
-                                    Move Up
-                                </button>
-                                <button type="button"
-                                        onclick="moveRecipeEditRow(this, 1); return false;">
-                                    Move Down
-                                </button>
-                                <form method="POST"
-                                      action="{{ url_for('recipe_bp.remove_recipe_route') }}"
-                                      class="remove-recipe-form recipe-view-remove-form recipe-view-menu-form"
-                                      onsubmit="saveScroll(); return confirm('Remove this recipe URL?');">
-                                    <input type="hidden" name="url" value="{{ recipe.url }}">
-                                    <button type="submit"
-                                            class="delete recipe-view-remove recipe-view-menu-delete"
-                                            aria-label="Remove recipe {{ recipe.number }}">
-                                        Delete
+                                <div class="recipe-view-menu-section">
+                                    <div class="recipe-view-menu-section-title">Recipe Display</div>
+                                    <button type="button"
+                                            onclick="return setRecipeImagesVisibleFromMenu(this, true)">
+                                        Show All Images
                                     </button>
-                                </form>
+                                    <button type="button"
+                                            onclick="return setRecipeImagesVisibleFromMenu(this, false)">
+                                        Hide All Images
+                                    </button>
+                                    <button type="button"
+                                            class="recipe-view-card-collapse-menu-toggle"
+                                            onclick="return toggleRecipeViewCardFromMenu(this)">
+                                        Collapse
+                                    </button>
+                                    <button type="button"
+                                            onclick="return setRecipeViewCardEverythingCollapsed(this, false)">
+                                        Expand Everything
+                                    </button>
+                                    <button type="button"
+                                            onclick="return setRecipeViewCardEverythingCollapsed(this, true)">
+                                        Collapse Everything
+                                    </button>
+                                </div>
+                                <div class="recipe-view-menu-section">
+                                    <div class="recipe-view-menu-section-title">Generate Images</div>
+                                    <div class="recipe-view-generate-submenu-row">
+                                        <button type="button"
+                                                class="recipe-view-generate-submenu-toggle"
+                                                aria-haspopup="true"
+                                                aria-expanded="false"
+                                                onclick="return toggleRecipeViewGenerateSubmenu(this, event)">
+                                            Generate All Images
+                                        </button>
+                                        <div class="recipe-view-generate-submenu" hidden>
+                                            <div class="recipe-view-menu-section-title">Generate By Section</div>
+                                            <button type="button"
+                                                    onclick="return generateRecipeImagesFromMenu(this, { imageScope: 'all' })">
+                                                All Recipe Images
+                                            </button>
+                                            <button type="button"
+                                                    onclick="return generateRecipeImagesFromMenu(this, { imageScope: 'equipment' })">
+                                                Equipment Images
+                                            </button>
+                                            <button type="button"
+                                                    onclick="return generateRecipeImagesFromMenu(this, { imageScope: 'instructions' })">
+                                                Instruction Step Images
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="recipe-view-generate-submenu-row">
+                                        <button type="button"
+                                                class="recipe-view-generate-submenu-toggle"
+                                                aria-haspopup="true"
+                                                aria-expanded="false"
+                                                onclick="return toggleRecipeViewGenerateSubmenu(this, event)">
+                                            Generate Missing Images
+                                        </button>
+                                        <div class="recipe-view-generate-submenu" hidden>
+                                            <div class="recipe-view-menu-section-title">Generate By Section</div>
+                                            <button type="button"
+                                                    onclick="return generateRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'all' })">
+                                                All Recipe Images
+                                            </button>
+                                            <button type="button"
+                                                    onclick="return generateRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'equipment' })">
+                                                Equipment Images
+                                            </button>
+                                            <button type="button"
+                                                    onclick="return generateRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'instructions' })">
+                                                Instruction Step Images
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="recipe-view-menu-section">
+                                    <div class="recipe-view-menu-section-title">Recipe</div>
+                                    <button type="button"
+                                            data-recipe-url="{{ recipe.url }}"
+                                            onclick="openRecipeEditor(this); closeRecipeEditRowMenus(); return false;">
+                                        Edit
+                                    </button>
+                                    {% if recipe.archive_pdf_available %}
+                                        <a class="recipe-edit-menu-link recipe-view-menu-pdf"
+                                           href="{{ url_for('recipe_bp.recipe_archive_pdf_route', url=recipe.url) }}"
+                                           target="_blank"
+                                           rel="noopener noreferrer"
+                                           title="{{ recipe.name }}"
+                                           aria-label="Open PDF for {{ recipe.name }}">
+                                            PDF
+                                        </a>
+                                    {% endif %}
+                                </div>
+                                <div class="recipe-view-menu-section">
+                                    <div class="recipe-view-menu-section-title">Recipe Order</div>
+                                    <button type="button"
+                                            onclick="moveRecipeEditRow(this, -1); return false;">
+                                        Move Up
+                                    </button>
+                                    <button type="button"
+                                            onclick="moveRecipeEditRow(this, 1); return false;">
+                                        Move Down
+                                    </button>
+                                </div>
+                                <div class="recipe-view-menu-section recipe-view-menu-section-danger">
+                                    <form method="POST"
+                                          action="{{ url_for('recipe_bp.remove_recipe_route') }}"
+                                          class="remove-recipe-form recipe-view-remove-form recipe-view-menu-form"
+                                          onsubmit="saveScroll(); return confirm('Remove this recipe URL?');">
+                                        <input type="hidden" name="url" value="{{ recipe.url }}">
+                                        <button type="submit"
+                                                class="delete recipe-view-remove recipe-view-menu-delete"
+                                                aria-label="Remove recipe {{ recipe.number }}">
+                                            Delete
+                                        </button>
+                                    </form>
+                                </div>
                             </div>
                         </div>
                     </div>
