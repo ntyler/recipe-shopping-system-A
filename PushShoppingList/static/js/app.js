@@ -9576,7 +9576,7 @@ async function generateRecipeStepImage(button) {
     return false;
 }
 
-async function generateAllRecipeInstructionImagesFromMenu(button) {
+async function generateAllRecipeInstructionImagesFromMenu(button, options = {}) {
     const header = button ? button.closest(".recipe-detail-header") : null;
     const toggle = header ? header.querySelector(".detail-toggle") : null;
     const parts = recipeDetailSectionParts(toggle);
@@ -9586,7 +9586,8 @@ async function generateAllRecipeInstructionImagesFromMenu(button) {
         return false;
     }
 
-    const stepButtons = [...parts.content.querySelectorAll("[data-step-image-generate]")];
+    const stepButtons = [...parts.content.querySelectorAll("[data-step-image-generate]")]
+        .filter(stepButton => !options.missingOnly || recipeStepImageIsMissing(stepButton));
 
     closeRecipeEditRowMenus();
 
@@ -9617,6 +9618,14 @@ async function generateAllRecipeInstructionImagesFromMenu(button) {
     }
 
     return false;
+}
+
+function recipeStepImageIsMissing(button) {
+    const panel = button ? button.closest("[data-step-image-panel]") : null;
+    const image = panel ? panel.querySelector(".recipe-step-image") : null;
+    const src = image ? String(image.getAttribute("src") || "").trim() : "";
+
+    return !src || image.hidden;
 }
 
 function updateRecipeDetailMenuToggleForButton(button) {
