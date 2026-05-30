@@ -9576,6 +9576,49 @@ async function generateRecipeStepImage(button) {
     return false;
 }
 
+async function generateAllRecipeInstructionImagesFromMenu(button) {
+    const header = button ? button.closest(".recipe-detail-header") : null;
+    const toggle = header ? header.querySelector(".detail-toggle") : null;
+    const parts = recipeDetailSectionParts(toggle);
+
+    if (!parts.content) {
+        closeRecipeEditRowMenus();
+        return false;
+    }
+
+    const stepButtons = [...parts.content.querySelectorAll("[data-step-image-generate]")];
+
+    closeRecipeEditRowMenus();
+
+    if (!stepButtons.length) {
+        return false;
+    }
+
+    if (toggle) {
+        setRecipeDetailSectionCollapsed(toggle, false);
+        localStorage.setItem(parts.storageKey, "0");
+    }
+
+    const firstPanel = stepButtons[0].closest("[data-step-image-panel]");
+    if (firstPanel) {
+        firstPanel.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+            inline: "nearest",
+        });
+    }
+
+    for (const stepButton of stepButtons) {
+        if (stepButton.disabled) {
+            continue;
+        }
+
+        await generateRecipeStepImage(stepButton);
+    }
+
+    return false;
+}
+
 function updateRecipeDetailMenuToggleForButton(button) {
     const header = button ? button.closest(".recipe-detail-header") : null;
     const toggle = header ? header.querySelector(".detail-toggle, .nutrition-toggle") : null;
