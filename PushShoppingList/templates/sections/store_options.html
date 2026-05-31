@@ -20,6 +20,10 @@
                 <div class="overflow-menu-section store-options-menu-section">
                     <div class="recipe-view-menu-subsection-title">List Options</div>
                     <button type="button"
+                            onclick="return openAddStoreModalFromMenu(this);">
+                        Add Store
+                    </button>
+                    <button type="button"
                             onclick="sortStoreOptionsList(); closeRecipeEditRowMenus(); return false;">
                         Sort List
                     </button>
@@ -103,11 +107,14 @@
 
             <div class="address-actions-grid">
                 <button form="homeAddressForm" type="submit" name="action" value="run_find_nearest" class="nearest-stores-btn">Nearest Stores</button>
-                <button type="button"
-                        class="sort-store-list-btn"
-                        onclick="sortStoreOptionsList()">
-                    Sort List
-                </button>
+                <div class="active-store-search store-options-toolbar-search">
+                    <input id="activeStoreSearchInput"
+                           type="search"
+                           placeholder="Search stores by name"
+                           autocomplete="off"
+                           aria-label="Search stores by name"
+                           oninput="filterActiveStores(this.value)">
+                </div>
             </div>
         </div>
     </div>
@@ -460,14 +467,6 @@
         {% set active_home_location = nearest_store_results.get("home_location") if nearest_store_results else {} %}
         <div class="active-store-summary-header">
             <span class="store-detail-label active-store-heading-label" data-active-store-heading-label>Active stores</span>
-            <div class="active-store-search">
-                <input id="activeStoreSearchInput"
-                       type="search"
-                       placeholder="Search stores by name"
-                       autocomplete="off"
-                       aria-label="Search stores by name"
-                       oninput="filterActiveStores(this.value)">
-            </div>
         </div>
         <div class="active-store-shelf-shell" aria-label="Store carousel">
             <button type="button"

@@ -11178,6 +11178,21 @@ async function saveStoreOptionsForm(form) {
 
 let addStoreReturnFocus = null;
 
+function expandStoreOptionsForAddStoreModal() {
+    const content = document.querySelector('[data-collapse-content="store-options"]');
+
+    if (content && content.classList.contains("collapsed")) {
+        toggleCardCollapse("store-options");
+    }
+}
+
+function openAddStoreModalFromMenu(button) {
+    closeRecipeEditRowMenus();
+    expandStoreOptionsForAddStoreModal();
+    openAddStoreModal();
+    return false;
+}
+
 function openAddStoreModal() {
     const modal = document.getElementById("addStoreModal");
 

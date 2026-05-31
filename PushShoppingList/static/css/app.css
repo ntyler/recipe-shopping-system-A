@@ -337,7 +337,6 @@ body {
         .address-save-btn,
         .location-address-btn,
         .nearest-stores-btn,
-        .sort-store-list-btn,
         .store-add-sticky-btn,
         .store-add-inline-btn,
         .store-edit-cancel-btn,
@@ -567,10 +566,10 @@ body {
             z-index: 1200;
             margin: calc(-1 * var(--store-options-sticky-inset)) calc(-1 * var(--store-options-sticky-inset)) 14px;
             padding: 10px 12px 12px;
-            background: transparent;
+            background: #111;
             border: 0;
             border-radius: 10px;
-            box-shadow: none;
+            box-shadow: 0 14px 24px rgba(0,0,0,0.45);
             box-sizing: border-box;
         }
 
@@ -660,6 +659,12 @@ body {
             max-width: 420px;
         }
 
+        .store-options-toolbar-search {
+            width: 100%;
+            min-width: 0;
+            max-width: none;
+        }
+
         .active-store-search input {
             width: 100%;
             box-sizing: border-box;
@@ -671,6 +676,13 @@ body {
             border-radius: 8px;
             font-size: 14px;
             outline: none;
+        }
+
+        .store-options-toolbar-search input {
+            height: 32px;
+            min-height: 32px;
+            padding-top: 6px;
+            padding-bottom: 6px;
         }
 
         .active-store-search input::placeholder {
@@ -2028,11 +2040,6 @@ body {
 
         .nearest-stores-btn {
             background: #0f766e;
-            margin-top: 0;
-        }
-
-        .sort-store-list-btn {
-            background: #155da8;
             margin-top: 0;
         }
 
