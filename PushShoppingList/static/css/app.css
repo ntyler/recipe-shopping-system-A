@@ -2095,9 +2095,15 @@ body {
         }
 
         .address-summary-box {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            flex-wrap: wrap;
+            gap: 6px;
             margin-top: 12px;
             background: #181b1c;
             border: 1px solid #333;
+            border-color: transparent;
             border-radius: 10px;
             padding: 12px 14px;
             color: #ddd;
@@ -2108,9 +2114,14 @@ body {
 
         .home-address-collapsed-summary {
             display: none;
+            align-items: center;
+            justify-content: flex-start;
+            flex-wrap: wrap;
+            gap: 6px;
             margin-top: 12px;
             background: #181b1c;
             border: 1px solid #333;
+            border-color: transparent;
             border-radius: 10px;
             padding: 12px 14px;
             color: #ddd;
@@ -2120,7 +2131,7 @@ body {
         }
 
         .home-address-content.collapsed + .home-address-collapsed-summary {
-            display: block;
+            display: flex;
         }
 
         .home-address-map-link {
@@ -4423,6 +4434,7 @@ body {
             display: grid;
             gap: 8px;
             margin-top: 0;
+            border-color: transparent;
         }
 
         .recipe-url-collapsed-actions {
@@ -5135,7 +5147,7 @@ body {
 
         .recipe-url-summary-header {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: space-between;
             gap: 12px;
             min-width: 0;
