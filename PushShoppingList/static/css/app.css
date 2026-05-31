@@ -11593,6 +11593,12 @@ body {
     line-height: 1.2;
 }
 
+.recipe-edit-nutrition-row input::placeholder {
+    color: rgba(196, 204, 216, 0.58);
+    opacity: 1;
+    font-weight: 650;
+}
+
 .recipe-edit-nutrition-row input:focus {
     border: 1px solid #5b8cff;
     border-radius: 6px;
@@ -11918,6 +11924,22 @@ body {
 .recipe-edit-ingredient-row label.recipe-edit-store-section-label select {
     height: 42px;
     min-height: 42px;
+}
+
+.recipe-edit-ingredient-row input:not([type="checkbox"]),
+.recipe-edit-ingredient-row textarea,
+.recipe-edit-ingredient-row select {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+}
+
+.recipe-edit-ingredient-row input:not([type="checkbox"]):focus,
+.recipe-edit-ingredient-row textarea:focus,
+.recipe-edit-ingredient-row select:focus {
+    border-color: #5b8cff;
+    background: #0b121c;
+    box-shadow: 0 0 0 2px rgba(91, 140, 255, 0.18);
 }
 
 @media (min-width: 1181px) {
@@ -12337,12 +12359,14 @@ body {
     }
 }
 
+.recipe-edit-ingredients .recipe-edit-row-menu,
 .recipe-edit-equipment .recipe-edit-row-menu,
 .recipe-edit-instructions .recipe-edit-row-menu,
 .recipe-edit-nutrition .recipe-edit-row-menu {
     z-index: 18;
 }
 
+.recipe-edit-ingredient-row .recipe-edit-row-menu-wrap,
 .recipe-edit-equipment-row .recipe-edit-row-menu-wrap,
 .recipe-edit-instruction-row .recipe-edit-row-menu-wrap,
 .recipe-edit-nutrition-row .recipe-edit-row-menu-wrap {
@@ -12351,6 +12375,7 @@ body {
     justify-self: end;
 }
 
+.recipe-edit-ingredients,
 .recipe-edit-equipment,
 .recipe-edit-instructions,
 .recipe-edit-nutrition {

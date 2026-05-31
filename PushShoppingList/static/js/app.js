@@ -8648,10 +8648,10 @@ function addRecipeNutritionRow(item = {}) {
     row.innerHTML = `
         <span class="recipe-edit-row-handle" aria-hidden="true">${recipeEditSvgIcon("drag")}</span>
         <label>
-            <input type="text" data-field="key" aria-label="Nutrition label" value="${escapeAttribute(item.key || "")}">
+            <input type="text" data-field="key" aria-label="Nutrition label" placeholder="Label" value="${escapeAttribute(item.key || "")}">
         </label>
         <label>
-            <input type="text" data-field="value" aria-label="Nutrition value" value="${escapeAttribute(item.value || "")}">
+            <input type="text" data-field="value" aria-label="Nutrition value" placeholder="Value" value="${escapeAttribute(item.value || "")}">
         </label>
         <div class="recipe-edit-row-menu-wrap">
             <button type="button"
