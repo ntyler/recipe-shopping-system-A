@@ -3562,6 +3562,9 @@ function setRecipeFileLoadingSummary(message) {
 
 function toggleCardCollapse(key) {
     const content = document.querySelector(`[data-collapse-content="${key}"]`);
+    const storeOptionsStickyTop = key === "store-options"
+        ? storeOptionsStickyStackTop()
+        : null;
 
     if (!content) {
         return;
@@ -3581,11 +3584,35 @@ function toggleCardCollapse(key) {
     scheduleAddStoreStickyVisibilityUpdate();
 
     if (key === "store-options" && isCollapsed) {
-        window.setTimeout(scrollStoreOptionsIntoView, 0);
+        preserveStoreOptionsStickyPosition(storeOptionsStickyTop);
     }
 
     if (key === "rules" && isCollapsed) {
         window.setTimeout(scrollRulesIntoView, 0);
+    }
+}
+
+function storeOptionsStickyStackTop() {
+    const stack = document.querySelector("#storeOptionsSection .store-options-sticky-stack");
+
+    return stack ? stack.getBoundingClientRect().top : null;
+}
+
+function preserveStoreOptionsStickyPosition(previousTop) {
+    if (!Number.isFinite(previousTop)) {
+        return;
+    }
+
+    const nextTop = storeOptionsStickyStackTop();
+
+    if (!Number.isFinite(nextTop)) {
+        return;
+    }
+
+    const delta = nextTop - previousTop;
+
+    if (Math.abs(delta) > 0.5) {
+        window.scrollBy(0, delta);
     }
 }
 
@@ -3605,10 +3632,6 @@ function updateCardCollapseToggleState(key, isCollapsed) {
         toggle.setAttribute("aria-expanded", isCollapsed ? "false" : "true");
         toggle.classList.toggle("card-collapse-toggle-collapsed", isCollapsed);
     }
-}
-
-function scrollStoreOptionsIntoView() {
-    scrollCardIntoView("storeOptionsSection", { behavior: "auto" });
 }
 
 function scrollRulesIntoView() {
