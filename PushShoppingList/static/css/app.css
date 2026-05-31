@@ -2683,12 +2683,12 @@ body {
 
         .recipe-view-card.recipe-edit-menu-open {
             position: relative;
-            z-index: 16020;
+            z-index: 18500;
             overflow: visible;
         }
 
         .recipe-view-card.recipe-edit-menu-open .recipe-view-title {
-            z-index: 16020;
+            z-index: 18500;
         }
 
         .recipe-view-title {
@@ -11516,7 +11516,7 @@ body {
 
 .recipe-edit-menu-open {
     position: relative;
-    z-index: 16020;
+    z-index: 18500;
     overflow: visible;
 }
 
@@ -11525,7 +11525,7 @@ body {
 }
 
 .recipe-edit-menu-open .recipe-edit-row-menu-wrap.recipe-edit-menu-wrap-open {
-    z-index: 16030;
+    z-index: 18510;
 }
 
 .recipe-edit-row-menu {
