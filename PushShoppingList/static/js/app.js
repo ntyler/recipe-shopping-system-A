@@ -4629,6 +4629,11 @@ function recipeUrlSummaryCollapseStorageKey(row) {
     return recipeUrl ? `recipe-url-summary-collapsed:${recipeUrl}` : "";
 }
 
+function recipeUrlSummaryImagesStorageKey(row) {
+    const recipeUrl = row ? row.dataset.recipeUrl || "" : "";
+    return recipeUrl ? `recipe-url-summary-images-hidden:${recipeUrl}` : "";
+}
+
 function setCurrentRecipeUrlSummaryCollapsed(row, collapsed) {
     if (!row) {
         return false;
@@ -4694,6 +4699,76 @@ function toggleCurrentRecipeUrlSummaryFromMenu(button) {
     return false;
 }
 
+function setCurrentRecipeUrlSummaryImagesVisible(row, visible) {
+    if (!row) {
+        return false;
+    }
+
+    row.classList.toggle("recipe-url-summary-images-hidden", !visible);
+    row.querySelectorAll(".recipe-url-summary-main").forEach(panel => {
+        panel.setAttribute("aria-hidden", visible ? "false" : "true");
+    });
+    return true;
+}
+
+function setCurrentRecipeUrlSummaryImagesVisibleFromMenu(button, visible) {
+    const row = recipeEditActionRowFromButton(button);
+    const storageKey = recipeUrlSummaryImagesStorageKey(row);
+
+    if (!row || !storageKey) {
+        closeRecipeEditRowMenus();
+        return false;
+    }
+
+    setCurrentRecipeUrlSummaryImagesVisible(row, visible);
+    localStorage.setItem(storageKey, visible ? "0" : "1");
+
+    if (visible) {
+        const collapseStorageKey = recipeUrlSummaryCollapseStorageKey(row);
+
+        setCurrentRecipeUrlSummaryCollapsed(row, false);
+
+        if (collapseStorageKey) {
+            localStorage.setItem(collapseStorageKey, "0");
+        }
+    }
+
+    closeRecipeEditRowMenus();
+    return false;
+}
+
+function currentRecipeViewCardFromMenuButton(button) {
+    const row = recipeEditActionRowFromButton(button);
+    const recipeUrl = row ? row.dataset.recipeUrl || "" : "";
+
+    return recipeUrl
+        ? document.querySelector(`[data-recipe-view-url="${cssEscape(recipeUrl)}"]`)
+        : null;
+}
+
+async function generateCurrentRecipeImagesFromMenu(button, options = {}) {
+    const card = currentRecipeViewCardFromMenuButton(button);
+
+    closeRecipeEditRowMenus();
+
+    if (!card) {
+        return false;
+    }
+
+    if (typeof showView === "function") {
+        showView("recipe");
+    }
+
+    card.scrollIntoView({
+        behavior: "auto",
+        block: "start",
+        inline: "nearest",
+    });
+
+    await generateRecipeImagesInCard(card, options);
+    return false;
+}
+
 function setAllCurrentRecipeUrlSummariesCollapsed(collapsed) {
     document.querySelectorAll("[data-current-recipe-row]").forEach(row => {
         const storageKey = recipeUrlSummaryCollapseStorageKey(row);
@@ -4725,12 +4800,17 @@ function bindCurrentRecipeUrlSummaryToggles() {
     document.querySelectorAll("[data-current-recipe-row]").forEach(row => {
         const titleToggle = row.querySelector("[data-recipe-url-summary-toggle]");
         const storageKey = recipeUrlSummaryCollapseStorageKey(row);
+        const imageStorageKey = recipeUrlSummaryImagesStorageKey(row);
 
         if (!titleToggle || !storageKey) {
             return;
         }
 
         setCurrentRecipeUrlSummaryCollapsed(row, localStorage.getItem(storageKey) === "1");
+
+        if (imageStorageKey) {
+            setCurrentRecipeUrlSummaryImagesVisible(row, localStorage.getItem(imageStorageKey) !== "1");
+        }
     });
 }
 
@@ -6890,9 +6970,23 @@ function handleRecipeEditRowMenuOutsideClick(event) {
 }
 
 function handleRecipeEditRowMenuScrollOrResize() {
-    if (recipeEditRowMenuIsOpen()) {
-        closeRecipeEditRowMenus();
+    if (!recipeEditRowMenuIsOpen()) {
+        return;
     }
+
+    window.requestAnimationFrame(() => {
+        document.querySelectorAll(".recipe-edit-row-menu:not([hidden])").forEach(menu => {
+            const wrap = menu.closest(".recipe-edit-row-menu-wrap, .recipe-edit-section-menu-wrap");
+            const button = wrap ? wrap.querySelector(".recipe-edit-row-menu-btn") : null;
+
+            if (button) {
+                positionRecipeEditPopupMenu(menu, button);
+            } else {
+                menu.hidden = true;
+                menu.classList.remove("recipe-edit-floating-menu");
+            }
+        });
+    });
 }
 
 function closeRecipeIngredientRowMenus() {
