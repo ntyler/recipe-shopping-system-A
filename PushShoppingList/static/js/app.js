@@ -3954,6 +3954,39 @@ function saveToggleSetting(inputId, storageKey, bodyClass, invertBodyClass = fal
             invertBodyClass ? !input.checked : input.checked
         );
     }
+
+    syncViewBehaviorMenuToggles(inputId);
+}
+
+function toggleViewBehaviorMenuSetting(button) {
+    const inputId = button ? button.dataset.viewBehaviorInput || "" : "";
+    const input = inputId ? document.getElementById(inputId) : null;
+
+    if (!input) {
+        return false;
+    }
+
+    input.checked = !input.checked;
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    syncViewBehaviorMenuToggles(inputId);
+
+    return false;
+}
+
+function syncViewBehaviorMenuToggles(inputId = "") {
+    document.querySelectorAll("[data-view-behavior-input]").forEach(button => {
+        const targetInputId = button.dataset.viewBehaviorInput || "";
+
+        if (inputId && targetInputId !== inputId) {
+            return;
+        }
+
+        const input = document.getElementById(targetInputId);
+        const checked = Boolean(input && input.checked);
+
+        button.setAttribute("aria-pressed", checked ? "true" : "false");
+        button.classList.toggle("active", checked);
+    });
 }
 
 function restoreViewBehaviorSettings() {
@@ -3963,6 +3996,7 @@ function restoreViewBehaviorSettings() {
     restoreToggleSetting("showQtyToggle", "show-qty", true, "hide-qty", true);
     restoreToggleSetting("hideCheckedItemsToggle", "hide-checked-items", false, "hide-checked-items");
     restoreToggleSetting("compactModeToggle", "compact-mode", false, "compact-mode");
+    syncViewBehaviorMenuToggles();
     showView(localStorage.getItem("shopping-view") || "section");
 }
 
@@ -4510,6 +4544,8 @@ function restoreToggleSetting(inputId, storageKey, defaultChecked, bodyClass, in
             invertBodyClass ? !input.checked : input.checked
         );
     }
+
+    syncViewBehaviorMenuToggles(inputId);
 }
 
 function restoreItemCheckState() {

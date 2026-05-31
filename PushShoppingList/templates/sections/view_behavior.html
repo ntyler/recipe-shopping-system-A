@@ -71,18 +71,6 @@
         </div>
     </div>
 
-    <div class="view-control-section">
-        <div class="view-control-title">Reset Tools</div>
-        <div class="view-control-row">
-            <form class="view-action-form" method="POST" action="/reset_checks" onsubmit="return resetItemChecks(event);">
-                <button class="reset-checks-btn view-action-btn" type="submit">Reset Checkboxes</button>
-            </form>
-
-            <form class="view-action-form" method="POST" action="/reset_stores" onsubmit="return resetStores(event);">
-                <button class="reset-stores-btn view-action-btn" type="submit">Reset Stores</button>
-            </form>
-        </div>
-    </div>
 </div>
 
 <div id="viewSwitcherSticky" class="view-switcher-sticky" aria-label="Display View">
@@ -110,6 +98,51 @@
             <span aria-hidden="true"></span>
         </button>
         <div class="recipe-edit-row-menu overflow-menu recipe-view-global-menu" hidden>
+            <div class="overflow-menu-section recipe-view-menu-section">
+                <div class="overflow-menu-section-title recipe-view-menu-section-title">Button Behavior</div>
+                <button type="button"
+                        class="recipe-view-behavior-toggle"
+                        data-view-behavior-input="openStoreUrlsToggle"
+                        aria-pressed="true"
+                        onclick="return toggleViewBehaviorMenuSetting(this)">
+                    Open store URLs
+                </button>
+                <button type="button"
+                        class="recipe-view-behavior-toggle"
+                        data-view-behavior-input="showItemButtonsToggle"
+                        aria-pressed="true"
+                        onclick="return toggleViewBehaviorMenuSetting(this)">
+                    Show item buttons
+                </button>
+                <button type="button"
+                        class="recipe-view-behavior-toggle"
+                        data-view-behavior-input="showBestProductToggle"
+                        aria-pressed="true"
+                        onclick="return toggleViewBehaviorMenuSetting(this)">
+                    Show best product
+                </button>
+                <button type="button"
+                        class="recipe-view-behavior-toggle"
+                        data-view-behavior-input="showQtyToggle"
+                        aria-pressed="true"
+                        onclick="return toggleViewBehaviorMenuSetting(this)">
+                    Show qty
+                </button>
+                <button type="button"
+                        class="recipe-view-behavior-toggle"
+                        data-view-behavior-input="hideCheckedItemsToggle"
+                        aria-pressed="false"
+                        onclick="return toggleViewBehaviorMenuSetting(this)">
+                    Hide checked items
+                </button>
+                <button type="button"
+                        class="recipe-view-behavior-toggle"
+                        data-view-behavior-input="compactModeToggle"
+                        aria-pressed="false"
+                        onclick="return toggleViewBehaviorMenuSetting(this)">
+                    Compact mode
+                </button>
+            </div>
             <div class="overflow-menu-section recipe-view-menu-section">
                 <div class="overflow-menu-section-title recipe-view-menu-section-title">Recipe Display</div>
                 <button type="button"
@@ -182,40 +215,6 @@
                                 data-recipe-image-global-btn
                                 onclick="return generateAllRecipeImagesFromViewBehavior(this, { missingOnly: true, imageScope: 'instructions' })">
                             Instruction Step Images
-                        </button>
-                    </div>
-                </div>
-            </div>
-            <div class="overflow-menu-section recipe-view-menu-section">
-                <div class="overflow-menu-section-title recipe-view-menu-section-title">Reset Tools</div>
-                <button type="button"
-                        onclick="return resetStoresFromRecipeViewMenu(this)">
-                    Reset Stores
-                </button>
-                <div class="recipe-view-generate-submenu-row">
-                    <button type="button"
-                            class="recipe-view-generate-submenu-toggle"
-                            aria-haspopup="true"
-                            aria-expanded="false"
-                            onclick="return toggleRecipeViewGenerateSubmenu(this, event)">
-                        Reset Checkboxes
-                    </button>
-                    <div class="overflow-submenu recipe-view-generate-submenu" hidden>
-                        <button type="button"
-                                onclick="return resetAllCheckboxesFromRecipeViewMenu(this)">
-                            All
-                        </button>
-                        <button type="button"
-                                onclick="return resetRecipeViewCheckboxesFromMenu(this, 'equipment')">
-                            Equipment
-                        </button>
-                        <button type="button"
-                                onclick="return resetRecipeViewCheckboxesFromMenu(this, 'instructions')">
-                            Instructions
-                        </button>
-                        <button type="button"
-                                onclick="return resetRecipeViewCheckboxesFromMenu(this, 'ingredients')">
-                            Ingredients
                         </button>
                     </div>
                 </div>
