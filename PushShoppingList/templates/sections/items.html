@@ -5,14 +5,11 @@
         {% for item in items %}
             {% if is_section_header(item) %}
                 {% set section_name = item.replace("===", "").strip() %}
-                <div class="section-header-row collapsible-header"
-                     data-collapse-scope="section"
-                     data-collapse-key="section|{{ section_name }}">
+                <div class="section-header-row">
                     <span class="header-title">
                         {{ section_name }}
                         <span class="header-count">({{ section_counts.get(section_name, 0) }})</span>
                     </span>
-                    <span class="header-toggle-icon">Hide ^</span>
                 </div>
             {% else %}
                 {% set item_key = normalize(item) %}
@@ -94,22 +91,16 @@
     <h2 class="items-title">Items by Store</h2>
     {% if store_view %}
         {% for store_group in store_view %}
-            <div class="store-header-row collapsible-header"
-                 data-collapse-scope="store"
-                 data-collapse-key="store|{{ store_group.key }}">
+            <div class="store-header-row">
                 <span class="header-title">{{ store_group.label.upper() }}</span>
-                <span class="header-toggle-icon">Hide ^</span>
             </div>
 
             {% for section in store_group.sections %}
-                <div class="store-section-header collapsible-header"
-                     data-collapse-scope="store-section"
-                     data-collapse-key="store-section|{{ store_group.key }}|{{ section.name }}">
+                <div class="store-section-header">
                     <span class="header-title">
                         {{ section.name }}
                         <span class="header-count">({{ section["items"]|length }})</span>
                     </span>
-                    <span class="header-toggle-icon">Hide ^</span>
                 </div>
 
                 {% for item in section["items"] %}

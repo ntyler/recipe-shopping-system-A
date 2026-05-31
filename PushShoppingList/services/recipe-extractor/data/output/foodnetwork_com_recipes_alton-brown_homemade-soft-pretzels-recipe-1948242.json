@@ -205,38 +205,38 @@
     {
       "equipment": "baking sheet",
       "text": "baking sheet",
-      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_equipment_1_4773b2207b99.png",
-      "equipment_image_generated_at": "2026-05-31T09:26:51.341933+00:00"
+      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_equipment_1_2db6ef3eb89b.png",
+      "equipment_image_generated_at": "2026-05-31T09:53:50.092546+00:00"
     },
     {
       "equipment": "oven",
       "text": "oven",
-      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_equipment_2_8f73f58d4b5a.png",
-      "equipment_image_generated_at": "2026-05-31T09:27:09.623999+00:00"
+      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_equipment_2_e39282c0efc6.png",
+      "equipment_image_generated_at": "2026-05-31T09:54:08.242272+00:00"
     },
     {
       "equipment": "pot",
       "text": "pot",
-      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_equipment_3_81a48135d179.png",
-      "equipment_image_generated_at": "2026-05-31T09:27:25.777119+00:00"
+      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_equipment_3_de41ae318fd2.png",
+      "equipment_image_generated_at": "2026-05-31T09:54:31.776909+00:00"
     },
     {
       "equipment": "rolling pin",
       "text": "rolling pin",
-      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_equipment_4_8692a2f1e0be.png",
-      "equipment_image_generated_at": "2026-05-31T09:27:41.757441+00:00"
+      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_equipment_4_e7f4156014c3.png",
+      "equipment_image_generated_at": "2026-05-31T09:54:47.515190+00:00"
     },
     {
       "equipment": "saucepan",
       "text": "saucepan",
-      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_equipment_5_7e8e73cd7f39.png",
-      "equipment_image_generated_at": "2026-05-31T09:27:58.012193+00:00"
+      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_equipment_5_a51478f0468d.png",
+      "equipment_image_generated_at": "2026-05-31T09:55:04.067377+00:00"
     },
     {
       "equipment": "spatula",
       "text": "spatula",
-      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_equipment_6_62ff229332be.png",
-      "equipment_image_generated_at": "2026-05-31T09:30:19.365217+00:00"
+      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_equipment_6_e539dd5a3944.png",
+      "equipment_image_generated_at": "2026-05-31T09:55:23.989168+00:00"
     }
   ],
   "instructions": [
@@ -248,8 +248,8 @@
       "temperature": null,
       "time": null,
       "equipment_used": [],
-      "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_step_1_5c0e37b17abb.png",
-      "step_image_generated_at": "2026-05-31T09:30:37.128141+00:00"
+      "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_step_1_17179f0afaeb.png",
+      "step_image_generated_at": "2026-05-31T09:55:43.034359+00:00"
     },
     {
       "section": null,
@@ -262,8 +262,8 @@
         "baking sheet",
         "oven"
       ],
-      "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_step_2_3e2689b9a4a6.png",
-      "step_image_generated_at": "2026-05-31T09:30:55.997063+00:00"
+      "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_step_2_5158b5531f05.png",
+      "step_image_generated_at": "2026-05-31T09:56:00.884069+00:00"
     },
     {
       "section": null,
@@ -277,8 +277,8 @@
         "rolling pin",
         "saucepan"
       ],
-      "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_step_3_84c0c7530dd6.png",
-      "step_image_generated_at": "2026-05-31T09:33:10.952167+00:00"
+      "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_step_3_1c9f21635e82.png",
+      "step_image_generated_at": "2026-05-31T09:56:18.650968+00:00"
     },
     {
       "section": null,
@@ -291,8 +291,8 @@
         "baking sheet",
         "rolling pin"
       ],
-      "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_step_4_fba755340c29.png",
-      "step_image_generated_at": "2026-05-31T09:33:30.305617+00:00"
+      "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_step_4_ba6c38adb598.png",
+      "step_image_generated_at": "2026-05-31T09:56:38.191914+00:00"
     },
     {
       "section": null,
@@ -306,8 +306,8 @@
         "oven",
         "spatula"
       ],
-      "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_step_5_b66e4d65d3be.png",
-      "step_image_generated_at": "2026-05-31T09:33:49.801129+00:00"
+      "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_step_5_96c121531a0f.png",
+      "step_image_generated_at": "2026-05-31T09:56:55.590899+00:00"
     }
   ],
   "nutrition": {

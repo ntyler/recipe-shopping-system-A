@@ -10052,7 +10052,7 @@ async function saveItemStoreSelection(itemKey, storeKey) {
 }
 
 function bindSectionHeaderToggles() {
-    document.querySelectorAll("#sectionView .collapsible-header, #storeView .collapsible-header, #recipeView .collapsible-header").forEach(header => {
+    document.querySelectorAll("#recipeView .collapsible-header").forEach(header => {
         const title = header.querySelector(".header-title");
         const collapseKey = header.dataset.collapseKey || (title ? normalizeSectionKey(title.textContent) : "");
         const icon = header.querySelector(".header-toggle-icon");
