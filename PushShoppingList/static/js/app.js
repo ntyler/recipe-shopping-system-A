@@ -3608,14 +3608,14 @@ function updateCardCollapseToggleState(key, isCollapsed) {
 }
 
 function scrollStoreOptionsIntoView() {
-    scrollCardIntoView("storeOptionsSection");
+    scrollCardIntoView("storeOptionsSection", { behavior: "auto" });
 }
 
 function scrollRulesIntoView() {
     scrollCardIntoView("rulesCard");
 }
 
-function scrollCardIntoView(cardId) {
+function scrollCardIntoView(cardId, options = {}) {
     const section = document.getElementById(cardId);
 
     if (!section) {
@@ -3623,7 +3623,7 @@ function scrollCardIntoView(cardId) {
     }
 
     section.scrollIntoView({
-        behavior: "smooth",
+        behavior: options.behavior || "smooth",
         block: "start",
     });
 }
