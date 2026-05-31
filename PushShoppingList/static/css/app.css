@@ -3269,6 +3269,13 @@ body {
             display: none !important;
         }
 
+        .recipe-view-card.recipe-view-collapsed .recipe-view-body-media.recipe-image-visibility-hidden,
+        .recipe-view-card.recipe-view-collapsed .recipe-cover-image.recipe-image-visibility-hidden,
+        .recipe-view-title-media.recipe-image-visibility-hidden,
+        .recipe-view-title-media .recipe-cover-image.recipe-image-visibility-hidden {
+            display: none !important;
+        }
+
         .recipe-task-check {
             margin-top: 3px;
             transform: scale(1.15);
@@ -9858,12 +9865,10 @@ body {
 .recipe-edit-section {
     margin-top: 18px;
     padding: 22px;
-    border: 1px solid #223044;
-    border-radius: 8px;
-    background:
-        linear-gradient(145deg, rgba(22, 32, 47, 0.88), rgba(10, 17, 27, 0.92)),
-        #101823;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
 }
 
 .recipe-edit-info-panel {
@@ -11224,11 +11229,11 @@ body {
 
 .recipe-edit-ingredients {
     gap: 10px;
-    padding: 12px;
-    overflow: hidden;
-    border: 1px solid #263447;
-    border-radius: 8px;
-    background: rgba(8, 14, 22, 0.34);
+    padding: 0;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
 }
 
 .recipe-edit-ingredients.recipe-edit-ingredients-collapsed .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded),
@@ -12124,7 +12129,7 @@ body {
     }
 
     .recipe-edit-ingredients {
-        padding: 10px;
+        padding: 0;
     }
 
     .recipe-edit-ingredient-row {
@@ -12423,8 +12428,8 @@ body {
     }
 
     .recipe-edit-ingredients {
-        overflow-x: hidden;
-        padding: 8px;
+        overflow-x: visible;
+        padding: 0;
     }
 
     .recipe-edit-ingredient-row,

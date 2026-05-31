@@ -11197,7 +11197,7 @@ function setRecipeImagesVisibleFromMenu(button, visible) {
         expandRecipeCardForImageGeneration(card);
     }
 
-    setRecipeImageContainersVisible(card.querySelectorAll(".recipe-view-body-media, [data-equipment-image-panel], [data-step-image-panel]"), visible);
+    setRecipeImageContainersVisible(recipeImageContainersForCard(card), visible);
     return false;
 }
 
@@ -11213,7 +11213,7 @@ function setAllRecipeImagesVisibleFromMenu(button, visible) {
             expandRecipeCardForImageGeneration(card);
         }
 
-        setRecipeImageContainersVisible(card.querySelectorAll(".recipe-view-body-media, [data-equipment-image-panel], [data-step-image-panel]"), visible);
+        setRecipeImageContainersVisible(recipeImageContainersForCard(card), visible);
     });
 
     return false;
@@ -11243,7 +11243,20 @@ function setRecipeImageContainersVisible(containers, visible) {
     [...containers].forEach(container => {
         container.classList.toggle("recipe-image-visibility-hidden", !visible);
         container.setAttribute("aria-hidden", visible ? "false" : "true");
+
+        if (container.classList.contains("recipe-view-body-media")) {
+            container.querySelectorAll(".recipe-cover-image").forEach(image => {
+                image.classList.toggle("recipe-image-visibility-hidden", !visible);
+                image.setAttribute("aria-hidden", visible ? "false" : "true");
+            });
+        }
     });
+}
+
+function recipeImageContainersForCard(card) {
+    return card
+        ? card.querySelectorAll(".recipe-view-title-media, .recipe-view-body-media, [data-equipment-image-panel], [data-step-image-panel]")
+        : [];
 }
 
 function keepRecipeCoverImagesVisible(scope = document) {
