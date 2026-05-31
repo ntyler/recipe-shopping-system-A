@@ -2226,6 +2226,24 @@ body {
             box-sizing: border-box;
         }
 
+        .view-switcher-sticky::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            bottom: -1px;
+            left: 50%;
+            width: 100vw;
+            transform: translateX(-50%);
+            background: #111414;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        body.recipe-editor-open .view-switcher-sticky {
+            visibility: hidden;
+            pointer-events: none;
+        }
+
         .view-switcher-sticky .view-control-title {
             margin-bottom: 7px;
         }

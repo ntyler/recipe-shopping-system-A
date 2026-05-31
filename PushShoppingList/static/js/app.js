@@ -5553,6 +5553,7 @@ async function openRecipeEditor(button, options = {}) {
     modal.classList.add("open");
     modal.setAttribute("aria-hidden", "false");
     document.body.classList.add("modal-open");
+    document.body.classList.add("recipe-editor-open");
 
     try {
         const response = await fetch(`/api/recipe?url=${encodeURIComponent(url)}`, {
@@ -5608,6 +5609,7 @@ function closeRecipeEditor() {
         modal.classList.remove("open");
         modal.setAttribute("aria-hidden", "true");
         document.body.classList.remove("modal-open");
+        document.body.classList.remove("recipe-editor-open");
     }
 
     window.location.reload();
