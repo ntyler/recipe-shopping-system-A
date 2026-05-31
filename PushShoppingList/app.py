@@ -27,7 +27,12 @@ def create_app():
             "http://localhost:",
         )
 
-        if request.path == "/api/recipe_urls/reorder" and origin.startswith(local_origins):
+        reorder_paths = {
+            "/api/recipe_urls/reorder",
+            "/api/cookbooks/reorder",
+        }
+
+        if request.path in reorder_paths and origin.startswith(local_origins):
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Headers"] = "Content-Type"
             response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"

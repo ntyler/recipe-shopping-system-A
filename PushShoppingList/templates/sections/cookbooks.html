@@ -62,19 +62,35 @@
                 </div>
 
                 {% if cookbook_view.cookbooks %}
-                    <div class="cookbook-card-grid">
+                    <div class="cookbook-card-grid"
+                         data-cookbook-sort-list
+                         aria-label="Cookbook order">
                         {% for cookbook in cookbook_view.cookbooks %}
                             <article class="cookbook-card"
                                      data-cookbook-card
                                      data-cookbook-id="{{ cookbook.id }}"
+                                     draggable="true"
                                      tabindex="0"
+                                     aria-grabbed="false"
                                      aria-expanded="true"
                                      onclick="return toggleCookbookCardFromSurface(this, event)"
                                      onkeydown="return handleCookbookCardSurfaceKeydown(this, event)">
                                 <div class="cookbook-card-header">
-                                    <div>
-                                        <h3>{{ cookbook.name }}</h3>
-                                        <span>{{ cookbook.recipes | length }} recipe{% if cookbook.recipes | length != 1 %}s{% endif %}</span>
+                                    <div class="cookbook-card-heading-row">
+                                        <button type="button"
+                                                class="recipe-url-drag-handle cookbook-drag-handle"
+                                                data-cookbook-drag-handle
+                                                aria-label="Reorder {{ cookbook.name }}"
+                                                onclick="event.stopPropagation()">
+                                            <span class="recipe-url-drag-dots" aria-hidden="true">
+                                                <span></span><span></span><span></span>
+                                                <span></span><span></span><span></span>
+                                            </span>
+                                        </button>
+                                        <div class="cookbook-card-title">
+                                            <h3>{{ cookbook.name }}</h3>
+                                            <span>{{ cookbook.recipes | length }} recipe{% if cookbook.recipes | length != 1 %}s{% endif %}</span>
+                                        </div>
                                     </div>
                                     <div class="cookbook-card-actions">
                                         <div class="cookbook-card-menu-wrap recipe-edit-row-menu-wrap">

@@ -28,6 +28,7 @@ from PushShoppingList.services.cookbook_service import recipe_ingredients_for_re
 from PushShoppingList.services.cookbook_service import recipe_cookbook_assignments
 from PushShoppingList.services.cookbook_service import remove_recipe_from_cookbook
 from PushShoppingList.services.cookbook_service import rename_cookbook
+from PushShoppingList.services.cookbook_service import reorder_cookbooks
 from PushShoppingList.services.home_address_service import load_home_address
 from PushShoppingList.services.home_address_service import save_home_address
 from PushShoppingList.services.home_store_location_service import DEFAULT_STORE_SEARCH_RADIUS_MILES
@@ -1216,6 +1217,32 @@ def rename_cookbook_route(cookbook_id):
         return jsonify({"ok": False, "error": str(err)}), 400
 
     return jsonify({"ok": True})
+
+
+@main_bp.route("/api/cookbooks/reorder", methods=["POST"])
+def reorder_cookbooks_route():
+    data = request.get_json(silent=True) or {}
+    cookbook_ids = data.get("cookbook_ids") if isinstance(data.get("cookbook_ids"), list) else []
+
+    if not cookbook_ids:
+        return jsonify({
+            "ok": False,
+            "error": "Cookbook order is required.",
+        }), 400
+
+    try:
+        cookbooks = reorder_cookbooks(cookbook_ids)
+    except ValueError as err:
+        return jsonify({"ok": False, "error": str(err)}), 400
+
+    return jsonify({
+        "ok": True,
+        "cookbook_ids": [
+            cookbook.get("id", "")
+            for cookbook in cookbooks
+            if cookbook.get("id")
+        ],
+    })
 
 
 @main_bp.route("/api/cookbooks/move_recipes", methods=["POST"])

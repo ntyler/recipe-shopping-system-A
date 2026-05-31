@@ -475,6 +475,52 @@ def rename_cookbook(cookbook_id, name):
         return save_cookbooks(payload)
 
 
+def reorder_cookbooks(cookbook_ids):
+    requested_ids = []
+    seen_requested = set()
+
+    for cookbook_id in cookbook_ids or []:
+        cookbook_id = clean_text(cookbook_id)
+
+        if cookbook_id and cookbook_id not in seen_requested:
+            requested_ids.append(cookbook_id)
+            seen_requested.add(cookbook_id)
+
+    if not requested_ids:
+        raise ValueError("Cookbook order is required.")
+
+    with COOKBOOKS_LOCK:
+        payload = load_cookbooks()
+        current_cookbooks = payload.get("cookbooks", [])
+        current_by_id = {
+            cookbook.get("id"): cookbook
+            for cookbook in current_cookbooks
+            if cookbook.get("id")
+        }
+        ordered_cookbooks = []
+        seen = set()
+
+        for cookbook_id in requested_ids:
+            cookbook = current_by_id.get(cookbook_id)
+
+            if cookbook is not None and cookbook_id not in seen:
+                ordered_cookbooks.append(cookbook)
+                seen.add(cookbook_id)
+
+        for cookbook in current_cookbooks:
+            cookbook_id = cookbook.get("id")
+
+            if cookbook_id and cookbook_id not in seen:
+                ordered_cookbooks.append(cookbook)
+                seen.add(cookbook_id)
+
+        if current_cookbooks and not ordered_cookbooks:
+            raise ValueError("No cookbooks matched the requested order.")
+
+        payload["cookbooks"] = ordered_cookbooks
+        return save_cookbooks(payload).get("cookbooks", [])
+
+
 def move_recipes_to_cookbook(cookbook_id, recipe_urls, recipe_rows=None, overwrite_existing=False):
     available_recipes = recipe_snapshot_lookup(recipe_rows)
 

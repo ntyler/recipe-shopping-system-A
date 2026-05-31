@@ -2876,6 +2876,204 @@ function toggleCookbookRecipeDetails(button) {
     return false;
 }
 
+function cookbookOrder(list) {
+    return [...list.querySelectorAll("[data-cookbook-card]")]
+        .map(card => card.dataset.cookbookId || "")
+        .filter(Boolean);
+}
+
+function updateCookbookDragLabels(list) {
+    [...list.querySelectorAll("[data-cookbook-card]")].forEach((card, index) => {
+        const title = card.querySelector(".cookbook-card-title h3");
+        const handle = card.querySelector("[data-cookbook-drag-handle]");
+        const label = title ? title.textContent.trim() : `cookbook ${index + 1}`;
+
+        if (handle) {
+            handle.setAttribute("aria-label", `Reorder ${label}`);
+        }
+    });
+}
+
+function bindCookbookDragAndDrop() {
+    const list = document.querySelector("[data-cookbook-sort-list]");
+
+    if (!list || list.dataset.dragBound === "1") {
+        return;
+    }
+
+    list.dataset.dragBound = "1";
+    list.dataset.savedOrder = cookbookOrder(list).join("\n");
+
+    list.querySelectorAll("[data-cookbook-card]").forEach(card => {
+        const handle = card.querySelector("[data-cookbook-drag-handle]");
+
+        card.setAttribute("draggable", "true");
+        card.setAttribute("aria-grabbed", "false");
+
+        if (handle) {
+            handle.addEventListener("pointerdown", () => {
+                card.dataset.dragHandleActive = "1";
+            });
+            handle.addEventListener("pointerup", () => {
+                delete card.dataset.dragHandleActive;
+            });
+            handle.addEventListener("blur", () => {
+                delete card.dataset.dragHandleActive;
+            });
+            handle.addEventListener("click", event => {
+                event.stopPropagation();
+            });
+        }
+
+        card.addEventListener("dragstart", event => {
+            if (card.dataset.dragHandleActive !== "1") {
+                event.preventDefault();
+                return;
+            }
+
+            closeRecipeEditRowMenus();
+            card.classList.add("is-dragging");
+            card.setAttribute("aria-grabbed", "true");
+            list.classList.add("is-dragging");
+            document.body.classList.add("recipe-url-dragging");
+
+            if (event.dataTransfer) {
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("text/plain", card.dataset.cookbookId || "");
+            }
+        });
+
+        card.addEventListener("dragend", () => {
+            const changed = list.dataset.savedOrder !== cookbookOrder(list).join("\n");
+
+            card.classList.remove("is-dragging");
+            card.setAttribute("aria-grabbed", "false");
+            delete card.dataset.dragHandleActive;
+            list.classList.remove("is-dragging");
+            document.body.classList.remove("recipe-url-dragging");
+            updateCookbookDragLabels(list);
+
+            if (changed) {
+                saveCookbookOrder(list);
+            }
+        });
+    });
+
+    list.addEventListener("dragover", event => {
+        const draggingCard = list.querySelector("[data-cookbook-card].is-dragging");
+        const targetCard = event.target.closest("[data-cookbook-card]");
+
+        if (!draggingCard || !targetCard || targetCard === draggingCard || targetCard.parentElement !== list) {
+            return;
+        }
+
+        event.preventDefault();
+
+        if (event.dataTransfer) {
+            event.dataTransfer.dropEffect = "move";
+        }
+
+        const rect = targetCard.getBoundingClientRect();
+        const shouldPlaceAfter = event.clientY > rect.top + rect.height / 2;
+        list.insertBefore(draggingCard, shouldPlaceAfter ? targetCard.nextElementSibling : targetCard);
+        updateCookbookDragLabels(list);
+    });
+
+    list.addEventListener("drop", event => {
+        if (list.querySelector("[data-cookbook-card].is-dragging")) {
+            event.preventDefault();
+        }
+    });
+
+    updateCookbookDragLabels(list);
+}
+
+async function saveCookbookOrder(list) {
+    const cookbookIds = cookbookOrder(list);
+
+    if (!cookbookIds.length || list.dataset.savePending === "1") {
+        return;
+    }
+
+    list.dataset.savePending = "1";
+    list.classList.add("is-saving");
+    setCookbookStatus("Saving cookbook order...");
+
+    try {
+        const data = await postCookbookOrder(cookbookIds);
+        const savedIds = Array.isArray(data.cookbook_ids) && data.cookbook_ids.length
+            ? data.cookbook_ids
+            : cookbookIds;
+
+        list.dataset.savedOrder = savedIds.join("\n");
+        setCookbookStatus("Cookbook order updated.");
+    } catch (err) {
+        console.warn("Unable to save cookbook order.", err);
+        setCookbookStatus(err.message || "Unable to save cookbook order.", true);
+        alert(err.message || "Unable to save cookbook order.");
+    } finally {
+        list.classList.remove("is-saving");
+        delete list.dataset.savePending;
+    }
+}
+
+async function postCookbookOrder(cookbookIds) {
+    const endpoints = ["/api/cookbooks/reorder"];
+    const hostname = window.location.hostname;
+
+    if (
+        window.location.port !== "5000"
+        && ["127.0.0.1", "localhost"].includes(hostname)
+    ) {
+        endpoints.push(`${window.location.protocol}//${hostname}:5000/api/cookbooks/reorder`);
+    }
+
+    let lastError = null;
+
+    for (const endpoint of endpoints) {
+        try {
+            return await postCookbookOrderToEndpoint(endpoint, cookbookIds);
+        } catch (err) {
+            lastError = err;
+
+            if (!err.canTryNextCookbookOrderEndpoint) {
+                break;
+            }
+        }
+    }
+
+    throw lastError || new Error("Unable to save cookbook order.");
+}
+
+async function postCookbookOrderToEndpoint(endpoint, cookbookIds) {
+    const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ cookbook_ids: cookbookIds }),
+    });
+    const contentType = response.headers.get("content-type") || "";
+    const data = contentType.includes("application/json")
+        ? await response.json()
+        : null;
+
+    if (!response.ok || !data || !data.ok) {
+        const error = new Error(
+            (data && data.error)
+            || (
+                response.status === 404
+                    ? "Cookbook reorder is not available on this running server."
+                    : "Unable to save cookbook order."
+            )
+        );
+        error.canTryNextCookbookOrderEndpoint = response.status === 404 || !contentType.includes("application/json");
+        throw error;
+    }
+
+    return data;
+}
+
 function bindCookbooks() {
     document.querySelectorAll("[data-cookbook-recipe-checkbox]").forEach(checkbox => {
         if (checkbox.dataset.cookbookBound === "1") {
@@ -2916,6 +3114,7 @@ function bindCookbooks() {
     restoreCookbookRecipeCollapseState();
     restoreCookbookRecipeSearchValue();
     applyCookbookRecipeSearch();
+    bindCookbookDragAndDrop();
 }
 
 async function refreshCookbooksMarkup() {

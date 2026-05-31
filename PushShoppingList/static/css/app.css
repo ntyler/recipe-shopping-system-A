@@ -4012,6 +4012,10 @@ body {
             gap: 10px;
         }
 
+        .cookbook-card-grid.is-saving .cookbook-card {
+            opacity: 0.74;
+        }
+
         .cookbook-card {
             min-width: 0;
             padding: 12px;
@@ -4023,6 +4027,12 @@ body {
             box-sizing: border-box;
             cursor: pointer;
             transition: background 120ms ease, border-color 120ms ease, opacity 120ms ease;
+        }
+
+        .cookbook-card.is-dragging {
+            opacity: 0.58;
+            background: #17211f;
+            border-color: #12d6c5;
         }
 
         .cookbook-card:hover,
@@ -4040,6 +4050,22 @@ body {
             justify-content: space-between;
             gap: 10px;
             margin-bottom: 10px;
+        }
+
+        .cookbook-card-heading-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            min-width: 0;
+            flex: 1 1 auto;
+        }
+
+        .cookbook-card-title {
+            min-width: 0;
+        }
+
+        .cookbook-drag-handle {
+            margin-top: -2px;
         }
 
         .cookbook-card-collapsed .cookbook-card-header {
