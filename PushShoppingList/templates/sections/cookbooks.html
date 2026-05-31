@@ -66,21 +66,17 @@
                         {% for cookbook in cookbook_view.cookbooks %}
                             <article class="cookbook-card"
                                      data-cookbook-card
-                                     data-cookbook-id="{{ cookbook.id }}">
+                                     data-cookbook-id="{{ cookbook.id }}"
+                                     tabindex="0"
+                                     aria-expanded="true"
+                                     onclick="return toggleCookbookCardFromSurface(this, event)"
+                                     onkeydown="return handleCookbookCardSurfaceKeydown(this, event)">
                                 <div class="cookbook-card-header">
                                     <div>
                                         <h3>{{ cookbook.name }}</h3>
                                         <span>{{ cookbook.recipes | length }} recipe{% if cookbook.recipes | length != 1 %}s{% endif %}</span>
                                     </div>
                                     <div class="cookbook-card-actions">
-                                        <button type="button"
-                                                class="cookbook-card-toggle-btn"
-                                                data-cookbook-toggle
-                                                data-cookbook-id="{{ cookbook.id }}"
-                                                aria-expanded="true"
-                                                onclick="return toggleCookbookCard(this)">
-                                            <span data-cookbook-toggle-icon>Hide ^</span>
-                                        </button>
                                         <div class="cookbook-card-menu-wrap recipe-edit-row-menu-wrap">
                                             <button type="button"
                                                     class="recipe-edit-row-menu-btn cookbook-card-menu-btn"

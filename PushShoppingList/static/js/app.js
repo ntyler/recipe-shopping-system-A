@@ -2676,6 +2676,7 @@ function updateCookbookCardCollapseDisplay(card) {
 
     card.classList.toggle("cookbook-card-collapsed", isVisuallyCollapsed);
     card.classList.toggle("cookbook-card-search-open", forceOpenForSearch);
+    card.setAttribute("aria-expanded", isVisuallyCollapsed ? "false" : "true");
 
     if (toggle) {
         toggle.setAttribute("aria-expanded", isVisuallyCollapsed ? "false" : "true");
@@ -2722,6 +2723,31 @@ function toggleCookbookCard(button) {
     }
 
     return false;
+}
+
+function toggleCookbookCardFromSurface(card, event = null) {
+    if (eventStartedInNestedInteractive(event, card)) {
+        return true;
+    }
+
+    if (event && event.target && event.target.closest && event.target.closest("[data-cookbook-recipe-card]")) {
+        return true;
+    }
+
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    return toggleCookbookCard(card);
+}
+
+function handleCookbookCardSurfaceKeydown(card, event) {
+    if (!event || (event.key !== "Enter" && event.key !== " ")) {
+        return true;
+    }
+
+    return toggleCookbookCardFromSurface(card, event);
 }
 
 function recipeCardMatchesCookbookSearch(recipeCard, terms) {
