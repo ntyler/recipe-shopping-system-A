@@ -14,15 +14,15 @@
       "quantity": "1 1/2",
       "recipe_qty": "1 1/2",
       "unit": "cups",
-      "base_quantity": "1 1/2",
-      "base_unit": "cups",
       "ingredient": "warm water",
       "preparation": null,
       "optional": false,
       "store_section": "MISC",
       "store_section_order": 19,
       "purchasable_item": "warm water",
-      "purchase_group": "warm water"
+      "purchase_group": "warm water",
+      "base_quantity": "1 1/2",
+      "base_unit": "cups"
     },
     {
       "section": null,
@@ -30,15 +30,15 @@
       "quantity": "1",
       "recipe_qty": "1",
       "unit": "tablespoon",
-      "base_quantity": "1",
-      "base_unit": "tablespoon",
       "ingredient": "sugar",
       "preparation": null,
       "optional": false,
       "store_section": "BAKING",
       "store_section_order": 7,
       "purchasable_item": "sugar",
-      "purchase_group": "sugar"
+      "purchase_group": "sugar",
+      "base_quantity": "1",
+      "base_unit": "tablespoon"
     },
     {
       "section": null,
@@ -46,15 +46,15 @@
       "quantity": "2",
       "recipe_qty": "2",
       "unit": "teaspoons",
-      "base_quantity": "2",
-      "base_unit": "teaspoons",
       "ingredient": "kosher salt",
       "preparation": null,
       "optional": false,
       "store_section": "SPICES & SEASONINGS",
       "store_section_order": 12,
       "purchasable_item": "kosher salt",
-      "purchase_group": "kosher salt"
+      "purchase_group": "kosher salt",
+      "base_quantity": "2",
+      "base_unit": "teaspoons"
     },
     {
       "section": null,
@@ -62,15 +62,14 @@
       "quantity": "1",
       "recipe_qty": "1",
       "unit": null,
-      "base_quantity": "1",
-      "base_unit": null,
       "ingredient": "package active dry yeast",
       "preparation": null,
       "optional": false,
       "store_section": "BAKING",
       "store_section_order": 7,
       "purchasable_item": "package active dry yeast",
-      "purchase_group": "package active dry yeast"
+      "purchase_group": "package active dry yeast",
+      "base_quantity": "1"
     },
     {
       "section": null,
@@ -78,15 +77,15 @@
       "quantity": "22",
       "recipe_qty": "22",
       "unit": "ounces",
-      "base_quantity": "22",
-      "base_unit": "ounces",
       "ingredient": "all-purpose flour",
       "preparation": "approximately 4 1/2 cups",
       "optional": false,
       "store_section": "BAKING",
       "store_section_order": 7,
       "purchasable_item": "all-purpose flour",
-      "purchase_group": "all-purpose flour"
+      "purchase_group": "all-purpose flour",
+      "base_quantity": "22",
+      "base_unit": "ounces"
     },
     {
       "section": null,
@@ -94,15 +93,15 @@
       "quantity": "2",
       "recipe_qty": "2",
       "unit": "ounces",
-      "base_quantity": "2",
-      "base_unit": "ounces",
       "ingredient": "unsalted butter",
       "preparation": "melted",
       "optional": false,
       "store_section": "DAIRY & EGGS",
       "store_section_order": 3,
       "purchasable_item": "unsalted butter",
-      "purchase_group": "unsalted butter"
+      "purchase_group": "unsalted butter",
+      "base_quantity": "2",
+      "base_unit": "ounces"
     },
     {
       "section": null,
@@ -110,8 +109,6 @@
       "quantity": null,
       "recipe_qty": null,
       "unit": null,
-      "base_quantity": null,
-      "base_unit": null,
       "ingredient": "Vegetable oil",
       "preparation": "for pan",
       "optional": false,
@@ -126,15 +123,15 @@
       "quantity": "10",
       "recipe_qty": "10",
       "unit": "cups",
-      "base_quantity": "10",
-      "base_unit": "cups",
       "ingredient": "water",
       "preparation": null,
       "optional": false,
       "store_section": "MISC",
       "store_section_order": 19,
       "purchasable_item": "water",
-      "purchase_group": "water"
+      "purchase_group": "water",
+      "base_quantity": "10",
+      "base_unit": "cups"
     },
     {
       "section": null,
@@ -142,47 +139,30 @@
       "quantity": "2/3",
       "recipe_qty": "2/3",
       "unit": "cup",
-      "base_quantity": "2/3",
-      "base_unit": "cup",
       "ingredient": "baking soda",
       "preparation": null,
       "optional": false,
       "store_section": "BAKING",
       "store_section_order": 7,
       "purchasable_item": "baking soda",
-      "purchase_group": "baking soda"
+      "purchase_group": "baking soda",
+      "base_quantity": "2/3",
+      "base_unit": "cup"
     },
     {
       "section": null,
-      "original_text": "1 large egg yolk",
+      "original_text": "1 large egg yolk beaten with 1 tablespoon water",
       "quantity": "1",
       "recipe_qty": "1",
       "unit": null,
-      "base_quantity": "1",
-      "base_unit": null,
-      "ingredient": "egg yolk",
+      "ingredient": "large egg yolk beaten with 1 tablespoon water",
       "preparation": null,
       "optional": false,
       "store_section": "DAIRY & EGGS",
       "store_section_order": 3,
-      "purchasable_item": "egg yolk",
-      "purchase_group": "egg yolk"
-    },
-    {
-      "section": null,
-      "original_text": "1 tablespoon water",
-      "quantity": "1",
-      "recipe_qty": "1",
-      "unit": "tablespoon",
-      "base_quantity": "1",
-      "base_unit": "tablespoon",
-      "ingredient": "water",
-      "preparation": null,
-      "optional": false,
-      "store_section": "MISC",
-      "store_section_order": 19,
-      "purchasable_item": "water",
-      "purchase_group": "water"
+      "purchasable_item": "large egg yolk beaten with 1 tablespoon water",
+      "purchase_group": "large egg yolk beaten with 1 tablespoon water",
+      "base_quantity": "1"
     },
     {
       "section": null,
@@ -190,8 +170,6 @@
       "quantity": null,
       "recipe_qty": null,
       "unit": null,
-      "base_quantity": null,
-      "base_unit": null,
       "ingredient": "Pretzel salt",
       "preparation": null,
       "optional": false,
@@ -203,40 +181,28 @@
   ],
   "equipment": [
     {
-      "equipment": "baking sheet",
-      "text": "baking sheet",
-      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_equipment_1_2db6ef3eb89b.png",
-      "equipment_image_generated_at": "2026-05-31T09:53:50.092546+00:00"
+      "name": "baking sheet",
+      "category": "cookware"
     },
     {
-      "equipment": "oven",
-      "text": "oven",
-      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_equipment_2_e39282c0efc6.png",
-      "equipment_image_generated_at": "2026-05-31T09:54:08.242272+00:00"
+      "name": "oven",
+      "category": "appliance"
     },
     {
-      "equipment": "pot",
-      "text": "pot",
-      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_equipment_3_de41ae318fd2.png",
-      "equipment_image_generated_at": "2026-05-31T09:54:31.776909+00:00"
+      "name": "pot",
+      "category": "cookware"
     },
     {
-      "equipment": "rolling pin",
-      "text": "rolling pin",
-      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_equipment_4_e7f4156014c3.png",
-      "equipment_image_generated_at": "2026-05-31T09:54:47.515190+00:00"
+      "name": "rolling pin",
+      "category": "prep"
     },
     {
-      "equipment": "saucepan",
-      "text": "saucepan",
-      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_equipment_5_a51478f0468d.png",
-      "equipment_image_generated_at": "2026-05-31T09:55:04.067377+00:00"
+      "name": "saucepan",
+      "category": "cookware"
     },
     {
-      "equipment": "spatula",
-      "text": "spatula",
-      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_equipment_6_e539dd5a3944.png",
-      "equipment_image_generated_at": "2026-05-31T09:55:23.989168+00:00"
+      "name": "spatula",
+      "category": "utensil"
     }
   ],
   "instructions": [
@@ -244,70 +210,55 @@
       "section": null,
       "step_number": 1,
       "instruction": "Combine the water, sugar and kosher salt in the bowl of a stand mixer and sprinkle the yeast on top. Allow to sit for 5 minutes or until the mixture begins to foam. Add the flour and butter and, using the dough hook attachment, mix on low speed until well combined. Change to medium speed and knead until the dough is smooth and pulls away from the side of the bowl, approximately 4 to 5 minutes. Remove the dough from the bowl, clean the bowl and then oil it well with vegetable oil. Return the dough to the bowl, cover with plastic wrap and sit in a warm place for approximately 50 to 55 minutes or until the dough has doubled in size.",
-      "text": "Combine the water, sugar and kosher salt in the bowl of a stand mixer and sprinkle the yeast on top. Allow to sit for 5 minutes or until the mixture begins to foam. Add the flour and butter and, using the dough hook attachment, mix on low speed until well combined. Change to medium speed and knead until the dough is smooth and pulls away from the side of the bowl, approximately 4 to 5 minutes. Remove the dough from the bowl, clean the bowl and then oil it well with vegetable oil. Return the dough to the bowl, cover with plastic wrap and sit in a warm place for approximately 50 to 55 minutes or until the dough has doubled in size.",
       "temperature": null,
       "time": null,
-      "equipment_used": [],
-      "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_step_1_17179f0afaeb.png",
-      "step_image_generated_at": "2026-05-31T09:55:43.034359+00:00"
+      "equipment_used": []
     },
     {
       "section": null,
       "step_number": 2,
       "instruction": "Preheat the oven to 450 degrees F. Line 2 half-sheet pans with parchment paper and lightly brush with the vegetable oil. Set aside.",
-      "text": "Preheat the oven to 450 degrees F. Line 2 half-sheet pans with parchment paper and lightly brush with the vegetable oil. Set aside.",
       "temperature": null,
       "time": null,
       "equipment_used": [
         "baking sheet",
         "oven"
-      ],
-      "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_step_2_5158b5531f05.png",
-      "step_image_generated_at": "2026-05-31T09:56:00.884069+00:00"
+      ]
     },
     {
       "section": null,
       "step_number": 3,
       "instruction": "Bring the 10 cups of water and the baking soda to a rolling boil in an 8-quart saucepan or roasting pan.",
-      "text": "Bring the 10 cups of water and the baking soda to a rolling boil in an 8-quart saucepan or roasting pan.",
       "temperature": null,
       "time": null,
       "equipment_used": [
         "pot",
         "rolling pin",
         "saucepan"
-      ],
-      "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_step_3_1c9f21635e82.png",
-      "step_image_generated_at": "2026-05-31T09:56:18.650968+00:00"
+      ]
     },
     {
       "section": null,
       "step_number": 4,
       "instruction": "In the meantime, turn the dough out onto a slightly oiled work surface and divide into 8 equal pieces. Roll out each piece of dough into a 24-inch rope. Make a U-shape with the rope, holding the ends of the rope, cross them over each other and press onto the bottom of the U in order to form the shape of a pretzel. Place onto the parchment-lined half sheet pan.",
-      "text": "In the meantime, turn the dough out onto a slightly oiled work surface and divide into 8 equal pieces. Roll out each piece of dough into a 24-inch rope. Make a U-shape with the rope, holding the ends of the rope, cross them over each other and press onto the bottom of the U in order to form the shape of a pretzel. Place onto the parchment-lined half sheet pan.",
       "temperature": null,
       "time": null,
       "equipment_used": [
         "baking sheet",
         "rolling pin"
-      ],
-      "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_step_4_ba6c38adb598.png",
-      "step_image_generated_at": "2026-05-31T09:56:38.191914+00:00"
+      ]
     },
     {
       "section": null,
       "step_number": 5,
       "instruction": "Place the pretzels into the boiling water, 1 by 1, for 30 seconds. Remove them from the water using a large flat spatula. Return to the half sheet pan, brush the top of each pretzel with the beaten egg yolk and water mixture and sprinkle with the pretzel salt. Bake until dark golden brown in color, approximately 12 to 14 minutes. Transfer to a cooling rack for at least 5 minutes before serving.",
-      "text": "Place the pretzels into the boiling water, 1 by 1, for 30 seconds. Remove them from the water using a large flat spatula. Return to the half sheet pan, brush the top of each pretzel with the beaten egg yolk and water mixture and sprinkle with the pretzel salt. Bake until dark golden brown in color, approximately 12 to 14 minutes. Transfer to a cooling rack for at least 5 minutes before serving.",
       "temperature": null,
       "time": null,
       "equipment_used": [
         "baking sheet",
         "oven",
         "spatula"
-      ],
-      "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_step_5_96c121531a0f.png",
-      "step_image_generated_at": "2026-05-31T09:56:55.590899+00:00"
+      ]
     }
   ],
   "nutrition": {
@@ -317,10 +268,19 @@
     "protein": "10g",
     "fat": "14g",
     "saturated_fat": "4g",
+    "polyunsaturated_fat": null,
+    "monounsaturated_fat": null,
+    "trans_fat": null,
     "cholesterol": "38mg",
     "sodium": "5061mg",
+    "potassium": null,
     "fiber": "3g",
-    "sugar": "2g"
+    "sugar": "2g",
+    "vitamin_a": null,
+    "vitamin_c": null,
+    "calcium": null,
+    "iron": null,
+    "other": []
   },
   "cover_image": {
     "url": "https://food.fnr.sndimg.com/content/dam/images/food/fullset/2011/11/23/0/FN_pretzels-005_s4x3.jpg.rend.hgtvcom.1280.1280.suffix/1382540999238.webp",
