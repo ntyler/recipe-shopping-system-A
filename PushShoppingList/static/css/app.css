@@ -576,7 +576,7 @@ body {
         }
 
         #storeOptionsSection.card-collapsed .store-options-sticky-stack {
-            position: static;
+            position: relative;
             z-index: auto;
         }
 
@@ -590,6 +590,28 @@ body {
 
         .store-options-title-toggle:hover {
             background: transparent;
+        }
+
+        .store-options-menu-wrap {
+            position: absolute;
+            top: 8px;
+            right: 10px;
+            z-index: 3;
+        }
+
+        .store-options-menu-btn.recipe-edit-row-menu-btn {
+            width: 34px;
+            min-width: 34px;
+            height: 34px;
+            min-height: 34px;
+            border-color: transparent;
+            background: transparent;
+        }
+
+        .recipe-edit-row-menu.store-options-overflow-menu {
+            min-width: 248px;
+            overflow: visible;
+            max-height: none;
         }
 
         .store-options-sticky-toolbar {
@@ -2401,16 +2423,16 @@ body {
             pointer-events: none;
         }
 
-        .recipe-view-global-menu .recipe-view-store-toggle,
-        .recipe-view-global-menu .recipe-view-store-mode-option {
+        .overflow-menu .recipe-view-store-toggle,
+        .overflow-menu .recipe-view-store-mode-option {
             display: flex;
             align-items: center;
             gap: 8px;
             text-align: left;
         }
 
-        .recipe-view-global-menu .recipe-view-store-toggle::before,
-        .recipe-view-global-menu .recipe-view-store-mode-option::before {
+        .overflow-menu .recipe-view-store-toggle::before,
+        .overflow-menu .recipe-view-store-mode-option::before {
             content: "";
             flex: 0 0 12px;
             width: 12px;
@@ -2421,8 +2443,8 @@ body {
             box-sizing: border-box;
         }
 
-        .recipe-view-global-menu .recipe-view-store-toggle[aria-pressed="true"]::before,
-        .recipe-view-global-menu .recipe-view-store-mode-option[aria-pressed="true"]::before {
+        .overflow-menu .recipe-view-store-toggle[aria-pressed="true"]::before,
+        .overflow-menu .recipe-view-store-mode-option[aria-pressed="true"]::before {
             border-color: #4da3ff;
             background: #0078D7;
             box-shadow: inset 0 0 0 2px #111927;
