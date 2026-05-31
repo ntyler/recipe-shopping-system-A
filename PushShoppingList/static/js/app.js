@@ -10410,6 +10410,45 @@ async function generateRecipeEditRowImageFromMenu(button) {
     return false;
 }
 
+async function generateRecipeImagesFromEditor(button, options = {}) {
+    const modal = document.getElementById("recipeEditModal");
+    const allButtons = [...document.querySelectorAll("[data-recipe-editor-image-global-btn]")];
+    const originalLabel = button ? button.textContent : "";
+
+    closeRecipeEditRowMenus();
+
+    if (!modal || !modal.classList.contains("open")) {
+        return false;
+    }
+
+    setRecipeImageContainersVisible(
+        modal.querySelectorAll("[data-equipment-image-panel], [data-step-image-panel]"),
+        true
+    );
+
+    allButtons.forEach(globalButton => {
+        globalButton.disabled = true;
+    });
+
+    if (button) {
+        button.textContent = options.missingOnly ? "Generating Missing..." : "Generating Images...";
+    }
+
+    try {
+        await generateRecipeImagesInCard(modal, options);
+    } finally {
+        allButtons.forEach(globalButton => {
+            globalButton.disabled = false;
+        });
+
+        if (button) {
+            button.textContent = originalLabel;
+        }
+    }
+
+    return false;
+}
+
 function setRecipeEditRowImageVisibleFromMenu(button, visible) {
     const row = recipeEditActionRowFromButton(button);
 

@@ -363,16 +363,87 @@
                     <h2 id="recipeEditTitle">Edit Recipe</h2>
                     <p>Manage and optimize the ingredients in this recipe.</p>
                 </div>
-                <a id="recipeEditPdfButton"
-                   class="recipe-edit-pdf-button recipe-edit-header-pdf-button recipe-edit-modal-header-pdf-button"
-                   href="#"
-                   target="_blank"
-                   rel="noopener noreferrer"
-                   aria-label="Download recipe PDF"
-                   hidden>
-                    <span class="recipe-edit-button-icon" aria-hidden="true">Ã¢â€ â€œ</span>
-                    <span>PDF</span>
-                </a>
+                <div class="recipe-edit-header-actions">
+                    <a id="recipeEditPdfButton"
+                       class="recipe-edit-pdf-button recipe-edit-header-pdf-button recipe-edit-modal-header-pdf-button"
+                       href="#"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       aria-label="Download recipe PDF"
+                       hidden>
+                        <span class="recipe-edit-button-icon" aria-hidden="true">Ã¢â€ â€œ</span>
+                        <span>PDF</span>
+                    </a>
+                    <div class="recipe-edit-section-menu-wrap recipe-edit-header-menu-wrap">
+                        <button type="button"
+                                class="recipe-edit-row-menu-btn recipe-edit-section-menu-btn recipe-edit-header-menu-btn"
+                                aria-label="Recipe image generation actions"
+                                aria-haspopup="true"
+                                aria-expanded="false"
+                                onclick="return toggleRecipeEditSectionMenu(this, event)">
+                            <span aria-hidden="true"></span>
+                        </button>
+                        <div class="recipe-edit-row-menu recipe-edit-section-menu overflow-menu recipe-edit-image-generation-menu recipe-edit-header-image-menu" hidden>
+                            <div class="overflow-menu-section">
+                                <div class="overflow-menu-section-title">Generate Images</div>
+                                <div class="recipe-view-generate-submenu-row">
+                                    <button type="button"
+                                            class="recipe-view-generate-submenu-toggle"
+                                            aria-haspopup="true"
+                                            aria-expanded="false"
+                                            onclick="return toggleRecipeViewGenerateSubmenu(this, event)">
+                                        Generate All Images
+                                    </button>
+                                    <div class="overflow-submenu recipe-view-generate-submenu" hidden>
+                                        <div class="overflow-menu-section-title recipe-view-menu-section-title">Generate By Section</div>
+                                        <button type="button"
+                                                data-recipe-editor-image-global-btn
+                                                onclick="return generateRecipeImagesFromEditor(this, { imageScope: 'all' })">
+                                            All Recipe Images
+                                        </button>
+                                        <button type="button"
+                                                data-recipe-editor-image-global-btn
+                                                onclick="return generateRecipeImagesFromEditor(this, { imageScope: 'equipment' })">
+                                            Equipment Images
+                                        </button>
+                                        <button type="button"
+                                                data-recipe-editor-image-global-btn
+                                                onclick="return generateRecipeImagesFromEditor(this, { imageScope: 'instructions' })">
+                                            Instruction Step Images
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="recipe-view-generate-submenu-row">
+                                    <button type="button"
+                                            class="recipe-view-generate-submenu-toggle"
+                                            aria-haspopup="true"
+                                            aria-expanded="false"
+                                            onclick="return toggleRecipeViewGenerateSubmenu(this, event)">
+                                        Generate Missing Images
+                                    </button>
+                                    <div class="overflow-submenu recipe-view-generate-submenu" hidden>
+                                        <div class="overflow-menu-section-title recipe-view-menu-section-title">Generate By Section</div>
+                                        <button type="button"
+                                                data-recipe-editor-image-global-btn
+                                                onclick="return generateRecipeImagesFromEditor(this, { missingOnly: true, imageScope: 'all' })">
+                                            All Recipe Images
+                                        </button>
+                                        <button type="button"
+                                                data-recipe-editor-image-global-btn
+                                                onclick="return generateRecipeImagesFromEditor(this, { missingOnly: true, imageScope: 'equipment' })">
+                                            Equipment Images
+                                        </button>
+                                        <button type="button"
+                                                data-recipe-editor-image-global-btn
+                                                onclick="return generateRecipeImagesFromEditor(this, { missingOnly: true, imageScope: 'instructions' })">
+                                            Instruction Step Images
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <input type="hidden" name="original_url" id="recipeEditOriginalUrl">
@@ -586,10 +657,37 @@
                             <p>Tools and equipment needed.</p>
                         </div>
                     </div>
-                    <button type="button" onclick="addRecipeEquipmentRow()">
-                        <span class="recipe-edit-button-icon" aria-hidden="true">+</span>
-                        <span>Add Equipment</span>
-                    </button>
+                    <div class="recipe-edit-section-actions recipe-edit-equipment-actions">
+                        <button type="button" onclick="addRecipeEquipmentRow()">
+                            <span class="recipe-edit-button-icon" aria-hidden="true">+</span>
+                            <span>Add Equipment</span>
+                        </button>
+                        <div class="recipe-edit-section-menu-wrap recipe-edit-equipment-menu-wrap">
+                            <button type="button"
+                                    class="recipe-edit-row-menu-btn recipe-edit-section-menu-btn"
+                                    aria-label="Equipment image generation actions"
+                                    aria-haspopup="true"
+                                    aria-expanded="false"
+                                    onclick="return toggleRecipeEditSectionMenu(this, event)">
+                                <span aria-hidden="true"></span>
+                            </button>
+                            <div class="recipe-edit-row-menu recipe-edit-section-menu overflow-menu recipe-edit-equipment-image-menu" hidden>
+                                <div class="overflow-menu-section">
+                                    <div class="overflow-menu-section-title">Image Generation</div>
+                                    <button type="button"
+                                            data-recipe-editor-image-global-btn
+                                            onclick="return generateRecipeImagesFromEditor(this, { imageScope: 'equipment' })">
+                                        Generate All Images
+                                    </button>
+                                    <button type="button"
+                                            data-recipe-editor-image-global-btn
+                                            onclick="return generateRecipeImagesFromEditor(this, { missingOnly: true, imageScope: 'equipment' })">
+                                        Generate Missing Images
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div id="recipeEditEquipment" class="recipe-edit-equipment">
                     <div class="recipe-edit-equipment-header" aria-hidden="true">
