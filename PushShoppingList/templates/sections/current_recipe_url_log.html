@@ -441,6 +441,17 @@
                                     </div>
                                 </div>
                             </div>
+                            <div class="overflow-menu-section">
+                                <div class="overflow-menu-section-title">Image Display</div>
+                                <button type="button"
+                                        onclick="return setRecipeEditorImagesVisibleFromMenu(this, true, { imageScope: 'all' })">
+                                    Show All Images
+                                </button>
+                                <button type="button"
+                                        onclick="return setRecipeEditorImagesVisibleFromMenu(this, false, { imageScope: 'all' })">
+                                    Hide All Images
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -683,6 +694,17 @@
                                             data-recipe-editor-image-global-btn
                                             onclick="return generateRecipeImagesFromEditor(this, { missingOnly: true, imageScope: 'equipment' })">
                                         Generate Missing Images
+                                    </button>
+                                </div>
+                                <div class="overflow-menu-section">
+                                    <div class="overflow-menu-section-title">Image Display</div>
+                                    <button type="button"
+                                            onclick="return setRecipeEditorImagesVisibleFromMenu(this, true, { imageScope: 'equipment' })">
+                                        Show All Images
+                                    </button>
+                                    <button type="button"
+                                            onclick="return setRecipeEditorImagesVisibleFromMenu(this, false, { imageScope: 'equipment' })">
+                                        Hide All Images
                                     </button>
                                 </div>
                             </div>

@@ -8187,6 +8187,14 @@ function addRecipeEquipmentRow(value = "") {
                             onclick="return setRecipeEditRowImageVisibleFromMenu(this, false)">
                         Hide Image
                     </button>
+                    <button type="button"
+                            onclick="return setRecipeEditorImagesVisibleFromMenu(this, true, { imageScope: 'equipment' })">
+                        Show All Images
+                    </button>
+                    <button type="button"
+                            onclick="return setRecipeEditorImagesVisibleFromMenu(this, false, { imageScope: 'equipment' })">
+                        Hide All Images
+                    </button>
                 </div>
             </div>
         </div>
@@ -8327,6 +8335,14 @@ function addRecipeInstructionRow(value = "", stepNumber = null) {
                             data-recipe-edit-row-image-hide
                             onclick="return setRecipeEditRowImageVisibleFromMenu(this, false)">
                         Hide Image
+                    </button>
+                    <button type="button"
+                            onclick="return setRecipeEditorImagesVisibleFromMenu(this, true, { imageScope: 'instructions' })">
+                        Show All Images
+                    </button>
+                    <button type="button"
+                            onclick="return setRecipeEditorImagesVisibleFromMenu(this, false, { imageScope: 'instructions' })">
+                        Hide All Images
                     </button>
                 </div>
             </div>
@@ -10422,7 +10438,7 @@ async function generateRecipeImagesFromEditor(button, options = {}) {
     }
 
     setRecipeImageContainersVisible(
-        modal.querySelectorAll("[data-equipment-image-panel], [data-step-image-panel]"),
+        modal.querySelectorAll(recipeEditorImagePanelSelector(options)),
         true
     );
 
@@ -10447,6 +10463,37 @@ async function generateRecipeImagesFromEditor(button, options = {}) {
     }
 
     return false;
+}
+
+function setRecipeEditorImagesVisibleFromMenu(button, visible, options = {}) {
+    const modal = document.getElementById("recipeEditModal");
+
+    closeRecipeEditRowMenus();
+
+    if (!modal || !modal.classList.contains("open")) {
+        return false;
+    }
+
+    setRecipeImageContainersVisible(
+        modal.querySelectorAll(recipeEditorImagePanelSelector(options)),
+        visible
+    );
+
+    return false;
+}
+
+function recipeEditorImagePanelSelector(options = {}) {
+    const scope = options.imageScope || options.scope || "all";
+
+    if (scope === "equipment") {
+        return "[data-equipment-image-panel]";
+    }
+
+    if (scope === "instructions") {
+        return "[data-step-image-panel]";
+    }
+
+    return "[data-equipment-image-panel], [data-step-image-panel]";
 }
 
 function setRecipeEditRowImageVisibleFromMenu(button, visible) {
