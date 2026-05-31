@@ -162,7 +162,7 @@ def load_editable_recipe(url):
             "ingredients": annotate_ingredients_for_food_review(
                 normalize_edit_ingredients(recipe_data.get("ingredients", []))
             ),
-            "equipment": normalize_text_rows(recipe_data.get("equipment", [])),
+            "equipment": normalize_equipment_records(recipe_data.get("equipment", [])),
             "instructions": normalize_instruction_rows(recipe_data.get("instructions", [])),
             "nutrition": normalize_nutrition_rows(
                 recipe_data.get("nutrition", {}),

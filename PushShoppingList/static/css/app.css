@@ -10700,6 +10700,57 @@ body {
     font-size: 17px;
 }
 
+.recipe-edit-equipment-row > .recipe-edit-row-handle,
+.recipe-edit-instruction-row > .recipe-edit-row-handle {
+    grid-column: 1 / 2;
+    grid-row: 1 / 3;
+}
+
+.recipe-edit-equipment-row > .recipe-edit-row-number,
+.recipe-edit-instruction-row > .recipe-edit-step-number {
+    grid-column: 2 / 3;
+    grid-row: 1 / 3;
+}
+
+.recipe-edit-equipment-row > label,
+.recipe-edit-instruction-row > .recipe-edit-step-text {
+    grid-column: 3 / 4;
+    grid-row: 1;
+}
+
+.recipe-edit-equipment-row > .recipe-edit-row-menu-wrap,
+.recipe-edit-instruction-row > .recipe-edit-row-menu-wrap {
+    grid-column: 4 / 5;
+    grid-row: 1 / 3;
+}
+
+.recipe-edit-row-image-panel.recipe-step-image-panel {
+    grid-column: 3 / 4;
+    grid-row: 2;
+    width: min(340px, 100%);
+    max-width: 100%;
+    margin: 8px 0 0;
+    padding: 9px;
+    border-color: #26384e;
+    background: #0b121c;
+}
+
+.recipe-edit-row-image-panel .recipe-step-image {
+    width: min(240px, 100%);
+    border-radius: 7px;
+}
+
+.recipe-edit-row-image-panel .recipe-step-image-actions {
+    margin-top: 7px;
+}
+
+.recipe-edit-row-image-panel .recipe-step-image-btn,
+.recipe-edit-row-image-panel .recipe-step-image-download {
+    min-height: 30px;
+    min-width: 102px;
+    padding: 6px 10px;
+}
+
 .recipe-edit-nutrition-row > .recipe-edit-inline-icon {
     width: 44px;
     height: 44px;
@@ -10975,10 +11026,32 @@ body {
         padding: 14px;
     }
 
+    .recipe-edit-equipment-row > .recipe-edit-row-handle,
+    .recipe-edit-instruction-row > .recipe-edit-row-handle {
+        grid-column: 1 / 2;
+        grid-row: 1 / 5;
+    }
+
+    .recipe-edit-equipment-row > .recipe-edit-row-menu-wrap,
+    .recipe-edit-instruction-row > .recipe-edit-row-menu-wrap {
+        grid-column: 3 / 4;
+        grid-row: 1 / 5;
+    }
+
+    .recipe-edit-equipment-row > .recipe-edit-row-number,
+    .recipe-edit-equipment-row > label,
     .recipe-edit-instruction-row .recipe-edit-step-number,
     .recipe-edit-instruction-row .recipe-edit-step-text,
+    .recipe-edit-equipment-row .recipe-edit-row-image-panel,
+    .recipe-edit-instruction-row .recipe-edit-row-image-panel,
     .recipe-edit-nutrition-row label {
         grid-column: 2 / 3;
+    }
+
+    .recipe-edit-equipment-row .recipe-edit-row-image-panel,
+    .recipe-edit-instruction-row .recipe-edit-row-image-panel {
+        grid-row: auto;
+        width: 100%;
     }
 
     .recipe-edit-instruction-row .recipe-edit-remove-row,
@@ -12065,6 +12138,18 @@ body {
         grid-column: 4 / 5;
         grid-row: 1;
         justify-self: end;
+    }
+
+    .recipe-edit-equipment-row .recipe-edit-row-image-panel {
+        grid-column: 3 / 4;
+        grid-row: 2;
+        width: 100%;
+    }
+
+    .recipe-edit-instruction-row .recipe-edit-row-image-panel {
+        grid-column: 1 / 5;
+        grid-row: 3;
+        width: min(260px, 100%);
     }
 }
 

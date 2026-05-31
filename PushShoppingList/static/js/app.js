@@ -8099,6 +8099,16 @@ function addRecipeEquipmentRow(value = "") {
         return;
     }
 
+    const equipmentText = typeof value === "object" && value !== null
+        ? (value.equipment || value.text || value.name || "")
+        : value;
+    const equipmentImageUrl = typeof value === "object" && value !== null
+        ? (value.equipment_image_url || value.image_url || "")
+        : "";
+    const equipmentImageGeneratedAt = typeof value === "object" && value !== null
+        ? (value.equipment_image_generated_at || value.image_generated_at || "")
+        : "";
+    const recipeUrl = recipeEditorCurrentUrl();
     const row = document.createElement("div");
     row.className = "recipe-edit-text-row recipe-edit-equipment-row";
     row.innerHTML = `
@@ -8106,8 +8116,39 @@ function addRecipeEquipmentRow(value = "") {
         <span class="recipe-edit-row-number" data-equipment-row-number></span>
         <label>
             <span class="sr-only">Equipment</span>
-            <input type="text" data-field="text" value="${escapeAttribute(value || "")}">
+            <input type="text" data-field="text" value="${escapeAttribute(equipmentText || "")}">
         </label>
+        <div class="recipe-edit-row-image-panel recipe-step-image-panel recipe-equipment-image-panel"
+             data-equipment-image-panel
+             data-recipe-url="${escapeAttribute(recipeUrl)}"
+             data-equipment-index="">
+            <div class="recipe-step-image-status${equipmentImageUrl ? " empty" : ""}"
+                 data-equipment-image-status>
+                ${equipmentImageUrl ? "" : "No image generated for this equipment."}
+            </div>
+            <img class="recipe-step-image recipe-equipment-image"
+                 ${equipmentImageUrl ? `src="${escapeAttribute(equipmentImageUrl)}"` : ""}
+                 alt="Equipment image"
+                 loading="lazy"
+                 ${equipmentImageUrl ? "" : "hidden"}>
+            <div class="recipe-step-image-actions">
+                <button type="button"
+                        class="recipe-step-image-btn"
+                        data-equipment-image-generate
+                        onclick="return generateRecipeEquipmentImage(this)">
+                    ${equipmentImageUrl ? "Regenerate" : "Generate Image"}
+                </button>
+                <a class="recipe-step-image-download"
+                   data-equipment-image-download
+                   href="${escapeAttribute(equipmentImageUrl || "#")}"
+                   download
+                   ${equipmentImageUrl ? "" : "hidden"}>
+                    Download
+                </a>
+            </div>
+            <input type="hidden" data-field="equipment_image_url" value="${escapeAttribute(equipmentImageUrl)}">
+            <input type="hidden" data-field="equipment_image_generated_at" value="${escapeAttribute(equipmentImageGeneratedAt)}">
+        </div>
         <div class="recipe-edit-row-menu-wrap">
             <button type="button"
                     class="recipe-edit-row-menu-btn"
@@ -8145,9 +8186,16 @@ function updateRecipeEquipmentRowNumbers() {
     [...document.querySelectorAll("#recipeEditEquipment .recipe-edit-equipment-row")]
         .forEach((row, index) => {
             const number = row.querySelector("[data-equipment-row-number]");
+            const panel = row.querySelector("[data-equipment-image-panel]");
+            const value = String(index + 1);
 
             if (number) {
-                number.textContent = String(index + 1);
+                number.textContent = value;
+            }
+
+            if (panel) {
+                panel.dataset.equipmentIndex = value;
+                panel.dataset.recipeUrl = recipeEditorCurrentUrl();
             }
         });
 }
@@ -8165,7 +8213,14 @@ function addRecipeInstructionRow(value = "", stepNumber = null) {
     const sourceStepNumber = typeof value === "object" && value !== null
         ? (value.step_number || value.stepNumber || stepNumber)
         : stepNumber;
+    const stepImageUrl = typeof value === "object" && value !== null
+        ? (value.step_image_url || value.image_url || "")
+        : "";
+    const stepImageGeneratedAt = typeof value === "object" && value !== null
+        ? (value.step_image_generated_at || value.image_generated_at || "")
+        : "";
     const nextStepNumber = sourceStepNumber || nextRecipeInstructionNumber();
+    const recipeUrl = recipeEditorCurrentUrl();
     const row = document.createElement("div");
     row.className = "recipe-edit-text-row recipe-edit-instruction-row";
     row.innerHTML = `
@@ -8179,6 +8234,37 @@ function addRecipeInstructionRow(value = "", stepNumber = null) {
             <span class="sr-only">Instructions</span>
             <textarea data-field="text" rows="3">${escapeHtml(instruction || "")}</textarea>
         </label>
+        <div class="recipe-edit-row-image-panel recipe-step-image-panel"
+             data-step-image-panel
+             data-recipe-url="${escapeAttribute(recipeUrl)}"
+             data-step-number="${escapeAttribute(nextStepNumber)}">
+            <div class="recipe-step-image-status${stepImageUrl ? " empty" : ""}"
+                 data-step-image-status>
+                ${stepImageUrl ? "" : "No image generated for this step."}
+            </div>
+            <img class="recipe-step-image"
+                 ${stepImageUrl ? `src="${escapeAttribute(stepImageUrl)}"` : ""}
+                 alt="Instruction step image"
+                 loading="lazy"
+                 ${stepImageUrl ? "" : "hidden"}>
+            <div class="recipe-step-image-actions">
+                <button type="button"
+                        class="recipe-step-image-btn"
+                        data-step-image-generate
+                        onclick="return generateRecipeStepImage(this)">
+                    ${stepImageUrl ? "Regenerate" : "Generate Image"}
+                </button>
+                <a class="recipe-step-image-download"
+                   data-step-image-download
+                   href="${escapeAttribute(stepImageUrl || "#")}"
+                   download
+                   ${stepImageUrl ? "" : "hidden"}>
+                    Download
+                </a>
+            </div>
+            <input type="hidden" data-field="step_image_url" value="${escapeAttribute(stepImageUrl)}">
+            <input type="hidden" data-field="step_image_generated_at" value="${escapeAttribute(stepImageGeneratedAt)}">
+        </div>
         <div class="recipe-edit-row-menu-wrap">
             <button type="button"
                     class="recipe-edit-row-menu-btn"
@@ -8224,6 +8310,7 @@ function updateRecipeInstructionStepNumbers() {
         .forEach((row, index) => {
             const input = row.querySelector('[data-field="step_number"]');
             const number = row.querySelector("[data-instruction-row-number]");
+            const panel = row.querySelector("[data-step-image-panel]");
             const value = String(index + 1);
 
             if (input) {
@@ -8232,6 +8319,11 @@ function updateRecipeInstructionStepNumbers() {
 
             if (number) {
                 number.textContent = value;
+            }
+
+            if (panel) {
+                panel.dataset.stepNumber = value;
+                panel.dataset.recipeUrl = recipeEditorCurrentUrl();
             }
         });
 }
@@ -8707,7 +8799,15 @@ function normalizeRecipeEditorSnapshot(recipe) {
             store_section: String(item.store_section || "").trim(),
             optional: Boolean(item.optional),
         })),
-        equipment: (recipe.equipment || []).map(value => String(value || "").trim()).filter(Boolean),
+        equipment: (recipe.equipment || [])
+            .map(value => {
+                if (typeof value === "object" && value !== null) {
+                    return String(value.equipment || value.text || value.name || "").trim();
+                }
+
+                return String(value || "").trim();
+            })
+            .filter(Boolean),
         instructions: (recipe.instructions || [])
             .map((value, index) => normalizeRecipeInstructionSnapshot(value, index))
             .filter(item => item.instruction),
@@ -8964,7 +9064,7 @@ function collectRecipeEditorPayload() {
             cook_time: document.getElementById("recipeEditCookTime").value.trim(),
             scaling: collectRecipeScalingPayload(),
             ingredients: collectRecipeIngredientRows(),
-            equipment: collectRecipeTextRows("#recipeEditEquipment .recipe-edit-text-row"),
+            equipment: collectRecipeEquipmentRows(),
             instructions: collectRecipeInstructionRows(),
             nutrition: collectRecipeNutritionRows(),
         },
@@ -9049,6 +9149,7 @@ function collectRecipeNutritionRows() {
 function collectRecipeInstructionRows() {
     return [...document.querySelectorAll("#recipeEditInstructions .recipe-edit-instruction-row")]
         .map((row, index) => {
+            const values = fieldValuesFromRow(row);
             const textInput = row.querySelector('[data-field="text"]');
             const stepInput = row.querySelector('[data-field="step_number"]');
             const stepNumber = Math.max(1, parseFloat(stepInput ? stepInput.value : "") || index + 1);
@@ -9057,6 +9158,8 @@ function collectRecipeInstructionRows() {
                 text: textInput ? textInput.value.trim() : "",
                 stepNumber,
                 originalIndex: index,
+                step_image_url: values.step_image_url || "",
+                step_image_generated_at: values.step_image_generated_at || "",
             };
         })
         .filter(item => item.text)
@@ -9064,7 +9167,25 @@ function collectRecipeInstructionRows() {
         .map(item => ({
             step_number: item.stepNumber,
             instruction: item.text,
+            step_image_url: item.step_image_url,
+            step_image_generated_at: item.step_image_generated_at,
         }));
+}
+
+function collectRecipeEquipmentRows() {
+    return [...document.querySelectorAll("#recipeEditEquipment .recipe-edit-equipment-row")]
+        .map(row => {
+            const values = fieldValuesFromRow(row);
+            const text = String(values.text || "").trim();
+
+            return {
+                equipment: text,
+                text,
+                equipment_image_url: values.equipment_image_url || "",
+                equipment_image_generated_at: values.equipment_image_generated_at || "",
+            };
+        })
+        .filter(item => item.equipment);
 }
 
 function collectRecipeTextRows(selector) {
@@ -10097,6 +10218,9 @@ async function generateRecipeStepImage(button) {
             download.hidden = false;
         }
 
+        setRecipeImagePanelHiddenValue(panel, "step_image_url", data.step_image_url);
+        setRecipeImagePanelHiddenValue(panel, "step_image_generated_at", data.step_image_generated_at || "");
+
         if (status) {
             status.textContent = "";
             status.classList.add("empty");
@@ -10178,6 +10302,9 @@ async function generateRecipeEquipmentImage(button) {
             download.hidden = false;
         }
 
+        setRecipeImagePanelHiddenValue(panel, "equipment_image_url", data.equipment_image_url);
+        setRecipeImagePanelHiddenValue(panel, "equipment_image_generated_at", data.equipment_image_generated_at || "");
+
         if (status) {
             status.textContent = "";
             status.classList.add("empty");
@@ -10199,6 +10326,14 @@ async function generateRecipeEquipmentImage(button) {
     }
 
     return false;
+}
+
+function setRecipeImagePanelHiddenValue(panel, field, value) {
+    const input = panel ? panel.querySelector(`[data-field="${field}"]`) : null;
+
+    if (input) {
+        input.value = value || "";
+    }
 }
 
 async function generateAllRecipeInstructionImagesFromMenu(button, options = {}) {
