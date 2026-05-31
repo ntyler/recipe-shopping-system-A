@@ -4859,6 +4859,7 @@ function setCurrentRecipeUrlSummaryImagesVisible(row, visible) {
 
     row.classList.toggle("recipe-url-summary-images-hidden", !visible);
     row.querySelectorAll(".recipe-url-summary-main").forEach(panel => {
+        panel.classList.toggle("recipe-image-visibility-hidden", !visible);
         panel.setAttribute("aria-hidden", visible ? "false" : "true");
     });
     return true;
@@ -11196,8 +11197,7 @@ function setRecipeImagesVisibleFromMenu(button, visible) {
         expandRecipeCardForImageGeneration(card);
     }
 
-    keepRecipeCoverImagesVisible(card);
-    setRecipeImageContainersVisible(card.querySelectorAll("[data-equipment-image-panel], [data-step-image-panel]"), visible);
+    setRecipeImageContainersVisible(card.querySelectorAll(".recipe-view-body-media, [data-equipment-image-panel], [data-step-image-panel]"), visible);
     return false;
 }
 
@@ -11213,8 +11213,7 @@ function setAllRecipeImagesVisibleFromMenu(button, visible) {
             expandRecipeCardForImageGeneration(card);
         }
 
-        keepRecipeCoverImagesVisible(card);
-        setRecipeImageContainersVisible(card.querySelectorAll("[data-equipment-image-panel], [data-step-image-panel]"), visible);
+        setRecipeImageContainersVisible(card.querySelectorAll(".recipe-view-body-media, [data-equipment-image-panel], [data-step-image-panel]"), visible);
     });
 
     return false;
@@ -11242,25 +11241,9 @@ function setRecipeDetailImagesVisibleFromMenu(button, visible) {
 
 function setRecipeImageContainersVisible(containers, visible) {
     [...containers].forEach(container => {
-        if (recipeImageContainerMustStayVisible(container)) {
-            container.classList.remove("recipe-image-visibility-hidden");
-            container.setAttribute("aria-hidden", "false");
-            return;
-        }
-
         container.classList.toggle("recipe-image-visibility-hidden", !visible);
         container.setAttribute("aria-hidden", visible ? "false" : "true");
     });
-}
-
-function recipeImageContainerMustStayVisible(container) {
-    return Boolean(
-        container &&
-        (
-            container.classList.contains("recipe-view-body-media") ||
-            container.classList.contains("recipe-cover-image")
-        )
-    );
 }
 
 function keepRecipeCoverImagesVisible(scope = document) {
@@ -11268,7 +11251,7 @@ function keepRecipeCoverImagesVisible(scope = document) {
         return;
     }
 
-    scope.querySelectorAll(".recipe-view-body-media, .recipe-cover-image").forEach(element => {
+    scope.querySelectorAll(".recipe-view-body-media:not(.recipe-image-visibility-hidden) .recipe-cover-image").forEach(element => {
         element.classList.remove("recipe-image-visibility-hidden");
         element.setAttribute("aria-hidden", "false");
     });

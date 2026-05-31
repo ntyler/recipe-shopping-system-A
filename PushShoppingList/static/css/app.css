@@ -3265,7 +3265,7 @@ body {
             pointer-events: none;
         }
 
-        .recipe-image-visibility-hidden:not(.recipe-view-body-media):not(.recipe-cover-image) {
+        .recipe-image-visibility-hidden {
             display: none !important;
         }
 
