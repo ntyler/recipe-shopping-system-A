@@ -27,6 +27,9 @@
                 <span aria-hidden="true"></span>
             </button>
             <div class="recipe-edit-row-menu recipe-url-log-menu" hidden>
+                <button type="button" onclick="closeRecipeEditRowMenus(); return createNewRecipe(this)">
+                    Create New Recipe
+                </button>
                 <button type="button" onclick="return setAllCurrentRecipeUrlSummariesCollapsed(false)">
                     Expand All Recipes
                 </button>
