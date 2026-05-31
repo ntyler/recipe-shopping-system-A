@@ -182,27 +182,51 @@
   "equipment": [
     {
       "name": "baking sheet",
-      "category": "cookware"
+      "category": "cookware",
+      "equipment": "baking sheet",
+      "text": "baking sheet",
+      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_equipment_1_920fc60fc951.png",
+      "equipment_image_generated_at": "2026-05-31T20:14:03.583994+00:00"
     },
     {
       "name": "oven",
-      "category": "appliance"
+      "category": "appliance",
+      "equipment": "oven",
+      "text": "oven",
+      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_equipment_2_39784fde6c86.png",
+      "equipment_image_generated_at": "2026-05-31T20:14:23.170178+00:00"
     },
     {
       "name": "pot",
-      "category": "cookware"
+      "category": "cookware",
+      "equipment": "pot",
+      "text": "pot",
+      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_equipment_3_69af9303f4bb.png",
+      "equipment_image_generated_at": "2026-05-31T20:14:52.175128+00:00"
     },
     {
       "name": "rolling pin",
-      "category": "prep"
+      "category": "prep",
+      "equipment": "rolling pin",
+      "text": "rolling pin",
+      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_equipment_4_4b32150307eb.png",
+      "equipment_image_generated_at": "2026-05-31T20:15:08.942159+00:00"
     },
     {
       "name": "saucepan",
-      "category": "cookware"
+      "category": "cookware",
+      "equipment": "saucepan",
+      "text": "saucepan",
+      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_equipment_5_9ae5c51c7283.png",
+      "equipment_image_generated_at": "2026-05-31T20:15:25.273023+00:00"
     },
     {
       "name": "spatula",
-      "category": "utensil"
+      "category": "utensil",
+      "equipment": "spatula",
+      "text": "spatula",
+      "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_equipment_6_4b3cfffacf0a.png",
+      "equipment_image_generated_at": "2026-05-31T20:15:47.580104+00:00"
     }
   ],
   "instructions": [
@@ -212,7 +236,10 @@
       "instruction": "Combine the water, sugar and kosher salt in the bowl of a stand mixer and sprinkle the yeast on top. Allow to sit for 5 minutes or until the mixture begins to foam. Add the flour and butter and, using the dough hook attachment, mix on low speed until well combined. Change to medium speed and knead until the dough is smooth and pulls away from the side of the bowl, approximately 4 to 5 minutes. Remove the dough from the bowl, clean the bowl and then oil it well with vegetable oil. Return the dough to the bowl, cover with plastic wrap and sit in a warm place for approximately 50 to 55 minutes or until the dough has doubled in size.",
       "temperature": null,
       "time": null,
-      "equipment_used": []
+      "equipment_used": [],
+      "text": "Combine the water, sugar and kosher salt in the bowl of a stand mixer and sprinkle the yeast on top. Allow to sit for 5 minutes or until the mixture begins to foam. Add the flour and butter and, using the dough hook attachment, mix on low speed until well combined. Change to medium speed and knead until the dough is smooth and pulls away from the side of the bowl, approximately 4 to 5 minutes. Remove the dough from the bowl, clean the bowl and then oil it well with vegetable oil. Return the dough to the bowl, cover with plastic wrap and sit in a warm place for approximately 50 to 55 minutes or until the dough has doubled in size.",
+      "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_step_1_f778b52a0ade.png",
+      "step_image_generated_at": "2026-05-31T20:16:05.191951+00:00"
     },
     {
       "section": null,
@@ -223,7 +250,10 @@
       "equipment_used": [
         "baking sheet",
         "oven"
-      ]
+      ],
+      "text": "Preheat the oven to 450 degrees F. Line 2 half-sheet pans with parchment paper and lightly brush with the vegetable oil. Set aside.",
+      "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_step_2_d9751084450b.png",
+      "step_image_generated_at": "2026-05-31T20:16:24.508273+00:00"
     },
     {
       "section": null,
@@ -235,7 +265,10 @@
         "pot",
         "rolling pin",
         "saucepan"
-      ]
+      ],
+      "text": "Bring the 10 cups of water and the baking soda to a rolling boil in an 8-quart saucepan or roasting pan.",
+      "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_step_3_633d27ed7a39.png",
+      "step_image_generated_at": "2026-05-31T20:16:41.608915+00:00"
     },
     {
       "section": null,
@@ -246,7 +279,10 @@
       "equipment_used": [
         "baking sheet",
         "rolling pin"
-      ]
+      ],
+      "text": "In the meantime, turn the dough out onto a slightly oiled work surface and divide into 8 equal pieces. Roll out each piece of dough into a 24-inch rope. Make a U-shape with the rope, holding the ends of the rope, cross them over each other and press onto the bottom of the U in order to form the shape of a pretzel. Place onto the parchment-lined half sheet pan.",
+      "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_step_4_83a9b81ca5eb.png",
+      "step_image_generated_at": "2026-05-31T20:17:00.680315+00:00"
     },
     {
       "section": null,
@@ -258,7 +294,10 @@
         "baking sheet",
         "oven",
         "spatula"
-      ]
+      ],
+      "text": "Place the pretzels into the boiling water, 1 by 1, for 30 seconds. Remove them from the water using a large flat spatula. Return to the half sheet pan, brush the top of each pretzel with the beaten egg yolk and water mixture and sprinkle with the pretzel salt. Bake until dark golden brown in color, approximately 12 to 14 minutes. Transfer to a cooling rack for at least 5 minutes before serving.",
+      "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_alton-brown_homemade-soft-pretzels-recipe-1948242_step_5_8962502a1591.png",
+      "step_image_generated_at": "2026-05-31T20:17:25.342300+00:00"
     }
   ],
   "nutrition": {
