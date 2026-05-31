@@ -6759,9 +6759,36 @@ function restoreRecipeEditPopupMenu(menu) {
 }
 
 function recipeEditActionRowFromButton(button) {
-    return button
+    const directRow = button
         ? button.closest(recipeEditMovableRowSelector())
         : null;
+
+    if (directRow) {
+        return directRow;
+    }
+
+    const menu = button ? button.closest(".recipe-edit-row-menu") : null;
+    const anchorButton = menu ? menu.recipeEditAnchorButton : null;
+
+    return anchorButton
+        ? anchorButton.closest(recipeEditMovableRowSelector())
+        : null;
+}
+
+function recipeEditMenuAnchorButtonFromButton(button) {
+    const menu = button ? button.closest(".recipe-edit-row-menu") : null;
+    return menu ? menu.recipeEditAnchorButton : null;
+}
+
+function recipeDetailHeaderFromMenuButton(button) {
+    const directHeader = button ? button.closest(".recipe-detail-header") : null;
+
+    if (directHeader) {
+        return directHeader;
+    }
+
+    const anchorButton = recipeEditMenuAnchorButtonFromButton(button);
+    return anchorButton ? anchorButton.closest(".recipe-detail-header") : null;
 }
 
 function toggleRecipeIngredientRowMenu(button, event = null) {
@@ -10254,7 +10281,7 @@ function recipeEquipmentImageIsMissing(button) {
 }
 
 async function generateRecipeImagesFromMenu(button, options = {}) {
-    const card = button ? button.closest("[data-recipe-view-card]") : null;
+    const card = recipeEditActionRowFromButton(button);
 
     closeRecipeEditRowMenus();
 
@@ -10398,7 +10425,7 @@ function expandRecipeCardForImageGeneration(card) {
 }
 
 function setRecipeImagesVisibleFromMenu(button, visible) {
-    const card = button ? button.closest("[data-recipe-view-card]") : null;
+    const card = recipeEditActionRowFromButton(button);
 
     closeRecipeEditRowMenus();
 
@@ -10435,7 +10462,7 @@ function setAllRecipeImagesVisibleFromMenu(button, visible) {
 }
 
 function setRecipeDetailImagesVisibleFromMenu(button, visible) {
-    const header = button ? button.closest(".recipe-detail-header") : null;
+    const header = recipeDetailHeaderFromMenuButton(button);
     const toggle = header ? header.querySelector(".detail-toggle") : null;
     const parts = recipeDetailSectionParts(toggle);
 
@@ -10489,7 +10516,7 @@ function keepRecipeCoverImagesVisible(scope = document) {
 }
 
 function updateRecipeDetailMenuToggleForButton(button) {
-    const header = button ? button.closest(".recipe-detail-header") : null;
+    const header = recipeDetailHeaderFromMenuButton(button);
     const toggle = header ? header.querySelector(".detail-toggle, .nutrition-toggle") : null;
     const parts = recipeDetailSectionParts(toggle);
 
@@ -10544,7 +10571,7 @@ function toggleRecipeViewCardFromMenu(button) {
 }
 
 function setRecipeViewCardEverythingCollapsed(button, collapsed) {
-    const card = button ? button.closest("[data-recipe-view-card]") : null;
+    const card = recipeEditActionRowFromButton(button);
     const toggle = card ? card.querySelector("[data-recipe-card-toggle]") : null;
     const key = card ? (card.dataset.recipeCardKey || (toggle ? toggle.dataset.recipeCardKey : "")) : "";
 
