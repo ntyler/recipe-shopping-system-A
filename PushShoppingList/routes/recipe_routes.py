@@ -37,6 +37,7 @@ from PushShoppingList.services.recipe_edit_service import generate_recipe_step_i
 from PushShoppingList.services.recipe_edit_service import load_editable_recipe
 from PushShoppingList.services.recipe_edit_service import save_editable_recipe
 from PushShoppingList.services.recipe_edit_service import create_source_url_pdf
+from PushShoppingList.services.recipe_image_progress_service import load_recipe_image_progress
 from PushShoppingList.services.recipe_ingredient_service import remove_recipe_and_unused_ingredients
 from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
 from PushShoppingList.services.recipe_ingredient_service import save_ingredients_for_recipe
@@ -405,6 +406,13 @@ def api_recipe_equipment_image_route():
     status = 200 if result.get("ok") else 400
 
     return jsonify(result), status
+
+
+@recipe_bp.route("/api/recipe_image_progress", methods=["GET"])
+def api_recipe_image_progress_route():
+    url = str(request.args.get("url", "") or "").strip()
+
+    return jsonify(load_recipe_image_progress(url=url or None))
 
 
 @recipe_bp.route("/api/recipe_pdf", methods=["POST"])

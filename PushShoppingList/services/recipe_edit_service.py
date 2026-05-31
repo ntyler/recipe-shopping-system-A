@@ -44,6 +44,8 @@ from PushShoppingList.services.recipe_url_service import save_recipe_urls
 from PushShoppingList.services.recipe_url_service import save_recipe_url_name
 from PushShoppingList.services.recipe_url_service import save_recipe_url_quantity
 from PushShoppingList.services.recipe_quantity_service import update_recipe_quantity
+from PushShoppingList.services.recipe_image_progress_service import finish_recipe_image_progress
+from PushShoppingList.services.recipe_image_progress_service import start_recipe_image_progress
 from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
 
 
@@ -502,23 +504,32 @@ def generate_recipe_step_image(payload):
         instruction_step=instruction_text,
     )
 
+    progress_target = target_instruction.get("step_number")
+    start_recipe_image_progress("step", url, progress_target, "Generating step image...")
+
     try:
         image_bytes = request_recipe_step_image_bytes(prompt)
     except TimeoutError:
+        error = "Image generation timed out. Please try again."
+        finish_recipe_image_progress("step", url, progress_target, ok=False, error=error)
         return {
             "ok": False,
-            "error": "Image generation timed out. Please try again.",
+            "error": error,
         }
     except Exception:
+        error = "Image generation failed. Please try again."
+        finish_recipe_image_progress("step", url, progress_target, ok=False, error=error)
         return {
             "ok": False,
-            "error": "Image generation failed. Please try again.",
+            "error": error,
         }
 
     if not image_bytes:
+        error = "Image generation did not return an image. Please try again."
+        finish_recipe_image_progress("step", url, progress_target, ok=False, error=error)
         return {
             "ok": False,
-            "error": "Image generation did not return an image. Please try again.",
+            "error": error,
         }
 
     step_image_url = save_recipe_step_image_file(url, target_instruction.get("step_number"), image_bytes)
@@ -533,6 +544,14 @@ def generate_recipe_step_image(payload):
     }
     recipe_data["instructions"] = instructions
     save_recipe_output(url, recipe_data)
+    finish_recipe_image_progress(
+        "step",
+        url,
+        progress_target,
+        ok=True,
+        image_url=step_image_url,
+        generated_at=generated_at,
+    )
 
     return {
         "ok": True,
@@ -585,23 +604,32 @@ def generate_recipe_equipment_image(payload):
         equipment_item=equipment_text,
     )
 
+    progress_target = target_index + 1
+    start_recipe_image_progress("equipment", url, progress_target, "Generating equipment image...")
+
     try:
         image_bytes = request_recipe_step_image_bytes(prompt)
     except TimeoutError:
+        error = "Image generation timed out. Please try again."
+        finish_recipe_image_progress("equipment", url, progress_target, ok=False, error=error)
         return {
             "ok": False,
-            "error": "Image generation timed out. Please try again.",
+            "error": error,
         }
     except Exception:
+        error = "Image generation failed. Please try again."
+        finish_recipe_image_progress("equipment", url, progress_target, ok=False, error=error)
         return {
             "ok": False,
-            "error": "Image generation failed. Please try again.",
+            "error": error,
         }
 
     if not image_bytes:
+        error = "Image generation did not return an image. Please try again."
+        finish_recipe_image_progress("equipment", url, progress_target, ok=False, error=error)
         return {
             "ok": False,
-            "error": "Image generation did not return an image. Please try again.",
+            "error": error,
         }
 
     equipment_image_url = save_recipe_equipment_image_file(url, target_index + 1, image_bytes)
@@ -616,6 +644,14 @@ def generate_recipe_equipment_image(payload):
     }
     recipe_data["equipment"] = equipment_items
     save_recipe_output(url, recipe_data)
+    finish_recipe_image_progress(
+        "equipment",
+        url,
+        progress_target,
+        ok=True,
+        image_url=equipment_image_url,
+        generated_at=generated_at,
+    )
 
     return {
         "ok": True,
