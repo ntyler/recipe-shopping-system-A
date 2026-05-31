@@ -2216,8 +2216,8 @@ body {
             z-index: 18000;
             isolation: isolate;
             max-width: 900px;
-            margin: 16px auto 12px auto;
-            padding: 10px 12px 12px;
+            margin: 16px auto 0 auto;
+            padding: 11px 12px;
             background: #111414;
             border: 1px solid #3a3a3a;
             border-color: transparent;
@@ -2228,6 +2228,10 @@ body {
 
         .view-switcher-sticky .view-control-title {
             margin-bottom: 7px;
+        }
+
+        .view-switcher-sticky .view-toggle-box {
+            margin-top: 0;
         }
 
         .recipe-view-global-menu-wrap {
