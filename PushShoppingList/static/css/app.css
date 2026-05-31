@@ -308,12 +308,26 @@ body {
         }
 
         .extract-btn { background: #107C10; }
-        .recipe-media-upload-form {
+
+        .recipe-import-actions {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
             margin-top: 10px;
+        }
+
+        .recipe-media-upload-form {
+            min-width: 0;
+            margin-top: 0;
         }
 
         .recipe-media-upload-btn {
             background: #107C10;
+        }
+
+        .recipe-import-actions .extract-btn,
+        .recipe-import-actions .recipe-media-upload-btn {
+            margin-top: 0;
         }
 
         .extract-btn,
@@ -497,6 +511,7 @@ body {
             margin-top: 12px;
             background: #181b1c;
             border: 1px solid #333;
+            border-color: transparent;
             border-radius: 10px;
             padding: 12px 14px;
         }
@@ -1995,6 +2010,7 @@ body {
             padding: 12px 14px;
             background: #181b1c;
             border: 1px solid #333;
+            border-color: transparent;
             border-radius: 10px;
             color: #ddd;
             box-sizing: border-box;
@@ -2271,6 +2287,7 @@ body {
             padding: 10px 12px 12px;
             background: #111414;
             border: 1px solid #3a3a3a;
+            border-color: transparent;
             border-radius: 10px;
             box-shadow: 0 8px 24px rgba(0,0,0,0.45);
             box-sizing: border-box;
@@ -2601,6 +2618,7 @@ body {
             padding: 16px;
             background: #1b1b1b;
             border: 1px solid #2d2d2d;
+            border-color: transparent;
             border-radius: 12px;
             box-shadow: 0 8px 24px rgba(0,0,0,0.25);
             box-sizing: border-box;
@@ -2627,12 +2645,12 @@ body {
 
         .recipe-view-card.recipe-edit-menu-open {
             position: relative;
-            z-index: 1300;
+            z-index: 16020;
             overflow: visible;
         }
 
         .recipe-view-card.recipe-edit-menu-open .recipe-view-title {
-            z-index: 1300;
+            z-index: 16020;
         }
 
         .recipe-view-title {
@@ -3281,6 +3299,7 @@ body {
             padding: 10px 12px;
             background: #181818;
             border: 1px solid #333;
+            border-color: transparent;
             border-radius: 8px;
             color: #4da3ff;
             font-size: 16px;
@@ -3362,6 +3381,19 @@ body {
             border-radius: 7px;
             background: transparent;
             padding-right: 54px;
+        }
+
+        #currentRecipeUrlLogCard .recipe-url-log-toggle,
+        #cookbooksCard > .card-collapse-toggle,
+        #rulesCard > .card-collapse-toggle,
+        #home-address-section > .card-collapse-toggle,
+        #storeOptionsSection .store-options-title-toggle {
+            justify-content: center;
+            text-align: center;
+        }
+
+        #currentRecipeUrlLogCard .recipe-url-log-toggle {
+            padding-left: 54px;
         }
 
         .recipe-url-log-header .card-collapse-toggle:hover,
@@ -4612,6 +4644,7 @@ body {
             min-width: 0;
             padding: 12px;
             border: 1px solid #2d2d2d;
+            border-color: transparent;
             border-radius: 8px;
             background: #181818;
         }

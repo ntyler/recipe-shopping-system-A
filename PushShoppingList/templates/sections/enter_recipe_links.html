@@ -8,24 +8,26 @@
             id="recipeUrlsTextarea"
             name="recipe_urls"
             placeholder="https://www.forkinthekitchen.com/homemade-cheese-ravioli/&#10;https://www.forkinthekitchen.com/homemade-crispy-falafel/"></textarea>
-
-        <button class="extract-btn" type="submit">Import Recipe URLs</button>
     </form>
 
-    <form id="recipeMediaUploadForm"
-          class="recipe-media-upload-form"
-          method="POST"
-          action="/upload_recipe_media"
-          enctype="multipart/form-data"
-          onsubmit="saveScroll()">
-        <input id="recipeMediaUploadInput"
-               name="recipe_media"
-               type="file"
-               onchange="submitRecipeMediaUpload(this)"
-               hidden>
-        <button class="recipe-media-upload-btn" type="button" onclick="openRecipeMediaUpload()">
-            Import Doc / Photo
-        </button>
-        <div id="recipeMediaUploadStatus" class="recipe-media-upload-status" aria-live="polite"></div>
-    </form>
+    <div class="recipe-import-actions">
+        <button class="extract-btn" type="submit" form="extractRecipeForm">Import Recipe URLs</button>
+
+        <form id="recipeMediaUploadForm"
+              class="recipe-media-upload-form"
+              method="POST"
+              action="/upload_recipe_media"
+              enctype="multipart/form-data"
+              onsubmit="saveScroll()">
+            <input id="recipeMediaUploadInput"
+                   name="recipe_media"
+                   type="file"
+                   onchange="submitRecipeMediaUpload(this)"
+                   hidden>
+            <button class="recipe-media-upload-btn" type="button" onclick="openRecipeMediaUpload()">
+                Import Doc / Photo
+            </button>
+        </form>
+    </div>
+    <div id="recipeMediaUploadStatus" class="recipe-media-upload-status" aria-live="polite"></div>
 </div>
