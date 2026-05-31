@@ -4782,11 +4782,6 @@ function recipeUrlSummaryCollapseStorageKey(row) {
     return recipeUrl ? `recipe-url-summary-collapsed:${recipeUrl}` : "";
 }
 
-function recipeUrlSummaryImagesStorageKey(row) {
-    const recipeUrl = row ? row.dataset.recipeUrl || "" : "";
-    return recipeUrl ? `recipe-url-summary-images-hidden:${recipeUrl}` : "";
-}
-
 function setCurrentRecipeUrlSummaryCollapsed(row, collapsed) {
     if (!row) {
         return false;
@@ -4857,25 +4852,34 @@ function setCurrentRecipeUrlSummaryImagesVisible(row, visible) {
         return false;
     }
 
-    row.classList.toggle("recipe-url-summary-images-hidden", !visible);
-    row.querySelectorAll(".recipe-url-summary-main").forEach(panel => {
-        panel.classList.toggle("recipe-image-visibility-hidden", !visible);
-        panel.setAttribute("aria-hidden", visible ? "false" : "true");
+    row.classList.remove("recipe-url-summary-images-hidden");
+    row.querySelectorAll(".recipe-url-summary-main, .recipe-url-summary-cover").forEach(panel => {
+        panel.classList.remove("recipe-image-visibility-hidden");
+        panel.setAttribute("aria-hidden", "false");
     });
     return true;
 }
 
+function clearCurrentRecipeUrlSummaryImageHiddenState(row) {
+    const recipeUrl = row ? row.dataset.recipeUrl || "" : "";
+
+    if (!recipeUrl) {
+        return;
+    }
+
+    localStorage.removeItem(`recipe-url-summary-images-hidden:${recipeUrl}`);
+}
+
 function setCurrentRecipeUrlSummaryImagesVisibleFromMenu(button, visible) {
     const row = recipeEditActionRowFromButton(button);
-    const storageKey = recipeUrlSummaryImagesStorageKey(row);
 
-    if (!row || !storageKey) {
+    if (!row) {
         closeRecipeEditRowMenus();
         return false;
     }
 
-    setCurrentRecipeUrlSummaryImagesVisible(row, visible);
-    localStorage.setItem(storageKey, visible ? "0" : "1");
+    clearCurrentRecipeUrlSummaryImageHiddenState(row);
+    setCurrentRecipeUrlSummaryImagesVisible(row, true);
 
     if (visible) {
         const collapseStorageKey = recipeUrlSummaryCollapseStorageKey(row);
@@ -4954,17 +4958,14 @@ function bindCurrentRecipeUrlSummaryToggles() {
     document.querySelectorAll("[data-current-recipe-row]").forEach(row => {
         const titleToggle = row.querySelector("[data-recipe-url-summary-toggle]");
         const storageKey = recipeUrlSummaryCollapseStorageKey(row);
-        const imageStorageKey = recipeUrlSummaryImagesStorageKey(row);
 
         if (!titleToggle || !storageKey) {
             return;
         }
 
         setCurrentRecipeUrlSummaryCollapsed(row, localStorage.getItem(storageKey) === "1");
-
-        if (imageStorageKey) {
-            setCurrentRecipeUrlSummaryImagesVisible(row, localStorage.getItem(imageStorageKey) !== "1");
-        }
+        clearCurrentRecipeUrlSummaryImageHiddenState(row);
+        setCurrentRecipeUrlSummaryImagesVisible(row, true);
     });
 }
 
@@ -11479,10 +11480,12 @@ function setRecipeImageContainersVisible(containers, visible) {
         container.classList.toggle("recipe-image-visibility-hidden", !visible);
         container.setAttribute("aria-hidden", visible ? "false" : "true");
 
-        if (container.classList.contains("recipe-view-body-media")) {
+        if (container.classList.contains("recipe-view-title-media") || container.classList.contains("recipe-view-body-media")) {
+            container.classList.remove("recipe-image-visibility-hidden");
+            container.setAttribute("aria-hidden", "false");
             container.querySelectorAll(".recipe-cover-image").forEach(image => {
-                image.classList.toggle("recipe-image-visibility-hidden", !visible);
-                image.setAttribute("aria-hidden", visible ? "false" : "true");
+                image.classList.remove("recipe-image-visibility-hidden");
+                image.setAttribute("aria-hidden", "false");
             });
         }
     });
@@ -11490,7 +11493,7 @@ function setRecipeImageContainersVisible(containers, visible) {
 
 function recipeImageContainersForCard(card) {
     return card
-        ? card.querySelectorAll(".recipe-view-title-media, .recipe-view-body-media, [data-equipment-image-panel], [data-step-image-panel]")
+        ? card.querySelectorAll("[data-equipment-image-panel], [data-step-image-panel]")
         : [];
 }
 
@@ -11499,7 +11502,7 @@ function keepRecipeCoverImagesVisible(scope = document) {
         return;
     }
 
-    scope.querySelectorAll(".recipe-view-body-media:not(.recipe-image-visibility-hidden) .recipe-cover-image").forEach(element => {
+    scope.querySelectorAll(".recipe-view-title-media, .recipe-view-body-media, .recipe-cover-image").forEach(element => {
         element.classList.remove("recipe-image-visibility-hidden");
         element.setAttribute("aria-hidden", "false");
     });
