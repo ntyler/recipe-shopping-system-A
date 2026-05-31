@@ -4,7 +4,10 @@
             data-collapse-toggle="cookbooks"
             aria-expanded="true"
             onclick="toggleCardCollapse('cookbooks')">
-        <span>Cookbooks</span>
+        <span class="cookbooks-header-title">
+            Cookbooks
+            <span class="cookbooks-header-count">{{ cookbook_view.cookbooks | length }}</span>
+        </span>
     </button>
 
     <div class="card-collapse-content cookbooks-content"
@@ -36,10 +39,6 @@
             <section class="cookbook-collection">
                 <div class="cookbook-collection-header">
                     <div class="cookbook-collection-heading">
-                        <div class="cookbook-section-title">
-                            <span>Cookbooks</span>
-                            <span>{{ cookbook_view.cookbooks | length }}</span>
-                        </div>
                         <input id="cookbookRecipeSearchInput"
                                class="cookbook-recipe-search"
                                type="search"

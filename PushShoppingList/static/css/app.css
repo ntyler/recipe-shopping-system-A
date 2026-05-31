@@ -3838,6 +3838,21 @@ body {
             color: #ff8a8a;
         }
 
+        .cookbooks-header-title {
+            display: inline-flex;
+            align-items: baseline;
+            justify-content: center;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .cookbooks-header-count {
+            color: #9ca3af;
+            font-size: 14px;
+            font-weight: 900;
+            line-height: 1;
+        }
+
         .cookbooks-layout {
             display: grid;
             grid-template-columns: minmax(0, 1fr);
@@ -3845,13 +3860,20 @@ body {
             align-items: start;
         }
 
-        .cookbook-pool,
-        .cookbook-collection {
+        .cookbook-pool {
             min-width: 0;
             padding: 12px;
             border: 1px solid #333;
             border-radius: 8px;
             background: #181818;
+        }
+
+        .cookbook-collection {
+            min-width: 0;
+            padding: 0;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
         }
 
         .cookbook-section-title {
@@ -4967,6 +4989,28 @@ body {
             background: #151717;
         }
 
+        .rules-editor-backdrop[data-active-section="home_stores"] .rules-editor-section {
+            padding: 0;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+        }
+
+        .rules-editor-backdrop[data-active-section="best_product_ranking"] .rules-editor-section,
+        .rules-editor-backdrop[data-active-section="saved_product_choices"] .rules-editor-section {
+            padding: 0;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+        }
+
+        .rules-editor-backdrop[data-active-section="food_restrictions"] .rules-editor-section:has([data-rules-food-list]) {
+            padding: 0;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+        }
+
         .rules-editor-section-heading {
             display: flex;
             align-items: center;
@@ -5022,6 +5066,15 @@ body {
             border-radius: 8px 8px 0 0;
             background: #151717;
             box-shadow: 0 8px 14px rgba(0, 0, 0, 0.22);
+        }
+
+        .rules-editor-backdrop[data-active-section="food_restrictions"] .rules-editor-section:has([data-rules-food-list]) .rules-editor-section-heading {
+            margin: 0 0 10px;
+            padding: 0;
+            border-bottom: 0;
+            border-radius: 0;
+            background: transparent;
+            box-shadow: none;
         }
 
         .rules-editor-section h3 {
