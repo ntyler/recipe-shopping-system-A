@@ -106,7 +106,7 @@
             </div>
 
             <div class="address-actions-grid">
-                <button form="homeAddressForm" type="submit" name="action" value="run_find_nearest" class="nearest-stores-btn">Nearest Stores</button>
+                <button form="homeAddressForm" type="submit" name="action" value="run_find_nearest" class="nearest-stores-btn">Find Nearest Stores</button>
                 <div class="active-store-search store-options-toolbar-search">
                     <input id="activeStoreSearchInput"
                            type="search"
@@ -226,7 +226,7 @@
                             {% elif nearest_store and nearest_store.skip_reason %}
                                 <span class="store-nearest-warning">{{ nearest_store.skip_reason }}</span>
                             {% else %}
-                                <span class="store-nearest-empty">No nearest location saved yet. Use Nearest Stores.</span>
+                                <span class="store-nearest-empty">No nearest location saved yet. Use Find Nearest Stores.</span>
                             {% endif %}
                         </div>
                         {% if nearby_stores %}

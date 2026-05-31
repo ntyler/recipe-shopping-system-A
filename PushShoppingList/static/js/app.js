@@ -3812,30 +3812,27 @@ function showView(viewName) {
         store: document.getElementById("storeView"),
         recipe: document.getElementById("recipeView"),
     };
-    const buttons = {
-        section: document.getElementById("sectionViewBtn"),
-        store: document.getElementById("storeViewBtn"),
-        recipe: document.getElementById("recipeViewBtn"),
-    };
+    const activeView = Object.prototype.hasOwnProperty.call(views, viewName)
+        ? viewName
+        : "section";
 
     Object.entries(views).forEach(([key, view]) => {
         if (view) {
-            view.style.display = key === viewName ? "" : "none";
+            view.style.display = key === activeView ? "" : "none";
         }
     });
 
-    Object.entries(buttons).forEach(([key, button]) => {
-        if (button) {
-            button.classList.toggle("active", key === viewName);
-        }
-    });
+    const viewSelect = document.getElementById("viewSelect");
+    if (viewSelect) {
+        viewSelect.value = activeView;
+    }
 
     const switcher = document.getElementById("viewSwitcherSticky");
     if (switcher) {
-        switcher.dataset.activeView = viewName;
+        switcher.dataset.activeView = activeView;
     }
 
-    localStorage.setItem("shopping-view", viewName);
+    localStorage.setItem("shopping-view", activeView);
     updateViewSwitcherStickyOffset();
 }
 

@@ -30,17 +30,15 @@
 
 <div id="viewSwitcherSticky" class="view-switcher-sticky" aria-label="Display View">
     <div class="view-toggle-box view-control-row">
-        <button type="button" id="sectionViewBtn" class="view-toggle-btn" onclick="showView('section')">
-            Section View
-        </button>
-
-        <button type="button" id="storeViewBtn" class="view-toggle-btn" onclick="showView('store')">
-            Store View
-        </button>
-
-        <button type="button" id="recipeViewBtn" class="view-toggle-btn" onclick="showView('recipe')">
-            Recipe View
-        </button>
+        <label class="view-select-label" for="viewSelect">View:</label>
+        <select id="viewSelect"
+                class="view-select"
+                aria-label="Display View"
+                onchange="showView(this.value)">
+            <option value="section">Section</option>
+            <option value="store">Store</option>
+            <option value="recipe">Recipe</option>
+        </select>
     </div>
     <div class="recipe-view-global-menu-wrap recipe-edit-row-menu-wrap">
         <button type="button"
@@ -117,7 +115,7 @@
                 </button>
             </div>
             <div class="overflow-menu-section recipe-view-menu-section">
-                <div class="overflow-menu-section-title recipe-view-menu-section-title">Generate Images</div>
+                <div class="overflow-menu-section-title recipe-view-menu-section-title">Image Generation</div>
                 <div class="recipe-view-generate-submenu-row">
                     <button type="button"
                             class="recipe-view-generate-submenu-toggle"

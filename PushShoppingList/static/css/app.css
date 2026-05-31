@@ -346,8 +346,7 @@ body {
         .save-recipe-qty-btn,
         .create-recipe-btn,
         .cookbook-action-btn,
-        .view-action-btn,
-        .view-toggle-btn {
+        .view-action-btn {
             height: 32px;
             min-height: 32px;
             padding: 2px 12px;
@@ -623,7 +622,7 @@ body {
         }
 
         .store-options-sticky-toolbar .address-actions-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
+            grid-template-columns: minmax(0, 1fr);
         }
 
         body.store-addresses-hidden .store-location-details > .store-detail-line,
@@ -2239,10 +2238,6 @@ body {
             margin-top: 0;
         }
 
-        .view-switcher-sticky[data-active-view="recipe"] .view-toggle-box {
-            padding-right: 46px;
-        }
-
         .recipe-view-global-menu-wrap {
             display: none;
             position: absolute;
@@ -2436,31 +2431,42 @@ body {
 
         .view-toggle-box {
             display: flex;
-            gap: 10px;
+            gap: 8px;
             justify-content: center;
             align-items: center;
             flex-wrap: wrap;
             margin-top: 10px;
         }
 
-        .view-toggle-btn {
-            width: auto;
-            height: 32px;
-            min-height: 32px;
-            padding: 2px 12px;
+        .view-select-label {
+            color: #dbe4f0;
             font-size: 13px;
+            font-weight: 900;
             line-height: 1.1;
-            background: #333;
-            margin-top: 0;
         }
 
-        .view-toggle-btn.active {
-            background: #0078D7;
+        .view-select {
+            width: auto;
+            min-width: 126px;
+            height: 32px;
+            min-height: 32px;
+            margin: 0;
+            padding: 4px 34px 4px 12px;
+            border: 1px solid #34455f;
+            border-radius: 7px;
+            background: #202425;
             color: #fff;
             font-size: 13px;
             font-weight: 800;
+            line-height: 1.1;
+            box-sizing: border-box;
         }
 
+        .view-select:focus {
+            border-color: #4da3ff;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(77, 163, 255, 0.18);
+        }
 
         .show-item-buttons-toggle {
             display: flex;
@@ -9746,7 +9752,8 @@ body {
 }
 
 .recipe-edit-image-generation-menu,
-.recipe-edit-equipment-image-menu {
+.recipe-edit-equipment-image-menu,
+.recipe-edit-instructions-image-menu {
     min-width: 260px;
 }
 
@@ -11526,6 +11533,21 @@ body {
     }
 }
 
+:root {
+    --submenu-bg: #121b28;
+    --submenu-border: #334a68;
+    --submenu-divider: rgba(111, 126, 148, 0.28);
+    --submenu-hover: #1d2b3f;
+    --submenu-active: #162337;
+    --submenu-text: #dbe4f0;
+    --submenu-muted: #aeb7c4;
+    --submenu-heading: #b8b2a5;
+    --submenu-danger: #ff7068;
+    --submenu-shadow: 0 16px 34px rgba(0, 0, 0, 0.46);
+    --submenu-width: 156px;
+    --submenu-wide-width: 260px;
+}
+
 .recipe-edit-row-menu-btn {
     position: relative;
     display: inline-flex;
@@ -11539,6 +11561,8 @@ body {
     border: 1px solid transparent;
     border-radius: 7px;
     background: transparent;
+    color: var(--submenu-muted);
+    transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .recipe-edit-row-menu-btn::before {
@@ -11594,8 +11618,9 @@ body {
 .recipe-edit-row-menu-btn:hover,
 .recipe-edit-row-menu-btn:focus,
 .recipe-edit-row-menu-btn[aria-expanded="true"] {
-    border-color: #34455f;
-    background: #131c29;
+    border-color: var(--submenu-border);
+    background: var(--submenu-active);
+    box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.08);
     outline: none;
 }
 
@@ -11618,13 +11643,18 @@ body {
     right: 0;
     top: 44px;
     z-index: 13050;
-    min-width: 148px;
+    min-width: var(--submenu-width);
+    padding: 4px 0;
     overflow-x: hidden;
     overflow-y: auto;
-    border: 1px solid #263447;
+    border: 1px solid var(--submenu-border);
     border-radius: 8px;
-    background: #141e2c;
-    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.46);
+    background:
+        linear-gradient(180deg, rgba(21, 32, 47, 0.98), rgba(13, 21, 32, 0.98)),
+        var(--submenu-bg);
+    color: var(--submenu-text);
+    box-shadow: var(--submenu-shadow);
+    box-sizing: border-box;
 }
 
 .recipe-edit-row-menu.recipe-edit-floating-menu {
@@ -11644,39 +11674,45 @@ body {
 }
 
 .recipe-edit-row-menu button {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 8px;
     width: 100%;
-    min-height: 34px;
+    min-height: 36px;
     margin: 0;
-    padding: 8px 13px;
+    padding: 9px 14px;
     border: 0;
     border-radius: 0;
     background: transparent;
-    color: #dbe4f0;
+    color: var(--submenu-text);
     text-align: left;
     font-size: 13px;
     font-weight: 700;
+    line-height: 1.2;
+    box-sizing: border-box;
 }
 
 .recipe-edit-row-menu a.recipe-edit-menu-link {
     display: flex;
     align-items: center;
+    gap: 8px;
     width: 100%;
-    min-height: 34px;
-    padding: 8px 13px;
+    min-height: 36px;
+    padding: 9px 14px;
     border: 0;
     background: transparent;
-    color: #dbe4f0;
+    color: var(--submenu-text);
     text-align: left;
     text-decoration: none;
     font-size: 13px;
     font-weight: 700;
+    line-height: 1.2;
     box-sizing: border-box;
 }
 
 .recipe-edit-row-menu a.recipe-edit-menu-link:hover,
 .recipe-edit-row-menu a.recipe-edit-menu-link:focus {
-    background: #1e2b3d;
+    background: var(--submenu-hover);
     outline: none;
 }
 
@@ -11686,7 +11722,7 @@ body {
 
 .recipe-edit-row-menu button:hover,
 .recipe-edit-row-menu button:focus {
-    background: #1e2b3d;
+    background: var(--submenu-hover);
     outline: none;
 }
 
@@ -11696,11 +11732,16 @@ body {
 }
 
 .recipe-edit-row-menu button.delete {
-    color: #ff7068;
+    color: var(--submenu-danger);
+}
+
+.recipe-edit-row-menu:not(.overflow-menu) > button.delete:not(:first-child) {
+    margin-top: 4px;
+    border-top: 1px solid var(--submenu-divider);
 }
 
 .recipe-edit-row-menu.overflow-menu {
-    min-width: 248px;
+    min-width: var(--submenu-wide-width);
     max-height: none;
     overflow: visible;
     padding: 4px 0;
@@ -11725,12 +11766,15 @@ body {
 .overflow-menu-section + .overflow-menu-section {
     margin-top: 4px;
     padding-top: 7px;
-    border-top: 1px solid rgba(111, 126, 148, 0.26);
+    border-top: 1px solid var(--submenu-divider);
 }
 
-.overflow-menu-section-title {
-    padding: 5px 13px 4px;
-    color: #91a0b7;
+.overflow-menu-section-title,
+.recipe-view-menu-section-title,
+.recipe-view-menu-subsection-title,
+.recipe-url-summary-cookbook-menu-label {
+    padding: 6px 14px 5px;
+    color: var(--submenu-heading);
     font-size: 11px;
     font-weight: 900;
     line-height: 1.15;
@@ -11740,6 +11784,11 @@ body {
     user-select: none;
 }
 
+.recipe-view-menu-subsection-title {
+    padding-top: 7px;
+    font-size: 10px;
+}
+
 .overflow-submenu {
     position: absolute;
     top: 0;
@@ -11747,10 +11796,12 @@ body {
     z-index: 16010;
     min-width: 218px;
     overflow: hidden;
-    border: 1px solid #263447;
+    border: 1px solid var(--submenu-border);
     border-radius: 8px;
-    background: #141e2c;
-    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.46);
+    background:
+        linear-gradient(180deg, rgba(21, 32, 47, 0.98), rgba(13, 21, 32, 0.98)),
+        var(--submenu-bg);
+    box-shadow: var(--submenu-shadow);
 }
 
 .overflow-submenu[hidden] {
@@ -11760,7 +11811,7 @@ body {
 .overflow-submenu .overflow-menu-section-title {
     margin-bottom: 2px;
     padding-top: 8px;
-    border-bottom: 1px solid rgba(111, 126, 148, 0.22);
+    border-bottom: 1px solid var(--submenu-divider);
 }
 
 .overflow-menu .recipe-view-generate-submenu-toggle {
@@ -11823,12 +11874,13 @@ body {
 
 @media (max-width: 760px) {
     .recipe-edit-choice-row {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr) max-content;
     }
 
     .recipe-edit-choice-create {
-        width: 100%;
-        white-space: normal;
+        width: auto;
+        min-width: max-content;
+        white-space: nowrap;
     }
 }
 
