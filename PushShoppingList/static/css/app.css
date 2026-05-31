@@ -13093,7 +13093,7 @@ body {
 
 .recipe-edit-ingredient-row,
 .recipe-edit-ingredient-row.has-ingredient-choice-review {
-    border: 1px solid transparent;
+    border: 1px solid #263447;
     border-radius: 8px;
     background:
         linear-gradient(145deg, rgba(19, 30, 45, 0.9), rgba(10, 16, 25, 0.96)),
@@ -13103,7 +13103,7 @@ body {
 
 .recipe-edit-ingredient-row:last-child,
 .recipe-edit-ingredient-row.has-ingredient-choice-review:last-child {
-    border-bottom: 1px solid transparent;
+    border-bottom: 1px solid #263447;
 }
 
 @media (min-width: 761px) {
@@ -13112,4 +13112,59 @@ body {
         min-height: 92px;
         padding: 18px;
     }
+}
+
+.recipe-edit-equipment-row:not(:has([data-equipment-image-panel]:not(.recipe-image-visibility-hidden))) {
+    align-items: center;
+    min-height: 48px;
+    padding: 6px 16px;
+}
+
+.recipe-edit-equipment-row:not(:has([data-equipment-image-panel]:not(.recipe-image-visibility-hidden))) > .recipe-edit-row-handle,
+.recipe-edit-equipment-row:not(:has([data-equipment-image-panel]:not(.recipe-image-visibility-hidden))) > .recipe-edit-row-number,
+.recipe-edit-equipment-row:not(:has([data-equipment-image-panel]:not(.recipe-image-visibility-hidden))) > label,
+.recipe-edit-equipment-row:not(:has([data-equipment-image-panel]:not(.recipe-image-visibility-hidden))) > .recipe-edit-row-menu-wrap {
+    grid-row: 1;
+    align-self: center;
+}
+
+.recipe-edit-equipment-row:not(:has([data-equipment-image-panel]:not(.recipe-image-visibility-hidden))) .recipe-edit-row-number {
+    width: 34px;
+    height: 34px;
+    font-size: 15px;
+}
+
+.recipe-edit-equipment-row:not(:has([data-equipment-image-panel]:not(.recipe-image-visibility-hidden))) input {
+    height: 28px;
+    min-height: 28px;
+    font-size: 15px;
+}
+
+.recipe-edit-equipment-row:not(:has([data-equipment-image-panel]:not(.recipe-image-visibility-hidden))) .recipe-edit-row-menu-btn {
+    height: 36px;
+    min-height: 36px;
+}
+
+.recipe-edit-nutrition-row {
+    min-height: 48px;
+    padding: 6px 16px;
+    gap: 10px 14px;
+}
+
+.recipe-edit-nutrition-row .recipe-edit-row-handle,
+.recipe-edit-nutrition-row > label,
+.recipe-edit-nutrition-row > .recipe-edit-row-menu-wrap {
+    align-self: center;
+}
+
+.recipe-edit-nutrition-row input {
+    height: 28px;
+    min-height: 28px;
+    padding: 0;
+    font-size: 15px;
+}
+
+.recipe-edit-nutrition-row .recipe-edit-row-menu-btn {
+    height: 36px;
+    min-height: 36px;
 }
