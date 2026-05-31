@@ -3815,6 +3815,11 @@ function showView(viewName) {
     const activeView = Object.prototype.hasOwnProperty.call(views, viewName)
         ? viewName
         : "section";
+    const buttons = {
+        section: document.getElementById("sectionViewBtn"),
+        store: document.getElementById("storeViewBtn"),
+        recipe: document.getElementById("recipeViewBtn"),
+    };
 
     Object.entries(views).forEach(([key, view]) => {
         if (view) {
@@ -3822,10 +3827,13 @@ function showView(viewName) {
         }
     });
 
-    const viewSelect = document.getElementById("viewSelect");
-    if (viewSelect) {
-        viewSelect.value = activeView;
-    }
+    Object.entries(buttons).forEach(([key, button]) => {
+        if (button) {
+            const isActive = key === activeView;
+            button.classList.toggle("active", isActive);
+            button.setAttribute("aria-pressed", isActive ? "true" : "false");
+        }
+    });
 
     const switcher = document.getElementById("viewSwitcherSticky");
     if (switcher) {

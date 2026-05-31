@@ -30,15 +30,28 @@
 
 <div id="viewSwitcherSticky" class="view-switcher-sticky" aria-label="Display View">
     <div class="view-toggle-box view-control-row">
-        <label class="view-select-label" for="viewSelect">View:</label>
-        <select id="viewSelect"
-                class="view-select"
-                aria-label="Display View"
-                onchange="showView(this.value)">
-            <option value="section">Section</option>
-            <option value="store">Store</option>
-            <option value="recipe">Recipe</option>
-        </select>
+        <span class="view-toggle-label">View:</span>
+        <button type="button"
+                id="sectionViewBtn"
+                class="view-toggle-btn"
+                aria-pressed="false"
+                onclick="showView('section')">
+            Section
+        </button>
+        <button type="button"
+                id="storeViewBtn"
+                class="view-toggle-btn"
+                aria-pressed="false"
+                onclick="showView('store')">
+            Store
+        </button>
+        <button type="button"
+                id="recipeViewBtn"
+                class="view-toggle-btn"
+                aria-pressed="false"
+                onclick="showView('recipe')">
+            Recipe
+        </button>
     </div>
     <div class="recipe-view-global-menu-wrap recipe-edit-row-menu-wrap">
         <button type="button"
