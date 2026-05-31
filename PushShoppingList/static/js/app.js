@@ -6920,6 +6920,7 @@ function closeRecipeEditRowMenus() {
 function closeRecipeViewGenerateSubmenus(scope = document) {
     scope.querySelectorAll(".recipe-view-generate-submenu").forEach(menu => {
         menu.hidden = true;
+        menu.style.top = "";
     });
     scope.querySelectorAll(".recipe-view-generate-submenu-toggle").forEach(button => {
         button.setAttribute("aria-expanded", "false");
@@ -6942,9 +6943,36 @@ function toggleRecipeViewGenerateSubmenu(button, event = null) {
     if (menu && shouldOpen) {
         menu.hidden = false;
         button.setAttribute("aria-expanded", "true");
+        positionRecipeViewGenerateSubmenu(menu);
     }
 
     return false;
+}
+
+function positionRecipeViewGenerateSubmenu(menu) {
+    if (!menu) {
+        return;
+    }
+
+    menu.style.top = "";
+
+    if (window.matchMedia("(max-width: 650px)").matches) {
+        return;
+    }
+
+    const margin = 8;
+    const rect = menu.getBoundingClientRect();
+    let offset = 0;
+
+    if (rect.bottom > window.innerHeight - margin) {
+        offset -= rect.bottom - (window.innerHeight - margin);
+    }
+    if (rect.top + offset < margin) {
+        offset += margin - (rect.top + offset);
+    }
+    if (offset) {
+        menu.style.top = `${Math.round(offset)}px`;
+    }
 }
 
 function recipeEditRowMenuIsOpen() {
@@ -9681,6 +9709,60 @@ function toggleRecipeDetailSectionFromMenu(button) {
     return toggleRecipeDetailSection(toggle);
 }
 
+function resetRecipeTaskCheckbox(checkbox) {
+    const key = checkbox ? checkbox.dataset.taskKey || "" : "";
+    const taskRow = checkbox ? checkbox.closest(".recipe-task-row") : null;
+    const taskText = taskRow ? taskRow.querySelector(".recipe-task-text") : null;
+
+    if (!checkbox) {
+        return;
+    }
+
+    checkbox.checked = false;
+    if (taskText) {
+        taskText.classList.remove("checked-item-text");
+    }
+    if (key) {
+        localStorage.removeItem(`recipe-task-checked:${key}`);
+    }
+}
+
+function resetRecipeTaskCheckboxes(scope = document, selector = ".recipe-task-check") {
+    const root = scope || document;
+
+    root.querySelectorAll(selector).forEach(checkbox => {
+        resetRecipeTaskCheckbox(checkbox);
+    });
+}
+
+function resetItemCheckboxRow(row) {
+    const checkbox = row ? row.querySelector(".item-check") : null;
+    const itemText = row ? row.querySelector(".item-text") : null;
+
+    if (!row) {
+        return;
+    }
+
+    if (checkbox) {
+        checkbox.checked = false;
+    }
+    row.classList.remove("row-checked");
+    if (itemText) {
+        itemText.classList.remove("checked-item-text");
+    }
+    if (row.dataset.key) {
+        localStorage.removeItem(`item-checked:${row.dataset.key}`);
+    }
+}
+
+function resetItemCheckboxRows(scope = document, selector = ".row[data-key]") {
+    const root = scope || document;
+
+    root.querySelectorAll(selector).forEach(row => {
+        resetItemCheckboxRow(row);
+    });
+}
+
 function resetRecipeDetailCheckboxesFromMenu(button) {
     const header = button ? button.closest(".recipe-detail-header") : null;
     const toggle = header ? header.querySelector(".detail-toggle") : null;
@@ -9691,35 +9773,8 @@ function resetRecipeDetailCheckboxesFromMenu(button) {
         return false;
     }
 
-    parts.content.querySelectorAll(".recipe-task-check").forEach(checkbox => {
-        const key = checkbox.dataset.taskKey || "";
-        const taskRow = checkbox.closest(".recipe-task-row");
-        const taskText = taskRow ? taskRow.querySelector(".recipe-task-text") : null;
-
-        checkbox.checked = false;
-        if (taskText) {
-            taskText.classList.remove("checked-item-text");
-        }
-        if (key) {
-            localStorage.removeItem(`recipe-task-checked:${key}`);
-        }
-    });
-
-    parts.content.querySelectorAll(".row[data-key]").forEach(row => {
-        const checkbox = row.querySelector(".item-check");
-        const itemText = row.querySelector(".item-text");
-
-        if (checkbox) {
-            checkbox.checked = false;
-        }
-        row.classList.remove("row-checked");
-        if (itemText) {
-            itemText.classList.remove("checked-item-text");
-        }
-        if (row.dataset.key) {
-            localStorage.removeItem(`item-checked:${row.dataset.key}`);
-        }
-    });
+    resetRecipeTaskCheckboxes(parts.content);
+    resetItemCheckboxRows(parts.content);
 
     closeRecipeEditRowMenus();
     return false;
@@ -10506,37 +10561,60 @@ function normalizeSectionKey(text) {
 }
 
 function resetItemChecks(event) {
-    event.preventDefault();
+    if (event && typeof event.preventDefault === "function") {
+        event.preventDefault();
+    }
 
-    document.querySelectorAll(".row[data-key]").forEach(row => {
-        const checkbox = row.querySelector(".item-check");
+    resetItemCheckboxRows();
+    resetRecipeTaskCheckboxes();
 
-        if (!checkbox) {
-            return;
+    return false;
+}
+
+function resetAllCheckboxesFromRecipeViewMenu(button) {
+    resetItemChecks();
+    closeRecipeEditRowMenus();
+    return false;
+}
+
+function resetRecipeViewCheckboxesFromMenu(button, scope) {
+    if (scope === "equipment") {
+        resetRecipeTaskCheckboxes(document, '.recipe-task-check[data-task-key^="equipment|"]');
+    } else if (scope === "instructions") {
+        resetRecipeTaskCheckboxes(document, '.recipe-task-check[data-task-key^="instruction|"]');
+    } else if (scope === "ingredients") {
+        resetItemCheckboxRows();
+    }
+
+    closeRecipeEditRowMenus();
+    return false;
+}
+
+async function resetStoresFromRecipeViewMenu(button) {
+    const originalDisabled = button ? button.disabled : false;
+    let form = document.querySelector('form[action="/reset_stores"]');
+
+    if (!form) {
+        form = document.createElement("form");
+        form.method = "POST";
+        form.action = "/reset_stores";
+    }
+
+    if (button) {
+        button.disabled = true;
+    }
+
+    try {
+        await resetStores({
+            currentTarget: form,
+            preventDefault() {},
+        });
+    } finally {
+        if (button) {
+            button.disabled = originalDisabled;
         }
-
-        checkbox.checked = false;
-        row.classList.remove("row-checked");
-        const itemText = row.querySelector(".item-text");
-        if (itemText) {
-            itemText.classList.remove("checked-item-text");
-        }
-        localStorage.removeItem(`item-checked:${row.dataset.key}`);
-    });
-
-    document.querySelectorAll(".recipe-task-check").forEach(checkbox => {
-        const key = checkbox.dataset.taskKey || "";
-        const taskRow = checkbox.closest(".recipe-task-row");
-        const taskText = taskRow ? taskRow.querySelector(".recipe-task-text") : null;
-
-        checkbox.checked = false;
-        if (taskText) {
-            taskText.classList.remove("checked-item-text");
-        }
-        if (key) {
-            localStorage.removeItem(`recipe-task-checked:${key}`);
-        }
-    });
+        closeRecipeEditRowMenus();
+    }
 
     return false;
 }

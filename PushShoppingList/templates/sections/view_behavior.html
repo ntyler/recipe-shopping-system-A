@@ -186,6 +186,40 @@
                     </div>
                 </div>
             </div>
+            <div class="overflow-menu-section recipe-view-menu-section">
+                <div class="overflow-menu-section-title recipe-view-menu-section-title">Reset Tools</div>
+                <button type="button"
+                        onclick="return resetStoresFromRecipeViewMenu(this)">
+                    Reset Stores
+                </button>
+                <div class="recipe-view-generate-submenu-row">
+                    <button type="button"
+                            class="recipe-view-generate-submenu-toggle"
+                            aria-haspopup="true"
+                            aria-expanded="false"
+                            onclick="return toggleRecipeViewGenerateSubmenu(this, event)">
+                        Reset Checkboxes
+                    </button>
+                    <div class="overflow-submenu recipe-view-generate-submenu" hidden>
+                        <button type="button"
+                                onclick="return resetAllCheckboxesFromRecipeViewMenu(this)">
+                            All
+                        </button>
+                        <button type="button"
+                                onclick="return resetRecipeViewCheckboxesFromMenu(this, 'equipment')">
+                            Equipment
+                        </button>
+                        <button type="button"
+                                onclick="return resetRecipeViewCheckboxesFromMenu(this, 'instructions')">
+                            Instructions
+                        </button>
+                        <button type="button"
+                                onclick="return resetRecipeViewCheckboxesFromMenu(this, 'ingredients')">
+                            Ingredients
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
