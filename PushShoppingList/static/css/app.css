@@ -4514,9 +4514,12 @@ body {
 
         #currentRecipeUrlLogCard .recipe-url-log-content > .recipe-url-collapsed-summary {
             display: grid;
-            gap: 8px;
+            gap: 10px;
             margin-top: 0;
-            border-color: transparent;
+            padding: 0;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
         }
 
         .recipe-url-collapsed-actions {
@@ -5153,8 +5156,12 @@ body {
             grid-template-columns: minmax(0, 1fr);
             gap: 10px;
             align-items: start;
-            padding-bottom: 8px;
-            border-bottom: 1px solid #2d2d2d;
+            padding: 12px;
+            border: 1px solid #263447;
+            border-radius: 8px;
+            background:
+                linear-gradient(145deg, rgba(19, 30, 45, 0.9), rgba(10, 16, 25, 0.96)),
+                #0d1520;
             scroll-margin-top: 12px;
             transition: background 120ms ease, border-color 120ms ease, opacity 120ms ease;
         }
@@ -5218,8 +5225,8 @@ body {
 
         .recipe-url-summary-row:last-child,
         .recipe-url-summary-row-last {
-            padding-bottom: 0;
-            border-bottom: none;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #263447;
         }
 
         .recipe-url-summary-number {
@@ -13071,5 +13078,38 @@ body {
         font-size: 11px;
         line-height: 1.1;
         white-space: nowrap;
+    }
+}
+
+/* Keep ingredient rows visually aligned with the Equipment row surface. */
+.recipe-edit-ingredients {
+    gap: 10px;
+    padding: 0;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+}
+
+.recipe-edit-ingredient-row,
+.recipe-edit-ingredient-row.has-ingredient-choice-review {
+    border: 1px solid #263447;
+    border-radius: 8px;
+    background:
+        linear-gradient(145deg, rgba(19, 30, 45, 0.9), rgba(10, 16, 25, 0.96)),
+        #0d1520;
+    box-shadow: none;
+}
+
+.recipe-edit-ingredient-row:last-child,
+.recipe-edit-ingredient-row.has-ingredient-choice-review:last-child {
+    border-bottom: 1px solid #263447;
+}
+
+@media (min-width: 761px) {
+    .recipe-edit-ingredient-row,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review {
+        min-height: 92px;
+        padding: 18px;
     }
 }
