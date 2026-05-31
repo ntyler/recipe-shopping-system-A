@@ -2833,6 +2833,11 @@ function setCookbookRecipeCollapsed(card, isCollapsed) {
     const toggle = card.querySelector("[data-cookbook-recipe-toggle]");
     const icon = card.querySelector("[data-cookbook-recipe-toggle-icon]");
 
+    if (!details && !toggle && !icon) {
+        card.classList.remove("cookbook-recipe-collapsed");
+        return;
+    }
+
     card.classList.toggle("cookbook-recipe-collapsed", isCollapsed);
 
     if (details) {
@@ -2926,6 +2931,10 @@ function bindCookbookDragAndDrop() {
         }
 
         card.addEventListener("dragstart", event => {
+            if (event.target && event.target.closest && event.target.closest("[data-cookbook-recipe-card]")) {
+                return;
+            }
+
             if (card.dataset.dragHandleActive !== "1") {
                 event.preventDefault();
                 return;
@@ -3074,6 +3083,208 @@ async function postCookbookOrderToEndpoint(endpoint, cookbookIds) {
     return data;
 }
 
+function draggedRecipeRow() {
+    return document.querySelector("[data-cookbook-recipe-card].is-dragging, [data-current-recipe-row].is-dragging");
+}
+
+function draggedRecipeUrl(row) {
+    return row ? row.dataset.recipeUrl || "" : "";
+}
+
+function clearCookbookRecipeDropState() {
+    document.querySelectorAll(".cookbook-card-recipe-drop-active").forEach(card => {
+        card.classList.remove("cookbook-card-recipe-drop-active");
+    });
+    document.querySelectorAll(".cookbook-recipe-drop-before, .cookbook-recipe-drop-after").forEach(card => {
+        card.classList.remove("cookbook-recipe-drop-before", "cookbook-recipe-drop-after");
+    });
+}
+
+function cookbookRecipeDropPosition(event, cookbookCard) {
+    const source = draggedRecipeRow();
+    const recipeUrl = draggedRecipeUrl(source);
+
+    if (!source || !recipeUrl || !cookbookCard) {
+        return null;
+    }
+
+    const targetRecipe = event && event.target && event.target.closest
+        ? event.target.closest("[data-cookbook-recipe-card]")
+        : null;
+    const targetCookbook = targetRecipe ? targetRecipe.closest("[data-cookbook-card]") : null;
+
+    if (targetRecipe && (targetCookbook !== cookbookCard || targetRecipe === source)) {
+        return null;
+    }
+
+    const targetRecipeUrl = targetRecipe ? targetRecipe.dataset.recipeUrl || "" : "";
+    const shouldInsertAfter = targetRecipe
+        ? event.clientY > targetRecipe.getBoundingClientRect().top + targetRecipe.getBoundingClientRect().height / 2
+        : false;
+
+    if (targetRecipe) {
+        return {
+            cookbookId: cookbookCard.dataset.cookbookId || "",
+            recipeUrl,
+            insertBeforeRecipeUrl: shouldInsertAfter ? "" : targetRecipeUrl,
+            insertAfterRecipeUrl: shouldInsertAfter ? targetRecipeUrl : "",
+            targetRecipe,
+            shouldInsertAfter,
+        };
+    }
+
+    return {
+        cookbookId: cookbookCard.dataset.cookbookId || "",
+        recipeUrl,
+        insertBeforeRecipeUrl: "",
+        insertAfterRecipeUrl: "",
+        targetRecipe: null,
+        shouldInsertAfter: false,
+    };
+}
+
+function updateCookbookRecipeDropState(event, cookbookCard) {
+    clearCookbookRecipeDropState();
+
+    const position = cookbookRecipeDropPosition(event, cookbookCard);
+
+    if (!position || !position.cookbookId || !position.recipeUrl) {
+        return null;
+    }
+
+    cookbookCard.classList.add("cookbook-card-recipe-drop-active");
+
+    if (position.targetRecipe) {
+        position.targetRecipe.classList.add(position.shouldInsertAfter ? "cookbook-recipe-drop-after" : "cookbook-recipe-drop-before");
+    }
+
+    return position;
+}
+
+async function saveCookbookRecipeDrop(position) {
+    if (!position || !position.cookbookId || !position.recipeUrl) {
+        return;
+    }
+
+    setCookbookStatus("Moving recipe...");
+
+    await moveRecipeUrlToCookbook(position.recipeUrl, position.cookbookId, {
+        insertBeforeRecipeUrl: position.insertBeforeRecipeUrl,
+        insertAfterRecipeUrl: position.insertAfterRecipeUrl,
+    });
+
+    await refreshStoreMarkup({
+        cacheBust: true,
+        requireRecipeLog: true,
+    });
+    showRecipeQuantityUpdatedMessage("", "", "", "Recipe moved.");
+}
+
+function bindCookbookRecipeDragAndDrop() {
+    document.querySelectorAll("[data-cookbook-recipe-card]").forEach(card => {
+        if (card.dataset.recipeDragBound === "1") {
+            return;
+        }
+
+        const handle = card.querySelector("[data-cookbook-recipe-drag-handle]");
+        card.dataset.recipeDragBound = "1";
+        card.setAttribute("draggable", "true");
+        card.setAttribute("aria-grabbed", "false");
+
+        if (handle) {
+            handle.addEventListener("pointerdown", () => {
+                card.dataset.dragHandleActive = "1";
+            });
+            handle.addEventListener("pointerup", () => {
+                delete card.dataset.dragHandleActive;
+            });
+            handle.addEventListener("blur", () => {
+                delete card.dataset.dragHandleActive;
+            });
+            handle.addEventListener("click", event => {
+                event.stopPropagation();
+            });
+        }
+
+        card.addEventListener("dragstart", event => {
+            if (card.dataset.dragHandleActive !== "1") {
+                event.preventDefault();
+                return;
+            }
+
+            closeRecipeEditRowMenus();
+            card.classList.add("is-dragging");
+            card.setAttribute("aria-grabbed", "true");
+            document.body.classList.add("recipe-url-dragging");
+
+            if (event.dataTransfer) {
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("text/plain", card.dataset.recipeUrl || "");
+            }
+        });
+
+        card.addEventListener("dragend", () => {
+            card.classList.remove("is-dragging");
+            card.setAttribute("aria-grabbed", "false");
+            delete card.dataset.dragHandleActive;
+            document.body.classList.remove("recipe-url-dragging");
+            clearCookbookRecipeDropState();
+        });
+    });
+
+    document.querySelectorAll("[data-cookbook-card]").forEach(cookbookCard => {
+        if (cookbookCard.dataset.recipeDropBound === "1") {
+            return;
+        }
+
+        cookbookCard.dataset.recipeDropBound = "1";
+
+        cookbookCard.addEventListener("dragover", event => {
+            const source = draggedRecipeRow();
+
+            if (!source) {
+                return;
+            }
+
+            const position = updateCookbookRecipeDropState(event, cookbookCard);
+
+            if (!position) {
+                return;
+            }
+
+            event.preventDefault();
+
+            if (event.dataTransfer) {
+                event.dataTransfer.dropEffect = "move";
+            }
+        });
+
+        cookbookCard.addEventListener("dragleave", event => {
+            if (event.relatedTarget && cookbookCard.contains(event.relatedTarget)) {
+                return;
+            }
+
+            clearCookbookRecipeDropState();
+        });
+
+        cookbookCard.addEventListener("drop", event => {
+            const position = updateCookbookRecipeDropState(event, cookbookCard);
+
+            if (!position) {
+                return;
+            }
+
+            event.preventDefault();
+            clearCookbookRecipeDropState();
+            saveCookbookRecipeDrop(position).catch(err => {
+                console.warn("Unable to move dropped recipe.", err);
+                setCookbookStatus(err.message || "Unable to move recipe.", true);
+                window.alert(err.message || "Unable to move recipe.");
+            });
+        });
+    });
+}
+
 function bindCookbooks() {
     document.querySelectorAll("[data-cookbook-recipe-checkbox]").forEach(checkbox => {
         if (checkbox.dataset.cookbookBound === "1") {
@@ -3115,6 +3326,7 @@ function bindCookbooks() {
     restoreCookbookRecipeSearchValue();
     applyCookbookRecipeSearch();
     bindCookbookDragAndDrop();
+    bindCookbookRecipeDragAndDrop();
 }
 
 async function refreshCookbooksMarkup() {
@@ -3228,11 +3440,19 @@ function recipeLogCookbookActionData(button) {
     };
 }
 
-async function moveRecipeUrlToCookbook(recipeUrl, cookbookId) {
+async function moveRecipeUrlToCookbook(recipeUrl, cookbookId, options = {}) {
     const formData = new FormData();
     formData.set("cookbook_id", cookbookId || "");
     formData.set("overwrite_existing", "1");
     formData.append("recipe_urls", recipeUrl || "");
+
+    if (options.insertBeforeRecipeUrl) {
+        formData.set("insert_before_recipe_url", options.insertBeforeRecipeUrl);
+    }
+
+    if (options.insertAfterRecipeUrl) {
+        formData.set("insert_after_recipe_url", options.insertAfterRecipeUrl);
+    }
 
     return submitCookbookApi("/api/cookbooks/move_recipes", formData);
 }
@@ -3438,6 +3658,45 @@ async function restoreCookbookRecipes(event) {
             button.disabled = false;
             button.textContent = originalText || "Add Selected to Recipe Log";
             updateCookbookRestoreButton();
+        }
+    }
+
+    return false;
+}
+
+async function restoreSingleCookbookRecipe(button) {
+    const recipeUrl = button ? button.dataset.recipeUrl || "" : "";
+    const originalText = button ? button.textContent : "";
+    const formData = new FormData();
+
+    if (!recipeUrl) {
+        return false;
+    }
+
+    formData.append("recipe_urls", recipeUrl);
+
+    try {
+        closeRecipeEditRowMenus();
+
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Adding...";
+        }
+
+        setCookbookStatus("Adding recipe to current recipes...");
+        await submitCookbookApi("/api/cookbooks/restore_recipes", formData);
+        await refreshStoreMarkup({
+            cacheBust: true,
+            requireRecipeLog: true,
+        });
+        showRecipeQuantityUpdatedMessage("", "", "", "Recipe added to current recipes.");
+    } catch (err) {
+        console.warn("Unable to add cookbook recipe to current recipes.", err);
+        setCookbookStatus(err.message || "Unable to add recipe to current recipes.", true);
+    } finally {
+        if (button && button.isConnected) {
+            button.disabled = false;
+            button.textContent = originalText || "Add to current recipes";
         }
     }
 

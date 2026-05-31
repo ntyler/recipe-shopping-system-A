@@ -368,9 +368,34 @@ def cookbook_cover_image_for_view(recipe):
 
 def cookbook_view_for_render(recipe_rows):
     view = cookbook_view(recipe_rows)
+    recipe_ingredient_data = load_recipe_ingredients()
 
     for cookbook in view.get("cookbooks", []):
         for recipe in cookbook.get("recipes", []):
+            recipe_url = recipe.get("url", "")
+            recipe_key = normalize_recipe_url_key(recipe_url)
+            recipe_quantity = normalize_recipe_quantity(recipe.get("quantity") or 1)
+            recipe_data = load_saved_recipe_output(recipe_url)
+            recipe_meta = recipe_ingredient_data.get(recipe_key, {})
+            nutrition_summary = recipe_view_nutrition_summary(recipe_data.get("nutrition", {}))
+            use_scaled_meta = multipliers_match(recipe_meta.get("quantity", 1), recipe_quantity)
+            scaled_servings = recipe_meta.get("scaled_servings") if use_scaled_meta else None
+
+            recipe["name"] = recipe.get("name") or recipe_data.get("recipe_title") or recipe_url
+            recipe["source_href"] = recipe.get("source_href") or recipe_source_href(recipe_url)
+            recipe["source_display_url"] = recipe.get("source_display_url") or recipe_source_display_url(recipe_url)
+            recipe["quantity"] = recipe_quantity
+            recipe["scaling_options"] = recipe_log_scaling_options(recipe_data, recipe_quantity)
+            recipe["food_rule_status"] = recipe_food_rule_status(recipe_data)
+            recipe["archive_pdf_available"] = recipe_archive_pdf_exists(recipe_url)
+            recipe["base_servings"] = recipe.get("base_servings") or recipe_data.get("servings")
+            recipe["scaled_servings"] = (
+                scaled_servings
+                or recipe.get("scaled_servings")
+                or scale_servings(recipe_data.get("servings"), recipe_quantity)
+            )
+            recipe["serving_basis"] = recipe.get("serving_basis") or nutrition_summary["serving_basis"]
+            recipe["calories"] = recipe.get("calories") or nutrition_summary["calories"]
             recipe["cover_image"] = cookbook_cover_image_for_view(recipe)
 
     for recipe in view.get("recipes", []):
@@ -1253,6 +1278,8 @@ def move_cookbook_recipes_route():
             request.form.getlist("recipe_urls"),
             recipe_view_rows(recipe_url_rows()),
             overwrite_existing=request.form.get("overwrite_existing") == "1",
+            insert_before_recipe_url=request.form.get("insert_before_recipe_url", ""),
+            insert_after_recipe_url=request.form.get("insert_after_recipe_url", ""),
         )
     except CookbookRecipeConflict as err:
         return jsonify({

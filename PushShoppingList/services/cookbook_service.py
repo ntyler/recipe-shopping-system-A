@@ -521,7 +521,14 @@ def reorder_cookbooks(cookbook_ids):
         return save_cookbooks(payload).get("cookbooks", [])
 
 
-def move_recipes_to_cookbook(cookbook_id, recipe_urls, recipe_rows=None, overwrite_existing=False):
+def move_recipes_to_cookbook(
+    cookbook_id,
+    recipe_urls,
+    recipe_rows=None,
+    overwrite_existing=False,
+    insert_before_recipe_url="",
+    insert_after_recipe_url="",
+):
     available_recipes = recipe_snapshot_lookup(recipe_rows)
 
     with COOKBOOKS_LOCK:
@@ -586,7 +593,27 @@ def move_recipes_to_cookbook(cookbook_id, recipe_urls, recipe_rows=None, overwri
                 if recipe_key(recipe.get("url")) not in selected_keys
             ]
 
-        target["recipes"].extend(selected_recipes)
+        before_key = recipe_key(insert_before_recipe_url)
+        after_key = recipe_key(insert_after_recipe_url)
+        target_recipes = target.setdefault("recipes", [])
+        insert_index = len(target_recipes)
+
+        if before_key:
+            for index, recipe in enumerate(target_recipes):
+                if recipe_key(recipe.get("url")) == before_key:
+                    insert_index = index
+                    break
+        elif after_key:
+            for index, recipe in enumerate(target_recipes):
+                if recipe_key(recipe.get("url")) == after_key:
+                    insert_index = index + 1
+                    break
+
+        target["recipes"] = [
+            *target_recipes[:insert_index],
+            *selected_recipes,
+            *target_recipes[insert_index:],
+        ]
         return save_cookbooks(payload)
 
 

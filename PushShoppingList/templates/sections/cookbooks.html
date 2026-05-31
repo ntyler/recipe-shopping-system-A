@@ -127,47 +127,125 @@
 
                                 <div class="cookbook-card-body" data-cookbook-body>
                                     {% if cookbook.recipes %}
-                                        <div class="cookbook-recipe-list" data-cookbook-recipe-list>
+                                        <div class="cookbook-recipe-list"
+                                             data-cookbook-recipe-list
+                                             data-cookbook-id="{{ cookbook.id }}">
                                             {% for recipe in cookbook.recipes %}
-                                                {% set recipe_details_id = "cookbook-recipe-details-" ~ cookbook.id ~ "-" ~ loop.index %}
-                                                <article class="cookbook-recipe-card"
+                                                <article class="cookbook-recipe-card recipe-url-summary-row{% if recipe.cover_image and recipe.cover_image.src %} recipe-url-summary-row-with-cover{% endif %}"
                                                          data-cookbook-recipe-card
+                                                         data-cookbook-id="{{ cookbook.id }}"
+                                                         data-recipe-url="{{ recipe.url }}"
                                                          data-cookbook-recipe-name="{{ recipe.name }}"
-                                                         data-cookbook-recipe-key="{{ cookbook.id }}|{{ recipe.url }}">
-                                                    <div class="cookbook-recipe-header">
-                                                        <div class="cookbook-recipe-title">
-                                                            <input type="checkbox"
-                                                                   class="cookbook-restore-checkbox"
-                                                                   name="recipe_urls"
-                                                                   value="{{ recipe.url }}"
-                                                                   form="restoreCookbookRecipesForm"
-                                                                   data-cookbook-restore-checkbox
-                                                                   aria-label="Select {{ recipe.name }} for recipe log">
-                                                            {% if recipe.number %}
-                                                                <span class="cookbook-recipe-number">Recipe {{ recipe.number }}:</span>
-                                                            {% endif %}
-                                                            <a href="{{ recipe.source_href }}"
-                                                               target="_blank"
-                                                               rel="noopener noreferrer"
-                                                               title="{{ recipe.source_display_url }}">
-                                                                {{ recipe.name }}
-                                                            </a>
-                                                            {% if recipe.base_servings %}
-                                                                <span class="cookbook-recipe-servings">Servings: {{ recipe.base_servings }}{% if recipe.scaled_servings and recipe.scaled_servings != recipe.base_servings %} -> {{ recipe.scaled_servings }}{% endif %}</span>
-                                                            {% endif %}
+                                                         data-cookbook-recipe-key="{{ cookbook.id }}|{{ recipe.url }}"
+                                                         draggable="true"
+                                                         aria-grabbed="false">
+                                                    <input type="checkbox"
+                                                           class="cookbook-restore-checkbox cookbook-recipe-restore-checkbox"
+                                                           name="recipe_urls"
+                                                           value="{{ recipe.url }}"
+                                                           form="restoreCookbookRecipesForm"
+                                                           data-cookbook-restore-checkbox
+                                                           aria-label="Select {{ recipe.name }} for recipe log"
+                                                           hidden>
+                                                    <div class="recipe-url-summary-header">
+                                                        <button type="button"
+                                                                class="recipe-url-drag-handle cookbook-recipe-drag-handle"
+                                                                data-cookbook-recipe-drag-handle
+                                                                aria-label="Move {{ recipe.name }}"
+                                                                onclick="event.stopPropagation()">
+                                                            <span class="recipe-url-drag-dots" aria-hidden="true">
+                                                                <span></span><span></span><span></span>
+                                                                <span></span><span></span><span></span>
+                                                            </span>
+                                                        </button>
+                                                        <div class="recipe-url-summary-title cookbook-recipe-summary-title">
+                                                            <div class="recipe-url-summary-heading">
+                                                                <div class="recipe-url-summary-title-toggle cookbook-recipe-title-toggle">
+                                                                    <span class="recipe-url-summary-title-line">
+                                                                        <span class="recipe-url-summary-number">Recipe {{ recipe.number or loop.index }}:</span>
+                                                                        <a class="recipe-url-summary-name recipe-url-summary-name-link"
+                                                                           href="{{ recipe.source_href }}"
+                                                                           target="_blank"
+                                                                           rel="noopener noreferrer"
+                                                                           title="{{ recipe.source_display_url }}"
+                                                                           onclick="event.stopPropagation()">
+                                                                            {{ recipe.name }}
+                                                                        </a>
+                                                                    </span>
+                                                                </div>
+                                                                {% if recipe.food_rule_status and recipe.food_rule_status.needs_review %}
+                                                                    <button type="button"
+                                                                            class="food-rule-marker recipe-log-food-review-btn recipe-url-summary-food-review"
+                                                                            data-recipe-url="{{ recipe.url }}"
+                                                                            title="{{ recipe.food_rule_status.marker }}"
+                                                                            aria-label="Food Review: {{ recipe.food_rule_status.count }} item{% if recipe.food_rule_status.count != 1 %}s{% endif %} need review"
+                                                                            onclick="event.stopPropagation(); openRecipeEditor(this, { scrollToFoodReview: true }); return false;">
+                                                                        Food Review ({{ recipe.food_rule_status.count }})
+                                                                    </button>
+                                                                {% endif %}
+                                                            </div>
+                                                            <div class="recipe-url-summary-body">
+                                                                {% if recipe.cover_image and recipe.cover_image.src %}
+                                                                    <div class="recipe-url-summary-main">
+                                                                        <img class="recipe-cover-image recipe-url-summary-cover"
+                                                                             src="{{ recipe.cover_image.src }}"
+                                                                             alt="{{ recipe.cover_image.alt or recipe.name }}"
+                                                                             loading="lazy">
+                                                                    </div>
+                                                                {% endif %}
+                                                                <div class="recipe-url-summary-meta">
+                                                                    {% if recipe.base_servings %}
+                                                                        <div class="recipe-url-summary-servings">
+                                                                            <span class="recipe-url-summary-meta-label">Servings:</span>
+                                                                            <span class="recipe-url-summary-meta-value">
+                                                                                <span>{{ recipe.base_servings }}</span>
+                                                                                {% if recipe.quantity != 1 and recipe.scaled_servings %}
+                                                                                    <span>-> {{ recipe.scaled_servings }}</span>
+                                                                                {% endif %}
+                                                                            </span>
+                                                                        </div>
+                                                                    {% endif %}
+                                                                    {% if recipe.serving_basis %}
+                                                                        <div class="recipe-url-summary-serving-basis">
+                                                                            <span class="recipe-url-summary-meta-label">Serving Basis:</span>
+                                                                            <span class="recipe-url-summary-meta-value">{{ recipe.serving_basis }}</span>
+                                                                        </div>
+                                                                    {% endif %}
+                                                                    {% if recipe.calories %}
+                                                                        <div class="recipe-url-summary-calories">
+                                                                            <span class="recipe-url-summary-meta-label">Calories:</span>
+                                                                            <span class="recipe-url-summary-meta-value">{{ recipe.calories }}</span>
+                                                                        </div>
+                                                                    {% endif %}
+                                                                    <div class="recipe-url-summary-amount">
+                                                                        <span class="recipe-url-summary-amount-label recipe-url-summary-meta-label">Amount:</span>
+                                                                        <div class="recipe-quantity-control recipe-url-summary-quantity recipe-url-summary-meta-value">
+                                                                            <select class="recipe-quantity-input recipe-scaling-select"
+                                                                                    data-recipe-number="{{ recipe.number or loop.index }}"
+                                                                                    data-recipe-url="{{ recipe.url }}"
+                                                                                    aria-label="Recipe {{ recipe.number or loop.index }} amount">
+                                                                                {% for option in recipe.scaling_options %}
+                                                                                    <option value="{{ option.value }}"
+                                                                                            {% if option.selected %}selected{% endif %}>
+                                                                                        {{ option.label }}
+                                                                                    </option>
+                                                                                {% endfor %}
+                                                                            </select>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="recipe-url-summary-cookbook">
+                                                                        <span class="recipe-url-summary-cookbook-label recipe-url-summary-meta-label">Cookbook:</span>
+                                                                        <div class="recipe-url-summary-cookbook-value recipe-url-summary-meta-value">
+                                                                            <span class="cookbook-recipe-current-cookbook">{{ cookbook.name }}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
                                                         </div>
-                                                        <div class="cookbook-recipe-actions">
-                                                            <button type="button"
-                                                                    class="cookbook-recipe-toggle-btn"
-                                                                    data-cookbook-recipe-toggle
-                                                                    aria-expanded="true"
-                                                                    aria-controls="{{ recipe_details_id }}"
-                                                                    onclick="return toggleCookbookRecipeDetails(this)">
-                                                                <span data-cookbook-recipe-toggle-icon>Hide ^</span>
-                                                            </button>
-                                                            <div class="cookbook-recipe-menu-wrap recipe-edit-row-menu-wrap">
+                                                        <div class="recipe-url-summary-actions cookbook-recipe-actions">
+                                                            <div class="recipe-url-summary-menu-wrap cookbook-recipe-menu-wrap recipe-edit-row-menu-wrap">
                                                                 <button type="button"
-                                                                        class="recipe-edit-row-menu-btn cookbook-recipe-menu-btn"
+                                                                        class="recipe-edit-row-menu-btn recipe-url-summary-menu-btn cookbook-recipe-menu-btn"
                                                                         aria-label="{{ recipe.name }} actions"
                                                                         title="{{ recipe.name }} actions"
                                                                         aria-haspopup="true"
@@ -175,97 +253,42 @@
                                                                         onclick="return toggleRecipeEditRowMenu(this, event)">
                                                                     <span aria-hidden="true"></span>
                                                                 </button>
-                                                                <div class="recipe-edit-row-menu cookbook-recipe-menu" hidden>
-                                                                    <button type="button"
-                                                                            data-recipe-url="{{ recipe.url }}"
-                                                                            onclick="closeRecipeEditRowMenus(); openRecipeEditor(this); return false;">
-                                                                        Edit recipe
-                                                                    </button>
-                                                                    {% if recipe.archive_pdf_available %}
-                                                                        <a class="recipe-edit-menu-link cookbook-recipe-menu-pdf"
-                                                                           href="{{ url_for('recipe_bp.recipe_archive_pdf_route', url=recipe.url) }}"
-                                                                           target="_blank"
-                                                                           rel="noopener noreferrer"
-                                                                           onclick="closeRecipeEditRowMenus()">
-                                                                            Open recipe PDF
-                                                                        </a>
-                                                                    {% endif %}
-                                                                    <button type="button"
-                                                                            class="delete"
-                                                                            data-cookbook-id="{{ cookbook.id }}"
-                                                                            data-recipe-url="{{ recipe.url }}"
-                                                                            aria-label="Remove {{ recipe.name }} from cookbook"
-                                                                            onclick="closeRecipeEditRowMenus(); removeCookbookRecipe(this); return false;">
-                                                                        Remove from cookbook
-                                                                    </button>
+                                                                <div class="recipe-edit-row-menu overflow-menu cookbook-recipe-menu" hidden>
+                                                                    <div class="overflow-menu-section recipe-view-menu-section">
+                                                                        <div class="overflow-menu-section-title recipe-view-menu-section-title">Recipe</div>
+                                                                        <button type="button"
+                                                                                data-recipe-url="{{ recipe.url }}"
+                                                                                onclick="return restoreSingleCookbookRecipe(this)">
+                                                                            Add to current recipes
+                                                                        </button>
+                                                                        <button type="button"
+                                                                                data-recipe-url="{{ recipe.url }}"
+                                                                                onclick="closeRecipeEditRowMenus(); openRecipeEditor(this); return false;">
+                                                                            Edit recipe
+                                                                        </button>
+                                                                        {% if recipe.archive_pdf_available %}
+                                                                            <a class="recipe-edit-menu-link cookbook-recipe-menu-pdf"
+                                                                               href="{{ url_for('recipe_bp.recipe_archive_pdf_route', url=recipe.url) }}"
+                                                                               target="_blank"
+                                                                               rel="noopener noreferrer"
+                                                                               onclick="closeRecipeEditRowMenus()">
+                                                                                Open recipe PDF
+                                                                            </a>
+                                                                        {% endif %}
+                                                                    </div>
+                                                                    <div class="overflow-menu-section recipe-view-menu-section recipe-view-menu-section-danger">
+                                                                        <button type="button"
+                                                                                class="delete"
+                                                                                data-cookbook-id="{{ cookbook.id }}"
+                                                                                data-recipe-url="{{ recipe.url }}"
+                                                                                aria-label="Remove {{ recipe.name }} from cookbook"
+                                                                                onclick="closeRecipeEditRowMenus(); removeCookbookRecipe(this); return false;">
+                                                                            Remove from cookbook
+                                                                        </button>
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                    <div class="cookbook-recipe-summary">
-                                                        {% if recipe.cover_image and recipe.cover_image.src %}
-                                                            <img class="recipe-cover-image cookbook-recipe-cover"
-                                                                 src="{{ recipe.cover_image.src }}"
-                                                                 alt="{{ recipe.cover_image.alt or recipe.name }}"
-                                                                 loading="lazy">
-                                                        {% endif %}
-                                                    </div>
-
-                                                    <div id="{{ recipe_details_id }}"
-                                                         class="cookbook-recipe-details"
-                                                         data-cookbook-recipe-details>
-                                                        <div class="cookbook-recipe-detail-grid">
-                                                            <section class="cookbook-recipe-detail">
-                                                                <h4>Equipment</h4>
-                                                                {% if recipe.equipment_items %}
-                                                                    <ul>
-                                                                        {% for equipment_item in recipe.equipment_items %}
-                                                                            <li>{{ equipment_item }}</li>
-                                                                        {% endfor %}
-                                                                    </ul>
-                                                                {% else %}
-                                                                    <div class="cookbook-detail-empty">No equipment found.</div>
-                                                                {% endif %}
-                                                            </section>
-
-                                                            <section class="cookbook-recipe-detail">
-                                                                <h4>Instructions</h4>
-                                                                {% if recipe.instruction_items %}
-                                                                    <ol>
-                                                                        {% for instruction in recipe.instruction_items %}
-                                                                            <li>{{ instruction }}</li>
-                                                                        {% endfor %}
-                                                                    </ol>
-                                                                {% else %}
-                                                                    <div class="cookbook-detail-empty">No instructions found.</div>
-                                                                {% endif %}
-                                                            </section>
-                                                        </div>
-
-                                                        <section class="cookbook-recipe-detail cookbook-recipe-ingredients">
-                                                            <h4>Ingredients</h4>
-                                                            {% if recipe["sections"] %}
-                                                                {% for section_name, section_items in recipe["sections"].items() %}
-                                                                    <div class="cookbook-ingredient-section">
-                                                                        <div class="cookbook-ingredient-section-title">{{ section_name }}</div>
-                                                                        <ul>
-                                                                            {% for recipe_item in section_items %}
-                                                                                {% set display_name = recipe_item.display_name or recipe_item.name %}
-                                                                                {% set quantity_display = recipe_item.quantity_display or recipe_item.base_display or recipe_item.quantity %}
-                                                                                <li>
-                                                                                    <span>{{ display_name }}</span>
-                                                                                    {% if quantity_display %}
-                                                                                        <small>{{ quantity_display }}</small>
-                                                                                    {% endif %}
-                                                                                </li>
-                                                                            {% endfor %}
-                                                                        </ul>
-                                                                    </div>
-                                                                {% endfor %}
-                                                            {% else %}
-                                                                <div class="cookbook-detail-empty">No ingredients found.</div>
-                                                            {% endif %}
-                                                        </section>
                                                     </div>
                                                 </article>
                                             {% endfor %}

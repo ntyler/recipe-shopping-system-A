@@ -4088,6 +4088,28 @@ body {
             font-weight: 800;
         }
 
+        .cookbook-card-header .recipe-url-drag-dots {
+            display: grid;
+            grid-template-columns: repeat(2, 4px);
+            grid-auto-rows: 4px;
+            gap: 4px;
+            margin-top: 0;
+            align-items: center;
+            justify-content: center;
+            color: inherit;
+        }
+
+        .cookbook-card-header .recipe-url-drag-dots span {
+            display: block;
+            width: 4px;
+            height: 4px;
+            margin-top: 0;
+            border-radius: 50%;
+            background: currentColor;
+            font-size: 0;
+            line-height: 0;
+        }
+
         .cookbook-card-actions {
             display: inline-flex;
             align-items: center;
@@ -13257,4 +13279,58 @@ body {
 .recipe-edit-nutrition-row .recipe-edit-row-menu-btn {
     height: 36px;
     min-height: 36px;
+}
+
+.cookbook-recipe-card.recipe-url-summary-row {
+    cursor: default;
+}
+
+.cookbook-recipe-card.recipe-url-summary-row.is-dragging {
+    opacity: 0.58;
+    background: #17211f;
+    border-color: #12d6c5;
+}
+
+.cookbook-card.cookbook-card-recipe-drop-active {
+    border-color: rgba(18, 214, 197, 0.58);
+}
+
+.cookbook-recipe-card.cookbook-recipe-drop-before {
+    box-shadow: inset 0 3px 0 #12d6c5;
+}
+
+.cookbook-recipe-card.cookbook-recipe-drop-after {
+    box-shadow: inset 0 -3px 0 #12d6c5;
+}
+
+.cookbook-recipe-summary-title,
+.cookbook-recipe-title-toggle {
+    cursor: default;
+}
+
+.cookbook-recipe-current-cookbook {
+    display: block;
+    min-height: 28px;
+    padding: 6px;
+    box-sizing: border-box;
+    color: inherit;
+    line-height: 1.15;
+}
+
+.cookbook-recipe-actions.recipe-url-summary-actions {
+    display: inline-flex;
+    justify-content: flex-end;
+    width: auto;
+    margin-left: 0;
+}
+
+.cookbook-recipe-actions.recipe-url-summary-actions > .cookbook-recipe-menu-wrap {
+    justify-self: auto;
+}
+
+#cookbooksCard .recipe-url-summary-menu-btn {
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+    min-height: 32px;
 }
