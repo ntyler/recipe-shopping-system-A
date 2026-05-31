@@ -572,6 +572,17 @@
                                                {% if not equipment_item.equipment_image_url %}hidden{% endif %}>
                                                 Download
                                             </a>
+                                            <button type="button"
+                                                    class="recipe-step-image-upload"
+                                                    data-recipe-image-upload-button
+                                                    onclick="return openRecipeDetailImageUpload(this)">
+                                                {% if equipment_item.equipment_image_url %}Replace{% else %}Upload{% endif %}
+                                            </button>
+                                            <input type="file"
+                                                   class="recipe-step-image-file-input"
+                                                   data-recipe-image-upload
+                                                   accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/avif"
+                                                   onchange="return uploadRecipeDetailImage(this)">
                                         </div>
                                     </div>
                                 </li>
@@ -677,6 +688,17 @@
                                                {% if not instruction.step_image_url %}hidden{% endif %}>
                                                 Download
                                             </a>
+                                            <button type="button"
+                                                    class="recipe-step-image-upload"
+                                                    data-recipe-image-upload-button
+                                                    onclick="return openRecipeDetailImageUpload(this)">
+                                                {% if instruction.step_image_url %}Replace{% else %}Upload{% endif %}
+                                            </button>
+                                            <input type="file"
+                                                   class="recipe-step-image-file-input"
+                                                   data-recipe-image-upload
+                                                   accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/avif"
+                                                   onchange="return uploadRecipeDetailImage(this)">
                                         </div>
                                     </div>
                                 </li>

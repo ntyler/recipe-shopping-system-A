@@ -3968,6 +3968,11 @@ function saveCompactModeSetting() {
     saveToggleSetting("compactModeToggle", "compact-mode", "compact-mode");
 }
 
+function saveShowImagesByDefaultSetting() {
+    saveToggleSetting("showImagesByDefaultToggle", "show-images-by-default", null);
+    applyRecipeImageDefaultVisibility();
+}
+
 function saveToggleSetting(inputId, storageKey, bodyClass, invertBodyClass = false) {
     const input = document.getElementById(inputId);
 
@@ -4025,6 +4030,8 @@ function restoreViewBehaviorSettings() {
     restoreToggleSetting("showQtyToggle", "show-qty", true, "hide-qty", true);
     restoreToggleSetting("hideCheckedItemsToggle", "hide-checked-items", false, "hide-checked-items");
     restoreToggleSetting("compactModeToggle", "compact-mode", false, "compact-mode");
+    restoreToggleSetting("showImagesByDefaultToggle", "show-images-by-default", true);
+    applyRecipeImageDefaultVisibility();
     syncViewBehaviorMenuToggles();
     showView(localStorage.getItem("shopping-view") || "section");
 }
@@ -8386,6 +8393,17 @@ function addRecipeEquipmentRow(value = "") {
                    ${equipmentImageUrl ? "" : "hidden"}>
                     Download
                 </a>
+                <button type="button"
+                        class="recipe-step-image-upload"
+                        data-recipe-image-upload-button
+                        onclick="return openRecipeDetailImageUpload(this)">
+                    ${equipmentImageUrl ? "Replace" : "Upload"}
+                </button>
+                <input type="file"
+                       class="recipe-step-image-file-input"
+                       data-recipe-image-upload
+                       accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/avif"
+                       onchange="return uploadRecipeDetailImage(this)">
             </div>
             <input type="hidden" data-field="equipment_image_url" value="${escapeAttribute(equipmentImageUrl)}">
             <input type="hidden" data-field="equipment_image_generated_at" value="${escapeAttribute(equipmentImageGeneratedAt)}">
@@ -8536,6 +8554,17 @@ function addRecipeInstructionRow(value = "", stepNumber = null) {
                    ${stepImageUrl ? "" : "hidden"}>
                     Download
                 </a>
+                <button type="button"
+                        class="recipe-step-image-upload"
+                        data-recipe-image-upload-button
+                        onclick="return openRecipeDetailImageUpload(this)">
+                    ${stepImageUrl ? "Replace" : "Upload"}
+                </button>
+                <input type="file"
+                       class="recipe-step-image-file-input"
+                       data-recipe-image-upload
+                       accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/avif"
+                       onchange="return uploadRecipeDetailImage(this)">
             </div>
             <input type="hidden" data-field="step_image_url" value="${escapeAttribute(stepImageUrl)}">
             <input type="hidden" data-field="step_image_generated_at" value="${escapeAttribute(stepImageGeneratedAt)}">
@@ -10777,13 +10806,56 @@ function recipeImagePanelDownload(panel) {
     return panel ? panel.querySelector("[data-equipment-image-download], [data-step-image-download]") : null;
 }
 
+function recipeImagePanelKind(panel) {
+    return panel && panel.matches("[data-equipment-image-panel]") ? "equipment" : "step";
+}
+
+function recipeImagePanelTarget(panel, kind = null) {
+    if (!panel) {
+        return "";
+    }
+
+    const normalizedKind = normalizeRecipeImageProgressKind(kind || recipeImagePanelKind(panel));
+
+    return normalizedKind === "equipment"
+        ? panel.dataset.equipmentIndex || ""
+        : panel.dataset.stepNumber || "";
+}
+
 function recipeImagePanelStatus(panel) {
     return panel ? panel.querySelector("[data-equipment-image-status], [data-step-image-status]") : null;
+}
+
+function recipeImagePanelUploadButton(panel) {
+    return panel ? panel.querySelector("[data-recipe-image-upload-button]") : null;
+}
+
+function recipeImagePanelUploadInput(panel) {
+    return panel ? panel.querySelector("[data-recipe-image-upload]") : null;
+}
+
+function updateRecipeImagePanelUploadButton(panel, kind = null) {
+    const uploadButton = recipeImagePanelUploadButton(panel);
+    const uploadInput = recipeImagePanelUploadInput(panel);
+    const image = recipeImagePanelImage(panel, kind || recipeImagePanelKind(panel));
+    const hasImage = Boolean(image && String(image.getAttribute("src") || "").trim());
+    const isGenerating = Boolean(panel && panel.classList.contains("generating"));
+
+    if (uploadButton) {
+        uploadButton.textContent = hasImage ? "Replace" : "Upload";
+        uploadButton.disabled = isGenerating;
+    }
+
+    if (uploadInput) {
+        uploadInput.disabled = isGenerating;
+    }
 }
 
 function setRecipeImagePanelGenerating(panel, message) {
     const status = recipeImagePanelStatus(panel);
     const button = recipeImagePanelGenerateButton(panel);
+    const uploadButton = recipeImagePanelUploadButton(panel);
+    const uploadInput = recipeImagePanelUploadInput(panel);
 
     panel.classList.remove("recipe-image-visibility-hidden");
     panel.classList.add("generating");
@@ -10795,6 +10867,14 @@ function setRecipeImagePanelGenerating(panel, message) {
 
     if (button) {
         button.disabled = true;
+    }
+
+    if (uploadButton) {
+        uploadButton.disabled = true;
+    }
+
+    if (uploadInput) {
+        uploadInput.disabled = true;
     }
 }
 
@@ -10842,12 +10922,15 @@ function setRecipeImagePanelComplete(panel, item) {
         button.textContent = "Regenerate";
     }
 
+    updateRecipeImagePanelUploadButton(panel, kind);
     updateRecipeImagePanelRowMenu(panel);
 }
 
 function setRecipeImagePanelFailed(panel, message) {
     const status = recipeImagePanelStatus(panel);
     const button = recipeImagePanelGenerateButton(panel);
+    const uploadButton = recipeImagePanelUploadButton(panel);
+    const uploadInput = recipeImagePanelUploadInput(panel);
 
     panel.classList.remove("generating");
     panel.classList.remove("recipe-image-visibility-hidden");
@@ -10861,6 +10944,15 @@ function setRecipeImagePanelFailed(panel, message) {
         button.disabled = false;
     }
 
+    if (uploadButton) {
+        uploadButton.disabled = false;
+    }
+
+    if (uploadInput) {
+        uploadInput.disabled = false;
+    }
+
+    updateRecipeImagePanelUploadButton(panel);
     updateRecipeImagePanelRowMenu(panel);
 }
 
@@ -10872,6 +10964,100 @@ function updateRecipeImagePanelRowMenu(panel) {
     if (row) {
         updateRecipeEditRowImageMenu(row);
     }
+}
+
+function openRecipeDetailImageUpload(button) {
+    const panel = button ? button.closest("[data-equipment-image-panel], [data-step-image-panel]") : null;
+    const input = recipeImagePanelUploadInput(panel);
+
+    if (input) {
+        input.click();
+    }
+
+    return false;
+}
+
+async function uploadRecipeDetailImage(input) {
+    const panel = input ? input.closest("[data-equipment-image-panel], [data-step-image-panel]") : null;
+    const file = input && input.files ? input.files[0] : null;
+    const kind = recipeImagePanelKind(panel);
+    const recipeUrl = panel ? panel.dataset.recipeUrl || "" : "";
+    const target = recipeImagePanelTarget(panel, kind);
+    const status = recipeImagePanelStatus(panel);
+
+    if (!file) {
+        return false;
+    }
+
+    if (!panel || !recipeUrl || !target) {
+        if (status) {
+            status.textContent = "This image location could not be found.";
+            status.classList.remove("empty");
+        }
+        input.value = "";
+        return false;
+    }
+
+    const runningItem = recipeImageProgressItemFromPanel(panel, kind, "running", {
+        message: "Uploading image...",
+    });
+    applyRecipeImageProgressItem(runningItem);
+    publishRecipeImageProgressItem(runningItem);
+
+    const formData = new FormData();
+    formData.append("url", recipeUrl);
+    formData.append("kind", kind);
+    formData.append("target", target);
+    formData.append(kind === "equipment" ? "equipment_index" : "step_number", target);
+    formData.append("image", file);
+
+    try {
+        const response = await fetch("/api/recipe_detail_image", {
+            method: "POST",
+            body: formData,
+        });
+        let data = {};
+        try {
+            data = await response.json();
+        } catch (err) {
+            data = {};
+        }
+
+        const imageUrl = data.image_url ||
+            (kind === "equipment" ? data.equipment_image_url : data.step_image_url) ||
+            "";
+        const generatedAt = data.generated_at ||
+            (kind === "equipment" ? data.equipment_image_generated_at : data.step_image_generated_at) ||
+            "";
+
+        if (!response.ok || !data.ok || !imageUrl) {
+            throw new Error((data && data.error) || "Unable to upload this image.");
+        }
+
+        const doneItem = recipeImageProgressItemFromPanel(panel, kind, "done", {
+            image_url: imageUrl,
+            generated_at: generatedAt,
+            equipment_image_url: kind === "equipment" ? imageUrl : "",
+            equipment_image_generated_at: kind === "equipment" ? generatedAt : "",
+            step_image_url: kind === "step" ? imageUrl : "",
+            step_image_generated_at: kind === "step" ? generatedAt : "",
+        });
+        applyRecipeImageProgressItem(doneItem);
+        publishRecipeImageProgressItem(doneItem);
+        showRecipeQuantityUpdatedMessage("", "", "", "Recipe image updated.");
+    } catch (err) {
+        const failedItem = recipeImageProgressItemFromPanel(panel, kind, "failed", {
+            message: err.message || "Unable to upload this image.",
+        });
+        applyRecipeImageProgressItem(failedItem);
+        publishRecipeImageProgressItem(failedItem);
+    } finally {
+        if (input) {
+            input.value = "";
+        }
+    }
+
+    return false;
 }
 
 async function generateRecipeStepImage(button) {
@@ -11489,6 +11675,23 @@ function setRecipeImageContainersVisible(containers, visible) {
             });
         }
     });
+}
+
+function recipeImagesShownByDefault() {
+    const savedValue = localStorage.getItem("show-images-by-default");
+    return savedValue === null ? true : savedValue === "1";
+}
+
+function applyRecipeImageDefaultVisibility(scope = document) {
+    if (!scope || !scope.querySelectorAll) {
+        return;
+    }
+
+    setRecipeImageContainersVisible(
+        scope.querySelectorAll("[data-equipment-image-panel], [data-step-image-panel]"),
+        recipeImagesShownByDefault()
+    );
+    keepRecipeCoverImagesVisible(scope);
 }
 
 function recipeImageContainersForCard(card) {

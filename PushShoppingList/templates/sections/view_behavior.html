@@ -9,6 +9,7 @@
         <input type="checkbox" id="showQtyToggle" checked onchange="saveShowQtySetting()">
         <input type="checkbox" id="hideCheckedItemsToggle" onchange="saveHideCheckedItemsSetting()">
         <input type="checkbox" id="compactModeToggle" onchange="saveCompactModeSetting()">
+        <input type="checkbox" id="showImagesByDefaultToggle" checked onchange="saveShowImagesByDefaultSetting()">
     </div>
 
     <div class="view-control-section">
@@ -112,6 +113,13 @@
             <div class="overflow-menu-section recipe-view-menu-section">
                 <div class="overflow-menu-section-title recipe-view-menu-section-title">Show or Hide Images</div>
                 <button type="button"
+                        class="recipe-view-behavior-toggle"
+                        data-view-behavior-input="showImagesByDefaultToggle"
+                        aria-pressed="true"
+                        onclick="return toggleViewBehaviorMenuSetting(this)">
+                    Show Images By Default
+                </button>
+                <button type="button"
                         onclick="return setAllRecipeImagesVisibleFromMenu(this, true)">
                     Show all recipe images
                 </button>
@@ -187,55 +195,6 @@
                         </button>
                     </div>
                 </div>
-            </div>
-            <div class="overflow-menu-section recipe-view-menu-section">
-                <div class="overflow-menu-section-title recipe-view-menu-section-title">Store Options</div>
-
-                <div class="recipe-view-menu-subsection-title">Toggle Options</div>
-                <button type="button"
-                        class="recipe-view-store-toggle"
-                        data-store-display-toggle="addresses"
-                        aria-pressed="true"
-                        onclick="toggleStoreOptionsDisplay('addresses'); return false;">
-                    Show all Addresses
-                </button>
-                <button type="button"
-                        class="recipe-view-store-toggle"
-                        data-store-display-toggle="maps"
-                        aria-pressed="true"
-                        onclick="toggleStoreOptionsDisplay('maps'); return false;">
-                    Show Maps
-                </button>
-
-                <div class="recipe-view-menu-subsection-title">Mode Options</div>
-                <button type="button"
-                        class="recipe-view-store-mode-option"
-                        data-active-store-mode-toggle="store"
-                        aria-pressed="true"
-                        onclick="setActiveStoreIconMode('store', { persist: true }); return false;">
-                    Store Mode
-                </button>
-                <button type="button"
-                        class="recipe-view-store-mode-option"
-                        data-active-store-mode-toggle="map"
-                        aria-pressed="false"
-                        onclick="setActiveStoreIconMode('map', { persist: true }); return false;">
-                    Map Mode
-                </button>
-                <button type="button"
-                        class="recipe-view-store-mode-option"
-                        data-active-store-mode-toggle="activation"
-                        aria-pressed="false"
-                        onclick="setActiveStoreIconMode('activation', { persist: true }); return false;">
-                    Store Selection Mode
-                </button>
-                <button type="button"
-                        class="recipe-view-store-mode-option"
-                        data-active-store-mode-toggle="edit"
-                        aria-pressed="false"
-                        onclick="setActiveStoreIconMode('edit', { persist: true }); return false;">
-                    Edit Mode
-                </button>
             </div>
         </div>
     </div>

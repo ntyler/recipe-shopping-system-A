@@ -37,6 +37,7 @@ from PushShoppingList.services.recipe_edit_service import generate_recipe_step_i
 from PushShoppingList.services.recipe_edit_service import load_editable_recipe
 from PushShoppingList.services.recipe_edit_service import save_editable_recipe
 from PushShoppingList.services.recipe_edit_service import save_recipe_cover_image_upload
+from PushShoppingList.services.recipe_edit_service import save_recipe_detail_image_upload
 from PushShoppingList.services.recipe_edit_service import create_source_url_pdf
 from PushShoppingList.services.recipe_image_progress_service import load_recipe_image_progress
 from PushShoppingList.services.recipe_ingredient_service import remove_recipe_and_unused_ingredients
@@ -416,6 +417,28 @@ def api_recipe_cover_image_route():
     fallback_alt = str(request.form.get("alt", "") or "").strip()
     uploaded_file = request.files.get("cover_image") or request.files.get("recipe_cover_image")
     result = save_recipe_cover_image_upload(url, uploaded_file, source_url, fallback_alt)
+    status = 200 if result.get("ok") else 400
+
+    return jsonify(result), status
+
+
+@recipe_bp.route("/api/recipe_detail_image", methods=["POST"])
+def api_recipe_detail_image_route():
+    url = str(request.form.get("url", "") or "").strip()
+    kind = str(request.form.get("kind", "") or "").strip()
+    target = (
+        request.form.get("target")
+        or request.form.get("equipment_index")
+        or request.form.get("equipment_number")
+        or request.form.get("step_number")
+        or ""
+    )
+    uploaded_file = (
+        request.files.get("image")
+        or request.files.get("detail_image")
+        or request.files.get("recipe_image")
+    )
+    result = save_recipe_detail_image_upload(url, kind, target, uploaded_file)
     status = 200 if result.get("ok") else 400
 
     return jsonify(result), status

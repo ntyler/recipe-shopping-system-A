@@ -544,6 +544,134 @@ def save_recipe_cover_image_upload(original_url, uploaded_file, source_url="", f
     }
 
 
+def save_recipe_detail_image_upload(original_url, kind, target, uploaded_file):
+    original_url = str(original_url or "").strip()
+    image_kind = "equipment" if str(kind or "").strip().lower() == "equipment" else "step"
+
+    if not original_url:
+        return {"ok": False, "error": "Recipe URL is required."}
+
+    if not uploaded_file or not uploaded_file.filename:
+        return {"ok": False, "error": "No image was selected."}
+
+    mime_type = str(
+        uploaded_file.mimetype
+        or mimetypes.guess_type(uploaded_file.filename or "")[0]
+        or ""
+    ).split(";", 1)[0].strip().lower()
+    guessed_mime_type = str(mimetypes.guess_type(uploaded_file.filename or "")[0] or "").lower()
+    if not mime_type.startswith("image/") and guessed_mime_type.startswith("image/"):
+        mime_type = guessed_mime_type
+
+    extension = recipe_cover_upload_extension(uploaded_file.filename, mime_type)
+    if not extension or not mime_type.startswith("image/"):
+        return {"ok": False, "error": "Choose a PNG, JPG, WebP, GIF, BMP, or AVIF image."}
+
+    recipe_data = load_recipe_output(original_url)
+    if not recipe_data:
+        return {"ok": False, "error": "Recipe data was not found."}
+
+    recipe_source_url = str(recipe_data.get("source_url") or original_url).strip() or original_url
+    recipe_data["source_url"] = recipe_source_url
+    generated_at = datetime.now(timezone.utc).isoformat()
+
+    if image_kind == "equipment":
+        equipment_items = normalize_equipment_records(recipe_data.get("equipment", []))
+        target_index, target_equipment = find_equipment_for_index(equipment_items, target)
+
+        if target_equipment is None:
+            return {"ok": False, "error": "Equipment item was not found."}
+
+        image_url = save_uploaded_recipe_detail_image_file(
+            recipe_source_url,
+            image_kind,
+            target_index + 1,
+            uploaded_file,
+            extension,
+        )
+        equipment_text = str(
+            target_equipment.get("equipment")
+            or target_equipment.get("text")
+            or target_equipment.get("name")
+            or ""
+        ).strip()
+        target_equipment["equipment_image_url"] = image_url
+        target_equipment["equipment_image_generated_at"] = generated_at
+        equipment_items[target_index] = {
+            **target_equipment,
+            "equipment": equipment_text,
+            "text": equipment_text,
+        }
+        recipe_data["equipment"] = equipment_items
+        save_recipe_output(recipe_source_url, recipe_data)
+        finish_recipe_image_progress(
+            "equipment",
+            recipe_source_url,
+            target_index + 1,
+            ok=True,
+            image_url=image_url,
+            generated_at=generated_at,
+        )
+
+        return {
+            "ok": True,
+            "url": recipe_source_url,
+            "kind": "equipment",
+            "equipment_index": target_index + 1,
+            "equipment_image_url": image_url,
+            "equipment_image_generated_at": generated_at,
+            "image_url": image_url,
+            "generated_at": generated_at,
+        }
+
+    instructions = sorted(
+        normalize_instruction_records(recipe_data.get("instructions", [])),
+        key=lambda item: item["step_number"],
+    )
+    target_index, target_instruction = find_instruction_for_step(instructions, target)
+
+    if target_instruction is None:
+        return {"ok": False, "error": "Instruction step was not found."}
+
+    step_number = target_instruction.get("step_number")
+    image_url = save_uploaded_recipe_detail_image_file(
+        recipe_source_url,
+        image_kind,
+        step_number,
+        uploaded_file,
+        extension,
+    )
+    instruction_text = str(target_instruction.get("instruction") or target_instruction.get("text") or "").strip()
+    target_instruction["step_image_url"] = image_url
+    target_instruction["step_image_generated_at"] = generated_at
+    instructions[target_index] = {
+        **target_instruction,
+        "instruction": instruction_text,
+        "text": instruction_text,
+    }
+    recipe_data["instructions"] = instructions
+    save_recipe_output(recipe_source_url, recipe_data)
+    finish_recipe_image_progress(
+        "step",
+        recipe_source_url,
+        step_number,
+        ok=True,
+        image_url=image_url,
+        generated_at=generated_at,
+    )
+
+    return {
+        "ok": True,
+        "url": recipe_source_url,
+        "kind": "step",
+        "step_number": step_number,
+        "step_image_url": image_url,
+        "step_image_generated_at": generated_at,
+        "image_url": image_url,
+        "generated_at": generated_at,
+    }
+
+
 def recipe_cover_upload_extension(filename, mime_type=""):
     suffix = Path(str(filename or "")).suffix.lower()
 
@@ -1056,6 +1184,16 @@ def save_recipe_equipment_image_file(recipe_url, equipment_index, image_bytes):
     filename = f"{safe_filename(recipe_url)}_equipment_{equipment_key}_{uuid.uuid4().hex[:12]}.png"
     image_path = STEP_IMAGE_FOLDER / filename
     image_path.write_bytes(image_bytes)
+    return f"{STEP_IMAGE_URL_PREFIX}/{filename}"
+
+
+def save_uploaded_recipe_detail_image_file(recipe_url, image_kind, target, uploaded_file, extension):
+    STEP_IMAGE_FOLDER.mkdir(parents=True, exist_ok=True)
+    kind_key = safe_filename(str(image_kind or "recipe"))
+    target_key = safe_filename(str(target or "image"))
+    filename = f"{safe_filename(recipe_url)}_{kind_key}_{target_key}_{uuid.uuid4().hex[:12]}{extension}"
+    image_path = STEP_IMAGE_FOLDER / filename
+    uploaded_file.save(image_path)
     return f"{STEP_IMAGE_URL_PREFIX}/{filename}"
 
 
