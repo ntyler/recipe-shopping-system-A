@@ -45,15 +45,16 @@ from PushShoppingList.services.recipe_url_service import recipe_url_rows
 from PushShoppingList.services.rules_display_service import load_rules_display
 from PushShoppingList.services.shopping_list_service import load_items
 from PushShoppingList.services.store_settings_service import load_store_settings
+from PushShoppingList.services.storage_service import scoped_extractor_data_path
 
 
 BASE_DIR = Path(__file__).resolve().parent
-PRODUCT_CHOICES_FILE = BASE_DIR / "recipe-extractor" / "data" / "product_choices.json"
-PRODUCT_RESULTS_FILE = BASE_DIR / "recipe-extractor" / "data" / "product_results.json"
-PRODUCT_PROGRESS_FILE = BASE_DIR / "recipe-extractor" / "data" / "product_progress.json"
-PRODUCT_RENDERED_HTML_DIR = BASE_DIR / "recipe-extractor" / "data" / "raw" / "product_pages"
-PRODUCT_PROMPTS_DIR = BASE_DIR / "recipe-extractor" / "data" / "raw" / "product_prompts"
-PRODUCT_BROWSER_PROFILES_DIR = BASE_DIR / "recipe-extractor" / "data" / "browser_profiles"
+PRODUCT_CHOICES_FILE = scoped_extractor_data_path("product_choices.json")
+PRODUCT_RESULTS_FILE = scoped_extractor_data_path("product_results.json")
+PRODUCT_PROGRESS_FILE = scoped_extractor_data_path("product_progress.json")
+PRODUCT_RENDERED_HTML_DIR = scoped_extractor_data_path("raw", "product_pages")
+PRODUCT_PROMPTS_DIR = scoped_extractor_data_path("raw", "product_prompts")
+PRODUCT_BROWSER_PROFILES_DIR = scoped_extractor_data_path("browser_profiles")
 PRODUCT_CHOICES_FILE.parent.mkdir(parents=True, exist_ok=True)
 PRODUCT_RENDERED_HTML_DIR.mkdir(parents=True, exist_ok=True)
 PRODUCT_PROMPTS_DIR.mkdir(parents=True, exist_ok=True)

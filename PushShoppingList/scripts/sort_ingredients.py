@@ -14,16 +14,12 @@ from PushShoppingList.services.recipe_extract_service import (
     normalize_ingredient_for_shopping_list,
     normalize_ingredient_key,
 )
+from PushShoppingList.services.shopping_list_service import SHOPPING_LIST_FILE
 
 
 BASE_DIR = Path(__file__).resolve().parent
 
 PUSH_DIR = BASE_DIR.parent
-
-SHOPPING_LIST_FILE = (
-    PUSH_DIR /
-    "shopping_list.txt"
-)
 
 OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
 LOG_FOLDER.mkdir(parents=True, exist_ok=True)

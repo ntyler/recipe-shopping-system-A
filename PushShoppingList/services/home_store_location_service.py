@@ -4,10 +4,11 @@ from pathlib import Path
 
 from PushShoppingList.services.home_address_service import load_home_address
 from PushShoppingList.services.store_settings_service import load_store_settings
+from PushShoppingList.services.storage_service import scoped_package_path
 
 
 PACKAGE_DIR = Path(__file__).resolve().parents[1]
-NEAREST_STORE_RESULTS_FILE = PACKAGE_DIR / "shopping_stores_Results.json"
+NEAREST_STORE_RESULTS_FILE = scoped_package_path("shopping_stores_Results.json")
 DEFAULT_STORE_SEARCH_RADIUS_MILES = 10
 
 

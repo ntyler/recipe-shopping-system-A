@@ -21,18 +21,20 @@ from bs4 import BeautifulSoup
 from openai import OpenAI
 
 from PushShoppingList.services.purchase_mapping_service import apply_purchase_mapping_to_ingredient
+from PushShoppingList.services.storage_service import scoped_extractor_data_path
+from PushShoppingList.services.storage_service import scoped_extractor_path
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 PROJECT_DIR = BASE_DIR.parent
 
-EXTRACTOR_FOLDER = Path(__file__).resolve().parent / "recipe-extractor"
-OUTPUT_FOLDER = EXTRACTOR_FOLDER / "data" / "output"
-RAW_FOLDER = EXTRACTOR_FOLDER / "data" / "raw"
-LOG_FOLDER = EXTRACTOR_FOLDER / "data" / "logs"
-UPLOAD_FOLDER = EXTRACTOR_FOLDER / "data" / "uploads"
-VIDEO_FOLDER = EXTRACTOR_FOLDER / "data" / "video"
-PDF_FOLDER = EXTRACTOR_FOLDER / "data" / "pdf"
+EXTRACTOR_FOLDER = scoped_extractor_path()
+OUTPUT_FOLDER = scoped_extractor_data_path("output")
+RAW_FOLDER = scoped_extractor_data_path("raw")
+LOG_FOLDER = scoped_extractor_data_path("logs")
+UPLOAD_FOLDER = scoped_extractor_data_path("uploads")
+VIDEO_FOLDER = scoped_extractor_data_path("video")
+PDF_FOLDER = scoped_extractor_data_path("pdf")
 
 OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
 RAW_FOLDER.mkdir(parents=True, exist_ok=True)

@@ -1,0 +1,122 @@
+<section id="userAccountSection" class="recipe-card user-account-card">
+    <h2 class="user-account-heading">User Account</h2>
+
+    {% set account_messages = get_flashed_messages(with_categories=true) %}
+    {% if account_messages %}
+        <div class="user-account-messages" aria-live="polite">
+            {% for category, text in account_messages %}
+                <div class="user-account-message {{ category }}">{{ text }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {% if current_user %}
+        <div class="user-account-profile">
+            <div class="user-account-avatar-wrap">
+                {% if current_user.avatar_path %}
+                    <img class="user-account-avatar"
+                         src="{{ url_for('static', filename=current_user.avatar_path) }}"
+                         alt="{{ current_user.username }} avatar">
+                {% else %}
+                    <div class="user-account-avatar user-account-avatar-fallback" aria-hidden="true">
+                        {{ current_user.username[:1]|upper }}
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="user-account-summary">
+                <div class="user-account-name">{{ current_user.username }}</div>
+                <div class="user-account-email">{{ current_user.email }}</div>
+            </div>
+
+            <div class="user-account-actions">
+                <button type="button" class="secondary" onclick="return toggleUserProfileEditor()">
+                    Edit Profile
+                </button>
+                <form method="POST" action="{{ url_for('account_bp.sign_out_route') }}">
+                    <button type="submit" class="danger">Sign Out</button>
+                </form>
+            </div>
+        </div>
+
+        <form id="userProfileEditForm"
+              class="user-account-form user-account-edit-form"
+              method="POST"
+              action="{{ url_for('account_bp.update_profile_route') }}"
+              enctype="multipart/form-data"
+              hidden>
+            <label>
+                <span>Username</span>
+                <input type="text" name="username" value="{{ current_user.username }}" required autocomplete="username">
+            </label>
+            <label>
+                <span>Email</span>
+                <input type="email" name="email" value="{{ current_user.email }}" required autocomplete="email">
+            </label>
+            <label>
+                <span>New Password</span>
+                <input type="password" name="password" autocomplete="new-password">
+            </label>
+            <label>
+                <span>Confirm New Password</span>
+                <input type="password" name="confirm_password" autocomplete="new-password">
+            </label>
+            <label class="user-account-file-label">
+                <span>Logo / Avatar</span>
+                <input type="file" name="avatar" accept="image/png,image/jpeg,image/webp">
+            </label>
+            <div class="user-account-submit-row">
+                <button type="submit">Save Profile</button>
+            </div>
+        </form>
+    {% else %}
+        <p class="helper-text user-account-helper">
+            You are using the guest workspace. Sign in to keep recipes, stores, product picks, and preferences private to your account.
+        </p>
+
+        <div class="user-account-forms">
+            <form class="user-account-form"
+                  method="POST"
+                  action="{{ url_for('account_bp.create_account_route') }}"
+                  enctype="multipart/form-data">
+                <h3>Create Account</h3>
+                <label>
+                    <span>Username</span>
+                    <input type="text" name="username" required autocomplete="username">
+                </label>
+                <label>
+                    <span>Email</span>
+                    <input type="email" name="email" required autocomplete="email">
+                </label>
+                <label>
+                    <span>Password</span>
+                    <input type="password" name="password" required autocomplete="new-password">
+                </label>
+                <label>
+                    <span>Confirm Password</span>
+                    <input type="password" name="confirm_password" required autocomplete="new-password">
+                </label>
+                <label class="user-account-file-label">
+                    <span>Logo / Avatar</span>
+                    <input type="file" name="avatar" accept="image/png,image/jpeg,image/webp">
+                </label>
+                <button type="submit">Create Account</button>
+            </form>
+
+            <form class="user-account-form"
+                  method="POST"
+                  action="{{ url_for('account_bp.sign_in_route') }}">
+                <h3>Sign In</h3>
+                <label>
+                    <span>Username or Email</span>
+                    <input type="text" name="identity" required autocomplete="username">
+                </label>
+                <label>
+                    <span>Password</span>
+                    <input type="password" name="password" required autocomplete="current-password">
+                </label>
+                <button type="submit">Sign In</button>
+            </form>
+        </div>
+    {% endif %}
+</section>

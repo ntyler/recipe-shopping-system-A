@@ -7,9 +7,11 @@ from pathlib import Path
 
 import requests
 
+from PushShoppingList.services.storage_service import scoped_extractor_data_path
+
 
 BASE_DIR = Path(__file__).resolve().parent
-PROGRESS_FILE = BASE_DIR / "recipe-extractor" / "data" / "extract_progress.json"
+PROGRESS_FILE = scoped_extractor_data_path("extract_progress.json")
 NTFY_TOPIC = os.getenv("NTFY_TOPIC", "nathaniel-shopping-list-12345")
 
 PROGRESS_FILE.parent.mkdir(parents=True, exist_ok=True)

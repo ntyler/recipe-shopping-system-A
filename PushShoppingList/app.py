@@ -1,10 +1,14 @@
+import os
+
 from flask import Flask
 from flask import request
 
+from PushShoppingList.routes.account_routes import account_bp
 from PushShoppingList.routes.main_routes import main_bp
 from PushShoppingList.routes.recipe_routes import recipe_bp
 from PushShoppingList.routes.store_routes import store_bp
 from PushShoppingList.routes.product_routes import product_bp
+from PushShoppingList.services.user_account_service import current_public_user
 
 
 def create_app():
@@ -13,11 +17,20 @@ def create_app():
         template_folder="templates",
         static_folder="static",
     )
+    # Flask sessions keep the signed-in user id across refreshes.
+    app.secret_key = os.getenv("SHOPPING_APP_SECRET_KEY", "dev-shopping-list-session-key")
 
+    app.register_blueprint(account_bp)
     app.register_blueprint(main_bp)
     app.register_blueprint(recipe_bp)
     app.register_blueprint(store_bp)
     app.register_blueprint(product_bp)
+
+    @app.context_processor
+    def inject_current_user():
+        return {
+            "current_user": current_public_user(),
+        }
 
     @app.after_request
     def add_local_reorder_cors_headers(response):

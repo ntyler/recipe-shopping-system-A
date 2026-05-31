@@ -2,9 +2,10 @@ import threading
 from pathlib import Path
 
 from PushShoppingList.services.recipe_extract_service import normalize_ingredient_for_shopping_list
+from PushShoppingList.services.storage_service import scoped_package_path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-SHOPPING_LIST_FILE = BASE_DIR / "shopping_list.txt"
+SHOPPING_LIST_FILE = scoped_package_path("shopping_list.txt")
 SHOPPING_LIST_LOCK = threading.RLock()
 
 

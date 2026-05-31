@@ -3,9 +3,11 @@ import threading
 import time
 from pathlib import Path
 
+from PushShoppingList.services.storage_service import scoped_extractor_data_path
+
 
 BASE_DIR = Path(__file__).resolve().parent
-PROGRESS_FILE = BASE_DIR / "recipe-extractor" / "data" / "recipe_image_progress.json"
+PROGRESS_FILE = scoped_extractor_data_path("recipe_image_progress.json")
 PROGRESS_FILE.parent.mkdir(parents=True, exist_ok=True)
 
 PROGRESS_LOCK = threading.RLock()

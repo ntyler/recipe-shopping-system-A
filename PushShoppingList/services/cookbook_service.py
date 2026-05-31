@@ -4,9 +4,10 @@ import threading
 from pathlib import Path
 
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
+from PushShoppingList.services.storage_service import scoped_package_path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-COOKBOOKS_FILE = BASE_DIR / "cookbooks.json"
+COOKBOOKS_FILE = scoped_package_path("cookbooks.json")
 COOKBOOKS_LOCK = threading.RLock()
 UNCLASSIFIED_COOKBOOK_NAME = "unclassified"
 

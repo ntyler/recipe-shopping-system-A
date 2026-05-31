@@ -2,9 +2,11 @@ import json
 import re
 from pathlib import Path
 
+from PushShoppingList.services.storage_service import scoped_extractor_data_path
+
 
 BASE_DIR = Path(__file__).resolve().parent
-STORE_SETTINGS_FILE = BASE_DIR / "recipe-extractor" / "data" / "store_settings.json"
+STORE_SETTINGS_FILE = scoped_extractor_data_path("store_settings.json")
 
 DEFAULT_STORES = {
     "aldi": {

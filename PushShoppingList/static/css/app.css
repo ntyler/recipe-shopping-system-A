@@ -3743,6 +3743,188 @@ body {
             font-weight: bold;
         }
 
+        .user-account-card {
+            max-width: 900px;
+        }
+
+        .user-account-heading {
+            margin-top: 0;
+            text-align: center;
+        }
+
+        .user-account-helper {
+            max-width: 680px;
+            margin: 0 auto 16px;
+            text-align: center;
+        }
+
+        .user-account-messages {
+            display: grid;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+
+        .user-account-message {
+            padding: 10px 12px;
+            border: 1px solid #3e4a4a;
+            border-radius: 8px;
+            background: #151d22;
+            color: #dbeafe;
+            font-weight: 800;
+            text-align: center;
+        }
+
+        .user-account-message.success {
+            border-color: #0f8f4d;
+            background: #073d24;
+            color: #d8ffe4;
+        }
+
+        .user-account-message.error {
+            border-color: #a33a3a;
+            background: #351417;
+            color: #ffd4d4;
+        }
+
+        .user-account-forms {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 14px;
+            align-items: start;
+        }
+
+        .user-account-form {
+            display: grid;
+            gap: 10px;
+            min-width: 0;
+            margin: 0;
+            padding: 14px;
+            border: 1px solid #2f4054;
+            border-radius: 8px;
+            background: #101820;
+            box-sizing: border-box;
+        }
+
+        .user-account-form[hidden] {
+            display: none;
+        }
+
+        .user-account-form h3 {
+            margin: 0 0 4px;
+            text-align: center;
+        }
+
+        .user-account-form label {
+            display: grid;
+            gap: 5px;
+            min-width: 0;
+            color: #ddd;
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .user-account-form input {
+            width: 100%;
+            min-height: 38px;
+            padding: 8px 10px;
+            border: 1px solid #4a596a;
+            border-radius: 7px;
+            background: #1b1f1f;
+            color: #fff;
+            box-sizing: border-box;
+            font-size: 15px;
+        }
+
+        .user-account-form input[type="file"] {
+            min-height: auto;
+            padding: 8px;
+            color: #cbd5e1;
+        }
+
+        .user-account-form button,
+        .user-account-actions button {
+            min-height: 38px;
+            margin: 0;
+            border: 1px solid #1b75bb;
+            border-radius: 7px;
+            background: #115e9f;
+            color: #fff;
+            font-weight: 800;
+        }
+
+        .user-account-profile {
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr) auto;
+            gap: 14px;
+            align-items: center;
+            padding: 14px;
+            border: 1px solid #2f4054;
+            border-radius: 8px;
+            background: #101820;
+        }
+
+        .user-account-avatar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 72px;
+            height: 72px;
+            border: 1px solid #466480;
+            border-radius: 50%;
+            background: #192638;
+            color: #b9f6ca;
+            font-size: 28px;
+            font-weight: 900;
+            object-fit: cover;
+        }
+
+        .user-account-name {
+            color: #fff;
+            font-size: 20px;
+            font-weight: 900;
+        }
+
+        .user-account-email {
+            margin-top: 4px;
+            color: #cbd5e1;
+            font-weight: 700;
+            overflow-wrap: anywhere;
+        }
+
+        .user-account-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .user-account-actions form {
+            margin: 0;
+        }
+
+        .user-account-actions .secondary {
+            border-color: #4a596a;
+            background: #202829;
+        }
+
+        .user-account-actions .danger {
+            border-color: #a52a2a;
+            background: #7f1212;
+        }
+
+        .user-account-edit-form {
+            margin-top: 12px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .user-account-file-label,
+        .user-account-submit-row {
+            grid-column: 1 / -1;
+        }
+
         .cookbooks-content {
             margin-top: 12px;
             container-type: inline-size;
@@ -8578,6 +8760,27 @@ body {
         @media (max-width: 650px) {
             #storeOptionsSection {
                 --store-options-sticky-inset: 17px;
+            }
+
+            .user-account-forms,
+            .user-account-profile,
+            .user-account-edit-form {
+                grid-template-columns: minmax(0, 1fr);
+            }
+
+            .user-account-profile {
+                justify-items: center;
+                text-align: center;
+            }
+
+            .user-account-actions {
+                width: 100%;
+                justify-content: stretch;
+            }
+
+            .user-account-actions button,
+            .user-account-actions form {
+                width: 100%;
             }
 
             .screen-settings-card {

@@ -5,9 +5,11 @@ from pathlib import Path
 
 from openai import OpenAI
 
+from PushShoppingList.services.storage_service import scoped_extractor_data_path
+
 
 BASE_DIR = Path(__file__).resolve().parent
-FOOD_RULES_FILE = BASE_DIR / "recipe-extractor" / "data" / "food_rules.json"
+FOOD_RULES_FILE = scoped_extractor_data_path("food_rules.json")
 MODEL = os.getenv("OPENAI_FOOD_RULES_MODEL", os.getenv("OPENAI_RECIPE_MODEL", "gpt-4o-mini"))
 client = None
 

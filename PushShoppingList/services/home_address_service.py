@@ -1,9 +1,12 @@
 import json
 from pathlib import Path
 
+from PushShoppingList.services.storage_service import active_user_id
+from PushShoppingList.services.storage_service import scoped_extractor_data_path
+
 
 BASE_DIR = Path(__file__).resolve().parent
-HOME_ADDRESS_FILE = BASE_DIR / "recipe-extractor" / "data" / "home_address.json"
+HOME_ADDRESS_FILE = scoped_extractor_data_path("home_address.json")
 
 DEFAULT_HOME_ADDRESS = {
     "street": "5905 Arlo Drive",
@@ -14,12 +17,21 @@ DEFAULT_HOME_ADDRESS = {
     "zip": "46237",
     "country": "United States",
 }
+EMPTY_HOME_ADDRESS = {
+    "street": "",
+    "apartment": "",
+    "city": "",
+    "county": "",
+    "state": "",
+    "zip": "",
+    "country": "",
+}
 
 HOME_ADDRESS_FILE.parent.mkdir(parents=True, exist_ok=True)
 
 
 def load_home_address():
-    data = DEFAULT_HOME_ADDRESS.copy()
+    data = (EMPTY_HOME_ADDRESS if active_user_id() else DEFAULT_HOME_ADDRESS).copy()
 
     if HOME_ADDRESS_FILE.exists():
         try:

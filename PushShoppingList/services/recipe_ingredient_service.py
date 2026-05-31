@@ -10,10 +10,11 @@ from PushShoppingList.services.purchase_mapping_service import apply_purchase_ma
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
 from PushShoppingList.services.shopping_list_service import load_items
 from PushShoppingList.services.shopping_list_service import save_items
+from PushShoppingList.services.storage_service import scoped_extractor_data_path
 
 
 BASE_DIR = Path(__file__).resolve().parent
-RECIPE_INGREDIENTS_FILE = BASE_DIR / "recipe-extractor" / "data" / "recipe_ingredients.json"
+RECIPE_INGREDIENTS_FILE = scoped_extractor_data_path("recipe_ingredients.json")
 
 RECIPE_INGREDIENTS_FILE.parent.mkdir(parents=True, exist_ok=True)
 

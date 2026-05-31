@@ -5,10 +5,13 @@ from threading import Lock
 from urllib.parse import urlparse
 from urllib.parse import urlunparse
 
+from PushShoppingList.services.storage_service import scoped_extractor_data_path
+from PushShoppingList.services.storage_service import scoped_package_path
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-URLS_FILE = BASE_DIR / "urls.txt"
-RECIPE_INGREDIENTS_FILE = BASE_DIR / "services" / "recipe-extractor" / "data" / "recipe_ingredients.json"
+URLS_FILE = scoped_package_path("urls.txt")
+RECIPE_INGREDIENTS_FILE = scoped_extractor_data_path("recipe_ingredients.json")
 url_file_lock = Lock()
 RECIPE_INGREDIENTS_FILE.parent.mkdir(parents=True, exist_ok=True)
 

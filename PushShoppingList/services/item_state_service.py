@@ -3,10 +3,11 @@ from pathlib import Path
 
 from PushShoppingList.services.purchase_mapping_service import clean_text
 from PushShoppingList.services.purchase_mapping_service import purchase_group_for_item
+from PushShoppingList.services.storage_service import scoped_extractor_data_path
 
 
 BASE_DIR = Path(__file__).resolve().parent
-ITEM_STATE_FILE = BASE_DIR / "recipe-extractor" / "data" / "shopping_item_state.json"
+ITEM_STATE_FILE = scoped_extractor_data_path("shopping_item_state.json")
 
 ITEM_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
 

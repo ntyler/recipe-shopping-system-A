@@ -2,6 +2,17 @@ function saveScroll() {
     localStorage.setItem("scrollY", window.scrollY);
 }
 
+function toggleUserProfileEditor() {
+    const form = document.getElementById("userProfileEditForm");
+
+    if (!form) {
+        return false;
+    }
+
+    form.hidden = !form.hidden;
+    return false;
+}
+
 let hiddenExtractJobId = null;
 let lastRenderedExtractJobId = null;
 let extractRefreshTimer = null;

@@ -2,9 +2,11 @@ import json
 import re
 from pathlib import Path
 
+from PushShoppingList.services.storage_service import scoped_extractor_data_path
+
 
 BASE_DIR = Path(__file__).resolve().parent
-RULES_DISPLAY_FILE = BASE_DIR / "recipe-extractor" / "data" / "rules_display.json"
+RULES_DISPLAY_FILE = scoped_extractor_data_path("rules_display.json")
 
 DEFAULT_RULES_DISPLAY = {
     "home_stores": {

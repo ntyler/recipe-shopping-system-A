@@ -21,5 +21,9 @@ PushShoppingList/services/recipe-extractor/data/raw/product_prompts/
 PushShoppingList/services/recipe-extractor/data/browser_profiles/
 PushShoppingList/cookbooks.json
 PushShoppingList/shopping_stores_Results.json
+PushShoppingList/users.json
+PushShoppingList/user_data/
+PushShoppingList/static/uploads/avatars/*
+!PushShoppingList/static/uploads/avatars/.gitkeep
 shopping_app_*.log
 flask_*.log
