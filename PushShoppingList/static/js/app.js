@@ -5413,7 +5413,12 @@ function populateRecipeEditor(recipe, originalUrl) {
     if (sourceInput) {
         sourceInput.dataset.canonicalSourceUrl = recipe.source_url || originalUrl;
         sourceInput.dataset.displaySourceUrl = recipe.source_display_url || "";
+        if (sourceInput.dataset.sourceLinkBound !== "true") {
+            sourceInput.dataset.sourceLinkBound = "true";
+            sourceInput.addEventListener("input", updateRecipeEditSourceUrlLink);
+        }
     }
+    updateRecipeEditSourceUrlLink();
 
     const ingredientWrap = document.getElementById("recipeEditIngredients");
     const equipmentWrap = document.getElementById("recipeEditEquipment");
@@ -8601,6 +8606,40 @@ function recipeEditorSourceUrlForSave() {
     }
 
     return currentValue;
+}
+
+function recipeEditorSourceUrlForOpen() {
+    const sourceInput = document.getElementById("recipeEditSourceUrl");
+
+    if (!sourceInput) {
+        return "";
+    }
+
+    const currentValue = sourceInput.value.trim();
+    const displaySourceUrl = sourceInput.dataset.displaySourceUrl || "";
+    const canonicalSourceUrl = sourceInput.dataset.canonicalSourceUrl || "";
+
+    if (displaySourceUrl && canonicalSourceUrl && currentValue === displaySourceUrl) {
+        return canonicalSourceUrl;
+    }
+
+    return currentValue;
+}
+
+function updateRecipeEditSourceUrlLink() {
+    const sourceLink = document.getElementById("recipeEditSourceUrlLink");
+
+    if (!sourceLink) {
+        return;
+    }
+
+    const sourceUrl = recipeEditorSourceUrlForOpen();
+    const canOpen = isLegitimateWebUrl(sourceUrl);
+
+    sourceLink.href = canOpen ? sourceUrl : "#";
+    sourceLink.hidden = !canOpen;
+    sourceLink.setAttribute("aria-disabled", canOpen ? "false" : "true");
+    sourceLink.title = canOpen ? "Open source URL" : "No web source URL";
 }
 
 function collectRecipeIngredientRows() {
