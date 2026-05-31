@@ -1359,8 +1359,24 @@ def infer_equipment_from_instructions(instructions):
     ]
 
 
+def equipment_item_name(item):
+    if isinstance(item, dict):
+        return str(
+            item.get("name")
+            or item.get("equipment")
+            or item.get("text")
+            or ""
+        ).strip()
+
+    return str(item or "").strip()
+
+
 def add_equipment_used_to_instructions(instructions, equipment):
-    equipment_names = [item["name"] for item in equipment if isinstance(item, dict)]
+    equipment_names = [
+        name
+        for name in (equipment_item_name(item) for item in equipment or [])
+        if name
+    ]
 
     for step in instructions or []:
         if not isinstance(step, dict):

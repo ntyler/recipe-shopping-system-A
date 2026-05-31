@@ -6857,6 +6857,48 @@ body {
             background: #7f1d1d;
         }
 
+        .recipe-save-progress-actions {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 10px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #444;
+        }
+
+        .recipe-save-progress-action {
+            width: 100%;
+            min-height: 42px;
+            margin: 0;
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: 1px solid #557094;
+            color: #dbe8f5;
+            background: #111923;
+            font-weight: 800;
+        }
+
+        .recipe-save-progress-action.primary {
+            border-color: #20a856;
+            color: #d8ffe4;
+            background: #147a35;
+        }
+
+        .recipe-save-progress-action.secondary {
+            border-color: #557094;
+            background: #131d2a;
+        }
+
+        .recipe-save-progress-action:not(:disabled):hover {
+            filter: brightness(1.08);
+        }
+
+        .recipe-save-progress-action:disabled {
+            cursor: not-allowed;
+            opacity: 0.52;
+            filter: saturate(0.55);
+        }
+
         .remove-recipe-form { margin: 0; }
 
         .remove-recipe-btn {
@@ -9510,6 +9552,10 @@ body {
 
             .recipe-qty-progress-status {
                 justify-self: start;
+            }
+
+            .recipe-save-progress-actions {
+                grid-template-columns: 1fr;
             }
         }
 

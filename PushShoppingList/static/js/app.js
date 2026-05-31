@@ -8635,6 +8635,7 @@ async function saveRecipeEditor(event) {
                 ? "Recipe saved, PDF created, and page values refreshed."
                 : "Recipe saved and page values refreshed."
         );
+        setRecipeSaveProgressActionsState("done");
         setRecipeEditStatus("");
         showRecipeQuantityUpdatedMessage("", "", "", "Recipe updated.");
     } catch (err) {
@@ -8642,6 +8643,7 @@ async function saveRecipeEditor(event) {
         setRecipeEditStatus("Unable to save recipe.", true);
         setRecipeSaveProgressSummary("Unable to save recipe.");
         updateRecipeSaveProgressFailed();
+        setRecipeSaveProgressActionsState("failed");
     } finally {
         if (saveButton) {
             saveButton.disabled = false;
@@ -9046,6 +9048,10 @@ function showRecipeSaveProgressOverlay(items) {
                 </div>
                 <div id="recipeSaveProgressSummary" class="recipe-qty-progress-summary">Starting recipe save...</div>
                 <div id="recipeSaveProgressList" class="recipe-qty-progress-list"></div>
+                <div id="recipeSaveProgressActions" class="recipe-save-progress-actions">
+                    <button type="button" class="recipe-save-progress-action secondary" onclick="hideRecipeSaveProgressOverlay()">Hide Progress</button>
+                    <button type="button" id="recipeSaveProgressCloseEditor" class="recipe-save-progress-action primary" onclick="closeRecipeEditorFromSaveProgress()" disabled>Close Edit Recipe</button>
+                </div>
             </div>
         `;
         document.body.appendChild(overlay);
@@ -9065,8 +9071,33 @@ function showRecipeSaveProgressOverlay(items) {
     }
 
     setRecipeSaveProgressSummary("Starting recipe save...");
+    setRecipeSaveProgressActionsState("running");
     overlay.classList.add("open");
     overlay.setAttribute("aria-hidden", "false");
+}
+
+function setRecipeSaveProgressActionsState(state) {
+    const closeButton = document.getElementById("recipeSaveProgressCloseEditor");
+
+    if (!closeButton) {
+        return;
+    }
+
+    if (state === "done") {
+        closeButton.disabled = false;
+        closeButton.textContent = "Close Edit Recipe";
+        return;
+    }
+
+    closeButton.disabled = true;
+    closeButton.textContent = state === "failed"
+        ? "Save Failed"
+        : "Close Edit Recipe";
+}
+
+function closeRecipeEditorFromSaveProgress() {
+    hideRecipeSaveProgressOverlay();
+    closeRecipeEditor();
 }
 
 function hideRecipeSaveProgressOverlay() {
