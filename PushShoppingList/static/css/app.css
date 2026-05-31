@@ -13093,7 +13093,7 @@ body {
 
 .recipe-edit-ingredient-row,
 .recipe-edit-ingredient-row.has-ingredient-choice-review {
-    border: 1px solid #263447;
+    border: 1px solid transparent;
     border-radius: 8px;
     background:
         linear-gradient(145deg, rgba(19, 30, 45, 0.9), rgba(10, 16, 25, 0.96)),
@@ -13103,7 +13103,7 @@ body {
 
 .recipe-edit-ingredient-row:last-child,
 .recipe-edit-ingredient-row.has-ingredient-choice-review:last-child {
-    border-bottom: 1px solid #263447;
+    border-bottom: 1px solid transparent;
 }
 
 @media (min-width: 761px) {
