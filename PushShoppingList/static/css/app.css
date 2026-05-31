@@ -2280,7 +2280,7 @@ body {
         .view-switcher-sticky {
             position: sticky;
             top: 0;
-            z-index: 1400;
+            z-index: 18000;
             isolation: isolate;
             max-width: 900px;
             margin: 16px auto 12px auto;
@@ -2647,6 +2647,20 @@ body {
             box-shadow: 0 8px 24px rgba(0,0,0,0.25);
             box-sizing: border-box;
             scroll-margin-top: calc(var(--view-switcher-sticky-offset, 0px) + 12px);
+        }
+
+        #recipeView.is-saving .recipe-view-card {
+            opacity: 0.74;
+        }
+
+        .recipe-view-card.is-dragging {
+            opacity: 0.58;
+            background: #17211f;
+            border-color: #12d6c5;
+        }
+
+        .recipe-view-drag-handle {
+            margin-top: -4px;
         }
 
         .recipe-view-card.recipe-view-state-pulse {
@@ -8999,14 +9013,21 @@ body {
 
             .recipe-view-title {
                 display: grid;
-                grid-template-columns: minmax(0, 1fr);
+                grid-template-columns: 32px minmax(0, 1fr);
                 align-items: start;
                 justify-content: stretch;
-                gap: 0;
+                gap: 0 8px;
                 padding: 12px 60px 12px 14px;
             }
 
+            .recipe-view-drag-handle {
+                grid-column: 1;
+                grid-row: 1;
+                margin-top: -2px;
+            }
+
             .recipe-view-title-main {
+                grid-column: 2;
                 grid-row: 1;
                 padding-right: 0;
             }
@@ -9035,6 +9056,7 @@ body {
             }
 
             .recipe-view-title-actions {
+                grid-column: 1 / -1;
                 display: flex;
                 width: 100%;
                 min-width: 0;

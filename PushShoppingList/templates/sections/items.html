@@ -179,7 +179,7 @@
     {% endif %}
 </div>
 
-<div id="recipeView" style="display:none;">
+<div id="recipeView" data-recipe-view-sort-list style="display:none;">
     <h2 class="items-title">Items by Recipe</h2>
     {% if recipe_view_rows %}
         {% set unclassified_cookbook = namespace(id="", name="unclassified") %}
@@ -198,6 +198,16 @@
                  data-recipe-view-url="{{ recipe.url }}">
                 <div class="recipe-view-title"
                      onclick="return toggleRecipeViewCardFromTitle(this, event)">
+                    <button type="button"
+                            class="recipe-url-drag-handle recipe-view-drag-handle"
+                            data-recipe-drag-handle
+                            aria-label="Reorder recipe {{ recipe.number }}"
+                            onclick="event.stopPropagation()">
+                        <span class="recipe-url-drag-dots" aria-hidden="true">
+                            <span></span><span></span><span></span>
+                            <span></span><span></span><span></span>
+                        </span>
+                    </button>
                     <div class="recipe-view-title-main recipe-view-title-toggle"
                          data-recipe-card-title-toggle
                          data-recipe-card-key="{{ recipe.url }}"

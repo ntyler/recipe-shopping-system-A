@@ -2,39 +2,13 @@
     <h2>View &amp; Behavior</h2>
     <p class="helper-text">Choose how the list is displayed, how buttons behave, and manage resets.</p>
 
-    <div class="view-control-section">
-        <div class="view-control-title">Button Behavior</div>
-        <div class="view-control-row">
-            <label class="behavior-toggle">
-                <input type="checkbox" id="openStoreUrlsToggle" checked onchange="saveOpenStoreUrlsSetting()">
-                Open store URLs
-            </label>
-
-            <label class="behavior-toggle">
-                <input type="checkbox" id="showItemButtonsToggle" checked onchange="saveShowItemButtonsSetting()">
-                Show item buttons
-            </label>
-
-            <label class="behavior-toggle">
-                <input type="checkbox" id="showBestProductToggle" checked onchange="saveShowBestProductSetting()">
-                Show best product
-            </label>
-
-            <label class="behavior-toggle">
-                <input type="checkbox" id="showQtyToggle" checked onchange="saveShowQtySetting()">
-                Show qty
-            </label>
-
-            <label class="behavior-toggle">
-                <input type="checkbox" id="hideCheckedItemsToggle" onchange="saveHideCheckedItemsSetting()">
-                Hide checked items
-            </label>
-
-            <label class="behavior-toggle">
-                <input type="checkbox" id="compactModeToggle" onchange="saveCompactModeSetting()">
-                Compact mode
-            </label>
-        </div>
+    <div hidden aria-hidden="true">
+        <input type="checkbox" id="openStoreUrlsToggle" checked onchange="saveOpenStoreUrlsSetting()">
+        <input type="checkbox" id="showItemButtonsToggle" checked onchange="saveShowItemButtonsSetting()">
+        <input type="checkbox" id="showBestProductToggle" checked onchange="saveShowBestProductSetting()">
+        <input type="checkbox" id="showQtyToggle" checked onchange="saveShowQtySetting()">
+        <input type="checkbox" id="hideCheckedItemsToggle" onchange="saveHideCheckedItemsSetting()">
+        <input type="checkbox" id="compactModeToggle" onchange="saveCompactModeSetting()">
     </div>
 
     <div class="view-control-section">
@@ -49,25 +23,6 @@
             <form class="view-action-form" method="POST" action="/clear_product_picks" onsubmit="return clearProductPicks(event);">
                 <button type="submit" class="clear-products-btn view-action-btn">Clear Product Picks</button>
             </form>
-        </div>
-    </div>
-
-    <div class="view-control-section">
-        <div class="view-control-title">Image Tools</div>
-        <div class="view-control-row">
-            <button type="button"
-                    class="grab-products-btn view-action-btn"
-                    data-recipe-image-global-btn
-                    onclick="return generateAllRecipeImagesFromViewBehavior(this)">
-                Generate All Images
-            </button>
-
-            <button type="button"
-                    class="grab-products-btn view-action-btn"
-                    data-recipe-image-global-btn
-                    onclick="return generateAllRecipeImagesFromViewBehavior(this, { missingOnly: true })">
-                Generate All Missing Images
-            </button>
         </div>
     </div>
 
