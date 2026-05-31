@@ -1,10 +1,12 @@
 import base64
 import json
+import mimetypes
 import os
 import uuid
 from datetime import datetime
 from datetime import timezone
 from pathlib import Path
+from urllib.parse import quote
 from urllib.parse import urlparse
 
 import requests
@@ -17,13 +19,16 @@ from PushShoppingList.services.recipe_extract_service import MODEL
 from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
 from PushShoppingList.services.recipe_extract_service import RAW_FOLDER
 from PushShoppingList.services.recipe_extract_service import STORE_SECTION_ORDER
+from PushShoppingList.services.recipe_extract_service import UPLOAD_FOLDER
 from PushShoppingList.services.recipe_extract_service import build_video_text_pdf_html
 from PushShoppingList.services.recipe_extract_service import classify_store_section
 from PushShoppingList.services.recipe_extract_service import clean_json_response
+from PushShoppingList.services.recipe_extract_service import extract_recipe_cover_image_from_upload
 from PushShoppingList.services.recipe_extract_service import extract_recipe_info_from_text
 from PushShoppingList.services.recipe_extract_service import extract_ingredients_from_result
 from PushShoppingList.services.recipe_extract_service import fetch_recipe_page
 from PushShoppingList.services.recipe_extract_service import get_openai_client
+from PushShoppingList.services.recipe_extract_service import normalize_recipe_cover_image
 from PushShoppingList.services.recipe_extract_service import normalize_extracted_equipment_fields
 from PushShoppingList.services.recipe_extract_service import normalize_extracted_ingredient_fields
 from PushShoppingList.services.recipe_extract_service import normalize_recipe_scaling_metadata
@@ -88,6 +93,24 @@ NUTRITION_ESTIMATE_FIELDS = [
 ]
 STEP_IMAGE_FOLDER = Path(__file__).resolve().parents[1] / "static" / "generated" / "recipe_steps"
 STEP_IMAGE_URL_PREFIX = "/static/generated/recipe_steps"
+COVER_IMAGE_UPLOAD_FOLDER = UPLOAD_FOLDER / "recipe_covers"
+COVER_IMAGE_EXTENSIONS = {
+    ".avif",
+    ".bmp",
+    ".gif",
+    ".jpeg",
+    ".jpg",
+    ".png",
+    ".webp",
+}
+COVER_IMAGE_MIME_EXTENSIONS = {
+    "image/avif": ".avif",
+    "image/bmp": ".bmp",
+    "image/gif": ".gif",
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+}
 
 
 def create_new_recipe():
@@ -145,6 +168,7 @@ def load_editable_recipe(url):
     if recipe_data.get("servings") and not scaling.get("base_servings"):
         scaling["base_servings"] = str(recipe_data.get("servings") or "").strip()
     recipe_info = recipe_information_fields(recipe_data, url)
+    cover_image = editable_recipe_cover_image(url, recipe_data, meta)
 
     return {
         "ok": True,
@@ -159,6 +183,7 @@ def load_editable_recipe(url):
             "cookbook_is_unclassified": cookbook_assignment.get("cookbook_is_unclassified", False),
             "recipe_title": recipe_data.get("recipe_title") or "",
             "servings": recipe_data.get("servings") or "",
+            "cover_image": cover_image,
             **recipe_info,
             "scaling": scaling,
             "ingredients": annotate_ingredients_for_food_review(
@@ -175,6 +200,44 @@ def load_editable_recipe(url):
         },
         "food_rules": load_food_rules(),
         "store_sections": list(STORE_SECTION_ORDER.keys()),
+    }
+
+
+def editable_recipe_cover_image(url, recipe_data, recipe_meta=None):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    recipe_meta = recipe_meta if isinstance(recipe_meta, dict) else {}
+    cover_image = recipe_data.get("cover_image")
+
+    if not isinstance(cover_image, dict) or not cover_image:
+        cover_image = recipe_meta.get("cover_image")
+
+    if not isinstance(cover_image, dict) or not cover_image:
+        return {}
+
+    source_url = str(recipe_data.get("source_url") or url or "").strip()
+    fallback_alt = (
+        str(cover_image.get("alt") or "").strip()
+        or str(recipe_data.get("recipe_title") or recipe_meta.get("name") or "Recipe title image").strip()
+    )
+    normalized = normalize_recipe_cover_image(
+        cover_image,
+        base_url=source_url,
+        fallback_alt=fallback_alt,
+    )
+
+    if not normalized:
+        return {}
+
+    src = ""
+    if normalized.get("path") and source_url:
+        src = f"/recipe_cover_image?url={quote(source_url, safe='')}"
+    elif normalized.get("url"):
+        src = normalized.get("url")
+
+    return {
+        **normalized,
+        "alt": normalized.get("alt") or fallback_alt,
+        "src": src,
     }
 
 
@@ -355,6 +418,11 @@ def save_editable_recipe(original_url, payload):
         previous_recipe_data,
     )
     existing_data = load_recipe_output(original_url) or {"source_url": original_url}
+    cover_image = sanitize_recipe_cover_image(
+        payload.get("cover_image") or existing_data.get("cover_image"),
+        source_url,
+        payload.get("recipe_title") or existing_data.get("recipe_title") or "",
+    )
     recipe_data = {
         **existing_data,
         "source_url": source_url,
@@ -379,6 +447,10 @@ def save_editable_recipe(original_url, payload):
         ),
         "nutrition": sanitize_nutrition(payload.get("nutrition", [])),
     }
+    if cover_image:
+        recipe_data["cover_image"] = cover_image
+    else:
+        recipe_data.pop("cover_image", None)
     if recipe_data["servings"] and not recipe_data["scaling"].get("base_servings"):
         recipe_data["scaling"]["base_servings"] = recipe_data["servings"]
 
@@ -400,6 +472,108 @@ def save_editable_recipe(original_url, payload):
     sync_saved_recipe_with_shopping_list(recipe_data, previous_ingredients)
 
     return load_editable_recipe(source_url)
+
+
+def save_recipe_cover_image_upload(original_url, uploaded_file, source_url="", fallback_alt=""):
+    original_url = str(original_url or "").strip()
+    source_url = str(source_url or original_url).strip() or original_url
+
+    if not original_url:
+        return {"ok": False, "error": "Recipe URL is required."}
+
+    if not uploaded_file or not uploaded_file.filename:
+        return {"ok": False, "error": "No title image was selected."}
+
+    mime_type = str(
+        uploaded_file.mimetype
+        or mimetypes.guess_type(uploaded_file.filename or "")[0]
+        or ""
+    ).split(";", 1)[0].strip().lower()
+    guessed_mime_type = str(mimetypes.guess_type(uploaded_file.filename or "")[0] or "").lower()
+    if not mime_type.startswith("image/") and guessed_mime_type.startswith("image/"):
+        mime_type = guessed_mime_type
+    extension = recipe_cover_upload_extension(uploaded_file.filename, mime_type)
+
+    if not extension or not mime_type.startswith("image/"):
+        return {"ok": False, "error": "Choose a PNG, JPG, WebP, GIF, BMP, or AVIF image."}
+
+    COVER_IMAGE_UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
+    upload_path = COVER_IMAGE_UPLOAD_FOLDER / (
+        f"{safe_filename(source_url or original_url)}_title_{uuid.uuid4().hex}{extension}"
+    )
+    uploaded_file.save(upload_path)
+
+    existing_data = load_recipe_output(original_url) or {"source_url": source_url}
+    recipe_source_url = str(existing_data.get("source_url") or source_url or original_url).strip()
+    alt = str(fallback_alt or existing_data.get("recipe_title") or "Recipe title image").strip()
+    cover_image = extract_recipe_cover_image_from_upload(
+        upload_path,
+        mime_type,
+        uploaded_file.filename,
+        recipe_source_url,
+        fallback_alt=alt,
+    )
+
+    if not cover_image:
+        try:
+            upload_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        return {"ok": False, "error": "Unable to save this title image."}
+
+    existing_data["source_url"] = recipe_source_url
+    existing_data["cover_image"] = cover_image
+    save_recipe_output(recipe_source_url, existing_data)
+
+    recipe_meta = load_recipe_ingredients().get(normalize_recipe_url_key(recipe_source_url), {})
+    quantity = normalize_recipe_quantity(recipe_meta.get("quantity", 1))
+    update_recipe_ingredient_record(recipe_source_url, quantity, existing_data)
+
+    loaded = load_editable_recipe(recipe_source_url)
+    response_recipe = loaded.get("recipe", {})
+    response_cover_image = response_recipe.get("cover_image") or editable_recipe_cover_image(
+        recipe_source_url,
+        existing_data,
+        recipe_meta,
+    )
+
+    return {
+        "ok": True,
+        "cover_image": response_cover_image,
+        "recipe": response_recipe,
+    }
+
+
+def recipe_cover_upload_extension(filename, mime_type=""):
+    suffix = Path(str(filename or "")).suffix.lower()
+
+    if suffix in COVER_IMAGE_EXTENSIONS:
+        return suffix
+
+    normalized_mime_type = str(mime_type or "").split(";", 1)[0].strip().lower()
+    if normalized_mime_type in COVER_IMAGE_MIME_EXTENSIONS:
+        return COVER_IMAGE_MIME_EXTENSIONS[normalized_mime_type]
+
+    guessed_extension = mimetypes.guess_extension(normalized_mime_type or "")
+    guessed_extension = ".jpg" if guessed_extension == ".jpe" else guessed_extension
+
+    if guessed_extension in COVER_IMAGE_EXTENSIONS:
+        return guessed_extension
+
+    return ""
+
+
+def sanitize_recipe_cover_image(value, source_url="", fallback_alt=""):
+    cover_image = normalize_recipe_cover_image(
+        value,
+        base_url=str(source_url or ""),
+        fallback_alt=str(fallback_alt or "Recipe title image"),
+    )
+
+    if not cover_image:
+        return {}
+
+    return cover_image
 
 
 def estimate_recipe_nutrition(payload):

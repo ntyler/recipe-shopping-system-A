@@ -530,6 +530,41 @@
                         <span>Recipe Title</span>
                         <input type="text" name="recipe_title" id="recipeEditTitleInput">
                     </label>
+                    <div class="recipe-edit-cover-field" id="recipeEditCoverField">
+                        <div class="recipe-edit-cover-preview" id="recipeEditCoverPreview">
+                            <img id="recipeEditCoverImage"
+                                 alt="Recipe title image"
+                                 loading="lazy"
+                                 hidden>
+                            <div id="recipeEditCoverEmpty" class="recipe-edit-cover-empty">
+                                No title image saved.
+                            </div>
+                        </div>
+                        <div class="recipe-edit-cover-details">
+                            <span class="recipe-edit-cover-label">Recipe Title Image</span>
+                            <span id="recipeEditCoverStatus" class="recipe-edit-cover-status">
+                                Upload or replace the image shown on recipe cards.
+                            </span>
+                            <div class="recipe-edit-cover-actions">
+                                <button type="button"
+                                        class="recipe-edit-cover-upload-button"
+                                        onclick="return openRecipeCoverUpload()">
+                                    <span class="recipe-edit-button-icon" aria-hidden="true">+</span>
+                                    <span id="recipeEditCoverUploadLabel">Upload title image</span>
+                                </button>
+                                <input id="recipeEditCoverUpload"
+                                       class="recipe-edit-cover-file-input"
+                                       type="file"
+                                       accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/avif"
+                                       onchange="return uploadRecipeCoverImage(this)">
+                            </div>
+                        </div>
+                        <input type="hidden" id="recipeEditCoverPath">
+                        <input type="hidden" id="recipeEditCoverUrl">
+                        <input type="hidden" id="recipeEditCoverAlt">
+                        <input type="hidden" id="recipeEditCoverMimeType">
+                        <input type="hidden" id="recipeEditCoverSource">
+                    </div>
                     <label>
                         <span>Source URL</span>
                         <span class="recipe-edit-source-url-field">

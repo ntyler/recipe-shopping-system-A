@@ -5623,12 +5623,15 @@ function closeRecipeEditor() {
 }
 
 function populateRecipeEditor(recipe, originalUrl) {
+    const coverImage = normalizeRecipeEditorCoverImage(recipe.cover_image || {});
+
     recipeEditOriginalSnapshot = normalizeRecipeEditorSnapshot({
         display_name: recipe.display_name || "",
         recipe_title: recipe.recipe_title || "",
         source_url: recipe.source_url || originalUrl,
         quantity: recipe.quantity || "1",
         servings: recipe.servings || "",
+        cover_image: coverImage,
         level: recipe.level || "",
         total_time: recipe.total_time || "",
         prep_time: recipe.prep_time || "",
@@ -5655,6 +5658,7 @@ function populateRecipeEditor(recipe, originalUrl) {
     setRecipeEditorCookbook(recipe, originalUrl);
     populateRecipeScalingControls(recipe.scaling || {}, recipe.servings || "");
     updateRecipeEditorPdfControls(recipe);
+    setRecipeEditorCoverImage(coverImage, recipe.recipe_title || recipe.display_name || "Recipe title image");
 
     const sourceInput = document.getElementById("recipeEditSourceUrl");
     if (sourceInput) {
@@ -5837,6 +5841,231 @@ function setRecipeEditStatus(message, isError = false) {
     status.textContent = message || "";
     status.classList.toggle("visible", Boolean(message));
     status.classList.toggle("error", Boolean(isError));
+}
+
+function normalizeRecipeEditorCoverImage(value = {}) {
+    if (typeof value === "string") {
+        const url = value.trim();
+        return url ? { url, src: url } : {};
+    }
+
+    if (!value || typeof value !== "object") {
+        return {};
+    }
+
+    const path = String(value.path || "").trim();
+    const url = String(value.url || "").trim();
+    const src = String(value.src || "").trim();
+    const alt = String(value.alt || "").trim();
+    const mimeType = String(value.mime_type || value.mimeType || "").trim();
+    const source = String(value.source || "").trim();
+    const normalized = {};
+
+    if (path) {
+        normalized.path = path;
+    }
+
+    if (url) {
+        normalized.url = url;
+    } else if (!path && src) {
+        normalized.url = src;
+    }
+
+    if (src) {
+        normalized.src = src;
+    }
+
+    if (alt) {
+        normalized.alt = alt;
+    }
+
+    if (mimeType) {
+        normalized.mime_type = mimeType;
+    }
+
+    if (source) {
+        normalized.source = source;
+    }
+
+    return normalized.path || normalized.url || normalized.src ? normalized : {};
+}
+
+function setRecipeEditorCoverImage(coverImage = {}, fallbackAlt = "") {
+    const normalized = normalizeRecipeEditorCoverImage(coverImage);
+    const field = document.getElementById("recipeEditCoverField");
+    const image = document.getElementById("recipeEditCoverImage");
+    const empty = document.getElementById("recipeEditCoverEmpty");
+    const status = document.getElementById("recipeEditCoverStatus");
+    const uploadLabel = document.getElementById("recipeEditCoverUploadLabel");
+    const alt = normalized.alt || fallbackAlt || "Recipe title image";
+    const src = normalized.src || normalized.url || "";
+    const hasImage = Boolean(src || normalized.path || normalized.url);
+
+    if (field) {
+        field.classList.toggle("has-cover", hasImage);
+    }
+
+    if (image) {
+        const nextSrc = src || (
+            normalized.path && recipeEditorCurrentUrl()
+                ? `/recipe_cover_image?url=${encodeURIComponent(recipeEditorCurrentUrl())}`
+                : ""
+        );
+        image.alt = alt;
+        if (nextSrc) {
+            image.src = nextSrc;
+            image.hidden = false;
+        } else {
+            image.removeAttribute("src");
+            image.hidden = true;
+        }
+    }
+
+    if (empty) {
+        empty.hidden = hasImage;
+    }
+
+    if (status) {
+        status.textContent = hasImage
+            ? "This image is shown on recipe cards."
+            : "Upload or replace the image shown on recipe cards.";
+    }
+
+    if (uploadLabel) {
+        uploadLabel.textContent = hasImage ? "Replace title image" : "Upload title image";
+    }
+
+    setValue("recipeEditCoverPath", normalized.path || "");
+    setValue("recipeEditCoverUrl", normalized.url || "");
+    setValue("recipeEditCoverAlt", alt);
+    setValue("recipeEditCoverMimeType", normalized.mime_type || "");
+    setValue("recipeEditCoverSource", normalized.source || "");
+}
+
+function collectRecipeEditorCoverImage() {
+    const pathInput = document.getElementById("recipeEditCoverPath");
+    const urlInput = document.getElementById("recipeEditCoverUrl");
+    const altInput = document.getElementById("recipeEditCoverAlt");
+    const mimeTypeInput = document.getElementById("recipeEditCoverMimeType");
+    const sourceInput = document.getElementById("recipeEditCoverSource");
+    const path = String(pathInput ? pathInput.value : "").trim();
+    const url = String(urlInput ? urlInput.value : "").trim();
+    const alt = String(altInput ? altInput.value : "").trim();
+    const mimeType = String(mimeTypeInput ? mimeTypeInput.value : "").trim();
+    const source = String(sourceInput ? sourceInput.value : "").trim();
+    const coverImage = {};
+
+    if (path) {
+        coverImage.path = path;
+    }
+
+    if (url) {
+        coverImage.url = url;
+    }
+
+    if (alt) {
+        coverImage.alt = alt;
+    }
+
+    if (mimeType) {
+        coverImage.mime_type = mimeType;
+    }
+
+    if (source) {
+        coverImage.source = source;
+    }
+
+    return coverImage.path || coverImage.url ? coverImage : {};
+}
+
+function normalizeRecipeCoverImageSnapshot(value = {}) {
+    const coverImage = normalizeRecipeEditorCoverImage(value);
+
+    return {
+        path: String(coverImage.path || "").trim(),
+        url: String(coverImage.url || "").trim(),
+        alt: String(coverImage.alt || "").trim(),
+        mime_type: String(coverImage.mime_type || "").trim(),
+        source: String(coverImage.source || "").trim(),
+    };
+}
+
+function cacheBustRecipeCoverSrc(src) {
+    if (!src || !src.startsWith("/recipe_cover_image")) {
+        return src || "";
+    }
+
+    const separator = src.includes("?") ? "&" : "?";
+    return `${src}${separator}_cover=${Date.now()}`;
+}
+
+function openRecipeCoverUpload() {
+    const input = document.getElementById("recipeEditCoverUpload");
+
+    if (input) {
+        input.click();
+    }
+
+    return false;
+}
+
+async function uploadRecipeCoverImage(input) {
+    const file = input && input.files ? input.files[0] : null;
+
+    if (!file) {
+        return false;
+    }
+
+    const originalUrl = recipeEditorCurrentUrl();
+    const sourceUrl = recipeEditorSourceUrlForSave() || originalUrl;
+    const titleInput = document.getElementById("recipeEditTitleInput");
+    const displayInput = document.getElementById("recipeEditDisplayName");
+    const fallbackAlt = (titleInput ? titleInput.value.trim() : "")
+        || (displayInput ? displayInput.value.trim() : "")
+        || "Recipe title image";
+
+    if (!originalUrl) {
+        setRecipeEditStatus("Unable to upload title image: missing recipe URL.", true);
+        input.value = "";
+        return false;
+    }
+
+    const formData = new FormData();
+    formData.append("url", originalUrl);
+    formData.append("source_url", sourceUrl);
+    formData.append("alt", fallbackAlt);
+    formData.append("cover_image", file);
+
+    try {
+        setRecipeEditStatus("Uploading title image...");
+        const response = await fetch("/api/recipe_cover_image", {
+            method: "POST",
+            body: formData,
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to upload title image.");
+        }
+
+        const coverImage = normalizeRecipeEditorCoverImage(data.cover_image || {});
+        if (coverImage.src) {
+            coverImage.src = cacheBustRecipeCoverSrc(coverImage.src);
+        }
+
+        setRecipeEditorCoverImage(coverImage, fallbackAlt);
+        setRecipeEditStatus("Title image updated. Save Recipe to keep any other edits.");
+        showRecipeQuantityUpdatedMessage("", "", "", "Recipe title image updated.");
+    } catch (err) {
+        console.warn("Unable to upload recipe title image.", err);
+        setRecipeEditStatus(err.message || "Unable to upload title image.", true);
+    } finally {
+        if (input) {
+            input.value = "";
+        }
+    }
+
+    return false;
 }
 
 function populateRecipeScalingControls(scaling = {}, servings = "") {
@@ -8864,6 +9093,7 @@ function normalizeRecipeEditorSnapshot(recipe) {
         source_url: String(recipe.source_url || "").trim(),
         quantity: String(parseRecipeScaleMultiplier(recipe.quantity || "1") || 1),
         servings: String(recipe.servings || "").trim(),
+        cover_image: normalizeRecipeCoverImageSnapshot(recipe.cover_image || {}),
         level: String(recipe.level || "").trim(),
         total_time: String(recipe.total_time || "").trim(),
         prep_time: String(recipe.prep_time || "").trim(),
@@ -8944,6 +9174,10 @@ function buildRecipeSaveProgressItems(recipe) {
 
     if (previous.scaling.selected_multiplier !== next.scaling.selected_multiplier) {
         detailLines.push(`Recipe amount: ${previous.scaling.selected_multiplier || "1"}x -> ${next.scaling.selected_multiplier || "1"}x`);
+    }
+
+    if (JSON.stringify(previous.cover_image) !== JSON.stringify(next.cover_image)) {
+        detailLines.push("Recipe title image updated.");
     }
 
     const ingredientLines = changedRecipeIngredientLines(previous.ingredients, next.ingredients);
@@ -9168,6 +9402,7 @@ function collectRecipeEditorPayload() {
             source_url: sourceUrl,
             quantity,
             servings: document.getElementById("recipeEditServings").value.trim(),
+            cover_image: collectRecipeEditorCoverImage(),
             level: document.getElementById("recipeEditLevel").value.trim(),
             total_time: document.getElementById("recipeEditTotalTime").value.trim(),
             prep_time: document.getElementById("recipeEditPrepTime").value.trim(),

@@ -36,6 +36,7 @@ from PushShoppingList.services.recipe_edit_service import generate_recipe_equipm
 from PushShoppingList.services.recipe_edit_service import generate_recipe_step_image
 from PushShoppingList.services.recipe_edit_service import load_editable_recipe
 from PushShoppingList.services.recipe_edit_service import save_editable_recipe
+from PushShoppingList.services.recipe_edit_service import save_recipe_cover_image_upload
 from PushShoppingList.services.recipe_edit_service import create_source_url_pdf
 from PushShoppingList.services.recipe_image_progress_service import load_recipe_image_progress
 from PushShoppingList.services.recipe_ingredient_service import remove_recipe_and_unused_ingredients
@@ -408,6 +409,18 @@ def api_recipe_equipment_image_route():
     return jsonify(result), status
 
 
+@recipe_bp.route("/api/recipe_cover_image", methods=["POST"])
+def api_recipe_cover_image_route():
+    url = str(request.form.get("url", "") or "").strip()
+    source_url = str(request.form.get("source_url", "") or "").strip()
+    fallback_alt = str(request.form.get("alt", "") or "").strip()
+    uploaded_file = request.files.get("cover_image") or request.files.get("recipe_cover_image")
+    result = save_recipe_cover_image_upload(url, uploaded_file, source_url, fallback_alt)
+    status = 200 if result.get("ok") else 400
+
+    return jsonify(result), status
+
+
 @recipe_bp.route("/api/recipe_image_progress", methods=["GET"])
 def api_recipe_image_progress_route():
     url = str(request.args.get("url", "") or "").strip()
@@ -483,6 +496,7 @@ def recipe_cover_image_route():
         mimetype=cover_image.get("mime_type") if isinstance(cover_image, dict) else None,
         as_attachment=False,
         download_name=image_path.name,
+        max_age=0,
     )
 
 
