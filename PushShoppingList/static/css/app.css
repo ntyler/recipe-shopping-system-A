@@ -3452,6 +3452,7 @@ body {
         }
 
         #currentRecipeUrlLogCard .recipe-url-log-toggle,
+        #screenSettingsCard .screen-settings-toggle,
         #cookbooksCard > .card-collapse-toggle,
         #rulesCard > .card-collapse-toggle,
         #home-address-section > .card-collapse-toggle,
