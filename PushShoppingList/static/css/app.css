@@ -3749,7 +3749,7 @@ body {
 
         .cookbooks-toolbar {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            grid-template-columns: minmax(0, 1fr);
             gap: 12px;
             margin-bottom: 12px;
         }
@@ -3840,7 +3840,7 @@ body {
 
         .cookbooks-layout {
             display: grid;
-            grid-template-columns: minmax(250px, 0.92fr) minmax(0, 1.35fr);
+            grid-template-columns: minmax(0, 1fr);
             gap: 12px;
             align-items: start;
         }
