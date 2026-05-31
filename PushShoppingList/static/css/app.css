@@ -2215,28 +2215,15 @@ body {
             top: 0;
             z-index: 18000;
             isolation: isolate;
+            width: min(900px, 100%);
             max-width: 900px;
             margin: 16px auto 0 auto;
-            padding: 11px 12px;
+            padding: 10px 12px;
             background: #111414;
-            border: 1px solid #3a3a3a;
-            border-color: transparent;
+            border: 0;
             border-radius: 10px;
             box-shadow: 0 8px 24px rgba(0,0,0,0.45);
             box-sizing: border-box;
-        }
-
-        .view-switcher-sticky::before {
-            content: "";
-            position: absolute;
-            top: 0;
-            bottom: -1px;
-            left: 50%;
-            width: 100vw;
-            transform: translateX(-50%);
-            background: #111414;
-            pointer-events: none;
-            z-index: -1;
         }
 
         body.recipe-editor-open .view-switcher-sticky {
@@ -2250,6 +2237,10 @@ body {
 
         .view-switcher-sticky .view-toggle-box {
             margin-top: 0;
+        }
+
+        .view-switcher-sticky[data-active-view="recipe"] .view-toggle-box {
+            padding-right: 46px;
         }
 
         .recipe-view-global-menu-wrap {
