@@ -439,6 +439,13 @@
                             <div class="overflow-menu-section">
                                 <div class="overflow-menu-section-title">Show or Hide Images</div>
                                 <button type="button"
+                                        class="recipe-view-behavior-toggle"
+                                        data-view-behavior-input="showImagesByDefaultToggle"
+                                        aria-pressed="true"
+                                        onclick="return toggleViewBehaviorMenuSetting(this)">
+                                    Show all recipe images by default
+                                </button>
+                                <button type="button"
                                         onclick="return setRecipeEditorImagesVisibleFromMenu(this, true, { imageScope: 'all' })">
                                     Show all recipe images
                                 </button>
