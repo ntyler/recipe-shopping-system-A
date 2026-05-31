@@ -2,6 +2,7 @@ import json
 
 from flask import Blueprint
 from flask import abort
+from flask import flash
 from flask import jsonify
 from flask import redirect
 from flask import request
@@ -53,10 +54,24 @@ from PushShoppingList.services.recipe_url_service import save_recipe_urls
 from PushShoppingList.services.recipe_quantity_service import update_recipe_ingredient_quantity
 from PushShoppingList.services.recipe_quantity_service import update_recipe_quantity
 from PushShoppingList.services.shopping_list_service import add_items
+from PushShoppingList.services.user_account_service import current_user
 
 recipe_bp = Blueprint("recipe_bp", __name__)
 
 NO_INGREDIENTS_ERROR = "No ingredients were found for this recipe URL."
+IMPORT_LOGIN_ERROR = "Sign in before importing recipes so imported data is saved to your account."
+
+
+def require_account_for_import(wants_json=False):
+    """Keep recipe imports bound to a signed-in user's scoped storage."""
+    if current_user():
+        return None
+
+    if wants_json:
+        return jsonify({"ok": False, "error": IMPORT_LOGIN_ERROR}), 401
+
+    flash(IMPORT_LOGIN_ERROR, "error")
+    return redirect("/#userAccountSection")
 
 
 def ensure_recipe_has_default_cookbook(url, recipe_metadata=None):
@@ -77,6 +92,10 @@ def ensure_recipe_has_default_cookbook(url, recipe_metadata=None):
 
 @recipe_bp.route("/extract_recipe", methods=["POST"])
 def extract_recipe_route():
+    account_response = require_account_for_import()
+    if account_response:
+        return account_response
+
     recipe_urls = request.form.get("recipe_urls", "")
 
     urls = [
@@ -133,11 +152,15 @@ def extract_recipe_route():
 
 @recipe_bp.route("/upload_recipe_media", methods=["POST"])
 def upload_recipe_media_route():
-    uploaded_file = request.files.get("recipe_media")
     wants_json = (
         request.headers.get("X-Requested-With") == "fetch"
         or request.form.get("ajax") == "1"
     )
+    account_response = require_account_for_import(wants_json=wants_json)
+    if account_response:
+        return account_response
+
+    uploaded_file = request.files.get("recipe_media")
 
     if not uploaded_file or not uploaded_file.filename:
         if wants_json:
@@ -173,6 +196,10 @@ def upload_recipe_media_route():
 
 @recipe_bp.route("/api/extract_recipe", methods=["POST"])
 def api_extract_recipe_route():
+    account_response = require_account_for_import(wants_json=True)
+    if account_response:
+        return account_response
+
     data = request.get_json(force=True)
 
     url = str(data.get("url", "")).strip()
@@ -238,6 +265,10 @@ def api_extract_recipe_route():
 
 @recipe_bp.route("/api/start_extract_progress", methods=["POST"])
 def api_start_extract_progress_route():
+    account_response = require_account_for_import(wants_json=True)
+    if account_response:
+        return account_response
+
     data = request.get_json(force=True)
     urls = [
         str(item).strip()

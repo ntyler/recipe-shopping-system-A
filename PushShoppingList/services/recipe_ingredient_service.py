@@ -11,6 +11,7 @@ from PushShoppingList.services.recipe_url_service import normalize_recipe_url_ke
 from PushShoppingList.services.shopping_list_service import load_items
 from PushShoppingList.services.shopping_list_service import save_items
 from PushShoppingList.services.storage_service import scoped_extractor_data_path
+from PushShoppingList.services.user_account_service import current_public_user
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -57,6 +58,12 @@ def save_ingredients_for_recipe(url, ingredients, recipe_metadata=None):
 
     if cover_image:
         record["cover_image"] = cover_image
+
+    # This metadata makes imported ingredient records auditable inside user-scoped storage.
+    user = current_public_user()
+    if user:
+        record["owner_user_id"] = user.get("user_id", "")
+        record["owner_username"] = user.get("username", "")
 
     data[normalize_recipe_url_key(url)] = record
     save_recipe_ingredients(data)

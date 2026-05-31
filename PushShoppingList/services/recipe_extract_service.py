@@ -23,6 +23,7 @@ from openai import OpenAI
 from PushShoppingList.services.purchase_mapping_service import apply_purchase_mapping_to_ingredient
 from PushShoppingList.services.storage_service import scoped_extractor_data_path
 from PushShoppingList.services.storage_service import scoped_extractor_path
+from PushShoppingList.services.user_account_service import current_public_user
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -765,6 +766,22 @@ def apply_recipe_cover_image_metadata(json_data, html_text=None, recipe_url="", 
         if not cover_image.get("alt"):
             cover_image["alt"] = fallback_alt
         json_data["cover_image"] = cover_image
+
+
+def apply_recipe_owner_metadata(json_data):
+    """Stamp imported recipes with the active account without exposing secrets."""
+    if not isinstance(json_data, dict):
+        return
+
+    user = current_public_user()
+
+    if not user:
+        json_data.pop("owner_user_id", None)
+        json_data.pop("owner_username", None)
+        return
+
+    json_data["owner_user_id"] = user.get("user_id", "")
+    json_data["owner_username"] = user.get("username", "")
 
 
 def recipe_cover_image_from_data(json_data, base_url="", fallback_alt=""):
@@ -4550,6 +4567,7 @@ def save_json_response(recipe_url, response_text, html_text=None):
         apply_recipe_info_metadata(json_data, html_text)
         apply_recipe_scaling_metadata(json_data, html_text)
         apply_recipe_cover_image_metadata(json_data, html_text, recipe_url)
+        apply_recipe_owner_metadata(json_data)
 
         json_path.write_text(
             json.dumps(json_data, indent=2, ensure_ascii=False),
@@ -4662,6 +4680,7 @@ def save_extracted_recipe_json(recipe_url, json_data):
     apply_recipe_info_metadata(json_data)
     apply_recipe_scaling_metadata(json_data)
     apply_recipe_cover_image_metadata(json_data, recipe_url=recipe_url)
+    apply_recipe_owner_metadata(json_data)
 
     json_path = OUTPUT_FOLDER / f"{safe_filename(recipe_url)}.json"
     json_path.write_text(
