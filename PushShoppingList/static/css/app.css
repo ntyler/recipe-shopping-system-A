@@ -11746,6 +11746,81 @@ body {
     overflow: visible;
 }
 
+@media (min-width: 1181px) and (max-width: 1500px) {
+    .recipe-edit-ingredient-row {
+        grid-template-columns: 26px 54px minmax(150px, 1.1fr) minmax(72px, 0.35fr) minmax(90px, 0.4fr) minmax(130px, 0.65fr) minmax(150px, 0.75fr) 72px 44px;
+        gap: 14px;
+        padding: 18px;
+    }
+
+    .recipe-edit-ingredient-row .recipe-edit-row-handle {
+        grid-column: 1 / 2;
+        grid-row: 1 / 3;
+        align-self: start;
+        margin-top: 6px;
+    }
+
+    .recipe-edit-ingredient-row .recipe-edit-row-number {
+        grid-column: 2 / 3;
+        grid-row: 1;
+    }
+
+    .recipe-edit-ingredient-row .recipe-edit-ingredient-name-label,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review .recipe-edit-ingredient-name-label {
+        grid-column: 3 / 4;
+        grid-row: 1 / 3;
+        min-width: 0;
+    }
+
+    .recipe-edit-ingredient-row label.recipe-edit-qty-label,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review label.recipe-edit-qty-label {
+        grid-column: 4 / 5;
+        grid-row: 1 / 3;
+    }
+
+    .recipe-edit-ingredient-row label.recipe-edit-unit-label,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review label.recipe-edit-unit-label {
+        grid-column: 5 / 6;
+        grid-row: 1 / 3;
+    }
+
+    .recipe-edit-ingredient-row label.recipe-edit-buy-as-label,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review label.recipe-edit-buy-as-label {
+        grid-column: 6 / 7;
+        grid-row: 1 / 3;
+    }
+
+    .recipe-edit-ingredient-row label.recipe-edit-store-section-label,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review label.recipe-edit-store-section-label {
+        grid-column: 7 / 8;
+        grid-row: 1 / 3;
+    }
+
+    .recipe-edit-ingredient-row label.recipe-edit-optional-label,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review label.recipe-edit-optional-label {
+        grid-column: 8 / 9;
+        grid-row: 1 / 3;
+    }
+
+    .recipe-edit-ingredient-row .recipe-edit-row-menu-wrap,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review .recipe-edit-row-menu-wrap {
+        grid-column: 9 / 10;
+        grid-row: 1 / 3;
+        justify-self: end;
+    }
+
+    .recipe-edit-ingredient-row label.recipe-edit-qty-label,
+    .recipe-edit-ingredient-row label.recipe-edit-unit-label,
+    .recipe-edit-ingredient-row label.recipe-edit-buy-as-label,
+    .recipe-edit-ingredient-row label.recipe-edit-store-section-label,
+    .recipe-edit-ingredient-row label.recipe-edit-optional-label,
+    .recipe-edit-ingredient-row input,
+    .recipe-edit-ingredient-row select,
+    .recipe-edit-ingredient-row textarea {
+        min-width: 0;
+    }
+}
+
 @media (max-width: 1180px) {
     .recipe-edit-ingredient-row {
         grid-template-columns: 26px 54px minmax(72px, 0.45fr) minmax(90px, 0.55fr) minmax(160px, 1fr) minmax(72px, 0.35fr) 44px;
@@ -11760,45 +11835,53 @@ body {
         margin-top: 6px;
     }
 
-    .recipe-edit-row-number {
+    .recipe-edit-ingredient-row .recipe-edit-row-number {
         grid-column: 2 / 3;
         grid-row: 1;
     }
 
-    .recipe-edit-ingredient-row .recipe-edit-ingredient-name-label {
+    .recipe-edit-ingredient-row .recipe-edit-ingredient-name-label,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review .recipe-edit-ingredient-name-label {
         grid-column: 3 / 7;
         grid-row: 1;
         min-width: 0;
     }
 
-    .recipe-edit-ingredient-row label.recipe-edit-qty-label {
+    .recipe-edit-ingredient-row label.recipe-edit-qty-label,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review label.recipe-edit-qty-label {
         grid-column: 4 / 5;
         grid-row: 2;
     }
 
-    .recipe-edit-ingredient-row label.recipe-edit-unit-label {
+    .recipe-edit-ingredient-row label.recipe-edit-unit-label,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review label.recipe-edit-unit-label {
         grid-column: 5 / 6;
         grid-row: 2;
     }
 
-    .recipe-edit-ingredient-row label.recipe-edit-buy-as-label {
+    .recipe-edit-ingredient-row label.recipe-edit-buy-as-label,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review label.recipe-edit-buy-as-label {
         grid-column: 3 / 5;
         grid-row: 3;
     }
 
-    .recipe-edit-ingredient-row label.recipe-edit-store-section-label {
+    .recipe-edit-ingredient-row label.recipe-edit-store-section-label,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review label.recipe-edit-store-section-label {
         grid-column: 5 / 7;
         grid-row: 3;
     }
 
-    .recipe-edit-ingredient-row label.recipe-edit-optional-label {
+    .recipe-edit-ingredient-row label.recipe-edit-optional-label,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review label.recipe-edit-optional-label {
         grid-column: 6 / 7;
         grid-row: 2;
     }
 
-    .recipe-edit-ingredient-row .recipe-edit-row-menu-wrap {
+    .recipe-edit-ingredient-row .recipe-edit-row-menu-wrap,
+    .recipe-edit-ingredient-row.has-ingredient-choice-review .recipe-edit-row-menu-wrap {
         grid-column: 7 / 8;
         grid-row: 1;
+        justify-self: end;
     }
 
     .recipe-edit-ingredient-row label.recipe-edit-qty-label,
