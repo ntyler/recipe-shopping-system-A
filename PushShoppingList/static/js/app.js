@@ -6622,6 +6622,11 @@ function toggleRecipeEditRowMenu(button, event = null) {
         event.stopPropagation();
     }
 
+    if (button && button.getAttribute("aria-expanded") === "true") {
+        closeRecipeEditRowMenus();
+        return false;
+    }
+
     const wrap = button ? button.closest(".recipe-edit-row-menu-wrap") : null;
     const row = recipeEditActionRowFromButton(button);
     const menu = wrap ? wrap.querySelector(".recipe-edit-row-menu") : (row ? row.querySelector(".recipe-edit-row-menu") : null);
@@ -6682,6 +6687,7 @@ function positionRecipeEditPopupMenu(menu, button) {
         : { top: 0, bottom: window.innerHeight };
 
     menu.classList.add("recipe-edit-floating-menu");
+    portalRecipeEditPopupMenu(menu, button);
     menu.style.left = "0px";
     menu.style.top = "0px";
     menu.style.right = "auto";
@@ -6715,6 +6721,41 @@ function positionRecipeEditPopupMenu(menu, button) {
 
     menu.style.left = `${Math.round(left)}px`;
     menu.style.top = `${Math.round(top)}px`;
+}
+
+function portalRecipeEditPopupMenu(menu, button) {
+    if (!menu || !menu.classList.contains("recipe-edit-row-menu") || !menu.parentNode || !document.body) {
+        return;
+    }
+
+    menu.recipeEditAnchorButton = button || menu.recipeEditAnchorButton || null;
+
+    if (menu.dataset.recipeEditPortaled === "1") {
+        return;
+    }
+
+    const placeholder = document.createComment("recipe-edit-menu-placeholder");
+    menu.recipeEditMenuPlaceholder = placeholder;
+    menu.parentNode.insertBefore(placeholder, menu);
+    document.body.appendChild(menu);
+    menu.dataset.recipeEditPortaled = "1";
+}
+
+function restoreRecipeEditPopupMenu(menu) {
+    if (!menu || menu.dataset.recipeEditPortaled !== "1") {
+        return;
+    }
+
+    const placeholder = menu.recipeEditMenuPlaceholder;
+
+    if (placeholder && placeholder.parentNode) {
+        placeholder.parentNode.insertBefore(menu, placeholder);
+        placeholder.remove();
+    }
+
+    delete menu.recipeEditAnchorButton;
+    delete menu.recipeEditMenuPlaceholder;
+    delete menu.dataset.recipeEditPortaled;
 }
 
 function recipeEditActionRowFromButton(button) {
@@ -7068,6 +7109,7 @@ function closeRecipeEditRowMenus() {
         menu.style.left = "";
         menu.style.top = "";
         menu.style.right = "";
+        restoreRecipeEditPopupMenu(menu);
     });
     document.querySelectorAll(".recipe-edit-menu-wrap-open").forEach(wrap => {
         wrap.classList.remove("recipe-edit-menu-wrap-open");
@@ -7169,13 +7211,14 @@ function handleRecipeEditRowMenuScrollOrResize() {
     window.requestAnimationFrame(() => {
         document.querySelectorAll(".recipe-edit-row-menu:not([hidden])").forEach(menu => {
             const wrap = menu.closest(".recipe-edit-row-menu-wrap, .recipe-edit-section-menu-wrap");
-            const button = wrap ? wrap.querySelector(".recipe-edit-row-menu-btn") : null;
+            const button = menu.recipeEditAnchorButton || (wrap ? wrap.querySelector(".recipe-edit-row-menu-btn") : null);
 
-            if (button) {
+            if (button && button.isConnected) {
                 positionRecipeEditPopupMenu(menu, button);
             } else {
                 menu.hidden = true;
                 menu.classList.remove("recipe-edit-floating-menu");
+                restoreRecipeEditPopupMenu(menu);
             }
         });
     });
