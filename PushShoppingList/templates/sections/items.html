@@ -241,6 +241,7 @@
                             <button type="button"
                                     class="recipe-edit-row-menu-btn recipe-view-title-menu-btn"
                                     aria-label="Recipe {{ recipe.number }} actions"
+                                    title="Recipe {{ recipe.number }} actions"
                                     aria-haspopup="true"
                                     aria-expanded="false"
                                     onclick="return toggleRecipeEditRowMenu(this, event)">
@@ -248,52 +249,55 @@
                             </button>
                             <div class="recipe-edit-row-menu overflow-menu recipe-view-title-menu" hidden>
                                 <div class="overflow-menu-section recipe-view-menu-section">
-                                    <div class="overflow-menu-section-title recipe-view-menu-section-title">Recipe Display</div>
+                                    <div class="overflow-menu-section-title recipe-view-menu-section-title">Show or Hide Images</div>
                                     <button type="button"
                                             onclick="return setRecipeImagesVisibleFromMenu(this, true)">
-                                        Show All Images
+                                        Show images for this recipe
                                     </button>
                                     <button type="button"
                                             onclick="return setRecipeImagesVisibleFromMenu(this, false)">
-                                        Hide All Images
-                                    </button>
-                                    <button type="button"
-                                            class="recipe-view-card-collapse-menu-toggle"
-                                            onclick="return toggleRecipeViewCardFromMenu(this)">
-                                        Collapse
-                                    </button>
-                                    <button type="button"
-                                            onclick="return setRecipeViewCardEverythingCollapsed(this, false)">
-                                        Expand Everything
-                                    </button>
-                                    <button type="button"
-                                            onclick="return setRecipeViewCardEverythingCollapsed(this, true)">
-                                        Collapse Everything
+                                        Hide images for this recipe
                                     </button>
                                 </div>
                                 <div class="overflow-menu-section recipe-view-menu-section">
-                                    <div class="overflow-menu-section-title recipe-view-menu-section-title">Image Generation</div>
+                                    <div class="overflow-menu-section-title recipe-view-menu-section-title">Recipe Details</div>
+                                    <button type="button"
+                                            class="recipe-view-card-collapse-menu-toggle"
+                                            onclick="return toggleRecipeViewCardFromMenu(this)">
+                                        Collapse this recipe
+                                    </button>
+                                    <button type="button"
+                                            onclick="return setRecipeViewCardEverythingCollapsed(this, false)">
+                                        Expand all details in this recipe
+                                    </button>
+                                    <button type="button"
+                                            onclick="return setRecipeViewCardEverythingCollapsed(this, true)">
+                                        Collapse all details in this recipe
+                                    </button>
+                                </div>
+                                <div class="overflow-menu-section recipe-view-menu-section">
+                                    <div class="overflow-menu-section-title recipe-view-menu-section-title">Generate Images</div>
                                     <div class="recipe-view-generate-submenu-row">
                                         <button type="button"
                                                 class="recipe-view-generate-submenu-toggle"
                                                 aria-haspopup="true"
                                                 aria-expanded="false"
                                                 onclick="return toggleRecipeViewGenerateSubmenu(this, event)">
-                                            Generate All Images
+                                            Regenerate images...
                                         </button>
                                         <div class="overflow-submenu recipe-view-generate-submenu" hidden>
-                                            <div class="overflow-menu-section-title recipe-view-menu-section-title">Generate By Section</div>
+                                            <div class="overflow-menu-section-title recipe-view-menu-section-title">Choose image scope</div>
                                             <button type="button"
                                                     onclick="return generateRecipeImagesFromMenu(this, { imageScope: 'all' })">
-                                                All Recipe Images
+                                                All sections
                                             </button>
                                             <button type="button"
                                                     onclick="return generateRecipeImagesFromMenu(this, { imageScope: 'equipment' })">
-                                                Equipment Images
+                                                Equipment only
                                             </button>
                                             <button type="button"
                                                     onclick="return generateRecipeImagesFromMenu(this, { imageScope: 'instructions' })">
-                                                Instruction Step Images
+                                                Instruction steps only
                                             </button>
                                         </div>
                                     </div>
@@ -303,21 +307,21 @@
                                                 aria-haspopup="true"
                                                 aria-expanded="false"
                                                 onclick="return toggleRecipeViewGenerateSubmenu(this, event)">
-                                            Generate Missing Images
+                                            Generate missing images...
                                         </button>
                                         <div class="overflow-submenu recipe-view-generate-submenu" hidden>
-                                            <div class="overflow-menu-section-title recipe-view-menu-section-title">Generate By Section</div>
+                                            <div class="overflow-menu-section-title recipe-view-menu-section-title">Choose image scope</div>
                                             <button type="button"
                                                     onclick="return generateRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'all' })">
-                                                All Recipe Images
+                                                All sections
                                             </button>
                                             <button type="button"
                                                     onclick="return generateRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'equipment' })">
-                                                Equipment Images
+                                                Equipment only
                                             </button>
                                             <button type="button"
                                                     onclick="return generateRecipeImagesFromMenu(this, { missingOnly: true, imageScope: 'instructions' })">
-                                                Instruction Step Images
+                                                Instruction steps only
                                             </button>
                                         </div>
                                     </div>
@@ -327,7 +331,7 @@
                                     <button type="button"
                                             data-recipe-url="{{ recipe.url }}"
                                             onclick="openRecipeEditor(this); closeRecipeEditRowMenus(); return false;">
-                                        Edit
+                                        Edit recipe
                                     </button>
                                     {% if recipe.archive_pdf_available %}
                                         <a class="recipe-edit-menu-link recipe-view-menu-pdf"
@@ -336,7 +340,7 @@
                                            rel="noopener noreferrer"
                                            title="{{ recipe.name }}"
                                            aria-label="Open PDF for {{ recipe.name }}">
-                                            PDF
+                                            Open recipe PDF
                                         </a>
                                     {% endif %}
                                 </div>
@@ -359,8 +363,8 @@
                                         <input type="hidden" name="url" value="{{ recipe.url }}">
                                         <button type="submit"
                                                 class="delete recipe-view-remove recipe-view-menu-delete"
-                                                aria-label="Remove recipe {{ recipe.number }}">
-                                            Delete
+                                                aria-label="Remove recipe {{ recipe.number }} from current recipes">
+                                            Remove from current recipes
                                         </button>
                                     </form>
                                 </div>
@@ -437,7 +441,7 @@
                                         Create New Cookbook
                                     </button>
                                     {% if cookbook_view and cookbook_view.cookbooks %}
-                                        <div class="recipe-url-summary-cookbook-menu-label">Move To</div>
+                                        <div class="recipe-url-summary-cookbook-menu-label">Move to cookbook</div>
                                         {% for cookbook in cookbook_view.cookbooks %}
                                             {% if cookbook.id != recipe.cookbook_id %}
                                                 <button type="button"
@@ -457,7 +461,7 @@
                                                 data-cookbook-id="{{ unclassified_cookbook.id }}"
                                                 data-cookbook-name="{{ unclassified_cookbook.name }}"
                                                 onclick="return deleteRecipeLogCookbookAssignment(this)">
-                                            Delete
+                                            Remove cookbook assignment
                                         </button>
                                     {% endif %}
                                 </div>
@@ -486,6 +490,7 @@
                         <button type="button"
                                 class="recipe-edit-row-menu-btn recipe-detail-menu-btn"
                                 aria-label="Equipment actions for recipe {{ recipe.number }}"
+                                title="Equipment actions"
                                 aria-haspopup="true"
                                 aria-expanded="false"
                                 onclick="return toggleRecipeEditRowMenu(this, event)">
@@ -497,29 +502,29 @@
                                 <button type="button"
                                         data-recipe-url="{{ recipe.url }}"
                                         onclick="return openRecipeEditorSection(this, 'equipment')">
-                                    Edit
+                                    Edit equipment
                                 </button>
                             </div>
                             <div class="overflow-menu-section">
-                                <div class="overflow-menu-section-title">Image Generation</div>
+                                <div class="overflow-menu-section-title">Generate Images</div>
                                 <button type="button"
                                         onclick="return generateAllRecipeEquipmentImagesFromMenu(this)">
-                                    Generate All Images
+                                    Regenerate equipment images
                                 </button>
                                 <button type="button"
                                         onclick="return generateAllRecipeEquipmentImagesFromMenu(this, { missingOnly: true })">
-                                    Generate Missing Images
+                                    Generate missing equipment images
                                 </button>
                             </div>
                             <div class="overflow-menu-section">
-                                <div class="overflow-menu-section-title">Image Display</div>
+                                <div class="overflow-menu-section-title">Show or Hide Images</div>
                                 <button type="button"
                                         onclick="return setRecipeDetailImagesVisibleFromMenu(this, true)">
-                                    Show All Images
+                                    Show equipment images
                                 </button>
                                 <button type="button"
                                         onclick="return setRecipeDetailImagesVisibleFromMenu(this, false)">
-                                    Hide All Images
+                                    Hide equipment images
                                 </button>
                             </div>
                         </div>
@@ -590,6 +595,7 @@
                         <button type="button"
                                 class="recipe-edit-row-menu-btn recipe-detail-menu-btn"
                                 aria-label="Instructions actions for recipe {{ recipe.number }}"
+                                title="Instruction actions"
                                 aria-haspopup="true"
                                 aria-expanded="false"
                                 onclick="return toggleRecipeEditRowMenu(this, event)">
@@ -601,29 +607,29 @@
                                 <button type="button"
                                         data-recipe-url="{{ recipe.url }}"
                                         onclick="return openRecipeEditorSection(this, 'instructions')">
-                                    Edit
+                                    Edit instructions
                                 </button>
                             </div>
                             <div class="overflow-menu-section">
-                                <div class="overflow-menu-section-title">Image Generation</div>
+                                <div class="overflow-menu-section-title">Generate Images</div>
                                 <button type="button"
                                         onclick="return generateAllRecipeInstructionImagesFromMenu(this)">
-                                    Generate All Images
+                                    Regenerate instruction images
                                 </button>
                                 <button type="button"
                                         onclick="return generateAllRecipeInstructionImagesFromMenu(this, { missingOnly: true })">
-                                    Generate Missing Images
+                                    Generate missing instruction images
                                 </button>
                             </div>
                             <div class="overflow-menu-section">
-                                <div class="overflow-menu-section-title">Image Display</div>
+                                <div class="overflow-menu-section-title">Show or Hide Images</div>
                                 <button type="button"
                                         onclick="return setRecipeDetailImagesVisibleFromMenu(this, true)">
-                                    Show All Images
+                                    Show instruction images
                                 </button>
                                 <button type="button"
                                         onclick="return setRecipeDetailImagesVisibleFromMenu(this, false)">
-                                    Hide All Images
+                                    Hide instruction images
                                 </button>
                             </div>
                         </div>
@@ -694,6 +700,7 @@
                         <button type="button"
                                 class="recipe-edit-row-menu-btn recipe-detail-menu-btn"
                                 aria-label="Nutrition actions for recipe {{ recipe.number }}"
+                                title="Nutrition actions"
                                 aria-haspopup="true"
                                 aria-expanded="false"
                                 onclick="return toggleRecipeEditRowMenu(this, event)">
@@ -705,7 +712,7 @@
                                 <button type="button"
                                         data-recipe-url="{{ recipe.url }}"
                                         onclick="return openRecipeEditorSection(this, 'nutrition')">
-                                    Edit
+                                    Edit nutrition
                                 </button>
                             </div>
                         </div>
@@ -741,6 +748,7 @@
                             <button type="button"
                                     class="recipe-edit-row-menu-btn recipe-detail-menu-btn"
                                     aria-label="Ingredients actions for recipe {{ recipe.number }}"
+                                    title="Ingredients actions"
                                     aria-haspopup="true"
                                     aria-expanded="false"
                                     onclick="return toggleRecipeEditRowMenu(this, event)">
@@ -752,7 +760,7 @@
                                     <button type="button"
                                             data-recipe-url="{{ recipe.url }}"
                                             onclick="return openRecipeEditorSection(this, 'ingredients')">
-                                        Edit
+                                        Edit ingredients
                                     </button>
                                 </div>
                             </div>

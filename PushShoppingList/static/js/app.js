@@ -2244,6 +2244,7 @@ function addRulesFoodRuleRow(section, rule = {}) {
             <button type="button"
                     class="recipe-edit-row-menu-btn rules-editor-food-row-menu-btn"
                     aria-label="Food restriction rule actions"
+                    title="Food restriction rule actions"
                     aria-haspopup="true"
                     aria-expanded="false"
                     onclick="return toggleRecipeEditRowMenu(this, event)">
@@ -2253,7 +2254,7 @@ function addRulesFoodRuleRow(section, rule = {}) {
                 <button type="button"
                         class="delete"
                         onclick="removeRulesEditorRow(this); closeRecipeEditRowMenus(); return false;">
-                    Delete
+                    Delete food restriction rule
                 </button>
             </div>
         </div>
@@ -4945,7 +4946,7 @@ function updateCurrentRecipeUrlSummaryCollapseMenuToggle(row) {
         return;
     }
 
-    button.textContent = row.classList.contains("recipe-url-summary-collapsed") ? "Expand" : "Collapse";
+    button.textContent = row.classList.contains("recipe-url-summary-collapsed") ? "Expand this recipe" : "Collapse this recipe";
 }
 
 function bindCurrentRecipeUrlSummaryToggles() {
@@ -6581,17 +6582,18 @@ function addRecipeIngredientRow(item = {}) {
             <button type="button"
                     class="recipe-edit-row-menu-btn"
                     aria-label="Ingredient actions"
+                    title="Ingredient actions"
                     aria-haspopup="true"
                     aria-expanded="false"
                     onclick="return toggleRecipeEditRowMenu(this, event)">
                 <span aria-hidden="true"></span>
             </button>
             <div class="recipe-edit-row-menu" hidden>
-                <button type="button" onclick="duplicateRecipeIngredientRow(this)">Duplicate</button>
-                <button type="button" class="recipe-edit-row-collapse-toggle" onclick="toggleRecipeIngredientRowCollapsed(this)">Collapse</button>
-                <button type="button" onclick="moveRecipeEditRow(this, -1)">Move Up</button>
-                <button type="button" onclick="moveRecipeEditRow(this, 1)">Move Down</button>
-                <button type="button" class="delete" onclick="removeRecipeEditRow(this)">Delete</button>
+                <button type="button" onclick="duplicateRecipeIngredientRow(this)">Duplicate ingredient</button>
+                <button type="button" class="recipe-edit-row-collapse-toggle" onclick="toggleRecipeIngredientRowCollapsed(this)">Collapse ingredient</button>
+                <button type="button" onclick="moveRecipeEditRow(this, -1)">Move ingredient up</button>
+                <button type="button" onclick="moveRecipeEditRow(this, 1)">Move ingredient down</button>
+                <button type="button" class="delete" onclick="removeRecipeEditRow(this)">Delete ingredient</button>
             </div>
         </div>
         <input type="hidden" data-field="section" value="${escapeAttribute(item.section || "")}">
@@ -7340,7 +7342,7 @@ async function confirmDeleteRecipeFromEditor(button, event = null) {
 
         if (button) {
             button.disabled = false;
-            button.textContent = originalText || "Delete Recipe";
+            button.textContent = originalText || "Delete recipe";
         }
     }
 
@@ -7425,7 +7427,7 @@ function updateRecipeIngredientRowCollapseToggle(row) {
         return;
     }
 
-    button.textContent = isRecipeIngredientRowCollapsed(row) ? "Expand" : "Collapse";
+    button.textContent = isRecipeIngredientRowCollapsed(row) ? "Expand ingredient" : "Collapse ingredient";
 }
 
 function updateRecipeViewCardCollapseMenuToggle(row) {
@@ -7437,7 +7439,7 @@ function updateRecipeViewCardCollapseMenuToggle(row) {
         return;
     }
 
-    button.textContent = row.classList.contains("recipe-view-collapsed") ? "Expand" : "Collapse";
+    button.textContent = row.classList.contains("recipe-view-collapsed") ? "Expand this recipe" : "Collapse this recipe";
 }
 
 function moveRecipeEditRow(button, direction) {
@@ -8144,7 +8146,7 @@ function addRecipeEquipmentRow(value = "") {
                         class="recipe-step-image-btn"
                         data-equipment-image-generate
                         onclick="return generateRecipeEquipmentImage(this)">
-                    ${equipmentImageUrl ? "Regenerate" : "Generate Image"}
+                    ${equipmentImageUrl ? "Regenerate equipment image" : "Generate equipment image"}
                 </button>
                 <a class="recipe-step-image-download"
                    data-equipment-image-download
@@ -8161,6 +8163,7 @@ function addRecipeEquipmentRow(value = "") {
             <button type="button"
                     class="recipe-edit-row-menu-btn"
                     aria-label="Equipment actions"
+                    title="Equipment actions"
                     aria-haspopup="true"
                     aria-expanded="false"
                     onclick="return toggleRecipeEditRowMenu(this, event)">
@@ -8169,38 +8172,38 @@ function addRecipeEquipmentRow(value = "") {
             <div class="recipe-edit-row-menu overflow-menu recipe-edit-text-row-menu" hidden>
                 <div class="overflow-menu-section">
                     <div class="overflow-menu-section-title">Content</div>
-                    <button type="button" onclick="moveRecipeEditRow(this, -1)">Move Up</button>
-                    <button type="button" onclick="moveRecipeEditRow(this, 1)">Move Down</button>
-                    <button type="button" class="delete" onclick="removeRecipeEditRow(this)">Delete</button>
+                    <button type="button" onclick="moveRecipeEditRow(this, -1)">Move equipment up</button>
+                    <button type="button" onclick="moveRecipeEditRow(this, 1)">Move equipment down</button>
+                    <button type="button" class="delete" onclick="removeRecipeEditRow(this)">Delete equipment</button>
                 </div>
                 <div class="overflow-menu-section">
-                    <div class="overflow-menu-section-title">Image Generation</div>
+                    <div class="overflow-menu-section-title">Generate Images</div>
                     <button type="button"
                             data-recipe-edit-row-image-generate
                             onclick="return generateRecipeEditRowImageFromMenu(this)">
-                        ${equipmentImageUrl ? "Regenerate Image" : "Generate Image"}
+                        ${equipmentImageUrl ? "Regenerate equipment image" : "Generate equipment image"}
                     </button>
                 </div>
                 <div class="overflow-menu-section">
-                    <div class="overflow-menu-section-title">Image Display</div>
+                    <div class="overflow-menu-section-title">Show or Hide Images</div>
                     <button type="button"
                             data-recipe-edit-row-image-show
                             onclick="return setRecipeEditRowImageVisibleFromMenu(this, true)"
                             hidden>
-                        Show Image
+                        Show equipment image
                     </button>
                     <button type="button"
                             data-recipe-edit-row-image-hide
                             onclick="return setRecipeEditRowImageVisibleFromMenu(this, false)">
-                        Hide Image
+                        Hide equipment image
                     </button>
                     <button type="button"
                             onclick="return setRecipeEditorImagesVisibleFromMenu(this, true, { imageScope: 'equipment' })">
-                        Show All Images
+                        Show all equipment images
                     </button>
                     <button type="button"
                             onclick="return setRecipeEditorImagesVisibleFromMenu(this, false, { imageScope: 'equipment' })">
-                        Hide All Images
+                        Hide all equipment images
                     </button>
                 </div>
             </div>
@@ -8293,7 +8296,7 @@ function addRecipeInstructionRow(value = "", stepNumber = null) {
                         class="recipe-step-image-btn"
                         data-step-image-generate
                         onclick="return generateRecipeStepImage(this)">
-                    ${stepImageUrl ? "Regenerate" : "Generate Image"}
+                    ${stepImageUrl ? "Regenerate step image" : "Generate step image"}
                 </button>
                 <a class="recipe-step-image-download"
                    data-step-image-download
@@ -8310,6 +8313,7 @@ function addRecipeInstructionRow(value = "", stepNumber = null) {
             <button type="button"
                     class="recipe-edit-row-menu-btn"
                     aria-label="Instruction actions"
+                    title="Instruction actions"
                     aria-haspopup="true"
                     aria-expanded="false"
                     onclick="return toggleRecipeEditRowMenu(this, event)">
@@ -8318,38 +8322,38 @@ function addRecipeInstructionRow(value = "", stepNumber = null) {
             <div class="recipe-edit-row-menu overflow-menu recipe-edit-text-row-menu" hidden>
                 <div class="overflow-menu-section">
                     <div class="overflow-menu-section-title">Content</div>
-                    <button type="button" onclick="moveRecipeEditRow(this, -1)">Move Up</button>
-                    <button type="button" onclick="moveRecipeEditRow(this, 1)">Move Down</button>
-                    <button type="button" class="delete" onclick="removeRecipeEditRow(this)">Delete</button>
+                    <button type="button" onclick="moveRecipeEditRow(this, -1)">Move step up</button>
+                    <button type="button" onclick="moveRecipeEditRow(this, 1)">Move step down</button>
+                    <button type="button" class="delete" onclick="removeRecipeEditRow(this)">Delete step</button>
                 </div>
                 <div class="overflow-menu-section">
-                    <div class="overflow-menu-section-title">Image Generation</div>
+                    <div class="overflow-menu-section-title">Generate Images</div>
                     <button type="button"
                             data-recipe-edit-row-image-generate
                             onclick="return generateRecipeEditRowImageFromMenu(this)">
-                        ${stepImageUrl ? "Regenerate Image" : "Generate Image"}
+                        ${stepImageUrl ? "Regenerate step image" : "Generate step image"}
                     </button>
                 </div>
                 <div class="overflow-menu-section">
-                    <div class="overflow-menu-section-title">Image Display</div>
+                    <div class="overflow-menu-section-title">Show or Hide Images</div>
                     <button type="button"
                             data-recipe-edit-row-image-show
                             onclick="return setRecipeEditRowImageVisibleFromMenu(this, true)"
                             hidden>
-                        Show Image
+                        Show step image
                     </button>
                     <button type="button"
                             data-recipe-edit-row-image-hide
                             onclick="return setRecipeEditRowImageVisibleFromMenu(this, false)">
-                        Hide Image
+                        Hide step image
                     </button>
                     <button type="button"
                             onclick="return setRecipeEditorImagesVisibleFromMenu(this, true, { imageScope: 'instructions' })">
-                        Show All Images
+                        Show all instruction images
                     </button>
                     <button type="button"
                             onclick="return setRecipeEditorImagesVisibleFromMenu(this, false, { imageScope: 'instructions' })">
-                        Hide All Images
+                        Hide all instruction images
                     </button>
                 </div>
             </div>
@@ -8423,15 +8427,16 @@ function addRecipeNutritionRow(item = {}) {
             <button type="button"
                     class="recipe-edit-row-menu-btn"
                     aria-label="Nutrition actions"
+                    title="Nutrition actions"
                     aria-haspopup="true"
                     aria-expanded="false"
                     onclick="return toggleRecipeEditRowMenu(this, event)">
                 <span aria-hidden="true"></span>
             </button>
             <div class="recipe-edit-row-menu" hidden>
-                <button type="button" onclick="moveRecipeEditRow(this, -1)">Move Up</button>
-                <button type="button" onclick="moveRecipeEditRow(this, 1)">Move Down</button>
-                <button type="button" class="delete" onclick="removeRecipeEditRow(this)">Delete</button>
+                <button type="button" onclick="moveRecipeEditRow(this, -1)">Move nutrition row up</button>
+                <button type="button" onclick="moveRecipeEditRow(this, 1)">Move nutrition row down</button>
+                <button type="button" class="delete" onclick="removeRecipeEditRow(this)">Delete nutrition row</button>
             </div>
         </div>
     `;
@@ -8733,7 +8738,7 @@ async function createRecipeEditorPdf(button) {
     } finally {
         if (button) {
             button.disabled = false;
-            button.textContent = originalText || "Create PDF";
+            button.textContent = originalText || "Create recipe PDF";
         }
     }
 
@@ -10907,15 +10912,25 @@ function updateRecipeEditRowImageMenu(row) {
     const isHidden = Boolean(panel && panel.classList.contains("recipe-image-visibility-hidden"));
 
     if (generateButton) {
-        generateButton.textContent = hasImage ? "Regenerate Image" : "Generate Image";
+        if (row && row.classList.contains("recipe-edit-equipment-row")) {
+            generateButton.textContent = hasImage ? "Regenerate equipment image" : "Generate equipment image";
+        } else {
+            generateButton.textContent = hasImage ? "Regenerate step image" : "Generate step image";
+        }
         generateButton.disabled = !panel;
     }
 
     if (showButton) {
+        showButton.textContent = row && row.classList.contains("recipe-edit-equipment-row")
+            ? "Show equipment image"
+            : "Show step image";
         showButton.hidden = !panel || !isHidden;
     }
 
     if (hideButton) {
+        hideButton.textContent = row && row.classList.contains("recipe-edit-equipment-row")
+            ? "Hide equipment image"
+            : "Hide step image";
         hideButton.hidden = !panel || isHidden;
     }
 }

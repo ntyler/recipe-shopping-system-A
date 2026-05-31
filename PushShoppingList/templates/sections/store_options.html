@@ -11,6 +11,7 @@
             <button type="button"
                     class="recipe-edit-row-menu-btn store-options-menu-btn"
                     aria-label="Store Options actions"
+                    title="Store options actions"
                     aria-haspopup="true"
                     aria-expanded="false"
                     onclick="return toggleRecipeEditRowMenu(this, event)">
@@ -50,28 +51,28 @@
                             data-active-store-mode-toggle="store"
                             aria-pressed="true"
                             onclick="setActiveStoreIconMode('store', { persist: true }); return false;">
-                        Store Mode
+                        Open store website
                     </button>
                     <button type="button"
                             class="recipe-view-store-mode-option"
                             data-active-store-mode-toggle="map"
                             aria-pressed="false"
                             onclick="setActiveStoreIconMode('map', { persist: true }); return false;">
-                        Map Mode
+                        Open selected location
                     </button>
                     <button type="button"
                             class="recipe-view-store-mode-option"
                             data-active-store-mode-toggle="activation"
                             aria-pressed="false"
                             onclick="setActiveStoreIconMode('activation', { persist: true }); return false;">
-                        Store Selection Mode
+                        Turn stores on/off
                     </button>
                     <button type="button"
                             class="recipe-view-store-mode-option"
                             data-active-store-mode-toggle="edit"
                             aria-pressed="false"
                             onclick="setActiveStoreIconMode('edit', { persist: true }); return false;">
-                        Edit Mode
+                        Edit store details
                     </button>
                 </div>
             </div>
@@ -168,6 +169,7 @@
                             <button type="button"
                                     class="recipe-edit-row-menu-btn store-action-menu-btn"
                                     aria-label="{{ store.label }} actions"
+                                    title="{{ store.label }} actions"
                                     aria-haspopup="true"
                                     aria-expanded="false"
                                     onclick="return toggleRecipeEditRowMenu(this, event)">
@@ -176,7 +178,7 @@
                             <div class="recipe-edit-row-menu store-action-menu" hidden>
                                 <button type="button"
                                         onclick="closeRecipeEditRowMenus(); return openStoreEditModal('store-edit-{{ store_key }}', this)">
-                                    Edit
+                                    Edit store
                                 </button>
                                 <form method="POST"
                                       action="/delete_store/{{ store_key }}"
@@ -185,7 +187,7 @@
                                     <button type="submit"
                                             class="delete store-action-menu-delete"
                                             aria-label="Delete {{ store.label }}">
-                                        Delete
+                                        Delete store
                                     </button>
                                 </form>
                             </div>

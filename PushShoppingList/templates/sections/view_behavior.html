@@ -57,6 +57,7 @@
         <button type="button"
                 class="recipe-edit-row-menu-btn recipe-view-global-menu-btn"
                 aria-label="View actions"
+                title="View actions"
                 aria-haspopup="true"
                 aria-expanded="false"
                 onclick="return toggleRecipeEditRowMenu(this, event)">
@@ -109,50 +110,53 @@
                 </button>
             </div>
             <div class="overflow-menu-section recipe-view-menu-section">
-                <div class="overflow-menu-section-title recipe-view-menu-section-title">Recipe Display</div>
+                <div class="overflow-menu-section-title recipe-view-menu-section-title">Show or Hide Images</div>
                 <button type="button"
                         onclick="return setAllRecipeImagesVisibleFromMenu(this, true)">
-                    Show All Images
+                    Show all recipe images
                 </button>
                 <button type="button"
                         onclick="return setAllRecipeImagesVisibleFromMenu(this, false)">
-                    Hide All Images
-                </button>
-                <button type="button"
-                        onclick="return setAllRecipeViewEverythingCollapsed(false)">
-                    Expand Everything
-                </button>
-                <button type="button"
-                        onclick="return setAllRecipeViewEverythingCollapsed(true)">
-                    Collapse Everything
+                    Hide all recipe images
                 </button>
             </div>
             <div class="overflow-menu-section recipe-view-menu-section">
-                <div class="overflow-menu-section-title recipe-view-menu-section-title">Image Generation</div>
+                <div class="overflow-menu-section-title recipe-view-menu-section-title">Recipe Details</div>
+                <button type="button"
+                        onclick="return setAllRecipeViewEverythingCollapsed(false)">
+                    Expand all recipe details
+                </button>
+                <button type="button"
+                        onclick="return setAllRecipeViewEverythingCollapsed(true)">
+                    Collapse all recipe details
+                </button>
+            </div>
+            <div class="overflow-menu-section recipe-view-menu-section">
+                <div class="overflow-menu-section-title recipe-view-menu-section-title">Generate Images</div>
                 <div class="recipe-view-generate-submenu-row">
                     <button type="button"
                             class="recipe-view-generate-submenu-toggle"
                             aria-haspopup="true"
                             aria-expanded="false"
                             onclick="return toggleRecipeViewGenerateSubmenu(this, event)">
-                        Generate All Images
+                        Regenerate images...
                     </button>
                     <div class="overflow-submenu recipe-view-generate-submenu" hidden>
-                        <div class="overflow-menu-section-title recipe-view-menu-section-title">Generate By Section</div>
+                        <div class="overflow-menu-section-title recipe-view-menu-section-title">Choose image scope</div>
                         <button type="button"
                                 data-recipe-image-global-btn
                                 onclick="return generateAllRecipeImagesFromViewBehavior(this, { imageScope: 'all' })">
-                            All Recipe Images
+                            All sections
                         </button>
                         <button type="button"
                                 data-recipe-image-global-btn
                                 onclick="return generateAllRecipeImagesFromViewBehavior(this, { imageScope: 'equipment' })">
-                            Equipment Images
+                            Equipment only
                         </button>
                         <button type="button"
                                 data-recipe-image-global-btn
                                 onclick="return generateAllRecipeImagesFromViewBehavior(this, { imageScope: 'instructions' })">
-                            Instruction Step Images
+                            Instruction steps only
                         </button>
                     </div>
                 </div>
@@ -162,24 +166,24 @@
                             aria-haspopup="true"
                             aria-expanded="false"
                             onclick="return toggleRecipeViewGenerateSubmenu(this, event)">
-                        Generate Missing Images
+                        Generate missing images...
                     </button>
                     <div class="overflow-submenu recipe-view-generate-submenu" hidden>
-                        <div class="overflow-menu-section-title recipe-view-menu-section-title">Generate By Section</div>
+                        <div class="overflow-menu-section-title recipe-view-menu-section-title">Choose image scope</div>
                         <button type="button"
                                 data-recipe-image-global-btn
                                 onclick="return generateAllRecipeImagesFromViewBehavior(this, { missingOnly: true, imageScope: 'all' })">
-                            All Recipe Images
+                            All sections
                         </button>
                         <button type="button"
                                 data-recipe-image-global-btn
                                 onclick="return generateAllRecipeImagesFromViewBehavior(this, { missingOnly: true, imageScope: 'equipment' })">
-                            Equipment Images
+                            Equipment only
                         </button>
                         <button type="button"
                                 data-recipe-image-global-btn
                                 onclick="return generateAllRecipeImagesFromViewBehavior(this, { missingOnly: true, imageScope: 'instructions' })">
-                            Instruction Step Images
+                            Instruction steps only
                         </button>
                     </div>
                 </div>
