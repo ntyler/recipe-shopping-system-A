@@ -5902,20 +5902,16 @@ function scrollRecipeEditorToIngredient(ingredientName) {
     }
 
     const rows = [...document.querySelectorAll("#recipeEditIngredients .recipe-edit-ingredient-row")];
-    const row = rows.find(candidate => {
+    const match = rows.reduce((best, candidate) => {
         const ingredientInput = candidate.querySelector('[data-field="ingredient"]');
         const originalTextInput = candidate.querySelector('[data-field="original_text"]');
         const ingredientKey = normalizeIngredientJumpKey(ingredientInput ? ingredientInput.value : "");
         const originalTextKey = normalizeIngredientJumpKey(originalTextInput ? originalTextInput.value : "");
+        const score = ingredientJumpMatchScore(targetKey, ingredientKey, originalTextKey);
 
-        return (
-            (ingredientKey && ingredientKey === targetKey)
-            || (originalTextKey && originalTextKey === targetKey)
-            || (ingredientKey && ingredientKey.includes(targetKey))
-            || (ingredientKey && targetKey.includes(ingredientKey))
-            || (originalTextKey && originalTextKey.includes(targetKey))
-        );
-    });
+        return score > best.score ? { row: candidate, score } : best;
+    }, { row: null, score: 0 });
+    const row = match.row;
 
     if (!row) {
         setRecipeEditStatus(`Ingredient not found: ${ingredientName}`, true);
@@ -5946,6 +5942,33 @@ function scrollRecipeEditorToIngredient(ingredientName) {
 
     setTimeout(() => row.classList.remove("recipe-edit-review-target"), 3000);
     return true;
+}
+
+function ingredientJumpMatchScore(targetKey, ingredientKey, originalTextKey) {
+    if (!targetKey) {
+        return 0;
+    }
+
+    if (ingredientKey && ingredientKey === targetKey) {
+        return 1000;
+    }
+    if (originalTextKey && originalTextKey === targetKey) {
+        return 950;
+    }
+    if (ingredientKey && ingredientKey.includes(targetKey)) {
+        return 700 + targetKey.length;
+    }
+    if (originalTextKey && originalTextKey.includes(targetKey)) {
+        return 650 + targetKey.length;
+    }
+    if (ingredientKey && ingredientKey.length >= 12 && targetKey.includes(ingredientKey)) {
+        return 500 + ingredientKey.length;
+    }
+    if (originalTextKey && originalTextKey.length >= 12 && targetKey.includes(originalTextKey)) {
+        return 450 + originalTextKey.length;
+    }
+
+    return 0;
 }
 
 function scrollRecipeEditorToSection(sectionKey) {
@@ -6479,6 +6502,9 @@ function toggleRecipeEditRowMenu(button, event = null) {
         if (row) {
             row.classList.add("recipe-edit-menu-open");
         }
+        if (wrap) {
+            wrap.classList.add("recipe-edit-menu-wrap-open");
+        }
         menu.hidden = false;
         positionRecipeEditPopupMenu(menu, button);
         button.setAttribute("aria-expanded", "true");
@@ -6907,6 +6933,9 @@ function closeRecipeEditRowMenus() {
         menu.style.left = "";
         menu.style.top = "";
         menu.style.right = "";
+    });
+    document.querySelectorAll(".recipe-edit-menu-wrap-open").forEach(wrap => {
+        wrap.classList.remove("recipe-edit-menu-wrap-open");
     });
     document.querySelectorAll(recipeEditMovableRowSelector()).forEach(row => {
         row.classList.remove("recipe-edit-menu-open");

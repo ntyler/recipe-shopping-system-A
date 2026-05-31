@@ -11477,6 +11477,10 @@ body {
 }
 
 .recipe-edit-menu-open .recipe-edit-row-menu-wrap {
+    z-index: 1;
+}
+
+.recipe-edit-menu-open .recipe-edit-row-menu-wrap.recipe-edit-menu-wrap-open {
     z-index: 16030;
 }
 
