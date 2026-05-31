@@ -8635,7 +8635,8 @@ body {
             }
 
             .cookbook-card-header {
-                flex-direction: column;
+                flex-direction: row;
+                align-items: flex-start;
             }
 
             .cookbook-create-row,
@@ -8676,16 +8677,18 @@ body {
             }
 
             .cookbook-card-actions {
-                display: grid;
-                grid-template-columns: minmax(0, 1fr) auto;
-                align-items: center;
-                width: 100%;
+                display: inline-flex;
+                align-items: flex-start;
+                align-self: flex-start;
+                width: auto;
                 gap: 6px;
-                justify-content: stretch;
+                justify-content: flex-end;
+                margin-left: auto;
             }
 
             .cookbook-card-actions > .cookbook-card-menu-wrap {
-                justify-self: end;
+                justify-self: auto;
+                align-self: flex-start;
             }
 
             .cookbook-recipe-search {
@@ -12872,16 +12875,30 @@ body {
         justify-self: end;
     }
 
-    .recipe-edit-equipment-row .recipe-edit-row-image-panel {
-        grid-column: 3 / 4;
-        grid-row: 2;
-        width: 100%;
+    .recipe-edit-equipment-row > .recipe-edit-row-handle,
+    .recipe-edit-instruction-row > .recipe-edit-row-handle,
+    .recipe-edit-equipment-row .recipe-edit-row-menu-wrap,
+    .recipe-edit-instruction-row .recipe-edit-row-menu-wrap {
+        grid-row: 1;
     }
 
+    .recipe-edit-equipment-row .recipe-edit-row-image-panel,
     .recipe-edit-instruction-row .recipe-edit-row-image-panel {
-        grid-column: 1 / 5;
-        grid-row: 3;
-        width: min(260px, 100%);
+        grid-column: 1 / -1;
+        grid-row: auto;
+        justify-self: stretch;
+        width: 100%;
+        max-width: none;
+    }
+
+    .recipe-edit-row-image-panel.recipe-step-image-panel {
+        width: 100%;
+        max-width: none;
+    }
+
+    .recipe-edit-row-image-panel .recipe-step-image {
+        width: 100%;
+        max-width: none;
     }
 }
 

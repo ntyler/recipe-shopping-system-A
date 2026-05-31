@@ -9,14 +9,15 @@
       "quantity": "5",
       "recipe_qty": "5",
       "unit": null,
+      "base_quantity": "5",
+      "base_unit": null,
       "ingredient": "egg",
       "preparation": null,
       "optional": false,
       "store_section": "DAIRY & EGGS",
       "store_section_order": 3,
       "purchasable_item": "eggs",
-      "purchase_group": "eggs",
-      "base_quantity": "5"
+      "purchase_group": "eggs"
     },
     {
       "section": null,
@@ -24,14 +25,15 @@
       "quantity": "2",
       "recipe_qty": "2",
       "unit": null,
+      "base_quantity": "2",
+      "base_unit": null,
       "ingredient": "yolks",
       "preparation": null,
       "optional": false,
       "store_section": "DAIRY & EGGS",
       "store_section_order": 3,
       "purchasable_item": "eggs",
-      "purchase_group": "eggs",
-      "base_quantity": "2"
+      "purchase_group": "eggs"
     },
     {
       "section": null,
@@ -39,15 +41,15 @@
       "quantity": "3/4",
       "recipe_qty": "3/4",
       "unit": "cup",
+      "base_quantity": "3/4",
+      "base_unit": "cup",
       "ingredient": "brown sugar",
       "preparation": null,
       "optional": false,
       "store_section": "BAKING",
       "store_section_order": 7,
       "purchasable_item": "brown sugar",
-      "purchase_group": "brown sugar",
-      "base_quantity": "3/4",
-      "base_unit": "cup"
+      "purchase_group": "brown sugar"
     },
     {
       "section": null,
@@ -55,15 +57,15 @@
       "quantity": "1",
       "recipe_qty": "1",
       "unit": "teaspoon",
+      "base_quantity": "1",
+      "base_unit": "teaspoon",
       "ingredient": "vanilla extract",
       "preparation": null,
       "optional": false,
       "store_section": "BAKING",
       "store_section_order": 7,
       "purchasable_item": "vanilla extract",
-      "purchase_group": "vanilla extract",
-      "base_quantity": "1",
-      "base_unit": "teaspoon"
+      "purchase_group": "vanilla extract"
     },
     {
       "section": null,
@@ -71,15 +73,15 @@
       "quantity": "3/4",
       "recipe_qty": "3/4",
       "unit": "cup",
+      "base_quantity": "3/4",
+      "base_unit": "cup",
       "ingredient": "all-purpose flour",
       "preparation": null,
       "optional": false,
       "store_section": "BAKING",
       "store_section_order": 7,
       "purchasable_item": "all-purpose flour",
-      "purchase_group": "all-purpose flour",
-      "base_quantity": "3/4",
-      "base_unit": "cup"
+      "purchase_group": "all-purpose flour"
     },
     {
       "section": null,
@@ -87,15 +89,15 @@
       "quantity": "6",
       "recipe_qty": "6",
       "unit": "tablespoons",
+      "base_quantity": "6",
+      "base_unit": "tablespoons",
       "ingredient": "Dutch-processed cocoa powder",
       "preparation": null,
       "optional": false,
       "store_section": "BAKING",
       "store_section_order": 7,
       "purchasable_item": "Dutch-processed cocoa powder",
-      "purchase_group": "Dutch-processed cocoa powder",
-      "base_quantity": "6",
-      "base_unit": "tablespoons"
+      "purchase_group": "Dutch-processed cocoa powder"
     },
     {
       "section": null,
@@ -103,15 +105,15 @@
       "quantity": "1/4",
       "recipe_qty": "1/4",
       "unit": "teaspoon",
+      "base_quantity": "1/4",
+      "base_unit": "teaspoon",
       "ingredient": "baking powder",
       "preparation": null,
       "optional": false,
       "store_section": "BAKING",
       "store_section_order": 7,
       "purchasable_item": "baking powder",
-      "purchase_group": "baking powder",
-      "base_quantity": "1/4",
-      "base_unit": "teaspoon"
+      "purchase_group": "baking powder"
     },
     {
       "section": null,
@@ -119,15 +121,15 @@
       "quantity": "1/4",
       "recipe_qty": "1/4",
       "unit": "cup",
+      "base_quantity": "1/4",
+      "base_unit": "cup",
       "ingredient": "clarified butter",
       "preparation": "warm",
       "optional": false,
       "store_section": "DAIRY & EGGS",
       "store_section_order": 3,
       "purchasable_item": "clarified butter",
-      "purchase_group": "clarified butter",
-      "base_quantity": "1/4",
-      "base_unit": "cup"
+      "purchase_group": "clarified butter"
     },
     {
       "section": null,
@@ -135,15 +137,15 @@
       "quantity": "3",
       "recipe_qty": "3",
       "unit": "cups",
+      "base_quantity": "3",
+      "base_unit": "cups",
       "ingredient": "confectioners' sugar",
       "preparation": null,
       "optional": false,
       "store_section": "BAKING",
       "store_section_order": 7,
       "purchasable_item": "confectioners' sugar",
-      "purchase_group": "confectioners' sugar",
-      "base_quantity": "3",
-      "base_unit": "cups"
+      "purchase_group": "confectioners' sugar"
     },
     {
       "section": null,
@@ -151,15 +153,15 @@
       "quantity": "1",
       "recipe_qty": "1",
       "unit": "cup",
+      "base_quantity": "1",
+      "base_unit": "cup",
       "ingredient": "butter",
       "preparation": null,
       "optional": false,
       "store_section": "DAIRY & EGGS",
       "store_section_order": 3,
       "purchasable_item": "butter",
-      "purchase_group": "butter",
-      "base_quantity": "1",
-      "base_unit": "cup"
+      "purchase_group": "butter"
     },
     {
       "section": null,
@@ -167,15 +169,15 @@
       "quantity": "1 to 2",
       "recipe_qty": "1 to 2",
       "unit": "tablespoons",
+      "base_quantity": "1 to 2",
+      "base_unit": "tablespoons",
       "ingredient": "heavy cream",
       "preparation": null,
       "optional": false,
       "store_section": "DAIRY & EGGS",
       "store_section_order": 3,
       "purchasable_item": "heavy cream",
-      "purchase_group": "heavy cream",
-      "base_quantity": "1 to 2",
-      "base_unit": "tablespoons"
+      "purchase_group": "heavy cream"
     },
     {
       "section": null,
@@ -183,15 +185,15 @@
       "quantity": "12",
       "recipe_qty": "12",
       "unit": "ounces",
+      "base_quantity": "12",
+      "base_unit": "ounces",
       "ingredient": "semisweet chocolate",
       "preparation": "chopped",
       "optional": false,
       "store_section": "BAKING",
       "store_section_order": 7,
       "purchasable_item": "semisweet chocolate",
-      "purchase_group": "semisweet chocolate",
-      "base_quantity": "12",
-      "base_unit": "ounces"
+      "purchase_group": "semisweet chocolate"
     },
     {
       "section": null,
@@ -199,77 +201,61 @@
       "quantity": "2",
       "recipe_qty": "2",
       "unit": "ounces",
+      "base_quantity": "2",
+      "base_unit": "ounces",
       "ingredient": "cocoa butter OR vegetable oil",
       "preparation": null,
       "optional": false,
       "store_section": "BAKING",
       "store_section_order": 7,
       "purchasable_item": "cocoa butter OR vegetable oil",
-      "purchase_group": "cocoa butter OR vegetable oil",
-      "base_quantity": "2",
-      "base_unit": "ounces"
+      "purchase_group": "cocoa butter OR vegetable oil"
     }
   ],
   "equipment": [
     {
-      "name": "cutting board",
-      "category": "prep",
       "equipment": "cutting board",
       "text": "cutting board",
       "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_homemade-ho-hos-recipe-2013817_equipment_1_e956f037bdcc.png",
       "equipment_image_generated_at": "2026-05-30T20:51:56.576592+00:00"
     },
     {
-      "name": "knife",
-      "category": "prep",
       "equipment": "knife",
       "text": "knife",
       "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_homemade-ho-hos-recipe-2013817_equipment_2_0312ff6e582d.png",
       "equipment_image_generated_at": "2026-05-30T20:52:12.914947+00:00"
     },
     {
-      "name": "mixing bowl",
-      "category": "prep",
       "equipment": "mixing bowl",
       "text": "mixing bowl",
       "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_homemade-ho-hos-recipe-2013817_equipment_3_5a91048553a8.png",
       "equipment_image_generated_at": "2026-05-30T20:52:29.614048+00:00"
     },
     {
-      "name": "oven",
-      "category": "appliance",
       "equipment": "oven",
       "text": "oven",
       "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_homemade-ho-hos-recipe-2013817_equipment_4_6f205014c6f2.png",
       "equipment_image_generated_at": "2026-05-30T20:52:46.393467+00:00"
     },
     {
-      "name": "rolling pin",
-      "category": "prep",
       "equipment": "rolling pin",
       "text": "rolling pin",
       "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_homemade-ho-hos-recipe-2013817_equipment_5_332e5ed004f7.png",
       "equipment_image_generated_at": "2026-05-30T20:53:03.138769+00:00"
     },
     {
-      "name": "saucepan",
-      "category": "cookware",
       "equipment": "saucepan",
       "text": "saucepan",
       "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_homemade-ho-hos-recipe-2013817_equipment_6_335a7ee8c0e1.png",
       "equipment_image_generated_at": "2026-05-30T20:53:17.589915+00:00"
     },
     {
-      "name": "spatula",
-      "category": "utensil",
       "equipment": "spatula",
       "text": "spatula",
       "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_homemade-ho-hos-recipe-2013817_equipment_7_55f7e56cace1.png",
       "equipment_image_generated_at": "2026-05-30T20:53:33.432778+00:00"
     },
     {
-      "name": "whisk",
-      "category": "utensil",
       "equipment": "whisk",
       "text": "whisk",
       "equipment_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_homemade-ho-hos-recipe-2013817_equipment_8_dad20c32814d.png",
@@ -281,12 +267,12 @@
       "section": null,
       "step_number": 1,
       "instruction": "Preheat the oven to 350 degrees F.",
+      "text": "Preheat the oven to 350 degrees F.",
       "temperature": null,
       "time": null,
       "equipment_used": [
         "oven"
       ],
-      "text": "Preheat the oven to 350 degrees F.",
       "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_homemade-ho-hos-recipe-2013817_step_1_634f2e508f6b.png",
       "step_image_generated_at": "2026-05-30T07:55:09.949833+00:00"
     },
@@ -294,12 +280,12 @@
       "section": null,
       "step_number": 2,
       "instruction": "To make the Cake: Butter the jelly roll pan and line it with parchment paper; then butter the paper to assure release.",
+      "text": "To make the Cake: Butter the jelly roll pan and line it with parchment paper; then butter the paper to assure release.",
       "temperature": null,
       "time": null,
       "equipment_used": [
         "rolling pin"
       ],
-      "text": "To make the Cake: Butter the jelly roll pan and line it with parchment paper; then butter the paper to assure release.",
       "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_homemade-ho-hos-recipe-2013817_step_2_fad0fb12ee2f.png",
       "step_image_generated_at": "2026-05-30T07:55:25.647043+00:00"
     },
@@ -307,12 +293,12 @@
       "section": null,
       "step_number": 3,
       "instruction": "Bring a saucepan of water to a simmer.",
+      "text": "Bring a saucepan of water to a simmer.",
       "temperature": null,
       "time": null,
       "equipment_used": [
         "saucepan"
       ],
-      "text": "Bring a saucepan of water to a simmer.",
       "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_homemade-ho-hos-recipe-2013817_step_3_70081f6461ea.png",
       "step_image_generated_at": "2026-05-30T07:55:43.169694+00:00"
     },
@@ -320,13 +306,13 @@
       "section": null,
       "step_number": 4,
       "instruction": "In the bowl from a standing mixer, combine the eggs, yolks, sugar, vanilla in a bowl and whisk briefly. Set the bowl over the simmering water and stir until warm and the sugar looks dissolved. Attach the bowl to the standing mixer fitted with a whisk, and whip until light and fluffy, about 6 minutes.",
+      "text": "In the bowl from a standing mixer, combine the eggs, yolks, sugar, vanilla in a bowl and whisk briefly. Set the bowl over the simmering water and stir until warm and the sugar looks dissolved. Attach the bowl to the standing mixer fitted with a whisk, and whip until light and fluffy, about 6 minutes.",
       "temperature": null,
       "time": null,
       "equipment_used": [
         "mixing bowl",
         "whisk"
       ],
-      "text": "In the bowl from a standing mixer, combine the eggs, yolks, sugar, vanilla in a bowl and whisk briefly. Set the bowl over the simmering water and stir until warm and the sugar looks dissolved. Attach the bowl to the standing mixer fitted with a whisk, and whip until light and fluffy, about 6 minutes.",
       "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_homemade-ho-hos-recipe-2013817_step_4_32ceb4857f65.png",
       "step_image_generated_at": "2026-05-30T07:56:00.348090+00:00"
     },
@@ -334,10 +320,10 @@
       "section": null,
       "step_number": 5,
       "instruction": "Meanwhile, sift together the flour, cocoa, and baking powder 3 times.",
+      "text": "Meanwhile, sift together the flour, cocoa, and baking powder 3 times.",
       "temperature": null,
       "time": null,
       "equipment_used": [],
-      "text": "Meanwhile, sift together the flour, cocoa, and baking powder 3 times.",
       "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_homemade-ho-hos-recipe-2013817_step_5_be6501d0357d.png",
       "step_image_generated_at": "2026-05-30T07:56:20.212171+00:00"
     },
@@ -345,10 +331,10 @@
       "section": null,
       "step_number": 6,
       "instruction": "Remove the bowl from the mixer and, while folding the egg mixture, sift in the flour mixture, little by little, until incorporated. Drizzle in the clarified butter, while folding the batter.",
+      "text": "Remove the bowl from the mixer and, while folding the egg mixture, sift in the flour mixture, little by little, until incorporated. Drizzle in the clarified butter, while folding the batter.",
       "temperature": null,
       "time": null,
       "equipment_used": [],
-      "text": "Remove the bowl from the mixer and, while folding the egg mixture, sift in the flour mixture, little by little, until incorporated. Drizzle in the clarified butter, while folding the batter.",
       "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_homemade-ho-hos-recipe-2013817_step_6_e393c8ec4a5d.png",
       "step_image_generated_at": "2026-05-30T07:56:38.243191+00:00"
     },
@@ -356,13 +342,13 @@
       "section": null,
       "step_number": 7,
       "instruction": "Immediately pour the batter into the prepared pans dividing equally and smooth the tops with a spatula. Bake until lightly browned and it starts to pull away from the edges of the pan, about 14 to 16 minutes.",
+      "text": "Immediately pour the batter into the prepared pans dividing equally and smooth the tops with a spatula. Bake until lightly browned and it starts to pull away from the edges of the pan, about 14 to 16 minutes.",
       "temperature": null,
       "time": null,
       "equipment_used": [
         "oven",
         "spatula"
       ],
-      "text": "Immediately pour the batter into the prepared pans dividing equally and smooth the tops with a spatula. Bake until lightly browned and it starts to pull away from the edges of the pan, about 14 to 16 minutes.",
       "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_homemade-ho-hos-recipe-2013817_step_7_9e84819dd758.png",
       "step_image_generated_at": "2026-05-30T07:56:55.311826+00:00"
     },
@@ -370,12 +356,12 @@
       "section": null,
       "step_number": 8,
       "instruction": "Remove the cakes from the oven and let sit in the pan for 1 minute. Run a knife along the edge to release the cake then flip it out onto parchment paper. Brush the paper (the one you lined the pan with) with water and let soak for 2 minutes. Peel it off the cake. Trim dry edges from the cake. Let cool covered with plastic wrap.",
+      "text": "Remove the cakes from the oven and let sit in the pan for 1 minute. Run a knife along the edge to release the cake then flip it out onto parchment paper. Brush the paper (the one you lined the pan with) with water and let soak for 2 minutes. Peel it off the cake. Trim dry edges from the cake. Let cool covered with plastic wrap.",
       "temperature": null,
       "time": null,
       "equipment_used": [
         "oven"
       ],
-      "text": "Remove the cakes from the oven and let sit in the pan for 1 minute. Run a knife along the edge to release the cake then flip it out onto parchment paper. Brush the paper (the one you lined the pan with) with water and let soak for 2 minutes. Peel it off the cake. Trim dry edges from the cake. Let cool covered with plastic wrap.",
       "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_homemade-ho-hos-recipe-2013817_step_8_360c22a74210.png",
       "step_image_generated_at": "2026-05-30T07:57:14.014880+00:00"
     },
@@ -383,10 +369,10 @@
       "section": null,
       "step_number": 9,
       "instruction": "To make the Filling: In the bowl of a standing mixer, combine the sugar and butter and mix on low speed until well blended; then increase speed to medium and beat for another 3 minutes. Add vanilla and cream and continue to beat on medium speed for 1 minute more, adding more cream for spreading consistency, if needed.",
+      "text": "To make the Filling: In the bowl of a standing mixer, combine the sugar and butter and mix on low speed until well blended; then increase speed to medium and beat for another 3 minutes. Add vanilla and cream and continue to beat on medium speed for 1 minute more, adding more cream for spreading consistency, if needed.",
       "temperature": null,
       "time": null,
       "equipment_used": [],
-      "text": "To make the Filling: In the bowl of a standing mixer, combine the sugar and butter and mix on low speed until well blended; then increase speed to medium and beat for another 3 minutes. Add vanilla and cream and continue to beat on medium speed for 1 minute more, adding more cream for spreading consistency, if needed.",
       "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_homemade-ho-hos-recipe-2013817_step_9_fbd85fae38e5.png",
       "step_image_generated_at": "2026-05-30T07:57:31.726542+00:00"
     },
@@ -394,6 +380,7 @@
       "section": null,
       "step_number": 10,
       "instruction": "Spread the sponge cakes with a thin layer of the filling, leaving a 1/4-inch space at the far edge. Roll the cake tightly on the long side until you have rolled a 1 1/2-inch thick log. Cut the log off from the remaining sheet of cake and place seam side-down. Repeat with remaining cake. Chill the logs for 30 minutes; then cut into 2 1/2-inch sections.",
+      "text": "Spread the sponge cakes with a thin layer of the filling, leaving a 1/4-inch space at the far edge. Roll the cake tightly on the long side until you have rolled a 1 1/2-inch thick log. Cut the log off from the remaining sheet of cake and place seam side-down. Repeat with remaining cake. Chill the logs for 30 minutes; then cut into 2 1/2-inch sections.",
       "temperature": null,
       "time": null,
       "equipment_used": [
@@ -401,7 +388,6 @@
         "knife",
         "rolling pin"
       ],
-      "text": "Spread the sponge cakes with a thin layer of the filling, leaving a 1/4-inch space at the far edge. Roll the cake tightly on the long side until you have rolled a 1 1/2-inch thick log. Cut the log off from the remaining sheet of cake and place seam side-down. Repeat with remaining cake. Chill the logs for 30 minutes; then cut into 2 1/2-inch sections.",
       "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_homemade-ho-hos-recipe-2013817_step_10_efe9a429f220.png",
       "step_image_generated_at": "2026-05-30T07:57:50.367358+00:00"
     },
@@ -409,10 +395,10 @@
       "section": null,
       "step_number": 11,
       "instruction": "To make the Glaze: Melt the 2 ingredients together in the top of a double boiler or a bowl set over barely simmering water, stirring occasionally. Line a cookie sheet with parchment paper or a nonstick baking mat. One at a time, gently drop the cake rolls into the hot chocolate. Lift out with a fork and let excess chocolate drip back into the bowl. Place on the cookie sheet and let set at room temperature until the coating is firm, about 1 to 2 hours.",
+      "text": "To make the Glaze: Melt the 2 ingredients together in the top of a double boiler or a bowl set over barely simmering water, stirring occasionally. Line a cookie sheet with parchment paper or a nonstick baking mat. One at a time, gently drop the cake rolls into the hot chocolate. Lift out with a fork and let excess chocolate drip back into the bowl. Place on the cookie sheet and let set at room temperature until the coating is firm, about 1 to 2 hours.",
       "temperature": null,
       "time": null,
       "equipment_used": [],
-      "text": "To make the Glaze: Melt the 2 ingredients together in the top of a double boiler or a bowl set over barely simmering water, stirring occasionally. Line a cookie sheet with parchment paper or a nonstick baking mat. One at a time, gently drop the cake rolls into the hot chocolate. Lift out with a fork and let excess chocolate drip back into the bowl. Place on the cookie sheet and let set at room temperature until the coating is firm, about 1 to 2 hours.",
       "step_image_url": "/static/generated/recipe_steps/foodnetwork_com_recipes_homemade-ho-hos-recipe-2013817_step_11_13c6f98b420f.png",
       "step_image_generated_at": "2026-05-30T07:58:12.755888+00:00"
     }
@@ -424,26 +410,15 @@
     "protein": "5g",
     "fat": "36g",
     "saturated_fat": "19g",
-    "polyunsaturated_fat": null,
-    "monounsaturated_fat": null,
-    "trans_fat": null,
     "cholesterol": "121mg",
     "sodium": "43mg",
-    "potassium": null,
     "fiber": "3g",
-    "sugar": "54g",
-    "vitamin_a": null,
-    "vitamin_c": null,
-    "calcium": null,
-    "iron": null,
-    "other": []
+    "sugar": "54g"
   },
   "cover_image": {
     "url": "https://food.fnr.sndimg.com/content/dam/images/food/fullset/2004/4/13/1/sd1e01_homemade_ho_hos.jpg.rend.hgtvcom.1280.1280.suffix/1386101456282.webp",
     "alt": "Homemade Ho-Hos",
-    "source": "structured_data",
-    "width": 1280,
-    "height": 1280
+    "source": "structured_data"
   },
   "scaling": {
     "selected_multiplier": 1.0,
@@ -467,5 +442,10 @@
         "value": 3.0
       }
     ]
-  }
+  },
+  "level": "Intermediate",
+  "total_time": "3 hr 25 min",
+  "prep_time": "1 hr",
+  "inactive_time": "2 hr",
+  "cook_time": "25 min"
 }

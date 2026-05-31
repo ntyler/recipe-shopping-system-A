@@ -9805,8 +9805,8 @@ function showRecipeSaveProgressOverlay(items) {
                 <div id="recipeSaveProgressSummary" class="recipe-qty-progress-summary">Starting recipe save...</div>
                 <div id="recipeSaveProgressList" class="recipe-qty-progress-list"></div>
                 <div id="recipeSaveProgressActions" class="recipe-save-progress-actions">
-                    <button type="button" class="recipe-save-progress-action secondary" onclick="hideRecipeSaveProgressOverlay()">Hide Progress</button>
                     <button type="button" id="recipeSaveProgressCloseEditor" class="recipe-save-progress-action primary" onclick="closeRecipeEditorFromSaveProgress()" disabled>Close Edit Recipe</button>
+                    <button type="button" class="recipe-save-progress-action secondary" onclick="hideRecipeSaveProgressOverlay()">Hide Progress</button>
                 </div>
             </div>
         `;
