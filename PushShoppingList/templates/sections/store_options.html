@@ -18,7 +18,6 @@
             </button>
             <div class="recipe-edit-row-menu overflow-menu store-options-overflow-menu" hidden>
                 <div class="overflow-menu-section store-options-menu-section">
-                    <div class="overflow-menu-section-title recipe-view-menu-section-title">Store Options</div>
                     <div class="recipe-view-menu-subsection-title">Toggle Options</div>
                     <button type="button"
                             class="recipe-view-store-toggle"
@@ -102,23 +101,6 @@
                         class="sort-store-list-btn"
                         onclick="sortStoreOptionsList()">
                     Sort List
-                </button>
-            </div>
-
-            <div class="store-options-display-controls" aria-label="Store Options display controls">
-                <button type="button"
-                        class="store-display-toggle"
-                        data-store-display-toggle="addresses"
-                        aria-pressed="true"
-                        onclick="toggleStoreOptionsDisplay('addresses')">
-                    Show all Addresses
-                </button>
-                <button type="button"
-                        class="store-display-toggle"
-                        data-store-display-toggle="maps"
-                        aria-pressed="true"
-                        onclick="toggleStoreOptionsDisplay('maps')">
-                    Show Maps
                 </button>
             </div>
         </div>
@@ -479,36 +461,6 @@
                        autocomplete="off"
                        aria-label="Search stores by name"
                        oninput="filterActiveStores(this.value)">
-            </div>
-            <div class="active-store-mode-controls" aria-label="Active store logo behavior">
-                <button type="button"
-                        class="active-store-mode-toggle"
-                        data-active-store-mode-toggle="store"
-                        aria-pressed="true"
-                        onclick="setActiveStoreIconMode('store', { persist: true })">
-                    Store Mode
-                </button>
-                <button type="button"
-                        class="active-store-mode-toggle"
-                        data-active-store-mode-toggle="map"
-                        aria-pressed="false"
-                        onclick="setActiveStoreIconMode('map', { persist: true })">
-                    Map Mode
-                </button>
-                <button type="button"
-                        class="active-store-mode-toggle"
-                        data-active-store-mode-toggle="activation"
-                        aria-pressed="false"
-                        onclick="setActiveStoreIconMode('activation', { persist: true })">
-                    Store Selection Mode
-                </button>
-                <button type="button"
-                        class="active-store-mode-toggle"
-                        data-active-store-mode-toggle="edit"
-                        aria-pressed="false"
-                        onclick="setActiveStoreIconMode('edit', { persist: true })">
-                    Edit Mode
-                </button>
             </div>
         </div>
         <div class="active-store-shelf-shell" aria-label="Store carousel">
