@@ -6661,6 +6661,7 @@ function toggleRecipeEditRowMenu(button, event = null) {
 
     if (menu && shouldOpen) {
         updateRecipeIngredientRowCollapseToggle(row);
+        updateRecipeEditRowImageMenu(row);
         updateCurrentRecipeUrlSummaryCollapseMenuToggle(row);
         updateRecipeViewCardCollapseMenuToggle(row);
         updateRecipeDetailMenuToggleForButton(button);
@@ -8158,10 +8159,35 @@ function addRecipeEquipmentRow(value = "") {
                     onclick="return toggleRecipeEditRowMenu(this, event)">
                 <span aria-hidden="true"></span>
             </button>
-            <div class="recipe-edit-row-menu" hidden>
-                <button type="button" onclick="moveRecipeEditRow(this, -1)">Move Up</button>
-                <button type="button" onclick="moveRecipeEditRow(this, 1)">Move Down</button>
-                <button type="button" class="delete" onclick="removeRecipeEditRow(this)">Delete</button>
+            <div class="recipe-edit-row-menu overflow-menu recipe-edit-text-row-menu" hidden>
+                <div class="overflow-menu-section">
+                    <div class="overflow-menu-section-title">Content</div>
+                    <button type="button" onclick="moveRecipeEditRow(this, -1)">Move Up</button>
+                    <button type="button" onclick="moveRecipeEditRow(this, 1)">Move Down</button>
+                    <button type="button" class="delete" onclick="removeRecipeEditRow(this)">Delete</button>
+                </div>
+                <div class="overflow-menu-section">
+                    <div class="overflow-menu-section-title">Image Generation</div>
+                    <button type="button"
+                            data-recipe-edit-row-image-generate
+                            onclick="return generateRecipeEditRowImageFromMenu(this)">
+                        ${equipmentImageUrl ? "Regenerate Image" : "Generate Image"}
+                    </button>
+                </div>
+                <div class="overflow-menu-section">
+                    <div class="overflow-menu-section-title">Image Display</div>
+                    <button type="button"
+                            data-recipe-edit-row-image-show
+                            onclick="return setRecipeEditRowImageVisibleFromMenu(this, true)"
+                            hidden>
+                        Show Image
+                    </button>
+                    <button type="button"
+                            data-recipe-edit-row-image-hide
+                            onclick="return setRecipeEditRowImageVisibleFromMenu(this, false)">
+                        Hide Image
+                    </button>
+                </div>
             </div>
         </div>
     `;
@@ -8274,10 +8300,35 @@ function addRecipeInstructionRow(value = "", stepNumber = null) {
                     onclick="return toggleRecipeEditRowMenu(this, event)">
                 <span aria-hidden="true"></span>
             </button>
-            <div class="recipe-edit-row-menu" hidden>
-                <button type="button" onclick="moveRecipeEditRow(this, -1)">Move Up</button>
-                <button type="button" onclick="moveRecipeEditRow(this, 1)">Move Down</button>
-                <button type="button" class="delete" onclick="removeRecipeEditRow(this)">Delete</button>
+            <div class="recipe-edit-row-menu overflow-menu recipe-edit-text-row-menu" hidden>
+                <div class="overflow-menu-section">
+                    <div class="overflow-menu-section-title">Content</div>
+                    <button type="button" onclick="moveRecipeEditRow(this, -1)">Move Up</button>
+                    <button type="button" onclick="moveRecipeEditRow(this, 1)">Move Down</button>
+                    <button type="button" class="delete" onclick="removeRecipeEditRow(this)">Delete</button>
+                </div>
+                <div class="overflow-menu-section">
+                    <div class="overflow-menu-section-title">Image Generation</div>
+                    <button type="button"
+                            data-recipe-edit-row-image-generate
+                            onclick="return generateRecipeEditRowImageFromMenu(this)">
+                        ${stepImageUrl ? "Regenerate Image" : "Generate Image"}
+                    </button>
+                </div>
+                <div class="overflow-menu-section">
+                    <div class="overflow-menu-section-title">Image Display</div>
+                    <button type="button"
+                            data-recipe-edit-row-image-show
+                            onclick="return setRecipeEditRowImageVisibleFromMenu(this, true)"
+                            hidden>
+                        Show Image
+                    </button>
+                    <button type="button"
+                            data-recipe-edit-row-image-hide
+                            onclick="return setRecipeEditRowImageVisibleFromMenu(this, false)">
+                        Hide Image
+                    </button>
+                </div>
             </div>
         </div>
     `;
@@ -10333,6 +10384,76 @@ function setRecipeImagePanelHiddenValue(panel, field, value) {
 
     if (input) {
         input.value = value || "";
+    }
+}
+
+async function generateRecipeEditRowImageFromMenu(button) {
+    const row = recipeEditActionRowFromButton(button);
+    const imageButton = row
+        ? row.querySelector("[data-equipment-image-generate], [data-step-image-generate]")
+        : null;
+
+    closeRecipeEditRowMenus();
+
+    if (!imageButton) {
+        return false;
+    }
+
+    setRecipeEditRowImageVisible(row, true);
+
+    if (imageButton.matches("[data-equipment-image-generate]")) {
+        await generateRecipeEquipmentImage(imageButton);
+    } else {
+        await generateRecipeStepImage(imageButton);
+    }
+
+    return false;
+}
+
+function setRecipeEditRowImageVisibleFromMenu(button, visible) {
+    const row = recipeEditActionRowFromButton(button);
+
+    closeRecipeEditRowMenus();
+    setRecipeEditRowImageVisible(row, visible);
+    return false;
+}
+
+function setRecipeEditRowImageVisible(row, visible) {
+    const panel = row
+        ? row.querySelector("[data-equipment-image-panel], [data-step-image-panel]")
+        : null;
+
+    if (!panel) {
+        return false;
+    }
+
+    setRecipeImageContainersVisible([panel], visible);
+    updateRecipeEditRowImageMenu(row);
+    return true;
+}
+
+function updateRecipeEditRowImageMenu(row) {
+    const panel = row
+        ? row.querySelector("[data-equipment-image-panel], [data-step-image-panel]")
+        : null;
+    const generateButton = row ? row.querySelector("[data-recipe-edit-row-image-generate]") : null;
+    const showButton = row ? row.querySelector("[data-recipe-edit-row-image-show]") : null;
+    const hideButton = row ? row.querySelector("[data-recipe-edit-row-image-hide]") : null;
+    const image = panel ? panel.querySelector(".recipe-step-image") : null;
+    const hasImage = Boolean(image && !image.hidden && String(image.getAttribute("src") || "").trim());
+    const isHidden = Boolean(panel && panel.classList.contains("recipe-image-visibility-hidden"));
+
+    if (generateButton) {
+        generateButton.textContent = hasImage ? "Regenerate Image" : "Generate Image";
+        generateButton.disabled = !panel;
+    }
+
+    if (showButton) {
+        showButton.hidden = !panel || !isHidden;
+    }
+
+    if (hideButton) {
+        hideButton.hidden = !panel || isHidden;
     }
 }
 
