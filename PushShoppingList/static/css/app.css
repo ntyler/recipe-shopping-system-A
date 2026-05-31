@@ -47,6 +47,23 @@ body {
             margin-bottom: 14px;
         }
 
+        .app-content > .recipe-card,
+        #screenSettingsCard,
+        #editItemsSection,
+        #storeOptionsSection,
+        .view-settings-card {
+            border: 0;
+            background: transparent;
+            box-shadow: none;
+        }
+
+        #screenSettingsCard .screen-settings-toggle,
+        #storeOptionsSection .store-options-title-toggle {
+            border: 0;
+            background: transparent;
+            box-shadow: none;
+        }
+
         #editItemsSection,
         #currentRecipeUrlLogCard,
         #cookbooksCard,
@@ -536,10 +553,10 @@ body {
             z-index: 1200;
             margin: calc(-1 * var(--store-options-sticky-inset)) calc(-1 * var(--store-options-sticky-inset)) 14px;
             padding: 10px 12px 12px;
-            background: #111414;
-            border: 1px solid #3a3a3a;
+            background: transparent;
+            border: 0;
             border-radius: 10px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+            box-shadow: none;
             box-sizing: border-box;
         }
 
@@ -2086,7 +2103,7 @@ body {
             color: #ddd;
             font-size: 14px;
             line-height: 1.45;
-            text-align: center;
+            text-align: left;
         }
 
         .home-address-collapsed-summary {
@@ -2099,7 +2116,7 @@ body {
             color: #ddd;
             font-size: 14px;
             line-height: 1.45;
-            text-align: center;
+            text-align: left;
         }
 
         .home-address-content.collapsed + .home-address-collapsed-summary {
