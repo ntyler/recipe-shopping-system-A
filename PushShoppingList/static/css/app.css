@@ -2473,7 +2473,9 @@ body {
 
         .view-toggle-btn.active {
             background: #0078D7;
-            font-weight: bold;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 800;
         }
 
 
