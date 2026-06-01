@@ -802,7 +802,124 @@ def recipe_view_ingredient_food_review(ingredient):
         review = fallback_ingredient_text_review(ingredient)
 
     normalized = normalize_ingredient_text_review(review, ingredient)
-    return normalized if isinstance(normalized, dict) else {}
+    if isinstance(normalized, dict):
+        return normalized
+
+    return recipe_ingredient_choice_review(ingredient)
+
+
+def recipe_ingredient_choice_review(ingredient):
+    if not isinstance(ingredient, dict):
+        return {}
+
+    fields = (
+        ("ingredient", ingredient.get("ingredient")),
+        ("purchasable_item", ingredient.get("purchasable_item")),
+        ("original_text", ingredient.get("original_text")),
+    )
+
+    for source_field, value in fields:
+        review = ingredient_choice_review_from_text(value, source_field)
+
+        if review:
+            return review
+
+    return {}
+
+
+def ingredient_choice_review_from_text(value, source_field):
+    text = str(value or "").strip()
+    choice_text = re.sub(r"\([^)]*\)", " ", text)
+
+    if not re.search(r"\s+\bor\b\s+", choice_text, flags=re.IGNORECASE):
+        return {}
+
+    options = unique_ingredient_choice_options(
+        expand_ingredient_choice_shared_nouns(
+            [
+                clean_ingredient_choice_option(option)
+                for option in re.split(r"\s+\bor\b\s+", choice_text, flags=re.IGNORECASE)
+            ]
+        )
+    )
+
+    if len(options) < 2 or len(options) > 4:
+        return {}
+
+    return {
+        "needs_review": True,
+        "kind": "ingredient_choice",
+        "reason": "Pick one option: " + ", ".join(options) + ".",
+        "prompt": "Pick one option",
+        "options": [
+            {
+                "ingredient": option,
+                "purchasable_item": option,
+                "reason": "",
+            }
+            for option in options
+        ],
+        "source": source_field,
+    }
+
+
+def clean_ingredient_choice_option(value):
+    text = str(value or "")
+    text = re.sub(r"\([^)]*\)", " ", text)
+    text = re.sub(r"^[\s,;:/-]+", "", text)
+    text = re.sub(r"^[\d\s./]+", "", text)
+    text = re.sub(
+        r"^(?:cups?|tablespoons?|tbsp\.?|teaspoons?|tsp\.?|ounces?|oz\.?|"
+        r"pounds?|lbs?\.?|grams?|g|kilograms?|kg|milliliters?|ml|liters?|l|"
+        r"pinch(?:es)?|dash(?:es)?|cloves?|slices?|cans?|packages?|pkg\.?)\b\s+",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(r"\b(?:divided|optional|to taste|as needed)\b", " ", text, flags=re.IGNORECASE)
+    text = re.sub(r"^[\s,;:/-]+|[\s,;:/-]+$", "", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def expand_ingredient_choice_shared_nouns(options):
+    cleaned = [
+        str(option or "").strip()
+        for option in options
+        if str(option or "").strip()
+    ]
+
+    if any(re.search(r"\btortillas?\b", option, flags=re.IGNORECASE) for option in cleaned):
+        return [normalize_tortilla_choice_option(option) for option in cleaned]
+
+    return cleaned
+
+
+def normalize_tortilla_choice_option(option):
+    cleaned = re.sub(r"\bflower\b", "flour", str(option or ""), flags=re.IGNORECASE)
+    cleaned = re.sub(r"\btortillas\b", "tortilla", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+
+    if not cleaned or re.search(r"\btortilla\b", cleaned, flags=re.IGNORECASE):
+        return cleaned
+
+    return f"{cleaned} tortilla"
+
+
+def unique_ingredient_choice_options(options):
+    seen = set()
+    cleaned = []
+
+    for option in options:
+        value = str(option or "").strip()
+        key = normalize(value)
+
+        if not value or len(value) < 2 or not key or key in seen:
+            continue
+
+        seen.add(key)
+        cleaned.append(value)
+
+    return cleaned
 
 
 def scale_servings(servings, multiplier):
