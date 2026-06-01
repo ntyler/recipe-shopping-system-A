@@ -4,6 +4,8 @@ import re
 
 from openai import OpenAI
 
+from PushShoppingList.services.storage_service import active_user_id
+
 
 MODEL = os.getenv(
     "OPENAI_INGREDIENT_REVIEW_MODEL",
@@ -56,6 +58,7 @@ def annotate_ingredients_for_food_review(ingredients):
     if not isinstance(ingredients, list):
         return []
 
+    cache = food_review_cache_for_active_user()
     rows = [
         dict(item)
         for item in ingredients
@@ -68,7 +71,7 @@ def annotate_ingredients_for_food_review(ingredients):
         if not key or not ingredient_text_review_candidate(item):
             continue
 
-        cached = _review_cache.get(key, _CACHE_MISS)
+        cached = cache.get(key, _CACHE_MISS)
         if cached is _CACHE_MISS:
             candidates.append({
                 "index": index,
@@ -98,12 +101,18 @@ def annotate_ingredients_for_food_review(ingredients):
                 review = fallback_ingredient_text_review(item)
 
             normalized = normalize_ingredient_text_review(review, item)
-            _review_cache[candidate["key"]] = normalized
+            cache[candidate["key"]] = normalized
 
             if normalized:
                 rows[candidate["index"]]["food_review"] = dict(normalized)
 
     return rows
+
+
+def food_review_cache_for_active_user():
+    """Keep generated food-review annotations isolated per account/session."""
+    user_id = active_user_id() or "guest"
+    return _review_cache.setdefault(user_id, {})
 
 
 def ingredient_text_review_candidate(item):

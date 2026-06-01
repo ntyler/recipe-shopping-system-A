@@ -60,6 +60,7 @@ recipe_bp = Blueprint("recipe_bp", __name__)
 
 NO_INGREDIENTS_ERROR = "No ingredients were found for this recipe URL."
 IMPORT_LOGIN_ERROR = "Sign in before importing recipes so imported data is saved to your account."
+FOOD_REVIEW_LOGIN_ERROR = "Sign in before using food reviews so results stay tied to your account."
 
 
 def require_account_for_import(wants_json=False):
@@ -72,6 +73,14 @@ def require_account_for_import(wants_json=False):
 
     flash(IMPORT_LOGIN_ERROR, "error")
     return redirect("/#userAccountSection")
+
+
+def require_account_for_food_review():
+    """Food-review alternatives use account-specific food rules and saved recipe data."""
+    if current_user():
+        return None
+
+    return jsonify({"ok": False, "error": FOOD_REVIEW_LOGIN_ERROR}), 401
 
 
 def ensure_recipe_has_default_cookbook(url, recipe_metadata=None):
@@ -578,6 +587,10 @@ def find_recipe_cover_image(url):
 
 @recipe_bp.route("/api/food_review_alternatives", methods=["POST"])
 def api_food_review_alternatives_route():
+    account_response = require_account_for_food_review()
+    if account_response:
+        return account_response
+
     data = request.get_json(silent=True) or {}
     result = suggest_food_review_alternatives(data)
     status = 200 if result.get("ok") else 400
