@@ -812,17 +812,24 @@ def recipe_ingredient_choice_review(ingredient):
     if not isinstance(ingredient, dict):
         return {}
 
-    fields = (
+    primary_fields = (
         ("ingredient", ingredient.get("ingredient")),
         ("purchasable_item", ingredient.get("purchasable_item")),
-        ("original_text", ingredient.get("original_text")),
     )
 
-    for source_field, value in fields:
+    for source_field, value in primary_fields:
         review = ingredient_choice_review_from_text(value, source_field)
 
         if review:
             return review
+
+    has_named_ingredient = any(
+        str(value or "").strip()
+        for _source_field, value in primary_fields
+    )
+
+    if not has_named_ingredient:
+        return ingredient_choice_review_from_text(ingredient.get("original_text"), "original_text")
 
     return {}
 
