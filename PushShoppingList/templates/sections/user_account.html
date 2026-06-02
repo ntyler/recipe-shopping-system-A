@@ -146,6 +146,7 @@
             </button>
             <div class="card-collapse-content user-two-factor-content{% if two_factor_default_state == 'collapsed' %} collapsed{% endif %}"
                  data-collapse-content="user-two-factor"
+                 data-collapse-storage-key="user-two-factor:{{ current_user.user_id }}"
                  data-collapse-default="{{ two_factor_default_state }}"
                  data-collapse-mobile-default="{{ two_factor_default_state }}">
             {% if current_user.two_factor_enabled %}

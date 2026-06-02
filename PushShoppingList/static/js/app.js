@@ -4076,6 +4076,30 @@ function setRecipeFileLoadingSummary(message) {
     }
 }
 
+function cardCollapseStorageKey(key, content) {
+    const explicitKey = content && content.dataset
+        ? content.dataset.collapseStorageKey
+        : "";
+
+    return `card-collapse:${explicitKey || key}`;
+}
+
+function getSavedCardCollapseState(key, content) {
+    try {
+        return localStorage.getItem(cardCollapseStorageKey(key, content));
+    } catch (err) {
+        return null;
+    }
+}
+
+function setSavedCardCollapseState(key, content, state) {
+    try {
+        localStorage.setItem(cardCollapseStorageKey(key, content), state);
+    } catch (err) {
+        // Collapse state is a convenience preference; keep the UI usable if storage is unavailable.
+    }
+}
+
 function toggleCardCollapse(key) {
     const content = document.querySelector(`[data-collapse-content="${key}"]`);
     const storeOptionsStickyTop = key === "store-options"
@@ -4088,7 +4112,7 @@ function toggleCardCollapse(key) {
 
     const isCollapsed = content.classList.toggle("collapsed");
     const card = content.closest(".app-card");
-    localStorage.setItem(`card-collapse:${key}`, isCollapsed ? "collapsed" : "expanded");
+    setSavedCardCollapseState(key, content, isCollapsed ? "collapsed" : "expanded");
 
     if (card) {
         card.classList.toggle("card-collapsed", isCollapsed);
@@ -4268,7 +4292,7 @@ function syncStoreEditFormDefaults(form) {
 function restoreCardCollapseState() {
     document.querySelectorAll("[data-collapse-content]").forEach(content => {
         const key = content.dataset.collapseContent;
-        const savedState = localStorage.getItem(`card-collapse:${key}`);
+        const savedState = getSavedCardCollapseState(key, content);
         const shouldCollapse = savedState
             ? savedState === "collapsed"
             : cardCollapseDefaultIsCollapsed(content);
