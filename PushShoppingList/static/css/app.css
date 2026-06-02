@@ -4061,6 +4061,27 @@ body {
             color: #fff;
         }
 
+        .user-account-form .user-two-factor-title-toggle {
+            justify-content: center;
+            min-height: 42px;
+            padding: 8px 12px;
+            border: 0;
+            background: #101820;
+            color: #f8fafc;
+            font-size: 20px;
+            text-align: center;
+        }
+
+        .user-account-form .user-two-factor-title-toggle:hover,
+        .user-account-form .user-two-factor-title-toggle:focus-visible {
+            background: #172331;
+        }
+
+        .user-two-factor-content {
+            display: grid;
+            gap: 10px;
+        }
+
         .user-password-reset-form,
         .user-account-forgot-form,
         .user-two-factor-sign-in-form {

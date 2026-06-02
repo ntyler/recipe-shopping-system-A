@@ -109,8 +109,19 @@
             </div>
         </form>
 
+        {% set two_factor_default_state = "collapsed" if current_user.two_factor_enabled and not two_factor_setup else "expanded" %}
         <div class="user-account-form user-two-factor-card">
-            <h3>Two-Factor Authentication</h3>
+            <button type="button"
+                    class="card-collapse-toggle user-two-factor-title-toggle"
+                    data-collapse-toggle="user-two-factor"
+                    aria-expanded="{% if two_factor_default_state == 'collapsed' %}false{% else %}true{% endif %}"
+                    onclick="toggleCardCollapse('user-two-factor')">
+                <span>Two-Factor Authentication</span>
+            </button>
+            <div class="card-collapse-content user-two-factor-content{% if two_factor_default_state == 'collapsed' %} collapsed{% endif %}"
+                 data-collapse-content="user-two-factor"
+                 data-collapse-default="{{ two_factor_default_state }}"
+                 data-collapse-mobile-default="{{ two_factor_default_state }}">
             {% if current_user.two_factor_enabled %}
                 <p class="user-account-form-note">
                     Enabled. Backup codes remaining: {{ current_user.two_factor_backup_codes_remaining }}.
@@ -204,6 +215,7 @@
                     <button type="submit">Set Up Authenticator App</button>
                 </form>
             {% endif %}
+            </div>
         </div>
     {% else %}
         <p class="helper-text user-account-helper">
