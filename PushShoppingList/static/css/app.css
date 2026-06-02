@@ -51,6 +51,7 @@ body {
         #screenSettingsCard,
         #editItemsSection,
         #storeOptionsSection,
+        #feedbackSupportSection,
         .view-settings-card {
             border: 0;
             background: transparent;
@@ -70,6 +71,7 @@ body {
         #rulesCard,
         #home-address-section,
         #storeOptionsSection,
+        #feedbackSupportSection,
         .view-settings-card {
             position: relative;
             margin-top: 46px;
@@ -81,6 +83,7 @@ body {
         #rulesCard::before,
         #home-address-section::before,
         #storeOptionsSection::before,
+        #feedbackSupportSection::before,
         .view-settings-card::before {
             content: "";
             position: absolute;
@@ -13713,4 +13716,396 @@ body {
     min-width: 32px;
     height: 32px;
     min-height: 32px;
+}
+
+.feedback-support-card {
+    display: grid;
+    gap: 18px;
+    max-width: 980px;
+}
+
+.feedback-support-header {
+    display: grid;
+    gap: 8px;
+    text-align: center;
+}
+
+.feedback-support-header h2 {
+    margin: 0;
+    font-size: 26px;
+}
+
+.feedback-support-header p {
+    max-width: 760px;
+    margin: 0 auto;
+    color: #d7ddd9;
+    line-height: 1.35;
+}
+
+.feedback-messages {
+    display: grid;
+    gap: 8px;
+}
+
+.feedback-message,
+.feedback-sign-in-panel,
+.feedback-empty {
+    padding: 12px 14px;
+    border-radius: 8px;
+    border: 1px solid #2d4157;
+    background: #101822;
+    color: #e5edf5;
+    font-weight: 800;
+    text-align: center;
+}
+
+.feedback-message.success {
+    border-color: #00d084;
+    background: #06351f;
+    color: #aaffd4;
+}
+
+.feedback-message.error {
+    border-color: #b91c1c;
+    background: #3b1111;
+    color: #ffb4b4;
+}
+
+.feedback-form,
+.feedback-ticket,
+.feedback-admin-form {
+    display: grid;
+    gap: 14px;
+}
+
+.feedback-form,
+.feedback-ticket {
+    padding: 16px;
+    border: 1px solid #2f5172;
+    border-radius: 10px;
+    background: #07111c;
+}
+
+.feedback-form-grid,
+.feedback-admin-form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.feedback-form label,
+.feedback-admin-form label {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+
+.feedback-form label span,
+.feedback-admin-form label span {
+    color: #d4d0c8;
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.feedback-form input,
+.feedback-form select,
+.feedback-form textarea,
+.feedback-admin-form input,
+.feedback-admin-form select,
+.feedback-admin-form textarea {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    border: 1px solid #655f50;
+    border-radius: 7px;
+    background: #1b1f1f;
+    color: #f5f7f7;
+    font-size: 15px;
+}
+
+.feedback-form input,
+.feedback-form select,
+.feedback-admin-form input,
+.feedback-admin-form select {
+    min-height: 42px;
+    padding: 8px 10px;
+}
+
+.feedback-form textarea,
+.feedback-admin-form textarea {
+    min-height: 120px;
+    height: 120px;
+    resize: vertical;
+}
+
+.feedback-form-wide,
+.feedback-admin-form label:nth-child(2),
+.feedback-admin-form label:nth-child(3) {
+    grid-column: 1 / -1;
+}
+
+.feedback-submit-btn,
+.feedback-secondary-btn {
+    width: 100%;
+    min-height: 40px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: white;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.feedback-submit-btn {
+    background: #155a92;
+    border-color: #1e80c9;
+}
+
+.feedback-submit-btn:hover,
+.feedback-submit-btn:focus-visible {
+    background: #0f6fb7;
+}
+
+.feedback-secondary-btn {
+    background: #23282d;
+    border-color: #334155;
+}
+
+.feedback-secondary-btn:hover,
+.feedback-secondary-btn:focus-visible {
+    background: #30363d;
+}
+
+.my-feedback-section,
+.admin-feedback-section {
+    display: grid;
+    gap: 12px;
+}
+
+.feedback-section-heading-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.feedback-section-heading-row h3 {
+    margin: 0;
+    font-size: 21px;
+}
+
+.feedback-unread-total,
+.feedback-admin-count,
+.feedback-unread-badge,
+.feedback-status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 26px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 900;
+}
+
+.feedback-unread-total,
+.feedback-unread-badge {
+    border: 1px solid #f59e0b;
+    background: #3a2503;
+    color: #ffd166;
+}
+
+.feedback-admin-count,
+.feedback-status {
+    border: 1px solid #245b8e;
+    background: #0d253d;
+    color: #dceeff;
+}
+
+.feedback-ticket-list {
+    display: grid;
+    gap: 12px;
+}
+
+.feedback-ticket {
+    scroll-margin-top: 84px;
+}
+
+.feedback-ticket.has-unread {
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.2);
+}
+
+.feedback-ticket-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.feedback-ticket-id {
+    color: #26ff99;
+    font-weight: 900;
+}
+
+.feedback-ticket h4 {
+    margin: 4px 0 0;
+    color: #fff;
+    font-size: 18px;
+}
+
+.feedback-ticket-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    margin-top: 7px;
+    color: #cbd5e1;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.feedback-status-wrap {
+    display: grid;
+    justify-items: end;
+    gap: 6px;
+}
+
+.feedback-ticket-body {
+    display: grid;
+    gap: 12px;
+}
+
+.feedback-ticket-description,
+.feedback-notification-update,
+.feedback-admin-update,
+.feedback-resolution {
+    display: grid;
+    gap: 5px;
+    padding: 12px;
+    border-radius: 8px;
+    background: #111819;
+    color: #e6edf3;
+    line-height: 1.35;
+}
+
+.feedback-notification-update {
+    border-left: 3px solid #f59e0b;
+}
+
+.feedback-admin-update {
+    border-left: 3px solid #1e80c9;
+}
+
+.feedback-resolution {
+    border-left: 3px solid #00d084;
+}
+
+.feedback-notification-update strong,
+.feedback-admin-update strong,
+.feedback-resolution strong,
+.feedback-timeline-wrap strong {
+    color: #d4d0c8;
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.feedback-notification-update small,
+.feedback-admin-update small {
+    color: #aeb7c2;
+}
+
+.feedback-attachment-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.feedback-attachment-list a {
+    display: inline-flex;
+    max-width: 100%;
+    padding: 6px 9px;
+    border: 1px solid #2f5172;
+    border-radius: 999px;
+    background: #101822;
+    color: #77c9ff;
+    font-weight: 800;
+    text-decoration: none;
+}
+
+.feedback-attachment-list a:hover,
+.feedback-attachment-list a:focus-visible {
+    border-color: #00d084;
+    color: #aaffd4;
+}
+
+.feedback-timeline-wrap {
+    display: grid;
+    gap: 8px;
+}
+
+.feedback-timeline {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.feedback-timeline li {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #0f161d;
+}
+
+.feedback-timeline span {
+    color: #f8fafc;
+    font-weight: 900;
+}
+
+.feedback-timeline small {
+    color: #b8c2cc;
+    font-weight: 700;
+}
+
+.admin-feedback-section,
+.feedback-admin-ticket {
+    border-color: #3e5b33;
+}
+
+.feedback-admin-ticket .feedback-ticket-body {
+    gap: 14px;
+}
+
+@media (max-width: 760px) {
+    .feedback-support-card {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+
+    .feedback-form-grid,
+    .feedback-admin-form {
+        grid-template-columns: 1fr;
+    }
+
+    .feedback-ticket-top,
+    .feedback-section-heading-row {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .feedback-status-wrap {
+        justify-items: start;
+    }
+
+    .feedback-timeline li {
+        grid-template-columns: 1fr;
+        gap: 2px;
+    }
 }

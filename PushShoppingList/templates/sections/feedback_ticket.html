@@ -1,0 +1,80 @@
+<article id="feedback-{{ feedback.feedback_id }}" class="feedback-ticket{% if feedback.unread_notifications_count %} has-unread{% endif %}">
+    <div class="feedback-ticket-top">
+        <div>
+            <div class="feedback-ticket-id">#{{ feedback.feedback_id }}</div>
+            <h4>{{ feedback.subject }}</h4>
+            <div class="feedback-ticket-meta">
+                <span>{{ feedback.feedback_type }}</span>
+                <span>Submitted {{ feedback.display_created_at }}</span>
+                <span>Last Updated {{ feedback.display_updated_at }}</span>
+            </div>
+        </div>
+        <div class="feedback-status-wrap">
+            {% if feedback.unread_notifications_count %}
+                <span class="feedback-unread-badge">Unread</span>
+            {% endif %}
+            <span class="feedback-status">{{ feedback.status }}</span>
+        </div>
+    </div>
+
+    <div class="feedback-ticket-body">
+        <div class="feedback-ticket-description">{{ feedback.description }}</div>
+
+        {% if feedback.latest_notification_message %}
+            <div class="feedback-notification-update">
+                <strong>Notification</strong>
+                <span>{{ feedback.latest_notification_message }}</span>
+                {% if feedback.latest_notification_at %}
+                    <small>{{ feedback.latest_notification_at }}</small>
+                {% endif %}
+            </div>
+        {% endif %}
+
+        {% if feedback.admin_notes %}
+            <div class="feedback-admin-update">
+                <strong>Admin Update</strong>
+                <span>{{ feedback.admin_notes }}</span>
+            </div>
+        {% endif %}
+
+        {% if feedback.resolution_notes %}
+            <div class="feedback-resolution">
+                <strong>Resolution Notes</strong>
+                <span>{{ feedback.resolution_notes }}</span>
+            </div>
+        {% endif %}
+
+        {% if feedback.attachments or feedback.admin_attachments %}
+            <div class="feedback-attachment-list">
+                {% for attachment in feedback.attachments %}
+                    <a href="{{ url_for('static', filename=attachment.path) }}" target="_blank" rel="noopener noreferrer">
+                        {{ attachment.original_name }}
+                    </a>
+                {% endfor %}
+                {% for attachment in feedback.admin_attachments %}
+                    <a href="{{ url_for('static', filename=attachment.path) }}" target="_blank" rel="noopener noreferrer">
+                        {{ attachment.original_name }}
+                    </a>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <div class="feedback-timeline-wrap">
+            <strong>Activity Timeline</strong>
+            <ol class="feedback-timeline">
+                {% for event in feedback.timeline %}
+                    <li>
+                        <span>{{ event.status }}</span>
+                        <small>{{ event.display_date }}</small>
+                    </li>
+                {% endfor %}
+            </ol>
+        </div>
+
+        {% if feedback.unread_notifications_count %}
+            <form method="POST" action="{{ url_for('feedback_bp.mark_feedback_read_route', feedback_id=feedback.feedback_id) }}">
+                <button type="submit" class="feedback-secondary-btn">Mark updates read</button>
+            </form>
+        {% endif %}
+    </div>
+</article>

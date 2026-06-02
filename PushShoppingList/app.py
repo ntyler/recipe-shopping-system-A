@@ -5,6 +5,7 @@ from flask import request
 from flask import session
 
 from PushShoppingList.routes.account_routes import account_bp
+from PushShoppingList.routes.feedback_routes import feedback_bp
 from PushShoppingList.routes.main_routes import main_bp
 from PushShoppingList.routes.recipe_routes import recipe_bp
 from PushShoppingList.routes.store_routes import store_bp
@@ -24,6 +25,7 @@ def create_app():
     app.secret_key = os.getenv("SHOPPING_APP_SECRET_KEY", "dev-shopping-list-session-key")
 
     app.register_blueprint(account_bp)
+    app.register_blueprint(feedback_bp)
     app.register_blueprint(main_bp)
     app.register_blueprint(recipe_bp)
     app.register_blueprint(store_bp)

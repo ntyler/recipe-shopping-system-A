@@ -1,0 +1,101 @@
+<section id="feedbackSupportSection" class="app-card feedback-support-card">
+    <div class="feedback-support-header">
+        <h2>💬 Feedback &amp; Support</h2>
+        <p>
+            Help us improve the shopping experience. Submit bugs, feature requests, product matching issues, recipe extraction problems, or general feedback.
+        </p>
+    </div>
+
+    {% if feedback_messages %}
+        <div class="feedback-messages" aria-live="polite">
+            {% for message in feedback_messages %}
+                <div class="feedback-message {{ message.category }}">{{ message.text }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {% if current_user %}
+        <form class="feedback-form"
+              method="POST"
+              action="{{ url_for('feedback_bp.submit_feedback_route') }}"
+              enctype="multipart/form-data">
+            <div class="feedback-form-grid">
+                <label>
+                    <span>Feedback Type</span>
+                    <select name="feedback_type" required>
+                        {% for feedback_type in feedback_dashboard.feedback_types %}
+                            <option value="{{ feedback_type }}">{{ feedback_type }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label>
+                    <span>Subject</span>
+                    <input type="text" name="subject" required autocomplete="off">
+                </label>
+                <label class="feedback-form-wide">
+                    <span>Description</span>
+                    <textarea name="description" required></textarea>
+                </label>
+                <label>
+                    <span>Attach Screenshot</span>
+                    <input type="file" name="screenshot" accept="image/png,image/jpeg,image/webp,image/gif">
+                </label>
+                <label>
+                    <span>Attach File</span>
+                    <input type="file"
+                           name="attachment"
+                           accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,text/markdown,text/csv,.doc,.docx,.xls,.xlsx">
+                </label>
+            </div>
+            <button type="submit" class="feedback-submit-btn">Submit Feedback</button>
+        </form>
+    {% else %}
+        <div class="feedback-sign-in-panel">
+            Sign in before submitting feedback so each request, status change, and admin response stays tied to your account.
+        </div>
+    {% endif %}
+
+    <section class="my-feedback-section" aria-labelledby="myFeedbackTitle">
+        <div class="feedback-section-heading-row">
+            <h3 id="myFeedbackTitle">📋 My Feedback</h3>
+            {% if feedback_dashboard.unread_count %}
+                <span class="feedback-unread-total">
+                    {{ feedback_dashboard.unread_count }} unread update{% if feedback_dashboard.unread_count != 1 %}s{% endif %}
+                </span>
+            {% endif %}
+        </div>
+
+        {% if current_user and feedback_dashboard.my_feedback %}
+            <div class="feedback-ticket-list">
+                {% for feedback in feedback_dashboard.my_feedback %}
+                    {% include "sections/feedback_ticket.html" %}
+                {% endfor %}
+            </div>
+        {% elif current_user %}
+            <div class="feedback-empty">No feedback submitted yet.</div>
+        {% else %}
+            <div class="feedback-empty">Sign in to view feedback submitted from your account.</div>
+        {% endif %}
+    </section>
+
+    {% if feedback_dashboard.is_admin %}
+        <section class="admin-feedback-section" aria-labelledby="adminFeedbackTitle">
+            <div class="feedback-section-heading-row">
+                <h3 id="adminFeedbackTitle">Admin Feedback Queue</h3>
+                <span class="feedback-admin-count">
+                    {{ feedback_dashboard.admin_feedback | length }} request{% if (feedback_dashboard.admin_feedback | length) != 1 %}s{% endif %}
+                </span>
+            </div>
+
+            {% if feedback_dashboard.admin_feedback %}
+                <div class="feedback-ticket-list feedback-admin-list">
+                    {% for feedback in feedback_dashboard.admin_feedback %}
+                        {% include "sections/feedback_admin_ticket.html" %}
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="feedback-empty">No feedback has been submitted.</div>
+            {% endif %}
+        </section>
+    {% endif %}
+</section>

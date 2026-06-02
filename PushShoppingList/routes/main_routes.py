@@ -12,11 +12,13 @@ from flask import jsonify
 from flask import redirect
 from flask import request
 from flask import render_template
+from flask import session
 from flask import url_for
 
 from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
 from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.food_rules_service import shopping_item_food_rule_status
+from PushShoppingList.services.feedback_service import feedback_dashboard_for_user
 from PushShoppingList.services.cookbook_service import cookbook_view
 from PushShoppingList.services.cookbook_service import create_cookbook
 from PushShoppingList.services.cookbook_service import cookbook_recipes_for_urls
@@ -68,6 +70,7 @@ from PushShoppingList.services.shopping_list_service import load_items
 from PushShoppingList.services.shopping_list_service import add_items
 from PushShoppingList.services.shopping_list_service import save_items
 from PushShoppingList.services.store_settings_service import load_store_settings
+from PushShoppingList.services.user_account_service import current_public_user
 
 main_bp = Blueprint("main_bp", __name__)
 address_openai_client = None
@@ -1247,6 +1250,7 @@ def build_store_view(items, item_state, available_stores, enabled_stores):
 
 @main_bp.route("/")
 def index():
+    active_public_user = current_public_user()
     items = load_items()
     store_settings = load_store_settings()
     recipe_urls = recipe_url_rows()
@@ -1302,6 +1306,8 @@ def index():
         food_rules=load_food_rules(),
         rules_display=load_rules_display(),
         food_rule_status=shopping_item_food_rule_status,
+        feedback_dashboard=feedback_dashboard_for_user(active_public_user),
+        feedback_messages=session.pop("feedback_messages", []),
         password_reset_token=request.args.get("reset_token", ""),
         app_css_version=static_asset_version("css/app.css"),
         app_js_version=static_asset_version("js/app.js"),
