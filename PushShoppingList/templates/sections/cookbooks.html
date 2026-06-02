@@ -235,8 +235,38 @@
                                                                     </div>
                                                                     <div class="recipe-url-summary-cookbook">
                                                                         <span class="recipe-url-summary-cookbook-label recipe-url-summary-meta-label">Cookbook:</span>
-                                                                        <div class="recipe-url-summary-cookbook-value recipe-url-summary-meta-value">
-                                                                            <span class="cookbook-recipe-current-cookbook">{{ cookbook.name }}</span>
+                                                                        <div class="recipe-url-summary-cookbook-value recipe-url-summary-meta-value recipe-url-summary-cookbook-menu-wrap recipe-edit-row-menu-wrap">
+                                                                            <button type="button"
+                                                                                    class="recipe-url-summary-cookbook-select"
+                                                                                    aria-label="Cookbook actions for {{ recipe.name }}"
+                                                                                    aria-haspopup="true"
+                                                                                    aria-expanded="false"
+                                                                                    onclick="return toggleRecipeEditRowMenu(this, event)">
+                                                                                <span class="recipe-url-summary-cookbook-name cookbook-recipe-current-cookbook">{{ cookbook.name }}</span>
+                                                                                <span class="recipe-url-summary-cookbook-chevron" aria-hidden="true"></span>
+                                                                            </button>
+                                                                            <div class="recipe-edit-row-menu recipe-url-summary-cookbook-menu" hidden>
+                                                                                <button type="button"
+                                                                                        data-recipe-url="{{ recipe.url }}"
+                                                                                        onclick="return createRecipeLogCookbook(this)">
+                                                                                    Create New Cookbook
+                                                                                </button>
+                                                                                {% if cookbook_view and cookbook_view.cookbooks %}
+                                                                                    <div class="recipe-url-summary-cookbook-menu-label">Move to cookbook</div>
+                                                                                    {% for target_cookbook in cookbook_view.cookbooks %}
+                                                                                        {% if target_cookbook.id != cookbook.id %}
+                                                                                            <button type="button"
+                                                                                                    data-recipe-url="{{ recipe.url }}"
+                                                                                                    data-cookbook-id="{{ target_cookbook.id }}"
+                                                                                                    data-cookbook-name="{{ target_cookbook.name }}"
+                                                                                                    data-cookbook-unclassified="{% if target_cookbook.is_unclassified %}1{% else %}0{% endif %}"
+                                                                                                    onclick="return moveRecipeLogCookbook(this)">
+                                                                                                {{ target_cookbook.name }}
+                                                                                            </button>
+                                                                                        {% endif %}
+                                                                                    {% endfor %}
+                                                                                {% endif %}
+                                                                            </div>
                                                                         </div>
                                                                     </div>
                                                                 </div>
