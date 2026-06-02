@@ -1,3 +1,5 @@
+import os
+
 from flask import Blueprint
 from flask import flash
 from flask import redirect
@@ -5,6 +7,8 @@ from flask import request
 from flask import session
 from flask import url_for
 
+from PushShoppingList.services.email_service import password_reset_email_configured
+from PushShoppingList.services.email_service import send_password_reset_email
 from PushShoppingList.services.user_account_service import authenticate_user
 from PushShoppingList.services.user_account_service import create_user
 from PushShoppingList.services.user_account_service import request_password_reset
@@ -23,6 +27,23 @@ def flash_account_result(result, success_message):
 
     for error in result.get("errors", ["Something went wrong. Please try again."]):
         flash(error, "error")
+
+
+def password_reset_link(token):
+    path = url_for(
+        "account_bp.open_password_reset_route",
+        token=token,
+    )
+    base_url = str(os.getenv("SHOPPING_APP_PASSWORD_RESET_BASE_URL") or "").strip().rstrip("/")
+
+    if base_url:
+        return f"{base_url}{path}"
+
+    return url_for(
+        "account_bp.open_password_reset_route",
+        token=token,
+        _external=True,
+    )
 
 
 @account_bp.route("/account/create", methods=["POST"])
@@ -55,13 +76,30 @@ def request_password_reset_route():
     if result.get("ok"):
         session.pop("password_reset_link", None)
         if result.get("sent") and result.get("token"):
-            session["password_reset_link"] = url_for(
-                "account_bp.open_password_reset_route",
-                token=result["token"],
-                _external=True,
-            )
+            reset_link = password_reset_link(result["token"])
+
+            if password_reset_email_configured():
+                email_result = send_password_reset_email(result.get("user"), reset_link)
+
+                if not email_result.get("ok"):
+                    flash(
+                        email_result.get("error")
+                        or "Password reset email could not be sent. Check SMTP settings.",
+                        "error",
+                    )
+                    return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+            else:
+                session["password_reset_link"] = reset_link
+                flash(
+                    "Email is not configured yet, so a local password reset link is available below.",
+                    "success",
+                )
+                return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
         flash(
-            "If that account exists, a password reset link has been prepared.",
+            "If that account exists, a password reset email has been sent."
+            if password_reset_email_configured()
+            else "If that account exists, a password reset link has been prepared.",
             "success",
         )
     else:

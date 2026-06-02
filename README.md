@@ -52,6 +52,19 @@ Optional ntfy topic for phone/computer extraction notifications:
 $env:NTFY_TOPIC="your-private-shopping-list-topic"
 ```
 
+Optional SMTP settings for forgot-password reset emails:
+
+```powershell
+$env:SHOPPING_APP_SMTP_HOST="smtp.gmail.com"
+$env:SHOPPING_APP_SMTP_PORT="587"
+$env:SHOPPING_APP_SMTP_USERNAME="your_email@gmail.com"
+$env:SHOPPING_APP_SMTP_PASSWORD="your_email_app_password"
+$env:SHOPPING_APP_SMTP_FROM_EMAIL="your_email@gmail.com"
+$env:SHOPPING_APP_SMTP_FROM_NAME="Recipe Shopping System"
+$env:SHOPPING_APP_SMTP_USE_TLS="1"
+$env:SHOPPING_APP_PASSWORD_RESET_BASE_URL="http://127.0.0.1:5083"
+```
+
 Optional recipe-fetch controls:
 
 ```powershell
@@ -79,6 +92,7 @@ Notes:
 - Leave `DISABLE_RECIPE_PDF_ARCHIVE` unset if you want each extracted recipe page saved as a PDF for later review.
 - Set `FORCE_OPENAI_RECIPE_EXTRACTION=1` only when you want the OpenAI extractor used even if recipe-card HTML already has enough structured data.
 - Leave `SHOPPING_APP_PORT` unset when running `py -3.11 app.py` directly and you want the default Flask port `5000`. The included `start_app.bat` currently sets `SHOPPING_APP_PORT=5083`.
+- Set `SHOPPING_APP_PASSWORD_RESET_BASE_URL` to the address users should open from email, such as your LAN, Tailscale, or public HTTPS URL. If unset, reset emails use the current request host.
 - Product lookup uses `OPENAI_API_KEY` for fully loaded product-page analysis and final best-product selection. If no key is set, the app still parses product candidates but skips ChatGPT product analysis.
 - Product image embedding is enabled by default. Set `DISABLE_PRODUCT_IMAGE_EMBEDDING=1` to skip downloading images into `embedded_image_base64`.
 - Full Base64 image strings are stored on candidates but omitted from ChatGPT prompts by default to keep prompts usable. Set `PRODUCT_PROMPT_INCLUDE_EMBEDDED_IMAGES=1` only if you really want those large strings sent to the API.

@@ -8,6 +8,7 @@ from PushShoppingList.routes.main_routes import main_bp
 from PushShoppingList.routes.recipe_routes import recipe_bp
 from PushShoppingList.routes.store_routes import store_bp
 from PushShoppingList.routes.product_routes import product_bp
+from PushShoppingList.services.email_service import password_reset_email_configured
 from PushShoppingList.services.user_account_service import current_public_user
 
 
@@ -30,6 +31,7 @@ def create_app():
     def inject_current_user():
         return {
             "current_user": current_public_user(),
+            "password_reset_email_configured": password_reset_email_configured(),
         }
 
     @app.after_request

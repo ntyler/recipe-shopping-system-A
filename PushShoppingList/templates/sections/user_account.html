@@ -14,7 +14,7 @@
     {% if local_password_reset_link %}
         <div class="user-account-reset-panel" aria-live="polite">
             <strong>Local password reset link</strong>
-            <span>This app is not configured to send email, so use this one-time link to reset your password.</span>
+            <span>Password reset email is not configured, so use this one-time local link to reset your password.</span>
             <a href="{{ local_password_reset_link }}">Reset Password</a>
         </div>
     {% endif %}
@@ -157,13 +157,23 @@
                   hidden>
                 <h3>Forgot Password</h3>
                 <p class="user-account-form-note">
-                    Enter your username or email and the app will prepare a one-time reset link.
+                    {% if password_reset_email_configured %}
+                        Enter your username or email and the app will email a one-time reset link.
+                    {% else %}
+                        Enter your username or email and the app will prepare a one-time local reset link.
+                    {% endif %}
                 </p>
                 <label>
                     <span>Username or Email</span>
                     <input type="text" name="identity" required autocomplete="username">
                 </label>
-                <button type="submit">Prepare Reset Link</button>
+                <button type="submit">
+                    {% if password_reset_email_configured %}
+                        Send Reset Email
+                    {% else %}
+                        Prepare Reset Link
+                    {% endif %}
+                </button>
             </form>
         </div>
     {% endif %}
