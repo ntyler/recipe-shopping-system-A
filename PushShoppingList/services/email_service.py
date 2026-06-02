@@ -1,6 +1,7 @@
 import os
 import smtplib
 import ssl
+import sys
 from email.message import EmailMessage
 from email.utils import formataddr
 
@@ -9,7 +10,23 @@ DEFAULT_FROM_NAME = "Recipe Shopping System"
 
 
 def env_value(name, default=""):
-    return str(os.getenv(name, default) or "").strip()
+    value = os.getenv(name)
+
+    if value is None and sys.platform.startswith("win"):
+        value = windows_user_env_value(name)
+
+    return str(value if value is not None else default).strip()
+
+
+def windows_user_env_value(name):
+    try:
+        import winreg
+
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment") as key:
+            value, _ = winreg.QueryValueEx(key, name)
+            return value
+    except Exception:
+        return None
 
 
 def env_bool(name, default=False):

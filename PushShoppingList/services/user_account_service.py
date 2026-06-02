@@ -13,6 +13,8 @@ from werkzeug.security import check_password_hash
 from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
 
+from PushShoppingList.services.user_workspace_seed_service import seed_new_user_rule_workspace
+
 
 PACKAGE_DIR = Path(__file__).resolve().parent.parent
 USERS_FILE = Path(os.getenv("SHOPPING_APP_USERS_FILE", PACKAGE_DIR / "users.json"))
@@ -187,6 +189,11 @@ def create_user(username, email, password, confirm_password, avatar_file=None):
         return {"ok": False, "errors": avatar_result.get("errors", ["Avatar upload failed."])}
 
     user["avatar_path"] = avatar_result.get("avatar_path", "")
+    seed_result = seed_new_user_rule_workspace(user_id)
+
+    if not seed_result.get("ok"):
+        return {"ok": False, "errors": seed_result.get("errors", ["Unable to initialize account rules."])}
+
     payload["users"].append(user)
     save_users(payload)
     session["user_id"] = user_id
