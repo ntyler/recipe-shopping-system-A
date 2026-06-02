@@ -4084,7 +4084,9 @@ body {
 
         .user-password-reset-form,
         .user-account-forgot-form,
-        .user-two-factor-sign-in-form {
+        .user-two-factor-sign-in-form,
+        .user-two-factor-recovery-form,
+        .user-two-factor-recovery-request-form {
             grid-column: 1 / -1;
         }
 

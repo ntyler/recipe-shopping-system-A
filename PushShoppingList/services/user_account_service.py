@@ -32,6 +32,7 @@ ALLOWED_AVATAR_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 PASSWORD_RESET_TTL_HOURS = 1
 TWO_FACTOR_TRUST_DAYS = 30
+TWO_FACTOR_RECOVERY_TTL_MINUTES = 30
 
 
 def now_iso():
@@ -320,6 +321,91 @@ def find_user_by_reset_token(payload, token):
     return None
 
 
+def request_two_factor_recovery(user_id):
+    """Create an email recovery token only after the password sign-in step succeeds."""
+    user_id = str(user_id or "").strip()
+
+    if not user_id:
+        return {"ok": False, "errors": ["Sign in with your password before requesting two-factor recovery."]}
+
+    payload = load_users()
+    user = find_user_by_id_in_payload(payload, user_id)
+
+    if not user:
+        return {"ok": False, "errors": ["Sign in with your password before requesting two-factor recovery."]}
+
+    if not two_factor_enabled(user):
+        return {"ok": False, "errors": ["Two-factor authentication is not enabled for this account."]}
+
+    token = secrets.token_urlsafe(32)
+    timestamp = now_iso()
+    user["two_factor_recovery"] = {
+        # Store only a hash of the one-time recovery token.
+        "token_hash": generate_password_hash(token),
+        "created_at": timestamp,
+        "expires_at": (
+            datetime.utcnow().replace(microsecond=0)
+            + timedelta(minutes=TWO_FACTOR_RECOVERY_TTL_MINUTES)
+        ).isoformat() + "Z",
+    }
+    user["updated_at"] = timestamp
+    save_users(payload)
+    return {"ok": True, "sent": True, "token": token, "user": public_user(user)}
+
+
+def recover_two_factor_with_token(token, password):
+    token = str(token or "").strip()
+    password = str(password or "")
+    errors = []
+
+    if not token:
+        errors.append("Two-factor recovery link is missing. Request a new recovery email.")
+    if not password:
+        errors.append("Current password is required to recover two-factor access.")
+
+    if errors:
+        return {"ok": False, "errors": errors}
+
+    payload = load_users()
+    user = find_user_by_two_factor_recovery_token(payload, token)
+
+    if not user:
+        return {
+            "ok": False,
+            "errors": ["That two-factor recovery link is invalid or expired. Request a new recovery email."],
+        }
+
+    if not check_password_hash(str(user.get("password_hash") or ""), password):
+        return {"ok": False, "errors": ["Enter the current password for this account to recover two-factor access."]}
+
+    user.pop("two_factor", None)
+    user.pop("two_factor_setup", None)
+    user.pop("two_factor_recovery", None)
+    user["updated_at"] = now_iso()
+    save_users(payload)
+    session.pop("user_id", None)
+    session.pop("pending_2fa_user_id", None)
+    return {"ok": True, "user": public_user(user)}
+
+
+def find_user_by_two_factor_recovery_token(payload, token):
+    for user in payload.get("users", []):
+        recovery = user.get("two_factor_recovery") if isinstance(user, dict) else None
+
+        if not isinstance(recovery, dict):
+            continue
+
+        expires_at = parse_iso_datetime(recovery.get("expires_at"))
+        if not expires_at or expires_at < datetime.utcnow():
+            continue
+
+        token_hash = str(recovery.get("token_hash") or "")
+        if token_hash and check_password_hash(token_hash, token):
+            return user
+
+    return None
+
+
 def two_factor_enabled(user):
     two_factor = user.get("two_factor") if isinstance(user, dict) else None
     return isinstance(two_factor, dict) and bool(two_factor.get("enabled"))
@@ -580,6 +666,7 @@ def find_user_by_id_in_payload(payload, user_id):
 def sign_out_user():
     session.pop("user_id", None)
     session.pop("pending_2fa_user_id", None)
+    session.pop("two_factor_recovery_link", None)
 
 
 def update_user_profile(user_id, username, email, password="", confirm_password="", avatar_file=None):

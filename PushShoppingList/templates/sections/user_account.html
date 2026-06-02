@@ -19,6 +19,15 @@
         </div>
     {% endif %}
 
+    {% set local_two_factor_recovery_link = session.get("two_factor_recovery_link") %}
+    {% if local_two_factor_recovery_link %}
+        <div class="user-account-reset-panel" aria-live="polite">
+            <strong>Local two-factor recovery link</strong>
+            <span>Email is not configured, so use this one-time local link to recover two-factor access.</span>
+            <a href="{{ local_two_factor_recovery_link }}">Recover Two-Factor Access</a>
+        </div>
+    {% endif %}
+
     {% if password_reset_token|default("") %}
         <form class="user-account-form user-password-reset-form"
               method="POST"
@@ -34,6 +43,23 @@
                 <input type="password" name="confirm_password" required autocomplete="new-password">
             </label>
             <button type="submit">Reset Password</button>
+        </form>
+    {% endif %}
+
+    {% if two_factor_recovery_token|default("") %}
+        <form class="user-account-form user-two-factor-recovery-form"
+              method="POST"
+              action="{{ url_for('account_bp.complete_two_factor_recovery_route') }}">
+            <h3>Recover Two-Factor Access</h3>
+            <p class="user-account-form-note">
+                Enter your current password to disable two-factor authentication. You can set it up again after signing in.
+            </p>
+            <input type="hidden" name="two_factor_recovery_token" value="{{ two_factor_recovery_token }}">
+            <label>
+                <span>Current Password</span>
+                <input type="password" name="password" required autocomplete="current-password">
+            </label>
+            <button type="submit" class="danger">Disable Two-Factor Authentication</button>
         </form>
     {% endif %}
 
@@ -251,6 +277,15 @@
                             formaction="{{ url_for('account_bp.cancel_two_factor_sign_in_route') }}">
                         Cancel Sign In
                     </button>
+                </form>
+                <form class="user-account-form user-two-factor-recovery-request-form"
+                      method="POST"
+                      action="{{ url_for('account_bp.request_two_factor_recovery_route') }}">
+                    <h3>Lost Access?</h3>
+                    <p class="user-account-form-note">
+                        If you lost your authenticator and backup codes, email a one-time recovery link to this account.
+                    </p>
+                    <button type="submit">Email Recovery Link</button>
                 </form>
             {% else %}
                 <form class="user-account-form"

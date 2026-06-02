@@ -139,6 +139,73 @@ def send_password_reset_email(user, reset_url):
     return {"ok": True, "configured": True}
 
 
+def send_two_factor_recovery_email(user, recovery_url):
+    config = smtp_config()
+
+    if not password_reset_email_configured():
+        return {
+            "ok": False,
+            "configured": False,
+            "error": "Two-factor recovery email is not configured.",
+        }
+
+    recipient = str((user or {}).get("email") or "").strip()
+    username = str((user or {}).get("username") or "there").strip()
+
+    if not recipient:
+        return {
+            "ok": False,
+            "configured": True,
+            "error": "This account does not have an email address.",
+        }
+
+    message = EmailMessage()
+    message["Subject"] = "Recover your Recipe Shopping System two-factor access"
+    message["From"] = formataddr((config["from_name"], config["from_email"]))
+    message["To"] = recipient
+    message.set_content(
+        "\n".join([
+            f"Hi {username},",
+            "",
+            "Use this one-time link to recover two-factor access:",
+            recovery_url,
+            "",
+            "This link expires in 30 minutes and still requires your current password.",
+            "If you did not request this recovery, change your password and ignore this email.",
+        ])
+    )
+
+    context = ssl.create_default_context()
+
+    try:
+        if config["use_ssl"]:
+            with smtplib.SMTP_SSL(config["host"], config["port"], timeout=15, context=context) as smtp:
+                login_smtp(smtp, config)
+                smtp.send_message(message)
+        else:
+            with smtplib.SMTP(config["host"], config["port"], timeout=15) as smtp:
+                smtp.ehlo()
+                if config["use_tls"]:
+                    smtp.starttls(context=context)
+                    smtp.ehlo()
+                login_smtp(smtp, config)
+                smtp.send_message(message)
+    except smtplib.SMTPAuthenticationError as err:
+        return {
+            "ok": False,
+            "configured": True,
+            "error": smtp_auth_error_message(err),
+        }
+    except Exception as err:
+        return {
+            "ok": False,
+            "configured": True,
+            "error": f"Two-factor recovery email could not be sent. Check SMTP settings. {err}",
+        }
+
+    return {"ok": True, "configured": True}
+
+
 def login_smtp(smtp, config):
     if config["username"]:
         smtp.login(config["username"], config["password"])

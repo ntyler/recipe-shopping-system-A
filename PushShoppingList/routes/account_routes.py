@@ -10,6 +10,7 @@ from flask import url_for
 
 from PushShoppingList.services.email_service import password_reset_email_configured
 from PushShoppingList.services.email_service import send_password_reset_email
+from PushShoppingList.services.email_service import send_two_factor_recovery_email
 from PushShoppingList.services.user_account_service import authenticate_user
 from PushShoppingList.services.user_account_service import cancel_two_factor_setup
 from PushShoppingList.services.user_account_service import cancel_two_factor_sign_in
@@ -19,6 +20,8 @@ from PushShoppingList.services.user_account_service import disable_two_factor
 from PushShoppingList.services.user_account_service import enable_two_factor
 from PushShoppingList.services.user_account_service import regenerate_two_factor_backup_codes
 from PushShoppingList.services.user_account_service import request_password_reset
+from PushShoppingList.services.user_account_service import request_two_factor_recovery
+from PushShoppingList.services.user_account_service import recover_two_factor_with_token
 from PushShoppingList.services.user_account_service import reset_password_with_token
 from PushShoppingList.services.user_account_service import sign_out_user
 from PushShoppingList.services.user_account_service import start_two_factor_setup
@@ -51,6 +54,23 @@ def password_reset_link(token):
 
     return url_for(
         "account_bp.open_password_reset_route",
+        token=token,
+        _external=True,
+    )
+
+
+def two_factor_recovery_link(token):
+    path = url_for(
+        "account_bp.open_two_factor_recovery_route",
+        token=token,
+    )
+    base_url = str(os.getenv("SHOPPING_APP_PASSWORD_RESET_BASE_URL") or "").strip().rstrip("/")
+
+    if base_url:
+        return f"{base_url}{path}"
+
+    return url_for(
+        "account_bp.open_two_factor_recovery_route",
         token=token,
         _external=True,
     )
@@ -117,6 +137,69 @@ def cancel_two_factor_sign_in_route():
     cancel_two_factor_sign_in()
     flash("Two-factor sign-in canceled.", "success")
     return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+
+@account_bp.route("/account/2fa/recovery/request", methods=["POST"])
+def request_two_factor_recovery_route():
+    result = request_two_factor_recovery(session.get("pending_2fa_user_id"))
+
+    if result.get("ok"):
+        session.pop("two_factor_recovery_link", None)
+        recovery_link = two_factor_recovery_link(result["token"])
+
+        if password_reset_email_configured():
+            email_result = send_two_factor_recovery_email(result.get("user"), recovery_link)
+
+            if not email_result.get("ok"):
+                flash(
+                    email_result.get("error")
+                    or "Two-factor recovery email could not be sent. Check SMTP settings.",
+                    "error",
+                )
+                return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+        else:
+            session["two_factor_recovery_link"] = recovery_link
+            flash(
+                "Email is not configured yet, so a local two-factor recovery link is available below.",
+                "success",
+            )
+            return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+        flash("A two-factor recovery email has been sent.", "success")
+    else:
+        flash_account_result(result, "")
+
+    return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+
+@account_bp.route("/account/2fa/recovery/<token>", methods=["GET"])
+def open_two_factor_recovery_route(token):
+    return redirect(url_for("main_bp.index", two_factor_recovery_token=token, _anchor="userAccountSection"))
+
+
+@account_bp.route("/account/2fa/recovery/complete", methods=["POST"])
+def complete_two_factor_recovery_route():
+    result = recover_two_factor_with_token(
+        request.form.get("two_factor_recovery_token"),
+        request.form.get("password"),
+    )
+
+    response = make_response(redirect(url_for("main_bp.index", _anchor="userAccountSection")))
+
+    if result.get("ok"):
+        session.pop("two_factor_recovery_link", None)
+        flash("Two-factor authentication disabled. Sign in with your password and set up a new authenticator.", "success")
+        response.delete_cookie(TWO_FACTOR_TRUST_COOKIE)
+        return response
+
+    flash_account_result(result, "")
+    return redirect(
+        url_for(
+            "main_bp.index",
+            two_factor_recovery_token=request.form.get("two_factor_recovery_token", ""),
+            _anchor="userAccountSection",
+        )
+    )
 
 
 @account_bp.route("/account/password-reset/request", methods=["POST"])
