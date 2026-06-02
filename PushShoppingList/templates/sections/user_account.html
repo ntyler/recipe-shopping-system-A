@@ -52,7 +52,7 @@
               action="{{ url_for('account_bp.complete_two_factor_recovery_route') }}">
             <h3>Recover Two-Factor Access</h3>
             <p class="user-account-form-note">
-                Enter your current password to disable two-factor authentication. You can set it up again after signing in.
+                This will disable two-factor authentication after confirming your current password. Sign in again and set up a new authenticator to receive new backup codes.
             </p>
             <input type="hidden" name="two_factor_recovery_token" value="{{ two_factor_recovery_token }}">
             <label>
@@ -281,9 +281,9 @@
                 <form class="user-account-form user-two-factor-recovery-request-form"
                       method="POST"
                       action="{{ url_for('account_bp.request_two_factor_recovery_route') }}">
-                    <h3>Lost Access?</h3>
+                    <h3>Lost authenticator or backup codes?</h3>
                     <p class="user-account-form-note">
-                        If you lost your authenticator and backup codes, email a one-time recovery link to this account.
+                        Email a one-time recovery link to this account. The link will disable 2FA only after you confirm your current password.
                     </p>
                     <button type="submit">Email Recovery Link</button>
                 </form>
