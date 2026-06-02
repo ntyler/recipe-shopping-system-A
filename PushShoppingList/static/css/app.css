@@ -59,7 +59,8 @@ body {
         }
 
         #screenSettingsCard .screen-settings-toggle,
-        #storeOptionsSection .store-options-title-toggle {
+        #storeOptionsSection .store-options-title-toggle,
+        #feedbackSupportSection .feedback-support-title-toggle {
             border: 0;
             background: transparent;
             box-shadow: none;
@@ -602,7 +603,19 @@ body {
             font-size: 22px;
         }
 
+        .feedback-support-title-toggle {
+            padding: 0 2px 8px;
+            background: transparent;
+            border: 0;
+            border-radius: 0;
+            font-size: 22px;
+        }
+
         .store-options-title-toggle:hover {
+            background: transparent;
+        }
+
+        .feedback-support-title-toggle:hover {
             background: transparent;
         }
 
@@ -3474,7 +3487,8 @@ body {
         #cookbooksCard > .card-collapse-toggle,
         #rulesCard > .card-collapse-toggle,
         #home-address-section > .card-collapse-toggle,
-        #storeOptionsSection .store-options-title-toggle {
+        #storeOptionsSection .store-options-title-toggle,
+        #feedbackSupportSection .feedback-support-title-toggle {
             justify-content: center;
             text-align: center;
         }

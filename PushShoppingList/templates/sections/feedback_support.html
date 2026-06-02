@@ -1,6 +1,17 @@
 <section id="feedbackSupportSection" class="app-card feedback-support-card">
+    <button type="button"
+            class="card-collapse-toggle feedback-support-title-toggle"
+            data-collapse-toggle="feedback-support"
+            aria-expanded="false"
+            onclick="toggleCardCollapse('feedback-support')">
+        <span>💬 Feedback &amp; Support</span>
+    </button>
+
+    <div class="card-collapse-content feedback-support-content collapsed"
+         data-collapse-content="feedback-support"
+         data-collapse-default="collapsed"
+         data-collapse-mobile-default="collapsed">
     <div class="feedback-support-header">
-        <h2>💬 Feedback &amp; Support</h2>
         <p>
             Help us improve the shopping experience. Submit bugs, feature requests, product matching issues, recipe extraction problems, or general feedback.
         </p>
@@ -98,4 +109,5 @@
             {% endif %}
         </section>
     {% endif %}
+    </div>
 </section>
