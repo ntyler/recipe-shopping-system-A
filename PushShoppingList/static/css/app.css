@@ -3972,6 +3972,20 @@ body {
             text-align: center;
         }
 
+        .user-two-factor-qr-unavailable {
+            background: #111819;
+            color: #f8fafc;
+        }
+
+        .user-two-factor-qr-unavailable strong {
+            color: #ffd166;
+            font-weight: 900;
+        }
+
+        .user-two-factor-qr-unavailable small {
+            color: #d4d0c8;
+        }
+
         .user-two-factor-checkbox {
             display: flex !important;
             grid-template-columns: none !important;

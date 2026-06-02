@@ -170,6 +170,12 @@
                                  alt="Authenticator setup QR code for {{ two_factor_setup.account_name }}">
                             <small>Scan with Google Authenticator.</small>
                         </div>
+                    {% else %}
+                        <span>QR Code</span>
+                        <div class="user-two-factor-qr-wrap user-two-factor-qr-unavailable">
+                            <strong>QR unavailable</strong>
+                            <small>Install qrcode[pil] or use the setup key above.</small>
+                        </div>
                     {% endif %}
                     <a href="{{ two_factor_setup.otpauth_uri }}">Open in authenticator app</a>
                 </div>
