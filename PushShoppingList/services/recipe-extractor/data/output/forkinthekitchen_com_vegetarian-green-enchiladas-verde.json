@@ -155,13 +155,13 @@
       "unit": null,
       "base_quantity": "12",
       "base_unit": null,
-      "ingredient": "flour OR corn tortillas",
+      "ingredient": "flour tortilla",
       "preparation": null,
       "optional": false,
       "store_section": "BAKING",
       "store_section_order": 7,
-      "purchasable_item": "flour OR corn tortillas",
-      "purchase_group": "flour OR corn tortillas"
+      "purchasable_item": "flour tortilla",
+      "purchase_group": "flour tortilla"
     }
   ],
   "equipment": [
