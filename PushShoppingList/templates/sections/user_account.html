@@ -162,6 +162,15 @@
                     <strong>{{ two_factor_setup.account_name }}</strong>
                     <span>Setup Key</span>
                     <code>{{ two_factor_setup.secret }}</code>
+                    {% if two_factor_setup.qr_data_uri %}
+                        <span>QR Code</span>
+                        <div class="user-two-factor-qr-wrap">
+                            <img class="user-two-factor-qr"
+                                 src="{{ two_factor_setup.qr_data_uri }}"
+                                 alt="Authenticator setup QR code for {{ two_factor_setup.account_name }}">
+                            <small>Scan with Google Authenticator.</small>
+                        </div>
+                    {% endif %}
                     <a href="{{ two_factor_setup.otpauth_uri }}">Open in authenticator app</a>
                 </div>
                 <form class="user-two-factor-inline-form"

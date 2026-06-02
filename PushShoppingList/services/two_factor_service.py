@@ -3,6 +3,7 @@ import hmac
 import secrets
 import struct
 import time
+from io import BytesIO
 from hashlib import sha1
 from urllib.parse import quote
 
@@ -32,6 +33,20 @@ def totp_uri(secret, username, issuer=ISSUER_NAME):
         f"&digits={TOTP_DIGITS}"
         f"&period={TOTP_PERIOD_SECONDS}"
     )
+
+
+def totp_qr_data_uri(otpauth_uri):
+    # Build the QR locally so the account setup secret is not sent to an external QR service.
+    try:
+        import qrcode
+    except ImportError:
+        return ""
+
+    image = qrcode.make(str(otpauth_uri or ""))
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
 
 
 def totp_code(secret, for_time=None):

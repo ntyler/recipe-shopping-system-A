@@ -3949,6 +3949,29 @@ body {
             text-align: center;
         }
 
+        .user-two-factor-qr-wrap {
+            display: grid;
+            justify-items: center;
+            gap: 6px;
+            padding: 10px;
+            border: 1px solid #2f4054;
+            border-radius: 8px;
+            background: #f8fafc;
+            color: #111827;
+        }
+
+        .user-two-factor-qr {
+            width: min(220px, 100%);
+            height: auto;
+            image-rendering: pixelated;
+        }
+
+        .user-two-factor-qr-wrap small {
+            color: #374151;
+            font-weight: 900;
+            text-align: center;
+        }
+
         .user-two-factor-checkbox {
             display: flex !important;
             grid-template-columns: none !important;

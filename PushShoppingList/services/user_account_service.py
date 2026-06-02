@@ -18,6 +18,7 @@ from PushShoppingList.services.two_factor_service import backup_codes_remaining
 from PushShoppingList.services.two_factor_service import generate_backup_codes
 from PushShoppingList.services.two_factor_service import generate_totp_secret
 from PushShoppingList.services.two_factor_service import hash_backup_codes
+from PushShoppingList.services.two_factor_service import totp_qr_data_uri
 from PushShoppingList.services.two_factor_service import totp_uri
 from PushShoppingList.services.two_factor_service import verify_backup_code
 from PushShoppingList.services.two_factor_service import verify_totp_code
@@ -331,9 +332,12 @@ def pending_two_factor_setup(user_id):
     if not isinstance(setup, dict) or not setup.get("secret"):
         return None
 
+    otpauth_uri = totp_uri(setup.get("secret", ""), user.get("username") or user.get("email"), ISSUER_NAME)
+
     return {
         "secret": setup.get("secret", ""),
-        "otpauth_uri": totp_uri(setup.get("secret", ""), user.get("username") or user.get("email"), ISSUER_NAME),
+        "otpauth_uri": otpauth_uri,
+        "qr_data_uri": totp_qr_data_uri(otpauth_uri),
         "issuer": ISSUER_NAME,
         "account_name": user.get("username") or user.get("email") or "account",
     }
