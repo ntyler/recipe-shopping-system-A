@@ -13,6 +13,26 @@ function toggleUserProfileEditor() {
     return false;
 }
 
+function toggleForgotPasswordForm() {
+    const form = document.getElementById("forgotPasswordForm");
+
+    if (!form) {
+        return false;
+    }
+
+    form.hidden = !form.hidden;
+
+    if (!form.hidden) {
+        const input = form.querySelector('input[name="identity"]');
+
+        if (input) {
+            input.focus();
+        }
+    }
+
+    return false;
+}
+
 let hiddenExtractJobId = null;
 let lastRenderedExtractJobId = null;
 let extractRefreshTimer = null;
@@ -4853,6 +4873,23 @@ function activeStoreCardName(card) {
     return name ? name.textContent : "";
 }
 
+function storeManagerRowName(row) {
+    const name = row ? row.querySelector(".store-manager-label") : null;
+
+    return name ? name.textContent : "";
+}
+
+function storeNameMatchesSearch(storeName, query) {
+    const normalizedName = normalizeActiveStoreSearchText(storeName);
+
+    if (!query) {
+        return true;
+    }
+
+    return normalizedName.startsWith(query)
+        || normalizedName.split(/\s+/).some(part => part.startsWith(query));
+}
+
 function activeStoreCardIsEligibleForSearch(card) {
     if (
         document.body.classList.contains("active-store-activation-mode") ||
@@ -4868,6 +4905,7 @@ function filterActiveStores(value) {
     const input = document.getElementById("activeStoreSearchInput");
     const query = normalizeActiveStoreSearchText(value !== undefined ? value : (input ? input.value : ""));
     let visibleCount = 0;
+    let visibleManagerCount = 0;
     const storeShelf = document.querySelector(".active-store-list");
 
     if (input && value !== undefined && input.value !== value) {
@@ -4875,8 +4913,7 @@ function filterActiveStores(value) {
     }
 
     document.querySelectorAll(".active-store-card").forEach(card => {
-        const storeName = normalizeActiveStoreSearchText(activeStoreCardName(card));
-        const matchesSearch = !query || storeName.includes(query);
+        const matchesSearch = storeNameMatchesSearch(activeStoreCardName(card), query);
         const eligible = activeStoreCardIsEligibleForSearch(card);
 
         card.classList.toggle("active-store-search-hidden", !matchesSearch);
@@ -4886,8 +4923,22 @@ function filterActiveStores(value) {
         }
     });
 
+    document.querySelectorAll(".store-manager-row").forEach(row => {
+        const matchesSearch = storeNameMatchesSearch(storeManagerRowName(row), query);
+
+        row.hidden = !matchesSearch;
+
+        if (matchesSearch) {
+            visibleManagerCount += 1;
+        }
+    });
+
     document.querySelectorAll(".active-store-search-empty").forEach(empty => {
         empty.hidden = !query || visibleCount > 0;
+    });
+
+    document.querySelectorAll(".store-manager-search-empty").forEach(empty => {
+        empty.hidden = !query || visibleManagerCount > 0;
     });
 
     if (value !== undefined && storeShelf) {

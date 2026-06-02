@@ -28,6 +28,7 @@ from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
 from PushShoppingList.services.recipe_extract_service import recipe_cover_image_file_path
 from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_path
 from PushShoppingList.services.cookbook_service import ensure_unclassified_cookbook_for_recipes
+from PushShoppingList.services.cookbook_service import purge_recipe_from_all_cookbooks
 from PushShoppingList.services.food_review_alternative_service import suggest_food_review_alternatives
 from PushShoppingList.services.recipe_edit_service import create_new_recipe
 from PushShoppingList.services.recipe_edit_service import create_editable_recipe_pdf
@@ -603,6 +604,18 @@ def remove_recipe_route():
     data = request.get_json(silent=True) or {}
     url = request.form.get("url") or data.get("url", "")
 
+    remove_recipe_and_unused_ingredients(url)
+    remove_recipe_url(url)
+
+    return redirect("/")
+
+
+@recipe_bp.route("/purge_recipe", methods=["POST"])
+def purge_recipe_route():
+    data = request.get_json(silent=True) or {}
+    url = request.form.get("url") or data.get("url", "")
+
+    purge_recipe_from_all_cookbooks(url)
     remove_recipe_and_unused_ingredients(url)
     remove_recipe_url(url)
 

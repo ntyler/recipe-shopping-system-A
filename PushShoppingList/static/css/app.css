@@ -391,6 +391,20 @@ body {
             box-sizing: border-box;
         }
 
+        .store-manager-row[hidden],
+        .store-manager-search-empty[hidden] {
+            display: none;
+        }
+
+        .store-manager-search-empty {
+            padding: 14px;
+            border: 1px dashed #4d514c;
+            border-radius: 12px;
+            color: #cbd5e1;
+            text-align: center;
+            font-weight: 800;
+        }
+
         .store-manager-row.inactive {
             opacity: 0.72;
         }
@@ -2225,6 +2239,7 @@ body {
             box-sizing: border-box;
         }
 
+        body.modal-open .view-switcher-sticky,
         body.recipe-editor-open .view-switcher-sticky {
             visibility: hidden;
             pointer-events: none;
@@ -3793,6 +3808,33 @@ body {
             align-items: start;
         }
 
+        .user-account-reset-panel {
+            display: grid;
+            gap: 6px;
+            margin: 0 0 14px;
+            padding: 12px 14px;
+            border: 1px solid #0f8f4d;
+            border-radius: 8px;
+            background: #071f17;
+            color: #d8ffe4;
+            text-align: center;
+        }
+
+        .user-account-reset-panel a {
+            display: inline-flex;
+            justify-self: center;
+            align-items: center;
+            justify-content: center;
+            min-height: 34px;
+            padding: 0 14px;
+            border: 1px solid #19c36b;
+            border-radius: 7px;
+            background: #0b6b38;
+            color: #fff;
+            font-weight: 900;
+            text-decoration: none;
+        }
+
         .user-account-form {
             display: grid;
             gap: 10px;
@@ -3811,6 +3853,15 @@ body {
 
         .user-account-form h3 {
             margin: 0 0 4px;
+            text-align: center;
+        }
+
+        .user-account-form-note {
+            margin: -2px 0 2px;
+            color: #cbd5e1;
+            font-size: 13px;
+            font-weight: 700;
+            line-height: 1.25;
             text-align: center;
         }
 
@@ -3852,6 +3903,20 @@ body {
             background: #115e9f;
             color: #fff;
             font-weight: 800;
+        }
+
+        .user-account-form .user-account-text-btn {
+            min-height: 30px;
+            border-color: transparent;
+            background: transparent;
+            color: #9ed0ff;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+
+        .user-password-reset-form,
+        .user-account-forgot-form {
+            grid-column: 1 / -1;
         }
 
         .user-account-profile {
@@ -7289,7 +7354,7 @@ body {
         .item-qty-modal-backdrop {
             position: fixed;
             inset: 0;
-            z-index: 2100;
+            z-index: 19000;
             background: rgba(0,0,0,0.72);
             display: flex;
             align-items: center;

@@ -1,8 +1,10 @@
 import json
 import os
 import re
+import secrets
 import uuid
 from datetime import datetime
+from datetime import timedelta
 from pathlib import Path
 
 from flask import has_request_context
@@ -17,10 +19,18 @@ USERS_FILE = Path(os.getenv("SHOPPING_APP_USERS_FILE", PACKAGE_DIR / "users.json
 AVATAR_UPLOAD_DIR = Path(os.getenv("SHOPPING_APP_AVATAR_UPLOAD_DIR", PACKAGE_DIR / "static" / "uploads" / "avatars"))
 ALLOWED_AVATAR_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+PASSWORD_RESET_TTL_HOURS = 1
 
 
 def now_iso():
     return datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+
+
+def parse_iso_datetime(value):
+    try:
+        return datetime.fromisoformat(str(value or "").replace("Z", ""))
+    except ValueError:
+        return None
 
 
 def load_users():
@@ -97,12 +107,16 @@ def find_user_by_id(user_id):
 
 
 def find_user_by_identity(identity):
+    return find_user_by_identity_in_payload(load_users(), identity)
+
+
+def find_user_by_identity_in_payload(payload, identity):
     identity_key = normalize_identity(identity)
 
     if not identity_key:
         return None
 
-    for user in load_users().get("users", []):
+    for user in payload.get("users", []):
         if (
             normalize_identity(user.get("username")) == identity_key
             or normalize_identity(user.get("email")) == identity_key
@@ -192,6 +206,87 @@ def authenticate_user(identity, password):
 
     session["user_id"] = user["user_id"]
     return {"ok": True, "user": public_user(user)}
+
+
+def request_password_reset(identity):
+    identity = str(identity or "").strip()
+
+    if not identity:
+        return {"ok": False, "errors": ["Enter your username or email to reset your password."]}
+
+    payload = load_users()
+    user = find_user_by_identity_in_payload(payload, identity)
+
+    if not user:
+        return {"ok": True, "sent": False}
+
+    token = secrets.token_urlsafe(32)
+    timestamp = now_iso()
+    user["password_reset"] = {
+        # Store only a hash of the one-time token, never the reset token itself.
+        "token_hash": generate_password_hash(token),
+        "created_at": timestamp,
+        "expires_at": (
+            datetime.utcnow().replace(microsecond=0)
+            + timedelta(hours=PASSWORD_RESET_TTL_HOURS)
+        ).isoformat() + "Z",
+    }
+    save_users(payload)
+    return {"ok": True, "sent": True, "token": token, "user": public_user(user)}
+
+
+def reset_password_with_token(token, password, confirm_password):
+    token = str(token or "").strip()
+    password = str(password or "")
+    confirm_password = str(confirm_password or "")
+    errors = []
+
+    if not token:
+        errors.append("Password reset link is missing. Request a new one.")
+
+    if not password:
+        errors.append("New password is required.")
+
+    if password or confirm_password:
+        if password != confirm_password:
+            errors.append("Password and confirm password must match.")
+
+    if errors:
+        return {"ok": False, "errors": errors}
+
+    payload = load_users()
+    user = find_user_by_reset_token(payload, token)
+
+    if not user:
+        return {
+            "ok": False,
+            "errors": ["That reset link is invalid or expired. Request a new password reset link."],
+        }
+
+    user["password_hash"] = generate_password_hash(password)
+    user.pop("password_reset", None)
+    user["updated_at"] = now_iso()
+    save_users(payload)
+    session.pop("user_id", None)
+    return {"ok": True, "user": public_user(user)}
+
+
+def find_user_by_reset_token(payload, token):
+    for user in payload.get("users", []):
+        reset = user.get("password_reset") if isinstance(user, dict) else None
+
+        if not isinstance(reset, dict):
+            continue
+
+        expires_at = parse_iso_datetime(reset.get("expires_at"))
+        if not expires_at or expires_at < datetime.utcnow():
+            continue
+
+        token_hash = str(reset.get("token_hash") or "")
+        if token_hash and check_password_hash(token_hash, token):
+            return user
+
+    return None
 
 
 def sign_out_user():

@@ -1302,6 +1302,7 @@ def index():
         food_rules=load_food_rules(),
         rules_display=load_rules_display(),
         food_rule_status=shopping_item_food_rule_status,
+        password_reset_token=request.args.get("reset_token", ""),
         app_css_version=static_asset_version("css/app.css"),
         app_js_version=static_asset_version("js/app.js"),
     )

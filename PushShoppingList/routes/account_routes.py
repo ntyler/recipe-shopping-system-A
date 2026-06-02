@@ -7,6 +7,8 @@ from flask import url_for
 
 from PushShoppingList.services.user_account_service import authenticate_user
 from PushShoppingList.services.user_account_service import create_user
+from PushShoppingList.services.user_account_service import request_password_reset
+from PushShoppingList.services.user_account_service import reset_password_with_token
 from PushShoppingList.services.user_account_service import sign_out_user
 from PushShoppingList.services.user_account_service import update_user_profile
 
@@ -44,6 +46,56 @@ def sign_in_route():
     )
     flash_account_result(result, "Signed in.")
     return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+
+@account_bp.route("/account/password-reset/request", methods=["POST"])
+def request_password_reset_route():
+    result = request_password_reset(request.form.get("identity"))
+
+    if result.get("ok"):
+        session.pop("password_reset_link", None)
+        if result.get("sent") and result.get("token"):
+            session["password_reset_link"] = url_for(
+                "account_bp.open_password_reset_route",
+                token=result["token"],
+                _external=True,
+            )
+        flash(
+            "If that account exists, a password reset link has been prepared.",
+            "success",
+        )
+    else:
+        flash_account_result(result, "")
+
+    return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+
+@account_bp.route("/account/password-reset/<token>", methods=["GET"])
+def open_password_reset_route(token):
+    return redirect(url_for("main_bp.index", reset_token=token, _anchor="userAccountSection"))
+
+
+@account_bp.route("/account/password-reset/complete", methods=["POST"])
+def complete_password_reset_route():
+    result = reset_password_with_token(
+        request.form.get("reset_token"),
+        request.form.get("password"),
+        request.form.get("confirm_password"),
+    )
+
+    if result.get("ok"):
+        session.pop("password_reset_link", None)
+        flash("Password reset. Sign in with your new password.", "success")
+        return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+    flash_account_result(result, "")
+    return redirect(
+        url_for(
+            "main_bp.index",
+            reset_token=request.form.get("reset_token", ""),
+            _anchor="userAccountSection",
+        )
+    )
 
 
 @account_bp.route("/account/sign-out", methods=["POST"])

@@ -649,6 +649,32 @@ def remove_recipe_from_cookbook(cookbook_id, recipe_url):
         return save_cookbooks(payload)
 
 
+def purge_recipe_from_all_cookbooks(recipe_url):
+    target_key = recipe_key(recipe_url)
+
+    if not target_key:
+        raise ValueError("Recipe is required.")
+
+    with COOKBOOKS_LOCK:
+        payload = load_cookbooks()
+        removed_count = 0
+
+        for cookbook in payload.get("cookbooks", []):
+            kept_recipes = []
+
+            for recipe in cookbook.get("recipes", []):
+                if recipe_key(recipe.get("url")) == target_key:
+                    removed_count += 1
+                    continue
+
+                kept_recipes.append(recipe)
+
+            cookbook["recipes"] = kept_recipes
+
+        save_cookbooks(payload)
+        return removed_count
+
+
 def cookbook_recipes_for_urls(recipe_urls):
     selected_keys = []
     seen_selected = set()

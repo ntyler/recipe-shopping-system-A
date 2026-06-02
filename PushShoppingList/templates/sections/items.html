@@ -367,6 +367,17 @@
                                             Remove from current recipes
                                         </button>
                                     </form>
+                                    <form method="POST"
+                                          action="{{ url_for('recipe_bp.purge_recipe_route') }}"
+                                          class="remove-recipe-form recipe-view-remove-form recipe-view-menu-form"
+                                          onsubmit="saveScroll(); return confirm('Purge this recipe from current recipes and every cookbook?');">
+                                        <input type="hidden" name="url" value="{{ recipe.url }}">
+                                        <button type="submit"
+                                                class="delete recipe-view-remove recipe-view-menu-delete"
+                                                aria-label="Purge recipe {{ recipe.number }} from current recipes and every cookbook">
+                                            Purge from all cookbooks and current recipes
+                                        </button>
+                                    </form>
                                 </div>
                             </div>
                         </div>
