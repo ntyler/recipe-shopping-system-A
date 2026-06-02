@@ -4,6 +4,7 @@ from flask import redirect
 from flask import request
 
 from PushShoppingList.services.store_settings_service import add_store
+from PushShoppingList.services.store_settings_service import clean_store_settings
 from PushShoppingList.services.store_settings_service import delete_store
 from PushShoppingList.services.home_store_location_service import select_nearby_store_location
 from PushShoppingList.services.item_state_service import reset_item_stores
@@ -54,10 +55,11 @@ def add_store_route():
     settings = add_store(request.form)
 
     if wants_json_response():
+        public_settings = clean_store_settings(settings)
         return jsonify({
             "ok": True,
-            "stores": settings["stores"],
-            "enabled_stores": settings["enabled_stores"],
+            "stores": public_settings["stores"],
+            "enabled_stores": public_settings["enabled_stores"],
         })
 
     return redirect("/#store-options")
@@ -68,10 +70,11 @@ def update_store_route(store_key):
     settings = update_store(store_key, request.form)
 
     if wants_json_response():
+        public_settings = clean_store_settings(settings)
         return jsonify({
             "ok": True,
-            "stores": settings["stores"],
-            "enabled_stores": settings["enabled_stores"],
+            "stores": public_settings["stores"],
+            "enabled_stores": public_settings["enabled_stores"],
         })
 
     return redirect("/#store-options")
@@ -82,10 +85,11 @@ def delete_store_route(store_key):
     settings = delete_store(store_key)
 
     if wants_json_response():
+        public_settings = clean_store_settings(settings)
         return jsonify({
             "ok": True,
-            "stores": settings["stores"],
-            "enabled_stores": settings["enabled_stores"],
+            "stores": public_settings["stores"],
+            "enabled_stores": public_settings["enabled_stores"],
         })
 
     return redirect("/#store-options")

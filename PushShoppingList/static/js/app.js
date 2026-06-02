@@ -6285,20 +6285,23 @@ function setRecipeEditorCookbook(recipe, fallbackUrl = "") {
 function updateRecipeEditorPdfControls(recipe) {
     const pdfPathInput = document.getElementById("recipeEditPdfPath");
     const pdfButton = document.getElementById("recipeEditPdfButton");
+    const pdfPanelButton = document.getElementById("recipeEditPdfButtonPanel");
     const pdfMenuButton = document.getElementById("recipeEditPdfMenuButton");
     const deletePdfButton = document.getElementById("recipeEditDeletePdfButton");
     const sourceUrl = recipe && recipe.source_url ? recipe.source_url : "";
     const pdfPath = recipe && recipe.pdf_path ? recipe.pdf_path : "";
     const hasPdf = Boolean(recipe && recipe.pdf_available && sourceUrl);
+    const archiveUrl = hasPdf ? recipeArchivePdfUrl(sourceUrl) : "#";
 
     if (pdfPathInput) {
         pdfPathInput.value = pdfPath;
     }
 
-    [pdfButton, pdfMenuButton].forEach((button) => {
+    [pdfButton, pdfPanelButton, pdfMenuButton].forEach((button) => {
         if (button) {
             button.hidden = !hasPdf;
-            button.href = hasPdf ? recipeArchivePdfUrl(sourceUrl) : "#";
+            button.href = archiveUrl;
+            button.dataset.recipePdfUrl = archiveUrl;
         }
     });
 
@@ -6309,6 +6312,39 @@ function updateRecipeEditorPdfControls(recipe) {
 
 function recipeArchivePdfUrl(sourceUrl) {
     return `/recipe_archive_pdf?url=${encodeURIComponent(sourceUrl || "")}`;
+}
+
+function openRecipeEditorPdf(link, event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const url = link && (link.dataset.recipePdfUrl || link.getAttribute("href"));
+
+    if (!url || url === "#") {
+        setRecipeEditStatus("Recipe PDF is not ready yet.", true);
+        return false;
+    }
+
+    try {
+        const targetWindow = isScreenPreviewFrame() && window.top ? window.top : window;
+        const opened = targetWindow.open(url, "_blank");
+
+        if (opened) {
+            try {
+                opened.opener = null;
+            } catch (err) {
+                // Some PDF viewers do not expose opener; the tab still opened.
+            }
+            return false;
+        }
+    } catch (err) {
+        // If a mobile browser blocks the popup, the fallback below still opens the PDF.
+    }
+
+    window.location.assign(url);
+    return false;
 }
 
 function updateRecipeEditStickyOffsets() {
