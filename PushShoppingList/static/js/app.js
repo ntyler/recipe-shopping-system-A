@@ -4886,8 +4886,7 @@ function storeNameMatchesSearch(storeName, query) {
         return true;
     }
 
-    return normalizedName.startsWith(query)
-        || normalizedName.split(/\s+/).some(part => part.startsWith(query));
+    return normalizedName.includes(query);
 }
 
 function activeStoreCardIsEligibleForSearch(card) {
