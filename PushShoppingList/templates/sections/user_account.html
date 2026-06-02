@@ -37,6 +37,18 @@
         </form>
     {% endif %}
 
+    {% if two_factor_backup_codes %}
+        <div class="user-account-reset-panel user-two-factor-backup-panel" aria-live="polite">
+            <strong>Save your backup codes</strong>
+            <span>Each code can be used once if your authenticator app is unavailable.</span>
+            <ul class="user-two-factor-backup-list">
+                {% for backup_code in two_factor_backup_codes %}
+                    <li><code>{{ backup_code }}</code></li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
     {% if current_user %}
         <div class="user-account-profile">
             <div class="user-account-avatar-wrap">
@@ -96,85 +108,198 @@
                 <button type="submit">Save Profile</button>
             </div>
         </form>
+
+        <div class="user-account-form user-two-factor-card">
+            <h3>Two-Factor Authentication</h3>
+            {% if current_user.two_factor_enabled %}
+                <p class="user-account-form-note">
+                    Enabled. Backup codes remaining: {{ current_user.two_factor_backup_codes_remaining }}.
+                </p>
+
+                <form class="user-two-factor-inline-form"
+                      method="POST"
+                      action="{{ url_for('account_bp.regenerate_two_factor_backup_codes_route') }}">
+                    <label>
+                        <span>Current Password</span>
+                        <input type="password" name="password" required autocomplete="current-password">
+                    </label>
+                    <label>
+                        <span>Authenticator or Backup Code</span>
+                        <input type="text"
+                               name="code"
+                               required
+                               inputmode="text"
+                               autocomplete="one-time-code">
+                    </label>
+                    <button type="submit" class="secondary">Regenerate Backup Codes</button>
+                </form>
+
+                <form class="user-two-factor-inline-form"
+                      method="POST"
+                      action="{{ url_for('account_bp.disable_two_factor_route') }}">
+                    <label>
+                        <span>Current Password</span>
+                        <input type="password" name="password" required autocomplete="current-password">
+                    </label>
+                    <label>
+                        <span>Authenticator or Backup Code</span>
+                        <input type="text"
+                               name="code"
+                               required
+                               inputmode="text"
+                               autocomplete="one-time-code">
+                    </label>
+                    <button type="submit" class="danger">Disable Two-Factor Authentication</button>
+                </form>
+            {% elif two_factor_setup %}
+                <p class="user-account-form-note">
+                    Add this setup key to your authenticator app, then enter the current 6-digit code.
+                </p>
+                <div class="user-two-factor-setup-box">
+                    <span>Issuer</span>
+                    <strong>{{ two_factor_setup.issuer }}</strong>
+                    <span>Account</span>
+                    <strong>{{ two_factor_setup.account_name }}</strong>
+                    <span>Setup Key</span>
+                    <code>{{ two_factor_setup.secret }}</code>
+                    <a href="{{ two_factor_setup.otpauth_uri }}">Open in authenticator app</a>
+                </div>
+                <form class="user-two-factor-inline-form"
+                      method="POST"
+                      action="{{ url_for('account_bp.enable_two_factor_route') }}">
+                    <label>
+                        <span>Authenticator Code</span>
+                        <input type="text"
+                               name="code"
+                               required
+                               inputmode="numeric"
+                               autocomplete="one-time-code">
+                    </label>
+                    <button type="submit">Enable Two-Factor Authentication</button>
+                </form>
+                <form method="POST"
+                      action="{{ url_for('account_bp.cancel_two_factor_setup_route') }}">
+                    <button type="submit" class="secondary">Cancel Setup</button>
+                </form>
+            {% else %}
+                <p class="user-account-form-note">
+                    Add an authenticator app code after your password when signing in.
+                </p>
+                <form method="POST" action="{{ url_for('account_bp.start_two_factor_setup_route') }}">
+                    <button type="submit">Set Up Authenticator App</button>
+                </form>
+            {% endif %}
+        </div>
     {% else %}
         <p class="helper-text user-account-helper">
             You are using the guest workspace. Sign in to keep recipes, stores, product picks, and preferences private to your account.
         </p>
 
         <div class="user-account-forms">
-            <form class="user-account-form"
-                  method="POST"
-                  action="{{ url_for('account_bp.create_account_route') }}"
-                  enctype="multipart/form-data">
-                <h3>Create Account</h3>
-                <label>
-                    <span>Username</span>
-                    <input type="text" name="username" required autocomplete="username">
-                </label>
-                <label>
-                    <span>Email</span>
-                    <input type="email" name="email" required autocomplete="email">
-                </label>
-                <label>
-                    <span>Password</span>
-                    <input type="password" name="password" required autocomplete="new-password">
-                </label>
-                <label>
-                    <span>Confirm Password</span>
-                    <input type="password" name="confirm_password" required autocomplete="new-password">
-                </label>
-                <label class="user-account-file-label">
-                    <span>Logo / Avatar</span>
-                    <input type="file" name="avatar" accept="image/png,image/jpeg,image/webp">
-                </label>
-                <button type="submit">Create Account</button>
-            </form>
+            {% if pending_two_factor_sign_in %}
+                <form class="user-account-form user-two-factor-sign-in-form"
+                      method="POST"
+                      action="{{ url_for('account_bp.verify_two_factor_route') }}">
+                    <h3>Two-Factor Verification</h3>
+                    <p class="user-account-form-note">
+                        Enter the current authenticator code or one backup code.
+                    </p>
+                    <label>
+                        <span>Authenticator or Backup Code</span>
+                        <input type="text"
+                               name="code"
+                               required
+                               autofocus
+                               inputmode="text"
+                               autocomplete="one-time-code">
+                    </label>
+                    <label class="user-two-factor-checkbox">
+                        <input type="checkbox" name="remember_device" value="1">
+                        <span>Remember this browser for 30 days</span>
+                    </label>
+                    <button type="submit">Verify Code</button>
+                    <button type="submit"
+                            class="secondary"
+                            formmethod="POST"
+                            formaction="{{ url_for('account_bp.cancel_two_factor_sign_in_route') }}">
+                        Cancel Sign In
+                    </button>
+                </form>
+            {% else %}
+                <form class="user-account-form"
+                      method="POST"
+                      action="{{ url_for('account_bp.create_account_route') }}"
+                      enctype="multipart/form-data">
+                    <h3>Create Account</h3>
+                    <label>
+                        <span>Username</span>
+                        <input type="text" name="username" required autocomplete="username">
+                    </label>
+                    <label>
+                        <span>Email</span>
+                        <input type="email" name="email" required autocomplete="email">
+                    </label>
+                    <label>
+                        <span>Password</span>
+                        <input type="password" name="password" required autocomplete="new-password">
+                    </label>
+                    <label>
+                        <span>Confirm Password</span>
+                        <input type="password" name="confirm_password" required autocomplete="new-password">
+                    </label>
+                    <label class="user-account-file-label">
+                        <span>Logo / Avatar</span>
+                        <input type="file" name="avatar" accept="image/png,image/jpeg,image/webp">
+                    </label>
+                    <button type="submit">Create Account</button>
+                </form>
 
-            <form class="user-account-form"
-                  method="POST"
-                  action="{{ url_for('account_bp.sign_in_route') }}">
-                <h3>Sign In</h3>
-                <label>
-                    <span>Username or Email</span>
-                    <input type="text" name="identity" required autocomplete="username">
-                </label>
-                <label>
-                    <span>Password</span>
-                    <input type="password" name="password" required autocomplete="current-password">
-                </label>
-                <button type="submit">Sign In</button>
-                <button type="button"
-                        class="user-account-text-btn"
-                        onclick="return toggleForgotPasswordForm()">
-                    Forgot password?
-                </button>
-            </form>
+                <form class="user-account-form"
+                      method="POST"
+                      action="{{ url_for('account_bp.sign_in_route') }}">
+                    <h3>Sign In</h3>
+                    <label>
+                        <span>Username or Email</span>
+                        <input type="text" name="identity" required autocomplete="username">
+                    </label>
+                    <label>
+                        <span>Password</span>
+                        <input type="password" name="password" required autocomplete="current-password">
+                    </label>
+                    <button type="submit">Sign In</button>
+                    <button type="button"
+                            class="user-account-text-btn"
+                            onclick="return toggleForgotPasswordForm()">
+                        Forgot password?
+                    </button>
+                </form>
 
-            <form id="forgotPasswordForm"
-                  class="user-account-form user-account-forgot-form"
-                  method="POST"
-                  action="{{ url_for('account_bp.request_password_reset_route') }}"
-                  hidden>
-                <h3>Forgot Password</h3>
-                <p class="user-account-form-note">
-                    {% if password_reset_email_configured %}
-                        Enter your username or email and the app will email a one-time reset link.
-                    {% else %}
-                        Enter your username or email and the app will prepare a one-time local reset link.
-                    {% endif %}
-                </p>
-                <label>
-                    <span>Username or Email</span>
-                    <input type="text" name="identity" required autocomplete="username">
-                </label>
-                <button type="submit">
-                    {% if password_reset_email_configured %}
-                        Send Reset Email
-                    {% else %}
-                        Prepare Reset Link
-                    {% endif %}
-                </button>
-            </form>
+                <form id="forgotPasswordForm"
+                      class="user-account-form user-account-forgot-form"
+                      method="POST"
+                      action="{{ url_for('account_bp.request_password_reset_route') }}"
+                      hidden>
+                    <h3>Forgot Password</h3>
+                    <p class="user-account-form-note">
+                        {% if password_reset_email_configured %}
+                            Enter your username or email and the app will email a one-time reset link.
+                        {% else %}
+                            Enter your username or email and the app will prepare a one-time local reset link.
+                        {% endif %}
+                    </p>
+                    <label>
+                        <span>Username or Email</span>
+                        <input type="text" name="identity" required autocomplete="username">
+                    </label>
+                    <button type="submit">
+                        {% if password_reset_email_configured %}
+                            Send Reset Email
+                        {% else %}
+                            Prepare Reset Link
+                        {% endif %}
+                    </button>
+                </form>
+            {% endif %}
         </div>
     {% endif %}
 </section>

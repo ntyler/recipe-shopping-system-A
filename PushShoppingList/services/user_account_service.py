@@ -13,6 +13,14 @@ from werkzeug.security import check_password_hash
 from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
 
+from PushShoppingList.services.two_factor_service import ISSUER_NAME
+from PushShoppingList.services.two_factor_service import backup_codes_remaining
+from PushShoppingList.services.two_factor_service import generate_backup_codes
+from PushShoppingList.services.two_factor_service import generate_totp_secret
+from PushShoppingList.services.two_factor_service import hash_backup_codes
+from PushShoppingList.services.two_factor_service import totp_uri
+from PushShoppingList.services.two_factor_service import verify_backup_code
+from PushShoppingList.services.two_factor_service import verify_totp_code
 from PushShoppingList.services.user_workspace_seed_service import seed_new_user_rule_workspace
 
 
@@ -22,6 +30,7 @@ AVATAR_UPLOAD_DIR = Path(os.getenv("SHOPPING_APP_AVATAR_UPLOAD_DIR", PACKAGE_DIR
 ALLOWED_AVATAR_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 PASSWORD_RESET_TTL_HOURS = 1
+TWO_FACTOR_TRUST_DAYS = 30
 
 
 def now_iso():
@@ -74,6 +83,7 @@ def save_users(payload):
 def public_user(user):
     if not isinstance(user, dict):
         return None
+    two_factor = user.get("two_factor") if isinstance(user.get("two_factor"), dict) else {}
 
     return {
         "user_id": user.get("user_id", ""),
@@ -82,6 +92,8 @@ def public_user(user):
         "avatar_path": user.get("avatar_path", ""),
         "created_at": user.get("created_at", ""),
         "updated_at": user.get("updated_at", ""),
+        "two_factor_enabled": bool(two_factor.get("enabled")),
+        "two_factor_backup_codes_remaining": backup_codes_remaining(two_factor) if two_factor.get("enabled") else 0,
     }
 
 
@@ -200,7 +212,7 @@ def create_user(username, email, password, confirm_password, avatar_file=None):
     return {"ok": True, "user": public_user(user)}
 
 
-def authenticate_user(identity, password):
+def authenticate_user(identity, password, trusted_device_token=""):
     identity = str(identity or "").strip()
     password = str(password or "")
 
@@ -211,7 +223,18 @@ def authenticate_user(identity, password):
     if not user or not check_password_hash(str(user.get("password_hash") or ""), password):
         return {"ok": False, "errors": ["We could not sign you in with those details."]}
 
+    if two_factor_enabled(user):
+        if verify_trusted_two_factor_device(user, trusted_device_token):
+            session["user_id"] = user["user_id"]
+            session.pop("pending_2fa_user_id", None)
+            return {"ok": True, "user": public_user(user)}
+
+        session.pop("user_id", None)
+        session["pending_2fa_user_id"] = user["user_id"]
+        return {"ok": True, "requires_2fa": True, "user": public_user(user)}
+
     session["user_id"] = user["user_id"]
+    session.pop("pending_2fa_user_id", None)
     return {"ok": True, "user": public_user(user)}
 
 
@@ -296,8 +319,263 @@ def find_user_by_reset_token(payload, token):
     return None
 
 
+def two_factor_enabled(user):
+    two_factor = user.get("two_factor") if isinstance(user, dict) else None
+    return isinstance(two_factor, dict) and bool(two_factor.get("enabled"))
+
+
+def pending_two_factor_setup(user_id):
+    user = find_user_by_id(user_id)
+    setup = user.get("two_factor_setup") if isinstance(user, dict) else None
+
+    if not isinstance(setup, dict) or not setup.get("secret"):
+        return None
+
+    return {
+        "secret": setup.get("secret", ""),
+        "otpauth_uri": totp_uri(setup.get("secret", ""), user.get("username") or user.get("email"), ISSUER_NAME),
+        "issuer": ISSUER_NAME,
+        "account_name": user.get("username") or user.get("email") or "account",
+    }
+
+
+def start_two_factor_setup(user_id):
+    payload = load_users()
+    user = find_user_by_id_in_payload(payload, user_id)
+
+    if not user:
+        return {"ok": False, "errors": ["Sign in again before setting up two-factor authentication."]}
+
+    if two_factor_enabled(user):
+        return {"ok": False, "errors": ["Two-factor authentication is already enabled."]}
+
+    secret = generate_totp_secret()
+    user["two_factor_setup"] = {
+        "secret": secret,
+        "created_at": now_iso(),
+    }
+    user["updated_at"] = now_iso()
+    save_users(payload)
+
+    return {
+        "ok": True,
+        "setup": pending_two_factor_setup(user_id),
+    }
+
+
+def enable_two_factor(user_id, code):
+    payload = load_users()
+    user = find_user_by_id_in_payload(payload, user_id)
+    setup = user.get("two_factor_setup") if isinstance(user, dict) else None
+
+    if not user:
+        return {"ok": False, "errors": ["Sign in again before enabling two-factor authentication."]}
+
+    if two_factor_enabled(user):
+        return {"ok": False, "errors": ["Two-factor authentication is already enabled."]}
+
+    if not isinstance(setup, dict) or not setup.get("secret"):
+        return {"ok": False, "errors": ["Start two-factor setup before entering a verification code."]}
+
+    if not verify_totp_code(setup["secret"], code):
+        return {"ok": False, "errors": ["That authenticator code did not match. Try the current 6-digit code."]}
+
+    backup_codes = generate_backup_codes()
+    user["two_factor"] = {
+        "enabled": True,
+        "secret": setup["secret"],
+        "enabled_at": now_iso(),
+        "backup_codes": hash_backup_codes(backup_codes),
+        "trusted_devices": [],
+    }
+    user.pop("two_factor_setup", None)
+    user["updated_at"] = now_iso()
+    save_users(payload)
+
+    return {"ok": True, "backup_codes": backup_codes, "user": public_user(user)}
+
+
+def cancel_two_factor_setup(user_id):
+    payload = load_users()
+    user = find_user_by_id_in_payload(payload, user_id)
+
+    if not user:
+        return {"ok": False, "errors": ["Sign in again before changing two-factor authentication."]}
+
+    user.pop("two_factor_setup", None)
+    user["updated_at"] = now_iso()
+    save_users(payload)
+    return {"ok": True}
+
+
+def complete_two_factor_sign_in(code, remember_device=False):
+    user_id = session.get("pending_2fa_user_id")
+
+    if not user_id:
+        return {"ok": False, "errors": ["Sign in with your password before entering a two-factor code."]}
+
+    payload = load_users()
+    user = find_user_by_id_in_payload(payload, user_id)
+
+    if not user or not two_factor_enabled(user):
+        session.pop("pending_2fa_user_id", None)
+        return {"ok": False, "errors": ["Two-factor verification is no longer available. Sign in again."]}
+
+    verified = verify_user_two_factor_code(user, code)
+
+    if not verified:
+        save_users(payload)
+        return {"ok": False, "errors": ["That two-factor code did not match."]}
+
+    trust_token = ""
+    if remember_device:
+        trust_token = add_trusted_two_factor_device(user)
+
+    user["updated_at"] = now_iso()
+    save_users(payload)
+    session["user_id"] = user["user_id"]
+    session.pop("pending_2fa_user_id", None)
+    return {"ok": True, "user": public_user(user), "trust_token": trust_token}
+
+
+def cancel_two_factor_sign_in():
+    session.pop("pending_2fa_user_id", None)
+    return {"ok": True}
+
+
+def disable_two_factor(user_id, password, code):
+    payload = load_users()
+    user = find_user_by_id_in_payload(payload, user_id)
+
+    if not user:
+        return {"ok": False, "errors": ["Sign in again before disabling two-factor authentication."]}
+
+    if not check_password_hash(str(user.get("password_hash") or ""), str(password or "")):
+        return {"ok": False, "errors": ["Enter your current password to disable two-factor authentication."]}
+
+    if not two_factor_enabled(user):
+        user.pop("two_factor_setup", None)
+        save_users(payload)
+        return {"ok": True, "user": public_user(user)}
+
+    if not verify_user_two_factor_code(user, code):
+        save_users(payload)
+        return {"ok": False, "errors": ["Enter a valid authenticator or backup code to disable two-factor authentication."]}
+
+    user.pop("two_factor", None)
+    user.pop("two_factor_setup", None)
+    user["updated_at"] = now_iso()
+    save_users(payload)
+    return {"ok": True, "user": public_user(user)}
+
+
+def regenerate_two_factor_backup_codes(user_id, password, code):
+    payload = load_users()
+    user = find_user_by_id_in_payload(payload, user_id)
+
+    if not user:
+        return {"ok": False, "errors": ["Sign in again before regenerating backup codes."]}
+
+    if not check_password_hash(str(user.get("password_hash") or ""), str(password or "")):
+        return {"ok": False, "errors": ["Enter your current password to regenerate backup codes."]}
+
+    if not two_factor_enabled(user):
+        return {"ok": False, "errors": ["Enable two-factor authentication before generating backup codes."]}
+
+    if not verify_user_two_factor_code(user, code):
+        save_users(payload)
+        return {"ok": False, "errors": ["Enter a valid authenticator or backup code to regenerate backup codes."]}
+
+    backup_codes = generate_backup_codes()
+    user["two_factor"]["backup_codes"] = hash_backup_codes(backup_codes)
+    user["updated_at"] = now_iso()
+    save_users(payload)
+    return {"ok": True, "backup_codes": backup_codes, "user": public_user(user)}
+
+
+def verify_user_two_factor_code(user, code):
+    two_factor = user.get("two_factor") if isinstance(user, dict) else None
+
+    if not isinstance(two_factor, dict) or not two_factor.get("enabled"):
+        return False
+
+    if verify_totp_code(two_factor.get("secret", ""), code):
+        return True
+
+    return verify_backup_code(two_factor, code, now_iso())
+
+
+def add_trusted_two_factor_device(user):
+    token = secrets.token_urlsafe(32)
+    expires_at = (
+        datetime.utcnow().replace(microsecond=0)
+        + timedelta(days=TWO_FACTOR_TRUST_DAYS)
+    ).isoformat() + "Z"
+
+    two_factor = user.setdefault("two_factor", {})
+    devices = purge_expired_trusted_devices(two_factor.get("trusted_devices", []))
+    devices.append({
+        "token_hash": generate_password_hash(token),
+        "created_at": now_iso(),
+        "expires_at": expires_at,
+    })
+    two_factor["trusted_devices"] = devices[-10:]
+    return f"{user.get('user_id', '')}:{token}"
+
+
+def verify_trusted_two_factor_device(user, trusted_device_token):
+    if not trusted_device_token or not two_factor_enabled(user):
+        return False
+
+    user_id, sep, token = str(trusted_device_token or "").partition(":")
+
+    if sep != ":" or user_id != str(user.get("user_id") or "") or not token:
+        return False
+
+    two_factor = user.get("two_factor", {})
+    devices = purge_expired_trusted_devices(two_factor.get("trusted_devices", []))
+    changed = len(devices) != len(two_factor.get("trusted_devices", []))
+    matched = False
+
+    for device in devices:
+        token_hash = str(device.get("token_hash") or "")
+        if token_hash and check_password_hash(token_hash, token):
+            matched = True
+            break
+
+    if changed:
+        payload = load_users()
+        stored_user = find_user_by_id_in_payload(payload, user.get("user_id"))
+        if stored_user and two_factor_enabled(stored_user):
+            stored_user["two_factor"]["trusted_devices"] = devices
+            save_users(payload)
+
+    return matched
+
+
+def purge_expired_trusted_devices(devices):
+    now = datetime.utcnow()
+    kept = []
+
+    for device in devices if isinstance(devices, list) else []:
+        expires_at = parse_iso_datetime(device.get("expires_at"))
+        if expires_at and expires_at >= now:
+            kept.append(device)
+
+    return kept
+
+
+def find_user_by_id_in_payload(payload, user_id):
+    user_id = str(user_id or "")
+    return next(
+        (user for user in payload.get("users", []) if str(user.get("user_id")) == user_id),
+        None,
+    )
+
+
 def sign_out_user():
     session.pop("user_id", None)
+    session.pop("pending_2fa_user_id", None)
 
 
 def update_user_profile(user_id, username, email, password="", confirm_password="", avatar_file=None):

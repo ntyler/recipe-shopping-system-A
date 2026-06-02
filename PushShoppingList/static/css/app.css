@@ -3865,6 +3865,87 @@ body {
             text-align: center;
         }
 
+        .user-two-factor-backup-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+            gap: 8px;
+            margin: 6px 0 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .user-two-factor-backup-list code,
+        .user-two-factor-setup-box code {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 30px;
+            padding: 4px 8px;
+            border: 1px solid #2f4054;
+            border-radius: 7px;
+            background: #0b1118;
+            color: #d8ffe4;
+            font-family: Consolas, Monaco, monospace;
+            font-weight: 900;
+            letter-spacing: 0.04em;
+        }
+
+        .user-two-factor-card {
+            margin-top: 14px;
+        }
+
+        .user-two-factor-sign-in-form {
+            grid-column: 1 / -1;
+        }
+
+        .user-two-factor-inline-form {
+            display: grid;
+            gap: 10px;
+            min-width: 0;
+            margin: 0;
+        }
+
+        .user-two-factor-setup-box {
+            display: grid;
+            grid-template-columns: minmax(90px, auto) minmax(0, 1fr);
+            gap: 8px 10px;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid #2f4054;
+            border-radius: 8px;
+            background: #0b1118;
+            color: #dbeafe;
+        }
+
+        .user-two-factor-setup-box span {
+            color: #cbd5e1;
+            font-size: 12px;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+
+        .user-two-factor-setup-box a {
+            grid-column: 1 / -1;
+            color: #7dd3fc;
+            font-weight: 900;
+            overflow-wrap: anywhere;
+            text-align: center;
+        }
+
+        .user-two-factor-checkbox {
+            display: flex !important;
+            grid-template-columns: none !important;
+            align-items: center;
+            gap: 8px !important;
+            text-transform: none !important;
+            letter-spacing: 0 !important;
+        }
+
+        .user-two-factor-checkbox input {
+            width: auto;
+            min-height: auto;
+        }
+
         .user-account-form label {
             display: grid;
             gap: 5px;
@@ -3914,8 +3995,21 @@ body {
             text-underline-offset: 3px;
         }
 
+        .user-account-form button.secondary {
+            border-color: #3f4b58;
+            background: #23282d;
+            color: #e2e8f0;
+        }
+
+        .user-account-form button.danger {
+            border-color: #a33a3a;
+            background: #7f1515;
+            color: #fff;
+        }
+
         .user-password-reset-form,
-        .user-account-forgot-form {
+        .user-account-forgot-form,
+        .user-two-factor-sign-in-form {
             grid-column: 1 / -1;
         }
 

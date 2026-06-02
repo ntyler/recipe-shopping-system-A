@@ -2,6 +2,7 @@ import os
 
 from flask import Blueprint
 from flask import flash
+from flask import make_response
 from flask import redirect
 from flask import request
 from flask import session
@@ -10,14 +11,23 @@ from flask import url_for
 from PushShoppingList.services.email_service import password_reset_email_configured
 from PushShoppingList.services.email_service import send_password_reset_email
 from PushShoppingList.services.user_account_service import authenticate_user
+from PushShoppingList.services.user_account_service import cancel_two_factor_setup
+from PushShoppingList.services.user_account_service import cancel_two_factor_sign_in
+from PushShoppingList.services.user_account_service import complete_two_factor_sign_in
 from PushShoppingList.services.user_account_service import create_user
+from PushShoppingList.services.user_account_service import disable_two_factor
+from PushShoppingList.services.user_account_service import enable_two_factor
+from PushShoppingList.services.user_account_service import regenerate_two_factor_backup_codes
 from PushShoppingList.services.user_account_service import request_password_reset
 from PushShoppingList.services.user_account_service import reset_password_with_token
 from PushShoppingList.services.user_account_service import sign_out_user
+from PushShoppingList.services.user_account_service import start_two_factor_setup
 from PushShoppingList.services.user_account_service import update_user_profile
 
 
 account_bp = Blueprint("account_bp", __name__)
+TWO_FACTOR_TRUST_COOKIE = "shopping_2fa_trust"
+TWO_FACTOR_TRUST_MAX_AGE = 30 * 24 * 60 * 60
 
 
 def flash_account_result(result, success_message):
@@ -64,8 +74,48 @@ def sign_in_route():
     result = authenticate_user(
         request.form.get("identity"),
         request.form.get("password"),
+        request.cookies.get(TWO_FACTOR_TRUST_COOKIE, ""),
     )
+
+    if result.get("ok") and result.get("requires_2fa"):
+        flash("Enter your authenticator code to finish signing in.", "success")
+        return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
     flash_account_result(result, "Signed in.")
+    return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+
+@account_bp.route("/account/2fa/verify", methods=["POST"])
+def verify_two_factor_route():
+    result = complete_two_factor_sign_in(
+        request.form.get("code"),
+        remember_device=request.form.get("remember_device") == "1",
+    )
+
+    if result.get("ok"):
+        flash("Signed in.", "success")
+        response = make_response(redirect(url_for("main_bp.index", _anchor="userAccountSection")))
+
+        if result.get("trust_token"):
+            response.set_cookie(
+                TWO_FACTOR_TRUST_COOKIE,
+                result["trust_token"],
+                max_age=TWO_FACTOR_TRUST_MAX_AGE,
+                httponly=True,
+                samesite="Lax",
+                secure=request.is_secure,
+            )
+
+        return response
+
+    flash_account_result(result, "")
+    return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+
+@account_bp.route("/account/2fa/cancel-sign-in", methods=["POST"])
+def cancel_two_factor_sign_in_route():
+    cancel_two_factor_sign_in()
+    flash("Two-factor sign-in canceled.", "success")
     return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
 
 
@@ -155,4 +205,63 @@ def update_profile_route():
         request.files.get("avatar"),
     )
     flash_account_result(result, "Profile updated.")
+    return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+
+@account_bp.route("/account/2fa/start", methods=["POST"])
+def start_two_factor_setup_route():
+    result = start_two_factor_setup(session.get("user_id"))
+    flash_account_result(result, "Two-factor setup started.")
+    return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+
+@account_bp.route("/account/2fa/enable", methods=["POST"])
+def enable_two_factor_route():
+    result = enable_two_factor(
+        session.get("user_id"),
+        request.form.get("code"),
+    )
+
+    if result.get("ok"):
+        session["two_factor_backup_codes"] = result.get("backup_codes", [])
+
+    flash_account_result(result, "Two-factor authentication enabled.")
+    return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+
+@account_bp.route("/account/2fa/cancel-setup", methods=["POST"])
+def cancel_two_factor_setup_route():
+    result = cancel_two_factor_setup(session.get("user_id"))
+    flash_account_result(result, "Two-factor setup canceled.")
+    return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+
+@account_bp.route("/account/2fa/disable", methods=["POST"])
+def disable_two_factor_route():
+    result = disable_two_factor(
+        session.get("user_id"),
+        request.form.get("password"),
+        request.form.get("code"),
+    )
+    flash_account_result(result, "Two-factor authentication disabled.")
+    response = make_response(redirect(url_for("main_bp.index", _anchor="userAccountSection")))
+
+    if result.get("ok"):
+        response.delete_cookie(TWO_FACTOR_TRUST_COOKIE)
+
+    return response
+
+
+@account_bp.route("/account/2fa/backup-codes/regenerate", methods=["POST"])
+def regenerate_two_factor_backup_codes_route():
+    result = regenerate_two_factor_backup_codes(
+        session.get("user_id"),
+        request.form.get("password"),
+        request.form.get("code"),
+    )
+
+    if result.get("ok"):
+        session["two_factor_backup_codes"] = result.get("backup_codes", [])
+
+    flash_account_result(result, "Backup codes regenerated.")
     return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
