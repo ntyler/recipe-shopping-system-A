@@ -65,6 +65,8 @@ $env:SHOPPING_APP_SMTP_USE_TLS="1"
 $env:SHOPPING_APP_PASSWORD_RESET_BASE_URL="http://127.0.0.1:5083"
 ```
 
+When using `start_app.bat`, place the same values in an untracked `local_env.bat` file. A safe template is included at `local_env.example.bat`, and `start_app.bat` loads `local_env.bat` before starting Flask.
+
 Optional recipe-fetch controls:
 
 ```powershell

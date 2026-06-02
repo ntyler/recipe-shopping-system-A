@@ -39,7 +39,14 @@ def smtp_config():
 
 def password_reset_email_configured():
     config = smtp_config()
-    return bool(config["host"] and config["from_email"])
+
+    if not config["host"] or not config["from_email"]:
+        return False
+
+    if config["username"] and not config["password"]:
+        return False
+
+    return True
 
 
 def env_int(name, default):
@@ -99,11 +106,17 @@ def send_password_reset_email(user, reset_url):
                     smtp.ehlo()
                 login_smtp(smtp, config)
                 smtp.send_message(message)
+    except smtplib.SMTPAuthenticationError as err:
+        return {
+            "ok": False,
+            "configured": True,
+            "error": smtp_auth_error_message(err),
+        }
     except Exception as err:
         return {
             "ok": False,
             "configured": True,
-            "error": f"Password reset email could not be sent. Check SMTP settings. ({err})",
+            "error": f"Password reset email could not be sent. Check SMTP settings. {err}",
         }
 
     return {"ok": True, "configured": True}
@@ -112,3 +125,15 @@ def send_password_reset_email(user, reset_url):
 def login_smtp(smtp, config):
     if config["username"]:
         smtp.login(config["username"], config["password"])
+
+
+def smtp_auth_error_message(err):
+    details = " ".join(str(part) for part in getattr(err, "args", []) if part)
+
+    if "Application-specific password required" in details or "5.7.9" in details:
+        return (
+            "Gmail rejected the SMTP login. Create a Gmail app password and use it "
+            "for SHOPPING_APP_SMTP_PASSWORD, then restart the app."
+        )
+
+    return "Password reset email could not be sent. Check the SMTP username and password."

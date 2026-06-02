@@ -5,6 +5,7 @@ cd /d D:\GitHub\recipe-shopping-system-A
 echo Starting Flask app...
 
 set SHOPPING_APP_PORT=5083
+if exist local_env.bat call local_env.bat
 set PRODUCT_SEARCH_WORKERS=2
 set PRODUCT_DETAIL_LIMIT_PER_STORE=4
 set PRODUCT_AI_ANALYSIS_LIMIT_PER_STORE=2
