@@ -6,7 +6,14 @@
             onclick="toggleCardCollapse('cookbooks')">
         <span class="cookbooks-header-title">
             Cookbooks
-            <span class="cookbooks-header-count">{{ cookbook_view.cookbooks | length }}</span>
+            <span class="cookbooks-header-count">
+                {{ cookbook_count | default(cookbook_view.cookbooks | length) }}
+                cookbook{% if (cookbook_count | default(cookbook_view.cookbooks | length)) != 1 %}s{% endif %}
+            </span>
+            <span class="cookbooks-header-count">
+                {{ cookbook_recipe_count | default(0) }}
+                recipe{% if (cookbook_recipe_count | default(0)) != 1 %}s{% endif %}
+            </span>
         </span>
     </button>
 

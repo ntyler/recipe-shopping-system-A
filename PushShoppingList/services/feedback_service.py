@@ -7,15 +7,17 @@ from pathlib import Path
 
 from werkzeug.utils import secure_filename
 
+from PushShoppingList.services.user_account_service import is_admin_user
+
 
 PACKAGE_DIR = Path(__file__).resolve().parent.parent
 FEEDBACK_FILE = Path(os.getenv("SHOPPING_APP_FEEDBACK_FILE", PACKAGE_DIR / "feedback.json"))
 FEEDBACK_UPLOAD_DIR = Path(os.getenv("SHOPPING_APP_FEEDBACK_UPLOAD_DIR", PACKAGE_DIR / "static" / "uploads" / "feedback"))
-ADMIN_EMAIL = "ntylerbert@gmail.com"
 FEEDBACK_TYPES = [
     "Bug Report",
     "Feature Request",
     "Product Match Issue",
+    "Store Request",
     "Store Issue",
     "Recipe Issue",
     "General Feedback",
@@ -446,8 +448,7 @@ def clean_status(value):
 
 
 def is_feedback_admin(user):
-    email = str((user or {}).get("email") or "").strip().lower()
-    return email == ADMIN_EMAIL
+    return is_admin_user(user)
 
 
 def secure_feedback_id(feedback_id):

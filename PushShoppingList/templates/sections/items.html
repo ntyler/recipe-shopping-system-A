@@ -1,5 +1,12 @@
 <div id="sectionView">
-    <h2 class="items-title">Items</h2>
+    <div class="items-title-row">
+        <h2 class="items-title">Items</h2>
+        <button type="button"
+                class="move-bought-pantry-btn"
+                onclick="return moveBoughtItemsToPantry(this)">
+            Move Bought Items to Pantry
+        </button>
+    </div>
 
     {% if items %}
         {% for item in items %}
@@ -21,7 +28,9 @@
                 {% set purchase_state = item_state.get(purchase_key, {}) if purchase_key else state %}
                 {% set food_status = food_rule_status(item) %}
 
-                <div class="row {% if state.get('checked') %}row-checked{% endif %}" data-key="{{ item_key }}">
+                <div class="row {% if state.get('checked') %}row-checked{% endif %}"
+                     data-key="{{ item_key }}"
+                     data-item-name="{{ item }}">
                     <div class="item">
                         <div class="item-main-line">
                             <input type="checkbox"

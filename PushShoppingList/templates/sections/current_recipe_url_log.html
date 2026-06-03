@@ -15,7 +15,13 @@
                 data-collapse-toggle="recipe-url-log"
                 aria-expanded="true"
                 onclick="toggleCardCollapse('recipe-url-log')">
-            <span>Current Recipes</span>
+            <span class="cookbooks-header-title recipe-url-log-header-title">
+                Current Recipes
+                <span class="cookbooks-header-count recipe-url-log-header-count">
+                    {{ current_recipe_count | default(current_urls | length) }}
+                    recipe{% if (current_recipe_count | default(current_urls | length)) != 1 %}s{% endif %}
+                </span>
+            </span>
         </button>
         <div class="recipe-url-log-menu-wrap recipe-edit-row-menu-wrap">
             <button type="button"
@@ -541,7 +547,7 @@
                         <input type="text" name="recipe_title" id="recipeEditTitleInput">
                     </label>
                     <div class="recipe-edit-cover-field" id="recipeEditCoverField">
-                        <div class="recipe-edit-cover-preview" id="recipeEditCoverPreview">
+                        <div class="recipe-edit-cover-preview" id="recipeEditCoverPreview" data-recipe-edit-title-image-panel>
                             <img id="recipeEditCoverImage"
                                  alt="Recipe title image"
                                  loading="lazy"

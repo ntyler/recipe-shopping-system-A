@@ -42,6 +42,9 @@ from PushShoppingList.services.ingredient_text_review_service import normalize_i
 from PushShoppingList.services.item_state_service import load_item_state
 from PushShoppingList.services.item_state_service import save_item_manual_qty
 from PushShoppingList.services.item_state_service import save_item_purchase_mapping
+from PushShoppingList.services.pantry_service import pantry_items_for_view
+from PushShoppingList.services.pantry_service import pantry_recipe_matches_for_view
+from PushShoppingList.services.pantry_service import receipt_history_for_view
 from PushShoppingList.services.purchase_mapping_service import purchase_mapping_for_item
 from PushShoppingList.services.purchase_mapping_service import purchase_mapping_for_recipe_ingredient
 from PushShoppingList.services.purchase_mapping_service import purchase_mapping_lookup_for_items
@@ -1261,8 +1264,13 @@ def index():
     apply_cookbook_assignments_to_recipe_rows(recipe_rows, cookbook_assignments)
     recipe_log_rows = recipe_url_log_rows(recipe_urls, cookbook_assignments)
     rendered_cookbook_view = cookbook_view_for_render(recipe_rows)
+    cookbook_recipe_count = sum(
+        len(cookbook.get("recipes", []))
+        for cookbook in rendered_cookbook_view.get("cookbooks", [])
+    )
     product_choices = product_choices_by_item()
     nearest_store_results = load_nearest_store_results()
+    pantry_items = pantry_items_for_view()
     purchase_mappings = purchase_mapping_lookup_for_items(shopping_items_only(items), item_state)
     recipe_item_quantities = recipe_quantity_lookup(recipe_rows)
     recipe_item_quantity_sources = recipe_quantity_sources_lookup(recipe_rows)
@@ -1277,7 +1285,10 @@ def index():
         raw_items="\n".join(items),
         items=items,
         current_urls=recipe_log_rows,
+        current_recipe_count=len(recipe_log_rows),
         cookbook_view=rendered_cookbook_view,
+        cookbook_count=len(rendered_cookbook_view.get("cookbooks", [])),
+        cookbook_recipe_count=cookbook_recipe_count,
         home_address=load_home_address(),
         nearest_store_results=nearest_store_results,
         nearest_store_locations=nearest_store_results.get("store_locations", {}),
@@ -1301,6 +1312,11 @@ def index():
         ),
         recipe_view_rows=recipe_rows,
         product_choices=product_choices,
+        pantry_items=pantry_items,
+        pantry_recipe_matches=pantry_recipe_matches_for_view(recipe_rows, pantry_items),
+        pantry_receipt_review=session.get("pantry_receipt_review", {}),
+        pantry_receipt_history=receipt_history_for_view(),
+        pantry_messages=session.pop("pantry_messages", []),
         normalize=normalize,
         is_section_header=is_section_header,
         food_rules=load_food_rules(),

@@ -30,6 +30,7 @@ USERS_FILE = Path(os.getenv("SHOPPING_APP_USERS_FILE", PACKAGE_DIR / "users.json
 AVATAR_UPLOAD_DIR = Path(os.getenv("SHOPPING_APP_AVATAR_UPLOAD_DIR", PACKAGE_DIR / "static" / "uploads" / "avatars"))
 ALLOWED_AVATAR_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+ADMIN_EMAIL = os.getenv("SHOPPING_APP_ADMIN_EMAIL", "ntylerbert@gmail.com").strip().lower()
 PASSWORD_RESET_TTL_HOURS = 1
 TWO_FACTOR_TRUST_DAYS = 30
 TWO_FACTOR_RECOVERY_TTL_MINUTES = 30
@@ -94,9 +95,15 @@ def public_user(user):
         "avatar_path": user.get("avatar_path", ""),
         "created_at": user.get("created_at", ""),
         "updated_at": user.get("updated_at", ""),
+        "is_admin": is_admin_user(user),
         "two_factor_enabled": bool(two_factor.get("enabled")),
         "two_factor_backup_codes_remaining": backup_codes_remaining(two_factor) if two_factor.get("enabled") else 0,
     }
+
+
+def is_admin_user(user):
+    email = str((user or {}).get("email") or "").strip().lower()
+    return bool(ADMIN_EMAIL and email == ADMIN_EMAIL)
 
 
 def current_user():

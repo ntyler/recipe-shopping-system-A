@@ -7,6 +7,7 @@ from flask import session
 from PushShoppingList.routes.account_routes import account_bp
 from PushShoppingList.routes.feedback_routes import feedback_bp
 from PushShoppingList.routes.main_routes import main_bp
+from PushShoppingList.routes.pantry_routes import pantry_bp
 from PushShoppingList.routes.recipe_routes import recipe_bp
 from PushShoppingList.routes.store_routes import store_bp
 from PushShoppingList.routes.product_routes import product_bp
@@ -27,6 +28,7 @@ def create_app():
     app.register_blueprint(account_bp)
     app.register_blueprint(feedback_bp)
     app.register_blueprint(main_bp)
+    app.register_blueprint(pantry_bp)
     app.register_blueprint(recipe_bp)
     app.register_blueprint(store_bp)
     app.register_blueprint(product_bp)

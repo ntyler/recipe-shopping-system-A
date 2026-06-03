@@ -120,7 +120,6 @@ def add_store(form_data):
         "url": search_url or guess_search_url(homepage_url),
         "urlStoreSelector": selector_url,
     }
-    save_store_credentials_for_form(key, form_data)
 
     if key not in settings["enabled_stores"]:
         settings["enabled_stores"].append(key)
@@ -143,6 +142,16 @@ def update_store(store_key, form_data):
     ).strip()
     save_store_credentials_for_form(store_key, form_data)
     save_store_settings(settings)
+    return load_store_settings()
+
+
+def update_store_credentials(store_key, form_data):
+    settings = load_store_settings()
+
+    if store_key not in settings["stores"]:
+        return settings
+
+    save_store_credentials_for_form(store_key, form_data)
     return load_store_settings()
 
 

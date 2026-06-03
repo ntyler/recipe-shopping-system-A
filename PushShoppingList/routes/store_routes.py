@@ -12,6 +12,9 @@ from PushShoppingList.services.item_state_service import save_item_store
 from PushShoppingList.services.store_settings_service import load_store_settings
 from PushShoppingList.services.store_settings_service import save_enabled_stores
 from PushShoppingList.services.store_settings_service import update_store
+from PushShoppingList.services.store_settings_service import update_store_credentials
+from PushShoppingList.services.user_account_service import current_public_user
+from PushShoppingList.services.user_account_service import is_admin_user
 
 store_bp = Blueprint("store_bp", __name__)
 
@@ -28,6 +31,9 @@ def api_stores():
 
 @store_bp.route("/save_store_settings", methods=["POST"])
 def save_store_settings_route():
+    if not current_user_can_manage_stores():
+        return forbidden_store_response("Only the administrator can activate or deactivate stores.")
+
     settings = save_enabled_stores(request.form.getlist("enabled_stores"))
 
     if wants_json_response():
@@ -41,6 +47,9 @@ def save_store_settings_route():
 
 @store_bp.route("/add_store", methods=["POST"])
 def add_store_route():
+    if not current_user_can_manage_stores():
+        return forbidden_store_response("Only the administrator can add stores.")
+
     label = str(request.form.get("store_label", "") or "").strip()
 
     if not label:
@@ -67,7 +76,15 @@ def add_store_route():
 
 @store_bp.route("/update_store/<store_key>", methods=["POST"])
 def update_store_route(store_key):
-    settings = update_store(store_key, request.form)
+    user = current_public_user()
+
+    if not user:
+        return forbidden_store_response("Sign in before updating store login details.")
+
+    if is_admin_user(user):
+        settings = update_store(store_key, request.form)
+    else:
+        settings = update_store_credentials(store_key, request.form)
 
     if wants_json_response():
         public_settings = clean_store_settings(settings)
@@ -82,6 +99,9 @@ def update_store_route(store_key):
 
 @store_bp.route("/delete_store/<store_key>", methods=["POST"])
 def delete_store_route(store_key):
+    if not current_user_can_manage_stores():
+        return forbidden_store_response("Only the administrator can remove stores.")
+
     settings = delete_store(store_key)
 
     if wants_json_response():
@@ -139,3 +159,17 @@ def wants_json_response():
         request.headers.get("X-Requested-With") == "fetch"
         or request.form.get("ajax") == "1"
     )
+
+
+def current_user_can_manage_stores():
+    return is_admin_user(current_public_user())
+
+
+def forbidden_store_response(error):
+    if wants_json_response():
+        return jsonify({
+            "ok": False,
+            "error": error,
+        }), 403
+
+    return redirect("/#store-options")

@@ -2009,9 +2009,27 @@ function renderRulesHomeStoresEditor(container, data) {
     const address = data.home_address || {};
     const stores = Array.isArray(data.available_stores) ? data.available_stores : [];
     const enabledStores = new Set(Array.isArray(data.enabled_stores) ? data.enabled_stores : []);
+    const userCanManageStores = data.can_manage_stores === true;
     const display = data.rules_display || {};
     const section = display.home_stores || {};
     const rows = Array.isArray(section.rows) ? section.rows : [];
+    const enabledStoresSection = userCanManageStores
+        ? `
+        <section class="rules-editor-section">
+            <h3>Enabled Stores</h3>
+            <div class="rules-editor-store-grid">
+                ${stores.map(store => `
+                    <label class="rules-editor-store-option">
+                        <input type="checkbox"
+                               data-rules-store-key="${escapeAttribute(store.key || "")}"
+                               ${enabledStores.has(store.key) ? "checked" : ""}>
+                        <span>${escapeHtml(store.label || store.key || "Store")}</span>
+                    </label>
+                `).join("")}
+            </div>
+        </section>
+        `
+        : "";
 
     container.innerHTML = `
         <section class="rules-editor-section">
@@ -2026,19 +2044,7 @@ function renderRulesHomeStoresEditor(container, data) {
                 ${rulesAddressInput("country", "Country", address.country)}
             </div>
         </section>
-        <section class="rules-editor-section">
-            <h3>Enabled Stores</h3>
-            <div class="rules-editor-store-grid">
-                ${stores.map(store => `
-                    <label class="rules-editor-store-option">
-                        <input type="checkbox"
-                               data-rules-store-key="${escapeAttribute(store.key || "")}"
-                               ${enabledStores.has(store.key) ? "checked" : ""}>
-                        <span>${escapeHtml(store.label || store.key || "Store")}</span>
-                    </label>
-                `).join("")}
-            </div>
-        </section>
+        ${enabledStoresSection}
         <section class="rules-editor-section">
             <div class="rules-editor-section-heading">
                 <h3>Section Text</h3>
@@ -4204,6 +4210,20 @@ function cardCollapseDefaultIsCollapsed(content) {
 
 let storeEditReturnFocus = null;
 
+function storeOptionsSection() {
+    return document.getElementById("storeOptionsSection");
+}
+
+function canManageStores() {
+    const section = storeOptionsSection();
+    return section ? section.dataset.storeCanManage === "true" : false;
+}
+
+function canEditStoreCredentials() {
+    const section = storeOptionsSection();
+    return section ? section.dataset.storeCanEditCredentials === "true" : false;
+}
+
 function toggleStorePanel(panelId) {
     return openStoreEditModal(panelId);
 }
@@ -4212,7 +4232,7 @@ function openStoreEditModal(formId, trigger) {
     const form = document.getElementById(formId);
     const backdrop = document.getElementById("storeEditModalBackdrop");
 
-    if (!form) {
+    if (!form || (!canManageStores() && !canEditStoreCredentials())) {
         return false;
     }
 
@@ -4229,7 +4249,7 @@ function openStoreEditModal(formId, trigger) {
     document.body.classList.add("modal-open");
 
     window.setTimeout(() => {
-        const firstInput = form.querySelector('input[name="store_label"]');
+        const firstInput = form.querySelector('input[name="store_label"], input[name="store_username"], input[name="store_password"]');
 
         if (firstInput) {
             firstInput.focus();
@@ -4837,6 +4857,15 @@ function restoreStoreOptionsDisplaySettings() {
 
 function setActiveStoreIconMode(mode, options = {}) {
     const allowedModes = new Set(["store", "map", "activation", "edit"]);
+
+    if (!canManageStores()) {
+        allowedModes.delete("activation");
+    }
+
+    if (!canManageStores() && !canEditStoreCredentials()) {
+        allowedModes.delete("edit");
+    }
+
     const nextMode = allowedModes.has(mode) ? mode : "store";
 
     document.body.classList.toggle("active-store-map-mode", nextMode === "map");
@@ -5044,6 +5073,10 @@ function restoreStoreOptionsListSort() {
 
 function openActiveStoreIcon(link, event) {
     if (document.body.classList.contains("active-store-edit-mode")) {
+        if (!canManageStores() && !canEditStoreCredentials()) {
+            return true;
+        }
+
         if (event) {
             event.preventDefault();
             event.stopPropagation();
@@ -5053,6 +5086,10 @@ function openActiveStoreIcon(link, event) {
     }
 
     if (document.body.classList.contains("active-store-activation-mode")) {
+        if (!canManageStores()) {
+            return true;
+        }
+
         if (event) {
             event.preventDefault();
             event.stopPropagation();
@@ -5104,6 +5141,10 @@ function updateActiveStoreCardActivationState(card, isActive) {
 }
 
 async function toggleStoreActivationFromCard(card) {
+    if (!canManageStores()) {
+        return false;
+    }
+
     if (!card || card.classList.contains("saving")) {
         return false;
     }
@@ -5177,6 +5218,86 @@ function restoreItemCheckState() {
             localStorage.setItem(`item-checked:${key}`, checkbox.checked ? "1" : "0");
         });
     });
+}
+
+function filterPantryItems(value) {
+    const query = String(value || "").trim().toLowerCase();
+    let visibleCount = 0;
+
+    document.querySelectorAll("[data-pantry-item]").forEach(item => {
+        const searchText = item.dataset.pantrySearch || item.textContent || "";
+        const visible = !query || searchText.toLowerCase().includes(query);
+        item.hidden = !visible;
+
+        if (visible) {
+            visibleCount += 1;
+        }
+    });
+
+    document.querySelectorAll("[data-pantry-search-empty]").forEach(empty => {
+        empty.hidden = !query || visibleCount > 0;
+    });
+}
+
+function checkedShoppingItemsForPantry() {
+    return Array.from(document.querySelectorAll("#sectionView .row"))
+        .filter(row => {
+            const checkbox = row.querySelector(".item-check");
+            return checkbox && checkbox.checked;
+        })
+        .map(row => {
+            const itemText = row.querySelector(".item-text");
+            return {
+                name: row.dataset.itemName || (itemText ? itemText.textContent.trim() : ""),
+                quantity: 1,
+            };
+        })
+        .filter(item => item.name);
+}
+
+async function moveBoughtItemsToPantry(button) {
+    const items = checkedShoppingItemsForPantry();
+
+    if (!items.length) {
+        showRecipeQuantityUpdatedMessage("", "", "", "Check at least one shopping list item before moving it to the pantry.");
+        return false;
+    }
+
+    const originalText = button ? button.textContent : "";
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Moving...";
+    }
+
+    try {
+        const response = await fetch("/pantry/move_bought_items", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "fetch",
+            },
+            body: JSON.stringify({ items }),
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to move bought items to pantry.");
+        }
+
+        showRecipeQuantityUpdatedMessage("", "", "", data.message || "Bought items moved to pantry.");
+        await refreshStoreMarkup({ cacheBust: true });
+    } catch (err) {
+        console.warn("Unable to move bought items to pantry.", err);
+        showRecipeQuantityUpdatedMessage("", "", "", err.message || "Unable to move bought items to pantry.");
+    } finally {
+        if (button && button.isConnected) {
+            button.disabled = false;
+            button.textContent = originalText || "Move Bought Items to Pantry";
+        }
+    }
+
+    return false;
 }
 
 function bindRecipeUrlLogDragAndDrop() {
@@ -11903,7 +12024,7 @@ function recipeEditorImagePanelSelector(options = {}) {
         return "[data-step-image-panel]";
     }
 
-    return "[data-equipment-image-panel], [data-step-image-panel]";
+    return "[data-recipe-edit-title-image-panel], [data-equipment-image-panel], [data-step-image-panel]";
 }
 
 function setRecipeEditRowImageVisibleFromMenu(button, visible) {
@@ -12984,6 +13105,10 @@ async function saveStoreOptions(event) {
 }
 
 async function saveStoreToggle(toggle) {
+    if (!canManageStores()) {
+        return false;
+    }
+
     const form = document.getElementById("store-options-form");
 
     if (!form) {
@@ -13004,6 +13129,68 @@ async function saveStoreOptionsForm(form) {
     }
 }
 
+const STORE_REQUEST_FEEDBACK_DESCRIPTION = [
+    "Store name:",
+    "Store website:",
+    "Store selector/location URL:",
+    "Why this store should be added:",
+    "Notes:"
+].join("\n");
+
+function openStoreRequestFeedback(button) {
+    closeRecipeEditRowMenus();
+
+    const section = document.getElementById("feedbackSupportSection");
+    const content = document.querySelector('[data-collapse-content="feedback-support"]');
+
+    if (!section || !content) {
+        return false;
+    }
+
+    if (content.classList.contains("collapsed")) {
+        toggleCardCollapse("feedback-support");
+    }
+
+    window.setTimeout(() => {
+        const form = document.getElementById("feedbackForm");
+
+        if (form) {
+            prefillStoreRequestFeedback(form);
+        }
+
+        section.scrollIntoView({ behavior: "smooth", block: "start" });
+
+        const focusTarget = form
+            ? (form.querySelector("#feedbackSubjectInput") || form.querySelector("[name=\"subject\"]"))
+            : section.querySelector(".feedback-sign-in-panel");
+
+        if (focusTarget && typeof focusTarget.focus === "function") {
+            focusTarget.focus({ preventScroll: true });
+        }
+    }, 0);
+
+    return false;
+}
+
+function prefillStoreRequestFeedback(form) {
+    const typeInput = form.querySelector("#feedbackTypeInput, [name=\"feedback_type\"]");
+    const subjectInput = form.querySelector("#feedbackSubjectInput, [name=\"subject\"]");
+    const descriptionInput = form.querySelector("#feedbackDescriptionInput, [name=\"description\"]");
+
+    if (typeInput) {
+        const storeRequestOption = Array.from(typeInput.options || []).find(option => option.value === "Store Request");
+        typeInput.value = storeRequestOption ? "Store Request" : "Store Issue";
+    }
+
+    if (subjectInput && !subjectInput.value.trim()) {
+        subjectInput.value = "Request store: ";
+    }
+
+    if (descriptionInput && !descriptionInput.value.trim()) {
+        descriptionInput.value = STORE_REQUEST_FEEDBACK_DESCRIPTION;
+    }
+}
+
 let addStoreReturnFocus = null;
 
 function expandStoreOptionsForAddStoreModal() {
@@ -13015,6 +13202,11 @@ function expandStoreOptionsForAddStoreModal() {
 }
 
 function openAddStoreModalFromMenu(button) {
+    if (!canManageStores()) {
+        closeRecipeEditRowMenus();
+        return false;
+    }
+
     closeRecipeEditRowMenus();
     expandStoreOptionsForAddStoreModal();
     openAddStoreModal();
@@ -13022,10 +13214,14 @@ function openAddStoreModalFromMenu(button) {
 }
 
 function openAddStoreModal() {
+    if (!canManageStores()) {
+        return false;
+    }
+
     const modal = document.getElementById("addStoreModal");
 
     if (!modal) {
-        return;
+        return false;
     }
 
     addStoreReturnFocus = document.activeElement;
@@ -13041,6 +13237,8 @@ function openAddStoreModal() {
             firstInput.focus();
         }
     }, 0);
+
+    return false;
 }
 
 function closeAddStoreModal(options = {}) {
@@ -13263,6 +13461,11 @@ function updateStoreDetailsFromForm(form) {
     const labelInput = form.querySelector('[name="store_label"]');
     const searchUrlInput = form.querySelector('[name="store_url"]');
     const selectorUrlInput = form.querySelector('[name="urlStoreSelector"]');
+
+    if (!labelInput && !searchUrlInput && !selectorUrlInput) {
+        return;
+    }
+
     const label = ((labelInput && labelInput.value) || "").trim();
     const searchUrl = ((searchUrlInput && searchUrlInput.value) || "").trim();
     const selectorUrl = ((selectorUrlInput && selectorUrlInput.value) || "").trim();
@@ -13720,6 +13923,7 @@ async function refreshStoreMarkup(options = {}) {
 
     const html = await response.text();
     const nextPage = new DOMParser().parseFromString(html, "text/html");
+    replaceSectionFromPage(nextPage, "#aiPantrySection");
     replaceSectionFromPage(nextPage, "#editItemsSection");
     replaceSectionFromPage(nextPage, "#home-address-section");
     replaceSectionFromPage(nextPage, "#storeOptionsSection");

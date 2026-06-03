@@ -4,7 +4,15 @@
             data-collapse-toggle="feedback-support"
             aria-expanded="false"
             onclick="toggleCardCollapse('feedback-support')">
-        <span>💬 Feedback &amp; Support</span>
+        <span class="feedback-support-title-text">
+            <span>💬 Feedback &amp; Support</span>
+            {% if current_user %}
+                <span class="feedback-support-header-count">
+                    {{ feedback_dashboard.my_feedback | length }}
+                    request{% if (feedback_dashboard.my_feedback | length) != 1 %}s{% endif %}
+                </span>
+            {% endif %}
+        </span>
     </button>
 
     <div class="card-collapse-content feedback-support-content collapsed"
@@ -26,14 +34,15 @@
     {% endif %}
 
     {% if current_user %}
-        <form class="feedback-form"
+        <form id="feedbackForm"
+              class="feedback-form"
               method="POST"
               action="{{ url_for('feedback_bp.submit_feedback_route') }}"
               enctype="multipart/form-data">
             <div class="feedback-form-grid">
                 <label>
                     <span>Feedback Type</span>
-                    <select name="feedback_type" required>
+                    <select id="feedbackTypeInput" name="feedback_type" required>
                         {% for feedback_type in feedback_dashboard.feedback_types %}
                             <option value="{{ feedback_type }}">{{ feedback_type }}</option>
                         {% endfor %}
@@ -41,11 +50,11 @@
                 </label>
                 <label>
                     <span>Subject</span>
-                    <input type="text" name="subject" required autocomplete="off">
+                    <input id="feedbackSubjectInput" type="text" name="subject" required autocomplete="off">
                 </label>
                 <label class="feedback-form-wide">
                     <span>Description</span>
-                    <textarea name="description" required></textarea>
+                    <textarea id="feedbackDescriptionInput" name="description" required></textarea>
                 </label>
                 <label>
                     <span>Attach Screenshot</span>
@@ -61,7 +70,7 @@
             <button type="submit" class="feedback-submit-btn">Submit Feedback</button>
         </form>
     {% else %}
-        <div class="feedback-sign-in-panel">
+        <div class="feedback-sign-in-panel" tabindex="-1">
             Sign in before submitting feedback so each request, status change, and admin response stays tied to your account.
         </div>
     {% endif %}
