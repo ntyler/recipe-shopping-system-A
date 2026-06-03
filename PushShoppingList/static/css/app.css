@@ -14240,6 +14240,17 @@ body {
     border-color: #4b5563;
 }
 
+#aiPantrySection .ai-pantry-toggle {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+#aiPantrySection .ai-pantry-toggle:hover,
+#aiPantrySection .ai-pantry-toggle:focus-visible {
+    background: transparent;
+}
+
 .ai-pantry-nav,
 .ai-pantry-placeholder-actions,
 .ai-pantry-review-actions {
