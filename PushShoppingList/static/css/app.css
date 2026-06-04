@@ -2145,6 +2145,96 @@ body {
             outline: none;
         }
 
+        .home-address-history {
+            margin-top: 12px;
+            padding: 12px 14px;
+            background: #121617;
+            border: 1px solid #2c3335;
+            border-radius: 10px;
+        }
+
+        .home-address-history-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .home-address-history-count {
+            color: #94a3b8;
+            font-size: 12px;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .home-address-history-list {
+            display: grid;
+            gap: 8px;
+            margin: 10px 0 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .home-address-history-item {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: #181d1f;
+            border: 1px solid #30383b;
+            border-radius: 8px;
+        }
+
+        .home-address-history-copy {
+            display: grid;
+            gap: 3px;
+            min-width: 0;
+        }
+
+        .home-address-history-time {
+            color: #94a3b8;
+            font-size: 11px;
+            font-weight: 900;
+            line-height: 1.2;
+            text-transform: uppercase;
+        }
+
+        .home-address-history-address {
+            font-size: 14px;
+            line-height: 1.35;
+        }
+
+        .home-address-history-use-btn {
+            width: auto;
+            min-width: 58px;
+            margin: 0;
+            padding: 8px 12px;
+            border: 1px solid #315e8f;
+            border-radius: 8px;
+            background: #123d68;
+            color: #e0f2fe;
+            font-size: 13px;
+            font-weight: 900;
+        }
+
+        .home-address-history-use-btn:hover,
+        .home-address-history-use-btn:focus-visible {
+            background: #155a92;
+            outline: none;
+        }
+
+        .home-address-history-empty {
+            margin-top: 10px;
+            color: #94a3b8;
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .home-address-history-empty[hidden] {
+            display: none;
+        }
+
         .store-options-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
@@ -9481,6 +9571,14 @@ body {
                 margin-right: -4px;
                 margin-left: -4px;
                 padding: 8px;
+            }
+
+            .home-address-history-item {
+                grid-template-columns: minmax(0, 1fr);
+            }
+
+            .home-address-history-use-btn {
+                width: 100%;
             }
 
             body :where(input, select, textarea) {

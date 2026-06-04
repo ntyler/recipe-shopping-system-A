@@ -86,3 +86,21 @@ def test_item_rows_use_price_grid_and_overflow_menu():
     assert "item-row-menu recipe-edit-row-menu overflow-menu" in action_menu
     assert "item-store-price-cell.cheapest" in css
     assert "item-store-price-cell.selected" in css
+
+
+def test_recipe_ingredient_store_tools_sit_under_quantity():
+    root = Path(__file__).resolve().parents[1]
+    items_template = (root / "PushShoppingList/templates/sections/items.html").read_text(encoding="utf-8")
+    css = (root / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    recipe_ingredient_block = items_template[items_template.index("{% for recipe_item in section_items %}"):]
+
+    assert 'class="row recipe-ingredient-row"' in recipe_ingredient_block
+    assert 'class="item-row-tools recipe-ingredient-store-tools"' in recipe_ingredient_block
+    assert recipe_ingredient_block.index('class="source-line item-qty-line"') < recipe_ingredient_block.index(
+        'include "sections/item_store_price_grid.html"'
+    )
+    assert recipe_ingredient_block.index('include "sections/item_store_price_grid.html"') < recipe_ingredient_block.index(
+        'include "sections/product_choice_line.html"'
+    )
+    assert ".recipe-ingredient-row .item-row-tools.recipe-ingredient-store-tools" in css
+    assert "grid-template-columns: 30px minmax(0, 1fr) auto" in css

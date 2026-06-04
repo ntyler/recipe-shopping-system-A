@@ -13292,6 +13292,10 @@ async function runFindNearestStores(form, button) {
             updateHomeAddressSummaries(data.home_address.full_address || "");
         }
 
+        if (data && data.home_address_history) {
+            updateHomeAddressHistory(data.home_address_history);
+        }
+
         let message = data && data.warning
             ? `Nearest stores not updated: ${data.warning}`
             : "Nearest stores updated.";
@@ -13351,6 +13355,7 @@ async function saveHomeAddressForm(form) {
         }
 
         updateHomeAddressSummaries(data.home_address.full_address || "");
+        updateHomeAddressHistory(data.home_address_history || []);
         return data;
     } catch (err) {
         console.warn("Unable to save address in the background.", err);
@@ -13376,6 +13381,89 @@ function updateHomeAddressSummaries(address) {
         collapsedSummary.textContent = text || "No home address saved.";
         updateHomeAddressMapLink(collapsedSummary, text);
     }
+}
+
+function useHomeAddressHistoryEntry(button) {
+    const form = document.getElementById("homeAddressForm");
+
+    if (!form || !button) {
+        return false;
+    }
+
+    setHomeAddressField(form, "address_street", button.dataset.addressStreet || "");
+    setHomeAddressField(form, "address_apartment", button.dataset.addressApartment || "");
+    setHomeAddressField(form, "address_city", button.dataset.addressCity || "");
+    setHomeAddressField(form, "address_county", button.dataset.addressCounty || "");
+    setHomeAddressField(form, "address_state", button.dataset.addressState || "");
+    setHomeAddressField(form, "address_zip", button.dataset.addressZip || "");
+    setHomeAddressField(form, "address_country", button.dataset.addressCountry || "");
+    updateHomeAddressSummaries(buildAddressSummaryFromForm(form));
+
+    const saveButton = form.querySelector('button[name="action"][value="save"]');
+
+    if (saveButton && typeof saveButton.focus === "function") {
+        saveButton.focus({ preventScroll: true });
+    }
+
+    return false;
+}
+
+function updateHomeAddressHistory(history) {
+    const list = document.querySelector("[data-home-address-history-list]");
+    const empty = document.querySelector("[data-home-address-history-empty]");
+    const count = document.querySelector("[data-home-address-history-count]");
+
+    if (!list || !Array.isArray(history)) {
+        return;
+    }
+
+    list.replaceChildren(...history.map(createHomeAddressHistoryItem));
+
+    if (empty) {
+        empty.hidden = history.length > 0;
+    }
+
+    if (count) {
+        count.textContent = `${history.length} saved`;
+    }
+}
+
+function createHomeAddressHistoryItem(entry) {
+    const item = document.createElement("li");
+    const address = String((entry && entry.full_address) || "").trim();
+    const copy = document.createElement("div");
+    const time = document.createElement("span");
+    const link = document.createElement("a");
+    const button = document.createElement("button");
+
+    item.className = "home-address-history-item";
+    copy.className = "home-address-history-copy";
+    time.className = "home-address-history-time";
+    time.textContent = (entry && (entry.saved_at_display || entry.saved_at)) || "Saved";
+
+    link.className = "home-address-history-address home-address-map-link";
+    link.textContent = address;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.title = "Open saved address in Maps";
+    link.onclick = event => openStoreAddressMap(link, event);
+    updateHomeAddressMapLink(link, address);
+
+    button.type = "button";
+    button.className = "home-address-history-use-btn";
+    button.textContent = "Use";
+    button.dataset.addressStreet = (entry && entry.street) || "";
+    button.dataset.addressApartment = (entry && entry.apartment) || "";
+    button.dataset.addressCity = (entry && entry.city) || "";
+    button.dataset.addressCounty = (entry && entry.county) || "";
+    button.dataset.addressState = (entry && entry.state) || "";
+    button.dataset.addressZip = (entry && entry.zip) || "";
+    button.dataset.addressCountry = (entry && entry.country) || "";
+    button.onclick = () => useHomeAddressHistoryEntry(button);
+
+    copy.append(time, link);
+    item.append(copy, button);
+    return item;
 }
 
 function homeAddressGoogleMapsUrl(address) {
