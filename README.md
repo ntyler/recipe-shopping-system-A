@@ -237,6 +237,39 @@ Account Menu items:
 
 Profile photos use the uploaded logo/avatar first. If the uploaded logo is removed, the account falls back to the Firebase/Google profile photo when available, then to the generated initial avatar.
 
+### Private Data And Admin Support
+
+Private data is anything that can identify a user, reveal something personal about them, or let someone access or control their account.
+
+Treat these as private in this app:
+
+- Account identity: email, phone number, full name, username, and Firebase UID.
+- Location/contact data: home address, delivery address, and store pickup address.
+- Security secrets: passwords, password hashes, two-factor secrets, backup codes, trusted-device tokens, session cookies, and reset tokens.
+- Store credentials: grocery login usernames/passwords and saved store account data.
+- User content: imported recipes, uploaded docs/photos/PDFs, pantry contents, shopping list items, and receipt data.
+- Security metadata: last sign-in, two-factor status, notification topics, device info, IP logs, and user-agent logs.
+- Admin/support audit data: who viewed an account, when, and why.
+
+For admin support, use the safer rule: admins can see support-safe summaries, not raw private data.
+
+Support-safe examples:
+
+- Account status
+- Email verified yes/no
+- Two-factor enabled yes/no
+- Backup codes remaining count
+- Last sign-in date
+- Workspace file counts
+
+Do not show admins:
+
+- Actual passwords or password hashes
+- Two-factor secrets or backup code values
+- Home address
+- Store passwords
+- Private recipe, shopping, pantry, receipt, upload, or PDF contents unless the user explicitly asks for help with that specific data.
+
 Two-factor authentication is account-specific:
 
 - Setup uses an authenticator app secret, QR code when available, and one-time backup codes.
