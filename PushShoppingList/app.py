@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 
 from flask import Flask
 from flask import flash
@@ -108,6 +109,8 @@ def create_app():
     )
     # Flask sessions keep the signed-in user id across refreshes.
     app.secret_key = os.getenv("SHOPPING_APP_SECRET_KEY", "dev-shopping-list-session-key")
+    app.permanent_session_lifetime = timedelta(days=30)
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
     app.register_blueprint(account_bp)
     app.register_blueprint(feedback_bp)

@@ -134,25 +134,72 @@
                     <div class="user-account-email">{{ current_user.username }}</div>
                 {% endif %}
                 <div class="user-account-email">{{ current_user.email }}</div>
+                {% if current_user.auth_provider == "firebase" %}
+                    <div class="user-firebase-connected-indicator"
+                         data-firebase-connected-indicator
+                         hidden>
+                        Connected via Firebase Authentication
+                    </div>
+                {% endif %}
                 <div class="user-account-meta">
-                    <span>{{ current_user.role }}</span>
-                    <span>{{ current_user.provider_label }}</span>
+                    <span class="user-role-badge">Role: {{ current_user.role }}</span>
+                    <span>{{ current_user.email_verified_label }}</span>
                     {% if current_user.is_admin %}
                         <span>Admin access enabled</span>
                     {% endif %}
                 </div>
+                <dl class="user-account-detail-list">
+                    <div>
+                        <dt>Created</dt>
+                        <dd>{{ current_user.created_at_label or current_user.created_at or "Unknown" }}</dd>
+                    </div>
+                    <div>
+                        <dt>Last Sign-In</dt>
+                        <dd>{{ current_user.last_sign_in_at_label or current_user.last_sign_in_at or "Unknown" }}</dd>
+                    </div>
+                </dl>
             </div>
 
             <div class="user-account-actions">
-                <button type="button" class="secondary" onclick="return toggleUserProfileEditor()">
-                    Edit Profile
-                </button>
-                <form id="firebaseSignOutForm"
-                      data-firebase-sign-out-form
-                      method="POST"
-                      action="{{ url_for('account_bp.sign_out_route') }}">
-                    <button type="submit" class="danger">Sign Out</button>
-                </form>
+                <details class="user-account-menu" data-account-menu>
+                    <summary>Account Menu</summary>
+                    <div class="user-account-menu-panel">
+                        <button type="button"
+                                class="secondary"
+                                onclick="return toggleUserProfileEditor()">
+                            Account Settings
+                        </button>
+                        {% if current_user.auth_provider == "firebase" %}
+                            <button type="button"
+                                    class="secondary"
+                                    data-firebase-change-password
+                                    data-user-email="{{ current_user.email }}">
+                                Change Password
+                            </button>
+                            <button type="button"
+                                    class="secondary"
+                                    data-firebase-verify-email>
+                                Verify Email
+                            </button>
+                        {% else %}
+                            <button type="button"
+                                    class="secondary"
+                                    onclick="return toggleUserProfileEditor()">
+                                Change Password
+                            </button>
+                        {% endif %}
+                        <form id="firebaseSignOutForm"
+                              data-firebase-sign-out-form
+                              method="POST"
+                              action="{{ url_for('account_bp.sign_out_route') }}">
+                            <button type="submit" class="danger">Sign Out</button>
+                        </form>
+                        <div class="user-account-menu-status"
+                             data-account-menu-status
+                             aria-live="polite"
+                             hidden></div>
+                    </div>
+                </details>
             </div>
         </div>
 
@@ -382,10 +429,6 @@
         <p class="helper-text user-account-helper">
             You are using the guest workspace. Sign in to keep recipes, stores, product picks, and preferences private to your account.
         </p>
-        <div id="firebaseAuthSetupWarning"
-             class="user-firebase-status user-firebase-warning error"
-             aria-live="polite"
-             hidden></div>
 
         <div class="user-account-forms">
             {% if pending_two_factor_sign_in %}

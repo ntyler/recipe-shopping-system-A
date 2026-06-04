@@ -3,9 +3,12 @@ import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.14.0/firebas
 import {
     getAuth,
     onAuthStateChanged,
+    browserLocalPersistence,
+    setPersistence,
     signInWithEmailAndPassword,
     createUserWithEmailAndPassword,
     sendPasswordResetEmail,
+    sendEmailVerification,
     signInWithPopup,
     GoogleAuthProvider,
     signOut
@@ -43,33 +46,6 @@ function firebaseConfigFromPage() {
     }
 }
 
-function firebaseWarningElement() {
-    return document.getElementById("firebaseAuthSetupWarning");
-}
-
-function showFirebaseAuthWarning(message) {
-    const warning = firebaseWarningElement();
-
-    if (!warning) {
-        return;
-    }
-
-    warning.textContent = message || "Firebase Authentication could not be initialized.";
-    warning.hidden = false;
-}
-
-function hideFirebaseAuthWarning() {
-    const warning = firebaseWarningElement();
-
-    if (warning) {
-        warning.textContent = "";
-        warning.hidden = true;
-    }
-}
-
-window.showShoppingFirebaseAuthWarning = showFirebaseAuthWarning;
-window.hideShoppingFirebaseAuthWarning = hideFirebaseAuthWarning;
-
 function missingFirebaseConfig(config) {
     return ["apiKey", "authDomain", "projectId", "appId"].some((key) => !String(config[key] || "").trim());
 }
@@ -85,7 +61,7 @@ let auth = null;
 let googleProvider = null;
 
 if (missingFirebaseConfig(firebaseConfig)) {
-    showFirebaseAuthWarning("Firebase config is missing. Check the Flask Firebase web config values.");
+    console.warn("Firebase config is missing. Check the Flask Firebase web config values.");
 } else {
     try {
         const initializedApp = initializeApp(firebaseConfig);
@@ -97,15 +73,16 @@ if (missingFirebaseConfig(firebaseConfig)) {
         analytics = initializedAnalytics;
         auth = initializedAuth;
         googleProvider = initializedGoogleProvider;
+        setPersistence(auth, browserLocalPersistence).catch((error) => {
+            console.warn("Firebase auth persistence could not be set.", error);
+        });
         window.shoppingFirebaseAuthStatus.initialized = true;
-        hideFirebaseAuthWarning();
 
         if (isDevelopmentHost()) {
             console.log("Firebase Auth initialized.");
         }
     } catch (error) {
         console.warn("Firebase Auth initialization failed.", error);
-        showFirebaseAuthWarning("Firebase Authentication failed to initialize. Check the Firebase web config.");
     }
 }
 
@@ -137,10 +114,6 @@ function firebaseErrorMessage(error) {
 
     if (code === "auth/popup-closed-by-user") {
         return "Google sign-in was canceled.";
-    }
-
-    if (code === "auth/unauthorized-domain") {
-        return "This domain is not authorized in Firebase Authentication settings.";
     }
 
     if (code === "auth/configuration-not-found") {
@@ -222,6 +195,7 @@ async function backendJson(url, options = {}) {
 
 async function loadBackendSession() {
     backendSession = await backendJson("/auth/session", { method: "GET" });
+    applyBackendSessionState(backendSession);
     return backendSession;
 }
 
@@ -243,6 +217,38 @@ async function logoutBackend() {
 function reloadAccountSection() {
     window.location.hash = "userAccountSection";
     window.location.reload();
+}
+
+function firebaseEmailActionSettings() {
+    return {
+        url: `${window.location.origin}/#userAccountSection`,
+        handleCodeInApp: false
+    };
+}
+
+function setAccountMenuStatus(message, type = "success") {
+    const status = document.querySelector("[data-account-menu-status]");
+
+    if (!status) {
+        return;
+    }
+
+    status.textContent = message || "";
+    status.classList.toggle("success", type === "success");
+    status.classList.toggle("error", type === "error");
+    status.hidden = !message;
+}
+
+function applyBackendSessionState(session) {
+    const indicator = document.querySelector("[data-firebase-connected-indicator]");
+    const user = session && session.user ? session.user : null;
+    const connected = Boolean(session && session.authenticated && user && user.auth_provider === "firebase");
+
+    if (indicator) {
+        indicator.hidden = !connected;
+    }
+
+    window.shoppingFirebaseAuthStatus.backendVerified = connected;
 }
 
 function firebaseUserProfile(firebaseUser, extra = {}) {
@@ -370,7 +376,7 @@ function bindForgotPasswordForm() {
         setBusy(form, true);
 
         try {
-            await sendPasswordResetEmail(auth, formValue(form, "identity"));
+            await sendPasswordResetEmail(auth, formValue(form, "identity"), firebaseEmailActionSettings());
             setStatus(form, "Firebase sent a password reset email.", "success");
         } catch (error) {
             setStatus(form, firebaseErrorMessage(error), "error");
@@ -401,6 +407,62 @@ function bindSignOutForm() {
             }
         }
     });
+}
+
+function bindAccountMenuActions() {
+    const changePasswordButton = document.querySelector("[data-firebase-change-password]");
+    const verifyEmailButton = document.querySelector("[data-firebase-verify-email]");
+
+    if (changePasswordButton) {
+        changePasswordButton.addEventListener("click", async () => {
+            const email = String(changePasswordButton.dataset.userEmail || (auth.currentUser || {}).email || "").trim();
+
+            if (!email) {
+                setAccountMenuStatus("This account does not have an email address.", "error");
+                return;
+            }
+
+            changePasswordButton.disabled = true;
+            setAccountMenuStatus("", "success");
+
+            try {
+                await sendPasswordResetEmail(auth, email, firebaseEmailActionSettings());
+                setAccountMenuStatus("Password reset email sent.", "success");
+            } catch (error) {
+                setAccountMenuStatus(firebaseErrorMessage(error), "error");
+            } finally {
+                changePasswordButton.disabled = false;
+            }
+        });
+    }
+
+    if (verifyEmailButton) {
+        verifyEmailButton.addEventListener("click", async () => {
+            const firebaseUser = auth.currentUser;
+
+            if (!firebaseUser) {
+                setAccountMenuStatus("Refresh the page, then try verifying email again.", "error");
+                return;
+            }
+
+            if (firebaseUser.emailVerified) {
+                setAccountMenuStatus("Email is already verified.", "success");
+                return;
+            }
+
+            verifyEmailButton.disabled = true;
+            setAccountMenuStatus("", "success");
+
+            try {
+                await sendEmailVerification(firebaseUser, firebaseEmailActionSettings());
+                setAccountMenuStatus("Verification email sent.", "success");
+            } catch (error) {
+                setAccountMenuStatus(firebaseErrorMessage(error), "error");
+            } finally {
+                verifyEmailButton.disabled = false;
+            }
+        });
+    }
 }
 
 function bindAccountDeleteConfirmForm() {
@@ -437,6 +499,7 @@ function bindFirebaseForms() {
     bindSignInForm();
     bindForgotPasswordForm();
     bindSignOutForm();
+    bindAccountMenuActions();
     bindAccountDeleteConfirmForm();
 }
 

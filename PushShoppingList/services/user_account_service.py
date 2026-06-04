@@ -56,6 +56,15 @@ def parse_iso_datetime(value):
         return None
 
 
+def display_datetime(value):
+    parsed = parse_iso_datetime(value)
+
+    if not parsed:
+        return ""
+
+    return parsed.strftime("%b %-d, %Y %-I:%M %p UTC") if os.name != "nt" else parsed.strftime("%b %#d, %Y %#I:%M %p UTC")
+
+
 def load_users():
     if not USERS_FILE.exists():
         return {"users": []}
@@ -133,6 +142,9 @@ def public_user(user):
         return None
     two_factor = user.get("two_factor") if isinstance(user.get("two_factor"), dict) else {}
     ntfy_topic = normalize_ntfy_topic(user.get("ntfy_topic"))
+    is_firebase = str(user.get("auth_provider") or "").strip().lower() == "firebase"
+    email_verified = bool(user.get("firebase_email_verified")) if is_firebase else account_email_verified(user)
+    last_sign_in_at = user.get("firebase_last_login_at") or user.get("last_login_at") or ""
 
     return {
         "user_id": user.get("user_id", ""),
@@ -147,7 +159,8 @@ def public_user(user):
         "firebase_uid": user.get("firebase_uid", ""),
         "picture": user.get("picture", ""),
         "email_verified_at": user.get("email_verified_at", ""),
-        "email_verified": account_email_verified(user),
+        "email_verified": email_verified,
+        "email_verified_label": "Email verified" if email_verified else "Email not verified",
         "account_status": account_status(user),
         "phone": user.get("phone", ""),
         "phone_verified_at": user.get("phone_verified_at", ""),
@@ -156,6 +169,9 @@ def public_user(user):
         "ntfy_url": ntfy_subscription_url(ntfy_topic),
         "avatar_path": user.get("avatar_path", ""),
         "created_at": user.get("created_at", ""),
+        "created_at_label": display_datetime(user.get("created_at")),
+        "last_sign_in_at": last_sign_in_at,
+        "last_sign_in_at_label": display_datetime(last_sign_in_at),
         "updated_at": user.get("updated_at", ""),
         "is_admin": is_admin_user(user),
         "role": "Admin" if is_admin_user(user) else "User",
@@ -248,6 +264,23 @@ def find_user_by_id(user_id):
         (user for user in load_users().get("users", []) if str(user.get("user_id")) == user_id),
         None,
     )
+
+
+def save_current_user_record(user):
+    user_id = str((user or {}).get("user_id") or "").strip()
+
+    if not user_id:
+        return False
+
+    payload = load_users()
+    stored_user = find_user_by_id_in_payload(payload, user_id)
+
+    if not stored_user:
+        return False
+
+    stored_user.update(user)
+    save_users(payload)
+    return True
 
 
 def find_user_by_identity(identity):
@@ -402,10 +435,13 @@ def sign_in_firebase_user(firebase_user, profile=None):
     user["firebase_provider_ids"] = provider_ids
     user["firebase_sign_in_provider"] = sign_in_provider
     user["firebase_email_verified"] = bool(firebase_user.get("email_verified") or firebase_user.get("emailVerified"))
+    if user["firebase_email_verified"]:
+        user["email_verified_at"] = user.get("email_verified_at") or timestamp
     user["firebase_last_login_at"] = timestamp
     user["updated_at"] = timestamp
     save_users(payload)
 
+    session.permanent = True
     session["user_id"] = user["user_id"]
     session["firebase_uid"] = firebase_uid
     session["email"] = email
@@ -592,6 +628,9 @@ def authenticate_user(identity, password, trusted_device_token=""):
 
     if two_factor_enabled(user):
         if verify_trusted_two_factor_device(user, trusted_device_token):
+            user["last_login_at"] = now_iso()
+            save_current_user_record(user)
+            session.permanent = True
             session["user_id"] = user["user_id"]
             session.pop("pending_2fa_user_id", None)
             return {"ok": True, "user": public_user(user)}
@@ -600,6 +639,9 @@ def authenticate_user(identity, password, trusted_device_token=""):
         session["pending_2fa_user_id"] = user["user_id"]
         return {"ok": True, "requires_2fa": True, "user": public_user(user)}
 
+    user["last_login_at"] = now_iso()
+    save_current_user_record(user)
+    session.permanent = True
     session["user_id"] = user["user_id"]
     session.pop("pending_2fa_user_id", None)
     return {"ok": True, "user": public_user(user)}
@@ -714,6 +756,7 @@ def verify_account_creation(token):
     user.pop("account_verification", None)
     user["updated_at"] = timestamp
     save_users(payload)
+    session.permanent = True
     session["user_id"] = user["user_id"]
     session.pop("pending_2fa_user_id", None)
     return {"ok": True, "user": public_user(user)}
@@ -1186,8 +1229,11 @@ def complete_two_factor_sign_in(code, remember_device=False):
     if remember_device:
         trust_token = add_trusted_two_factor_device(user)
 
-    user["updated_at"] = now_iso()
+    timestamp = now_iso()
+    user["last_login_at"] = timestamp
+    user["updated_at"] = timestamp
     save_users(payload)
+    session.permanent = True
     session["user_id"] = user["user_id"]
     session.pop("pending_2fa_user_id", None)
     return {"ok": True, "user": public_user(user), "trust_token": trust_token}

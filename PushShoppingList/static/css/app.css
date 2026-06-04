@@ -5037,6 +5037,61 @@ body {
             background: #142338;
         }
 
+        .user-account-meta .user-role-badge {
+            border-color: #60a5fa;
+            background: #12325a;
+            color: #dbeafe;
+        }
+
+        .user-firebase-connected-indicator {
+            display: inline-flex;
+            width: fit-content;
+            max-width: 100%;
+            min-height: 22px;
+            margin-top: 8px;
+            padding: 3px 9px;
+            border: 1px solid #19c36b;
+            border-radius: 999px;
+            background: #073d24;
+            color: #d8ffe4;
+            font-size: 12px;
+            font-weight: 900;
+            line-height: 1.2;
+        }
+
+        .user-firebase-connected-indicator[hidden] {
+            display: none;
+        }
+
+        .user-account-detail-list {
+            display: grid;
+            gap: 5px;
+            margin: 10px 0 0;
+            color: #cbd5e1;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .user-account-detail-list div {
+            display: grid;
+            grid-template-columns: 92px minmax(0, 1fr);
+            gap: 8px;
+            align-items: baseline;
+            min-width: 0;
+        }
+
+        .user-account-detail-list dt,
+        .user-account-detail-list dd {
+            min-width: 0;
+            margin: 0;
+            overflow-wrap: anywhere;
+        }
+
+        .user-account-detail-list dt {
+            color: #93c5fd;
+            text-transform: uppercase;
+        }
+
         .user-account-phone {
             display: flex;
             gap: 8px;
@@ -5079,14 +5134,85 @@ body {
             margin: 0;
         }
 
-        .user-account-actions .secondary {
+        .user-account-menu {
+            position: relative;
+            min-width: min(220px, 100%);
+        }
+
+        .user-account-menu summary {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 42px;
+            padding: 0 14px;
+            border: 1px solid #4a596a;
+            border-radius: 7px;
+            background: #202829;
+            color: #fff;
+            font-weight: 900;
+            cursor: pointer;
+            list-style: none;
+        }
+
+        .user-account-menu summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .user-account-menu-panel {
+            position: absolute;
+            z-index: 20;
+            top: calc(100% + 8px);
+            right: 0;
+            display: grid;
+            gap: 8px;
+            width: min(240px, 84vw);
+            padding: 10px;
+            border: 1px solid #2f4054;
+            border-radius: 8px;
+            background: #0b1118;
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+        }
+
+        .user-account-menu-panel button {
+            width: 100%;
+        }
+
+        .user-account-menu-panel .secondary {
             border-color: #4a596a;
             background: #202829;
         }
 
-        .user-account-actions .danger {
+        .user-account-menu-panel .danger {
             border-color: #a52a2a;
             background: #7f1212;
+        }
+
+        .user-account-menu-status {
+            padding: 7px 8px;
+            border: 1px solid #2f4054;
+            border-radius: 7px;
+            background: #101820;
+            color: #dbeafe;
+            font-size: 12px;
+            font-weight: 800;
+            line-height: 1.25;
+            text-align: center;
+        }
+
+        .user-account-menu-status.success {
+            border-color: #0f8f4d;
+            background: #073d24;
+            color: #d8ffe4;
+        }
+
+        .user-account-menu-status.error {
+            border-color: #a33a3a;
+            background: #351417;
+            color: #ffd4d4;
+        }
+
+        .user-account-menu-status[hidden] {
+            display: none;
         }
 
         .user-account-edit-form {
@@ -10223,9 +10349,18 @@ body {
                 justify-content: stretch;
             }
 
+            .user-account-menu,
             .user-account-actions button,
             .user-account-actions form {
                 width: 100%;
+            }
+
+            .user-account-menu-panel {
+                position: static;
+                width: 100%;
+                margin-top: 8px;
+                box-shadow: none;
+                box-sizing: border-box;
             }
 
             .user-ntfy-link-row,

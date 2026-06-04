@@ -58,11 +58,7 @@ def firebase_web_config():
             "SHOPPING_APP_FIREBASE_APP_ID",
             default=DEFAULT_FIREBASE_WEB_CONFIG["appId"],
         ),
-        "measurementId": env_value(
-            "FIREBASE_MEASUREMENT_ID",
-            "SHOPPING_APP_FIREBASE_MEASUREMENT_ID",
-            default=DEFAULT_FIREBASE_WEB_CONFIG["measurementId"],
-        ),
+        "measurementId": DEFAULT_FIREBASE_WEB_CONFIG["measurementId"],
     }
 
 

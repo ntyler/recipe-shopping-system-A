@@ -13,6 +13,7 @@ call :load_user_env SHOPPING_APP_SMTP_FROM_EMAIL
 call :load_user_env SHOPPING_APP_SMTP_FROM_NAME
 call :load_user_env SHOPPING_APP_SMTP_USE_TLS
 call :load_user_env SHOPPING_APP_PASSWORD_RESET_BASE_URL
+call :load_user_env SHOPPING_APP_ACCOUNT_LINK_BASE_URL
 if exist local_env.bat call local_env.bat
 set PRODUCT_SEARCH_WORKERS=2
 set PRODUCT_DETAIL_LIMIT_PER_STORE=4
