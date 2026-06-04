@@ -214,6 +214,11 @@ async function logoutBackend() {
     });
 }
 
+async function accountExistsForPasswordReset(email) {
+    const query = new URLSearchParams({ email });
+    return backendJson(`/auth/account-exists?${query.toString()}`, { method: "GET" });
+}
+
 function reloadAccountSection() {
     window.location.hash = "userAccountSection";
     window.location.reload();
@@ -376,7 +381,16 @@ function bindForgotPasswordForm() {
         setBusy(form, true);
 
         try {
-            await sendPasswordResetEmail(auth, formValue(form, "identity"), firebaseEmailActionSettings());
+            const email = formValue(form, "identity");
+            const accountCheck = await accountExistsForPasswordReset(email);
+
+            if (!accountCheck.exists) {
+                setStatus(form, "No account was found for that email. Create an account first.", "error");
+                return;
+            }
+
+            setStatus(form, "Account found. Sending password reset email...", "success");
+            await sendPasswordResetEmail(auth, email, firebaseEmailActionSettings());
             setStatus(form, "Firebase sent a password reset email.", "success");
         } catch (error) {
             setStatus(form, firebaseErrorMessage(error), "error");

@@ -154,6 +154,35 @@ def firebase_user_from_id_token(id_token):
     return {"ok": True, "firebase_user": firebase_user}
 
 
+def firebase_account_exists_by_email(email):
+    email = str(email or "").strip()
+
+    if not email:
+        return {"ok": False, "errors": ["Email is required."]}
+
+    admin_app, app_result = firebase_admin_app()
+
+    if not app_result.get("ok"):
+        return app_result
+
+    try:
+        from firebase_admin import auth
+
+        auth.get_user_by_email(email, app=admin_app)
+    except Exception as err:
+        if err.__class__.__name__ == "UserNotFoundError":
+            return {"ok": True, "exists": False}
+
+        LOGGER.warning("Firebase account lookup failed: %s", err.__class__.__name__)
+        return {
+            "ok": False,
+            "code": "firebase_account_lookup_failed",
+            "errors": ["Firebase account lookup failed."],
+        }
+
+    return {"ok": True, "exists": True}
+
+
 def delete_firebase_auth_user(firebase_uid):
     firebase_uid = str(firebase_uid or "").strip()
 

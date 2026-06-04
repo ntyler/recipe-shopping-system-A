@@ -9,6 +9,7 @@ from flask import request
 from flask import session
 from flask import url_for
 
+from PushShoppingList.services.firebase_auth_service import firebase_account_exists_by_email
 from PushShoppingList.services.firebase_auth_service import firebase_user_from_id_token
 from PushShoppingList.services.email_service import password_reset_email_configured
 from PushShoppingList.services.email_service import send_account_delete_email
@@ -145,6 +146,26 @@ def account_verification_link(token):
 def firebase_session_route():
     user = current_public_user()
     return jsonify({"success": True, "authenticated": bool(user), "user": user})
+
+
+@account_bp.route("/auth/account-exists", methods=["GET"])
+def firebase_account_exists_route():
+    result = firebase_account_exists_by_email(request.args.get("email"))
+
+    if result.get("ok"):
+        return jsonify({
+            "success": True,
+            "exists": bool(result.get("exists")),
+        })
+
+    status = 503 if result.get("code") in {
+        "firebase_admin_credentials_missing",
+        "firebase_admin_credentials_invalid",
+        "firebase_admin_initialization_failed",
+        "firebase_admin_sdk_missing",
+        "firebase_account_lookup_failed",
+    } else 400
+    return json_account_result(result, error_status=status)
 
 
 @account_bp.route("/auth/firebase-login", methods=["POST"])
