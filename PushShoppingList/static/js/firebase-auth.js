@@ -224,6 +224,18 @@ function reloadAccountSection() {
     window.location.reload();
 }
 
+function handleFirebaseBackendLogin(result, form, successMessage) {
+    if (result && result.requires_2fa) {
+        setStatus(form, "Enter your authenticator code to finish signing in.", "success");
+        reloadAccountSection();
+        return true;
+    }
+
+    setStatus(form, successMessage, "success");
+    reloadAccountSection();
+    return true;
+}
+
 function firebaseEmailActionSettings() {
     return {
         url: `${window.location.origin}/#userAccountSection`,
@@ -242,6 +254,289 @@ function setAccountMenuStatus(message, type = "success") {
     status.classList.toggle("success", type === "success");
     status.classList.toggle("error", type === "error");
     status.hidden = !message;
+}
+
+function setPushNotificationsStatus(message, type = "success") {
+    const status = document.querySelector("[data-push-notifications-status]");
+
+    if (!status) {
+        return;
+    }
+
+    status.textContent = message || "";
+    status.classList.toggle("success", type === "success");
+    status.classList.toggle("error", type === "error");
+    status.hidden = !message;
+}
+
+function setPushNotificationsBusy(panel, busy) {
+    if (!panel) {
+        return;
+    }
+
+    panel.querySelectorAll(
+        "[data-push-notifications-enable], [data-push-notifications-disable], [data-push-notifications-test], [data-notification-preference]"
+    ).forEach((control) => {
+        control.disabled = busy;
+    });
+}
+
+function collectNotificationPreferences(panel) {
+    const preferences = {};
+
+    if (!panel) {
+        return preferences;
+    }
+
+    panel.querySelectorAll("[data-notification-preference]").forEach((input) => {
+        preferences[String(input.dataset.notificationPreference || "")] = Boolean(input.checked);
+    });
+
+    return preferences;
+}
+
+function updatePushNotificationControls(panel, enabled) {
+    if (!panel) {
+        return;
+    }
+
+    const normalizedEnabled = Boolean(enabled);
+    const statusLabel = panel.querySelector("[data-push-notifications-status-label]");
+    const enableButton = panel.querySelector("[data-push-notifications-enable]");
+    const disableButton = panel.querySelector("[data-push-notifications-disable]");
+    const testButton = panel.querySelector("[data-push-notifications-test]");
+
+    panel.dataset.notificationsEnabled = normalizedEnabled ? "1" : "0";
+
+    if (statusLabel) {
+        statusLabel.textContent = normalizedEnabled ? "Enabled" : "Disabled";
+    }
+
+    if (enableButton) {
+        enableButton.disabled = normalizedEnabled;
+    }
+
+    if (disableButton) {
+        disableButton.disabled = !normalizedEnabled;
+    }
+
+    if (testButton) {
+        testButton.disabled = !normalizedEnabled;
+    }
+}
+
+function applyNotificationSettingsUser(panel, user) {
+    if (!panel || !user) {
+        return;
+    }
+
+    updatePushNotificationControls(panel, Boolean(user.notifications_enabled));
+
+    const preferences = user.notification_preferences || {};
+    panel.querySelectorAll("[data-notification-preference]").forEach((input) => {
+        const key = String(input.dataset.notificationPreference || "");
+
+        if (Object.prototype.hasOwnProperty.call(preferences, key)) {
+            input.checked = Boolean(preferences[key]);
+        }
+    });
+}
+
+async function saveNotificationSettings(panel, enabled = null) {
+    const body = {
+        preferences: collectNotificationPreferences(panel)
+    };
+
+    if (typeof enabled === "boolean") {
+        body.enabled = enabled;
+    }
+
+    setPushNotificationsBusy(panel, true);
+    setPushNotificationsStatus("Saving notification settings...", "success");
+
+    try {
+        const result = await backendJson("/account/notifications", {
+            method: "POST",
+            body: JSON.stringify(body)
+        });
+        applyNotificationSettingsUser(panel, result.user);
+        setPushNotificationsStatus("Notification settings saved.", "success");
+    } catch (error) {
+        setPushNotificationsStatus(error.message, "error");
+    } finally {
+        setPushNotificationsBusy(panel, false);
+        updatePushNotificationControls(panel, panel.dataset.notificationsEnabled === "1");
+    }
+}
+
+function bindPushNotificationsPanel() {
+    const panel = document.querySelector("[data-push-notifications-panel]");
+
+    if (!panel) {
+        return;
+    }
+
+    updatePushNotificationControls(panel, panel.dataset.notificationsEnabled === "1");
+
+    document.querySelectorAll("[data-push-notifications-open]").forEach((button) => {
+        button.addEventListener("click", () => {
+            panel.hidden = false;
+            setPushNotificationsStatus("", "success");
+            hideAccountMenuPanels(panel);
+
+            const menu = document.querySelector("[data-account-menu]");
+            if (menu) {
+                menu.open = false;
+            }
+
+            window.requestAnimationFrame(() => {
+                panel.scrollIntoView({ behavior: "smooth", block: "start" });
+                const firstControl = panel.querySelector("[data-push-notifications-close]");
+                if (firstControl) {
+                    firstControl.focus({ preventScroll: true });
+                }
+            });
+        });
+    });
+
+    const closeButton = panel.querySelector("[data-push-notifications-close]");
+    if (closeButton) {
+        closeButton.addEventListener("click", () => {
+            panel.hidden = true;
+            setPushNotificationsStatus("", "success");
+        });
+    }
+
+    const enableButton = panel.querySelector("[data-push-notifications-enable]");
+    if (enableButton) {
+        enableButton.addEventListener("click", () => {
+            saveNotificationSettings(panel, true);
+        });
+    }
+
+    const disableButton = panel.querySelector("[data-push-notifications-disable]");
+    if (disableButton) {
+        disableButton.addEventListener("click", () => {
+            saveNotificationSettings(panel, false);
+        });
+    }
+
+    const testButton = panel.querySelector("[data-push-notifications-test]");
+    if (testButton) {
+        testButton.addEventListener("click", async () => {
+            if (panel.dataset.notificationsEnabled !== "1") {
+                setPushNotificationsStatus("Enable push notifications before sending a test notification.", "error");
+                return;
+            }
+
+            setPushNotificationsBusy(panel, true);
+            setPushNotificationsStatus("Sending test notification...", "success");
+
+            try {
+                const result = await backendJson("/account/notifications/test", {
+                    method: "POST",
+                    body: JSON.stringify({})
+                });
+                applyNotificationSettingsUser(panel, result.user);
+                setPushNotificationsStatus("Test notification sent.", "success");
+            } catch (error) {
+                setPushNotificationsStatus(error.message, "error");
+            } finally {
+                setPushNotificationsBusy(panel, false);
+                updatePushNotificationControls(panel, panel.dataset.notificationsEnabled === "1");
+            }
+        });
+    }
+
+    let preferenceSaveTimer = null;
+    panel.querySelectorAll("[data-notification-preference]").forEach((input) => {
+        input.addEventListener("change", () => {
+            window.clearTimeout(preferenceSaveTimer);
+            preferenceSaveTimer = window.setTimeout(() => {
+                saveNotificationSettings(panel);
+            }, 250);
+        });
+    });
+}
+
+function hideAccountMenuPanels(exceptPanel = null) {
+    document.querySelectorAll(
+        "[data-push-notifications-panel], [data-two-factor-panel], [data-delete-account-panel]"
+    ).forEach((panel) => {
+        if (panel !== exceptPanel) {
+            panel.hidden = true;
+        }
+    });
+}
+
+function bindTwoFactorPanel() {
+    const panel = document.querySelector("[data-two-factor-panel]");
+
+    if (!panel) {
+        return;
+    }
+
+    document.querySelectorAll("[data-two-factor-open]").forEach((button) => {
+        button.addEventListener("click", () => {
+            panel.hidden = false;
+            hideAccountMenuPanels(panel);
+
+            const menu = document.querySelector("[data-account-menu]");
+            if (menu) {
+                menu.open = false;
+            }
+
+            window.requestAnimationFrame(() => {
+                panel.scrollIntoView({ behavior: "smooth", block: "start" });
+                const firstControl = panel.querySelector("[data-two-factor-close]");
+                if (firstControl) {
+                    firstControl.focus({ preventScroll: true });
+                }
+            });
+        });
+    });
+
+    const closeButton = panel.querySelector("[data-two-factor-close]");
+    if (closeButton) {
+        closeButton.addEventListener("click", () => {
+            panel.hidden = true;
+        });
+    }
+}
+
+function bindDeleteAccountPanel() {
+    const panel = document.querySelector("[data-delete-account-panel]");
+
+    if (!panel) {
+        return;
+    }
+
+    document.querySelectorAll("[data-delete-account-open]").forEach((button) => {
+        button.addEventListener("click", () => {
+            panel.hidden = false;
+            hideAccountMenuPanels(panel);
+
+            const menu = document.querySelector("[data-account-menu]");
+            if (menu) {
+                menu.open = false;
+            }
+
+            window.requestAnimationFrame(() => {
+                panel.scrollIntoView({ behavior: "smooth", block: "start" });
+                const firstControl = panel.querySelector("[data-delete-account-close]");
+                if (firstControl) {
+                    firstControl.focus({ preventScroll: true });
+                }
+            });
+        });
+    });
+
+    const closeButton = panel.querySelector("[data-delete-account-close]");
+    if (closeButton) {
+        closeButton.addEventListener("click", () => {
+            panel.hidden = true;
+        });
+    }
 }
 
 function applyBackendSessionState(session) {
@@ -302,14 +597,13 @@ function bindCreateAccountForm() {
         explicitAuthInProgress = true;
         try {
             const credential = await createUserWithEmailAndPassword(auth, email, password);
-            await syncFirebaseUser(credential.user, firebaseUserProfile(credential.user, {
+            const result = await syncFirebaseUser(credential.user, firebaseUserProfile(credential.user, {
                 first_name: formValue(form, "first_name"),
                 last_name: formValue(form, "last_name"),
                 username: formValue(form, "username"),
                 email
             }));
-            setStatus(form, "Account created. Signing you in...", "success");
-            reloadAccountSection();
+            handleFirebaseBackendLogin(result, form, "Account created. Signing you in...");
         } catch (error) {
             setStatus(form, firebaseErrorMessage(error), "error");
             setBusy(form, false);
@@ -337,9 +631,8 @@ function bindSignInForm() {
                 formValue(form, "identity"),
                 String((form.elements.password || {}).value || "")
             );
-            await syncFirebaseUser(credential.user, firebaseUserProfile(credential.user));
-            setStatus(form, "Signed in. Loading your workspace...", "success");
-            reloadAccountSection();
+            const result = await syncFirebaseUser(credential.user, firebaseUserProfile(credential.user));
+            handleFirebaseBackendLogin(result, form, "Signed in. Loading your workspace...");
         } catch (error) {
             setStatus(form, firebaseErrorMessage(error), "error");
             setBusy(form, false);
@@ -356,9 +649,8 @@ function bindSignInForm() {
 
             try {
                 const credential = await signInWithPopup(auth, googleProvider);
-                await syncFirebaseUser(credential.user, firebaseUserProfile(credential.user));
-                setStatus(form, "Signed in with Google. Loading your workspace...", "success");
-                reloadAccountSection();
+                const result = await syncFirebaseUser(credential.user, firebaseUserProfile(credential.user));
+                handleFirebaseBackendLogin(result, form, "Signed in with Google. Loading your workspace...");
             } catch (error) {
                 setStatus(form, firebaseErrorMessage(error), "error");
                 setBusy(form, false);
@@ -419,6 +711,31 @@ function bindSignOutForm() {
             } finally {
                 reloadAccountSection();
             }
+        }
+    });
+}
+
+function bindTwoFactorCancelButton() {
+    const button = document.querySelector("[data-firebase-cancel-two-factor]");
+
+    if (!button) {
+        return;
+    }
+
+    button.addEventListener("click", async (event) => {
+        event.preventDefault();
+        button.disabled = true;
+
+        try {
+            await signOut(auth);
+        } catch (error) {
+            console.warn("Firebase sign-out before canceling two-factor sign-in failed.", error);
+        }
+
+        const form = button.form;
+        if (form) {
+            form.action = button.formAction || form.action;
+            form.submit();
         }
     });
 }
@@ -513,11 +830,16 @@ function bindFirebaseForms() {
     bindSignInForm();
     bindForgotPasswordForm();
     bindSignOutForm();
+    bindTwoFactorCancelButton();
     bindAccountMenuActions();
     bindAccountDeleteConfirmForm();
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+    bindPushNotificationsPanel();
+    bindTwoFactorPanel();
+    bindDeleteAccountPanel();
+
     if (auth) {
         bindFirebaseForms();
     } else {
@@ -540,8 +862,12 @@ if (auth) {
         try {
             const session = await loadBackendSession();
 
-            if (firebaseUser && !session.authenticated) {
-                await syncFirebaseUser(firebaseUser, firebaseUserProfile(firebaseUser));
+            if (firebaseUser && !session.authenticated && !session.pending_2fa) {
+                const result = await syncFirebaseUser(firebaseUser, firebaseUserProfile(firebaseUser));
+                if (result && result.requires_2fa) {
+                    reloadAccountSection();
+                    return;
+                }
                 reloadAccountSection();
                 return;
             }

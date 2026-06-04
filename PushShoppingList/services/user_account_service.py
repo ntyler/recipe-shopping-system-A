@@ -8,6 +8,7 @@ from datetime import datetime
 from datetime import timedelta
 from pathlib import Path
 
+import requests
 from flask import has_request_context
 from flask import session
 from werkzeug.security import check_password_hash
@@ -43,6 +44,20 @@ PHONE_VERIFICATION_TTL_MINUTES = 10
 TWO_FACTOR_TRUST_DAYS = 30
 TWO_FACTOR_RECOVERY_TTL_MINUTES = 30
 NTFY_TOPIC_PREFIX = os.getenv("SHOPPING_APP_NTFY_TOPIC_PREFIX", "shopping-user").strip() or "shopping-user"
+NOTIFICATION_PREFERENCE_OPTIONS = (
+    ("recipe_import_complete", "Recipe Import Complete"),
+    ("recipe_pdf_generated", "Recipe PDF Generated"),
+    ("cloudflare_upload_complete", "Cloudflare Upload Complete"),
+    ("store_search_complete", "Store Search Complete"),
+    ("shopping_list_updated", "Shopping List Updated"),
+    ("feedback_response", "Feedback Response"),
+    ("security_alerts", "Security Alerts"),
+)
+DEFAULT_NOTIFICATION_PREFERENCES = {
+    key: True
+    for key, _label in NOTIFICATION_PREFERENCE_OPTIONS
+}
+SUPPORTED_NOTIFICATION_DEVICES = ("Windows PC", "iPhone", "Browser")
 
 
 def now_iso():
@@ -119,6 +134,74 @@ def ntfy_subscription_url(topic):
     return f"https://ntfy.sh/{topic}"
 
 
+def normalize_notification_preferences(preferences):
+    normalized = DEFAULT_NOTIFICATION_PREFERENCES.copy()
+
+    if isinstance(preferences, dict):
+        for key in normalized:
+            if key in preferences:
+                normalized[key] = bool(preferences.get(key))
+
+    return normalized
+
+
+def normalize_notification_devices(devices):
+    normalized = []
+
+    for device in devices if isinstance(devices, list) else []:
+        if isinstance(device, str):
+            name = device.strip()
+            if name:
+                normalized.append({"name": name, "status": "Registered"})
+            continue
+
+        if not isinstance(device, dict):
+            continue
+
+        name = str(device.get("name") or "").strip()
+        if not name:
+            continue
+
+        normalized.append({
+            "name": name,
+            "status": str(device.get("status") or "Registered").strip() or "Registered",
+            "last_seen_at": str(device.get("last_seen_at") or "").strip(),
+            "last_seen_at_label": display_datetime(device.get("last_seen_at")),
+        })
+
+    return normalized
+
+
+def notifications_enabled(user):
+    if not isinstance(user, dict):
+        return False
+
+    value = user.get("notifications_enabled")
+
+    if isinstance(value, bool):
+        return value
+
+    if isinstance(value, str) and value.strip().lower() in {"0", "false", "no", "off", "disabled"}:
+        return False
+
+    return bool(normalize_ntfy_topic(user.get("ntfy_topic")))
+
+
+def notification_preference_enabled(user, preference_key=""):
+    if not notifications_enabled(user):
+        return False
+
+    preference_key = str(preference_key or "").strip()
+
+    if not preference_key:
+        return True
+
+    preferences = normalize_notification_preferences(
+        (user or {}).get("notification_preferences")
+    )
+    return bool(preferences.get(preference_key, True))
+
+
 def ensure_user_ntfy_topic(user_id):
     payload = load_users()
     user = find_user_by_id_in_payload(payload, user_id)
@@ -145,6 +228,7 @@ def public_user(user):
     is_firebase = str(user.get("auth_provider") or "").strip().lower() == "firebase"
     email_verified = bool(user.get("firebase_email_verified")) if is_firebase else account_email_verified(user)
     last_sign_in_at = user.get("firebase_last_login_at") or user.get("last_login_at") or ""
+    notification_preferences = normalize_notification_preferences(user.get("notification_preferences"))
 
     return {
         "user_id": user.get("user_id", ""),
@@ -167,6 +251,18 @@ def public_user(user):
         "phone_verified": bool(user.get("phone") and user.get("phone_verified_at")),
         "ntfy_topic": ntfy_topic,
         "ntfy_url": ntfy_subscription_url(ntfy_topic),
+        "notifications_enabled": notifications_enabled(user),
+        "notification_preferences": notification_preferences,
+        "notification_preference_options": [
+            {
+                "key": key,
+                "label": label,
+                "enabled": bool(notification_preferences.get(key, True)),
+            }
+            for key, label in NOTIFICATION_PREFERENCE_OPTIONS
+        ],
+        "notification_devices": normalize_notification_devices(user.get("notification_devices")),
+        "supported_notification_devices": list(SUPPORTED_NOTIFICATION_DEVICES),
         "avatar_path": user.get("avatar_path", ""),
         "created_at": user.get("created_at", ""),
         "created_at_label": display_datetime(user.get("created_at")),
@@ -344,7 +440,23 @@ def name_parts_from_display_name(display_name):
     return parts[0], " ".join(parts[1:])
 
 
-def sign_in_firebase_user(firebase_user, profile=None):
+def set_signed_in_session(user):
+    session.permanent = True
+    session["user_id"] = user["user_id"]
+
+    if str((user or {}).get("auth_provider") or "").strip().lower() == "firebase":
+        session["firebase_uid"] = user.get("firebase_uid", "")
+        session["email"] = user.get("email", "")
+        session["display_name"] = user_display_name(user)
+        session["picture"] = user.get("picture", "")
+        session["provider"] = "Firebase Authentication"
+
+    session["is_admin"] = is_admin_user(user)
+    session.pop("pending_2fa_user_id", None)
+    session.pop("pending_2fa_provider", None)
+
+
+def sign_in_firebase_user(firebase_user, profile=None, trusted_device_token=""):
     profile = profile if isinstance(profile, dict) else {}
     firebase_claims = firebase_user.get("firebase") if isinstance(firebase_user.get("firebase"), dict) else {}
     sign_in_provider = str(
@@ -404,6 +516,9 @@ def sign_in_firebase_user(firebase_user, profile=None):
             "phone": "",
             "ntfy_topic": generate_ntfy_topic(),
             "ntfy_topic_created_at": timestamp,
+            "notifications_enabled": True,
+            "notification_preferences": DEFAULT_NOTIFICATION_PREFERENCES.copy(),
+            "notification_devices": [],
             "password_hash": "",
             "avatar_path": "",
             "created_at": timestamp,
@@ -441,16 +556,16 @@ def sign_in_firebase_user(firebase_user, profile=None):
     user["updated_at"] = timestamp
     save_users(payload)
 
-    session.permanent = True
-    session["user_id"] = user["user_id"]
-    session["firebase_uid"] = firebase_uid
-    session["email"] = email
-    session["display_name"] = display_name or user_display_name(user)
-    session["picture"] = picture or user.get("picture", "")
-    session["provider"] = "Firebase Authentication"
-    session["is_admin"] = is_admin_user(user)
-    session.pop("pending_2fa_user_id", None)
     session.pop("account_verification_link", None)
+
+    if two_factor_enabled(user) and not verify_trusted_two_factor_device(user, trusted_device_token):
+        session.permanent = True
+        session.pop("user_id", None)
+        session["pending_2fa_user_id"] = user["user_id"]
+        session["pending_2fa_provider"] = "firebase"
+        return {"ok": True, "created": created, "requires_2fa": True, "user": public_user(user)}
+
+    set_signed_in_session(user)
     return {"ok": True, "created": created, "user": public_user(user)}
 
 
@@ -596,6 +711,9 @@ def create_user(
         "phone": phone,
         "ntfy_topic": generate_ntfy_topic(),
         "ntfy_topic_created_at": timestamp,
+        "notifications_enabled": True,
+        "notification_preferences": DEFAULT_NOTIFICATION_PREFERENCES.copy(),
+        "notification_devices": [],
         "password_hash": generate_password_hash(password),
         "avatar_path": "",
         "created_at": timestamp,
@@ -1068,8 +1186,6 @@ def recover_two_factor_with_token(token, password):
 
     if not token:
         errors.append("Two-factor recovery link is missing. Request a new recovery email.")
-    if not password:
-        errors.append("Current password is required to recover two-factor access.")
 
     if errors:
         return {"ok": False, "errors": errors}
@@ -1083,7 +1199,11 @@ def recover_two_factor_with_token(token, password):
             "errors": ["That two-factor recovery link is invalid or expired. Request a new recovery email."],
         }
 
-    if not check_password_hash(str(user.get("password_hash") or ""), password):
+    requires_local_password = str(user.get("auth_provider") or "local").strip().lower() != "firebase"
+    if requires_local_password and not password:
+        return {"ok": False, "errors": ["Current password is required to recover two-factor access."]}
+
+    if requires_local_password and not check_password_hash(str(user.get("password_hash") or ""), password):
         return {"ok": False, "errors": ["Enter the current password for this account to recover two-factor access."]}
 
     user.pop("two_factor", None)
@@ -1233,9 +1353,7 @@ def complete_two_factor_sign_in(code, remember_device=False):
     user["last_login_at"] = timestamp
     user["updated_at"] = timestamp
     save_users(payload)
-    session.permanent = True
-    session["user_id"] = user["user_id"]
-    session.pop("pending_2fa_user_id", None)
+    set_signed_in_session(user)
     return {"ok": True, "user": public_user(user), "trust_token": trust_token}
 
 
@@ -1251,7 +1369,8 @@ def disable_two_factor(user_id, password, code):
     if not user:
         return {"ok": False, "errors": ["Sign in again before disabling two-factor authentication."]}
 
-    if not check_password_hash(str(user.get("password_hash") or ""), str(password or "")):
+    requires_local_password = str(user.get("auth_provider") or "local").strip().lower() != "firebase"
+    if requires_local_password and not check_password_hash(str(user.get("password_hash") or ""), str(password or "")):
         return {"ok": False, "errors": ["Enter your current password to disable two-factor authentication."]}
 
     if not two_factor_enabled(user):
@@ -1277,7 +1396,8 @@ def regenerate_two_factor_backup_codes(user_id, password, code):
     if not user:
         return {"ok": False, "errors": ["Sign in again before regenerating backup codes."]}
 
-    if not check_password_hash(str(user.get("password_hash") or ""), str(password or "")):
+    requires_local_password = str(user.get("auth_provider") or "local").strip().lower() != "firebase"
+    if requires_local_password and not check_password_hash(str(user.get("password_hash") or ""), str(password or "")):
         return {"ok": False, "errors": ["Enter your current password to regenerate backup codes."]}
 
     if not two_factor_enabled(user):
@@ -1458,6 +1578,61 @@ def update_user_profile(
         user.pop("phone_verification", None)
     user["updated_at"] = now_iso()
     save_users(payload)
+    return {"ok": True, "user": public_user(user)}
+
+
+def update_notification_settings(user_id, enabled=None, preferences=None):
+    payload = load_users()
+    user = find_user_by_id_in_payload(payload, user_id)
+
+    if not user:
+        return {"ok": False, "errors": ["Sign in again before editing notification settings."]}
+
+    if enabled is not None:
+        user["notifications_enabled"] = bool(enabled)
+
+        if user["notifications_enabled"] and not normalize_ntfy_topic(user.get("ntfy_topic")):
+            user["ntfy_topic"] = generate_ntfy_topic()
+            user["ntfy_topic_created_at"] = user.get("ntfy_topic_created_at") or now_iso()
+
+    if isinstance(preferences, dict):
+        user["notification_preferences"] = normalize_notification_preferences(preferences)
+
+    user["updated_at"] = now_iso()
+    save_users(payload)
+    return {"ok": True, "user": public_user(user)}
+
+
+def send_test_notification(user_id):
+    payload = load_users()
+    user = find_user_by_id_in_payload(payload, user_id)
+
+    if not user:
+        return {"ok": False, "errors": ["Sign in again before testing push notifications."]}
+
+    if not notifications_enabled(user):
+        return {"ok": False, "errors": ["Enable push notifications before sending a test notification."]}
+
+    topic = normalize_ntfy_topic(user.get("ntfy_topic"))
+
+    if not topic:
+        user["ntfy_topic"] = generate_ntfy_topic()
+        user["ntfy_topic_created_at"] = user.get("ntfy_topic_created_at") or now_iso()
+        user["updated_at"] = now_iso()
+        save_users(payload)
+        topic = user["ntfy_topic"]
+
+    try:
+        response = requests.post(
+            f"https://ntfy.sh/{topic}",
+            data=b"Recipe Shopping push notifications are connected.",
+            headers={"Title": "Recipe Shopping test notification"},
+            timeout=5,
+        )
+        response.raise_for_status()
+    except Exception:
+        return {"ok": False, "errors": ["The test notification could not be sent. Try again in a moment."]}
+
     return {"ok": True, "user": public_user(user)}
 
 

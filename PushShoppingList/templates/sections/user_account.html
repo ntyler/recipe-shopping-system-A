@@ -70,12 +70,12 @@
               action="{{ url_for('account_bp.complete_two_factor_recovery_route') }}">
             <h3>Recover Two-Factor Access</h3>
             <p class="user-account-form-note">
-                This will disable two-factor authentication after confirming your current password. Sign in again and set up a new authenticator to receive new backup codes.
+                This will disable two-factor authentication after verification. Local accounts must also enter the current password.
             </p>
             <input type="hidden" name="two_factor_recovery_token" value="{{ two_factor_recovery_token }}">
             <label>
-                <span>Current Password</span>
-                <input type="password" name="password" required autocomplete="current-password">
+                <span>Current Password (local accounts only)</span>
+                <input type="password" name="password" autocomplete="current-password">
             </label>
             <button type="submit" class="danger">Disable Two-Factor Authentication</button>
         </form>
@@ -188,6 +188,24 @@
                                 Change Password
                             </button>
                         {% endif %}
+                        <button type="button"
+                                class="secondary"
+                                data-two-factor-open
+                                aria-controls="accountTwoFactorPanel">
+                            Two-Factor Authentication
+                        </button>
+                        <button type="button"
+                                class="secondary"
+                                data-push-notifications-open
+                                aria-controls="accountPushNotificationsPanel">
+                            Push Notifications
+                        </button>
+                        <button type="button"
+                                class="danger"
+                                data-delete-account-open
+                                aria-controls="accountDeletePanel">
+                            Delete Account
+                        </button>
                         <form id="firebaseSignOutForm"
                               data-firebase-sign-out-form
                               method="POST"
@@ -252,21 +270,38 @@
             </div>
         </form>
 
-        {% if current_user.ntfy_url %}
-            <div class="user-account-form user-ntfy-card">
+        <div id="accountPushNotificationsPanel"
+             class="user-account-form user-push-notifications-panel"
+             data-push-notifications-panel
+             data-notifications-enabled="{% if current_user.notifications_enabled %}1{% else %}0{% endif %}"
+             hidden>
+            <div class="user-push-panel-header">
+                <h3>Push Notifications</h3>
                 <button type="button"
-                        class="card-collapse-toggle user-ntfy-title-toggle"
-                        data-collapse-toggle="user-ntfy"
-                        aria-expanded="false"
-                        onclick="toggleCardCollapse('user-ntfy')">
-                    <span>Push Notifications</span>
+                        class="secondary user-push-panel-close"
+                        data-push-notifications-close>
+                    Close
                 </button>
-                <div class="card-collapse-content user-ntfy-content collapsed"
-                     data-collapse-content="user-ntfy"
-                     data-collapse-storage-key="user-ntfy:{{ current_user.user_id }}"
-                     data-collapse-default="collapsed"
-                     data-collapse-mobile-default="collapsed">
-                    <div class="user-ntfy-link-row">
+            </div>
+
+            <div class="user-push-status-grid">
+                <div class="user-push-status-card">
+                    <span>Status:</span>
+                    <strong data-push-notifications-status-label>
+                        {% if current_user.notifications_enabled %}Enabled{% else %}Disabled{% endif %}
+                    </strong>
+                </div>
+                {% if current_user.ntfy_url %}
+                    <div class="user-push-status-card">
+                        <span>Topic</span>
+                        <code>{{ current_user.ntfy_topic }}</code>
+                    </div>
+                {% endif %}
+            </div>
+
+            {% if current_user.ntfy_url %}
+                <div class="user-ntfy-content">
+                    <div class="user-ntfy-link-row user-push-link-row">
                         <a class="user-ntfy-link"
                            href="{{ current_user.ntfy_url }}"
                            target="_blank"
@@ -280,30 +315,79 @@
                             Copy Link
                         </button>
                     </div>
-                    <div class="user-ntfy-topic">
-                        <span>Topic</span>
-                        <code>{{ current_user.ntfy_topic }}</code>
-                    </div>
-                    <div class="user-ntfy-copy-status" aria-live="polite"></div>
                 </div>
-            </div>
-        {% endif %}
+            {% endif %}
 
-        {% if current_user.auth_provider != "firebase" %}
-            {% set two_factor_default_state = "collapsed" if current_user.two_factor_enabled and not two_factor_setup else "expanded" %}
-            <div class="user-account-form user-two-factor-card">
-                <button type="button"
-                        class="card-collapse-toggle user-two-factor-title-toggle"
-                        data-collapse-toggle="user-two-factor"
-                        aria-expanded="{% if two_factor_default_state == 'collapsed' %}false{% else %}true{% endif %}"
-                        onclick="toggleCardCollapse('user-two-factor')">
-                    <span>Two-Factor Authentication</span>
+            <div class="user-push-control-row">
+                <button type="button" data-push-notifications-enable>
+                    Enable Notifications
                 </button>
-                <div class="card-collapse-content user-two-factor-content{% if two_factor_default_state == 'collapsed' %} collapsed{% endif %}"
-                     data-collapse-content="user-two-factor"
-                     data-collapse-storage-key="user-two-factor:{{ current_user.user_id }}"
-                     data-collapse-default="{{ two_factor_default_state }}"
-                     data-collapse-mobile-default="{{ two_factor_default_state }}">
+                <button type="button"
+                        class="secondary"
+                        data-push-notifications-disable>
+                    Disable Notifications
+                </button>
+                <button type="button"
+                        class="secondary"
+                        data-push-notifications-test>
+                    Send Test Notification
+                </button>
+            </div>
+
+            <section class="user-push-subsection" aria-label="Devices">
+                <h4>Devices</h4>
+                <ul class="user-push-devices">
+                    {% if current_user.notification_devices %}
+                        {% for device in current_user.notification_devices %}
+                            <li>
+                                <span>{{ device.name }}</span>
+                                <small>{{ device.status }}{% if device.last_seen_at_label %} - {{ device.last_seen_at_label }}{% endif %}</small>
+                            </li>
+                        {% endfor %}
+                    {% else %}
+                        {% for device in current_user.supported_notification_devices %}
+                            <li>
+                                <span>{{ device }}</span>
+                                <small>Ready to connect</small>
+                            </li>
+                        {% endfor %}
+                    {% endif %}
+                </ul>
+            </section>
+
+            <fieldset class="user-push-preferences">
+                <legend>Notification Preferences</legend>
+                <div class="user-push-preferences-grid">
+                    {% for preference in current_user.notification_preference_options %}
+                        <label class="user-push-preference">
+                            <input type="checkbox"
+                                   data-notification-preference="{{ preference.key }}"
+                                   {% if preference.enabled %}checked{% endif %}>
+                            <span>{{ preference.label }}</span>
+                        </label>
+                    {% endfor %}
+                </div>
+            </fieldset>
+
+            <div class="user-ntfy-copy-status user-push-panel-status"
+                 data-push-notifications-status
+                 aria-live="polite"
+                 hidden></div>
+        </div>
+
+        <div id="accountTwoFactorPanel"
+             class="user-account-form user-two-factor-card"
+             data-two-factor-panel
+             {% if not two_factor_setup %}hidden{% endif %}>
+                <div class="user-push-panel-header user-two-factor-panel-header">
+                    <h3>Two-Factor Authentication</h3>
+                    <button type="button"
+                            class="secondary user-push-panel-close"
+                            data-two-factor-close>
+                        Close
+                    </button>
+                </div>
+                <div class="user-two-factor-content">
                 {% if current_user.two_factor_enabled %}
                     <p class="user-account-form-note">
                         Enabled. Backup codes remaining: {{ current_user.two_factor_backup_codes_remaining }}.
@@ -312,10 +396,12 @@
                     <form class="user-two-factor-inline-form"
                           method="POST"
                           action="{{ url_for('account_bp.regenerate_two_factor_backup_codes_route') }}">
-                        <label>
-                            <span>Current Password</span>
-                            <input type="password" name="password" required autocomplete="current-password">
-                        </label>
+                        {% if current_user.auth_provider != "firebase" %}
+                            <label>
+                                <span>Current Password</span>
+                                <input type="password" name="password" required autocomplete="current-password">
+                            </label>
+                        {% endif %}
                         <label>
                             <span>Authenticator or Backup Code</span>
                             <input type="text"
@@ -330,10 +416,12 @@
                 <form class="user-two-factor-inline-form"
                       method="POST"
                       action="{{ url_for('account_bp.disable_two_factor_route') }}">
-                    <label>
-                        <span>Current Password</span>
-                        <input type="password" name="password" required autocomplete="current-password">
-                    </label>
+                    {% if current_user.auth_provider != "firebase" %}
+                        <label>
+                            <span>Current Password</span>
+                            <input type="password" name="password" required autocomplete="current-password">
+                        </label>
+                    {% endif %}
                     <label>
                         <span>Authenticator or Backup Code</span>
                         <input type="text"
@@ -391,7 +479,11 @@
                 </form>
             {% else %}
                 <p class="user-account-form-note">
-                    Add an authenticator app code after your password when signing in.
+                    {% if current_user.auth_provider == "firebase" %}
+                        Require an authenticator app code after Firebase sign-in.
+                    {% else %}
+                        Add an authenticator app code after your password when signing in.
+                    {% endif %}
                 </p>
                 <form method="POST" action="{{ url_for('account_bp.start_two_factor_setup_route') }}">
                     <button type="submit">Set Up Authenticator App</button>
@@ -399,21 +491,20 @@
             {% endif %}
             </div>
         </div>
-        {% endif %}
 
-        <div class="user-account-form user-delete-account-card">
-            <button type="button"
-                    class="card-collapse-toggle user-delete-account-title-toggle"
-                    data-collapse-toggle="user-delete-account"
-                    aria-expanded="false"
-                    onclick="toggleCardCollapse('user-delete-account')">
-                <span>Delete Account</span>
-            </button>
-            <div class="card-collapse-content user-delete-account-content collapsed"
-                 data-collapse-content="user-delete-account"
-                 data-collapse-storage-key="user-delete-account:{{ current_user.user_id }}"
-                 data-collapse-default="collapsed"
-                 data-collapse-mobile-default="collapsed">
+        <div id="accountDeletePanel"
+             class="user-account-form user-delete-account-card"
+             data-delete-account-panel
+             hidden>
+            <div class="user-push-panel-header user-delete-account-panel-header">
+                <h3>Delete Account</h3>
+                <button type="button"
+                        class="secondary user-push-panel-close"
+                        data-delete-account-close>
+                    Close
+                </button>
+            </div>
+            <div class="user-delete-account-content">
                 <p class="user-account-form-note">
                     Send a one-time verification link to {{ current_user.email }} before deleting this account.
                 </p>
@@ -455,6 +546,7 @@
                     <button type="submit">Verify Code</button>
                     <button type="submit"
                             class="secondary"
+                            data-firebase-cancel-two-factor
                             formmethod="POST"
                             formaction="{{ url_for('account_bp.cancel_two_factor_sign_in_route') }}">
                         Cancel Sign In
@@ -465,7 +557,7 @@
                       action="{{ url_for('account_bp.request_two_factor_recovery_route') }}">
                     <h3>Lost authenticator or backup codes?</h3>
                     <p class="user-account-form-note">
-                        Email a one-time recovery link to this account. The link will disable 2FA only after you confirm your current password.
+                        Email a one-time recovery link to this account. Local accounts confirm the current password from that link.
                     </p>
                     <button type="submit">Email Recovery Link</button>
                 </form>

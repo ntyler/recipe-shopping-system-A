@@ -9,6 +9,7 @@ import requests
 
 from PushShoppingList.services.storage_service import scoped_extractor_data_path
 from PushShoppingList.services.user_account_service import current_user
+from PushShoppingList.services.user_account_service import notification_preference_enabled
 from PushShoppingList.services.user_account_service import normalize_ntfy_topic
 
 
@@ -225,7 +226,7 @@ def finish_progress(job_id, ok=True):
     save_progress(progress)
 
     title = "Recipe extraction complete" if ok else "Recipe extraction failed"
-    send_ntfy(title, progress["summary"])
+    send_ntfy(title, progress["summary"], preference_key="recipe_import_complete")
     return progress
 
 
@@ -288,8 +289,8 @@ def ingredients_count(item):
         return 0
 
 
-def send_ntfy(title, message):
-    topic = active_ntfy_topic()
+def send_ntfy(title, message, preference_key=""):
+    topic = active_ntfy_topic(preference_key=preference_key)
 
     if not topic:
         return
@@ -305,8 +306,12 @@ def send_ntfy(title, message):
         pass
 
 
-def active_ntfy_topic():
+def active_ntfy_topic(preference_key=""):
     user = current_user()
+
+    if user and not notification_preference_enabled(user, preference_key):
+        return ""
+
     topic = normalize_ntfy_topic((user or {}).get("ntfy_topic"))
 
     if topic:

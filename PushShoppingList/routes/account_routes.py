@@ -36,9 +36,11 @@ from PushShoppingList.services.user_account_service import request_phone_verific
 from PushShoppingList.services.user_account_service import request_two_factor_recovery
 from PushShoppingList.services.user_account_service import recover_two_factor_with_token
 from PushShoppingList.services.user_account_service import reset_password_with_token
+from PushShoppingList.services.user_account_service import send_test_notification
 from PushShoppingList.services.user_account_service import sign_out_user
 from PushShoppingList.services.user_account_service import sign_in_firebase_user
 from PushShoppingList.services.user_account_service import start_two_factor_setup
+from PushShoppingList.services.user_account_service import update_notification_settings
 from PushShoppingList.services.user_account_service import update_user_profile
 from PushShoppingList.services.user_account_service import verify_account_creation
 from PushShoppingList.services.user_account_service import verify_phone_code
@@ -145,7 +147,13 @@ def account_verification_link(token):
 @account_bp.route("/auth/session", methods=["GET"])
 def firebase_session_route():
     user = current_public_user()
-    return jsonify({"success": True, "authenticated": bool(user), "user": user})
+    return jsonify({
+        "success": True,
+        "authenticated": bool(user),
+        "pending_2fa": bool(session.get("pending_2fa_user_id")),
+        "pending_2fa_provider": session.get("pending_2fa_provider", ""),
+        "user": user,
+    })
 
 
 @account_bp.route("/auth/account-exists", methods=["GET"])
@@ -185,6 +193,7 @@ def firebase_login_route():
     result = sign_in_firebase_user(
         token_result.get("firebase_user") or {},
         profile=payload.get("profile") if isinstance(payload.get("profile"), dict) else {},
+        trusted_device_token=request.cookies.get(TWO_FACTOR_TRUST_COOKIE, ""),
     )
     return json_account_result(result, success_status=200, error_status=400)
 
@@ -478,6 +487,23 @@ def update_profile_route():
     )
     flash_account_result(result, "Profile updated.")
     return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+
+@account_bp.route("/account/notifications", methods=["POST"])
+def update_notification_settings_route():
+    payload = request.get_json(silent=True) or {}
+    result = update_notification_settings(
+        session.get("user_id"),
+        enabled=payload.get("enabled") if "enabled" in payload else None,
+        preferences=payload.get("preferences") if isinstance(payload.get("preferences"), dict) else None,
+    )
+    return json_account_result(result)
+
+
+@account_bp.route("/account/notifications/test", methods=["POST"])
+def send_test_notification_route():
+    result = send_test_notification(session.get("user_id"))
+    return json_account_result(result)
 
 
 @account_bp.route("/account/phone/verification/request", methods=["POST"])

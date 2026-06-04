@@ -4718,6 +4718,10 @@ body {
             border-color: #7f1d1d;
         }
 
+        .user-delete-account-panel-header h3 {
+            color: #ffd4d4;
+        }
+
         .user-two-factor-sign-in-form {
             grid-column: 1 / -1;
         }
@@ -4912,35 +4916,6 @@ body {
             border-color: #a33a3a;
             background: #7f1515;
             color: #fff;
-        }
-
-        .user-account-form .user-delete-account-title-toggle,
-        .user-account-form .user-ntfy-title-toggle,
-        .user-account-form .user-two-factor-title-toggle {
-            justify-content: center;
-            min-height: 42px;
-            padding: 8px 12px;
-            border: 0;
-            background: #101820;
-            color: #f8fafc;
-            font-size: 20px;
-            text-align: center;
-        }
-
-        .user-account-form .user-delete-account-title-toggle {
-            color: #ffd4d4;
-        }
-
-        .user-account-form .user-delete-account-title-toggle:hover,
-        .user-account-form .user-delete-account-title-toggle:focus-visible {
-            background: #351417;
-        }
-
-        .user-account-form .user-ntfy-title-toggle:hover,
-        .user-account-form .user-ntfy-title-toggle:focus-visible,
-        .user-account-form .user-two-factor-title-toggle:hover,
-        .user-account-form .user-two-factor-title-toggle:focus-visible {
-            background: #172331;
         }
 
         .user-delete-account-content,
@@ -5252,10 +5227,6 @@ body {
             line-height: 1.2;
         }
 
-        .user-ntfy-card {
-            margin-top: 12px;
-        }
-
         .user-ntfy-link-row {
             display: grid;
             grid-template-columns: minmax(0, 1fr) auto;
@@ -5313,6 +5284,165 @@ body {
             color: #d8ffe4;
             font-size: 12px;
             font-weight: 900;
+        }
+
+        .user-push-notifications-panel {
+            margin-top: 12px;
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .user-push-panel-header {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            justify-content: space-between;
+            min-width: 0;
+        }
+
+        .user-push-panel-header h3 {
+            margin: 0;
+            text-align: left;
+        }
+
+        .user-push-panel-close {
+            width: auto !important;
+            min-width: 96px;
+            padding-right: 14px;
+            padding-left: 14px;
+        }
+
+        .user-push-status-grid,
+        .user-push-control-row {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .user-push-status-grid {
+            grid-template-columns: minmax(150px, 0.35fr) minmax(0, 1fr);
+        }
+
+        .user-push-status-card {
+            display: grid;
+            gap: 4px;
+            min-width: 0;
+            padding: 10px;
+            border: 1px solid #2f4054;
+            border-radius: 8px;
+            background: #0b1118;
+            color: #dbeafe;
+        }
+
+        .user-push-status-card span,
+        .user-push-subsection h4,
+        .user-push-preferences legend {
+            color: #cbd5e1;
+            font-size: 12px;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+
+        .user-push-status-card strong {
+            color: #d8ffe4;
+            font-size: 18px;
+            font-weight: 900;
+        }
+
+        .user-push-status-card code {
+            color: #d8ffe4;
+            font-family: Consolas, Monaco, monospace;
+            font-weight: 900;
+            overflow-wrap: anywhere;
+        }
+
+        .user-push-subsection,
+        .user-push-preferences {
+            min-width: 0;
+            margin: 0;
+            padding: 10px;
+            border: 1px solid #2f4054;
+            border-radius: 8px;
+            background: #0b1118;
+        }
+
+        .user-push-subsection h4,
+        .user-push-preferences legend {
+            margin: 0 0 8px;
+            padding: 0;
+            letter-spacing: 0.04em;
+        }
+
+        .user-push-devices,
+        .user-push-preferences-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+            min-width: 0;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .user-push-devices li,
+        .user-push-preference {
+            display: flex !important;
+            gap: 8px !important;
+            align-items: center;
+            min-width: 0;
+            min-height: 42px;
+            padding: 9px 10px;
+            border: 1px solid #2f4054;
+            border-radius: 8px;
+            background: #101820;
+            color: #dbeafe;
+            text-transform: none !important;
+            letter-spacing: 0 !important;
+        }
+
+        .user-push-devices li {
+            display: grid !important;
+            gap: 2px !important;
+            align-items: start;
+        }
+
+        .user-push-devices span,
+        .user-push-preference span {
+            min-width: 0;
+            overflow-wrap: anywhere;
+            color: #f8fafc;
+            font-size: 13px;
+            font-weight: 900;
+            line-height: 1.2;
+        }
+
+        .user-push-devices small {
+            color: #9ed0ff;
+            font-size: 11px;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+
+        .user-push-preference input[type="checkbox"] {
+            flex: 0 0 auto;
+            width: 20px !important;
+            min-width: 20px;
+            height: 20px;
+            min-height: 20px;
+            margin: 0;
+            padding: 0;
+        }
+
+        .user-push-panel-status {
+            padding: 0 2px;
+        }
+
+        .user-push-panel-status.success {
+            color: #d8ffe4;
+        }
+
+        .user-push-panel-status.error {
+            color: #ffd4d4;
         }
 
         .cookbooks-content {
@@ -10365,9 +10495,26 @@ body {
 
             .user-ntfy-link-row,
             .user-ntfy-topic,
+            .user-push-status-grid,
+            .user-push-control-row,
+            .user-push-devices,
+            .user-push-preferences-grid,
             .user-account-edit-form .user-phone-field,
             .user-phone-field {
                 grid-template-columns: minmax(0, 1fr);
+            }
+
+            .user-push-panel-header {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .user-push-panel-header h3 {
+                text-align: center;
+            }
+
+            .user-push-panel-close {
+                width: 100% !important;
             }
 
             .screen-settings-card {

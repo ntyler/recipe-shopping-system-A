@@ -563,11 +563,12 @@ function updateForgotPasswordResetMethod() {
 
 async function copyAccountNtfyLink(button) {
     const url = button ? String(button.dataset.ntfyUrl || "").trim() : "";
-    const card = button ? button.closest(".user-ntfy-card") : null;
-    const status = card ? card.querySelector(".user-ntfy-copy-status") : null;
+    const card = button ? button.closest("[data-push-notifications-panel]") : null;
+    const status = card ? card.querySelector("[data-push-notifications-status], .user-ntfy-copy-status") : null;
 
     if (!url) {
         if (status) {
+            status.hidden = false;
             status.textContent = "Push notification link is not ready.";
         }
 
@@ -590,12 +591,14 @@ async function copyAccountNtfyLink(button) {
         }
 
         if (status) {
+            status.hidden = false;
             status.textContent = "Push notification link copied.";
         }
     } catch (err) {
         console.warn("Unable to copy push notification link.", err);
 
         if (status) {
+            status.hidden = false;
             status.textContent = "Open the ntfy topic link to copy it.";
         }
     }
