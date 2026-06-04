@@ -10,6 +10,7 @@ from flask import url_for
 
 from PushShoppingList.services.email_service import password_reset_email_configured
 from PushShoppingList.services.email_service import send_account_delete_email
+from PushShoppingList.services.email_service import send_account_verification_email
 from PushShoppingList.services.email_service import send_password_reset_email
 from PushShoppingList.services.email_service import send_two_factor_recovery_email
 from PushShoppingList.services.sms_service import password_reset_sms_configured
@@ -21,6 +22,7 @@ from PushShoppingList.services.user_account_service import cancel_two_factor_sig
 from PushShoppingList.services.user_account_service import complete_two_factor_sign_in
 from PushShoppingList.services.user_account_service import create_user
 from PushShoppingList.services.user_account_service import delete_account_with_token
+from PushShoppingList.services.user_account_service import discard_pending_account
 from PushShoppingList.services.user_account_service import disable_two_factor
 from PushShoppingList.services.user_account_service import enable_two_factor
 from PushShoppingList.services.user_account_service import regenerate_two_factor_backup_codes
@@ -33,6 +35,7 @@ from PushShoppingList.services.user_account_service import reset_password_with_t
 from PushShoppingList.services.user_account_service import sign_out_user
 from PushShoppingList.services.user_account_service import start_two_factor_setup
 from PushShoppingList.services.user_account_service import update_user_profile
+from PushShoppingList.services.user_account_service import verify_account_creation
 from PushShoppingList.services.user_account_service import verify_phone_code
 
 
@@ -104,6 +107,26 @@ def account_delete_link(token):
     )
 
 
+def account_verification_link(token):
+    path = url_for(
+        "account_bp.verify_account_creation_route",
+        token=token,
+    )
+    base_url = (
+        str(os.getenv("SHOPPING_APP_ACCOUNT_LINK_BASE_URL") or "").strip().rstrip("/")
+        or str(os.getenv("SHOPPING_APP_PASSWORD_RESET_BASE_URL") or "").strip().rstrip("/")
+    )
+
+    if base_url:
+        return f"{base_url}{path}"
+
+    return url_for(
+        "account_bp.verify_account_creation_route",
+        token=token,
+        _external=True,
+    )
+
+
 @account_bp.route("/account/create", methods=["POST"])
 def create_account_route():
     result = create_user(
@@ -113,8 +136,50 @@ def create_account_route():
         request.form.get("confirm_password"),
         request.files.get("avatar"),
         phone=request.form.get("phone"),
+        first_name=request.form.get("first_name"),
+        last_name=request.form.get("last_name"),
     )
-    flash_account_result(result, "Account created. You are signed in.")
+
+    if result.get("ok"):
+        session.pop("account_verification_link", None)
+        verify_link = account_verification_link(result["token"])
+
+        if password_reset_email_configured():
+            email_result = send_account_verification_email(result.get("user"), verify_link)
+
+            if not email_result.get("ok"):
+                discard_pending_account((result.get("user") or {}).get("user_id"))
+                flash(
+                    email_result.get("error")
+                    or "Account verification email could not be sent. Check SMTP settings.",
+                    "error",
+                )
+                return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+        else:
+            session["account_verification_link"] = verify_link
+            flash(
+                "Email is not configured yet, so a local account verification link is available below.",
+                "success",
+            )
+            return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+        flash("Account created. Check your email to verify it before signing in.", "success")
+    else:
+        flash_account_result(result, "")
+
+    return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+
+@account_bp.route("/account/verify/<token>")
+def verify_account_creation_route(token):
+    result = verify_account_creation(token)
+
+    if result.get("ok"):
+        session.pop("account_verification_link", None)
+        flash("Account verified. You are signed in.", "success")
+    else:
+        flash_account_result(result, "")
+
     return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
 
 
@@ -339,6 +404,8 @@ def update_profile_route():
         request.form.get("confirm_password"),
         request.files.get("avatar"),
         phone=request.form.get("phone"),
+        first_name=request.form.get("first_name"),
+        last_name=request.form.get("last_name"),
     )
     flash_account_result(result, "Profile updated.")
     return redirect(url_for("main_bp.index", _anchor="userAccountSection"))

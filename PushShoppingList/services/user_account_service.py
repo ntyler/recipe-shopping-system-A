@@ -37,6 +37,7 @@ PHONE_DIGITS_PATTERN = re.compile(r"\d+")
 ADMIN_EMAIL = os.getenv("SHOPPING_APP_ADMIN_EMAIL", "ntylerbert@gmail.com").strip().lower()
 PASSWORD_RESET_TTL_HOURS = 1
 ACCOUNT_DELETE_TTL_HOURS = 1
+ACCOUNT_VERIFICATION_TTL_HOURS = 24
 PHONE_VERIFICATION_TTL_MINUTES = 10
 TWO_FACTOR_TRUST_DAYS = 30
 TWO_FACTOR_RECOVERY_TTL_MINUTES = 30
@@ -134,8 +135,14 @@ def public_user(user):
 
     return {
         "user_id": user.get("user_id", ""),
+        "first_name": user.get("first_name", ""),
+        "last_name": user.get("last_name", ""),
+        "display_name": user_display_name(user),
         "username": user.get("username", ""),
         "email": user.get("email", ""),
+        "email_verified_at": user.get("email_verified_at", ""),
+        "email_verified": account_email_verified(user),
+        "account_status": account_status(user),
         "phone": user.get("phone", ""),
         "phone_verified_at": user.get("phone_verified_at", ""),
         "phone_verified": bool(user.get("phone") and user.get("phone_verified_at")),
@@ -153,6 +160,21 @@ def public_user(user):
 def is_admin_user(user):
     email = str((user or {}).get("email") or "").strip().lower()
     return bool(ADMIN_EMAIL and email == ADMIN_EMAIL)
+
+
+def user_display_name(user):
+    first_name = str((user or {}).get("first_name") or "").strip()
+    last_name = str((user or {}).get("last_name") or "").strip()
+    full_name = " ".join(part for part in (first_name, last_name) if part)
+    return full_name or str((user or {}).get("username") or (user or {}).get("email") or "").strip()
+
+
+def account_status(user):
+    return str((user or {}).get("account_status") or "active").strip() or "active"
+
+
+def account_email_verified(user):
+    return account_status(user) != "pending_email_verification"
 
 
 def current_user():
@@ -309,8 +331,19 @@ def validate_account_fields(username, email, password=None, confirm_password=Non
     return errors
 
 
-def create_user(username, email, password, confirm_password, avatar_file=None, phone=""):
+def create_user(
+    username,
+    email,
+    password,
+    confirm_password,
+    avatar_file=None,
+    phone="",
+    first_name="",
+    last_name="",
+):
     errors = validate_account_fields(username, email, password, confirm_password, require_password=True, phone=phone)
+    first_name = str(first_name or "").strip()
+    last_name = str(last_name or "").strip()
     username = str(username or "").strip()
     email = str(email or "").strip()
     phone = normalize_phone_for_storage(phone)
@@ -331,10 +364,22 @@ def create_user(username, email, password, confirm_password, avatar_file=None, p
 
     user_id = uuid.uuid4().hex
     timestamp = now_iso()
+    verification_token = secrets.token_urlsafe(32)
     user = {
         "user_id": user_id,
+        "first_name": first_name,
+        "last_name": last_name,
         "username": username,
         "email": email,
+        "account_status": "pending_email_verification",
+        "account_verification": {
+            "token_hash": generate_password_hash(verification_token),
+            "created_at": timestamp,
+            "expires_at": (
+                datetime.utcnow().replace(microsecond=0)
+                + timedelta(hours=ACCOUNT_VERIFICATION_TTL_HOURS)
+            ).isoformat() + "Z",
+        },
         "phone": phone,
         "ntfy_topic": generate_ntfy_topic(),
         "ntfy_topic_created_at": timestamp,
@@ -349,15 +394,9 @@ def create_user(username, email, password, confirm_password, avatar_file=None, p
         return {"ok": False, "errors": avatar_result.get("errors", ["Avatar upload failed."])}
 
     user["avatar_path"] = avatar_result.get("avatar_path", "")
-    seed_result = seed_new_user_rule_workspace(user_id)
-
-    if not seed_result.get("ok"):
-        return {"ok": False, "errors": seed_result.get("errors", ["Unable to initialize account rules."])}
-
     payload["users"].append(user)
     save_users(payload)
-    session["user_id"] = user_id
-    return {"ok": True, "user": public_user(user)}
+    return {"ok": True, "token": verification_token, "user": public_user(user)}
 
 
 def authenticate_user(identity, password, trusted_device_token=""):
@@ -370,6 +409,9 @@ def authenticate_user(identity, password, trusted_device_token=""):
     user = find_user_by_identity(identity)
     if not user or not check_password_hash(str(user.get("password_hash") or ""), password):
         return {"ok": False, "errors": ["We could not sign you in with those details."]}
+
+    if not account_email_verified(user):
+        return {"ok": False, "errors": ["Check your email and verify this account before signing in."]}
 
     if two_factor_enabled(user):
         if verify_trusted_two_factor_device(user, trusted_device_token):
@@ -411,6 +453,9 @@ def request_password_reset(identity, delivery_method="email"):
     )
 
     if not user:
+        return {"ok": True, "sent": False}
+
+    if not account_email_verified(user):
         return {"ok": True, "sent": False}
 
     if delivery_method == "phone" and not user.get("phone_verified_at"):
@@ -465,6 +510,71 @@ def reset_password_with_token(token, password, confirm_password):
     save_users(payload)
     session.pop("user_id", None)
     return {"ok": True, "user": public_user(user)}
+
+
+def verify_account_creation(token):
+    token = str(token or "").strip()
+
+    if not token:
+        return {"ok": False, "errors": ["Account verification link is missing. Request a new account."]}
+
+    payload = load_users()
+    user = find_user_by_account_verification_token(payload, token)
+
+    if not user:
+        return {
+            "ok": False,
+            "errors": ["That account verification link is invalid or expired. Create the account again."],
+        }
+
+    seed_result = seed_new_user_rule_workspace(user.get("user_id"))
+    if not seed_result.get("ok"):
+        return {"ok": False, "errors": seed_result.get("errors", ["Unable to initialize account rules."])}
+
+    timestamp = now_iso()
+    user["account_status"] = "active"
+    user["email_verified_at"] = timestamp
+    user.pop("account_verification", None)
+    user["updated_at"] = timestamp
+    save_users(payload)
+    session["user_id"] = user["user_id"]
+    session.pop("pending_2fa_user_id", None)
+    return {"ok": True, "user": public_user(user)}
+
+
+def discard_pending_account(user_id):
+    user_id = str(user_id or "").strip()
+
+    if not user_id:
+        return {"ok": False}
+
+    payload = load_users()
+    kept_users = []
+    discarded_user = None
+
+    for user in payload.get("users", []):
+        if str(user.get("user_id") or "") == user_id and account_status(user) == "pending_email_verification":
+            discarded_user = user
+            continue
+        kept_users.append(user)
+
+    if not discarded_user:
+        return {"ok": False}
+
+    payload["users"] = kept_users
+    save_users(payload)
+
+    avatar_path = str(discarded_user.get("avatar_path") or "").strip()
+    if avatar_path:
+        try:
+            avatar_file = (PACKAGE_DIR / "static" / avatar_path).resolve()
+            avatar_root = AVATAR_UPLOAD_DIR.resolve()
+            if avatar_file.is_file() and avatar_root in avatar_file.parents:
+                avatar_file.unlink()
+        except Exception:
+            pass
+
+    return {"ok": True}
 
 
 def phone_verification_code():
@@ -557,6 +667,24 @@ def find_user_by_reset_token(payload, token):
             continue
 
         token_hash = str(reset.get("token_hash") or "")
+        if token_hash and check_password_hash(token_hash, token):
+            return user
+
+    return None
+
+
+def find_user_by_account_verification_token(payload, token):
+    for user in payload.get("users", []):
+        verification = user.get("account_verification") if isinstance(user, dict) else None
+
+        if not isinstance(verification, dict):
+            continue
+
+        expires_at = parse_iso_datetime(verification.get("expires_at"))
+        if not expires_at or expires_at < datetime.utcnow():
+            continue
+
+        token_hash = str(verification.get("token_hash") or "")
         if token_hash and check_password_hash(token_hash, token):
             return user
 
@@ -1022,10 +1150,21 @@ def sign_out_user():
     session.pop("pending_2fa_user_id", None)
     session.pop("two_factor_recovery_link", None)
     session.pop("account_delete_link", None)
+    session.pop("account_verification_link", None)
     session.pop("phone_verification_code", None)
 
 
-def update_user_profile(user_id, username, email, password="", confirm_password="", avatar_file=None, phone=""):
+def update_user_profile(
+    user_id,
+    username,
+    email,
+    password="",
+    confirm_password="",
+    avatar_file=None,
+    phone="",
+    first_name="",
+    last_name="",
+):
     payload = load_users()
     user = next((item for item in payload["users"] if item.get("user_id") == user_id), None)
 
@@ -1040,6 +1179,8 @@ def update_user_profile(user_id, username, email, password="", confirm_password=
         require_password=False,
         phone=phone,
     )
+    first_name = str(first_name or "").strip()
+    last_name = str(last_name or "").strip()
     username = str(username or "").strip()
     email = str(email or "").strip()
     phone = normalize_phone_for_storage(phone)
@@ -1063,6 +1204,8 @@ def update_user_profile(user_id, username, email, password="", confirm_password=
     if not avatar_result.get("ok"):
         return {"ok": False, "errors": avatar_result.get("errors", ["Avatar upload failed."])}
 
+    user["first_name"] = first_name
+    user["last_name"] = last_name
     user["username"] = username
     user["email"] = email
     user["phone"] = phone

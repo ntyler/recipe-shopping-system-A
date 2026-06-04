@@ -206,6 +206,72 @@ def send_two_factor_recovery_email(user, recovery_url):
     return {"ok": True, "configured": True}
 
 
+def send_account_verification_email(user, verification_url):
+    config = smtp_config()
+
+    if not password_reset_email_configured():
+        return {
+            "ok": False,
+            "configured": False,
+            "error": "Account verification email is not configured.",
+        }
+
+    recipient = str((user or {}).get("email") or "").strip()
+    username = str((user or {}).get("username") or "there").strip()
+
+    if not recipient:
+        return {
+            "ok": False,
+            "configured": True,
+            "error": "This account does not have an email address.",
+        }
+
+    message = EmailMessage()
+    message["Subject"] = "Verify your Recipe Shopping System account"
+    message["From"] = formataddr((config["from_name"], config["from_email"]))
+    message["To"] = recipient
+    message.set_content(
+        "\n".join([
+            f"Hi {username},",
+            "",
+            "Use this one-time link to verify and activate your Recipe Shopping System account:",
+            verification_url,
+            "",
+            "This link expires in 24 hours. If you did not create this account, you can ignore this email.",
+        ])
+    )
+
+    context = ssl.create_default_context()
+
+    try:
+        if config["use_ssl"]:
+            with smtplib.SMTP_SSL(config["host"], config["port"], timeout=15, context=context) as smtp:
+                login_smtp(smtp, config)
+                smtp.send_message(message)
+        else:
+            with smtplib.SMTP(config["host"], config["port"], timeout=15) as smtp:
+                smtp.ehlo()
+                if config["use_tls"]:
+                    smtp.starttls(context=context)
+                    smtp.ehlo()
+                login_smtp(smtp, config)
+                smtp.send_message(message)
+    except smtplib.SMTPAuthenticationError as err:
+        return {
+            "ok": False,
+            "configured": True,
+            "error": smtp_auth_error_message(err),
+        }
+    except Exception as err:
+        return {
+            "ok": False,
+            "configured": True,
+            "error": f"Account verification email could not be sent. Check SMTP settings. {err}",
+        }
+
+    return {"ok": True, "configured": True}
+
+
 def send_account_delete_email(user, delete_url):
     config = smtp_config()
 
