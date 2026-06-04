@@ -14794,7 +14794,9 @@ body {
 }
 
 .ai-pantry-card {
-    border-color: #4b5563;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
 }
 
 #aiPantrySection .ai-pantry-toggle {

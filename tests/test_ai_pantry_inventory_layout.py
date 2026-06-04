@@ -22,6 +22,8 @@ def test_ai_pantry_inventory_uses_recipe_editor_style_markup():
     assert "Delete inventory item" in template
     assert ".ai-pantry-inventory-row" in css
     assert ".ai-pantry-inventory-header .recipe-edit-section-title h3" in css
+    assert ".ai-pantry-card {\n    border: 0;" in css
+    assert "background: transparent;" in css
 
 
 def test_ai_pantry_inventory_renders_inventory_heading():
