@@ -75,8 +75,8 @@ def test_two_factor_recovery_page_disables_invalid_token_submit():
         html = response.data.decode("utf-8")
 
     assert response.status_code == 200
-    assert "Unable to verify this recovery link." in html
-    assert "Recovery Link Invalid" in html
+    assert "Unable to verify this disable link." in html
+    assert "Disable Link Invalid" in html
     assert "disabled" in html
 
 
@@ -99,7 +99,7 @@ def test_two_factor_recovery_token_page_hides_pending_sign_in_form(tmp_path, mon
         html = response.data.decode("utf-8")
 
     assert response.status_code == 200
-    assert "Recover Two-Factor Access" in html
+    assert "Disable Two-Factor Authentication" in html
     assert "freepdfjobsearch@gmail.com" in html
     assert "Cancel" in html
     assert "Two-Factor Verification" not in html

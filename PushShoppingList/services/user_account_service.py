@@ -1148,17 +1148,17 @@ def delete_user_avatar(user):
 
 
 def request_two_factor_recovery(user_id):
-    """Create an email recovery token only after the password sign-in step succeeds."""
+    """Create an email token to verify disabling two-factor authentication."""
     user_id = str(user_id or "").strip()
 
     if not user_id:
-        return {"ok": False, "errors": ["Sign in with your password before requesting two-factor recovery."]}
+        return {"ok": False, "errors": ["Sign in before requesting a two-factor disable verification link."]}
 
     payload = load_users()
     user = find_user_by_id_in_payload(payload, user_id)
 
     if not user:
-        return {"ok": False, "errors": ["Sign in with your password before requesting two-factor recovery."]}
+        return {"ok": False, "errors": ["Sign in before requesting a two-factor disable verification link."]}
 
     if not two_factor_enabled(user):
         return {"ok": False, "errors": ["Two-factor authentication is not enabled for this account."]}
@@ -1185,7 +1185,7 @@ def recover_two_factor_with_token(token, password):
     errors = []
 
     if not token:
-        errors.append("Two-factor recovery link is missing. Request a new recovery email.")
+        errors.append("Two-factor disable verification link is missing. Request a new verification email.")
 
     if errors:
         return {"ok": False, "errors": errors}
@@ -1196,15 +1196,15 @@ def recover_two_factor_with_token(token, password):
     if not user:
         return {
             "ok": False,
-            "errors": ["That two-factor recovery link is invalid or expired. Request a new recovery email."],
+            "errors": ["That two-factor disable verification link is invalid or expired. Request a new verification email."],
         }
 
     requires_local_password = str(user.get("auth_provider") or "local").strip().lower() != "firebase"
     if requires_local_password and not password:
-        return {"ok": False, "errors": ["Current password is required to recover two-factor access."]}
+        return {"ok": False, "errors": ["Current password is required to disable two-factor authentication."]}
 
     if requires_local_password and not check_password_hash(str(user.get("password_hash") or ""), password):
-        return {"ok": False, "errors": ["Enter the current password for this account to recover two-factor access."]}
+        return {"ok": False, "errors": ["Enter the current password for this account to disable two-factor authentication."]}
 
     user.pop("two_factor", None)
     user.pop("two_factor_setup", None)

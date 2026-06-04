@@ -326,19 +326,19 @@ def request_two_factor_recovery_route():
             if not email_result.get("ok"):
                 flash(
                     email_result.get("error")
-                    or "Two-factor recovery email could not be sent. Check SMTP settings.",
+                    or "Two-factor disable verification email could not be sent. Check SMTP settings.",
                     "error",
                 )
                 return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
         else:
             session["two_factor_recovery_link"] = recovery_link
             flash(
-                "Email is not configured yet, so a local two-factor recovery link is available below.",
+                "Email is not configured yet, so a local two-factor disable verification link is available below.",
                 "success",
             )
             return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
 
-        flash("A two-factor recovery email has been sent.", "success")
+        flash("A two-factor disable verification email has been sent.", "success")
     else:
         flash_account_result(result, "")
 

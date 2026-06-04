@@ -32,9 +32,9 @@
     {% set local_two_factor_recovery_link = session.get("two_factor_recovery_link") %}
     {% if local_two_factor_recovery_link %}
         <div class="user-account-reset-panel" aria-live="polite">
-            <strong>Local two-factor recovery link</strong>
-            <span>Email is not configured, so use this one-time local link to recover two-factor access.</span>
-            <a href="{{ local_two_factor_recovery_link }}">Recover Two-Factor Access</a>
+            <strong>Local two-factor disable verification link</strong>
+            <span>Email is not configured, so use this one-time local link to verify disabling two-factor authentication.</span>
+            <a href="{{ local_two_factor_recovery_link }}">Verify Disable Two-Factor</a>
         </div>
     {% endif %}
 
@@ -69,22 +69,22 @@
         <form class="user-account-form user-two-factor-recovery-form"
               method="POST"
               action="{{ url_for('account_bp.complete_two_factor_recovery_route') }}">
-            <h3>Recover Two-Factor Access</h3>
+            <h3>Disable Two-Factor Authentication</h3>
             {% if two_factor_recovery_user|default(none) %}
                 <div class="user-account-token-target">
-                    <span>Recovery account</span>
+                    <span>Account</span>
                     <strong>{{ two_factor_recovery_user.display_name }}</strong>
                     <code>{{ two_factor_recovery_user.email }}</code>
                 </div>
             {% else %}
                 <div class="user-account-token-target error">
-                    <span>Recovery account</span>
-                    <strong>Unable to verify this recovery link.</strong>
-                    <code>Request a new two-factor recovery email.</code>
+                    <span>Account</span>
+                    <strong>Unable to verify this disable link.</strong>
+                    <code>Request a new two-factor disable verification email.</code>
                 </div>
             {% endif %}
             <p class="user-account-form-note">
-                This recovery link only affects the account shown above. Local accounts must also enter the current password.
+                This link only disables two-factor authentication for the account shown above. Local accounts must also enter the current password.
             </p>
             <input type="hidden" name="two_factor_recovery_token" value="{{ two_factor_recovery_token }}">
             {% if two_factor_recovery_user|default(none) and two_factor_recovery_user.auth_provider != "firebase" %}
@@ -100,7 +100,7 @@
                     {% if two_factor_recovery_user|default(none) %}
                         Disable Two-Factor Authentication for {{ two_factor_recovery_user.email }}
                     {% else %}
-                        Recovery Link Invalid
+                        Disable Link Invalid
                     {% endif %}
                 </button>
                 <button type="button"
@@ -144,8 +144,8 @@
         <div class="user-account-reset-panel" aria-live="polite">
             <strong>Signed-in browser session</strong>
             <span>
-                You are currently signed in as {{ current_user.email }}, but the recovery form above is for
-                {% if two_factor_recovery_user|default(none) %}{{ two_factor_recovery_user.email }}{% else %}the account tied to that recovery link{% endif %}.
+                You are currently signed in as {{ current_user.email }}, but the disable two-factor form above is for
+                {% if two_factor_recovery_user|default(none) %}{{ two_factor_recovery_user.email }}{% else %}the account tied to that disable link{% endif %}.
             </span>
         </div>
     {% elif current_user and not account_action_token %}
@@ -461,34 +461,14 @@
                         <button type="submit" class="secondary">Regenerate Backup Codes</button>
                     </form>
 
-                <form class="user-two-factor-inline-form"
-                      method="POST"
-                      action="{{ url_for('account_bp.disable_two_factor_route') }}">
-                    {% if current_user.auth_provider != "firebase" %}
-                        <label>
-                            <span>Current Password</span>
-                            <input type="password" name="password" required autocomplete="current-password">
-                        </label>
-                    {% endif %}
-                    <label>
-                        <span>Authenticator or Backup Code</span>
-                        <input type="text"
-                               name="code"
-                               required
-                               inputmode="text"
-                               autocomplete="one-time-code">
-                    </label>
-                    <button type="submit" class="danger">Disable Two-Factor Authentication</button>
-                </form>
-
                 <form class="user-two-factor-inline-form user-two-factor-recovery-request-form"
                       method="POST"
                       action="{{ url_for('account_bp.request_two_factor_recovery_route') }}">
-                    <h4>Lost authenticator or backup codes?</h4>
+                    <h4>Disable Two-Factor Authentication</h4>
                     <p class="user-account-form-note">
-                        Email a one-time recovery link to this account. Local accounts confirm the current password from that link.
+                        Email a one-time verification link to {{ current_user.email }}. Two-factor authentication is disabled only after that link is opened and confirmed.
                     </p>
-                    <button type="submit">Email Recovery Link</button>
+                    <button type="submit" class="danger">Email Disable Verification Link</button>
                 </form>
             {% elif two_factor_setup %}
                 <p class="user-account-form-note">
@@ -613,11 +593,11 @@
                 <form class="user-account-form user-two-factor-recovery-request-form"
                       method="POST"
                       action="{{ url_for('account_bp.request_two_factor_recovery_route') }}">
-                    <h3>Lost authenticator or backup codes?</h3>
+                    <h3>Need to disable two-factor authentication?</h3>
                     <p class="user-account-form-note">
-                        Email a one-time recovery link to this account. Local accounts confirm the current password from that link.
+                        Email a one-time verification link to this account. After you confirm the link, two-factor authentication is disabled for that account.
                     </p>
-                    <button type="submit">Email Recovery Link</button>
+                    <button type="submit">Email Disable Verification Link</button>
                 </form>
             {% else %}
                 <form id="firebaseCreateAccountForm"

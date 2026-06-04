@@ -41,3 +41,12 @@ def test_account_action_token_pages_stay_focused_and_visible():
     assert "function hasAccountActionToken()" in script
     assert 'setScreenPreviewMode("live", { persist: false })' in script
     assert "function cancelAccountActionLink()" in script
+
+
+def test_two_factor_disable_uses_email_verification_link():
+    template = (ROOT / "PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")
+
+    assert "Email Disable Verification Link" in template
+    assert "Email a one-time verification link to {{ current_user.email }}" in template
+    assert "Disable Two-Factor Authentication for {{ two_factor_recovery_user.email }}" in template
+    assert "action=\"{{ url_for('account_bp.disable_two_factor_route') }}\"" not in template

@@ -146,7 +146,7 @@ def send_two_factor_recovery_email(user, recovery_url):
         return {
             "ok": False,
             "configured": False,
-            "error": "Two-factor recovery email is not configured.",
+            "error": "Two-factor disable verification email is not configured.",
         }
 
     recipient = str((user or {}).get("email") or "").strip()
@@ -160,18 +160,18 @@ def send_two_factor_recovery_email(user, recovery_url):
         }
 
     message = EmailMessage()
-    message["Subject"] = "Recover your Recipe Shopping System two-factor access"
+    message["Subject"] = "Verify disabling Recipe Shopping System two-factor authentication"
     message["From"] = formataddr((config["from_name"], config["from_email"]))
     message["To"] = recipient
     message.set_content(
         "\n".join([
             f"Hi {username},",
             "",
-            "Use this one-time link to recover two-factor access:",
+            "Use this one-time link to verify that you want to disable two-factor authentication:",
             recovery_url,
             "",
             "This link expires in 30 minutes. Local accounts must also enter the current password.",
-            "If you did not request this recovery, change your password and ignore this email.",
+            "If you did not request this change, change your password and ignore this email.",
         ])
     )
 
@@ -200,7 +200,7 @@ def send_two_factor_recovery_email(user, recovery_url):
         return {
             "ok": False,
             "configured": True,
-            "error": f"Two-factor recovery email could not be sent. Check SMTP settings. {err}",
+            "error": f"Two-factor disable verification email could not be sent. Check SMTP settings. {err}",
         }
 
     return {"ok": True, "configured": True}
