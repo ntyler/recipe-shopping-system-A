@@ -453,6 +453,7 @@ def update_profile_route():
         phone=request.form.get("phone"),
         first_name=request.form.get("first_name"),
         last_name=request.form.get("last_name"),
+        remove_avatar=request.form.get("remove_avatar") == "1",
     )
     flash_account_result(result, "Profile updated.")
     return redirect(url_for("main_bp.index", _anchor="userAccountSection"))

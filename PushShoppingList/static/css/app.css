@@ -5095,8 +5095,35 @@ body {
         }
 
         .user-account-file-label,
+        .user-account-remove-avatar,
         .user-account-submit-row {
             grid-column: 1 / -1;
+        }
+
+        .user-account-remove-avatar {
+            display: flex !important;
+            align-items: center;
+            gap: 8px !important;
+            width: fit-content;
+            max-width: 100%;
+            text-transform: none !important;
+            letter-spacing: 0 !important;
+        }
+
+        .user-account-remove-avatar input[type="checkbox"] {
+            width: 20px !important;
+            min-width: 20px;
+            height: 20px;
+            min-height: 20px;
+            margin: 0;
+            padding: 0;
+        }
+
+        .user-account-remove-avatar span {
+            color: #dbeafe;
+            font-size: 13px;
+            font-weight: 900;
+            line-height: 1.2;
         }
 
         .user-ntfy-card {

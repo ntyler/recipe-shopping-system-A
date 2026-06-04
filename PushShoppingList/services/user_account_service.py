@@ -1346,6 +1346,7 @@ def update_user_profile(
     phone="",
     first_name="",
     last_name="",
+    remove_avatar=False,
 ):
     payload = load_users()
     user = next((item for item in payload["users"] if item.get("user_id") == user_id), None)
@@ -1394,7 +1395,11 @@ def update_user_profile(
     if password:
         user["password_hash"] = generate_password_hash(password)
     if avatar_result.get("avatar_path"):
+        delete_user_avatar(user)
         user["avatar_path"] = avatar_result["avatar_path"]
+    elif remove_avatar:
+        delete_user_avatar(user)
+        user["avatar_path"] = ""
     if phone != previous_phone:
         user.pop("phone_verified_at", None)
         user.pop("phone_verification", None)
