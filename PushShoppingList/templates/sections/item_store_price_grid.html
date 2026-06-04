@@ -5,21 +5,33 @@
         <div class="item-store-price-grid"
              style="--store-price-count: {{ item_price_cells|length }};">
             {% for cell in item_price_cells %}
-                <div class="item-store-price-header">
+                <button type="button"
+                        class="item-store-price-header"
+                        data-item-key="{{ product_choice_key }}"
+                        data-store-key="{{ cell.store_key }}"
+                        data-store-label="{{ cell.label }}"
+                        aria-label="Select {{ cell.label }} for {{ store_price_item_label }}"
+                        title="Select {{ cell.label }}"
+                        onclick="return selectItemStoreFromPriceHeader(this)">
                     {{ cell.label }}
-                </div>
+                </button>
             {% endfor %}
             {% for cell in item_price_cells %}
-                <div class="item-store-price-cell {% if cell.is_cheapest %}cheapest{% endif %} {% if cell.is_selected %}selected{% endif %}"
-                     data-store-key="{{ cell.store_key }}"
-                     title="{{ cell.title }}">
+                <button type="button"
+                        class="item-store-price-cell {% if cell.is_cheapest %}cheapest{% endif %} {% if cell.is_selected %}selected{% endif %}"
+                        data-item-key="{{ product_choice_key }}"
+                        data-store-key="{{ cell.store_key }}"
+                        data-store-label="{{ cell.label }}"
+                        aria-label="Show {{ cell.label }} product alternatives for {{ store_price_item_label }}"
+                        title="{{ cell.title }}"
+                        onclick="return openProductAlternatives(this)">
                     <span class="item-store-price-value {% if not cell.price_value %}item-store-price-empty{% endif %}">
                         {{ cell.display_price }}
                     </span>
                     {% if cell.unit_price %}
                         <span class="item-store-unit-price">{{ cell.unit_price }}</span>
                     {% endif %}
-                </div>
+                </button>
             {% endfor %}
         </div>
     </div>

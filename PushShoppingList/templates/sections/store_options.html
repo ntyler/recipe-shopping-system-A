@@ -85,7 +85,7 @@
                                     data-active-store-mode-toggle="edit"
                                     aria-pressed="false"
                                     onclick="setActiveStoreIconMode('edit', { persist: true }); return false;">
-                                {{ "Edit store details" if can_manage_stores else "Edit store login" }}
+                                Edit store
                             </button>
                         {% endif %}
                     </div>
@@ -146,7 +146,7 @@
             {% if can_manage_stores %}
                 This is your editable store list. Check stores to include them in product searches.
             {% elif can_edit_store_credentials %}
-                Check stores to include them in product searches. Store definitions are managed by the administrator.
+                This is your editable store list. Check stores to include them in product searches.
             {% endif %}
         </p>
 
@@ -214,7 +214,7 @@
                                     {% if can_manage_stores or can_edit_store_credentials %}
                                         <button type="button"
                                                 onclick="closeRecipeEditRowMenus(); return openStoreEditModal('store-edit-{{ store_key }}', this)">
-                                            {{ "Edit store" if can_manage_stores else "Edit login" }}
+                                            Edit store
                                         </button>
                                     {% endif %}
                                     {% if can_manage_stores %}
@@ -378,7 +378,7 @@
                               onsubmit="return saveStoreDetails(event);">
                             <div class="store-edit-modal-header">
                                 <h2 id="store-edit-title-{{ store_key }}">
-                                    {{ "Edit " ~ store.label if can_manage_stores else store.label ~ " Login" }}
+                                    Edit {{ store.label }}
                                 </h2>
                                 <button type="button"
                                         class="store-edit-modal-close"
@@ -431,7 +431,7 @@
                                     Cancel
                                 </button>
                                 <button type="submit" class="store-edit-save-btn">
-                                    {{ "Save Store Details" if can_manage_stores else "Save Store Login" }}
+                                    Save Store Details
                                 </button>
                             </div>
                         </form>

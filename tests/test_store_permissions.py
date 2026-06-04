@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 
 from flask import render_template
 
@@ -181,10 +182,57 @@ def test_store_options_toggle_controls_render_without_admin():
     assert 'name="enabled_stores"' in html
     assert 'data-store-toggle-menu-action="aldi"' in html
     assert "Activate store" in html
-    assert "Edit login" in html
+    assert "Edit store" in html
+    assert "Edit Aldi" in html
+    assert "Save Store Details" in html
     assert "Username / Email" in html
     assert "Password" in html
+    edit_form = html[html.index('id="store-edit-aldi"'):]
+    assert "Store Name" not in edit_form
+    assert "Search URL" not in edit_form
+    assert "Store Selector URL" not in edit_form
     assert "Delete store" not in html
+
+
+def test_store_options_admin_menu_renders_store_management_actions():
+    app = create_app()
+
+    with app.test_request_context("/"):
+        html = render_template(
+            "sections/store_options.html",
+            current_user=SimpleNamespace(is_admin=True),
+            available_stores={
+                "aldi": {
+                    "label": "Aldi",
+                    "url": "https://aldi.example/search?q=",
+                    "urlStoreSelector": "https://aldi.example/stores",
+                },
+            },
+            enabled_stores=["aldi"],
+            nearest_store_locations={},
+            nearest_store_results={},
+            nearest_store_search_radius_miles=5,
+        )
+
+    assert "Deactivate store" in html
+    assert "Edit store" in html
+    assert "Delete store" in html
+    assert "Edit Aldi" in html
+    assert "Store Name" in html
+    assert "Search URL" in html
+    assert "Store Selector URL" in html
+    assert "Username / Email" in html
+    assert "Password" in html
+    assert "Save Store Details" in html
+
+
+def test_store_action_menu_keeps_actions_readable():
+    css = open("PushShoppingList/static/css/app.css", encoding="utf-8").read()
+
+    assert ".recipe-edit-row-menu.store-action-menu" in css
+    assert "min-width: 172px" in css
+    assert ".recipe-edit-row-menu.store-action-menu button" in css
+    assert "white-space: nowrap" in css
 
 
 def test_guest_can_update_store_credentials(monkeypatch, tmp_path):

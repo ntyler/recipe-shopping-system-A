@@ -126,7 +126,10 @@ def test_home_address_template_renders_history_panel():
         )
 
     assert "Home Address History" in html
+    assert "data-home-address-history-toggle" in html
+    assert "data-home-address-history-body" in html
     assert "data-home-address-history-list" in html
+    assert "toggleHomeAddressHistoryCollapse(this)" in html
     assert "useHomeAddressHistoryEntry(this)" in html
     assert "saveHomeAddressHistoryTitle(this)" in html
     assert "removeHomeAddressHistoryEntry(this)" in html
@@ -142,6 +145,12 @@ def test_home_address_history_scripts_are_wired():
 
     assert "function saveHomeAddressHistoryTitle" in script
     assert "function removeHomeAddressHistoryEntry" in script
+    assert "function toggleHomeAddressHistoryCollapse" in script
+    assert "restoreHomeAddressHistoryCollapseState" in script
     assert "address_label" in script
+    assert ".home-address-history-toggle" in css
+    assert ".home-address-history-body.collapsed" in css
     assert ".home-address-history-title-row" in css
     assert ".home-address-history-remove-btn" in css
+    history_css = css[css.index(".home-address-history {"):css.index(".home-address-history-toggle")]
+    assert "border: 0;" in history_css

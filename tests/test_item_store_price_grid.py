@@ -78,14 +78,22 @@ def test_item_rows_use_price_grid_and_overflow_menu():
     price_grid = (root / "PushShoppingList/templates/sections/item_store_price_grid.html").read_text(encoding="utf-8")
     action_menu = (root / "PushShoppingList/templates/sections/item_row_action_menu.html").read_text(encoding="utf-8")
     css = (root / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    app_js = (root / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
 
     assert "sections/item_store_price_grid.html" in items_template
     assert "sections/item_row_action_menu.html" in items_template
     assert "item-store-price-grid" in price_grid
     assert "item-store-price-header" in price_grid
+    assert "selectItemStoreFromPriceHeader(this)" in price_grid
+    assert "openProductAlternatives(this)" in price_grid
+    assert 'data-item-key="{{ product_choice_key }}"' in price_grid
     assert "item-row-menu recipe-edit-row-menu overflow-menu" in action_menu
     assert "item-store-price-cell.cheapest" in css
     assert "item-store-price-cell.selected" in css
+    assert "item-store-price-header:focus-visible" in css
+    assert "item-store-price-cell:focus-visible" in css
+    assert "async function selectItemStoreFromPriceHeader" in app_js
+    assert "await saveItemStoreSelection(itemKey, storeKey)" in app_js
 
 
 def test_recipe_ingredient_store_tools_sit_under_quantity():

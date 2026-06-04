@@ -1417,30 +1417,59 @@ def product_choice_for_item(item_key, store_key=None):
 def product_choice_for_store(choice, store_key):
     store_key = str(store_key or "").strip()
     filtered = dict(choice)
-    candidates = [
-        candidate
-        for candidate in choice.get("candidates", [])
-        if candidate.get("store_key") == store_key
-    ]
     store_result = find_store_result(choice, store_key)
+    store_name = (store_result or {}).get("store_name", "")
+
+    def candidates_for_store(values, assume_store=False):
+        output = []
+        for candidate in values or []:
+            if not isinstance(candidate, dict):
+                continue
+            candidate_store_key = str(candidate.get("store_key") or "").strip()
+            if candidate_store_key == store_key:
+                output.append(candidate)
+            elif assume_store and not candidate_store_key:
+                hydrated = dict(candidate)
+                hydrated["store_key"] = store_key
+                hydrated["store_name"] = hydrated.get("store_name") or store_name
+                output.append(hydrated)
+        return output
+
+    candidates = dedupe_candidates(
+        candidates_for_store(choice.get("candidates", []))
+        + candidates_for_store((store_result or {}).get("alternative_products", []), assume_store=True)
+        + candidates_for_store((store_result or {}).get("alternatives", []), assume_store=True)
+        + candidates_for_store((store_result or {}).get("valid_alternatives", []), assume_store=True)
+        + candidates_for_store((store_result or {}).get("rejected_products", []), assume_store=True)
+    )
+    valid_alternatives = dedupe_candidates(
+        candidates_for_store((store_result or {}).get("valid_alternatives", []), assume_store=True)
+        or [
+            candidate
+            for candidate in candidates
+            if candidate.get("viable") is not False
+        ]
+    )
+    rejected_products = dedupe_candidates(
+        candidates_for_store((store_result or {}).get("rejected_products", []), assume_store=True)
+        or [
+            candidate
+            for candidate in candidates
+            if candidate.get("viable") is False
+        ]
+    )
     selected = (store_result or {}).get("best_product")
     if not selected and (choice.get("selected_product") or {}).get("store_key") == store_key:
         selected = choice.get("selected_product")
 
     filtered["filtered_store_key"] = store_key
-    filtered["filtered_store_name"] = (store_result or {}).get("store_name", "") or (selected or {}).get("store_name", "")
+    filtered["filtered_store_name"] = store_name or (selected or {}).get("store_name", "")
     filtered["store_result"] = store_result or {}
     filtered["candidates"] = candidates
-    filtered["valid_alternatives"] = [
-        candidate
-        for candidate in candidates
-        if candidate.get("viable") is not False
-    ]
-    filtered["rejected_products"] = [
-        candidate
-        for candidate in candidates
-        if candidate.get("viable") is False
-    ]
+    filtered["alternatives"] = candidates
+    filtered["alternative_products"] = candidates
+    filtered["valid_alternatives"] = valid_alternatives
+    filtered["rejected_products"] = rejected_products
     filtered["selected_product"] = selected
     filtered["selected_product_id"] = (store_result or {}).get("best_product_id") or (selected or {}).get("id", "")
     filtered["skip_reasons"] = (

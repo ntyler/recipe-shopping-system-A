@@ -785,6 +785,7 @@ async function clearProductPicks(event) {
 async function openProductAlternatives(button) {
     const itemKey = button ? button.dataset.itemKey || "" : "";
     const storeKey = button ? button.dataset.storeKey || "" : "";
+    const storeLabel = button ? button.dataset.storeLabel || storeKey : storeKey;
 
     if (!itemKey) {
         return false;
@@ -794,7 +795,7 @@ async function openProductAlternatives(button) {
     modal.classList.add("open");
     modal.setAttribute("aria-hidden", "false");
     document.body.classList.add("modal-open");
-    renderProductAlternativesLoading(itemKey, storeKey);
+    renderProductAlternativesLoading(itemKey, storeLabel);
 
     try {
         const params = new URLSearchParams({ item_key: itemKey });
@@ -813,6 +814,27 @@ async function openProductAlternatives(button) {
         renderProductAlternatives(data.choice);
     } catch (err) {
         renderProductAlternativesError(err.message || "Unable to load alternatives.");
+    }
+
+    return false;
+}
+
+async function selectItemStoreFromPriceHeader(button) {
+    const itemKey = button ? button.dataset.itemKey || "" : "";
+    const storeKey = button ? button.dataset.storeKey || "" : "";
+
+    if (!itemKey || !storeKey) {
+        return false;
+    }
+
+    button.disabled = true;
+    button.setAttribute("aria-busy", "true");
+
+    try {
+        await saveItemStoreSelection(itemKey, storeKey);
+    } finally {
+        button.disabled = false;
+        button.removeAttribute("aria-busy");
     }
 
     return false;
@@ -13330,17 +13352,55 @@ function bindRecipeTaskChecks() {
         const text = taskRow ? taskRow.querySelector(".recipe-task-text") : null;
 
         checkbox.checked = localStorage.getItem(`recipe-task-checked:${key}`) === "1";
-        if (text) {
-            text.classList.toggle("checked-item-text", checkbox.checked);
+        syncRecipeTaskCheckedState(checkbox, text);
+
+        if (checkbox.dataset.recipeTaskCheckBound !== "1") {
+            checkbox.dataset.recipeTaskCheckBound = "1";
+            checkbox.addEventListener("change", () => {
+                saveRecipeTaskCheckedState(checkbox, text, key);
+            });
         }
 
-        checkbox.addEventListener("change", () => {
-            localStorage.setItem(`recipe-task-checked:${key}`, checkbox.checked ? "1" : "0");
-            if (text) {
-                text.classList.toggle("checked-item-text", checkbox.checked);
-            }
-        });
+        if (text && text.dataset.recipeTaskTextToggleBound !== "1") {
+            text.dataset.recipeTaskTextToggleBound = "1";
+            text.tabIndex = 0;
+            text.setAttribute("role", "button");
+            text.setAttribute("aria-label", `Toggle ${text.textContent.trim()}`);
+            text.addEventListener("click", () => {
+                toggleRecipeTaskCheckbox(checkbox, text, key);
+            });
+            text.addEventListener("keydown", event => {
+                if (event.key !== "Enter" && event.key !== " ") {
+                    return;
+                }
+
+                event.preventDefault();
+                toggleRecipeTaskCheckbox(checkbox, text, key);
+            });
+        }
     });
+}
+
+function syncRecipeTaskCheckedState(checkbox, text) {
+    if (text) {
+        text.classList.toggle("checked-item-text", checkbox.checked);
+        text.setAttribute("aria-pressed", checkbox.checked ? "true" : "false");
+    }
+}
+
+function saveRecipeTaskCheckedState(checkbox, text, key) {
+    localStorage.setItem(`recipe-task-checked:${key}`, checkbox.checked ? "1" : "0");
+    syncRecipeTaskCheckedState(checkbox, text);
+}
+
+function toggleRecipeTaskCheckbox(checkbox, text, key) {
+    if (!checkbox) {
+        return;
+    }
+
+    checkbox.checked = !checkbox.checked;
+    saveRecipeTaskCheckedState(checkbox, text, key);
+    checkbox.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
 function cssEscape(value) {
@@ -13623,6 +13683,8 @@ function updateHomeAddressHistory(history) {
     if (count) {
         count.textContent = `${history.length} saved`;
     }
+
+    restoreHomeAddressHistoryCollapseState();
 }
 
 function createHomeAddressHistoryItem(entry) {
@@ -13698,6 +13760,31 @@ function createHomeAddressHistoryItem(entry) {
     copy.append(time, link);
     item.append(copy, titleRow, actions, status);
     return item;
+}
+
+function toggleHomeAddressHistoryCollapse(button) {
+    const expanded = button ? button.getAttribute("aria-expanded") === "true" : true;
+    setHomeAddressHistoryCollapsed(expanded);
+    return false;
+}
+
+function restoreHomeAddressHistoryCollapseState() {
+    const saved = localStorage.getItem("home-address-history-collapsed");
+    setHomeAddressHistoryCollapsed(saved === "1");
+}
+
+function setHomeAddressHistoryCollapsed(collapsed) {
+    const toggle = document.querySelector("[data-home-address-history-toggle]");
+    const body = document.querySelector("[data-home-address-history-body]");
+
+    if (!toggle || !body) {
+        return;
+    }
+
+    body.classList.toggle("collapsed", collapsed);
+    toggle.classList.toggle("collapsed", collapsed);
+    toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    localStorage.setItem("home-address-history-collapsed", collapsed ? "1" : "0");
 }
 
 function homeAddressHistoryRowForButton(button) {
@@ -14818,6 +14905,7 @@ async function refreshStoreMarkup(options = {}) {
     }
 
     restoreCardCollapseState();
+    restoreHomeAddressHistoryCollapseState();
     restoreOpenStorePanels();
     restoreViewBehaviorSettings();
     restoreItemCheckState();
@@ -15007,6 +15095,7 @@ document.addEventListener("DOMContentLoaded", function () {
     restoreScroll();
     restoreScreenSettings();
     restoreCardCollapseState();
+    restoreHomeAddressHistoryCollapseState();
     restoreOpenStorePanels();
     restoreViewBehaviorSettings();
     restoreItemCheckState();

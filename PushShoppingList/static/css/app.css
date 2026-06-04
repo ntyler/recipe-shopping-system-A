@@ -1162,8 +1162,13 @@ body {
             flex: 0 0 auto;
         }
 
-        .store-action-menu {
-            min-width: 142px;
+        .recipe-edit-row-menu.store-action-menu {
+            min-width: 172px;
+        }
+
+        .recipe-edit-row-menu.store-action-menu button,
+        .recipe-edit-row-menu.store-action-menu .store-action-menu-delete {
+            white-space: nowrap;
         }
 
         .store-action-menu .store-action-menu-form {
@@ -2323,17 +2328,60 @@ body {
 
         .home-address-history {
             margin-top: 12px;
-            padding: 12px 14px;
-            background: #121617;
-            border: 1px solid #2c3335;
-            border-radius: 10px;
+            padding: 0;
+            background: transparent;
+            border: 0;
+            border-radius: 0;
         }
 
-        .home-address-history-header {
+        .home-address-history-toggle {
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 10px;
+            width: 100%;
+            min-height: 38px;
+            margin: 0;
+            padding: 10px 14px;
+            border: 0;
+            border-radius: 10px;
+            background: #121617;
+            color: #f8fafc;
+            text-align: left;
+            box-sizing: border-box;
+            cursor: pointer;
+        }
+
+        .home-address-history-toggle:hover,
+        .home-address-history-toggle:focus-visible {
+            background: #181d1f;
+            outline: none;
+        }
+
+        .home-address-history-toggle:focus-visible {
+            box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.45);
+        }
+
+        .home-address-history-chevron {
+            flex: 0 0 auto;
+            width: 9px;
+            height: 9px;
+            border-right: 2px solid #94a3b8;
+            border-bottom: 2px solid #94a3b8;
+            transform: rotate(45deg);
+            transition: transform 0.15s ease;
+        }
+
+        .home-address-history-toggle.collapsed .home-address-history-chevron {
+            transform: rotate(-45deg);
+        }
+
+        .home-address-history-body {
+            margin-top: 8px;
+        }
+
+        .home-address-history-body.collapsed {
+            display: none;
         }
 
         .home-address-history-count {
@@ -3737,6 +3785,16 @@ body {
             flex: 0 0 auto;
         }
 
+        .recipe-task-text {
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .recipe-task-text:focus-visible {
+            outline: 2px solid #38bdf8;
+            outline-offset: 3px;
+        }
+
         .recipe-equipment-task-row .recipe-task-check,
         .recipe-instruction-task-row .recipe-task-check {
             justify-self: center;
@@ -4095,10 +4153,14 @@ body {
         .item-store-price-header,
         .item-store-price-cell {
             min-width: 0;
+            width: 100%;
+            margin: 0;
             padding: 5px 9px;
             border: 1px solid #334155;
             text-align: center;
             box-sizing: border-box;
+            font: inherit;
+            cursor: pointer;
         }
 
         .item-store-price-header {
@@ -4114,6 +4176,23 @@ body {
             font-weight: 900;
             line-height: 1.1;
             overflow-wrap: anywhere;
+        }
+
+        .item-store-price-header:hover,
+        .item-store-price-header:focus-visible,
+        .item-store-price-cell:hover,
+        .item-store-price-cell:focus-visible {
+            border-color: #58a6ff;
+            outline: none;
+        }
+
+        .item-store-price-header:focus-visible,
+        .item-store-price-cell:focus-visible {
+            box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.5);
+        }
+
+        .item-store-price-header[aria-busy="true"] {
+            opacity: 0.72;
         }
 
         .item-store-price-cell {

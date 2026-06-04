@@ -57,74 +57,81 @@
             </div>
 
             <div class="home-address-history" data-home-address-history>
-                <div class="home-address-history-header">
+                <button type="button"
+                        class="home-address-history-toggle"
+                        data-home-address-history-toggle
+                        aria-expanded="true"
+                        onclick="return toggleHomeAddressHistoryCollapse(this)">
                     <span class="store-detail-label">Home Address History</span>
                     <span class="home-address-history-count" data-home-address-history-count>
                         {{ address_history|length }} saved
                     </span>
-                </div>
-                <ol class="home-address-history-list" data-home-address-history-list>
-                    {% for history_item in address_history %}
-                        {% set history_google_maps_url = "https://www.google.com/maps/search/?api=1&query=" ~ (history_item.full_address|urlencode) %}
-                        {% set history_apple_maps_url = "https://maps.apple.com/?q=" ~ (history_item.full_address|urlencode) %}
-                        <li class="home-address-history-item">
-                            <div class="home-address-history-copy">
-                                <span class="home-address-history-time">{{ history_item.saved_at_display }}</span>
-                                <a class="home-address-history-address home-address-map-link"
-                                   href="{{ history_google_maps_url }}"
-                                   data-google-maps-url="{{ history_google_maps_url }}"
-                                   data-apple-maps-url="{{ history_apple_maps_url }}"
-                                   target="_blank"
-                                   rel="noopener noreferrer"
-                                   onclick="return openStoreAddressMap(this, event);"
-                                   title="Open saved address in Maps">
-                                    {{ history_item.full_address }}
-                                </a>
-                            </div>
-                            <div class="home-address-history-title-row">
-                                <label>
-                                    <span>Title</span>
-                                    <input type="text"
-                                           class="home-address-history-title-input"
-                                           value="{{ history_item.label }}"
-                                           placeholder="Home">
-                                </label>
-                                <button type="button"
-                                        class="home-address-history-title-btn"
-                                        data-home-address-history-id="{{ history_item.id }}"
-                                        onclick="return saveHomeAddressHistoryTitle(this);">
-                                    Save Title
-                                </button>
-                            </div>
-                            <div class="home-address-history-actions">
-                                <button type="button"
-                                        class="home-address-history-use-btn"
-                                        data-address-label="{{ history_item.label }}"
-                                        data-address-street="{{ history_item.street }}"
-                                        data-address-apartment="{{ history_item.apartment }}"
-                                        data-address-city="{{ history_item.city }}"
-                                        data-address-county="{{ history_item.county }}"
-                                        data-address-state="{{ history_item.state }}"
-                                        data-address-zip="{{ history_item.zip }}"
-                                        data-address-country="{{ history_item.country }}"
-                                        onclick="return useHomeAddressHistoryEntry(this);">
-                                    Use
-                                </button>
-                                <button type="button"
-                                        class="home-address-history-remove-btn"
-                                        data-home-address-history-id="{{ history_item.id }}"
-                                        onclick="return removeHomeAddressHistoryEntry(this);">
-                                    Remove
-                                </button>
-                            </div>
-                            <div class="home-address-history-status" aria-live="polite"></div>
-                        </li>
-                    {% endfor %}
-                </ol>
-                <div class="home-address-history-empty"
-                     data-home-address-history-empty
-                     {% if address_history %}hidden{% endif %}>
-                    No saved addresses yet.
+                    <span class="home-address-history-chevron" aria-hidden="true"></span>
+                </button>
+                <div class="home-address-history-body" data-home-address-history-body>
+                    <ol class="home-address-history-list" data-home-address-history-list>
+                        {% for history_item in address_history %}
+                            {% set history_google_maps_url = "https://www.google.com/maps/search/?api=1&query=" ~ (history_item.full_address|urlencode) %}
+                            {% set history_apple_maps_url = "https://maps.apple.com/?q=" ~ (history_item.full_address|urlencode) %}
+                            <li class="home-address-history-item">
+                                <div class="home-address-history-copy">
+                                    <span class="home-address-history-time">{{ history_item.saved_at_display }}</span>
+                                    <a class="home-address-history-address home-address-map-link"
+                                       href="{{ history_google_maps_url }}"
+                                       data-google-maps-url="{{ history_google_maps_url }}"
+                                       data-apple-maps-url="{{ history_apple_maps_url }}"
+                                       target="_blank"
+                                       rel="noopener noreferrer"
+                                       onclick="return openStoreAddressMap(this, event);"
+                                       title="Open saved address in Maps">
+                                        {{ history_item.full_address }}
+                                    </a>
+                                </div>
+                                <div class="home-address-history-title-row">
+                                    <label>
+                                        <span>Title</span>
+                                        <input type="text"
+                                               class="home-address-history-title-input"
+                                               value="{{ history_item.label }}"
+                                               placeholder="Home">
+                                    </label>
+                                    <button type="button"
+                                            class="home-address-history-title-btn"
+                                            data-home-address-history-id="{{ history_item.id }}"
+                                            onclick="return saveHomeAddressHistoryTitle(this);">
+                                        Save Title
+                                    </button>
+                                </div>
+                                <div class="home-address-history-actions">
+                                    <button type="button"
+                                            class="home-address-history-use-btn"
+                                            data-address-label="{{ history_item.label }}"
+                                            data-address-street="{{ history_item.street }}"
+                                            data-address-apartment="{{ history_item.apartment }}"
+                                            data-address-city="{{ history_item.city }}"
+                                            data-address-county="{{ history_item.county }}"
+                                            data-address-state="{{ history_item.state }}"
+                                            data-address-zip="{{ history_item.zip }}"
+                                            data-address-country="{{ history_item.country }}"
+                                            onclick="return useHomeAddressHistoryEntry(this);">
+                                        Use
+                                    </button>
+                                    <button type="button"
+                                            class="home-address-history-remove-btn"
+                                            data-home-address-history-id="{{ history_item.id }}"
+                                            onclick="return removeHomeAddressHistoryEntry(this);">
+                                        Remove
+                                    </button>
+                                </div>
+                                <div class="home-address-history-status" aria-live="polite"></div>
+                            </li>
+                        {% endfor %}
+                    </ol>
+                    <div class="home-address-history-empty"
+                         data-home-address-history-empty
+                         {% if address_history %}hidden{% endif %}>
+                        No saved addresses yet.
+                    </div>
                 </div>
             </div>
 

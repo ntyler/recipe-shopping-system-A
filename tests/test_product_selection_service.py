@@ -2875,6 +2875,64 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertEqual(record["validation_summary"]["rejected"], 1)
         self.assertTrue(any(stage["name"] == "Validation Layer" for stage in record["agent_stages"]))
 
+    def test_product_choice_for_store_uses_store_specific_alternatives(self):
+        aldi_best = candidate("Aldi Cilantro")
+        aldi_best.update({
+            "id": "aldi-best",
+            "store_key": "aldi",
+            "store_name": "Aldi",
+            "price": "$0.89",
+        })
+        aldi_alt = candidate("Organic Cilantro")
+        aldi_alt.update({
+            "id": "aldi-alt",
+            "product_name": "Organic Cilantro",
+            "store_name": "Aldi",
+            "price": "$1.19",
+        })
+        aldi_rejected = candidate("Cilantro Lime Dressing")
+        aldi_rejected.update({
+            "id": "aldi-rejected",
+            "store_key": "aldi",
+            "store_name": "Aldi",
+            "viable": False,
+            "price": "$3.49",
+        })
+        meijer_alt = candidate("Meijer Cilantro")
+        meijer_alt.update({
+            "id": "meijer-alt",
+            "store_key": "meijer",
+            "store_name": "Meijer",
+            "price": "$1.09",
+        })
+        choice = {
+            "item_key": "cilantro",
+            "ingredient": "cilantro",
+            "candidates": [meijer_alt],
+            "alternatives": [meijer_alt],
+            "store_results": {
+                "aldi": {
+                    "store_key": "aldi",
+                    "store_name": "Aldi",
+                    "best_product_id": "aldi-best",
+                    "best_product": aldi_best,
+                    "alternative_products": [aldi_best, aldi_alt],
+                    "valid_alternatives": [aldi_best, aldi_alt],
+                    "rejected_products": [aldi_rejected],
+                }
+            },
+        }
+
+        filtered = product_service.product_choice_for_store(choice, "aldi")
+
+        self.assertEqual(filtered["filtered_store_name"], "Aldi")
+        self.assertEqual(filtered["selected_product_id"], "aldi-best")
+        self.assertEqual(filtered["selected_product"]["product_name"], "Aldi Cilantro")
+        self.assertTrue(all(item["store_key"] == "aldi" for item in filtered["candidates"]))
+        self.assertEqual([item["id"] for item in filtered["valid_alternatives"]], ["aldi-best", "aldi-alt"])
+        self.assertEqual(filtered["rejected_products"][0]["id"], "aldi-rejected")
+        self.assertFalse(any(item["id"] == "meijer-alt" for item in filtered["alternative_products"]))
+
     def test_product_results_file_is_written_with_hybrid_schema(self):
         with TemporaryDirectory() as tmp_dir:
             choices_file = Path(tmp_dir) / "product_choices.json"
