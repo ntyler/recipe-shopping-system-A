@@ -1,4 +1,5 @@
 import json
+from time import perf_counter
 
 from flask import Blueprint
 from flask import abort
@@ -38,11 +39,13 @@ from PushShoppingList.services.recipe_edit_service import estimate_recipe_nutrit
 from PushShoppingList.services.recipe_edit_service import generate_recipe_equipment_image
 from PushShoppingList.services.recipe_edit_service import generate_recipe_step_image
 from PushShoppingList.services.recipe_edit_service import load_editable_recipe
+from PushShoppingList.services.recipe_edit_service import log_recipe_pdf_timing
 from PushShoppingList.services.recipe_edit_service import recipe_note_feedback
 from PushShoppingList.services.recipe_edit_service import save_editable_recipe
 from PushShoppingList.services.recipe_edit_service import save_recipe_cover_image_upload
 from PushShoppingList.services.recipe_edit_service import save_recipe_detail_image_upload
 from PushShoppingList.services.recipe_edit_service import create_source_url_pdf
+from PushShoppingList.services.recipe_edit_service import ensure_recipe_pdf_cloudflare_link
 from PushShoppingList.services.recipe_edit_service import upload_recipe_pdf_to_cloudflare
 from PushShoppingList.services.recipe_image_progress_service import load_recipe_image_progress
 from PushShoppingList.services.recipe_ingredient_service import remove_recipe_and_unused_ingredients
@@ -545,6 +548,35 @@ def api_upload_recipe_pdf_to_cloudflare_route():
     return jsonify(result), status
 
 
+@recipe_bp.route("/recipe_pdf_link", methods=["GET"])
+def recipe_pdf_link_route():
+    url = str(request.args.get("url", "") or "").strip()
+
+    if not url:
+        return jsonify({
+            "success": False,
+            "cached": False,
+            "public_url": "",
+            "error": "Recipe URL is required.",
+        }), 400
+
+    result = ensure_recipe_pdf_cloudflare_link(url, allow_local_fallback=False)
+    public_url = str(result.get("public_url") or result.get("pdf_public_url") or "").strip()
+    success = bool(result.get("success") and public_url)
+    status = 200 if success else 400
+
+    return jsonify({
+        "success": success,
+        "cached": bool(result.get("cached")),
+        "public_url": public_url,
+        "r2_object_key": result.get("r2_object_key") or result.get("pdf_object_key") or "",
+        "uploaded_at": result.get("uploaded_at") or result.get("pdf_uploaded_at") or "",
+        "cloud_status": result.get("cloud_status") or ("uploaded" if success else ""),
+        "timings": result.get("timings", {}),
+        "error": "" if success else result.get("error", "Unable to prepare Cloudflare PDF link."),
+    }), status
+
+
 @recipe_bp.route("/recipe_archive_pdf", methods=["GET"])
 def recipe_archive_pdf_route():
     url = str(request.args.get("url", "") or "").strip()
@@ -558,17 +590,41 @@ def recipe_archive_pdf_route():
         if not is_admin_user(user):
             return Response("Admin access is required to download local recipe PDFs.", status=403)
 
+        pdf_path = recipe_archive_pdf_path(url)
+
+        if not pdf_path.exists():
+            abort(404)
+
+        return send_file(
+            pdf_path,
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name=pdf_path.name,
+        )
+
+    result = ensure_recipe_pdf_cloudflare_link(url, allow_local_fallback=True)
+    public_url = str(result.get("public_url") or result.get("pdf_public_url") or "").strip()
+
+    if result.get("success") and public_url:
+        timings = result.get("timings", {})
+        redirect_start = perf_counter()
+        response = redirect(public_url)
+        timings["redirect_ms"] = round((perf_counter() - redirect_start) * 1000, 2)
+        log_recipe_pdf_timing("redirect", url, timings)
+
+        return response
+
     pdf_path = recipe_archive_pdf_path(url)
 
-    if not pdf_path.exists():
-        abort(404)
+    if pdf_path.exists():
+        return send_file(
+            pdf_path,
+            mimetype="application/pdf",
+            as_attachment=False,
+            download_name=pdf_path.name,
+        )
 
-    return send_file(
-        pdf_path,
-        mimetype="application/pdf",
-        as_attachment=wants_download,
-        download_name=pdf_path.name,
-    )
+    abort(404)
 
 
 @recipe_bp.route("/recipe_cover_image", methods=["GET"])

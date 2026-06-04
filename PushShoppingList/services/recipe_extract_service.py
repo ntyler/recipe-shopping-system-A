@@ -262,14 +262,20 @@ def attach_cloudflare_pdf_metadata(recipe_url, json_data, upload_result, pdf_pat
     if not object_key or not public_url:
         return json_data
 
+    uploaded_at = utc_iso_now()
     pdf_metadata = json_data.get("pdf") if isinstance(json_data.get("pdf"), dict) else {}
     pdf_metadata["local_path"] = str(pdf_path or recipe_archive_pdf_path(recipe_url))
+    pdf_metadata["r2_object_key"] = object_key
+    pdf_metadata["r2_public_url"] = public_url
+    pdf_metadata["uploaded_at"] = uploaded_at
+    pdf_metadata["cloud_status"] = "uploaded"
     pdf_metadata["cloudflare_r2"] = {
         "provider": "cloudflare_r2",
         "bucket": str(upload_result.get("bucket") or os.getenv("R2_BUCKET_NAME", "")).strip(),
         "object_key": object_key,
         "public_url": public_url,
-        "uploaded_at": utc_iso_now(),
+        "uploaded_at": uploaded_at,
+        "cloud_status": "uploaded",
     }
     json_data["pdf"] = pdf_metadata
 

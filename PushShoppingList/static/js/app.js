@@ -5577,7 +5577,7 @@ async function copyPdfCloudflareLink(button) {
     );
 
     if (!publicUrl) {
-        setPdfShareStatus(row, "Upload to Cloudflare first.", true);
+        setPdfShareStatus(row, "Cloudflare link is not ready yet.", true);
         return false;
     }
 
@@ -5589,7 +5589,7 @@ async function copyPdfCloudflareLink(button) {
             document.execCommand("copy");
         }
 
-        setPdfShareStatus(row, "PDF link copied.");
+        setPdfShareStatus(row, "Cloudflare link copied.");
     } catch (err) {
         console.warn("Unable to copy Cloudflare PDF link.", err);
         if (input) {
@@ -10391,8 +10391,8 @@ async function saveRecipeEditor(event) {
         );
 
         if (shouldCreatePdf) {
-            updateRecipeSaveProgressItem(pdfProgressIndex, "running", "Creating...");
-            setRecipeEditStatus("Creating PDF...");
+            updateRecipeSaveProgressItem(pdfProgressIndex, "running", "Generating...");
+            setRecipeEditStatus("Generating PDF...");
             const pdfData = await createRecipePdfForSource(sourceUrl);
             recipeForEditor = {
                 ...(recipeForEditor || {}),
@@ -10404,7 +10404,7 @@ async function saveRecipeEditor(event) {
                 pdf_object_key: pdfData.pdf_object_key || "",
                 pdf_uploaded_at: pdfData.pdf_uploaded_at || "",
             };
-            updateRecipeSaveProgressItem(pdfProgressIndex, "done", "Created");
+            updateRecipeSaveProgressItem(pdfProgressIndex, "done", pdfData.pdf_public_url ? "Cloud ready" : "Created");
         }
 
         updateRecipeSaveProgressItem(refreshProgressIndex, "running", "Refreshing...");
@@ -10415,7 +10415,7 @@ async function saveRecipeEditor(event) {
         updateRecipeSaveProgressItem(refreshProgressIndex, "done", "Refreshed");
         setRecipeSaveProgressSummary(
             shouldCreatePdf
-                ? "Recipe saved, PDF created, and page values refreshed."
+                ? "Recipe saved, cloud PDF ready, and page values refreshed."
                 : "Recipe saved and page values refreshed."
         );
         setRecipeSaveProgressActionsState("done");
@@ -10465,7 +10465,7 @@ function recipeEditorHasChanges(recipe) {
 
 async function createRecipeEditorPdf(button) {
     const originalText = button ? button.textContent : "";
-    let statusMessage = "PDF created.";
+    let statusMessage = "Cloud PDF ready.";
     let finalPdfData = null;
 
     if (button) {
@@ -10500,7 +10500,7 @@ async function createRecipeEditorPdf(button) {
             populateRecipeEditor(saveData.recipe, sourceUrl);
         }
 
-        setRecipeEditStatus("Creating PDF...");
+        setRecipeEditStatus("Generating PDF...");
         const pdfData = await createRecipePdfForSource(sourceUrl);
         finalPdfData = pdfData;
 
@@ -10513,7 +10513,7 @@ async function createRecipeEditorPdf(button) {
                         ...finalPdfData,
                         ...uploadData,
                     };
-                    statusMessage = "PDF created and uploaded to Cloudflare.";
+                    statusMessage = "Cloud PDF ready.";
                 } else {
                     statusMessage = "PDF created, but Cloudflare upload was not completed.";
                 }
@@ -10521,9 +10521,9 @@ async function createRecipeEditorPdf(button) {
                 statusMessage = `PDF created, but automatic Cloudflare upload failed: ${uploadError.message || "Unknown error"}`;
             }
         } else if (pdfData.already_exists) {
-            statusMessage = "PDF loaded from existing Cloudflare copy.";
+            statusMessage = "Cloud PDF ready.";
         } else {
-            statusMessage = "PDF created and Cloudflare link is ready.";
+            statusMessage = "Cloud PDF ready.";
         }
 
         updateRecipeEditorPdfControls({
@@ -10657,8 +10657,8 @@ async function uploadRecipeEditorPdfToCloudflare(button) {
     try {
         setRecipeEditStatus("Uploading PDF to Cloudflare...");
         const data = await uploadRecipeEditorPdfToCloudflareWithSource(sourceUrl);
-        setRecipeEditStatus(data.already_exists ? "Cloudflare PDF link saved." : "PDF uploaded to Cloudflare.");
-        showRecipeQuantityUpdatedMessage("", "", "", data.already_exists ? "Cloudflare PDF link saved." : "PDF uploaded to Cloudflare.");
+        setRecipeEditStatus("Cloud PDF ready.");
+        showRecipeQuantityUpdatedMessage("", "", "", "Cloud PDF ready.");
         return false;
     } catch (err) {
         console.warn("Unable to upload recipe PDF to Cloudflare.", err);
@@ -10681,7 +10681,7 @@ async function copyRecipeEditorPdfLink(button) {
     );
 
     if (!publicUrl) {
-        setRecipeEditStatus("Upload to Cloudflare first.", true);
+        setRecipeEditStatus("Cloud PDF link is not ready yet.", true);
         return false;
     }
 
@@ -10693,7 +10693,7 @@ async function copyRecipeEditorPdfLink(button) {
             document.execCommand("copy");
         }
 
-        setRecipeEditStatus("PDF link copied.");
+        setRecipeEditStatus("Cloudflare link copied.");
     } catch (err) {
         console.warn("Unable to copy recipe PDF link.", err);
         if (publicUrlInput) {

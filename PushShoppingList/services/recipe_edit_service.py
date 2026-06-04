@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime
 from datetime import timezone
 from pathlib import Path
+from time import perf_counter
 from urllib.parse import quote
 from urllib.parse import urlparse
 
@@ -258,6 +259,8 @@ def editable_recipe_pdf_info(url, recipe_data=None):
     pdf_path = recipe_archive_pdf_path(url)
     metadata = normalize_recipe_pdf_storage_metadata(recipe_data or load_recipe_output(url) or {})
     public_url = metadata.get("public_url", "")
+    if not is_shareable_pdf_public_url(public_url):
+        public_url = ""
 
     return {
         "path": str(pdf_path),
@@ -284,12 +287,30 @@ def normalize_recipe_pdf_storage_metadata(recipe_data):
     recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
     pdf_metadata = recipe_data.get("pdf") if isinstance(recipe_data.get("pdf"), dict) else {}
     r2_metadata = pdf_metadata.get("cloudflare_r2") if isinstance(pdf_metadata.get("cloudflare_r2"), dict) else {}
+    object_key = (
+        str(pdf_metadata.get("r2_object_key") or "").strip()
+        or str(r2_metadata.get("object_key") or "").strip()
+    )
+    public_url = (
+        str(pdf_metadata.get("r2_public_url") or "").strip()
+        or str(r2_metadata.get("public_url") or "").strip()
+    )
+    uploaded_at = (
+        str(pdf_metadata.get("uploaded_at") or "").strip()
+        or str(r2_metadata.get("uploaded_at") or "").strip()
+    )
+    cloud_status = (
+        str(pdf_metadata.get("cloud_status") or "").strip()
+        or str(r2_metadata.get("cloud_status") or "").strip()
+        or ("uploaded" if object_key and public_url and uploaded_at else "")
+    )
 
     return {
         "local_path": str(pdf_metadata.get("local_path") or "").strip(),
-        "object_key": str(r2_metadata.get("object_key") or "").strip(),
-        "public_url": str(r2_metadata.get("public_url") or "").strip(),
-        "uploaded_at": str(r2_metadata.get("uploaded_at") or "").strip(),
+        "object_key": object_key,
+        "public_url": public_url,
+        "uploaded_at": uploaded_at,
+        "cloud_status": cloud_status,
         "bucket": str(r2_metadata.get("bucket") or "").strip(),
     }
 
@@ -320,14 +341,20 @@ def save_recipe_pdf_storage_metadata(url, upload_result, local_pdf_path=None):
             "error": "Cloudflare R2 upload metadata is incomplete.",
         }
 
+    uploaded_at = utc_iso_now()
     pdf_metadata = recipe_data.get("pdf") if isinstance(recipe_data.get("pdf"), dict) else {}
     pdf_metadata["local_path"] = str(local_pdf_path or recipe_archive_pdf_path(url))
+    pdf_metadata["r2_object_key"] = object_key
+    pdf_metadata["r2_public_url"] = public_url
+    pdf_metadata["uploaded_at"] = uploaded_at
+    pdf_metadata["cloud_status"] = "uploaded"
     pdf_metadata["cloudflare_r2"] = {
         "provider": "cloudflare_r2",
         "bucket": str(upload_result.get("bucket") or os.getenv("R2_BUCKET_NAME", "")).strip(),
         "object_key": object_key,
         "public_url": public_url,
-        "uploaded_at": utc_iso_now(),
+        "uploaded_at": uploaded_at,
+        "cloud_status": "uploaded",
     }
     recipe_data["pdf"] = pdf_metadata
     save_recipe_output(url, recipe_data)
@@ -370,7 +397,7 @@ def recipe_pdf_storage_metadata_for_filename(pdf_filename):
     recipe_data = load_recipe_output(source_url) or {}
     metadata = normalize_recipe_pdf_storage_metadata(recipe_data)
 
-    if not metadata.get("public_url"):
+    if not is_shareable_pdf_public_url(metadata.get("public_url", "")):
         return {}
 
     return {
@@ -397,7 +424,7 @@ def list_recipe_pdf_storage_metadata():
         public_url = metadata.get("public_url", "")
         object_key = metadata.get("object_key", "")
 
-        if not source_url or not public_url:
+        if not source_url or not is_shareable_pdf_public_url(public_url):
             continue
 
         filename = (
@@ -417,6 +444,134 @@ def list_recipe_pdf_storage_metadata():
 
 def cloudflare_upload_success(upload_result):
     return bool(upload_result and (upload_result.get("ok") or upload_result.get("code") == "duplicate_object"))
+
+
+def recipe_pdf_timing_ms(start):
+    return round((perf_counter() - start) * 1000, 2)
+
+
+def recipe_pdf_timing_log():
+    return {
+        "cache_lookup_ms": 0,
+        "pdf_generation_ms": 0,
+        "r2_upload_ms": 0,
+        "redirect_ms": 0,
+    }
+
+
+def log_recipe_pdf_timing(action, url, timings):
+    timings = timings if isinstance(timings, dict) else {}
+    print(
+        "[recipe_pdf] "
+        f"action={action} "
+        f"url={url} "
+        f"cache_lookup_ms={timings.get('cache_lookup_ms', 0)} "
+        f"pdf_generation_ms={timings.get('pdf_generation_ms', 0)} "
+        f"r2_upload_ms={timings.get('r2_upload_ms', 0)} "
+        f"redirect_ms={timings.get('redirect_ms', 0)}"
+    )
+
+
+def is_app_tunnel_or_local_url(url):
+    parsed = urlparse(str(url or "").strip())
+    hostname = (parsed.hostname or "").lower()
+
+    return (
+        hostname in {"127.0.0.1", "localhost", "::1"}
+        or hostname.endswith(".trycloudflare.com")
+    )
+
+
+def is_shareable_pdf_public_url(url):
+    parsed = urlparse(str(url or "").strip())
+
+    return (
+        parsed.scheme in {"http", "https"}
+        and bool(parsed.netloc)
+        and not is_app_tunnel_or_local_url(url)
+    )
+
+
+def cloudflare_metadata_is_uploaded(metadata):
+    metadata = metadata if isinstance(metadata, dict) else {}
+
+    return (
+        metadata.get("cloud_status") == "uploaded"
+        and bool(metadata.get("object_key"))
+        and bool(metadata.get("uploaded_at"))
+        and is_shareable_pdf_public_url(metadata.get("public_url"))
+    )
+
+
+def recipe_pdf_cloudflare_result(url, metadata, cached, pdf_path=None, timings=None):
+    metadata = metadata if isinstance(metadata, dict) else {}
+    path = Path(pdf_path) if pdf_path else recipe_archive_pdf_path(url)
+
+    return {
+        "ok": True,
+        "success": True,
+        "cached": bool(cached),
+        "url": url,
+        "public_url": metadata.get("public_url", ""),
+        "pdf_public_url": metadata.get("public_url", ""),
+        "r2_public_url": metadata.get("public_url", ""),
+        "pdf_object_key": metadata.get("object_key", ""),
+        "r2_object_key": metadata.get("object_key", ""),
+        "pdf_uploaded_at": metadata.get("uploaded_at", ""),
+        "uploaded_at": metadata.get("uploaded_at", ""),
+        "cloud_status": metadata.get("cloud_status", "uploaded"),
+        "pdf_path": str(path),
+        "pdf_available": True,
+        "pdf_local_available": path.exists(),
+        "timings": timings or recipe_pdf_timing_log(),
+    }
+
+
+def cached_recipe_pdf_cloudflare_result(url, timings=None):
+    recipe_data = load_recipe_output(url) or {}
+    metadata = normalize_recipe_pdf_storage_metadata(recipe_data)
+
+    if not cloudflare_metadata_is_uploaded(metadata):
+        return None
+
+    return recipe_pdf_cloudflare_result(url, metadata, cached=True, timings=timings)
+
+
+def existing_r2_recipe_pdf_result(url, timings=None):
+    if not cloudflare_r2_storage.has_required_r2_config():
+        return None
+
+    pdf_path = recipe_archive_pdf_path(url)
+
+    try:
+        object_key = cloudflare_r2_storage.object_key_for_pdf(pdf_path)
+        public_url = cloudflare_r2_storage.get_public_url(object_key)
+        if not cloudflare_r2_storage.object_exists(object_key):
+            return None
+    except Exception as exc:
+        print(f"[recipe_pdf] R2 cache probe failed for {url}: {exc}")
+        return None
+
+    upload_result = {
+        "ok": True,
+        "object_key": object_key,
+        "public_url": public_url,
+        "bucket": os.getenv("R2_BUCKET_NAME", "").strip(),
+    }
+    metadata_result = save_recipe_pdf_storage_metadata(url, upload_result, pdf_path)
+    metadata = (
+        metadata_result.get("metadata", {})
+        if metadata_result.get("ok")
+        else {
+            "local_path": str(pdf_path),
+            "object_key": object_key,
+            "public_url": public_url,
+            "uploaded_at": utc_iso_now(),
+            "cloud_status": "uploaded",
+        }
+    )
+
+    return recipe_pdf_cloudflare_result(url, metadata, cached=True, timings=timings)
 
 
 def delete_uploaded_local_pdf_if_configured(pdf_path):
@@ -456,17 +611,24 @@ def upload_local_pdf_path_to_cloudflare(local_pdf_path, url=""):
     deleted_local_pdf, delete_warning = delete_uploaded_local_pdf_if_configured(path)
     public_url = str(upload_result.get("public_url") or "").strip()
     object_key = str(upload_result.get("object_key") or "").strip()
+    uploaded_at = utc_iso_now()
 
     return {
         "ok": True,
         "success": True,
         "url": str(url or ""),
+        "cached": upload_result.get("code") == "duplicate_object",
         "pdf_path": str(path),
         "pdf_available": path.exists() or bool(public_url),
         "pdf_local_available": path.exists(),
+        "public_url": public_url,
+        "r2_public_url": public_url,
         "pdf_public_url": public_url,
+        "r2_object_key": object_key,
         "pdf_object_key": object_key,
-        "pdf_uploaded_at": utc_iso_now(),
+        "pdf_uploaded_at": uploaded_at,
+        "uploaded_at": uploaded_at,
+        "cloud_status": "uploaded",
         "deleted_local_pdf": deleted_local_pdf,
         "delete_warning": delete_warning,
         "already_exists": upload_result.get("code") == "duplicate_object",
@@ -489,17 +651,23 @@ def upload_recipe_pdf_to_cloudflare(url):
     existing_metadata = normalize_recipe_pdf_storage_metadata(recipe_data)
 
     if not pdf_path.exists():
-        if existing_metadata.get("public_url"):
+        if cloudflare_metadata_is_uploaded(existing_metadata):
             return {
                 "ok": True,
                 "success": True,
+                "cached": True,
                 "url": url,
                 "pdf_path": str(pdf_path),
                 "pdf_available": True,
                 "pdf_local_available": False,
+                "public_url": existing_metadata.get("public_url", ""),
+                "r2_public_url": existing_metadata.get("public_url", ""),
                 "pdf_public_url": existing_metadata.get("public_url", ""),
+                "r2_object_key": existing_metadata.get("object_key", ""),
                 "pdf_object_key": existing_metadata.get("object_key", ""),
                 "pdf_uploaded_at": existing_metadata.get("uploaded_at", ""),
+                "uploaded_at": existing_metadata.get("uploaded_at", ""),
+                "cloud_status": existing_metadata.get("cloud_status", "uploaded"),
                 "already_exists": True,
                 "cloudflare_upload": {
                     "ok": True,
@@ -533,9 +701,17 @@ def attach_cloudflare_pdf_result(result, upload_result):
         return result
 
     result["cloudflare_upload"] = upload_result.get("cloudflare_upload", upload_result)
-    result["pdf_public_url"] = upload_result.get("pdf_public_url", "")
-    result["pdf_object_key"] = upload_result.get("pdf_object_key", "")
-    result["pdf_uploaded_at"] = upload_result.get("pdf_uploaded_at", "")
+    public_url = upload_result.get("pdf_public_url", "") or upload_result.get("public_url", "")
+    object_key = upload_result.get("pdf_object_key", "") or upload_result.get("r2_object_key", "") or upload_result.get("object_key", "")
+    uploaded_at = upload_result.get("uploaded_at", "") or upload_result.get("pdf_uploaded_at", "")
+    result["public_url"] = public_url
+    result["r2_public_url"] = result["public_url"]
+    result["pdf_public_url"] = public_url
+    result["r2_object_key"] = object_key
+    result["pdf_object_key"] = object_key
+    result["pdf_uploaded_at"] = uploaded_at
+    result["uploaded_at"] = uploaded_at
+    result["cloud_status"] = upload_result.get("cloud_status", "")
     result["pdf_local_available"] = upload_result.get("pdf_local_available", result.get("pdf_local_available", False))
     result["pdf_available"] = upload_result.get("pdf_available", result.get("pdf_available", False))
     result["deleted_local_pdf"] = upload_result.get("deleted_local_pdf", False)
@@ -596,7 +772,7 @@ def extract_recipe_info_from_saved_text(url):
         return {}
 
 
-def create_editable_recipe_pdf(url):
+def generate_editable_recipe_pdf_file(url):
     url = str(url or "").strip()
 
     if not url:
@@ -620,7 +796,6 @@ def create_editable_recipe_pdf(url):
     )
     pdf_path = recipe_archive_pdf_path(url)
     saved_path = write_recipe_page_pdf(url, html_text, None, pdf_path)
-    upload_result = maybe_upload_generated_recipe_pdf_to_cloudflare(url, saved_path)
     result = {
         "ok": True,
         "url": url,
@@ -629,17 +804,17 @@ def create_editable_recipe_pdf(url):
         "pdf_local_available": Path(saved_path).exists(),
     }
 
-    return attach_cloudflare_pdf_result(result, upload_result)
+    return result
 
 
-def create_source_url_pdf(url):
+def generate_source_url_pdf_file(url):
     url = str(url or "").strip()
 
     if not url:
         return {"ok": False, "error": "Source URL is required."}
 
     if not is_web_source_url(url):
-        return create_editable_recipe_pdf(url)
+        return generate_editable_recipe_pdf_file(url)
 
     try:
         fetch_recipe_page(url)
@@ -651,17 +826,122 @@ def create_source_url_pdf(url):
         }
 
     pdf_path = recipe_archive_pdf_path(url)
-    upload_result = maybe_upload_generated_recipe_pdf_to_cloudflare(url, pdf_path) if pdf_path.exists() else None
     result = {
-        "ok": pdf_path.exists() or bool(upload_result and upload_result.get("pdf_public_url")),
+        "ok": pdf_path.exists(),
         "url": url,
         "pdf_path": str(pdf_path),
-        "pdf_available": pdf_path.exists() or bool(upload_result and upload_result.get("pdf_public_url")),
+        "pdf_available": pdf_path.exists(),
         "pdf_local_available": pdf_path.exists(),
-        "error": None if pdf_path.exists() or bool(upload_result and upload_result.get("pdf_public_url")) else "PDF file was not created.",
+        "error": None if pdf_path.exists() else "PDF file was not created.",
     }
 
-    return attach_cloudflare_pdf_result(result, upload_result)
+    return result
+
+
+def ensure_recipe_pdf_cloudflare_link(url, allow_local_fallback=True):
+    url = str(url or "").strip()
+    timings = recipe_pdf_timing_log()
+
+    if not url:
+        return {
+            "ok": False,
+            "success": False,
+            "cached": False,
+            "error": "Recipe URL is required.",
+            "timings": timings,
+        }
+
+    cache_start = perf_counter()
+    cached_result = cached_recipe_pdf_cloudflare_result(url, timings=timings)
+    timings["cache_lookup_ms"] = recipe_pdf_timing_ms(cache_start)
+
+    if cached_result:
+        cached_result["timings"] = timings
+        log_recipe_pdf_timing("cache_hit", url, timings)
+        return cached_result
+
+    r2_probe_start = perf_counter()
+    existing_r2_result = existing_r2_recipe_pdf_result(url, timings=timings)
+    timings["cache_lookup_ms"] += recipe_pdf_timing_ms(r2_probe_start)
+
+    if existing_r2_result:
+        existing_r2_result["timings"] = timings
+        log_recipe_pdf_timing("r2_object_hit", url, timings)
+        return existing_r2_result
+
+    pdf_path = recipe_archive_pdf_path(url)
+    local_result = {
+        "ok": True,
+        "url": url,
+        "pdf_path": str(pdf_path),
+        "pdf_available": pdf_path.exists(),
+        "pdf_local_available": pdf_path.exists(),
+    }
+
+    if not pdf_path.exists():
+        generation_start = perf_counter()
+        local_result = generate_source_url_pdf_file(url) if is_web_source_url(url) else generate_editable_recipe_pdf_file(url)
+        timings["pdf_generation_ms"] = recipe_pdf_timing_ms(generation_start)
+
+        if not local_result.get("ok"):
+            post_generation_cached_result = cached_recipe_pdf_cloudflare_result(url, timings=timings)
+            if post_generation_cached_result:
+                post_generation_cached_result["cached"] = False
+                post_generation_cached_result["timings"] = timings
+                log_recipe_pdf_timing("generated_cached_upload", url, timings)
+                return post_generation_cached_result
+
+            local_result["success"] = False
+            local_result["cached"] = False
+            local_result["timings"] = timings
+            log_recipe_pdf_timing("generation_failed", url, timings)
+            return local_result
+
+        pdf_path = Path(local_result.get("pdf_path") or recipe_archive_pdf_path(url))
+
+    if cloudflare_r2_storage.has_any_r2_config():
+        upload_start = perf_counter()
+        upload_result = upload_local_pdf_path_to_cloudflare(pdf_path, url=url)
+        timings["r2_upload_ms"] = recipe_pdf_timing_ms(upload_start)
+        upload_result["cached"] = upload_result.get("already_exists", False)
+        upload_result["timings"] = timings
+
+        if upload_result.get("ok") and upload_result.get("pdf_public_url"):
+            log_recipe_pdf_timing("uploaded", url, timings)
+            return upload_result
+
+        if not allow_local_fallback:
+            upload_result["success"] = False
+            log_recipe_pdf_timing("upload_failed", url, timings)
+            return upload_result
+
+        local_result["cloudflare_upload"] = upload_result.get("cloudflare_upload", upload_result)
+        local_result["error"] = upload_result.get("error", "Unable to upload PDF to Cloudflare R2.")
+    else:
+        local_result["error"] = "Cloudflare R2 is not configured; using local PDF fallback."
+
+    local_result.update({
+        "success": False,
+        "cached": False,
+        "public_url": "",
+        "r2_public_url": "",
+        "pdf_public_url": "",
+        "cloud_status": "local_only",
+        "pdf_available": pdf_path.exists(),
+        "pdf_local_available": pdf_path.exists(),
+        "timings": timings,
+    })
+    log_recipe_pdf_timing("local_fallback", url, timings)
+
+    return local_result
+
+
+def create_editable_recipe_pdf(url):
+    return ensure_recipe_pdf_cloudflare_link(url)
+
+
+def create_source_url_pdf(url):
+    return ensure_recipe_pdf_cloudflare_link(url)
 
 
 def is_web_source_url(url):

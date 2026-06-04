@@ -71,6 +71,8 @@ from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_
 from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_path
 from PushShoppingList.services.recipe_extract_service import recipe_scaling_from_data
 from PushShoppingList.services.recipe_extract_service import scaling_multiplier_label
+from PushShoppingList.services.recipe_edit_service import is_shareable_pdf_public_url
+from PushShoppingList.services.recipe_edit_service import normalize_recipe_pdf_storage_metadata
 from PushShoppingList.services.product_selection_service import product_choices_by_item
 from PushShoppingList.services.product_selection_service import store_price_cells_for_item
 from PushShoppingList.services.rules_display_service import load_rules_display
@@ -240,10 +242,10 @@ def section_counts(items):
 
 def recipe_pdf_public_url(recipe_url):
     recipe_data = load_saved_recipe_output(recipe_url)
-    pdf_metadata = recipe_data.get("pdf") if isinstance(recipe_data.get("pdf"), dict) else {}
-    cloudflare_data = pdf_metadata.get("cloudflare_r2") if isinstance(pdf_metadata.get("cloudflare_r2"), dict) else {}
+    metadata = normalize_recipe_pdf_storage_metadata(recipe_data)
+    public_url = str(metadata.get("public_url") or "").strip()
 
-    return str(cloudflare_data.get("public_url") or "").strip()
+    return public_url if is_shareable_pdf_public_url(public_url) else ""
 
 
 def recipe_view_rows(recipe_urls):
