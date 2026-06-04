@@ -1,3 +1,5 @@
+from flask import session
+
 from PushShoppingList.app import create_app
 from PushShoppingList.services import user_account_service as accounts
 
@@ -164,6 +166,54 @@ def test_local_admin_two_factor_unlock_defaults_to_admin_accounts(tmp_path, monk
     non_admin_user = accounts.find_user_by_id("freepdf")
     assert not accounts.two_factor_enabled(non_admin_user)
     assert non_admin_user["two_factor_disabled_by_admin_reason"] == "support-approved unlock"
+
+
+def test_firebase_resync_after_completed_two_factor_does_not_restart_challenge(tmp_path, monkeypatch):
+    monkeypatch.setattr(accounts, "USERS_FILE", tmp_path / "users.json")
+    accounts.save_users({
+        "users": [
+            firebase_user("freepdf", "freepdfjobsearch@gmail.com", "firebase-freepdf"),
+        ],
+    })
+    app = create_app()
+
+    with app.test_request_context("/auth/firebase-login"):
+        session["user_id"] = "freepdf"
+        session["firebase_uid"] = "firebase-freepdf"
+
+        result = accounts.sign_in_firebase_user({
+            "uid": "firebase-freepdf",
+            "email": "freepdfjobsearch@gmail.com",
+            "email_verified": True,
+        })
+
+        assert result["ok"]
+        assert not result.get("requires_2fa")
+        assert session.get("user_id") == "freepdf"
+        assert session.get("firebase_uid") == "firebase-freepdf"
+        assert session.get("pending_2fa_user_id") is None
+
+
+def test_firebase_resync_for_unsigned_session_still_requires_two_factor(tmp_path, monkeypatch):
+    monkeypatch.setattr(accounts, "USERS_FILE", tmp_path / "users.json")
+    accounts.save_users({
+        "users": [
+            firebase_user("freepdf", "freepdfjobsearch@gmail.com", "firebase-freepdf"),
+        ],
+    })
+    app = create_app()
+
+    with app.test_request_context("/auth/firebase-login"):
+        result = accounts.sign_in_firebase_user({
+            "uid": "firebase-freepdf",
+            "email": "freepdfjobsearch@gmail.com",
+            "email_verified": True,
+        })
+
+        assert result["ok"]
+        assert result["requires_2fa"]
+        assert session.get("user_id") is None
+        assert session.get("pending_2fa_user_id") == "freepdf"
 
 
 def test_two_factor_setup_confirmation_requires_explicit_new_setup_flag():

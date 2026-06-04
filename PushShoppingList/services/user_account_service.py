@@ -559,6 +559,10 @@ def sign_in_firebase_user(firebase_user, profile=None, trusted_device_token=""):
 
     session.pop("account_verification_link", None)
 
+    if signed_in_as_same_firebase_user(user, firebase_uid):
+        set_signed_in_session(user)
+        return {"ok": True, "created": created, "user": public_user(user)}
+
     if two_factor_enabled(user) and not verify_trusted_two_factor_device(user, trusted_device_token):
         session.permanent = True
         session.pop("user_id", None)
@@ -572,6 +576,19 @@ def sign_in_firebase_user(firebase_user, profile=None, trusted_device_token=""):
 
     set_signed_in_session(user)
     return {"ok": True, "created": created, "user": public_user(user)}
+
+
+def signed_in_as_same_firebase_user(user, firebase_uid):
+    if not has_request_context():
+        return False
+
+    session_user_id = str(session.get("user_id") or "")
+    session_firebase_uid = str(session.get("firebase_uid") or "")
+
+    if not session_user_id or session_user_id != str((user or {}).get("user_id") or ""):
+        return False
+
+    return not session_firebase_uid or session_firebase_uid == str(firebase_uid or "")
 
 
 def normalize_identity(value):
