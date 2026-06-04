@@ -43,10 +43,39 @@ def test_account_action_token_pages_stay_focused_and_visible():
     assert "function cancelAccountActionLink()" in script
 
 
-def test_two_factor_disable_uses_email_verification_link():
+def test_two_factor_disable_success_cleans_up_firebase_auto_sync():
+    route = (ROOT / "PushShoppingList/routes/account_routes.py").read_text(encoding="utf-8")
+    script = (ROOT / "PushShoppingList/static/js/firebase-auth.js").read_text(encoding="utf-8")
+
+    assert 'two_factor_disabled="1"' in route
+    assert "function needsPostTwoFactorDisableSignOut()" in script
+    assert "async function finishPostTwoFactorDisableSignOut()" in script
+    assert 'removeQueryParams(["two_factor_disabled"])' in script
+    assert "if (needsPostTwoFactorDisableSignOut())" in script
+
+
+def test_two_factor_panel_forms_return_to_panel_after_refresh():
+    route = (ROOT / "PushShoppingList/routes/account_routes.py").read_text(encoding="utf-8")
+    template = (ROOT / "PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")
+    script = (ROOT / "PushShoppingList/static/js/firebase-auth.js").read_text(encoding="utf-8")
+
+    assert "def two_factor_panel_redirect" in route
+    assert 'account_panel", "two_factor"' in route
+    assert '_anchor="accountTwoFactorPanel"' in route
+    assert 'request.args.get("account_panel") == "two_factor"' in template
+    assert "data-two-factor-return-form" in template
+    assert "TWO_FACTOR_PANEL_RETURN_KEY" in script
+    assert "scrollToPanel(\"auto\")" in script
+
+
+def test_two_factor_disable_has_code_and_email_recovery_paths():
     template = (ROOT / "PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")
 
+    assert "Use your authenticator app or a backup code to disable two-factor authentication now." in template
+    assert "action=\"{{ url_for('account_bp.disable_two_factor_route') }}\"" in template
+    assert "Authenticator or Backup Code" in template
+    assert "Disable Two-Factor Authentication</button>" in template
+    assert "Lost authenticator or backup codes?" in template
     assert "Email Disable Verification Link" in template
     assert "Email a one-time verification link to {{ current_user.email }}" in template
     assert "Disable Two-Factor Authentication for {{ two_factor_recovery_user.email }}" in template
-    assert "action=\"{{ url_for('account_bp.disable_two_factor_route') }}\"" not in template

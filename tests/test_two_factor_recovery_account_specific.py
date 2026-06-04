@@ -54,6 +54,7 @@ def test_two_factor_recovery_token_targets_owner_not_signed_in_session(tmp_path,
         )
 
         assert response.status_code == 302
+        assert "two_factor_disabled=1" in response.headers["Location"]
 
         payload = accounts.load_users()
         recovered_user = accounts.find_user_by_id_in_payload(payload, "freepdf")

@@ -60,6 +60,18 @@ def flash_account_result(result, success_message):
         flash(error, "error")
 
 
+def two_factor_panel_redirect(**values):
+    values.setdefault("account_panel", "two_factor")
+    return redirect(url_for("main_bp.index", **values, _anchor="accountTwoFactorPanel"))
+
+
+def two_factor_request_redirect():
+    if session.get("pending_2fa_user_id") and not session.get("user_id"):
+        return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+    return two_factor_panel_redirect()
+
+
 def json_account_result(result, success_status=200, error_status=400):
     if result.get("ok"):
         return jsonify({"success": True, **{key: value for key, value in result.items() if key != "ok"}}), success_status
@@ -329,20 +341,20 @@ def request_two_factor_recovery_route():
                     or "Two-factor disable verification email could not be sent. Check SMTP settings.",
                     "error",
                 )
-                return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+                return two_factor_request_redirect()
         else:
             session["two_factor_recovery_link"] = recovery_link
             flash(
                 "Email is not configured yet, so a local two-factor disable verification link is available below.",
                 "success",
             )
-            return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+            return two_factor_request_redirect()
 
         flash("A two-factor disable verification email has been sent.", "success")
     else:
         flash_account_result(result, "")
 
-    return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+    return two_factor_request_redirect()
 
 
 @account_bp.route("/account/2fa/recovery/<token>", methods=["GET"])
@@ -363,6 +375,11 @@ def complete_two_factor_recovery_route():
         session.pop("two_factor_recovery_link", None)
         recovered_user = result.get("user") or {}
         recovered_email = str(recovered_user.get("email") or "").strip()
+        response = make_response(redirect(url_for(
+            "main_bp.index",
+            two_factor_disabled="1",
+            _anchor="userAccountSection",
+        )))
         flash(
             (
                 f"Two-factor authentication disabled for {recovered_email}. "
@@ -629,7 +646,7 @@ def complete_account_delete_route():
 def start_two_factor_setup_route():
     result = start_two_factor_setup(session.get("user_id"))
     flash_account_result(result, "Two-factor setup started.")
-    return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+    return two_factor_panel_redirect()
 
 
 @account_bp.route("/account/2fa/enable", methods=["POST"])
@@ -643,14 +660,14 @@ def enable_two_factor_route():
         session["two_factor_backup_codes"] = result.get("backup_codes", [])
 
     flash_account_result(result, "Two-factor authentication enabled.")
-    return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+    return two_factor_panel_redirect()
 
 
 @account_bp.route("/account/2fa/cancel-setup", methods=["POST"])
 def cancel_two_factor_setup_route():
     result = cancel_two_factor_setup(session.get("user_id"))
     flash_account_result(result, "Two-factor setup canceled.")
-    return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+    return two_factor_panel_redirect()
 
 
 @account_bp.route("/account/2fa/disable", methods=["POST"])
@@ -661,7 +678,7 @@ def disable_two_factor_route():
         request.form.get("code"),
     )
     flash_account_result(result, "Two-factor authentication disabled.")
-    response = make_response(redirect(url_for("main_bp.index", _anchor="userAccountSection")))
+    response = make_response(two_factor_panel_redirect())
 
     if result.get("ok"):
         response.delete_cookie(TWO_FACTOR_TRUST_COOKIE)
@@ -681,4 +698,4 @@ def regenerate_two_factor_backup_codes_route():
         session["two_factor_backup_codes"] = result.get("backup_codes", [])
 
     flash_account_result(result, "Backup codes regenerated.")
-    return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+    return two_factor_panel_redirect()

@@ -88,6 +88,7 @@ if (missingFirebaseConfig(firebaseConfig)) {
 
 let backendSession = null;
 let explicitAuthInProgress = false;
+const TWO_FACTOR_PANEL_RETURN_KEY = "shoppingTwoFactorPanelReturn";
 
 function formValue(form, name) {
     return String((form.elements[name] || {}).value || "").trim();
@@ -231,6 +232,43 @@ function hasAccountActionToken() {
         || params.get("reset_token")
         || params.get("account_delete_token")
     );
+}
+
+function needsPostTwoFactorDisableSignOut() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("two_factor_disabled") === "1";
+}
+
+function removeQueryParams(names) {
+    const params = new URLSearchParams(window.location.search);
+    names.forEach((name) => params.delete(name));
+    const query = params.toString();
+    const nextUrl = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash || ""}`;
+    window.history.replaceState({}, document.title, nextUrl);
+}
+
+async function finishPostTwoFactorDisableSignOut() {
+    if (!auth || !needsPostTwoFactorDisableSignOut()) {
+        return false;
+    }
+
+    explicitAuthInProgress = true;
+
+    try {
+        await signOut(auth);
+    } catch (error) {
+        console.warn("Firebase sign-out after two-factor disable failed.", error);
+    }
+
+    try {
+        await logoutBackend();
+    } catch (error) {
+        console.warn("Backend sign-out after two-factor disable failed.", error);
+    }
+
+    removeQueryParams(["two_factor_disabled"]);
+    explicitAuthInProgress = false;
+    return true;
 }
 
 function handleFirebaseBackendLogin(result, form, successMessage) {
@@ -485,6 +523,16 @@ function bindTwoFactorPanel() {
         return;
     }
 
+    const scrollToPanel = (behavior = "smooth") => {
+        window.requestAnimationFrame(() => {
+            panel.scrollIntoView({ behavior, block: "start" });
+            const firstControl = panel.querySelector("[data-two-factor-close]");
+            if (firstControl) {
+                firstControl.focus({ preventScroll: true });
+            }
+        });
+    };
+
     document.querySelectorAll("[data-two-factor-open]").forEach((button) => {
         button.addEventListener("click", () => {
             panel.hidden = false;
@@ -495,20 +543,32 @@ function bindTwoFactorPanel() {
                 menu.open = false;
             }
 
-            window.requestAnimationFrame(() => {
-                panel.scrollIntoView({ behavior: "smooth", block: "start" });
-                const firstControl = panel.querySelector("[data-two-factor-close]");
-                if (firstControl) {
-                    firstControl.focus({ preventScroll: true });
-                }
-            });
+            scrollToPanel("smooth");
         });
     });
+
+    document.querySelectorAll("[data-two-factor-return-form]").forEach((form) => {
+        form.addEventListener("submit", () => {
+            window.sessionStorage.setItem(TWO_FACTOR_PANEL_RETURN_KEY, "1");
+        });
+    });
+
+    const shouldReturnToPanel = (
+        window.sessionStorage.getItem(TWO_FACTOR_PANEL_RETURN_KEY) === "1"
+        || new URLSearchParams(window.location.search).get("account_panel") === "two_factor"
+        || window.location.hash === "#accountTwoFactorPanel"
+    );
+
+    if (shouldReturnToPanel && !panel.hidden) {
+        window.sessionStorage.removeItem(TWO_FACTOR_PANEL_RETURN_KEY);
+        scrollToPanel("auto");
+    }
 
     const closeButton = panel.querySelector("[data-two-factor-close]");
     if (closeButton) {
         closeButton.addEventListener("click", () => {
             panel.hidden = true;
+            window.sessionStorage.removeItem(TWO_FACTOR_PANEL_RETURN_KEY);
         });
     }
 }
@@ -851,6 +911,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (auth) {
         bindFirebaseForms();
+        await finishPostTwoFactorDisableSignOut();
     } else {
         disableFirebaseAuthForms("Firebase Authentication could not be initialized.");
     }
@@ -865,6 +926,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 if (auth) {
     onAuthStateChanged(auth, async (firebaseUser) => {
         if (explicitAuthInProgress) {
+            return;
+        }
+
+        if (needsPostTwoFactorDisableSignOut()) {
             return;
         }
 

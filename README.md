@@ -242,8 +242,9 @@ Two-factor authentication is account-specific:
 - Setup uses an authenticator app secret, QR code when available, and one-time backup codes.
 - Sign-in can remember the browser for 30 days.
 - Backup-code regeneration requires an authenticator code or backup code.
-- Disabling two-factor authentication sends a one-time verification link to the account email. Two-factor authentication is disabled only after that link is opened and confirmed.
-- Disable links are tied to the account that requested the email. Opening the link should not switch to another signed-in account.
+- Normal disable requires an authenticator code or backup code.
+- If the user lost the authenticator app and backup codes, the recovery option sends a one-time disable verification link to the account email.
+- Email disable links are tied to the account that requested the email. Opening the link should not switch to another signed-in account.
 - Account action pages for password reset, two-factor disable verification, and account deletion should remain visible until the user completes the action or clicks cancel.
 
 ## Recipe PDF Sharing
@@ -493,15 +494,16 @@ Notifications are best treated as convenience alerts. The actual UI sync comes f
 16. Confirm email verification status is shown. If the email is already verified, the Account Menu item should read `Email Verified` and be disabled.
 17. Confirm Account Menu contains Account Settings, Change Password, Verify Email or Email Verified, Two-Factor Authentication, Push Notifications, Delete Account, and Sign Out.
 18. Confirm Account Settings can remove an uploaded logo/avatar and falls back to the Firebase/Google profile photo when available.
-19. Confirm two-factor authentication is account-specific. A disable verification link emailed to one user should disable only that user's two-factor settings.
-20. Confirm account action pages for password reset, two-factor disable verification, and account deletion do not collapse into a blank screen before the user completes or cancels the action.
-21. Confirm Push Notifications lives inside Account Menu and can enable, disable, send a test notification, and update preferences.
-22. Confirm signed-out users cannot manage protected sections.
-23. Confirm a signed-in admin user can create and upload a PDF to Cloudflare R2.
-24. Confirm Copy PDF Link copies an R2 URL.
-25. Confirm the copied PDF link does not contain localhost, 127.0.0.1, trycloudflare, or the app tunnel hostname.
-26. Confirm `/recipe_archive_pdf?url=<recipe_url>` redirects to the R2 public URL after the first generated upload.
-27. Confirm secrets, service account JSON files, and generated PDFs are not shown in `git status`.
+19. Confirm normal two-factor disable requires an authenticator code or backup code.
+20. Confirm two-factor authentication is account-specific. A disable verification link emailed to one user should disable only that user's two-factor settings.
+21. Confirm account action pages for password reset, two-factor disable verification, and account deletion do not collapse into a blank screen before the user completes or cancels the action.
+22. Confirm Push Notifications lives inside Account Menu and can enable, disable, send a test notification, and update preferences.
+23. Confirm signed-out users cannot manage protected sections.
+24. Confirm a signed-in admin user can create and upload a PDF to Cloudflare R2.
+25. Confirm Copy PDF Link copies an R2 URL.
+26. Confirm the copied PDF link does not contain localhost, 127.0.0.1, trycloudflare, or the app tunnel hostname.
+27. Confirm `/recipe_archive_pdf?url=<recipe_url>` redirects to the R2 public URL after the first generated upload.
+28. Confirm secrets, service account JSON files, and generated PDFs are not shown in `git status`.
 
 ## Important Data Files
 
