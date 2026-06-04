@@ -38,6 +38,8 @@ def test_account_settings_editor_has_header_close_and_closes_menu():
     assert ".user-account-edit-header" in css
     assert "function toggleUserProfileEditor(open = null)" in script
     assert 'document.querySelector("[data-account-menu]")' in script
+    assert "const isAlreadyOpen = !form.hidden" in script
+    assert "if (!explicitState && isAlreadyOpen)" in script
     assert "accountMenu.open = false" in script
 
 
@@ -55,6 +57,15 @@ def test_account_action_token_pages_stay_focused_and_visible():
     assert "function hasAccountActionToken()" in script
     assert 'setScreenPreviewMode("live", { persist: false })' in script
     assert "function cancelAccountActionLink()" in script
+
+
+def test_screen_preview_mode_resets_when_preview_controls_are_absent():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+
+    assert 'document.getElementById("screenSettingsCard")' in script
+    assert 'document.getElementById("screenPreviewStage")' in script
+    assert 'localStorage.setItem(SCREEN_PREVIEW_MODE_KEY, "live")' in script
+    assert 'setScreenPreviewMode("live", { persist: false })' in script
 
 
 def test_two_factor_disable_success_cleans_up_firebase_auto_sync():

@@ -442,15 +442,25 @@ function toggleUserProfileEditor(open = null) {
         return false;
     }
 
-    const shouldOpen = typeof open === "boolean" ? open : form.hidden;
-    form.hidden = !shouldOpen;
-
-    if (shouldOpen) {
-        const accountMenu = document.querySelector("[data-account-menu]");
-
+    const accountMenu = document.querySelector("[data-account-menu]");
+    const closeAccountMenu = () => {
         if (accountMenu) {
             accountMenu.open = false;
         }
+    };
+    const explicitState = typeof open === "boolean";
+    const isAlreadyOpen = !form.hidden;
+
+    if (!explicitState && isAlreadyOpen) {
+        closeAccountMenu();
+        return false;
+    }
+
+    const shouldOpen = explicitState ? open : true;
+    form.hidden = !shouldOpen;
+
+    if (shouldOpen) {
+        closeAccountMenu();
 
         document.querySelectorAll(
             "[data-push-notifications-panel], [data-two-factor-panel], [data-delete-account-panel]"
@@ -5249,6 +5259,12 @@ function restoreScreenSettings() {
     }
 
     if (hasAccountActionToken()) {
+        localStorage.setItem(SCREEN_PREVIEW_MODE_KEY, "live");
+        setScreenPreviewMode("live", { persist: false });
+        return;
+    }
+
+    if (!document.getElementById("screenSettingsCard") || !document.getElementById("screenPreviewStage")) {
         localStorage.setItem(SCREEN_PREVIEW_MODE_KEY, "live");
         setScreenPreviewMode("live", { persist: false });
         return;
