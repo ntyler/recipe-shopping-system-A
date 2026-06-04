@@ -92,6 +92,9 @@
             <div class="user-account-summary">
                 <div class="user-account-name">{{ current_user.username }}</div>
                 <div class="user-account-email">{{ current_user.email }}</div>
+                {% if current_user.phone %}
+                    <div class="user-account-phone">{{ current_user.phone }}</div>
+                {% endif %}
             </div>
 
             <div class="user-account-actions">
@@ -117,6 +120,10 @@
             <label>
                 <span>Email</span>
                 <input type="email" name="email" value="{{ current_user.email }}" required autocomplete="email">
+            </label>
+            <label>
+                <span>Phone</span>
+                <input type="tel" name="phone" value="{{ current_user.phone }}" autocomplete="tel">
             </label>
             <label>
                 <span>New Password</span>
@@ -303,6 +310,10 @@
                         <input type="email" name="email" required autocomplete="email">
                     </label>
                     <label>
+                        <span>Phone</span>
+                        <input type="tel" name="phone" autocomplete="tel">
+                    </label>
+                    <label>
                         <span>Password</span>
                         <input type="password" name="password" required autocomplete="new-password">
                     </label>
@@ -343,7 +354,24 @@
                       action="{{ url_for('account_bp.request_password_reset_route') }}"
                       hidden>
                     <h3>Forgot Password</h3>
-                    <p class="user-account-form-note">
+                    <div class="user-password-reset-methods" role="radiogroup" aria-label="Password reset method">
+                        <label class="user-password-reset-method">
+                            <input type="radio"
+                                   name="reset_method"
+                                   value="email"
+                                   checked
+                                   onchange="return updateForgotPasswordResetMethod()">
+                            <span>Email</span>
+                        </label>
+                        <label class="user-password-reset-method">
+                            <input type="radio"
+                                   name="reset_method"
+                                   value="phone"
+                                   onchange="return updateForgotPasswordResetMethod()">
+                            <span>Phone</span>
+                        </label>
+                    </div>
+                    <p id="forgotPasswordMethodNote" class="user-account-form-note">
                         {% if password_reset_email_configured %}
                             Enter your username or email and the app will email a one-time reset link.
                         {% else %}
@@ -351,10 +379,16 @@
                         {% endif %}
                     </p>
                     <label>
-                        <span>Username or Email</span>
-                        <input type="text" name="identity" required autocomplete="username">
+                        <span id="forgotPasswordIdentityLabel">Username or Email</span>
+                        <input id="forgotPasswordIdentityInput"
+                               type="text"
+                               name="identity"
+                               required
+                               autocomplete="username"
+                               data-email-configured="{% if password_reset_email_configured %}1{% else %}0{% endif %}"
+                               data-sms-configured="{% if password_reset_sms_configured %}1{% else %}0{% endif %}">
                     </label>
-                    <button type="submit">
+                    <button id="forgotPasswordSubmitButton" type="submit">
                         {% if password_reset_email_configured %}
                             Send Reset Email
                         {% else %}

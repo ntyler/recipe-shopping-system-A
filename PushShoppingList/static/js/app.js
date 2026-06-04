@@ -23,11 +23,72 @@ function toggleForgotPasswordForm() {
     form.hidden = !form.hidden;
 
     if (!form.hidden) {
+        updateForgotPasswordResetMethod();
         const input = form.querySelector('input[name="identity"]');
 
         if (input) {
             input.focus();
         }
+    }
+
+    return false;
+}
+
+function updateForgotPasswordResetMethod() {
+    const form = document.getElementById("forgotPasswordForm");
+    const input = document.getElementById("forgotPasswordIdentityInput");
+    const label = document.getElementById("forgotPasswordIdentityLabel");
+    const note = document.getElementById("forgotPasswordMethodNote");
+    const button = document.getElementById("forgotPasswordSubmitButton");
+    const selected = form ? form.querySelector('input[name="reset_method"]:checked') : null;
+    const method = selected ? selected.value : "email";
+    const emailConfigured = input ? input.dataset.emailConfigured === "1" : false;
+    const smsConfigured = input ? input.dataset.smsConfigured === "1" : false;
+
+    if (!form || !input) {
+        return false;
+    }
+
+    if (method === "phone") {
+        input.type = "tel";
+        input.inputMode = "tel";
+        input.autocomplete = "tel";
+        input.placeholder = "Phone number";
+
+        if (label) {
+            label.textContent = "Phone Number";
+        }
+
+        if (note) {
+            note.textContent = smsConfigured
+                ? "Enter the phone number on your account and the app will text a one-time reset link."
+                : "Enter the phone number on your account and the app will prepare a one-time local reset link.";
+        }
+
+        if (button) {
+            button.textContent = smsConfigured ? "Send Reset Text" : "Prepare Phone Reset Link";
+        }
+
+        return false;
+    }
+
+    input.type = "text";
+    input.inputMode = "";
+    input.autocomplete = "username";
+    input.placeholder = "";
+
+    if (label) {
+        label.textContent = "Username or Email";
+    }
+
+    if (note) {
+        note.textContent = emailConfigured
+            ? "Enter your username or email and the app will email a one-time reset link."
+            : "Enter your username or email and the app will prepare a one-time local reset link.";
+    }
+
+    if (button) {
+        button.textContent = emailConfigured ? "Send Reset Email" : "Prepare Reset Link";
     }
 
     return false;

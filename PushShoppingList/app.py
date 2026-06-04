@@ -13,6 +13,7 @@ from PushShoppingList.routes.recipe_routes import recipe_bp
 from PushShoppingList.routes.store_routes import store_bp
 from PushShoppingList.routes.product_routes import product_bp
 from PushShoppingList.services.email_service import password_reset_email_configured
+from PushShoppingList.services.sms_service import password_reset_sms_configured
 from PushShoppingList.services.user_account_service import current_public_user
 from PushShoppingList.services.user_account_service import pending_two_factor_setup
 
@@ -40,6 +41,7 @@ def create_app():
         return {
             "current_user": current_public_user(),
             "password_reset_email_configured": password_reset_email_configured(),
+            "password_reset_sms_configured": password_reset_sms_configured(),
             "pending_two_factor_sign_in": bool(session.get("pending_2fa_user_id")),
             "two_factor_setup": pending_two_factor_setup(session.get("user_id")),
             "two_factor_backup_codes": session.pop("two_factor_backup_codes", None),

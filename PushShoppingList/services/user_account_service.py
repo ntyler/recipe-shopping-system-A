@@ -30,6 +30,7 @@ USERS_FILE = Path(os.getenv("SHOPPING_APP_USERS_FILE", PACKAGE_DIR / "users.json
 AVATAR_UPLOAD_DIR = Path(os.getenv("SHOPPING_APP_AVATAR_UPLOAD_DIR", PACKAGE_DIR / "static" / "uploads" / "avatars"))
 ALLOWED_AVATAR_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+PHONE_DIGITS_PATTERN = re.compile(r"\d+")
 ADMIN_EMAIL = os.getenv("SHOPPING_APP_ADMIN_EMAIL", "ntylerbert@gmail.com").strip().lower()
 PASSWORD_RESET_TTL_HOURS = 1
 TWO_FACTOR_TRUST_DAYS = 30
@@ -92,6 +93,7 @@ def public_user(user):
         "user_id": user.get("user_id", ""),
         "username": user.get("username", ""),
         "email": user.get("email", ""),
+        "phone": user.get("phone", ""),
         "avatar_path": user.get("avatar_path", ""),
         "created_at": user.get("created_at", ""),
         "updated_at": user.get("updated_at", ""),
@@ -149,14 +151,46 @@ def find_user_by_identity_in_payload(payload, identity):
     return None
 
 
+def find_user_by_phone_in_payload(payload, phone):
+    phone_key = normalize_phone_lookup(phone)
+
+    if not phone_key:
+        return None
+
+    for user in payload.get("users", []):
+        if normalize_phone_lookup(user.get("phone")) == phone_key:
+            return user
+
+    return None
+
+
 def normalize_identity(value):
     return str(value or "").strip().lower()
 
 
-def validate_account_fields(username, email, password=None, confirm_password=None, require_password=True):
+def normalize_phone_lookup(value):
+    return "".join(PHONE_DIGITS_PATTERN.findall(str(value or "")))
+
+
+def validate_phone(phone):
+    phone = str(phone or "").strip()
+
+    if not phone:
+        return ""
+
+    digits = normalize_phone_lookup(phone)
+
+    if len(digits) < 7:
+        return "Enter a valid phone number."
+
+    return ""
+
+
+def validate_account_fields(username, email, password=None, confirm_password=None, require_password=True, phone=""):
     errors = []
     username = str(username or "").strip()
     email = str(email or "").strip()
+    phone = str(phone or "").strip()
     password = str(password or "")
     confirm_password = str(confirm_password or "")
 
@@ -168,6 +202,10 @@ def validate_account_fields(username, email, password=None, confirm_password=Non
     elif not EMAIL_PATTERN.match(email):
         errors.append("Enter a valid email address.")
 
+    phone_error = validate_phone(phone)
+    if phone_error:
+        errors.append(phone_error)
+
     if require_password and not password:
         errors.append("Password is required.")
 
@@ -178,10 +216,12 @@ def validate_account_fields(username, email, password=None, confirm_password=Non
     return errors
 
 
-def create_user(username, email, password, confirm_password, avatar_file=None):
-    errors = validate_account_fields(username, email, password, confirm_password, require_password=True)
+def create_user(username, email, password, confirm_password, avatar_file=None, phone=""):
+    errors = validate_account_fields(username, email, password, confirm_password, require_password=True, phone=phone)
     username = str(username or "").strip()
     email = str(email or "").strip()
+    phone = str(phone or "").strip()
+    phone_key = normalize_phone_lookup(phone)
     payload = load_users()
 
     if username and any(normalize_identity(user.get("username")) == normalize_identity(username) for user in payload["users"]):
@@ -189,6 +229,9 @@ def create_user(username, email, password, confirm_password, avatar_file=None):
 
     if email and any(normalize_identity(user.get("email")) == normalize_identity(email) for user in payload["users"]):
         errors.append("That email is already in use.")
+
+    if phone_key and any(normalize_phone_lookup(user.get("phone")) == phone_key for user in payload["users"]):
+        errors.append("That phone number is already in use.")
 
     if errors:
         return {"ok": False, "errors": errors}
@@ -199,6 +242,7 @@ def create_user(username, email, password, confirm_password, avatar_file=None):
         "user_id": user_id,
         "username": username,
         "email": email,
+        "phone": phone,
         "password_hash": generate_password_hash(password),
         "avatar_path": "",
         "created_at": timestamp,
@@ -247,14 +291,29 @@ def authenticate_user(identity, password, trusted_device_token=""):
     return {"ok": True, "user": public_user(user)}
 
 
-def request_password_reset(identity):
+def request_password_reset(identity, delivery_method="email"):
     identity = str(identity or "").strip()
+    delivery_method = str(delivery_method or "email").strip().lower()
+
+    if delivery_method not in {"email", "phone"}:
+        delivery_method = "email"
 
     if not identity:
-        return {"ok": False, "errors": ["Enter your username or email to reset your password."]}
+        return {
+            "ok": False,
+            "errors": [
+                "Enter your phone number to reset your password."
+                if delivery_method == "phone"
+                else "Enter your username or email to reset your password."
+            ],
+        }
 
     payload = load_users()
-    user = find_user_by_identity_in_payload(payload, identity)
+    user = (
+        find_user_by_phone_in_payload(payload, identity)
+        if delivery_method == "phone"
+        else find_user_by_identity_in_payload(payload, identity)
+    )
 
     if not user:
         return {"ok": True, "sent": False}
@@ -271,7 +330,7 @@ def request_password_reset(identity):
         ).isoformat() + "Z",
     }
     save_users(payload)
-    return {"ok": True, "sent": True, "token": token, "user": public_user(user)}
+    return {"ok": True, "sent": True, "token": token, "user": public_user(user), "delivery_method": delivery_method}
 
 
 def reset_password_with_token(token, password, confirm_password):
@@ -676,7 +735,7 @@ def sign_out_user():
     session.pop("two_factor_recovery_link", None)
 
 
-def update_user_profile(user_id, username, email, password="", confirm_password="", avatar_file=None):
+def update_user_profile(user_id, username, email, password="", confirm_password="", avatar_file=None, phone=""):
     payload = load_users()
     user = next((item for item in payload["users"] if item.get("user_id") == user_id), None)
 
@@ -689,9 +748,12 @@ def update_user_profile(user_id, username, email, password="", confirm_password=
         password,
         confirm_password,
         require_password=False,
+        phone=phone,
     )
     username = str(username or "").strip()
     email = str(email or "").strip()
+    phone = str(phone or "").strip()
+    phone_key = normalize_phone_lookup(phone)
 
     for existing in payload["users"]:
         if existing.get("user_id") == user_id:
@@ -700,6 +762,8 @@ def update_user_profile(user_id, username, email, password="", confirm_password=
             errors.append("That username is already in use.")
         if normalize_identity(existing.get("email")) == normalize_identity(email):
             errors.append("That email is already in use.")
+        if phone_key and normalize_phone_lookup(existing.get("phone")) == phone_key:
+            errors.append("That phone number is already in use.")
 
     if errors:
         return {"ok": False, "errors": errors}
@@ -710,6 +774,7 @@ def update_user_profile(user_id, username, email, password="", confirm_password=
 
     user["username"] = username
     user["email"] = email
+    user["phone"] = phone
     if password:
         user["password_hash"] = generate_password_hash(password)
     if avatar_result.get("avatar_path"):

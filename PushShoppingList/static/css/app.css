@@ -4582,6 +4582,53 @@ body {
             text-align: center;
         }
 
+        .user-password-reset-methods {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .user-account-form .user-password-reset-method {
+            position: relative;
+            display: grid;
+            min-width: 0;
+            gap: 0;
+            cursor: pointer;
+            color: #e2e8f0;
+            font-size: 14px;
+            font-weight: 900;
+            letter-spacing: 0;
+            text-align: center;
+            text-transform: none;
+        }
+
+        .user-password-reset-method input {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+        }
+
+        .user-password-reset-method span {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 36px;
+            border: 1px solid #3f4b58;
+            border-radius: 7px;
+            background: #18212c;
+        }
+
+        .user-password-reset-method input:checked + span {
+            border-color: #1b75bb;
+            background: #115e9f;
+            color: #fff;
+        }
+
+        .user-password-reset-method input:focus-visible + span {
+            outline: 2px solid #9ed0ff;
+            outline-offset: 2px;
+        }
+
         .user-two-factor-backup-list {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
@@ -4835,7 +4882,8 @@ body {
             font-weight: 900;
         }
 
-        .user-account-email {
+        .user-account-email,
+        .user-account-phone {
             margin-top: 4px;
             color: #cbd5e1;
             font-weight: 700;

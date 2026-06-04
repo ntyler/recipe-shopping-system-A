@@ -11,6 +11,8 @@ from flask import url_for
 from PushShoppingList.services.email_service import password_reset_email_configured
 from PushShoppingList.services.email_service import send_password_reset_email
 from PushShoppingList.services.email_service import send_two_factor_recovery_email
+from PushShoppingList.services.sms_service import password_reset_sms_configured
+from PushShoppingList.services.sms_service import send_password_reset_sms
 from PushShoppingList.services.user_account_service import authenticate_user
 from PushShoppingList.services.user_account_service import cancel_two_factor_setup
 from PushShoppingList.services.user_account_service import cancel_two_factor_sign_in
@@ -84,6 +86,7 @@ def create_account_route():
         request.form.get("password"),
         request.form.get("confirm_password"),
         request.files.get("avatar"),
+        phone=request.form.get("phone"),
     )
     flash_account_result(result, "Account created. You are signed in.")
     return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
@@ -204,14 +207,33 @@ def complete_two_factor_recovery_route():
 
 @account_bp.route("/account/password-reset/request", methods=["POST"])
 def request_password_reset_route():
-    result = request_password_reset(request.form.get("identity"))
+    reset_method = str(request.form.get("reset_method") or "email").strip().lower()
+    result = request_password_reset(request.form.get("identity"), reset_method)
 
     if result.get("ok"):
         session.pop("password_reset_link", None)
         if result.get("sent") and result.get("token"):
             reset_link = password_reset_link(result["token"])
 
-            if password_reset_email_configured():
+            if reset_method == "phone":
+                if password_reset_sms_configured():
+                    sms_result = send_password_reset_sms(result.get("user"), reset_link)
+
+                    if not sms_result.get("ok"):
+                        flash(
+                            sms_result.get("error")
+                            or "Password reset text could not be sent. Check SMS settings.",
+                            "error",
+                        )
+                        return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+                else:
+                    session["password_reset_link"] = reset_link
+                    flash(
+                        "Text messaging is not configured yet, so a local password reset link is available below.",
+                        "success",
+                    )
+                    return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+            elif password_reset_email_configured():
                 email_result = send_password_reset_email(result.get("user"), reset_link)
 
                 if not email_result.get("ok"):
@@ -230,9 +252,13 @@ def request_password_reset_route():
                 return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
 
         flash(
-            "If that account exists, a password reset email has been sent."
-            if password_reset_email_configured()
-            else "If that account exists, a password reset link has been prepared.",
+            (
+                "If that account exists, a password reset text has been sent."
+                if reset_method == "phone" and password_reset_sms_configured()
+                else "If that account exists, a password reset email has been sent."
+                if password_reset_email_configured()
+                else "If that account exists, a password reset link has been prepared."
+            ),
             "success",
         )
     else:
@@ -286,6 +312,7 @@ def update_profile_route():
         request.form.get("password"),
         request.form.get("confirm_password"),
         request.files.get("avatar"),
+        phone=request.form.get("phone"),
     )
     flash_account_result(result, "Profile updated.")
     return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
