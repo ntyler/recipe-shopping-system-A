@@ -156,3 +156,32 @@ def firebase_user_from_id_token(id_token):
         return {"ok": False, "errors": ["Firebase user id is missing."]}
 
     return {"ok": True, "firebase_user": firebase_user}
+
+
+def delete_firebase_auth_user(firebase_uid):
+    firebase_uid = str(firebase_uid or "").strip()
+
+    if not firebase_uid:
+        return {"ok": True, "skipped": True}
+
+    admin_app, app_result = firebase_admin_app()
+
+    if not app_result.get("ok"):
+        return {**app_result, "skipped": True}
+
+    try:
+        from firebase_admin import auth
+
+        auth.delete_user(firebase_uid, app=admin_app)
+    except Exception as err:
+        if err.__class__.__name__ == "UserNotFoundError":
+            return {"ok": True, "missing": True}
+
+        LOGGER.warning("Firebase Auth user deletion failed: %s", err.__class__.__name__)
+        return {
+            "ok": False,
+            "code": "firebase_auth_user_delete_failed",
+            "errors": ["Firebase Auth user deletion failed."],
+        }
+
+    return {"ok": True, "deleted": True}

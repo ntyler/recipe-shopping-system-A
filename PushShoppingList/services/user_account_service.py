@@ -14,6 +14,7 @@ from werkzeug.security import check_password_hash
 from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
 
+from PushShoppingList.services.firebase_auth_service import delete_firebase_auth_user
 from PushShoppingList.services.two_factor_service import ISSUER_NAME
 from PushShoppingList.services.two_factor_service import backup_codes_remaining
 from PushShoppingList.services.two_factor_service import generate_backup_codes
@@ -911,6 +912,12 @@ def delete_account_with_token(token):
 
     user_id = str(user.get("user_id") or "")
     deleted_user = public_user(user)
+    firebase_delete_result = delete_firebase_auth_user(user.get("firebase_uid"))
+    if not firebase_delete_result.get("ok"):
+        print(
+            "[account_delete] Firebase Auth user deletion skipped or failed for "
+            f"user_id={user_id}: {firebase_delete_result.get('code', 'unknown')}"
+        )
     payload["users"] = [
         item
         for item in payload.get("users", [])

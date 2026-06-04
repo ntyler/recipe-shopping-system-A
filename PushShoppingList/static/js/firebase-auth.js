@@ -403,11 +403,41 @@ function bindSignOutForm() {
     });
 }
 
+function bindAccountDeleteConfirmForm() {
+    const form = document.querySelector("[data-firebase-account-delete-confirm-form]");
+
+    if (!form) {
+        return;
+    }
+
+    form.addEventListener("submit", async (event) => {
+        if (form.dataset.firebaseDeleteSubmitting === "1") {
+            return;
+        }
+
+        event.preventDefault();
+        form.dataset.firebaseDeleteSubmitting = "1";
+        explicitAuthInProgress = true;
+        form.querySelectorAll("button").forEach((button) => {
+            button.disabled = true;
+        });
+
+        try {
+            await signOut(auth);
+        } catch (error) {
+            console.warn("Firebase sign-out before account deletion failed.", error);
+        }
+
+        form.submit();
+    });
+}
+
 function bindFirebaseForms() {
     bindCreateAccountForm();
     bindSignInForm();
     bindForgotPasswordForm();
     bindSignOutForm();
+    bindAccountDeleteConfirmForm();
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
