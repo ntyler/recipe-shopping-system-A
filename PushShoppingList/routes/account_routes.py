@@ -2,12 +2,14 @@ import os
 
 from flask import Blueprint
 from flask import flash
+from flask import jsonify
 from flask import make_response
 from flask import redirect
 from flask import request
 from flask import session
 from flask import url_for
 
+from PushShoppingList.services.firebase_auth_service import firebase_user_from_id_token
 from PushShoppingList.services.email_service import password_reset_email_configured
 from PushShoppingList.services.email_service import send_account_delete_email
 from PushShoppingList.services.email_service import send_account_verification_email
@@ -21,6 +23,7 @@ from PushShoppingList.services.user_account_service import cancel_two_factor_set
 from PushShoppingList.services.user_account_service import cancel_two_factor_sign_in
 from PushShoppingList.services.user_account_service import complete_two_factor_sign_in
 from PushShoppingList.services.user_account_service import create_user
+from PushShoppingList.services.user_account_service import current_public_user
 from PushShoppingList.services.user_account_service import delete_account_with_token
 from PushShoppingList.services.user_account_service import discard_pending_account
 from PushShoppingList.services.user_account_service import disable_two_factor
@@ -33,6 +36,7 @@ from PushShoppingList.services.user_account_service import request_two_factor_re
 from PushShoppingList.services.user_account_service import recover_two_factor_with_token
 from PushShoppingList.services.user_account_service import reset_password_with_token
 from PushShoppingList.services.user_account_service import sign_out_user
+from PushShoppingList.services.user_account_service import sign_in_firebase_user
 from PushShoppingList.services.user_account_service import start_two_factor_setup
 from PushShoppingList.services.user_account_service import update_user_profile
 from PushShoppingList.services.user_account_service import verify_account_creation
@@ -51,6 +55,16 @@ def flash_account_result(result, success_message):
 
     for error in result.get("errors", ["Something went wrong. Please try again."]):
         flash(error, "error")
+
+
+def json_account_result(result, success_status=200, error_status=400):
+    if result.get("ok"):
+        return jsonify({"success": True, **{key: value for key, value in result.items() if key != "ok"}}), success_status
+
+    return jsonify({
+        "success": False,
+        "errors": result.get("errors", ["Something went wrong. Please try again."]),
+    }), error_status
 
 
 def password_reset_link(token):
@@ -125,6 +139,33 @@ def account_verification_link(token):
         token=token,
         _external=True,
     )
+
+
+@account_bp.route("/auth/session", methods=["GET"])
+def firebase_session_route():
+    user = current_public_user()
+    return jsonify({"success": True, "authenticated": bool(user), "user": user})
+
+
+@account_bp.route("/auth/firebase-login", methods=["POST"])
+def firebase_login_route():
+    payload = request.get_json(silent=True) or {}
+    token_result = firebase_user_from_id_token(payload.get("idToken"))
+
+    if not token_result.get("ok"):
+        return json_account_result(token_result, error_status=401)
+
+    result = sign_in_firebase_user(
+        token_result.get("firebase_user") or {},
+        profile=payload.get("profile") if isinstance(payload.get("profile"), dict) else {},
+    )
+    return json_account_result(result, success_status=200, error_status=400)
+
+
+@account_bp.route("/auth/logout", methods=["POST"])
+def firebase_logout_route():
+    sign_out_user()
+    return jsonify({"success": True, "authenticated": False, "user": None})
 
 
 @account_bp.route("/account/create", methods=["POST"])

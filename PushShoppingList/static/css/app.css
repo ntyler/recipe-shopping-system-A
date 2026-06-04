@@ -4607,6 +4607,30 @@ body {
             text-align: center;
         }
 
+        .user-firebase-status {
+            padding: 9px 10px;
+            border: 1px solid #2f4054;
+            border-radius: 7px;
+            background: #0b1118;
+            color: #dbeafe;
+            font-size: 13px;
+            font-weight: 800;
+            line-height: 1.25;
+            text-align: center;
+        }
+
+        .user-firebase-status.success {
+            border-color: #0f8f4d;
+            background: #073d24;
+            color: #d8ffe4;
+        }
+
+        .user-firebase-status.error {
+            border-color: #a33a3a;
+            background: #351417;
+            color: #ffd4d4;
+        }
+
         .user-password-reset-methods {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));

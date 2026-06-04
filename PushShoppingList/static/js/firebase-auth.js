@@ -1,0 +1,363 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-analytics.js";
+import {
+    getAuth,
+    onAuthStateChanged,
+    signInWithEmailAndPassword,
+    createUserWithEmailAndPassword,
+    sendPasswordResetEmail,
+    signInWithPopup,
+    GoogleAuthProvider,
+    signOut
+} from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
+
+const localDevelopmentFirebaseConfig = {
+    apiKey: "AIzaSyAzUeQBO2t98GVp_8zKpTFvmm_6ePX-U2U",
+    authDomain: "recipe-shopping-app-d4a07.firebaseapp.com",
+    projectId: "recipe-shopping-app-d4a07",
+    storageBucket: "recipe-shopping-app-d4a07.firebasestorage.app",
+    messagingSenderId: "1084430352486",
+    appId: "1:1084430352486:web:71b25f380928a61bdfeda7",
+    measurementId: "G-J44GKNGRDY"
+};
+
+function firebaseConfigFromPage() {
+    const element = document.getElementById("firebaseWebConfig");
+
+    if (!element) {
+        return localDevelopmentFirebaseConfig;
+    }
+
+    try {
+        return {
+            ...localDevelopmentFirebaseConfig,
+            ...JSON.parse(element.textContent || "{}")
+        };
+    } catch (error) {
+        console.warn("Firebase config JSON could not be parsed.", error);
+        return localDevelopmentFirebaseConfig;
+    }
+}
+
+const firebaseConfig = firebaseConfigFromPage();
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+const auth = getAuth(app);
+const googleProvider = new GoogleAuthProvider();
+
+let backendSession = null;
+let explicitAuthInProgress = false;
+
+function formValue(form, name) {
+    return String((form.elements[name] || {}).value || "").trim();
+}
+
+function firebaseErrorMessage(error) {
+    const code = String(error && error.code || "");
+
+    if (code === "auth/email-already-in-use") {
+        return "That email is already registered. Sign in instead.";
+    }
+
+    if (code === "auth/invalid-email") {
+        return "Enter a valid email address.";
+    }
+
+    if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
+        return "We could not sign you in with that email and password.";
+    }
+
+    if (code === "auth/weak-password") {
+        return "Use a stronger password. Firebase requires at least 6 characters.";
+    }
+
+    if (code === "auth/popup-closed-by-user") {
+        return "Google sign-in was canceled.";
+    }
+
+    if (code === "auth/unauthorized-domain") {
+        return "This domain is not authorized in Firebase Authentication settings.";
+    }
+
+    if (code === "auth/configuration-not-found") {
+        return "Firebase Authentication is not enabled for this project. In Firebase Console, enable Authentication and turn on Email/Password and Google providers.";
+    }
+
+    return String(error && error.message || "Firebase authentication failed.");
+}
+
+function statusForForm(form) {
+    if (!form) {
+        return null;
+    }
+
+    let status = form.querySelector("[data-firebase-status]");
+    if (status) {
+        return status;
+    }
+
+    status = document.createElement("div");
+    status.className = "user-firebase-status";
+    status.setAttribute("data-firebase-status", "");
+    status.setAttribute("aria-live", "polite");
+    status.hidden = true;
+
+    const heading = form.querySelector("h3");
+    if (heading && heading.nextSibling) {
+        form.insertBefore(status, heading.nextSibling);
+    } else {
+        form.prepend(status);
+    }
+
+    return status;
+}
+
+function setStatus(form, message, type) {
+    const status = statusForForm(form);
+
+    if (!status) {
+        return;
+    }
+
+    status.textContent = message || "";
+    status.classList.toggle("success", type === "success");
+    status.classList.toggle("error", type === "error");
+    status.hidden = !message;
+}
+
+function setBusy(form, busy) {
+    if (!form) {
+        return;
+    }
+
+    form.querySelectorAll("button, input, select, textarea").forEach((control) => {
+        control.disabled = busy;
+    });
+}
+
+async function backendJson(url, options = {}) {
+    const response = await fetch(url, {
+        credentials: "same-origin",
+        headers: {
+            "Content-Type": "application/json",
+            ...(options.headers || {})
+        },
+        ...options
+    });
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok || payload.success === false) {
+        const message = Array.isArray(payload.errors) ? payload.errors.join(" ") : "The server could not complete authentication.";
+        throw new Error(message);
+    }
+
+    return payload;
+}
+
+async function loadBackendSession() {
+    backendSession = await backendJson("/auth/session", { method: "GET" });
+    return backendSession;
+}
+
+async function syncFirebaseUser(firebaseUser, profile = {}) {
+    const idToken = await firebaseUser.getIdToken();
+    return backendJson("/auth/firebase-login", {
+        method: "POST",
+        body: JSON.stringify({ idToken, profile })
+    });
+}
+
+async function logoutBackend() {
+    return backendJson("/auth/logout", {
+        method: "POST",
+        body: JSON.stringify({})
+    });
+}
+
+function reloadAccountSection() {
+    window.location.hash = "userAccountSection";
+    window.location.reload();
+}
+
+function bindCreateAccountForm() {
+    const form = document.querySelector("[data-firebase-create-form]");
+
+    if (!form) {
+        return;
+    }
+
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        setStatus(form, "", "");
+
+        const email = formValue(form, "email");
+        const password = String((form.elements.password || {}).value || "");
+        const confirmPassword = String((form.elements.confirm_password || {}).value || "");
+
+        if (password !== confirmPassword) {
+            setStatus(form, "Password and confirm password must match.", "error");
+            return;
+        }
+
+        setBusy(form, true);
+        explicitAuthInProgress = true;
+        try {
+            const credential = await createUserWithEmailAndPassword(auth, email, password);
+            await syncFirebaseUser(credential.user, {
+                first_name: formValue(form, "first_name"),
+                last_name: formValue(form, "last_name"),
+                username: formValue(form, "username"),
+                email
+            });
+            setStatus(form, "Account created. Signing you in...", "success");
+            reloadAccountSection();
+        } catch (error) {
+            setStatus(form, firebaseErrorMessage(error), "error");
+            setBusy(form, false);
+            explicitAuthInProgress = false;
+        }
+    });
+}
+
+function bindSignInForm() {
+    const form = document.querySelector("[data-firebase-sign-in-form]");
+
+    if (!form) {
+        return;
+    }
+
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        setStatus(form, "", "");
+        setBusy(form, true);
+        explicitAuthInProgress = true;
+
+        try {
+            const credential = await signInWithEmailAndPassword(
+                auth,
+                formValue(form, "identity"),
+                String((form.elements.password || {}).value || "")
+            );
+            await syncFirebaseUser(credential.user);
+            setStatus(form, "Signed in. Loading your workspace...", "success");
+            reloadAccountSection();
+        } catch (error) {
+            setStatus(form, firebaseErrorMessage(error), "error");
+            setBusy(form, false);
+            explicitAuthInProgress = false;
+        }
+    });
+
+    const googleButton = form.querySelector("[data-firebase-google-sign-in]");
+    if (googleButton) {
+        googleButton.addEventListener("click", async () => {
+            setStatus(form, "", "");
+            setBusy(form, true);
+            explicitAuthInProgress = true;
+
+            try {
+                const credential = await signInWithPopup(auth, googleProvider);
+                await syncFirebaseUser(credential.user);
+                setStatus(form, "Signed in with Google. Loading your workspace...", "success");
+                reloadAccountSection();
+            } catch (error) {
+                setStatus(form, firebaseErrorMessage(error), "error");
+                setBusy(form, false);
+                explicitAuthInProgress = false;
+            }
+        });
+    }
+}
+
+function bindForgotPasswordForm() {
+    const form = document.querySelector("[data-firebase-forgot-form]");
+
+    if (!form) {
+        return;
+    }
+
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        setStatus(form, "", "");
+        setBusy(form, true);
+
+        try {
+            await sendPasswordResetEmail(auth, formValue(form, "identity"));
+            setStatus(form, "Firebase sent a password reset email.", "success");
+        } catch (error) {
+            setStatus(form, firebaseErrorMessage(error), "error");
+        } finally {
+            setBusy(form, false);
+        }
+    });
+}
+
+function bindSignOutForm() {
+    const form = document.querySelector("[data-firebase-sign-out-form]");
+
+    if (!form) {
+        return;
+    }
+
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        setBusy(form, true);
+
+        try {
+            await signOut(auth);
+        } finally {
+            try {
+                await logoutBackend();
+            } finally {
+                reloadAccountSection();
+            }
+        }
+    });
+}
+
+function bindFirebaseForms() {
+    bindCreateAccountForm();
+    bindSignInForm();
+    bindForgotPasswordForm();
+    bindSignOutForm();
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+    bindFirebaseForms();
+
+    try {
+        await loadBackendSession();
+    } catch (error) {
+        console.warn("Could not load Flask auth session.", error);
+    }
+});
+
+onAuthStateChanged(auth, async (firebaseUser) => {
+    if (explicitAuthInProgress) {
+        return;
+    }
+
+    try {
+        const session = await loadBackendSession();
+
+        if (firebaseUser && !session.authenticated) {
+            await syncFirebaseUser(firebaseUser);
+            reloadAccountSection();
+            return;
+        }
+
+        if (!firebaseUser && session.user && session.user.auth_provider === "firebase") {
+            await logoutBackend();
+            reloadAccountSection();
+        }
+    } catch (error) {
+        console.warn("Firebase auth state sync failed.", error);
+    }
+});
+
+window.shoppingFirebaseAuth = {
+    app,
+    analytics,
+    auth,
+    googleProvider
+};

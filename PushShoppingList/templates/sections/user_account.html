@@ -46,15 +46,6 @@
         </div>
     {% endif %}
 
-    {% set local_phone_verification_code = session.get("phone_verification_code") %}
-    {% if local_phone_verification_code %}
-        <div class="user-account-reset-panel user-phone-verification-local-panel" aria-live="polite">
-            <strong>Local phone verification code</strong>
-            <span>Text messaging is not configured, so enter this local code to verify your phone.</span>
-            <code>{{ local_phone_verification_code }}</code>
-        </div>
-    {% endif %}
-
     {% if password_reset_token|default("") %}
         <form class="user-account-form user-password-reset-form"
               method="POST"
@@ -137,23 +128,16 @@
                     <div class="user-account-email">{{ current_user.username }}</div>
                 {% endif %}
                 <div class="user-account-email">{{ current_user.email }}</div>
-                {% if current_user.phone %}
-                    <div class="user-account-phone">
-                        <span>{{ current_user.phone }}</span>
-                        {% if current_user.phone_verified %}
-                            <span class="user-phone-status verified">Verified</span>
-                        {% else %}
-                            <span class="user-phone-status unverified">Unverified</span>
-                        {% endif %}
-                    </div>
-                {% endif %}
             </div>
 
             <div class="user-account-actions">
                 <button type="button" class="secondary" onclick="return toggleUserProfileEditor()">
                     Edit Profile
                 </button>
-                <form method="POST" action="{{ url_for('account_bp.sign_out_route') }}">
+                <form id="firebaseSignOutForm"
+                      data-firebase-sign-out-form
+                      method="POST"
+                      action="{{ url_for('account_bp.sign_out_route') }}">
                     <button type="submit" class="danger">Sign Out</button>
                 </form>
             </div>
@@ -181,30 +165,16 @@
                 <span>Email</span>
                 <input type="email" name="email" value="{{ current_user.email }}" required autocomplete="email">
             </label>
-            <div class="user-phone-field" data-phone-field>
-                <label class="user-phone-country-label">
-                    <span>Country</span>
-                    <select data-phone-country autocomplete="tel-country-code"></select>
+            {% if current_user.auth_provider != "firebase" %}
+                <label>
+                    <span>New Password</span>
+                    <input type="password" name="password" autocomplete="new-password">
                 </label>
-                <label class="user-phone-local-label">
-                    <span>Phone</span>
-                    <input type="tel"
-                           name="phone"
-                           value="{{ current_user.phone }}"
-                           data-phone-local
-                           autocomplete="tel-national"
-                           inputmode="tel"
-                           placeholder="309 660 6603">
+                <label>
+                    <span>Confirm New Password</span>
+                    <input type="password" name="confirm_password" autocomplete="new-password">
                 </label>
-            </div>
-            <label>
-                <span>New Password</span>
-                <input type="password" name="password" autocomplete="new-password">
-            </label>
-            <label>
-                <span>Confirm New Password</span>
-                <input type="password" name="confirm_password" autocomplete="new-password">
-            </label>
+            {% endif %}
             <label class="user-account-file-label">
                 <span>Logo / Avatar</span>
                 <input type="file" name="avatar" accept="image/png,image/jpeg,image/webp">
@@ -213,57 +183,6 @@
                 <button type="submit">Save Profile</button>
             </div>
         </form>
-
-        <div class="user-account-form user-phone-verification-card">
-            <h3>Phone Verification</h3>
-            {% if current_user.phone %}
-                {% if current_user.phone_verified %}
-                    <p class="user-account-form-note">
-                        {{ current_user.phone }} is verified.
-                    </p>
-                {% else %}
-                    <p class="user-account-form-note">
-                        {% if password_reset_sms_configured %}
-                            Verify {{ current_user.phone }} before relying on phone-based account recovery.
-                        {% else %}
-                            Text messaging is not configured. Generate a local code to verify {{ current_user.phone }}.
-                        {% endif %}
-                    </p>
-                    <form class="user-phone-verification-request-form"
-                          method="POST"
-                          action="{{ url_for('account_bp.request_phone_verification_route') }}">
-                        <button type="submit" class="secondary">
-                            {% if password_reset_sms_configured %}
-                                Send Verification Text
-                            {% else %}
-                                Generate Local Verification Code
-                            {% endif %}
-                        </button>
-                    </form>
-                    <form class="user-phone-verification-confirm-form"
-                          method="POST"
-                          action="{{ url_for('account_bp.confirm_phone_verification_route') }}">
-                        <label>
-                            <span>Verification Code</span>
-                            <input type="text"
-                                   name="phone_verification_code"
-                                   inputmode="numeric"
-                                   autocomplete="one-time-code"
-                                   maxlength="6"
-                                   placeholder="123456"
-                                   required>
-                        </label>
-                        <button type="submit">
-                            Verify Phone
-                        </button>
-                    </form>
-                {% endif %}
-            {% else %}
-                <p class="user-account-form-note">
-                    Add and save a phone number before verifying it.
-                </p>
-            {% endif %}
-        </div>
 
         {% if current_user.ntfy_url %}
             <div class="user-account-form user-ntfy-card">
@@ -302,42 +221,43 @@
             </div>
         {% endif %}
 
-        {% set two_factor_default_state = "collapsed" if current_user.two_factor_enabled and not two_factor_setup else "expanded" %}
-        <div class="user-account-form user-two-factor-card">
-            <button type="button"
-                    class="card-collapse-toggle user-two-factor-title-toggle"
-                    data-collapse-toggle="user-two-factor"
-                    aria-expanded="{% if two_factor_default_state == 'collapsed' %}false{% else %}true{% endif %}"
-                    onclick="toggleCardCollapse('user-two-factor')">
-                <span>Two-Factor Authentication</span>
-            </button>
-            <div class="card-collapse-content user-two-factor-content{% if two_factor_default_state == 'collapsed' %} collapsed{% endif %}"
-                 data-collapse-content="user-two-factor"
-                 data-collapse-storage-key="user-two-factor:{{ current_user.user_id }}"
-                 data-collapse-default="{{ two_factor_default_state }}"
-                 data-collapse-mobile-default="{{ two_factor_default_state }}">
-            {% if current_user.two_factor_enabled %}
-                <p class="user-account-form-note">
-                    Enabled. Backup codes remaining: {{ current_user.two_factor_backup_codes_remaining }}.
-                </p>
+        {% if current_user.auth_provider != "firebase" %}
+            {% set two_factor_default_state = "collapsed" if current_user.two_factor_enabled and not two_factor_setup else "expanded" %}
+            <div class="user-account-form user-two-factor-card">
+                <button type="button"
+                        class="card-collapse-toggle user-two-factor-title-toggle"
+                        data-collapse-toggle="user-two-factor"
+                        aria-expanded="{% if two_factor_default_state == 'collapsed' %}false{% else %}true{% endif %}"
+                        onclick="toggleCardCollapse('user-two-factor')">
+                    <span>Two-Factor Authentication</span>
+                </button>
+                <div class="card-collapse-content user-two-factor-content{% if two_factor_default_state == 'collapsed' %} collapsed{% endif %}"
+                     data-collapse-content="user-two-factor"
+                     data-collapse-storage-key="user-two-factor:{{ current_user.user_id }}"
+                     data-collapse-default="{{ two_factor_default_state }}"
+                     data-collapse-mobile-default="{{ two_factor_default_state }}">
+                {% if current_user.two_factor_enabled %}
+                    <p class="user-account-form-note">
+                        Enabled. Backup codes remaining: {{ current_user.two_factor_backup_codes_remaining }}.
+                    </p>
 
-                <form class="user-two-factor-inline-form"
-                      method="POST"
-                      action="{{ url_for('account_bp.regenerate_two_factor_backup_codes_route') }}">
-                    <label>
-                        <span>Current Password</span>
-                        <input type="password" name="password" required autocomplete="current-password">
-                    </label>
-                    <label>
-                        <span>Authenticator or Backup Code</span>
-                        <input type="text"
-                               name="code"
-                               required
-                               inputmode="text"
-                               autocomplete="one-time-code">
-                    </label>
-                    <button type="submit" class="secondary">Regenerate Backup Codes</button>
-                </form>
+                    <form class="user-two-factor-inline-form"
+                          method="POST"
+                          action="{{ url_for('account_bp.regenerate_two_factor_backup_codes_route') }}">
+                        <label>
+                            <span>Current Password</span>
+                            <input type="password" name="password" required autocomplete="current-password">
+                        </label>
+                        <label>
+                            <span>Authenticator or Backup Code</span>
+                            <input type="text"
+                                   name="code"
+                                   required
+                                   inputmode="text"
+                                   autocomplete="one-time-code">
+                        </label>
+                        <button type="submit" class="secondary">Regenerate Backup Codes</button>
+                    </form>
 
                 <form class="user-two-factor-inline-form"
                       method="POST"
@@ -411,31 +331,34 @@
             {% endif %}
             </div>
         </div>
+        {% endif %}
 
-        <div class="user-account-form user-delete-account-card">
-            <button type="button"
-                    class="card-collapse-toggle user-delete-account-title-toggle"
-                    data-collapse-toggle="user-delete-account"
-                    aria-expanded="false"
-                    onclick="toggleCardCollapse('user-delete-account')">
-                <span>Delete Account</span>
-            </button>
-            <div class="card-collapse-content user-delete-account-content collapsed"
-                 data-collapse-content="user-delete-account"
-                 data-collapse-storage-key="user-delete-account:{{ current_user.user_id }}"
-                 data-collapse-default="collapsed"
-                 data-collapse-mobile-default="collapsed">
-                <p class="user-account-form-note">
-                    Send a one-time verification link to {{ current_user.email }} before deleting this account.
-                </p>
-                <form method="POST"
-                      action="{{ url_for('account_bp.request_account_delete_route') }}">
-                    <button type="submit" class="danger">
-                        Send Delete Verification Email
-                    </button>
-                </form>
+        {% if current_user.auth_provider != "firebase" %}
+            <div class="user-account-form user-delete-account-card">
+                <button type="button"
+                        class="card-collapse-toggle user-delete-account-title-toggle"
+                        data-collapse-toggle="user-delete-account"
+                        aria-expanded="false"
+                        onclick="toggleCardCollapse('user-delete-account')">
+                    <span>Delete Account</span>
+                </button>
+                <div class="card-collapse-content user-delete-account-content collapsed"
+                     data-collapse-content="user-delete-account"
+                     data-collapse-storage-key="user-delete-account:{{ current_user.user_id }}"
+                     data-collapse-default="collapsed"
+                     data-collapse-mobile-default="collapsed">
+                    <p class="user-account-form-note">
+                        Send a one-time verification link to {{ current_user.email }} before deleting this account.
+                    </p>
+                    <form method="POST"
+                          action="{{ url_for('account_bp.request_account_delete_route') }}">
+                        <button type="submit" class="danger">
+                            Send Delete Verification Email
+                        </button>
+                    </form>
+                </div>
             </div>
-        </div>
+        {% endif %}
     {% else %}
         <p class="helper-text user-account-helper">
             You are using the guest workspace. Sign in to keep recipes, stores, product picks, and preferences private to your account.
@@ -481,13 +404,15 @@
                     <button type="submit">Email Recovery Link</button>
                 </form>
             {% else %}
-                <form class="user-account-form"
+                <form id="firebaseCreateAccountForm"
+                      class="user-account-form"
+                      data-firebase-create-form
                       method="POST"
                       action="{{ url_for('account_bp.create_account_route') }}"
                       enctype="multipart/form-data">
                     <h3>Create Account</h3>
                     <p class="user-account-form-note">
-                        A verification link will be sent to your email before the account is activated.
+                        Create a Firebase account with email and password.
                     </p>
                     <label>
                         <span>First Name</span>
@@ -505,21 +430,6 @@
                         <span>Email</span>
                         <input type="email" name="email" required autocomplete="email">
                     </label>
-                    <div class="user-phone-field" data-phone-field>
-                        <label class="user-phone-country-label">
-                            <span>Country</span>
-                            <select data-phone-country autocomplete="tel-country-code"></select>
-                        </label>
-                        <label class="user-phone-local-label">
-                            <span>Phone</span>
-                            <input type="tel"
-                                   name="phone"
-                                   data-phone-local
-                                   autocomplete="tel-national"
-                                   inputmode="tel"
-                                   placeholder="309 660 6603">
-                        </label>
-                    </div>
                     <label>
                         <span>Password</span>
                         <input type="password" name="password" required autocomplete="new-password">
@@ -528,26 +438,29 @@
                         <span>Confirm Password</span>
                         <input type="password" name="confirm_password" required autocomplete="new-password">
                     </label>
-                    <label class="user-account-file-label">
-                        <span>Logo / Avatar</span>
-                        <input type="file" name="avatar" accept="image/png,image/jpeg,image/webp">
-                    </label>
                     <button type="submit">Create Account</button>
                 </form>
 
-                <form class="user-account-form"
+                <form id="firebaseSignInForm"
+                      class="user-account-form"
+                      data-firebase-sign-in-form
                       method="POST"
                       action="{{ url_for('account_bp.sign_in_route') }}">
                     <h3>Sign In</h3>
                     <label>
-                        <span>Username or Email</span>
-                        <input type="text" name="identity" required autocomplete="username">
+                        <span>Email</span>
+                        <input type="email" name="identity" required autocomplete="email">
                     </label>
                     <label>
                         <span>Password</span>
                         <input type="password" name="password" required autocomplete="current-password">
                     </label>
                     <button type="submit">Sign In</button>
+                    <button type="button"
+                            class="secondary"
+                            data-firebase-google-sign-in>
+                        Sign In With Google
+                    </button>
                     <button type="button"
                             class="user-account-text-btn"
                             onclick="return toggleForgotPasswordForm()">
@@ -557,60 +470,26 @@
 
                 <form id="forgotPasswordForm"
                       class="user-account-form user-account-forgot-form"
+                      data-firebase-forgot-form
                       method="POST"
                       action="{{ url_for('account_bp.request_password_reset_route') }}"
                       hidden>
                     <h3>Forgot Password</h3>
-                    <div class="user-password-reset-methods" role="radiogroup" aria-label="Password reset method">
-                        <label class="user-password-reset-method">
-                            <input type="radio"
-                                   name="reset_method"
-                                   value="email"
-                                   checked
-                                   onchange="return updateForgotPasswordResetMethod()">
-                            <span>Email</span>
-                        </label>
-                        <label class="user-password-reset-method">
-                            <input type="radio"
-                                   name="reset_method"
-                                   value="phone"
-                                   onchange="return updateForgotPasswordResetMethod()">
-                            <span>Phone</span>
-                        </label>
-                    </div>
                     <p id="forgotPasswordMethodNote" class="user-account-form-note">
-                        {% if password_reset_email_configured %}
-                            Enter your username or email and the app will email a one-time reset link.
-                        {% else %}
-                            Enter your username or email and the app will prepare a one-time local reset link.
-                        {% endif %}
+                        Enter your email and Firebase will send a password reset link.
                     </p>
-                    <div id="forgotPasswordPhoneCountryWrap"
-                         class="user-phone-reset-country"
-                         hidden>
-                        <label class="user-phone-country-label">
-                            <span>Country</span>
-                            <select id="forgotPasswordPhoneCountry"
-                                    data-phone-country
-                                    autocomplete="tel-country-code"></select>
-                        </label>
-                    </div>
                     <label>
-                        <span id="forgotPasswordIdentityLabel">Username or Email</span>
+                        <span id="forgotPasswordIdentityLabel">Email</span>
                         <input id="forgotPasswordIdentityInput"
-                               type="text"
+                               type="email"
                                name="identity"
                                required
-                               autocomplete="username"
+                               autocomplete="email"
                                data-email-configured="{% if password_reset_email_configured %}1{% else %}0{% endif %}"
                                data-sms-configured="{% if password_reset_sms_configured %}1{% else %}0{% endif %}">
                     </label>
                     <button id="forgotPasswordSubmitButton" type="submit">
-                        {% if password_reset_email_configured %}
-                            Send Reset Email
-                        {% else %}
-                            Prepare Reset Link
-                        {% endif %}
+                        Send Reset Email
                     </button>
                 </form>
             {% endif %}

@@ -80,6 +80,7 @@ from PushShoppingList.services.shopping_list_service import load_items
 from PushShoppingList.services.shopping_list_service import add_items
 from PushShoppingList.services.shopping_list_service import save_items
 from PushShoppingList.services.store_settings_service import load_store_settings
+from PushShoppingList.services.firebase_auth_service import firebase_web_config
 from PushShoppingList.services.user_account_service import current_public_user
 
 main_bp = Blueprint("main_bp", __name__)
@@ -1397,6 +1398,8 @@ def index():
         account_delete_token=request.args.get("account_delete_token", ""),
         app_css_version=static_asset_version("css/app.css"),
         app_js_version=static_asset_version("js/app.js"),
+        firebase_auth_js_version=static_asset_version("js/firebase-auth.js"),
+        firebase_web_config=firebase_web_config(),
     )
 
 

@@ -140,6 +140,8 @@ def public_user(user):
         "display_name": user_display_name(user),
         "username": user.get("username", ""),
         "email": user.get("email", ""),
+        "auth_provider": user.get("auth_provider", "local"),
+        "firebase_uid": user.get("firebase_uid", ""),
         "email_verified_at": user.get("email_verified_at", ""),
         "email_verified": account_email_verified(user),
         "account_status": account_status(user),
@@ -212,6 +214,22 @@ def find_user_by_identity(identity):
     return find_user_by_identity_in_payload(load_users(), identity)
 
 
+def find_user_by_firebase_uid_in_payload(payload, firebase_uid):
+    firebase_uid = str(firebase_uid or "").strip()
+
+    if not firebase_uid:
+        return None
+
+    return next(
+        (
+            user
+            for user in payload.get("users", [])
+            if str(user.get("firebase_uid") or "").strip() == firebase_uid
+        ),
+        None,
+    )
+
+
 def find_user_by_identity_in_payload(payload, identity):
     identity_key = normalize_identity(identity)
 
@@ -239,6 +257,99 @@ def find_user_by_phone_in_payload(payload, phone):
             return user
 
     return None
+
+
+def name_parts_from_display_name(display_name):
+    parts = str(display_name or "").strip().split()
+
+    if not parts:
+        return "", ""
+
+    if len(parts) == 1:
+        return parts[0], ""
+
+    return parts[0], " ".join(parts[1:])
+
+
+def sign_in_firebase_user(firebase_user, profile=None):
+    profile = profile if isinstance(profile, dict) else {}
+    firebase_uid = str(firebase_user.get("localId") or "").strip()
+    email = str(firebase_user.get("email") or profile.get("email") or "").strip()
+    display_name = str(firebase_user.get("displayName") or profile.get("display_name") or "").strip()
+    first_name = str(profile.get("first_name") or "").strip()
+    last_name = str(profile.get("last_name") or "").strip()
+    username = str(profile.get("username") or email or display_name or firebase_uid).strip()
+
+    if not firebase_uid:
+        return {"ok": False, "errors": ["Firebase user id is missing."]}
+
+    if not first_name and not last_name:
+        first_name, last_name = name_parts_from_display_name(display_name)
+
+    payload = load_users()
+    user = find_user_by_firebase_uid_in_payload(payload, firebase_uid)
+
+    if not user and email:
+        user = find_user_by_identity_in_payload(payload, email)
+
+    timestamp = now_iso()
+    created = False
+
+    if not user:
+        user_id = uuid.uuid4().hex
+        user = {
+            "user_id": user_id,
+            "first_name": first_name,
+            "last_name": last_name,
+            "username": username,
+            "email": email,
+            "auth_provider": "firebase",
+            "firebase_uid": firebase_uid,
+            "account_status": "active",
+            "email_verified_at": timestamp,
+            "phone": "",
+            "ntfy_topic": generate_ntfy_topic(),
+            "ntfy_topic_created_at": timestamp,
+            "password_hash": "",
+            "avatar_path": "",
+            "created_at": timestamp,
+            "updated_at": timestamp,
+        }
+        seed_result = seed_new_user_rule_workspace(user_id)
+        if not seed_result.get("ok"):
+            return {"ok": False, "errors": seed_result.get("errors", ["Unable to initialize account rules."])}
+        payload["users"].append(user)
+        created = True
+    else:
+        if first_name:
+            user["first_name"] = first_name
+        if last_name:
+            user["last_name"] = last_name
+        if email:
+            user["email"] = email
+        if username:
+            user["username"] = username
+        user["auth_provider"] = "firebase"
+        user["firebase_uid"] = firebase_uid
+        user["account_status"] = "active"
+        user["email_verified_at"] = user.get("email_verified_at") or timestamp
+        user.pop("account_verification", None)
+
+    provider_ids = [
+        str(provider.get("providerId") or "").strip()
+        for provider in firebase_user.get("providerUserInfo", [])
+        if isinstance(provider, dict) and str(provider.get("providerId") or "").strip()
+    ]
+    user["firebase_provider_ids"] = provider_ids
+    user["firebase_email_verified"] = bool(firebase_user.get("emailVerified"))
+    user["firebase_last_login_at"] = timestamp
+    user["updated_at"] = timestamp
+    save_users(payload)
+
+    session["user_id"] = user["user_id"]
+    session.pop("pending_2fa_user_id", None)
+    session.pop("account_verification_link", None)
+    return {"ok": True, "created": created, "user": public_user(user)}
 
 
 def normalize_identity(value):

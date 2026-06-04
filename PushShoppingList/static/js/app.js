@@ -483,6 +483,31 @@ function updateForgotPasswordResetMethod() {
         return false;
     }
 
+    if (form.hasAttribute("data-firebase-forgot-form")) {
+        input.type = "email";
+        input.inputMode = "";
+        input.autocomplete = "email";
+        input.placeholder = "";
+
+        if (phoneCountryWrap) {
+            phoneCountryWrap.hidden = true;
+        }
+
+        if (label) {
+            label.textContent = "Email";
+        }
+
+        if (note) {
+            note.textContent = "Enter your email and Firebase will send a password reset link.";
+        }
+
+        if (button) {
+            button.textContent = "Send Reset Email";
+        }
+
+        return false;
+    }
+
     if (method === "phone") {
         input.type = "tel";
         input.inputMode = "tel";
