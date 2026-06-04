@@ -448,6 +448,16 @@ function toggleUserProfileEditor(open = null) {
             accountMenu.open = false;
         }
     };
+    const scrollToProfileEditor = () => {
+        window.requestAnimationFrame(() => {
+            form.scrollIntoView({ behavior: "smooth", block: "start" });
+            const firstControl = form.querySelector("[data-user-profile-close]")
+                || form.querySelector("input, button, select, textarea");
+            if (firstControl) {
+                firstControl.focus({ preventScroll: true });
+            }
+        });
+    };
     const explicitState = typeof open === "boolean";
     const isAlreadyOpen = !form.hidden;
 
@@ -467,6 +477,8 @@ function toggleUserProfileEditor(open = null) {
         ).forEach(panel => {
             panel.hidden = true;
         });
+
+        scrollToProfileEditor();
     }
 
     return false;

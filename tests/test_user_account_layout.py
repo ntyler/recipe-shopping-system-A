@@ -31,6 +31,7 @@ def test_account_settings_editor_has_header_close_and_closes_menu():
     template = (ROOT / "PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    firebase_script = (ROOT / "PushShoppingList/static/js/firebase-auth.js").read_text(encoding="utf-8")
 
     assert '<h3>Account Settings</h3>' in template
     assert "data-user-profile-close" in template
@@ -41,6 +42,10 @@ def test_account_settings_editor_has_header_close_and_closes_menu():
     assert "const isAlreadyOpen = !form.hidden" in script
     assert "if (!explicitState && isAlreadyOpen)" in script
     assert "accountMenu.open = false" in script
+    assert "form.scrollIntoView({ behavior: \"smooth\", block: \"start\" })" in script
+    assert "form.querySelector(\"[data-user-profile-close]\")" in script
+    assert "firstControl.focus({ preventScroll: true })" in script
+    assert "#userProfileEditForm, [data-push-notifications-panel]" in firebase_script
 
 
 def test_mobile_account_dates_stack_left_aligned():

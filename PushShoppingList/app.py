@@ -66,7 +66,6 @@ ADMIN_ENDPOINTS = {
     "pdf_bp.revoke_pdf_share_route",
     "pdf_bp.upload_pdf_to_cloudflare_route",
     "feedback_bp.update_feedback_admin_route",
-    "feedback_bp.mark_feedback_read_route",
 }
 
 

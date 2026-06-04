@@ -508,7 +508,7 @@ function bindPushNotificationsPanel() {
 
 function hideAccountMenuPanels(exceptPanel = null) {
     document.querySelectorAll(
-        "[data-push-notifications-panel], [data-two-factor-panel], [data-delete-account-panel]"
+        "#userProfileEditForm, [data-push-notifications-panel], [data-two-factor-panel], [data-delete-account-panel]"
     ).forEach((panel) => {
         if (panel !== exceptPanel) {
             panel.hidden = true;
