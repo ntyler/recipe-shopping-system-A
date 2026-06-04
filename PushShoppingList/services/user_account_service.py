@@ -454,6 +454,7 @@ def set_signed_in_session(user):
     session["is_admin"] = is_admin_user(user)
     session.pop("pending_2fa_user_id", None)
     session.pop("pending_2fa_provider", None)
+    session.pop("pending_2fa_context", None)
 
 
 def sign_in_firebase_user(firebase_user, profile=None, trusted_device_token=""):
@@ -563,6 +564,10 @@ def sign_in_firebase_user(firebase_user, profile=None, trusted_device_token=""):
         session.pop("user_id", None)
         session["pending_2fa_user_id"] = user["user_id"]
         session["pending_2fa_provider"] = "firebase"
+        if two_factor_setup_confirmation_pending(user):
+            session["pending_2fa_context"] = "setup_confirmation"
+        else:
+            session.pop("pending_2fa_context", None)
         return {"ok": True, "created": created, "requires_2fa": True, "user": public_user(user)}
 
     set_signed_in_session(user)
@@ -751,10 +756,15 @@ def authenticate_user(identity, password, trusted_device_token=""):
             session.permanent = True
             session["user_id"] = user["user_id"]
             session.pop("pending_2fa_user_id", None)
+            session.pop("pending_2fa_context", None)
             return {"ok": True, "user": public_user(user)}
 
         session.pop("user_id", None)
         session["pending_2fa_user_id"] = user["user_id"]
+        if two_factor_setup_confirmation_pending(user):
+            session["pending_2fa_context"] = "setup_confirmation"
+        else:
+            session.pop("pending_2fa_context", None)
         return {"ok": True, "requires_2fa": True, "user": public_user(user)}
 
     user["last_login_at"] = now_iso()
@@ -1247,6 +1257,15 @@ def two_factor_enabled(user):
     return isinstance(two_factor, dict) and bool(two_factor.get("enabled"))
 
 
+def two_factor_setup_confirmation_pending(user):
+    two_factor = user.get("two_factor") if isinstance(user, dict) else None
+    return (
+        isinstance(two_factor, dict)
+        and bool(two_factor.get("enabled"))
+        and bool(two_factor.get("setup_confirmation_required"))
+    )
+
+
 def pending_two_factor_setup(user_id):
     user = find_user_by_id(user_id)
     setup = user.get("two_factor_setup") if isinstance(user, dict) else None
@@ -1311,6 +1330,8 @@ def enable_two_factor(user_id, code):
         "enabled": True,
         "secret": setup["secret"],
         "enabled_at": now_iso(),
+        "setup_confirmation_required": True,
+        "setup_confirmed_at": "",
         "backup_codes": hash_backup_codes(backup_codes),
         "trusted_devices": [],
     }
@@ -1345,6 +1366,7 @@ def complete_two_factor_sign_in(code, remember_device=False):
 
     if not user or not two_factor_enabled(user):
         session.pop("pending_2fa_user_id", None)
+        session.pop("pending_2fa_context", None)
         return {"ok": False, "errors": ["Two-factor verification is no longer available. Sign in again."]}
 
     verified = verify_user_two_factor_code(user, code)
@@ -1358,6 +1380,10 @@ def complete_two_factor_sign_in(code, remember_device=False):
         trust_token = add_trusted_two_factor_device(user)
 
     timestamp = now_iso()
+    two_factor = user.get("two_factor") if isinstance(user.get("two_factor"), dict) else {}
+    if isinstance(two_factor, dict) and two_factor.get("setup_confirmation_required"):
+        two_factor["setup_confirmation_required"] = False
+        two_factor["setup_confirmed_at"] = timestamp
     user["last_login_at"] = timestamp
     user["updated_at"] = timestamp
     save_users(payload)
@@ -1367,6 +1393,8 @@ def complete_two_factor_sign_in(code, remember_device=False):
 
 def cancel_two_factor_sign_in():
     session.pop("pending_2fa_user_id", None)
+    session.pop("pending_2fa_provider", None)
+    session.pop("pending_2fa_context", None)
     return {"ok": True}
 
 
@@ -1511,6 +1539,8 @@ def sign_out_user():
     session.pop("provider", None)
     session.pop("is_admin", None)
     session.pop("pending_2fa_user_id", None)
+    session.pop("pending_2fa_provider", None)
+    session.pop("pending_2fa_context", None)
     session.pop("two_factor_recovery_link", None)
     session.pop("account_delete_link", None)
     session.pop("account_verification_link", None)

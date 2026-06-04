@@ -587,21 +587,48 @@
             </div>
         </div>
     {% elif not account_action_token %}
-        <p class="helper-text user-account-helper">
-            You are using the guest workspace. Sign in to keep recipes, stores, product picks, and preferences private to your account.
-        </p>
+        {% set pending_two_factor_setup_confirmation = pending_two_factor_context == "setup_confirmation" %}
+        {% if pending_two_factor_sign_in %}
+            <p class="helper-text user-account-helper">
+                {% if pending_two_factor_setup_confirmation %}
+                    Two-factor authentication was enabled. Confirm the new code once to finish setup and return to your account.
+                {% else %}
+                    Finish two-factor verification to continue signing in.
+                {% endif %}
+            </p>
+        {% else %}
+            <p class="helper-text user-account-helper">
+                You are using the guest workspace. Sign in to keep recipes, stores, product picks, and preferences private to your account.
+            </p>
+        {% endif %}
 
         <div class="user-account-forms">
             {% if pending_two_factor_sign_in %}
                 <form class="user-account-form user-two-factor-sign-in-form"
                       method="POST"
                       action="{{ url_for('account_bp.verify_two_factor_route') }}">
-                    <h3>Two-Factor Verification</h3>
+                    <h3>
+                        {% if pending_two_factor_setup_confirmation %}
+                            Two-Factor Authentication Enabled
+                        {% else %}
+                            Two-Factor Verification
+                        {% endif %}
+                    </h3>
                     <p class="user-account-form-note">
-                        Enter the current authenticator code or one backup code.
+                        {% if pending_two_factor_setup_confirmation %}
+                            Enter the code from your authenticator app to confirm setup. After this, your account will be protected by two-factor authentication.
+                        {% else %}
+                            Enter the current authenticator code or one backup code.
+                        {% endif %}
                     </p>
                     <label>
-                        <span>Authenticator or Backup Code</span>
+                        <span>
+                            {% if pending_two_factor_setup_confirmation %}
+                                Authenticator Code
+                            {% else %}
+                                Authenticator or Backup Code
+                            {% endif %}
+                        </span>
                         <input type="text"
                                name="code"
                                required
@@ -613,7 +640,13 @@
                         <input type="checkbox" name="remember_device" value="1">
                         <span>Remember this browser for 30 days</span>
                     </label>
-                    <button type="submit">Verify Code</button>
+                    <button type="submit">
+                        {% if pending_two_factor_setup_confirmation %}
+                            Confirm Two-Factor Setup
+                        {% else %}
+                            Verify Code
+                        {% endif %}
+                    </button>
                     <button type="submit"
                             class="secondary"
                             data-firebase-cancel-two-factor
@@ -622,15 +655,16 @@
                         Cancel Sign In
                     </button>
                 </form>
-                <form class="user-account-form user-two-factor-recovery-request-form"
-                      method="POST"
-                      action="{{ url_for('account_bp.request_two_factor_recovery_route') }}">
-                    <h3>Need to disable two-factor authentication?</h3>
-                    <p class="user-account-form-note">
-                        Email a one-time verification link to this account. After you confirm the link, two-factor authentication is disabled for that account.
-                    </p>
-                    <button type="submit">Email Disable Verification Link</button>
-                </form>
+                <details class="user-account-form user-two-factor-recovery-request-form user-two-factor-trouble-details">
+                    <summary>Can't access your authenticator?</summary>
+                    <form method="POST"
+                          action="{{ url_for('account_bp.request_two_factor_recovery_route') }}">
+                        <p class="user-account-form-note">
+                            Email a one-time verification link to this account. After you confirm the link, two-factor authentication is disabled for that account.
+                        </p>
+                        <button type="submit">Email Disable Verification Link</button>
+                    </form>
+                </details>
             {% else %}
                 <form id="firebaseCreateAccountForm"
                       class="user-account-form"

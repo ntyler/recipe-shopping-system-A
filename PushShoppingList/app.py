@@ -151,6 +151,7 @@ def create_app():
             "password_reset_email_configured": password_reset_email_configured(),
             "password_reset_sms_configured": password_reset_sms_configured(),
             "pending_two_factor_sign_in": bool(session.get("pending_2fa_user_id")),
+            "pending_two_factor_context": session.get("pending_2fa_context", ""),
             "two_factor_setup": pending_two_factor_setup(session.get("user_id")),
             "two_factor_backup_codes": session.pop("two_factor_backup_codes", None),
         }

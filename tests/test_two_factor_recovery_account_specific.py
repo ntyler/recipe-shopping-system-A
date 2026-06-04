@@ -105,3 +105,13 @@ def test_two_factor_recovery_token_page_hides_pending_sign_in_form(tmp_path, mon
     assert "Cancel" in html
     assert "Two-Factor Verification" not in html
     assert "Verify Code" not in html
+
+
+def test_two_factor_setup_confirmation_requires_explicit_new_setup_flag():
+    old_user = firebase_user("old", "old@example.com", "firebase-old")
+    new_user = firebase_user("new", "new@example.com", "firebase-new")
+    new_user["two_factor"]["setup_confirmation_required"] = True
+    new_user["two_factor"]["setup_confirmed_at"] = ""
+
+    assert not accounts.two_factor_setup_confirmation_pending(old_user)
+    assert accounts.two_factor_setup_confirmation_pending(new_user)

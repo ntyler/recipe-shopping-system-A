@@ -240,6 +240,7 @@ Profile photos use the uploaded logo/avatar first. If the uploaded logo is remov
 Two-factor authentication is account-specific:
 
 - Setup uses an authenticator app secret, QR code when available, and one-time backup codes.
+- First-time setup asks the user to confirm the new authenticator code once with a setup-specific confirmation screen.
 - Sign-in can remember the browser for 30 days.
 - Backup-code regeneration requires an authenticator code or backup code.
 - Normal disable requires an authenticator code or backup code.

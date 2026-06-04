@@ -290,13 +290,17 @@ def sign_in_route():
 
 @account_bp.route("/account/2fa/verify", methods=["POST"])
 def verify_two_factor_route():
+    two_factor_context = session.get("pending_2fa_context", "")
     result = complete_two_factor_sign_in(
         request.form.get("code"),
         remember_device=request.form.get("remember_device") == "1",
     )
 
     if result.get("ok"):
-        flash("Signed in.", "success")
+        if two_factor_context == "setup_confirmation":
+            flash("Two-factor setup confirmed. You are signed in.", "success")
+        else:
+            flash("Signed in.", "success")
         response = make_response(redirect(url_for("main_bp.index", _anchor="userAccountSection")))
 
         if result.get("trust_token"):
@@ -658,6 +662,7 @@ def enable_two_factor_route():
 
     if result.get("ok"):
         session["two_factor_backup_codes"] = result.get("backup_codes", [])
+        session["pending_2fa_context"] = "setup_confirmation"
 
     flash_account_result(result, "Two-factor authentication enabled.")
     return two_factor_panel_redirect()
