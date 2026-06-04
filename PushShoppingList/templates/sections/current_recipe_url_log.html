@@ -626,11 +626,37 @@
                     </label>
                     <label>
                         <span>PDF Path</span>
-                        <input type="text" id="recipeEditPdfPath" readonly>
+                        <span class="recipe-edit-source-url-field">
+                            <input type="text" id="recipeEditPdfPath" readonly>
+                            <a id="recipeEditPdfPathLink"
+                               class="recipe-edit-source-url-link"
+                               href="#"
+                               target="_blank"
+                               rel="noopener noreferrer"
+                               aria-label="Open PDF path"
+                               title="Open PDF path"
+                               onclick="return openRecipeEditorPdf(this, event)"
+                               hidden>
+                                &#8599;
+                            </a>
+                        </span>
                     </label>
                     <label id="recipeEditPdfPublicUrlField" hidden>
                         <span>PDF Public URL</span>
-                        <input type="text" id="recipeEditPdfPublicUrl" readonly>
+                        <span class="recipe-edit-source-url-field">
+                            <input type="text" id="recipeEditPdfPublicUrl" readonly>
+                            <a id="recipeEditPdfPublicUrlLink"
+                               class="recipe-edit-source-url-link"
+                               href="#"
+                               target="_blank"
+                               rel="noopener noreferrer"
+                               aria-label="Open PDF public URL"
+                               title="Open PDF public URL"
+                               onclick="return openRecipeEditorPdf(this, event)"
+                               hidden>
+                                &#8599;
+                            </a>
+                        </span>
                     </label>
                     <label>
                         <span>Servings</span>

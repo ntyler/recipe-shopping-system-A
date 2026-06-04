@@ -6979,8 +6979,10 @@ function setRecipeEditorCookbook(recipe, fallbackUrl = "") {
 
 function updateRecipeEditorPdfControls(recipe) {
     const pdfPathInput = document.getElementById("recipeEditPdfPath");
+    const pdfPathLink = document.getElementById("recipeEditPdfPathLink");
     const pdfPublicUrlField = document.getElementById("recipeEditPdfPublicUrlField");
     const pdfPublicUrlInput = document.getElementById("recipeEditPdfPublicUrl");
+    const pdfPublicUrlLink = document.getElementById("recipeEditPdfPublicUrlLink");
     const pdfButton = document.getElementById("recipeEditPdfButton");
     const pdfPanelButton = document.getElementById("recipeEditPdfButtonPanel");
     const pdfMenuButton = document.getElementById("recipeEditPdfMenuButton");
@@ -6999,12 +7001,29 @@ function updateRecipeEditorPdfControls(recipe) {
         pdfPathInput.value = pdfPath;
     }
 
+    if (pdfPathLink) {
+        pdfPathLink.href = archiveUrl;
+        pdfPathLink.hidden = !hasPdf;
+        pdfPathLink.setAttribute("aria-disabled", hasPdf ? "false" : "true");
+        pdfPathLink.title = hasPdf ? "Open PDF" : "PDF not available";
+        pdfPathLink.setAttribute("aria-label", hasPdf ? "Open PDF" : "PDF not available");
+    }
+
     if (pdfPublicUrlInput) {
         pdfPublicUrlInput.value = pdfPublicUrl;
     }
 
     if (pdfPublicUrlField) {
         pdfPublicUrlField.hidden = !pdfPublicUrl;
+        if (pdfPublicUrlLink) {
+            const hasPublicPdfUrl = Boolean(pdfPublicUrl);
+            const canOpenPublicPdfUrl = hasPublicPdfUrl && isLegitimateWebUrl(pdfPublicUrl);
+            pdfPublicUrlLink.href = canOpenPublicPdfUrl ? pdfPublicUrl : "#";
+            pdfPublicUrlLink.hidden = !canOpenPublicPdfUrl;
+            pdfPublicUrlLink.setAttribute("aria-disabled", canOpenPublicPdfUrl ? "false" : "true");
+            pdfPublicUrlLink.title = canOpenPublicPdfUrl ? "Open PDF public URL" : "No public PDF URL";
+            pdfPublicUrlLink.setAttribute("aria-label", canOpenPublicPdfUrl ? "Open PDF public URL" : "No public PDF URL");
+        }
     }
 
     [pdfButton, pdfPanelButton, pdfMenuButton].forEach((button) => {
