@@ -4546,6 +4546,13 @@ body {
             gap: 10px;
         }
 
+        .user-account-access-notices-heading > div {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            min-width: 0;
+        }
+
         .user-account-access-notices-heading strong,
         .user-account-access-notice strong {
             color: #fff7d6;
@@ -4558,6 +4565,43 @@ body {
             font-size: 12px;
             font-weight: 900;
             white-space: nowrap;
+        }
+
+        .user-account-access-history-toggle {
+            width: auto;
+            min-height: 38px;
+            padding: 8px 12px;
+            margin: 0;
+            border: 1px solid #7c5a16;
+            border-radius: 7px;
+            background: #17130a;
+            color: #fff7d6;
+            font-size: 12px;
+            font-weight: 900;
+            white-space: nowrap;
+        }
+
+        .user-account-access-history-toggle:hover,
+        .user-account-access-history-toggle:focus-visible {
+            border-color: #f7d889;
+            background: #2b210b;
+            color: #ffffff;
+        }
+
+        .user-account-access-list {
+            display: grid;
+            gap: 10px;
+        }
+
+        .user-account-access-list[hidden] {
+            display: none;
+        }
+
+        .user-account-access-history-label {
+            color: #f7d889;
+            font-size: 12px;
+            font-weight: 900;
+            text-transform: uppercase;
         }
 
         .user-account-access-notice {
@@ -10632,8 +10676,19 @@ body {
                 gap: 4px;
             }
 
+            .user-account-access-notices-heading > div {
+                align-items: flex-start;
+                flex-direction: column;
+                gap: 4px;
+            }
+
             .user-account-access-notices-heading span,
             .user-account-access-notice span {
+                white-space: normal;
+            }
+
+            .user-account-access-history-toggle {
+                width: 100%;
                 white-space: normal;
             }
 

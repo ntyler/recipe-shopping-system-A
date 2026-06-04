@@ -78,6 +78,9 @@ def support_access_notices_for_user(user, limit=3):
         key=lambda item: (str(item[1].get("timestamp") or ""), item[0]),
         reverse=True,
     )
+    if limit is None:
+        return [notice for _index, notice in sorted_notices]
+
     return [notice for _index, notice in sorted_notices[:limit]]
 
 

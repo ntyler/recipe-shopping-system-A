@@ -270,6 +270,8 @@ Do not show admins:
 - Store passwords
 - Private recipe, shopping, pantry, receipt, upload, or PDF contents unless the user explicitly asks for help with that specific data.
 
+Users can click `View account access history` in the account access notice to show the full sanitized admin-support access history for their account.
+
 Two-factor authentication is account-specific:
 
 - Setup uses an authenticator app secret, QR code when available, and one-time backup codes.

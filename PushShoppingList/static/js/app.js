@@ -484,6 +484,37 @@ function toggleUserProfileEditor(open = null) {
     return false;
 }
 
+function toggleAccountAccessHistory(button) {
+    const card = button ? button.closest("[data-account-access-history]") : null;
+
+    if (!card) {
+        return false;
+    }
+
+    const recentList = card.querySelector("[data-account-access-recent-list]");
+    const fullList = card.querySelector("[data-account-access-full-list]");
+    const count = card.querySelector("[data-account-access-history-count]");
+    const open = button.getAttribute("aria-expanded") !== "true";
+
+    if (recentList) {
+        recentList.hidden = open;
+    }
+
+    if (fullList) {
+        fullList.hidden = !open;
+    }
+
+    if (count) {
+        count.textContent = open
+            ? count.dataset.historyLabel || count.textContent
+            : count.dataset.recentLabel || count.textContent;
+    }
+
+    button.setAttribute("aria-expanded", open ? "true" : "false");
+    button.textContent = open ? "Hide account access history" : "View account access history";
+    return false;
+}
+
 function toggleForgotPasswordForm() {
     const form = document.getElementById("forgotPasswordForm");
 

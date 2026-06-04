@@ -1349,6 +1349,8 @@ def index():
         item_state,
     )
 
+    admin_support_history = support_access_notices_for_user(active_public_user, limit=None)
+
     return render_template(
         "index.html",
         message="",
@@ -1403,7 +1405,8 @@ def index():
             errors=session.pop("admin_support_errors", []),
             reason=session.get("admin_support_reason", ""),
         ),
-        admin_support_notices=support_access_notices_for_user(active_public_user),
+        admin_support_notices=admin_support_history[:3],
+        admin_support_history=admin_support_history,
         password_reset_token=request.args.get("reset_token", ""),
         two_factor_recovery_token=two_factor_recovery_token,
         two_factor_recovery_user=public_two_factor_recovery_user(two_factor_recovery_token),

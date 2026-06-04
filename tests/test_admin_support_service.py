@@ -160,6 +160,14 @@ def test_support_access_notices_for_user_are_recent_and_targeted(monkeypatch, tm
 
     assert [notice["reason"] for notice in notices] == ["second reason", "first reason"]
     assert notices[0]["admin_email"] == "admin@example.com"
+    assert [
+        notice["reason"]
+        for notice in support.support_access_notices_for_user(target_user(), limit=None)
+    ] == ["second reason", "first reason"]
+    assert [
+        notice["reason"]
+        for notice in support.support_access_notices_for_user(target_user(), limit=1)
+    ] == ["second reason"]
 
 
 def test_admin_support_requires_admin_and_reason(monkeypatch, tmp_path):
@@ -221,14 +229,20 @@ def test_admin_support_route_notice_renders_for_target_user(monkeypatch, tmp_pat
         with client.session_transaction() as session:
             session["user_id"] = "admin"
 
-        response = client.post(
-            "/account/admin-support",
-            data={
-                "target_user_id": "customer",
-                "support_reason": "checking verification state",
-            },
-        )
-        assert response.status_code == 302
+        for reason in (
+            "first support check",
+            "second support check",
+            "third support check",
+            "checking verification state",
+        ):
+            response = client.post(
+                "/account/admin-support",
+                data={
+                    "target_user_id": "customer",
+                    "support_reason": reason,
+                },
+            )
+            assert response.status_code == 302
 
         with client.session_transaction() as session:
             session.clear()
@@ -241,6 +255,11 @@ def test_admin_support_route_notice_renders_for_target_user(monkeypatch, tmp_pat
     assert "Admin support viewed your account support record." in html
     assert "admin@example.com" in html
     assert "checking verification state" in html
+    assert "first support check" in html
+    assert "View account access history" in html
+    assert 'data-recent-label="3 recent views"' in html
+    assert 'data-history-label="4 total views"' in html
+    assert "Full account access history" in html
 
 
 def test_admin_support_route_reports_configured_email_failure(monkeypatch, tmp_path):

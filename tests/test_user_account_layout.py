@@ -79,7 +79,13 @@ def test_admin_support_view_is_admin_only_reasoned_and_audited():
     assert "record_support_access" in service
     assert "support_access_notices" in account_template
     assert "Account Access Notice" in account_template
+    assert "View account access history" in account_template
+    assert "data-account-access-history-toggle" in account_template
+    assert "admin_support_history" in account_template
     assert ".user-account-access-notices" in css
+    assert ".user-account-access-history-toggle" in css
+    assert ".user-account-access-list[hidden]" in css
+    assert "function toggleAccountAccessHistory(button)" in (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     assert "password_hash" not in support_template
     assert "two_factor.secret" not in support_template
     assert ".admin-support-card" in css

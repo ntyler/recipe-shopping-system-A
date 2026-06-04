@@ -11,31 +11,61 @@
         </div>
     {% endif %}
 
-    {% set support_access_notices = admin_support_notices|default([]) %}
-    {% if current_user and support_access_notices and not account_action_token %}
-        <div class="user-account-access-notices" aria-live="polite">
-            <div class="user-account-access-notices-heading">
-                <strong>Account Access Notice</strong>
-                <span>{{ support_access_notices|length }} recent view{% if support_access_notices|length != 1 %}s{% endif %}</span>
+    {% macro account_access_notice_card(notice) %}
+        <article class="user-account-access-notice">
+            <div>
+                <strong>Admin support viewed your account support record.</strong>
+                <span>{{ notice.timestamp_label or notice.timestamp or "Time unavailable" }}</span>
             </div>
-            {% for notice in support_access_notices %}
-                <article class="user-account-access-notice">
-                    <div>
-                        <strong>Admin support viewed your account support record.</strong>
-                        <span>{{ notice.timestamp_label or notice.timestamp or "Time unavailable" }}</span>
-                    </div>
-                    <dl>
-                        <div>
-                            <dt>Admin</dt>
-                            <dd>{{ notice.admin_email or "Administrator" }}</dd>
-                        </div>
-                        <div>
-                            <dt>Reason</dt>
-                            <dd>{{ notice.reason or "No reason provided" }}</dd>
-                        </div>
-                    </dl>
-                </article>
-            {% endfor %}
+            <dl>
+                <div>
+                    <dt>Admin</dt>
+                    <dd>{{ notice.admin_email or "Administrator" }}</dd>
+                </div>
+                <div>
+                    <dt>Reason</dt>
+                    <dd>{{ notice.reason or "No reason provided" }}</dd>
+                </div>
+            </dl>
+        </article>
+    {% endmacro %}
+
+    {% set support_access_notices = admin_support_notices|default([]) %}
+    {% set support_access_history = admin_support_history|default(support_access_notices) %}
+    {% if current_user and support_access_notices and not account_action_token %}
+        <div class="user-account-access-notices"
+             data-account-access-history
+             aria-live="polite">
+            <div class="user-account-access-notices-heading">
+                <div>
+                    <strong>Account Access Notice</strong>
+                    <span data-account-access-history-count
+                          data-recent-label="{{ support_access_notices|length }} recent view{% if support_access_notices|length != 1 %}s{% endif %}"
+                          data-history-label="{{ support_access_history|length }} total view{% if support_access_history|length != 1 %}s{% endif %}">
+                        {{ support_access_notices|length }} recent view{% if support_access_notices|length != 1 %}s{% endif %}
+                    </span>
+                </div>
+                <button type="button"
+                        class="secondary user-account-access-history-toggle"
+                        data-account-access-history-toggle
+                        aria-expanded="false"
+                        onclick="return toggleAccountAccessHistory(this)">
+                    View account access history
+                </button>
+            </div>
+            <div class="user-account-access-list" data-account-access-recent-list>
+                {% for notice in support_access_notices %}
+                    {{ account_access_notice_card(notice) }}
+                {% endfor %}
+            </div>
+            <div class="user-account-access-list"
+                 data-account-access-full-list
+                 hidden>
+                <div class="user-account-access-history-label">Full account access history</div>
+                {% for notice in support_access_history %}
+                    {{ account_access_notice_card(notice) }}
+                {% endfor %}
+            </div>
         </div>
     {% endif %}
 
