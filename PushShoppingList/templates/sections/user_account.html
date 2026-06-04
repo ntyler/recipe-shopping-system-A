@@ -142,6 +142,31 @@
             </div>
         </form>
 
+        {% if current_user.ntfy_url %}
+            <div class="user-account-form user-ntfy-card">
+                <h3>Push Notifications</h3>
+                <div class="user-ntfy-link-row">
+                    <a class="user-ntfy-link"
+                       href="{{ current_user.ntfy_url }}"
+                       target="_blank"
+                       rel="noopener noreferrer">
+                        Open ntfy Topic
+                    </a>
+                    <button type="button"
+                            class="secondary"
+                            data-ntfy-url="{{ current_user.ntfy_url }}"
+                            onclick="return copyAccountNtfyLink(this)">
+                        Copy Link
+                    </button>
+                </div>
+                <div class="user-ntfy-topic">
+                    <span>Topic</span>
+                    <code>{{ current_user.ntfy_topic }}</code>
+                </div>
+                <div class="user-ntfy-copy-status" aria-live="polite"></div>
+            </div>
+        {% endif %}
+
         {% set two_factor_default_state = "collapsed" if current_user.two_factor_enabled and not two_factor_setup else "expanded" %}
         <div class="user-account-form user-two-factor-card">
             <button type="button"

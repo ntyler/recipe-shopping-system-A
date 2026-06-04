@@ -8,11 +8,13 @@ from pathlib import Path
 import requests
 
 from PushShoppingList.services.storage_service import scoped_extractor_data_path
+from PushShoppingList.services.user_account_service import current_user
+from PushShoppingList.services.user_account_service import normalize_ntfy_topic
 
 
 BASE_DIR = Path(__file__).resolve().parent
 PROGRESS_FILE = scoped_extractor_data_path("extract_progress.json")
-NTFY_TOPIC = os.getenv("NTFY_TOPIC", "nathaniel-shopping-list-12345")
+FALLBACK_NTFY_TOPIC = normalize_ntfy_topic(os.getenv("NTFY_TOPIC", ""))
 
 PROGRESS_FILE.parent.mkdir(parents=True, exist_ok=True)
 PROGRESS_LOCK = threading.RLock()
@@ -287,15 +289,27 @@ def ingredients_count(item):
 
 
 def send_ntfy(title, message):
-    if not NTFY_TOPIC:
+    topic = active_ntfy_topic()
+
+    if not topic:
         return
 
     try:
         requests.post(
-            f"https://ntfy.sh/{NTFY_TOPIC}",
+            f"https://ntfy.sh/{topic}",
             data=str(message).encode("utf-8"),
             headers={"Title": str(title)},
             timeout=5,
         )
     except Exception:
         pass
+
+
+def active_ntfy_topic():
+    user = current_user()
+    topic = normalize_ntfy_topic((user or {}).get("ntfy_topic"))
+
+    if topic:
+        return topic
+
+    return FALLBACK_NTFY_TOPIC

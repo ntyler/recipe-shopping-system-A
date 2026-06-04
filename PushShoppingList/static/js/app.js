@@ -94,6 +94,48 @@ function updateForgotPasswordResetMethod() {
     return false;
 }
 
+async function copyAccountNtfyLink(button) {
+    const url = button ? String(button.dataset.ntfyUrl || "").trim() : "";
+    const card = button ? button.closest(".user-ntfy-card") : null;
+    const status = card ? card.querySelector(".user-ntfy-copy-status") : null;
+
+    if (!url) {
+        if (status) {
+            status.textContent = "Push notification link is not ready.";
+        }
+
+        return false;
+    }
+
+    try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(url);
+        } else {
+            const temp = document.createElement("textarea");
+            temp.value = url;
+            temp.setAttribute("readonly", "readonly");
+            temp.style.position = "fixed";
+            temp.style.left = "-9999px";
+            document.body.appendChild(temp);
+            temp.select();
+            document.execCommand("copy");
+            document.body.removeChild(temp);
+        }
+
+        if (status) {
+            status.textContent = "Push notification link copied.";
+        }
+    } catch (err) {
+        console.warn("Unable to copy push notification link.", err);
+
+        if (status) {
+            status.textContent = "Open the ntfy topic link to copy it.";
+        }
+    }
+
+    return false;
+}
+
 let hiddenExtractJobId = null;
 let lastRenderedExtractJobId = null;
 let extractRefreshTimer = null;

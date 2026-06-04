@@ -4922,6 +4922,69 @@ body {
             grid-column: 1 / -1;
         }
 
+        .user-ntfy-card {
+            margin-top: 12px;
+        }
+
+        .user-ntfy-link-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .user-ntfy-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 40px;
+            padding: 0 14px;
+            border: 1px solid #2563eb;
+            border-radius: 8px;
+            background: #155195;
+            color: #fff;
+            font-weight: 900;
+            text-decoration: none;
+        }
+
+        .user-ntfy-link:hover,
+        .user-ntfy-link:focus-visible {
+            background: #1d64b8;
+        }
+
+        .user-ntfy-topic {
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr);
+            gap: 8px;
+            align-items: center;
+            padding: 9px 10px;
+            border: 1px solid #2f4054;
+            border-radius: 8px;
+            background: #0b1118;
+            color: #dbeafe;
+        }
+
+        .user-ntfy-topic span {
+            color: #cbd5e1;
+            font-size: 12px;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+
+        .user-ntfy-topic code {
+            color: #d8ffe4;
+            font-family: Consolas, Monaco, monospace;
+            font-weight: 900;
+            overflow-wrap: anywhere;
+        }
+
+        .user-ntfy-copy-status {
+            min-height: 18px;
+            color: #d8ffe4;
+            font-size: 12px;
+            font-weight: 900;
+        }
+
         .cookbooks-content {
             margin-top: 12px;
             container-type: inline-size;
@@ -9959,6 +10022,11 @@ body {
             .user-account-actions button,
             .user-account-actions form {
                 width: 100%;
+            }
+
+            .user-ntfy-link-row,
+            .user-ntfy-topic {
+                grid-template-columns: minmax(0, 1fr);
             }
 
             .screen-settings-card {

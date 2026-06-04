@@ -35,6 +35,7 @@ ADMIN_EMAIL = os.getenv("SHOPPING_APP_ADMIN_EMAIL", "ntylerbert@gmail.com").stri
 PASSWORD_RESET_TTL_HOURS = 1
 TWO_FACTOR_TRUST_DAYS = 30
 TWO_FACTOR_RECOVERY_TTL_MINUTES = 30
+NTFY_TOPIC_PREFIX = os.getenv("SHOPPING_APP_NTFY_TOPIC_PREFIX", "shopping-user").strip() or "shopping-user"
 
 
 def now_iso():
@@ -84,16 +85,55 @@ def save_users(payload):
     return normalized
 
 
+def normalize_ntfy_topic(topic):
+    return re.sub(r"[^a-zA-Z0-9_-]+", "", str(topic or "").strip())[:200]
+
+
+def generate_ntfy_topic():
+    prefix = normalize_ntfy_topic(NTFY_TOPIC_PREFIX) or "shopping-user"
+    return normalize_ntfy_topic(f"{prefix}-{secrets.token_urlsafe(24)}")
+
+
+def ntfy_subscription_url(topic):
+    topic = normalize_ntfy_topic(topic)
+
+    if not topic:
+        return ""
+
+    return f"https://ntfy.sh/{topic}"
+
+
+def ensure_user_ntfy_topic(user_id):
+    payload = load_users()
+    user = find_user_by_id_in_payload(payload, user_id)
+
+    if not user:
+        return None
+
+    topic = normalize_ntfy_topic(user.get("ntfy_topic"))
+
+    if not topic or topic != str(user.get("ntfy_topic") or ""):
+        user["ntfy_topic"] = topic or generate_ntfy_topic()
+        user["ntfy_topic_created_at"] = user.get("ntfy_topic_created_at") or now_iso()
+        user["updated_at"] = now_iso()
+        save_users(payload)
+
+    return user
+
+
 def public_user(user):
     if not isinstance(user, dict):
         return None
     two_factor = user.get("two_factor") if isinstance(user.get("two_factor"), dict) else {}
+    ntfy_topic = normalize_ntfy_topic(user.get("ntfy_topic"))
 
     return {
         "user_id": user.get("user_id", ""),
         "username": user.get("username", ""),
         "email": user.get("email", ""),
         "phone": user.get("phone", ""),
+        "ntfy_topic": ntfy_topic,
+        "ntfy_url": ntfy_subscription_url(ntfy_topic),
         "avatar_path": user.get("avatar_path", ""),
         "created_at": user.get("created_at", ""),
         "updated_at": user.get("updated_at", ""),
@@ -116,7 +156,15 @@ def current_user():
     if not user_id:
         return None
 
-    return find_user_by_id(user_id)
+    user = find_user_by_id(user_id)
+
+    stored_ntfy_topic = str((user or {}).get("ntfy_topic") or "")
+    normalized_ntfy_topic = normalize_ntfy_topic(stored_ntfy_topic)
+
+    if user and (not normalized_ntfy_topic or normalized_ntfy_topic != stored_ntfy_topic):
+        user = ensure_user_ntfy_topic(user_id) or user
+
+    return user
 
 
 def current_public_user():
@@ -243,6 +291,8 @@ def create_user(username, email, password, confirm_password, avatar_file=None, p
         "username": username,
         "email": email,
         "phone": phone,
+        "ntfy_topic": generate_ntfy_topic(),
+        "ntfy_topic_created_at": timestamp,
         "password_hash": generate_password_hash(password),
         "avatar_path": "",
         "created_at": timestamp,
