@@ -246,6 +246,15 @@ body {
             display: none;
         }
 
+        body.account-action-token.screen-preview-active #appContent {
+            display: block;
+        }
+
+        body.account-action-token #screenSettingsCard,
+        body.account-action-token .app-content > :not(#userAccountSection) {
+            display: none !important;
+        }
+
         body.screen-preview-frame-page #screenSettingsCard {
             display: none;
         }
@@ -4748,6 +4757,11 @@ body {
             color: #ffd4d4;
         }
 
+        .user-account-token-actions {
+            display: grid;
+            gap: 8px;
+        }
+
         .user-delete-account-card,
         .user-phone-verification-card,
         .user-two-factor-card {
@@ -5210,6 +5224,16 @@ body {
         .user-account-menu-panel .secondary {
             border-color: #4a596a;
             background: #202829;
+        }
+
+        .user-account-menu-panel button:disabled,
+        .user-account-menu-panel button[aria-disabled="true"],
+        .user-account-menu-panel .user-account-menu-disabled {
+            border-color: #334155;
+            background: #171b1f;
+            color: #94a3b8;
+            cursor: default;
+            opacity: 1;
         }
 
         .user-account-menu-panel .danger {

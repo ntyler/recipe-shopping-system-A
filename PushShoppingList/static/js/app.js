@@ -5211,6 +5211,15 @@ function isScreenPreviewFrame() {
     return new URLSearchParams(window.location.search).get("screen_preview_frame") === "1";
 }
 
+function hasAccountActionToken() {
+    const params = new URLSearchParams(window.location.search);
+    return Boolean(
+        params.get("two_factor_recovery_token")
+        || params.get("reset_token")
+        || params.get("account_delete_token")
+    );
+}
+
 function restoreScreenSettings() {
     if (isScreenPreviewFrame()) {
         document.body.classList.add("screen-preview-frame-page");
@@ -5220,6 +5229,12 @@ function restoreScreenSettings() {
 
         document.body.dataset.screenPreviewMode = mode;
         document.body.classList.toggle("screen-preview-mobile-frame", mode === "phone" || width <= 650);
+        return;
+    }
+
+    if (hasAccountActionToken()) {
+        localStorage.setItem(SCREEN_PREVIEW_MODE_KEY, "live");
+        setScreenPreviewMode("live", { persist: false });
         return;
     }
 
@@ -5237,6 +5252,23 @@ function restoreScreenSettings() {
     }
 
     setScreenPreviewMode(localStorage.getItem(SCREEN_PREVIEW_MODE_KEY) || "live", { persist: false });
+}
+
+function cancelAccountActionLink() {
+    localStorage.setItem(SCREEN_PREVIEW_MODE_KEY, "live");
+
+    const url = new URL(window.location.href);
+    [
+        "two_factor_recovery_token",
+        "reset_token",
+        "account_delete_token",
+        "screen_preview_frame",
+        "screen_preview_mode",
+        "screen_preview_width",
+    ].forEach(param => url.searchParams.delete(param));
+    url.hash = "userAccountSection";
+    window.location.href = url.toString();
+    return false;
 }
 
 function screenPreviewStoredNumber(key, fallback) {

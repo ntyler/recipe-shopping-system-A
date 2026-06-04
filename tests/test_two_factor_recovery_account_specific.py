@@ -78,3 +78,29 @@ def test_two_factor_recovery_page_disables_invalid_token_submit():
     assert "Unable to verify this recovery link." in html
     assert "Recovery Link Invalid" in html
     assert "disabled" in html
+
+
+def test_two_factor_recovery_token_page_hides_pending_sign_in_form(tmp_path, monkeypatch):
+    monkeypatch.setattr(accounts, "USERS_FILE", tmp_path / "users.json")
+    accounts.save_users({
+        "users": [
+            firebase_user("freepdf", "freepdfjobsearch@gmail.com", "firebase-freepdf"),
+        ],
+    })
+    recovery = accounts.request_two_factor_recovery("freepdf")
+    app = create_app()
+
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["pending_2fa_user_id"] = "freepdf"
+            session["pending_2fa_provider"] = "firebase"
+
+        response = client.get(f"/?two_factor_recovery_token={recovery['token']}")
+        html = response.data.decode("utf-8")
+
+    assert response.status_code == 200
+    assert "Recover Two-Factor Access" in html
+    assert "freepdfjobsearch@gmail.com" in html
+    assert "Cancel" in html
+    assert "Two-Factor Verification" not in html
+    assert "Verify Code" not in html

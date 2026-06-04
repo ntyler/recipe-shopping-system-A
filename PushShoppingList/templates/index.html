@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 
-<body>
+<body class="{% if password_reset_token|default('') or two_factor_recovery_token|default('') or account_delete_token|default('') %}account-action-token{% endif %}">
 
 <h1>Shopping List</h1>
 
