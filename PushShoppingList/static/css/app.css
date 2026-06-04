@@ -4852,6 +4852,7 @@ body {
             color: #fff;
         }
 
+        .user-account-form .user-ntfy-title-toggle,
         .user-account-form .user-two-factor-title-toggle {
             justify-content: center;
             min-height: 42px;
@@ -4863,11 +4864,14 @@ body {
             text-align: center;
         }
 
+        .user-account-form .user-ntfy-title-toggle:hover,
+        .user-account-form .user-ntfy-title-toggle:focus-visible,
         .user-account-form .user-two-factor-title-toggle:hover,
         .user-account-form .user-two-factor-title-toggle:focus-visible {
             background: #172331;
         }
 
+        .user-ntfy-content,
         .user-two-factor-content {
             display: grid;
             gap: 10px;
