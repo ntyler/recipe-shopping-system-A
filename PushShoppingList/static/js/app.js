@@ -10465,6 +10465,8 @@ function recipeEditorHasChanges(recipe) {
 
 async function createRecipeEditorPdf(button) {
     const originalText = button ? button.textContent : "";
+    let statusMessage = "PDF created.";
+    let finalPdfData = null;
 
     if (button) {
         button.disabled = true;
@@ -10500,18 +10502,41 @@ async function createRecipeEditorPdf(button) {
 
         setRecipeEditStatus("Creating PDF...");
         const pdfData = await createRecipePdfForSource(sourceUrl);
+        finalPdfData = pdfData;
+
+        if (!pdfData.pdf_public_url) {
+            try {
+                setRecipeEditStatus("Uploading PDF to Cloudflare...");
+                const uploadData = await uploadRecipeEditorPdfToCloudflareWithSource(sourceUrl);
+                if (uploadData && uploadData.ok) {
+                    finalPdfData = {
+                        ...finalPdfData,
+                        ...uploadData,
+                    };
+                    statusMessage = "PDF created and uploaded to Cloudflare.";
+                } else {
+                    statusMessage = "PDF created, but Cloudflare upload was not completed.";
+                }
+            } catch (uploadError) {
+                statusMessage = `PDF created, but automatic Cloudflare upload failed: ${uploadError.message || "Unknown error"}`;
+            }
+        } else if (pdfData.already_exists) {
+            statusMessage = "PDF loaded from existing Cloudflare copy.";
+        } else {
+            statusMessage = "PDF created and Cloudflare link is ready.";
+        }
 
         updateRecipeEditorPdfControls({
-            source_url: pdfData.url || sourceUrl,
-            pdf_path: pdfData.pdf_path || "",
+            source_url: finalPdfData.url || sourceUrl,
+            pdf_path: finalPdfData.pdf_path || "",
             pdf_available: true,
-            pdf_local_available: Boolean(pdfData.pdf_local_available),
-            pdf_public_url: pdfData.pdf_public_url || "",
-            pdf_object_key: pdfData.pdf_object_key || "",
-            pdf_uploaded_at: pdfData.pdf_uploaded_at || "",
+            pdf_local_available: Boolean(finalPdfData.pdf_local_available),
+            pdf_public_url: finalPdfData.pdf_public_url || "",
+            pdf_object_key: finalPdfData.pdf_object_key || "",
+            pdf_uploaded_at: finalPdfData.pdf_uploaded_at || "",
         });
-        setRecipeEditStatus("PDF created.");
-        showRecipeQuantityUpdatedMessage("", "", "", "Recipe PDF created.");
+        setRecipeEditStatus(statusMessage);
+        showRecipeQuantityUpdatedMessage("", "", "", statusMessage);
     } catch (err) {
         console.warn("Unable to create recipe PDF.", err);
         setRecipeEditStatus("Unable to create PDF.", true);
@@ -10576,6 +10601,39 @@ async function createRecipePdfFromSavedRecipe(sourceUrl) {
     return pdfData;
 }
 
+async function uploadRecipeEditorPdfToCloudflareWithSource(sourceUrl) {
+    const sourceUrlValue = String(sourceUrl || "").trim();
+
+    if (!sourceUrlValue) {
+        throw new Error("Recipe URL is required before uploading the PDF.");
+    }
+
+    const response = await fetch("/api/recipe_pdf/cloudflare_upload", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ url: sourceUrlValue }),
+    });
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+        throw new Error((data && data.error) || "Unable to upload PDF to Cloudflare.");
+    }
+
+    updateRecipeEditorPdfControls({
+        source_url: data.url || sourceUrlValue,
+        pdf_path: data.pdf_path || "",
+        pdf_available: data.pdf_available !== false,
+        pdf_local_available: Boolean(data.pdf_local_available),
+        pdf_public_url: data.pdf_public_url || "",
+        pdf_object_key: data.pdf_object_key || "",
+        pdf_uploaded_at: data.pdf_uploaded_at || "",
+    });
+
+    return data;
+}
+
 async function uploadRecipeEditorPdfToCloudflare(button) {
     const originalText = button ? button.textContent : "";
     const sourceInput = document.getElementById("recipeEditSourceUrl");
@@ -10598,31 +10656,10 @@ async function uploadRecipeEditorPdfToCloudflare(button) {
 
     try {
         setRecipeEditStatus("Uploading PDF to Cloudflare...");
-
-        const response = await fetch("/api/recipe_pdf/cloudflare_upload", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ url: sourceUrl }),
-        });
-        const data = await response.json();
-
-        if (!response.ok || !data.ok) {
-            throw new Error((data && data.error) || "Unable to upload PDF to Cloudflare.");
-        }
-
-        updateRecipeEditorPdfControls({
-            source_url: data.url || sourceUrl,
-            pdf_path: data.pdf_path || "",
-            pdf_available: data.pdf_available !== false,
-            pdf_local_available: Boolean(data.pdf_local_available),
-            pdf_public_url: data.pdf_public_url || "",
-            pdf_object_key: data.pdf_object_key || "",
-            pdf_uploaded_at: data.pdf_uploaded_at || "",
-        });
+        const data = await uploadRecipeEditorPdfToCloudflareWithSource(sourceUrl);
         setRecipeEditStatus(data.already_exists ? "Cloudflare PDF link saved." : "PDF uploaded to Cloudflare.");
         showRecipeQuantityUpdatedMessage("", "", "", data.already_exists ? "Cloudflare PDF link saved." : "PDF uploaded to Cloudflare.");
+        return false;
     } catch (err) {
         console.warn("Unable to upload recipe PDF to Cloudflare.", err);
         setRecipeEditStatus(err.message || "Unable to upload PDF to Cloudflare.", true);
