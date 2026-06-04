@@ -339,6 +339,84 @@ def send_account_delete_email(user, delete_url):
     return {"ok": True, "configured": True}
 
 
+def send_admin_support_access_email(user, admin_user, audit_entry):
+    config = smtp_config()
+
+    if not password_reset_email_configured():
+        return {
+            "ok": False,
+            "configured": False,
+            "error": "Admin support access email is not configured.",
+        }
+
+    recipient = str((user or {}).get("email") or "").strip()
+    username = str((user or {}).get("username") or "there").strip()
+    admin_email = str((admin_user or {}).get("email") or "an administrator").strip()
+    timestamp_label = str(
+        (audit_entry or {}).get("timestamp_label")
+        or (audit_entry or {}).get("timestamp")
+        or ""
+    ).strip()
+    reason = str((audit_entry or {}).get("reason") or "").strip()
+
+    if not recipient:
+        return {
+            "ok": False,
+            "configured": True,
+            "error": "This account does not have an email address.",
+        }
+
+    message = EmailMessage()
+    message["Subject"] = "Your Recipe Shopping System account support record was viewed"
+    message["From"] = formataddr((config["from_name"], config["from_email"]))
+    message["To"] = recipient
+    message.set_content(
+        "\n".join([
+            f"Hi {username},",
+            "",
+            "An administrator opened your read-only account support record.",
+            f"Admin: {admin_email}",
+            f"Time: {timestamp_label or 'Unknown'}",
+            f"Reason: {reason or 'No reason provided'}",
+            "",
+            "Visible to admin support: account status, sign-in metadata, security settings, and workspace counts.",
+            "Not shown: passwords, two-factor secrets, backup code values, home address, store passwords, or private recipe data.",
+            "",
+            "If this does not look right, contact support or change your password.",
+        ])
+    )
+
+    context = ssl.create_default_context()
+
+    try:
+        if config["use_ssl"]:
+            with smtplib.SMTP_SSL(config["host"], config["port"], timeout=15, context=context) as smtp:
+                login_smtp(smtp, config)
+                smtp.send_message(message)
+        else:
+            with smtplib.SMTP(config["host"], config["port"], timeout=15) as smtp:
+                smtp.ehlo()
+                if config["use_tls"]:
+                    smtp.starttls(context=context)
+                    smtp.ehlo()
+                login_smtp(smtp, config)
+                smtp.send_message(message)
+    except smtplib.SMTPAuthenticationError as err:
+        return {
+            "ok": False,
+            "configured": True,
+            "error": smtp_auth_error_message(err),
+        }
+    except Exception as err:
+        return {
+            "ok": False,
+            "configured": True,
+            "error": f"Admin support access email could not be sent. Check SMTP settings. {err}",
+        }
+
+    return {"ok": True, "configured": True}
+
+
 def login_smtp(smtp, config):
     if config["username"]:
         smtp.login(config["username"], config["password"])

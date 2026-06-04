@@ -11,6 +11,34 @@
         </div>
     {% endif %}
 
+    {% set support_access_notices = admin_support_notices|default([]) %}
+    {% if current_user and support_access_notices and not account_action_token %}
+        <div class="user-account-access-notices" aria-live="polite">
+            <div class="user-account-access-notices-heading">
+                <strong>Account Access Notice</strong>
+                <span>{{ support_access_notices|length }} recent view{% if support_access_notices|length != 1 %}s{% endif %}</span>
+            </div>
+            {% for notice in support_access_notices %}
+                <article class="user-account-access-notice">
+                    <div>
+                        <strong>Admin support viewed your account support record.</strong>
+                        <span>{{ notice.timestamp_label or notice.timestamp or "Time unavailable" }}</span>
+                    </div>
+                    <dl>
+                        <div>
+                            <dt>Admin</dt>
+                            <dd>{{ notice.admin_email or "Administrator" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Reason</dt>
+                            <dd>{{ notice.reason or "No reason provided" }}</dd>
+                        </div>
+                    </dl>
+                </article>
+            {% endfor %}
+        </div>
+    {% endif %}
+
     {% set local_password_reset_link = session.get("password_reset_link") %}
     {% if local_password_reset_link %}
         <div class="user-account-reset-panel" aria-live="polite">

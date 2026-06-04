@@ -4527,6 +4527,77 @@ body {
             color: #ffd4d4;
         }
 
+        .user-account-access-notices {
+            display: grid;
+            gap: 10px;
+            margin-bottom: 14px;
+            padding: 12px 14px;
+            border: 1px solid #7c5a16;
+            border-radius: 8px;
+            background: #211808;
+            color: #f8eed2;
+        }
+
+        .user-account-access-notices-heading,
+        .user-account-access-notice > div {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .user-account-access-notices-heading strong,
+        .user-account-access-notice strong {
+            color: #fff7d6;
+            font-weight: 900;
+        }
+
+        .user-account-access-notices-heading span,
+        .user-account-access-notice span {
+            color: #f7d889;
+            font-size: 12px;
+            font-weight: 900;
+            white-space: nowrap;
+        }
+
+        .user-account-access-notice {
+            display: grid;
+            gap: 8px;
+            padding: 10px;
+            border: 1px solid #5a4213;
+            border-radius: 7px;
+            background: #17130a;
+        }
+
+        .user-account-access-notice dl {
+            display: grid;
+            gap: 5px;
+            margin: 0;
+            color: #f2e5c0;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .user-account-access-notice dl div {
+            display: grid;
+            grid-template-columns: 74px minmax(0, 1fr);
+            gap: 8px;
+            align-items: baseline;
+            min-width: 0;
+        }
+
+        .user-account-access-notice dt,
+        .user-account-access-notice dd {
+            min-width: 0;
+            margin: 0;
+            overflow-wrap: anywhere;
+        }
+
+        .user-account-access-notice dt {
+            color: #f7d889;
+            text-transform: uppercase;
+        }
+
         .user-account-forms {
             display: grid;
             grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -10552,6 +10623,23 @@ body {
             .user-account-profile {
                 justify-items: center;
                 text-align: center;
+            }
+
+            .user-account-access-notices-heading,
+            .user-account-access-notice > div {
+                align-items: flex-start;
+                flex-direction: column;
+                gap: 4px;
+            }
+
+            .user-account-access-notices-heading span,
+            .user-account-access-notice span {
+                white-space: normal;
+            }
+
+            .user-account-access-notice dl div {
+                grid-template-columns: minmax(0, 1fr);
+                gap: 2px;
             }
 
             .user-account-detail-list {

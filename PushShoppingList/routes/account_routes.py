@@ -1,4 +1,6 @@
 import os
+from datetime import datetime
+from datetime import timedelta
 
 from flask import Blueprint
 from flask import flash
@@ -87,6 +89,29 @@ def json_account_result(result, success_status=200, error_status=400):
         "success": False,
         "errors": result.get("errors", ["Something went wrong. Please try again."]),
     }), error_status
+
+
+def request_is_secure():
+    forwarded_proto = str(request.headers.get("X-Forwarded-Proto") or "").split(",", 1)[0].strip().lower()
+    cloudflare_visitor = str(request.headers.get("CF-Visitor") or "").lower()
+    return request.is_secure or forwarded_proto == "https" or '"scheme":"https"' in cloudflare_visitor
+
+
+def set_two_factor_trust_cookie(response, trust_token):
+    if not trust_token:
+        return response
+
+    response.set_cookie(
+        TWO_FACTOR_TRUST_COOKIE,
+        trust_token,
+        max_age=TWO_FACTOR_TRUST_MAX_AGE,
+        expires=datetime.utcnow() + timedelta(seconds=TWO_FACTOR_TRUST_MAX_AGE),
+        httponly=True,
+        samesite="Lax",
+        secure=request_is_secure(),
+        path="/",
+    )
+    return response
 
 
 def clear_admin_support_session():
@@ -316,15 +341,7 @@ def verify_two_factor_route():
             flash("Signed in.", "success")
         response = make_response(redirect(url_for("main_bp.index", _anchor="userAccountSection")))
 
-        if result.get("trust_token"):
-            response.set_cookie(
-                TWO_FACTOR_TRUST_COOKIE,
-                result["trust_token"],
-                max_age=TWO_FACTOR_TRUST_MAX_AGE,
-                httponly=True,
-                samesite="Lax",
-                secure=request.is_secure,
-            )
+        set_two_factor_trust_cookie(response, result.get("trust_token", ""))
 
         return response
 
@@ -534,7 +551,14 @@ def open_admin_support_record_route():
 
     if result.get("ok"):
         session["admin_support_selected_user"] = result.get("selected_user") or {}
-        session.pop("admin_support_errors", None)
+        email_notice = result.get("email_notice") if isinstance(result.get("email_notice"), dict) else {}
+        if email_notice.get("configured") and not email_notice.get("ok"):
+            session["admin_support_errors"] = [
+                email_notice.get("error")
+                or "Support record opened, but the user email notice could not be sent.",
+            ]
+        else:
+            session.pop("admin_support_errors", None)
     else:
         session["admin_support_errors"] = result.get(
             "errors",

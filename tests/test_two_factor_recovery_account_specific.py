@@ -1,6 +1,7 @@
 from flask import session
 
 from PushShoppingList.app import create_app
+from PushShoppingList.routes import account_routes
 from PushShoppingList.services import user_account_service as accounts
 
 
@@ -214,6 +215,108 @@ def test_firebase_resync_for_unsigned_session_still_requires_two_factor(tmp_path
         assert result["requires_2fa"]
         assert session.get("user_id") is None
         assert session.get("pending_2fa_user_id") == "freepdf"
+
+
+def test_remember_device_skips_local_two_factor_for_thirty_days(tmp_path, monkeypatch):
+    monkeypatch.setattr(accounts, "USERS_FILE", tmp_path / "users.json")
+    user = firebase_user("local-user", "local@example.com", "")
+    user["auth_provider"] = "local"
+    user["password_hash"] = accounts.generate_password_hash("secret-password")
+    user["account_status"] = "active"
+    user["two_factor"]["secret"] = ""
+    user["two_factor"]["backup_codes"] = accounts.hash_backup_codes(["ABC123"])
+    accounts.save_users({"users": [user]})
+    app = create_app()
+
+    with app.test_client() as client:
+        sign_in_response = client.post(
+            "/account/sign-in",
+            data={"identity": "local@example.com", "password": "secret-password"},
+        )
+        assert sign_in_response.status_code == 302
+
+        with client.session_transaction() as test_session:
+            assert test_session.get("pending_2fa_user_id") == "local-user"
+
+        verify_response = client.post(
+            "/account/2fa/verify",
+            data={"code": "ABC123", "remember_device": "1"},
+        )
+
+        assert verify_response.status_code == 302
+        remember_cookie = next(
+            (
+                cookie
+                for cookie in verify_response.headers.getlist("Set-Cookie")
+                if cookie.startswith("shopping_2fa_trust=")
+            ),
+            "",
+        )
+        assert "Max-Age=2592000" in remember_cookie
+        assert "expires=" in remember_cookie.lower()
+        assert "HttpOnly" in remember_cookie
+        assert "Path=/" in remember_cookie
+
+        client.post("/account/sign-out")
+        remembered_response = client.post(
+            "/account/sign-in",
+            data={"identity": "local@example.com", "password": "secret-password"},
+        )
+
+        assert remembered_response.status_code == 302
+        with client.session_transaction() as test_session:
+            assert test_session.get("user_id") == "local-user"
+            assert test_session.get("pending_2fa_user_id") is None
+
+
+def test_remember_device_skips_firebase_two_factor_for_thirty_days(tmp_path, monkeypatch):
+    monkeypatch.setattr(accounts, "USERS_FILE", tmp_path / "users.json")
+    monkeypatch.setattr(
+        account_routes,
+        "firebase_user_from_id_token",
+        lambda _token: {
+            "ok": True,
+            "firebase_user": {
+                "uid": "firebase-freepdf",
+                "email": "freepdfjobsearch@gmail.com",
+                "email_verified": True,
+            },
+        },
+    )
+    user = firebase_user("freepdf", "freepdfjobsearch@gmail.com", "firebase-freepdf")
+    user["two_factor"]["secret"] = ""
+    user["two_factor"]["backup_codes"] = accounts.hash_backup_codes(["ABC123"])
+    accounts.save_users({"users": [user]})
+    app = create_app()
+
+    with app.test_client() as client:
+        with client.session_transaction() as test_session:
+            test_session["pending_2fa_user_id"] = "freepdf"
+            test_session["pending_2fa_provider"] = "firebase"
+
+        verify_response = client.post(
+            "/account/2fa/verify",
+            data={"code": "ABC123", "remember_device": "1"},
+        )
+
+        assert verify_response.status_code == 302
+        assert "shopping_2fa_trust=" in "\n".join(verify_response.headers.getlist("Set-Cookie"))
+
+        with client.session_transaction() as test_session:
+            test_session.clear()
+
+        firebase_response = client.post(
+            "/auth/firebase-login",
+            json={"idToken": "test-token"},
+        )
+        result = firebase_response.get_json()
+
+        assert firebase_response.status_code == 200
+        assert result["success"]
+        assert not result.get("requires_2fa")
+        with client.session_transaction() as test_session:
+            assert test_session.get("user_id") == "freepdf"
+            assert test_session.get("pending_2fa_user_id") is None
 
 
 def test_two_factor_setup_confirmation_requires_explicit_new_setup_flag():

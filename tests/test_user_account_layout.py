@@ -60,6 +60,7 @@ def test_mobile_account_dates_stack_left_aligned():
 def test_admin_support_view_is_admin_only_reasoned_and_audited():
     index_template = (ROOT / "PushShoppingList/templates/index.html").read_text(encoding="utf-8")
     support_template = (ROOT / "PushShoppingList/templates/sections/admin_support.html").read_text(encoding="utf-8")
+    account_template = (ROOT / "PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")
     route = (ROOT / "PushShoppingList/routes/account_routes.py").read_text(encoding="utf-8")
     service = (ROOT / "PushShoppingList/services/admin_support_service.py").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
@@ -71,6 +72,9 @@ def test_admin_support_view_is_admin_only_reasoned_and_audited():
     assert "open_admin_support_record_route" in route
     assert "is_admin_user(admin_user)" in route
     assert "record_support_access" in service
+    assert "support_access_notices" in account_template
+    assert "Account Access Notice" in account_template
+    assert ".user-account-access-notices" in css
     assert "password_hash" not in support_template
     assert "two_factor.secret" not in support_template
     assert ".admin-support-card" in css

@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
+from PushShoppingList.services.email_service import send_admin_support_access_email
 from PushShoppingList.services.storage_service import USER_DATA_DIR
 from PushShoppingList.services.storage_service import safe_user_id
 from PushShoppingList.services.user_account_service import display_datetime
@@ -56,6 +57,28 @@ def recent_support_audit_entries(limit=20):
         reverse=True,
     )
     return [audit_entry_for_render(entry) for entry in entries[:limit]]
+
+
+def support_access_notices_for_user(user, limit=3):
+    user_id = str((user or {}).get("user_id") or "").strip()
+    email = str((user or {}).get("email") or "").strip().lower()
+
+    if not user_id and not email:
+        return []
+
+    notices = []
+    for index, entry in enumerate(load_audit_entries()):
+        target_user_id = str(entry.get("target_user_id") or "").strip()
+        target_email = str(entry.get("target_email") or "").strip().lower()
+        if (user_id and target_user_id == user_id) or (email and target_email == email):
+            notices.append((index, audit_entry_for_render(entry)))
+
+    sorted_notices = sorted(
+        notices,
+        key=lambda item: (str(item[1].get("timestamp") or ""), item[0]),
+        reverse=True,
+    )
+    return [notice for _index, notice in sorted_notices[:limit]]
 
 
 def audit_entry_for_render(entry):
@@ -203,10 +226,17 @@ def open_admin_support_record(admin_user, target_user_id, reason):
         }
 
     audit_entry = record_support_access(admin_user, target_user, reason)
+    rendered_audit_entry = audit_entry_for_render(audit_entry)
+    email_notice = send_admin_support_access_email(
+        target_user,
+        admin_user,
+        rendered_audit_entry,
+    )
     return {
         "ok": True,
         "selected_user": safe_account_detail(target_user),
-        "audit_entry": audit_entry_for_render(audit_entry),
+        "audit_entry": rendered_audit_entry,
+        "email_notice": email_notice,
     }
 
 

@@ -1,0 +1,24 @@
+{
+  "entries": [
+    {
+      "audit_id": "c788c0506b5f42dea4af0e0c7e2958ce",
+      "action": "view_account_support_record",
+      "timestamp": "2026-06-04T22:33:34Z",
+      "admin_user_id": "476262025aa2477a86c6efd66c77c8b0",
+      "admin_email": "ntylerbert@gmail.com",
+      "target_user_id": "be46f4d862d74336b7ecbf73b9eb0adf",
+      "target_email": "freepdfjobsearch@gmail.com",
+      "reason": "checking stuff"
+    },
+    {
+      "audit_id": "4d10233f3c4c4d3f9880c9f81c939462",
+      "action": "view_account_support_record",
+      "timestamp": "2026-06-04T22:33:50Z",
+      "admin_user_id": "476262025aa2477a86c6efd66c77c8b0",
+      "admin_email": "ntylerbert@gmail.com",
+      "target_user_id": "be46f4d862d74336b7ecbf73b9eb0adf",
+      "target_email": "freepdfjobsearch@gmail.com",
+      "reason": "checking stuff"
+    }
+  ]
+}

@@ -2,6 +2,7 @@ import json
 
 from PushShoppingList.app import create_app
 from PushShoppingList.services import admin_support_service as support
+from PushShoppingList.services import email_service
 from PushShoppingList.services import storage_service
 from PushShoppingList.services import user_account_service as accounts
 
@@ -12,6 +13,11 @@ def configure_admin_support(monkeypatch, tmp_path):
     monkeypatch.setattr(storage_service, "USER_DATA_DIR", tmp_path / "user_data")
     monkeypatch.setattr(support, "USER_DATA_DIR", tmp_path / "user_data")
     monkeypatch.setattr(support, "ADMIN_SUPPORT_AUDIT_FILE", tmp_path / "admin_support_audit.json")
+    monkeypatch.setattr(
+        support,
+        "send_admin_support_access_email",
+        lambda *_args, **_kwargs: {"ok": False, "configured": False},
+    )
 
 
 def admin_user():
@@ -108,6 +114,52 @@ def test_admin_support_record_is_sanitized_and_audited(monkeypatch, tmp_path):
     assert audit_entries[0]["admin_email"] == "admin@example.com"
     assert audit_entries[0]["target_email"] == "customer@example.com"
     assert audit_entries[0]["reason"] == "helping with login issue"
+    assert result["email_notice"]["configured"] is False
+
+
+def test_admin_support_record_emails_user_when_configured(monkeypatch, tmp_path):
+    configure_admin_support(monkeypatch, tmp_path)
+    accounts.save_users({"users": [admin_user(), target_user()]})
+    sent = []
+    monkeypatch.setattr(
+        support,
+        "send_admin_support_access_email",
+        lambda user, admin, audit_entry: sent.append((user, admin, audit_entry)) or {
+            "ok": True,
+            "configured": True,
+        },
+    )
+
+    result = support.open_admin_support_record(
+        admin_user(),
+        "customer",
+        "checking verification state",
+    )
+
+    assert result["ok"]
+    assert result["email_notice"]["ok"] is True
+    assert len(sent) == 1
+    assert sent[0][0]["email"] == "customer@example.com"
+    assert sent[0][1]["email"] == "admin@example.com"
+    assert sent[0][2]["reason"] == "checking verification state"
+
+
+def test_support_access_notices_for_user_are_recent_and_targeted(monkeypatch, tmp_path):
+    configure_admin_support(monkeypatch, tmp_path)
+    accounts.save_users({"users": [admin_user(), target_user()]})
+
+    support.record_support_access(admin_user(), target_user(), "first reason")
+    support.record_support_access(admin_user(), target_user(), "second reason")
+    support.record_support_access(
+        admin_user(),
+        {**target_user(), "user_id": "someone-else", "email": "other@example.com"},
+        "other account",
+    )
+
+    notices = support.support_access_notices_for_user(target_user())
+
+    assert [notice["reason"] for notice in notices] == ["second reason", "first reason"]
+    assert notices[0]["admin_email"] == "admin@example.com"
 
 
 def test_admin_support_requires_admin_and_reason(monkeypatch, tmp_path):
@@ -160,6 +212,68 @@ def test_admin_support_route_stores_only_sanitized_record(monkeypatch, tmp_path)
     assert len(support.load_audit_entries()) == 1
 
 
+def test_admin_support_route_notice_renders_for_target_user(monkeypatch, tmp_path):
+    configure_admin_support(monkeypatch, tmp_path)
+    accounts.save_users({"users": [admin_user(), target_user()]})
+    app = create_app()
+
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["user_id"] = "admin"
+
+        response = client.post(
+            "/account/admin-support",
+            data={
+                "target_user_id": "customer",
+                "support_reason": "checking verification state",
+            },
+        )
+        assert response.status_code == 302
+
+        with client.session_transaction() as session:
+            session.clear()
+            session["user_id"] = "customer"
+
+        page = client.get("/")
+        html = page.data.decode("utf-8")
+
+    assert "Account Access Notice" in html
+    assert "Admin support viewed your account support record." in html
+    assert "admin@example.com" in html
+    assert "checking verification state" in html
+
+
+def test_admin_support_route_reports_configured_email_failure(monkeypatch, tmp_path):
+    configure_admin_support(monkeypatch, tmp_path)
+    accounts.save_users({"users": [admin_user(), target_user()]})
+    monkeypatch.setattr(
+        support,
+        "send_admin_support_access_email",
+        lambda _user, _admin, _audit_entry: {
+            "ok": False,
+            "configured": True,
+            "error": "SMTP failed.",
+        },
+    )
+    app = create_app()
+
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["user_id"] = "admin"
+
+        response = client.post(
+            "/account/admin-support",
+            data={
+                "target_user_id": "customer",
+                "support_reason": "checking verification state",
+            },
+        )
+        assert response.status_code == 302
+
+        with client.session_transaction() as session:
+            assert session["admin_support_errors"] == ["SMTP failed."]
+
+
 def test_non_admin_support_route_does_not_audit(monkeypatch, tmp_path):
     configure_admin_support(monkeypatch, tmp_path)
     accounts.save_users({"users": [admin_user(), target_user()]})
@@ -180,3 +294,60 @@ def test_non_admin_support_route_does_not_audit(monkeypatch, tmp_path):
     assert response.status_code == 302
     assert response.headers["Location"].endswith("/#userAccountSection")
     assert not support.ADMIN_SUPPORT_AUDIT_FILE.exists()
+
+
+def test_admin_support_access_email_explains_visible_and_hidden_data(monkeypatch):
+    sent_messages = []
+
+    class FakeSmtp:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def ehlo(self):
+            pass
+
+        def send_message(self, message):
+            sent_messages.append(message)
+
+    monkeypatch.setattr(
+        email_service,
+        "smtp_config",
+        lambda: {
+            "host": "smtp.example.com",
+            "port": 587,
+            "username": "",
+            "password": "",
+            "from_email": "support@example.com",
+            "from_name": "Recipe Shopping System",
+            "use_tls": False,
+            "use_ssl": False,
+        },
+    )
+    monkeypatch.setattr(email_service.smtplib, "SMTP", FakeSmtp)
+
+    result = email_service.send_admin_support_access_email(
+        target_user(),
+        admin_user(),
+        {
+            "timestamp_label": "Jun 4, 2026 10:33 PM UTC",
+            "reason": "checking verification state",
+        },
+    )
+
+    assert result["ok"]
+    assert len(sent_messages) == 1
+    message = sent_messages[0]
+    body = message.get_content()
+
+    assert message["To"] == "customer@example.com"
+    assert "account support record was viewed" in message["Subject"]
+    assert "Admin: admin@example.com" in body
+    assert "Reason: checking verification state" in body
+    assert "account status, sign-in metadata, security settings, and workspace counts" in body
+    assert "passwords, two-factor secrets, backup code values, home address, store passwords" in body
