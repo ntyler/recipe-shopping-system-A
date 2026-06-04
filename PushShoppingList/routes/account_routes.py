@@ -328,9 +328,7 @@ def cancel_two_factor_sign_in_route():
 
 @account_bp.route("/account/2fa/recovery/request", methods=["POST"])
 def request_two_factor_recovery_route():
-    result = request_two_factor_recovery(
-        session.get("pending_2fa_user_id") or session.get("user_id")
-    )
+    result = request_two_factor_recovery(session.get("user_id"))
 
     if result.get("ok"):
         session.pop("two_factor_recovery_link", None)

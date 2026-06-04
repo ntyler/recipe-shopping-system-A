@@ -36,7 +36,6 @@ PUBLIC_ENDPOINTS = {
     "account_bp.sign_in_route",
     "account_bp.verify_two_factor_route",
     "account_bp.cancel_two_factor_sign_in_route",
-    "account_bp.request_two_factor_recovery_route",
     "account_bp.open_two_factor_recovery_route",
     "account_bp.complete_two_factor_recovery_route",
     "account_bp.request_password_reset_route",

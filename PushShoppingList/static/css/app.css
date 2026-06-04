@@ -4802,31 +4802,6 @@ body {
             text-align: center;
         }
 
-        .user-two-factor-trouble-details {
-            gap: 12px;
-        }
-
-        .user-two-factor-trouble-details summary {
-            cursor: pointer;
-            color: #dbeafe;
-            font-size: 18px;
-            font-weight: 900;
-            text-align: center;
-            list-style-position: inside;
-        }
-
-        .user-two-factor-trouble-details summary:focus-visible {
-            outline: 2px solid #93c5fd;
-            outline-offset: 4px;
-            border-radius: 6px;
-        }
-
-        .user-two-factor-trouble-details form {
-            display: grid;
-            gap: 10px;
-            margin: 0;
-        }
-
         .user-two-factor-setup-box {
             display: grid;
             grid-template-columns: minmax(90px, auto) minmax(0, 1fr);

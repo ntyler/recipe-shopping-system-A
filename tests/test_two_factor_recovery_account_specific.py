@@ -107,6 +107,65 @@ def test_two_factor_recovery_token_page_hides_pending_sign_in_form(tmp_path, mon
     assert "Verify Code" not in html
 
 
+def test_pending_two_factor_session_cannot_request_recovery_email(tmp_path, monkeypatch):
+    monkeypatch.setattr(accounts, "USERS_FILE", tmp_path / "users.json")
+    accounts.save_users({
+        "users": [
+            firebase_user("freepdf", "freepdfjobsearch@gmail.com", "firebase-freepdf"),
+        ],
+    })
+    app = create_app()
+
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["pending_2fa_user_id"] = "freepdf"
+            session["pending_2fa_provider"] = "firebase"
+
+        response = client.post("/account/2fa/recovery/request")
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/#userAccountSection")
+
+    user = accounts.find_user_by_id("freepdf")
+    assert accounts.two_factor_enabled(user)
+    assert "two_factor_recovery" not in user
+
+
+def test_local_admin_two_factor_unlock_defaults_to_admin_accounts(tmp_path, monkeypatch):
+    monkeypatch.setattr(accounts, "USERS_FILE", tmp_path / "users.json")
+    accounts.save_users({
+        "users": [
+            firebase_user("freepdf", "freepdfjobsearch@gmail.com", "firebase-freepdf"),
+            firebase_user("admin", "ntylerbert@gmail.com", "firebase-admin"),
+        ],
+    })
+
+    admin_result = accounts.admin_disable_two_factor_for_identity("ntylerbert@gmail.com")
+
+    assert admin_result["ok"]
+    assert admin_result["changed"]
+    admin_user = accounts.find_user_by_id("admin")
+    assert not accounts.two_factor_enabled(admin_user)
+    assert admin_user["two_factor_disabled_by_admin_actor"] == "local_admin_script"
+
+    non_admin_result = accounts.admin_disable_two_factor_for_identity("freepdfjobsearch@gmail.com")
+
+    assert not non_admin_result["ok"]
+    assert accounts.two_factor_enabled(accounts.find_user_by_id("freepdf"))
+
+    allowed_result = accounts.admin_disable_two_factor_for_identity(
+        "freepdfjobsearch@gmail.com",
+        allow_non_admin=True,
+        reason="support-approved unlock",
+    )
+
+    assert allowed_result["ok"]
+    assert allowed_result["changed"]
+    non_admin_user = accounts.find_user_by_id("freepdf")
+    assert not accounts.two_factor_enabled(non_admin_user)
+    assert non_admin_user["two_factor_disabled_by_admin_reason"] == "support-approved unlock"
+
+
 def test_two_factor_setup_confirmation_requires_explicit_new_setup_flag():
     old_user = firebase_user("old", "old@example.com", "firebase-old")
     new_user = firebase_user("new", "new@example.com", "firebase-new")

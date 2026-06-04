@@ -655,16 +655,6 @@
                         Cancel Sign In
                     </button>
                 </form>
-                <details class="user-account-form user-two-factor-recovery-request-form user-two-factor-trouble-details">
-                    <summary>Can't access your authenticator?</summary>
-                    <form method="POST"
-                          action="{{ url_for('account_bp.request_two_factor_recovery_route') }}">
-                        <p class="user-account-form-note">
-                            Email a one-time verification link to this account. After you confirm the link, two-factor authentication is disabled for that account.
-                        </p>
-                        <button type="submit">Email Disable Verification Link</button>
-                    </form>
-                </details>
             {% else %}
                 <form id="firebaseCreateAccountForm"
                       class="user-account-form"

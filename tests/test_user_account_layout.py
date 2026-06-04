@@ -70,16 +70,12 @@ def test_two_factor_panel_forms_return_to_panel_after_refresh():
 
 def test_pending_two_factor_setup_confirmation_copy_is_less_alarming():
     template = (ROOT / "PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")
-    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
     assert 'pending_two_factor_context == "setup_confirmation"' in template
     assert "Two-factor authentication was enabled. Confirm the new code once" in template
     assert "Two-Factor Authentication Enabled" in template
     assert "Enter the code from your authenticator app to confirm setup." in template
     assert "Confirm Two-Factor Setup" in template
-    assert "Can't access your authenticator?" in template
-    assert "user-two-factor-trouble-details" in template
-    assert ".user-two-factor-trouble-details summary" in css
 
 
 def test_two_factor_disable_has_code_and_email_recovery_paths():

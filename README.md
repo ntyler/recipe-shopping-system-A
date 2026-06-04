@@ -54,7 +54,7 @@ Optional ntfy topic for phone/computer extraction notifications:
 $env:NTFY_TOPIC="your-private-shopping-list-topic"
 ```
 
-Optional SMTP settings for account verification, password reset, two-factor disable verification, and account deletion verification emails:
+Optional SMTP settings for account verification, password reset, signed-in two-factor disable verification, and account deletion verification emails:
 
 ```powershell
 $env:SHOPPING_APP_SMTP_HOST="smtp.gmail.com"
@@ -148,7 +148,7 @@ Notes:
 - Leave `DISABLE_RECIPE_PDF_ARCHIVE` unset if you want each extracted recipe page saved as a PDF for later review.
 - Set `FORCE_OPENAI_RECIPE_EXTRACTION=1` only when you want the OpenAI extractor used even if recipe-card HTML already has enough structured data.
 - Leave `SHOPPING_APP_PORT` unset when running `py -3.11 app.py` directly and you want the default Flask port `5000`. The included `start_app.bat` currently sets `SHOPPING_APP_PORT=5083`.
-- Set `SHOPPING_APP_PASSWORD_RESET_BASE_URL` to the address users should open from password reset and two-factor disable verification emails, such as your LAN, Tailscale, or public HTTPS URL. If unset, reset emails use the current request host.
+- Set `SHOPPING_APP_PASSWORD_RESET_BASE_URL` to the address users should open from password reset emails and signed-in two-factor disable verification emails, such as your LAN, Tailscale, or public HTTPS URL. If unset, reset emails use the current request host.
 - Set `SHOPPING_APP_ACCOUNT_LINK_BASE_URL` to the address users should open from account verification and account deletion emails. If unset, account links fall back to `SHOPPING_APP_PASSWORD_RESET_BASE_URL` or the current request host.
 - Product lookup uses `OPENAI_API_KEY` for fully loaded product-page analysis and final best-product selection. If no key is set, the app still parses product candidates but skips ChatGPT product analysis.
 - Product image embedding is enabled by default. Set `DISABLE_PRODUCT_IMAGE_EMBEDDING=1` to skip downloading images into `embedded_image_base64`.
@@ -244,9 +244,22 @@ Two-factor authentication is account-specific:
 - Sign-in can remember the browser for 30 days.
 - Backup-code regeneration requires an authenticator code or backup code.
 - Normal disable requires an authenticator code or backup code.
-- If the user lost the authenticator app and backup codes, the recovery option sends a one-time disable verification link to the account email.
+- The public two-factor sign-in challenge does not offer an email-disable option. It requires the authenticator app code or a backup code.
+- If a signed-in user is already inside their account and needs to retire a lost authenticator, the account menu can send a one-time disable verification link to that account email.
 - Email disable links are tied to the account that requested the email. Opening the link should not switch to another signed-in account.
-- Account action pages for password reset, two-factor disable verification, and account deletion should remain visible until the user completes the action or clicks cancel.
+- Admin lockout recovery is local-only. Run the break-glass script from the app host, not through a web route:
+
+```powershell
+py -3.11 PushShoppingList\scripts\disable_2fa.py --email ntylerbert@gmail.com --confirm
+```
+
+To intentionally unlock a non-admin user from the local host:
+
+```powershell
+py -3.11 PushShoppingList\scripts\disable_2fa.py --email user@example.com --allow-non-admin --confirm
+```
+
+- Account action pages for password reset, signed-in two-factor disable verification, and account deletion should remain visible until the user completes the action or clicks cancel.
 
 ## Recipe PDF Sharing
 
@@ -496,15 +509,18 @@ Notifications are best treated as convenience alerts. The actual UI sync comes f
 17. Confirm Account Menu contains Account Settings, Change Password, Verify Email or Email Verified, Two-Factor Authentication, Push Notifications, Delete Account, and Sign Out.
 18. Confirm Account Settings can remove an uploaded logo/avatar and falls back to the Firebase/Google profile photo when available.
 19. Confirm normal two-factor disable requires an authenticator code or backup code.
-20. Confirm two-factor authentication is account-specific. A disable verification link emailed to one user should disable only that user's two-factor settings.
-21. Confirm account action pages for password reset, two-factor disable verification, and account deletion do not collapse into a blank screen before the user completes or cancels the action.
-22. Confirm Push Notifications lives inside Account Menu and can enable, disable, send a test notification, and update preferences.
-23. Confirm signed-out users cannot manage protected sections.
-24. Confirm a signed-in admin user can create and upload a PDF to Cloudflare R2.
-25. Confirm Copy PDF Link copies an R2 URL.
-26. Confirm the copied PDF link does not contain localhost, 127.0.0.1, trycloudflare, or the app tunnel hostname.
-27. Confirm `/recipe_archive_pdf?url=<recipe_url>` redirects to the R2 public URL after the first generated upload.
-28. Confirm secrets, service account JSON files, and generated PDFs are not shown in `git status`.
+20. Confirm the public two-factor sign-in challenge does not show an email-disable recovery option.
+21. Confirm a pending two-factor sign-in session cannot request a disable verification email.
+22. Confirm two-factor authentication is account-specific. A disable verification link emailed from a signed-in account should disable only that account's two-factor settings.
+23. Confirm local admin recovery works only from the app host with `PushShoppingList\scripts\disable_2fa.py`, and that non-admin accounts require `--allow-non-admin`.
+24. Confirm account action pages for password reset, signed-in two-factor disable verification, and account deletion do not collapse into a blank screen before the user completes or cancels the action.
+25. Confirm Push Notifications lives inside Account Menu and can enable, disable, send a test notification, and update preferences.
+26. Confirm signed-out users cannot manage protected sections.
+27. Confirm a signed-in admin user can create and upload a PDF to Cloudflare R2.
+28. Confirm Copy PDF Link copies an R2 URL.
+29. Confirm the copied PDF link does not contain localhost, 127.0.0.1, trycloudflare, or the app tunnel hostname.
+30. Confirm `/recipe_archive_pdf?url=<recipe_url>` redirects to the R2 public URL after the first generated upload.
+31. Confirm secrets, service account JSON files, and generated PDFs are not shown in `git status`.
 
 ## Important Data Files
 
@@ -520,7 +536,7 @@ Account state is stored separately in:
 PushShoppingList/users.json
 ```
 
-That file contains local account records, Firebase-linked account metadata, generated ntfy topics, notification preferences, account verification/delete tokens, and two-factor settings. Keep it out of commits unless you intentionally want to version local account data.
+That file contains local account records, Firebase-linked account metadata, generated ntfy topics, notification preferences, account verification/delete tokens, two-factor settings, and local admin two-factor unlock metadata. Keep it out of commits unless you intentionally want to version local account data.
 
 Common files:
 

@@ -1225,6 +1225,51 @@ def recover_two_factor_with_token(token, password):
     return {"ok": True, "user": public_user(user)}
 
 
+def admin_disable_two_factor_for_identity(identity, allow_non_admin=False, reason="", actor="local_admin_script"):
+    """Disable two-factor authentication from a local admin-only recovery path."""
+    identity = str(identity or "").strip()
+
+    if not identity:
+        return {"ok": False, "errors": ["Enter the account email or username to unlock."]}
+
+    payload = load_users()
+    user = find_user_by_identity_in_payload(payload, identity)
+
+    if not user:
+        return {"ok": False, "errors": [f"No account was found for {identity}."]}
+
+    if not is_admin_user(user) and not allow_non_admin:
+        return {
+            "ok": False,
+            "errors": [
+                (
+                    "Refusing to disable two-factor authentication for a non-admin account. "
+                    "Pass --allow-non-admin only when you intentionally want to unlock that user."
+                )
+            ],
+            "user": public_user(user),
+        }
+
+    had_two_factor_state = any(
+        key in user
+        for key in ("two_factor", "two_factor_setup", "two_factor_recovery")
+    )
+
+    if not had_two_factor_state:
+        return {"ok": True, "changed": False, "user": public_user(user)}
+
+    timestamp = now_iso()
+    user.pop("two_factor", None)
+    user.pop("two_factor_setup", None)
+    user.pop("two_factor_recovery", None)
+    user["two_factor_disabled_by_admin_at"] = timestamp
+    user["two_factor_disabled_by_admin_actor"] = str(actor or "local_admin_script").strip() or "local_admin_script"
+    user["two_factor_disabled_by_admin_reason"] = str(reason or "").strip()
+    user["updated_at"] = timestamp
+    save_users(payload)
+    return {"ok": True, "changed": True, "user": public_user(user)}
+
+
 def public_two_factor_recovery_user(token):
     token = str(token or "").strip()
 
