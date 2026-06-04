@@ -144,6 +144,7 @@
             "available_stores": rules_editor_stores,
             "enabled_stores": enabled_stores,
             "can_manage_stores": current_user.is_admin if current_user else false,
+            "can_toggle_stores": true,
             "rules_display": rules_display,
             "food_rules": food_rules,
         } | tojson }}

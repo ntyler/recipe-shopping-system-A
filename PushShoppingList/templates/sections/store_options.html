@@ -1,8 +1,10 @@
 {% set can_manage_stores = current_user and current_user.is_admin %}
+{% set can_toggle_stores = true %}
 {% set can_edit_store_credentials = current_user %}
 <div class="app-card"
      id="storeOptionsSection"
      data-store-can-manage="{{ 'true' if can_manage_stores else 'false' }}"
+     data-store-can-toggle="{{ 'true' if can_toggle_stores else 'false' }}"
      data-store-can-edit-credentials="{{ 'true' if can_edit_store_credentials else 'false' }}">
     <div class="store-options-sticky-stack">
         <button type="button"
@@ -68,7 +70,7 @@
                                 onclick="setActiveStoreIconMode('map', { persist: true }); return false;">
                             Open selected location
                         </button>
-                        {% if can_manage_stores %}
+                        {% if can_toggle_stores %}
                             <button type="button"
                                     class="recipe-view-store-mode-option active-store-mode-toggle"
                                     data-active-store-mode-toggle="activation"
@@ -142,11 +144,11 @@
     <div class="card-collapse-content store-options-content collapsed" data-collapse-content="store-options">
         <p class="helper-text">
             {% if can_manage_stores %}
-                This is your editable store list. Check stores to show buttons next to each item.
+                This is your editable store list. Check stores to include them in product searches.
             {% elif can_edit_store_credentials %}
-                Store definitions are managed by the administrator. You can save your store login details.
+                Check stores to include them in product searches. Store definitions are managed by the administrator.
             {% else %}
-                Store definitions and login details are available after signing in.
+                Check stores to include them in product searches. Sign in to save store login details.
             {% endif %}
         </p>
 
@@ -159,8 +161,8 @@
             {% for store_key, store in available_stores.items() %}
                 {% set store_logo_text = {"aldi": "ALDI", "kroger": "K", "walmart": "W", "meijer": "M", "target": "T", "costco": "C"}.get(store_key, store.label[:2]|upper) %}
                 {% set store_enabled = store_key in enabled_stores %}
-                <div class="store-manager-row{% if not store_enabled %} inactive{% endif %}{% if not can_manage_stores %} credentials-only{% endif %}">
-                    {% if can_manage_stores %}
+                <div class="store-manager-row{% if not store_enabled %} inactive{% endif %}{% if not can_toggle_stores %} credentials-only{% endif %}">
+                    {% if can_toggle_stores %}
                         <input type="checkbox"
                                form="store-options-form"
                                name="enabled_stores"
@@ -192,7 +194,7 @@
                     </div>
 
                     <div class="store-action-row">
-                        {% if can_manage_stores or can_edit_store_credentials %}
+                        {% if can_toggle_stores or can_manage_stores or can_edit_store_credentials %}
                             <div class="store-action-menu-wrap recipe-edit-row-menu-wrap">
                                 <button type="button"
                                         class="recipe-edit-row-menu-btn store-action-menu-btn"
@@ -204,10 +206,19 @@
                                     <span aria-hidden="true"></span>
                                 </button>
                                 <div class="recipe-edit-row-menu store-action-menu" hidden>
-                                    <button type="button"
-                                            onclick="closeRecipeEditRowMenus(); return openStoreEditModal('store-edit-{{ store_key }}', this)">
-                                        {{ "Edit store" if can_manage_stores else "Edit login" }}
-                                    </button>
+                                    {% if can_toggle_stores %}
+                                        <button type="button"
+                                                data-store-toggle-menu-action="{{ store_key }}"
+                                                onclick="return toggleStoreActivationFromMenu(this);">
+                                            {{ "Deactivate store" if store_enabled else "Activate store" }}
+                                        </button>
+                                    {% endif %}
+                                    {% if can_manage_stores or can_edit_store_credentials %}
+                                        <button type="button"
+                                                onclick="closeRecipeEditRowMenus(); return openStoreEditModal('store-edit-{{ store_key }}', this)">
+                                            {{ "Edit store" if can_manage_stores else "Edit login" }}
+                                        </button>
+                                    {% endif %}
                                     {% if can_manage_stores %}
                                         <form method="POST"
                                               action="/delete_store/{{ store_key }}"
@@ -516,7 +527,7 @@
                     {% set selected_store = nearest_store_locations.get(store_key, {}) if nearest_store_locations else {} %}
                     {% set store_unavailable_reason = selected_store.skip_reason if selected_store and selected_store.skip_reason else "" %}
                     {% set store_tile_title = store_unavailable_reason or "Open " ~ store.label %}
-                    {% set store_activation_title = ("Deactivate " if store_enabled else "Activate ") ~ store.label if can_manage_stores else store_tile_title %}
+                    {% set store_activation_title = ("Deactivate " if store_enabled else "Activate ") ~ store.label if can_toggle_stores else store_tile_title %}
                     {% set active_google_maps_url = "" %}
                     {% set active_apple_maps_url = "" %}
                     {% if selected_store and selected_store.address %}

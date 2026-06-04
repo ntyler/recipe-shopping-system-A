@@ -31,9 +31,6 @@ def api_stores():
 
 @store_bp.route("/save_store_settings", methods=["POST"])
 def save_store_settings_route():
-    if not current_user_can_manage_stores():
-        return forbidden_store_response("Only the administrator can activate or deactivate stores.")
-
     settings = save_enabled_stores(request.form.getlist("enabled_stores"))
 
     if wants_json_response():

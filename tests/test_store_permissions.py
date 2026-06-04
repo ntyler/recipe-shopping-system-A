@@ -1,5 +1,7 @@
 import json
 
+from flask import render_template
+
 from PushShoppingList.app import create_app
 from PushShoppingList.services import storage_service
 from PushShoppingList.services import user_account_service
@@ -43,6 +45,23 @@ def write_store_settings(tmp_path, user_id, payload):
 
 def read_store_settings(tmp_path, user_id):
     return json.loads((store_data_dir(tmp_path, user_id) / "store_settings.json").read_text(encoding="utf-8"))
+
+
+def legacy_store_data_dir(tmp_path):
+    return tmp_path / "legacy-extractor" / "data"
+
+
+def write_legacy_store_settings(tmp_path, payload):
+    data_dir = legacy_store_data_dir(tmp_path)
+    data_dir.mkdir(parents=True, exist_ok=True)
+    (data_dir / "store_settings.json").write_text(
+        json.dumps(payload, indent=2),
+        encoding="utf-8",
+    )
+
+
+def read_legacy_store_settings(tmp_path):
+    return json.loads((legacy_store_data_dir(tmp_path) / "store_settings.json").read_text(encoding="utf-8"))
 
 
 def read_store_credentials(tmp_path, user_id):
@@ -101,7 +120,7 @@ def test_non_admin_can_only_update_store_credentials(monkeypatch, tmp_path):
     }
 
 
-def test_non_admin_cannot_manage_stores(monkeypatch, tmp_path):
+def test_non_admin_can_toggle_but_cannot_manage_store_definitions(monkeypatch, tmp_path):
     user = create_user("regular-user", "user@example.com")
     seed_user_and_store(monkeypatch, tmp_path, user)
     app = create_app()
@@ -124,13 +143,76 @@ def test_non_admin_cannot_manage_stores(monkeypatch, tmp_path):
             headers={"X-Requested-With": "fetch"},
         )
 
-    assert toggle_response.status_code == 403
+    assert toggle_response.status_code == 200
     assert add_response.status_code == 403
     assert delete_response.status_code == 403
 
     settings = read_store_settings(tmp_path, user["user_id"])
-    assert settings["enabled_stores"] == ["aldi"]
+    assert settings["enabled_stores"] == []
     assert list(settings["stores"].keys()) == ["aldi"]
+
+
+def test_store_options_toggle_controls_render_without_admin():
+    app = create_app()
+
+    with app.test_request_context("/"):
+        html = render_template(
+            "sections/store_options.html",
+            current_user=None,
+            available_stores={
+                "aldi": {
+                    "label": "Aldi",
+                    "url": "https://aldi.example/search?q=",
+                    "urlStoreSelector": "https://aldi.example/stores",
+                },
+            },
+            enabled_stores=[],
+            nearest_store_locations={},
+            nearest_store_results={},
+            nearest_store_search_radius_miles=5,
+        )
+
+    assert 'data-store-can-toggle="true"' in html
+    assert 'name="enabled_stores"' in html
+    assert 'data-store-toggle-menu-action="aldi"' in html
+    assert "Activate store" in html
+    assert "Edit login" not in html
+    assert "Delete store" not in html
+
+
+def test_guest_can_toggle_enabled_stores(monkeypatch, tmp_path):
+    configure_user_data(monkeypatch, tmp_path)
+    monkeypatch.setattr(storage_service, "LEGACY_EXTRACTOR_DIR", tmp_path / "legacy-extractor")
+    write_legacy_store_settings(
+        tmp_path,
+        {
+            "stores": {
+                "aldi": {
+                    "label": "Aldi",
+                    "url": "https://aldi.example/search?q=",
+                    "urlStoreSelector": "https://aldi.example/stores",
+                },
+                "meijer": {
+                    "label": "Meijer",
+                    "url": "https://meijer.example/search?q=",
+                    "urlStoreSelector": "https://meijer.example/stores",
+                },
+            },
+            "enabled_stores": ["aldi"],
+        },
+    )
+    app = create_app()
+
+    with app.test_client() as client:
+        response = client.post(
+            "/save_store_settings",
+            data={"ajax": "1", "enabled_stores": "meijer"},
+            headers={"X-Requested-With": "fetch"},
+        )
+
+    assert response.status_code == 200
+    assert response.get_json()["enabled_stores"] == ["meijer"]
+    assert read_legacy_store_settings(tmp_path)["enabled_stores"] == ["meijer"]
 
 
 def test_admin_can_manage_store_fields(monkeypatch, tmp_path):
@@ -172,7 +254,7 @@ def test_admin_can_manage_store_fields(monkeypatch, tmp_path):
     assert "target" in settings["stores"]
 
 
-def test_rules_home_stores_ignores_enabled_store_changes_for_non_admin(monkeypatch, tmp_path):
+def test_rules_home_stores_saves_enabled_store_changes_for_non_admin(monkeypatch, tmp_path):
     user = create_user("regular-user", "user@example.com")
     seed_user_and_store(monkeypatch, tmp_path, user)
     app = create_app()
@@ -190,5 +272,5 @@ def test_rules_home_stores_ignores_enabled_store_changes_for_non_admin(monkeypat
         )
 
     assert response.status_code == 200
-    assert response.get_json()["enabled_stores"] == ["aldi"]
-    assert read_store_settings(tmp_path, user["user_id"])["enabled_stores"] == ["aldi"]
+    assert response.get_json()["enabled_stores"] == []
+    assert read_store_settings(tmp_path, user["user_id"])["enabled_stores"] == []

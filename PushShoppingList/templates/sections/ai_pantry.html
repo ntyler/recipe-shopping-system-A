@@ -20,7 +20,7 @@
         {% endif %}
 
         <nav class="ai-pantry-nav" aria-label="AI Pantry sections">
-            <a href="#aiPantryInventory">Pantry Inventory</a>
+            <a href="#aiPantryInventory">Inventory</a>
             <a href="#aiPantryAddItems">Add Items</a>
             <a href="#aiPantryUploadReceipt">Upload Receipt</a>
             <a href="#aiPantryCookWithWhatIHave">Cook With What I Have</a>
@@ -28,14 +28,23 @@
             <a href="#aiPantryMissingIngredients">Missing Ingredients</a>
         </nav>
 
-        <section id="aiPantryInventory" class="ai-pantry-section">
-            <div class="ai-pantry-section-header">
-                <h3>Pantry Inventory</h3>
-                <button type="button"
-                        class="ai-pantry-action-btn"
-                        onclick="return moveBoughtItemsToPantry(this)">
-                    Move Bought Items to Pantry
-                </button>
+        <section id="aiPantryInventory" class="ai-pantry-section ai-pantry-inventory-section">
+            <div class="recipe-edit-section-header ai-pantry-inventory-header">
+                <div class="recipe-edit-section-title">
+                    <span class="recipe-edit-panel-icon recipe-edit-panel-icon-ingredients" aria-hidden="true"></span>
+                    <div>
+                        <h3>Inventory <span class="ai-pantry-inventory-count">({{ pantry_items|length if pantry_items else 0 }})</span></h3>
+                        <p>Add, edit, and organize pantry inventory.</p>
+                    </div>
+                </div>
+                <div class="recipe-edit-section-actions ai-pantry-inventory-actions">
+                    <button type="button"
+                            class="ai-pantry-action-btn"
+                            onclick="return moveBoughtItemsToPantry(this)">
+                        <span class="recipe-edit-button-icon" aria-hidden="true">+</span>
+                        <span>Move Bought Items to Pantry</span>
+                    </button>
+                </div>
             </div>
 
             <div class="ai-pantry-search">
@@ -48,9 +57,9 @@
             </div>
 
             {% if pantry_items %}
-                <div class="ai-pantry-inventory-list">
+                <div class="ai-pantry-inventory-list ai-pantry-editor-list">
                     {% for item in pantry_items %}
-                        <article class="ai-pantry-item"
+                        <article class="ai-pantry-item ai-pantry-inventory-row"
                                  data-pantry-item
                                  data-pantry-ingredient="{{ item.ingredient_name }}"
                                  data-pantry-product="{{ item.product_name }}"
@@ -58,47 +67,74 @@
                                  data-pantry-unit="{{ item.unit }}"
                                  data-pantry-category="{{ item.category }}"
                                  data-pantry-search="{{ (item.ingredient_name ~ ' ' ~ item.product_name ~ ' ' ~ item.category ~ ' ' ~ item.source)|lower }}">
-                            <div class="ai-pantry-item-main">
+                            <span class="recipe-edit-row-handle ai-pantry-inventory-handle" aria-hidden="true"></span>
+                            <span class="recipe-edit-row-number ai-pantry-inventory-number">{{ loop.index }}</span>
+                            <div class="ai-pantry-item-main ai-pantry-inventory-name">
                                 <h4>{{ item.ingredient_name }}</h4>
                                 {% if item.product_name %}
                                     <span>{{ item.product_name }}</span>
                                 {% endif %}
-                            </div>
-                            <div class="ai-pantry-item-meta">
-                                <span>{{ item.quantity }}{% if item.unit %} {{ item.unit }}{% endif %}</span>
-                                <span>{{ item.category or "Uncategorized" }}</span>
-                                <span>{{ item.source }}</span>
-                                <span class="confidence-pill confidence-{{ item.confidence_label|lower }}">{{ item.confidence_label }}</span>
-                                <span>{{ item.date_added }}</span>
+                                <div class="ai-pantry-item-meta">
+                                    <span>{{ item.quantity }}{% if item.unit %} {{ item.unit }}{% endif %}</span>
+                                    <span>{{ item.category or "Uncategorized" }}</span>
+                                    <span>{{ item.source }}</span>
+                                    <span class="confidence-pill confidence-{{ item.confidence_label|lower }}">{{ item.confidence_label }}</span>
+                                </div>
                             </div>
                             <form class="ai-pantry-inline-form"
+                                  id="pantryUpdate{{ loop.index }}"
                                   method="POST"
                                   action="{{ url_for('pantry_bp.update_pantry_item_route', item_id=item.id) }}">
-                                <input name="quantity"
-                                       type="number"
-                                       min="0"
-                                       step="0.25"
-                                       value="{{ item.quantity }}"
-                                       aria-label="Quantity for {{ item.ingredient_name }}">
-                                <input name="unit"
-                                       value="{{ item.unit }}"
-                                       placeholder="Unit"
-                                       aria-label="Unit for {{ item.ingredient_name }}">
-                                <input name="category"
-                                       value="{{ item.category }}"
-                                       placeholder="Category"
-                                       aria-label="Category for {{ item.ingredient_name }}">
-                                <input name="notes"
-                                       value="{{ item.notes }}"
-                                       placeholder="Notes"
-                                       aria-label="Notes for {{ item.ingredient_name }}">
-                                <button type="submit">Save</button>
+                                <label class="ai-pantry-inventory-qty-label">
+                                    <span>Qty</span>
+                                    <input name="quantity"
+                                           type="number"
+                                           min="0"
+                                           step="0.25"
+                                           value="{{ item.quantity }}"
+                                           aria-label="Quantity for {{ item.ingredient_name }}">
+                                </label>
+                                <label class="ai-pantry-inventory-unit-label">
+                                    <span>Unit</span>
+                                    <input name="unit"
+                                           value="{{ item.unit }}"
+                                           placeholder="Unit"
+                                           aria-label="Unit for {{ item.ingredient_name }}">
+                                </label>
+                                <label class="ai-pantry-inventory-category-label">
+                                    <span>Category</span>
+                                    <input name="category"
+                                           value="{{ item.category }}"
+                                           placeholder="Category"
+                                           aria-label="Category for {{ item.ingredient_name }}">
+                                </label>
+                                <label class="ai-pantry-inventory-notes-label">
+                                    <span>Notes</span>
+                                    <input name="notes"
+                                           value="{{ item.notes }}"
+                                           placeholder="Notes"
+                                           aria-label="Notes for {{ item.ingredient_name }}">
+                                </label>
                             </form>
                             <form method="POST"
+                                  id="pantryDelete{{ loop.index }}"
                                   action="{{ url_for('pantry_bp.delete_pantry_item_route', item_id=item.id) }}"
-                                  onsubmit="return confirm('Delete {{ item.ingredient_name }} from pantry?');">
-                                <button type="submit" class="danger ai-pantry-delete-btn">Delete</button>
-                            </form>
+                                  onsubmit="return confirm('Delete {{ item.ingredient_name }} from pantry?');"></form>
+                            <div class="recipe-edit-row-menu-wrap ai-pantry-inventory-menu-wrap">
+                                <button type="button"
+                                        class="recipe-edit-row-menu-btn ai-pantry-inventory-menu-btn"
+                                        aria-label="Inventory actions for {{ item.ingredient_name }}"
+                                        title="Inventory actions"
+                                        aria-haspopup="true"
+                                        aria-expanded="false"
+                                        onclick="return toggleRecipeEditRowMenu(this, event)">
+                                    <span aria-hidden="true"></span>
+                                </button>
+                                <div class="recipe-edit-row-menu ai-pantry-inventory-menu" hidden>
+                                    <button type="submit" form="pantryUpdate{{ loop.index }}">Save inventory item</button>
+                                    <button type="submit" form="pantryDelete{{ loop.index }}" class="delete">Delete inventory item</button>
+                                </div>
+                            </div>
                         </article>
                     {% endfor %}
                     <div class="ai-pantry-empty" data-pantry-search-empty hidden>No pantry items match that search.</div>

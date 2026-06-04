@@ -3705,6 +3705,26 @@ body {
             box-sizing: border-box;
         }
 
+        .recipe-ingredient-row .item-row-tools.recipe-ingredient-store-tools {
+            display: grid;
+            grid-template-columns: 30px minmax(0, 1fr) auto;
+            align-items: start;
+            gap: 10px;
+            width: 100%;
+            margin: 8px 0 0 0;
+        }
+
+        .recipe-ingredient-store-tools .item-store-price-panel {
+            grid-column: 2 / 3;
+            justify-self: start;
+        }
+
+        .recipe-ingredient-store-tools .item-row-menu-wrap {
+            grid-column: 3 / 4;
+            justify-self: end;
+            margin-left: 0;
+        }
+
         .item-store-price-panel {
             min-width: 0;
             max-width: 100%;
@@ -9739,6 +9759,19 @@ body {
                 align-items: flex-start;
             }
 
+            .recipe-ingredient-row .item-row-tools.recipe-ingredient-store-tools {
+                grid-template-columns: minmax(0, 1fr) auto;
+                margin-top: 6px;
+            }
+
+            .recipe-ingredient-store-tools .item-store-price-panel {
+                grid-column: 1 / 2;
+            }
+
+            .recipe-ingredient-store-tools .item-row-menu-wrap {
+                grid-column: 2 / 3;
+            }
+
             .item-store-price-panel {
                 flex: 1 1 auto;
                 min-width: 0;
@@ -10843,6 +10876,7 @@ body {
 
 .recipe-edit-image-generation-menu,
 .recipe-edit-equipment-image-menu,
+.recipe-edit-ingredients-image-menu,
 .recipe-edit-instructions-image-menu {
     min-width: 260px;
 }
@@ -12394,11 +12428,12 @@ body {
     flex-wrap: wrap;
 }
 
-.recipe-edit-ingredient-actions button {
+.recipe-edit-ingredient-actions > button {
     min-width: 138px;
 }
 
-.recipe-edit-ingredients-section .recipe-edit-ingredient-actions button:not(:first-child) {
+.recipe-edit-ingredients-section .recipe-edit-ingredient-actions > button:not(:first-child),
+.recipe-edit-ingredients-section .recipe-edit-ingredients-menu-wrap .recipe-edit-section-menu-btn {
     border-color: #344154;
     background: linear-gradient(180deg, #151e2b, #101722);
     color: #f8fafc;
@@ -14767,6 +14802,149 @@ body {
     align-items: start;
 }
 
+.ai-pantry-inventory-section {
+    border-top-color: #233044;
+}
+
+.ai-pantry-inventory-header {
+    align-items: center;
+}
+
+.ai-pantry-inventory-header .recipe-edit-section-title h3 {
+    color: #f8fafc;
+    font-size: 16px;
+    font-weight: 850;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+}
+
+.ai-pantry-inventory-count {
+    color: #dbeafe;
+}
+
+.ai-pantry-inventory-actions {
+    margin-left: auto;
+}
+
+.ai-pantry-inventory-actions .ai-pantry-action-btn {
+    border-color: #1d5936;
+    background: rgba(17, 61, 35, 0.68);
+    color: #8ff5a1;
+}
+
+.ai-pantry-editor-list {
+    gap: 10px;
+    overflow: visible;
+}
+
+.ai-pantry-inventory-row {
+    display: grid;
+    grid-template-columns: 26px 54px minmax(210px, 1.15fr) minmax(360px, 2fr) 52px;
+    gap: 14px 18px;
+    align-items: center;
+    min-height: 128px;
+    padding: 18px 20px;
+    border: 1px solid #233044;
+    border-radius: 8px;
+    background:
+        linear-gradient(145deg, rgba(18, 28, 41, 0.9), rgba(10, 16, 25, 0.96)),
+        #0d1520;
+}
+
+.ai-pantry-inventory-handle {
+    grid-column: 1 / 2;
+    grid-row: 1;
+    align-self: center;
+    justify-self: center;
+    width: 18px;
+    height: 38px;
+    background-image: radial-gradient(circle, currentColor 1.5px, transparent 1.7px);
+    background-position: 0 0;
+    background-size: 7px 8px;
+    color: #8793a2;
+}
+
+.ai-pantry-inventory-number {
+    grid-column: 2 / 3;
+    grid-row: 1;
+    align-self: center;
+    width: 44px;
+    height: 44px;
+    font-size: 18px;
+}
+
+.ai-pantry-inventory-name {
+    grid-column: 3 / 4;
+    grid-row: 1;
+    min-width: 0;
+}
+
+.ai-pantry-inventory-name h4 {
+    margin: 0 0 8px;
+    color: #f8fafc;
+    font-size: 18px;
+    font-weight: 850;
+    line-height: 1.18;
+    overflow-wrap: anywhere;
+}
+
+.ai-pantry-inventory-name > span {
+    display: block;
+    margin-bottom: 8px;
+}
+
+.ai-pantry-inventory-row .ai-pantry-item-meta {
+    margin-top: 6px;
+}
+
+.ai-pantry-inventory-row .ai-pantry-inline-form {
+    grid-column: 4 / 5;
+    grid-row: 1;
+    display: grid;
+    grid-template-columns: minmax(72px, 0.45fr) minmax(88px, 0.52fr) minmax(130px, 0.85fr) minmax(160px, 1.1fr);
+    gap: 12px;
+    min-width: 0;
+}
+
+.ai-pantry-inventory-row .ai-pantry-inline-form label {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+    color: #aab5c3;
+    font-size: 11px;
+    font-weight: 850;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+}
+
+.ai-pantry-inventory-row .ai-pantry-inline-form input {
+    width: 100%;
+    min-height: 38px;
+    box-sizing: border-box;
+    border: 1px solid #344154;
+    border-radius: 7px;
+    background: #0b111a;
+    color: #f8fafc;
+    font-size: 14px;
+}
+
+.ai-pantry-inventory-row .ai-pantry-inline-form input:focus {
+    border-color: #5b8cff;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(91, 140, 255, 0.18);
+}
+
+.ai-pantry-inventory-menu-wrap {
+    grid-column: 5 / 6;
+    grid-row: 1;
+    align-self: center;
+    justify-self: end;
+}
+
+.ai-pantry-inventory-menu {
+    min-width: 190px;
+}
+
 .ai-pantry-item-main h4,
 .ai-pantry-recipe-card h4,
 .ai-pantry-history h4 {
@@ -14999,6 +15177,58 @@ body {
     .ai-pantry-missing-row,
     .ai-pantry-feeling-grid {
         grid-template-columns: 1fr;
+    }
+
+    .ai-pantry-inventory-header {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .ai-pantry-inventory-actions {
+        width: 100%;
+        margin-left: 0;
+    }
+
+    .ai-pantry-inventory-actions .ai-pantry-action-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .ai-pantry-inventory-row {
+        grid-template-columns: 24px 44px minmax(0, 1fr) 42px;
+        gap: 12px;
+        min-height: 0;
+        padding: 14px;
+    }
+
+    .ai-pantry-inventory-handle {
+        grid-column: 1 / 2;
+        grid-row: 1;
+    }
+
+    .ai-pantry-inventory-number {
+        grid-column: 2 / 3;
+        grid-row: 1;
+        width: 38px;
+        height: 38px;
+        font-size: 16px;
+    }
+
+    .ai-pantry-inventory-name {
+        grid-column: 3 / 4;
+        grid-row: 1;
+    }
+
+    .ai-pantry-inventory-menu-wrap {
+        grid-column: 4 / 5;
+        grid-row: 1;
+    }
+
+    .ai-pantry-inventory-row .ai-pantry-inline-form {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
     }
 
     .ai-pantry-missing-row {

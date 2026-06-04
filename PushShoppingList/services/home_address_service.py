@@ -1,4 +1,6 @@
 import json
+from datetime import datetime
+from datetime import timezone
 from pathlib import Path
 
 from PushShoppingList.services.storage_service import active_user_id
@@ -7,6 +9,8 @@ from PushShoppingList.services.storage_service import scoped_extractor_data_path
 
 BASE_DIR = Path(__file__).resolve().parent
 HOME_ADDRESS_FILE = scoped_extractor_data_path("home_address.json")
+HOME_ADDRESS_HISTORY_FILE = scoped_extractor_data_path("home_address_history.json")
+MAX_HOME_ADDRESS_HISTORY = 25
 
 DEFAULT_HOME_ADDRESS = {
     "street": "5905 Arlo Drive",
@@ -65,7 +69,121 @@ def save_home_address(form_data):
     )
 
     data["full_address"] = build_full_address(data)
+    save_home_address_history_entry(data)
     return data
+
+
+def load_home_address_history(limit=10):
+    payload = read_home_address_history_payload()
+    entries = payload.get("history", []) if isinstance(payload, dict) else []
+    history = []
+
+    for entry in entries:
+        normalized = normalize_home_address_history_entry(entry)
+
+        if normalized:
+            history.append(normalized)
+
+    if limit is None:
+        return history
+
+    return history[:limit]
+
+
+def save_home_address_history_entry(address):
+    full_address = str(address.get("full_address") or build_full_address(address) or "").strip()
+
+    if not full_address:
+        return load_home_address_history()
+
+    entry = {
+        key: str(address.get(key, "") or "").strip()
+        for key in EMPTY_HOME_ADDRESS
+    }
+    entry["full_address"] = full_address
+    entry["saved_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+    history = [
+        existing
+        for existing in load_home_address_history(limit=None)
+        if existing.get("full_address") != full_address
+    ]
+    save_home_address_history([entry] + history)
+    return load_home_address_history()
+
+
+def read_home_address_history_payload():
+    if not HOME_ADDRESS_HISTORY_FILE.exists():
+        return {"history": []}
+
+    try:
+        saved = json.loads(HOME_ADDRESS_HISTORY_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return {"history": []}
+
+    if isinstance(saved, list):
+        return {"history": saved}
+
+    if not isinstance(saved, dict):
+        return {"history": []}
+
+    return saved
+
+
+def save_home_address_history(history):
+    cleaned = []
+
+    for entry in history[:MAX_HOME_ADDRESS_HISTORY]:
+        normalized = normalize_home_address_history_entry(entry)
+
+        if not normalized:
+            continue
+
+        cleaned.append({
+            key: normalized.get(key, "")
+            for key in [*EMPTY_HOME_ADDRESS.keys(), "full_address", "saved_at"]
+        })
+
+    HOME_ADDRESS_HISTORY_FILE.write_text(
+        json.dumps({"history": cleaned}, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+
+def normalize_home_address_history_entry(entry):
+    if not isinstance(entry, dict):
+        return None
+
+    normalized = {
+        key: str(entry.get(key, "") or "").strip()
+        for key in EMPTY_HOME_ADDRESS
+    }
+    full_address = str(entry.get("full_address") or build_full_address(normalized) or "").strip()
+
+    if not full_address:
+        return None
+
+    saved_at = str(entry.get("saved_at") or entry.get("timestamp") or "").strip()
+    normalized["full_address"] = full_address
+    normalized["saved_at"] = saved_at
+    normalized["saved_at_display"] = format_home_address_history_timestamp(saved_at)
+    return normalized
+
+
+def format_home_address_history_timestamp(saved_at):
+    if not saved_at:
+        return "Saved"
+
+    try:
+        parsed = datetime.fromisoformat(saved_at.replace("Z", "+00:00"))
+    except ValueError:
+        return saved_at
+
+    if parsed.tzinfo:
+        parsed = parsed.astimezone(timezone.utc)
+        return parsed.strftime("%Y-%m-%d %H:%M UTC")
+
+    return parsed.strftime("%Y-%m-%d %H:%M")
 
 
 def build_full_address(data):

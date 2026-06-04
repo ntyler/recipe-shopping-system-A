@@ -32,6 +32,7 @@ from PushShoppingList.services.cookbook_service import remove_recipe_from_cookbo
 from PushShoppingList.services.cookbook_service import rename_cookbook
 from PushShoppingList.services.cookbook_service import reorder_cookbooks
 from PushShoppingList.services.home_address_service import load_home_address
+from PushShoppingList.services.home_address_service import load_home_address_history
 from PushShoppingList.services.home_address_service import save_home_address
 from PushShoppingList.services.home_store_location_service import DEFAULT_STORE_SEARCH_RADIUS_MILES
 from PushShoppingList.services.home_store_location_service import format_store_search_radius
@@ -1312,6 +1313,7 @@ def index():
         cookbook_count=len(rendered_cookbook_view.get("cookbooks", [])),
         cookbook_recipe_count=cookbook_recipe_count,
         home_address=load_home_address(),
+        home_address_history=load_home_address_history(),
         nearest_store_results=nearest_store_results,
         nearest_store_locations=nearest_store_results.get("store_locations", {}),
         nearest_store_search_radius_miles=format_store_search_radius(
@@ -1557,6 +1559,7 @@ def save_home_address_route():
         response = {
             "ok": True,
             "home_address": saved_address,
+            "home_address_history": load_home_address_history(),
         }
         if nearest_store_results is not None:
             response["nearest_store_results"] = nearest_store_results

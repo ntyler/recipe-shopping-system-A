@@ -2010,10 +2010,11 @@ function renderRulesHomeStoresEditor(container, data) {
     const stores = Array.isArray(data.available_stores) ? data.available_stores : [];
     const enabledStores = new Set(Array.isArray(data.enabled_stores) ? data.enabled_stores : []);
     const userCanManageStores = data.can_manage_stores === true;
+    const userCanToggleStores = data.can_toggle_stores === true || userCanManageStores;
     const display = data.rules_display || {};
     const section = display.home_stores || {};
     const rows = Array.isArray(section.rows) ? section.rows : [];
-    const enabledStoresSection = userCanManageStores
+    const enabledStoresSection = userCanToggleStores
         ? `
         <section class="rules-editor-section">
             <h3>Enabled Stores</h3>
@@ -4219,6 +4220,11 @@ function canManageStores() {
     return section ? section.dataset.storeCanManage === "true" : false;
 }
 
+function canToggleStores() {
+    const section = storeOptionsSection();
+    return section ? section.dataset.storeCanToggle === "true" : false;
+}
+
 function canEditStoreCredentials() {
     const section = storeOptionsSection();
     return section ? section.dataset.storeCanEditCredentials === "true" : false;
@@ -4858,7 +4864,7 @@ function restoreStoreOptionsDisplaySettings() {
 function setActiveStoreIconMode(mode, options = {}) {
     const allowedModes = new Set(["store", "map", "activation", "edit"]);
 
-    if (!canManageStores()) {
+    if (!canToggleStores()) {
         allowedModes.delete("activation");
     }
 
@@ -5086,7 +5092,7 @@ function openActiveStoreIcon(link, event) {
     }
 
     if (document.body.classList.contains("active-store-activation-mode")) {
-        if (!canManageStores()) {
+        if (!canToggleStores()) {
             return true;
         }
 
@@ -5141,7 +5147,7 @@ function updateActiveStoreCardActivationState(card, isActive) {
 }
 
 async function toggleStoreActivationFromCard(card) {
-    if (!canManageStores()) {
+    if (!canToggleStores()) {
         return false;
     }
 
@@ -5172,6 +5178,42 @@ async function toggleStoreActivationFromCard(card) {
     }
 
     return saved;
+}
+
+async function toggleStoreActivationFromMenu(button) {
+    closeRecipeEditRowMenus();
+
+    if (!canToggleStores()) {
+        return false;
+    }
+
+    const storeKey = button ? button.dataset.storeToggleMenuAction || "" : "";
+    const input = findStoreEnabledInput(storeKey);
+
+    if (!input) {
+        return false;
+    }
+
+    const previousChecked = input.checked;
+    input.checked = !previousChecked;
+
+    if (button) {
+        button.disabled = true;
+        button.setAttribute("aria-busy", "true");
+    }
+
+    const saved = await saveStoreToggle(input);
+
+    if (!saved) {
+        input.checked = previousChecked;
+    }
+
+    if (button) {
+        button.disabled = false;
+        button.removeAttribute("aria-busy");
+    }
+
+    return false;
 }
 
 function restoreToggleSetting(inputId, storageKey, defaultChecked, bodyClass, invertBodyClass = false) {
@@ -13509,7 +13551,7 @@ async function saveStoreOptions(event) {
 }
 
 async function saveStoreToggle(toggle) {
-    if (!canManageStores()) {
+    if (!canToggleStores()) {
         return false;
     }
 

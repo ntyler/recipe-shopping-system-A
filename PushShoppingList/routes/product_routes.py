@@ -19,10 +19,7 @@ from PushShoppingList.services.product_selection_service import product_prompt_f
 from PushShoppingList.services.product_selection_service import select_product_choice
 from PushShoppingList.services.rules_display_service import save_home_store_rule_text
 from PushShoppingList.services.rules_display_service import save_rules_display_section
-from PushShoppingList.services.store_settings_service import load_store_settings
 from PushShoppingList.services.store_settings_service import save_enabled_stores
-from PushShoppingList.services.user_account_service import current_public_user
-from PushShoppingList.services.user_account_service import is_admin_user
 from PushShoppingList.scripts.aldi import run_test_grab_aldi
 from PushShoppingList.scripts.test_grab_aldi_eggs import select_test_grab_product
 from PushShoppingList.scripts.test_grab_aldi_eggs import test_grab_choice_from_result
@@ -82,7 +79,6 @@ def api_save_home_store_rules_route():
     data = request.get_json(silent=True) or {}
     address = data.get("address") if isinstance(data.get("address"), dict) else {}
     enabled_stores = data.get("enabled_stores") if isinstance(data.get("enabled_stores"), list) else []
-    user = current_public_user()
     saved_address = save_home_address({
         "address_street": address.get("street", ""),
         "address_apartment": address.get("apartment", ""),
@@ -92,11 +88,7 @@ def api_save_home_store_rules_route():
         "address_zip": address.get("zip", ""),
         "address_country": address.get("country", ""),
     })
-    store_settings = (
-        save_enabled_stores(enabled_stores)
-        if is_admin_user(user)
-        else load_store_settings()
-    )
+    store_settings = save_enabled_stores(enabled_stores)
     section = save_home_store_rule_text(data.get("rows", []))
 
     return jsonify({
