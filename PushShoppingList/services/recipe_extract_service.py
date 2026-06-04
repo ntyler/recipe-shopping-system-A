@@ -11,6 +11,8 @@ import time
 import uuid
 import zipfile
 import xml.etree.ElementTree as ET
+from datetime import datetime
+from datetime import timezone
 from pathlib import Path
 from urllib.parse import unquote
 from urllib.parse import urljoin
@@ -20,6 +22,7 @@ import requests
 from bs4 import BeautifulSoup
 from openai import OpenAI
 
+from PushShoppingList.services import cloudflare_r2_storage
 from PushShoppingList.services.purchase_mapping_service import apply_purchase_mapping_to_ingredient
 from PushShoppingList.services.storage_service import scoped_extractor_data_path
 from PushShoppingList.services.storage_service import scoped_extractor_path
@@ -239,6 +242,83 @@ def recipe_archive_pdf_path(recipe_url):
 
 def recipe_archive_pdf_exists(recipe_url):
     return recipe_archive_pdf_path(recipe_url).exists()
+
+
+def utc_iso_now():
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def cloudflare_pdf_upload_is_usable(upload_result):
+    return bool(upload_result and (upload_result.get("ok") or upload_result.get("code") == "duplicate_object"))
+
+
+def attach_cloudflare_pdf_metadata(recipe_url, json_data, upload_result, pdf_path=None):
+    if not isinstance(json_data, dict) or not cloudflare_pdf_upload_is_usable(upload_result):
+        return json_data
+
+    object_key = str(upload_result.get("object_key") or "").strip()
+    public_url = str(upload_result.get("public_url") or "").strip()
+
+    if not object_key or not public_url:
+        return json_data
+
+    pdf_metadata = json_data.get("pdf") if isinstance(json_data.get("pdf"), dict) else {}
+    pdf_metadata["local_path"] = str(pdf_path or recipe_archive_pdf_path(recipe_url))
+    pdf_metadata["cloudflare_r2"] = {
+        "provider": "cloudflare_r2",
+        "bucket": str(upload_result.get("bucket") or os.getenv("R2_BUCKET_NAME", "")).strip(),
+        "object_key": object_key,
+        "public_url": public_url,
+        "uploaded_at": utc_iso_now(),
+    }
+    json_data["pdf"] = pdf_metadata
+
+    return json_data
+
+
+def delete_local_pdf_after_cloudflare_upload(pdf_path):
+    path = Path(pdf_path)
+
+    if not cloudflare_r2_storage.delete_local_pdf_after_upload():
+        return False
+
+    try:
+        path.unlink(missing_ok=True)
+        return True
+    except Exception as exc:
+        print(f"Cloudflare R2 upload succeeded, but local PDF cleanup failed: {exc}")
+        return False
+
+
+def maybe_upload_recipe_archive_pdf_to_cloudflare(recipe_url, progress_callback=None):
+    if not cloudflare_r2_storage.has_any_r2_config():
+        return None
+
+    pdf_path = recipe_archive_pdf_path(recipe_url)
+    if not pdf_path.exists():
+        return None
+
+    if progress_callback:
+        progress_callback(
+            "uploading recipe PDF to Cloudflare...",
+            "Saving the PDF archive to Cloudflare R2 and preparing a public link.",
+        )
+
+    upload_result = cloudflare_r2_storage.upload_pdf(pdf_path)
+
+    if cloudflare_pdf_upload_is_usable(upload_result):
+        delete_local_pdf_after_cloudflare_upload(pdf_path)
+        return upload_result
+
+    print(f"Cloudflare R2 recipe PDF upload failed: {upload_result.get('error', 'Unknown error')}")
+
+    if progress_callback:
+        progress_callback(
+            "Cloudflare PDF upload failed - continuing recipe import...",
+            upload_result.get("error", "The recipe was imported, but the PDF was not uploaded to Cloudflare."),
+        )
+
+    return upload_result
 
 
 def clean_json_response(text):
@@ -4568,6 +4648,13 @@ def save_json_response(recipe_url, response_text, html_text=None):
         apply_recipe_scaling_metadata(json_data, html_text)
         apply_recipe_cover_image_metadata(json_data, html_text, recipe_url)
         apply_recipe_owner_metadata(json_data)
+        upload_result = maybe_upload_recipe_archive_pdf_to_cloudflare(recipe_url)
+        attach_cloudflare_pdf_metadata(
+            recipe_url,
+            json_data,
+            upload_result,
+            recipe_archive_pdf_path(recipe_url),
+        )
 
         json_path.write_text(
             json.dumps(json_data, indent=2, ensure_ascii=False),
@@ -4681,6 +4768,13 @@ def save_extracted_recipe_json(recipe_url, json_data):
     apply_recipe_scaling_metadata(json_data)
     apply_recipe_cover_image_metadata(json_data, recipe_url=recipe_url)
     apply_recipe_owner_metadata(json_data)
+    upload_result = maybe_upload_recipe_archive_pdf_to_cloudflare(recipe_url)
+    attach_cloudflare_pdf_metadata(
+        recipe_url,
+        json_data,
+        upload_result,
+        recipe_archive_pdf_path(recipe_url),
+    )
 
     json_path = OUTPUT_FOLDER / f"{safe_filename(recipe_url)}.json"
     json_path.write_text(

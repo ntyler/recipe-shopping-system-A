@@ -47,11 +47,6 @@
                                             class="pdf-share-action-btn"
                                             onclick="return uploadPdfToCloudflare(this)">Upload to Cloudflare</button>
                                 {% endif %}
-                                {% if pdf.local_available %}
-                                    <button type="button"
-                                            class="pdf-share-action-btn"
-                                            onclick="return createPdfShareLink(this)">Create Share Link</button>
-                                {% endif %}
                             </div>
                             <div class="pdf-cloudflare-active" {% if not pdf.r2_public_url %}hidden{% endif %}>
                                 <input class="pdf-cloudflare-url"

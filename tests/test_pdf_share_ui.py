@@ -21,7 +21,7 @@ def test_shared_recipe_pdf_section_is_wired_into_main_page():
     assert "Open PDF" in section_template
     assert "Copy PDF Link" in section_template
     assert "Upload to Cloudflare" in section_template
-    assert "Create Share Link" in section_template
+    assert "Create Share Link" not in section_template
     assert "Copy Link" in section_template
     assert "Revoke Link" in section_template
     assert "data-pdf-share-row" in section_template
