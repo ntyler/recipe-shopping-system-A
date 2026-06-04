@@ -314,9 +314,11 @@
                                             onclick="openRecipeEditor(this); closeRecipeEditRowMenus(); return false;">
                                         Edit recipe
                                     </button>
-                                    {% if recipe.archive_pdf_available %}
+                                    {% set recipe_public_pdf_url = recipe.pdf_public_url %}
+                                    {% set recipe_pdf_url = recipe_public_pdf_url or (url_for('recipe_bp.recipe_archive_pdf_route', url=recipe.url) if recipe.archive_pdf_available else "") %}
+                                    {% if recipe_pdf_url %}
                                         <a class="recipe-edit-menu-link recipe-view-menu-pdf"
-                                           href="{{ url_for('recipe_bp.recipe_archive_pdf_route', url=recipe.url) }}"
+                                           href="{{ recipe_pdf_url }}"
                                            target="_blank"
                                            rel="noopener noreferrer"
                                            title="{{ recipe.name }}"

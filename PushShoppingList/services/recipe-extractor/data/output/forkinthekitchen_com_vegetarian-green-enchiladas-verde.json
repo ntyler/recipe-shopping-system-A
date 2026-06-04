@@ -338,8 +338,12 @@
     ]
   },
   "level": "",
-  "total_time": "45 minutes mins Servings: 6 servings Print Pin Rate These green enchiladas are made meatless but still have the texture of shredded chicken, thanks to jackfruit. White beans add extra heartiness. Make it with homemade sauce or use store-bought for an easy weeknight dinner! 1/2x 1x 2x 3x",
-  "prep_time": "20 minutes mins",
+  "total_time": "45 minutes",
+  "prep_time": "20 minutes",
   "inactive_time": "",
-  "cook_time": "25 minutes mins"
+  "cook_time": "25 minutes",
+  "rating": 0,
+  "reflection_notes": [],
+  "chatgpt_feedback": "",
+  "chatgpt_feedback_created_at": ""
 }

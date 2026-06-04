@@ -238,6 +238,14 @@ def section_counts(items):
     return counts
 
 
+def recipe_pdf_public_url(recipe_url):
+    recipe_data = load_saved_recipe_output(recipe_url)
+    pdf_metadata = recipe_data.get("pdf") if isinstance(recipe_data.get("pdf"), dict) else {}
+    cloudflare_data = pdf_metadata.get("cloudflare_r2") if isinstance(pdf_metadata.get("cloudflare_r2"), dict) else {}
+
+    return str(cloudflare_data.get("public_url") or "").strip()
+
+
 def recipe_view_rows(recipe_urls):
     rows = []
     recipe_ingredient_data = load_recipe_ingredients()
@@ -259,6 +267,7 @@ def recipe_view_rows(recipe_urls):
             "url": recipe["url"],
             "source_href": recipe_source_href(recipe["url"]),
             "source_display_url": recipe_source_display_url(recipe["url"]),
+            "pdf_public_url": recipe_pdf_public_url(recipe["url"]),
             "cover_image": cover_image,
             "quantity": recipe_quantity,
             "scaling_options": recipe_log_scaling_options(recipe_data, recipe_quantity),
@@ -337,6 +346,7 @@ def recipe_url_log_rows(recipe_urls, cookbook_assignments=None):
             "scaling_options": recipe_log_scaling_options(recipe_data, recipe_quantity),
             "source_href": recipe_source_href(recipe["url"]),
             "source_display_url": recipe_source_display_url(recipe["url"]),
+            "pdf_public_url": recipe_pdf_public_url(recipe["url"]),
             "cover_image": recipe_cover_image_for_view(recipe["url"], recipe_data, recipe_meta),
             "food_rule_status": recipe_food_rule_status(recipe_data),
             "rating": recipe_rating_for_view(recipe_data),
@@ -445,6 +455,7 @@ def cookbook_view_for_render(recipe_rows):
             recipe["food_rule_status"] = recipe_food_rule_status(recipe_data)
             recipe["rating"] = recipe_rating_for_view(recipe_data)
             recipe["rating_stars"] = recipe_rating_stars_for_view(recipe_data)
+            recipe["pdf_public_url"] = recipe_pdf_public_url(recipe_url)
             recipe["archive_pdf_available"] = recipe_archive_pdf_exists(recipe_url)
             recipe["base_servings"] = recipe.get("base_servings") or recipe_data.get("servings")
             recipe["scaled_servings"] = (
