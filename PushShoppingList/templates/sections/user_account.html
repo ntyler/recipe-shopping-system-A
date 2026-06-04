@@ -275,6 +275,15 @@
               action="{{ url_for('account_bp.update_profile_route') }}"
               enctype="multipart/form-data"
               hidden>
+            <div class="user-push-panel-header user-account-edit-header">
+                <h3>Account Settings</h3>
+                <button type="button"
+                        class="secondary user-push-panel-close"
+                        data-user-profile-close
+                        onclick="return toggleUserProfileEditor(false)">
+                    Close
+                </button>
+            </div>
             <label>
                 <span>First Name</span>
                 <input type="text" name="first_name" value="{{ current_user.first_name }}" autocomplete="given-name">

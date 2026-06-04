@@ -5271,6 +5271,10 @@ body {
             grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
+        .user-account-edit-header {
+            grid-column: 1 / -1;
+        }
+
         .user-account-file-label,
         .user-account-remove-avatar,
         .user-account-submit-row {

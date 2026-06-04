@@ -541,13 +541,37 @@ function bindTwoFactorPanel() {
             return;
         }
 
+        const scrollToTarget = (scrollBehavior = behavior) => {
+            target.scrollIntoView({ behavior: scrollBehavior, block: "start" });
+        };
+
         window.requestAnimationFrame(() => {
-            target.scrollIntoView({ behavior, block: "start" });
+            scrollToTarget();
+            window.requestAnimationFrame(() => scrollToTarget("auto"));
+            window.setTimeout(() => scrollToTarget("auto"), 120);
+
             const menuSummary = document.querySelector("[data-account-menu] summary");
             if (menuSummary) {
                 menuSummary.focus({ preventScroll: true });
             }
         });
+    };
+
+    const clearTwoFactorPanelLocation = () => {
+        const url = new URL(window.location.href);
+        const hadTwoFactorPanelQuery = url.searchParams.get("account_panel") === "two_factor";
+        const hadTwoFactorPanelHash = url.hash === "#accountTwoFactorPanel";
+
+        if (!hadTwoFactorPanelQuery && !hadTwoFactorPanelHash) {
+            return;
+        }
+
+        if (hadTwoFactorPanelQuery) {
+            url.searchParams.delete("account_panel");
+        }
+
+        url.hash = "userAccountSection";
+        window.history.replaceState({}, document.title, url.toString());
     };
 
     document.querySelectorAll("[data-two-factor-open]").forEach((button) => {
@@ -584,9 +608,10 @@ function bindTwoFactorPanel() {
     const closeButton = panel.querySelector("[data-two-factor-close]");
     if (closeButton) {
         closeButton.addEventListener("click", () => {
+            clearTwoFactorPanelLocation();
             panel.hidden = true;
             window.sessionStorage.removeItem(TWO_FACTOR_PANEL_RETURN_KEY);
-            scrollToAccountProfile("smooth");
+            scrollToAccountProfile("auto");
         });
     }
 }

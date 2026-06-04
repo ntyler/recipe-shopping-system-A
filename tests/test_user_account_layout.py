@@ -27,6 +27,20 @@ def test_verified_email_menu_action_is_disabled():
     assert ".user-account-menu-disabled" in css
 
 
+def test_account_settings_editor_has_header_close_and_closes_menu():
+    template = (ROOT / "PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+
+    assert '<h3>Account Settings</h3>' in template
+    assert "data-user-profile-close" in template
+    assert "toggleUserProfileEditor(false)" in template
+    assert ".user-account-edit-header" in css
+    assert "function toggleUserProfileEditor(open = null)" in script
+    assert 'document.querySelector("[data-account-menu]")' in script
+    assert "accountMenu.open = false" in script
+
+
 def test_account_action_token_pages_stay_focused_and_visible():
     index_template = (ROOT / "PushShoppingList/templates/index.html").read_text(encoding="utf-8")
     account_template = (ROOT / "PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")
@@ -74,7 +88,10 @@ def test_two_factor_close_returns_to_account_profile():
     assert "const scrollToAccountProfile" in script
     assert 'document.querySelector(".user-account-profile")' in script
     assert 'document.getElementById("userAccountSection")' in script
-    assert 'scrollToAccountProfile("smooth")' in script
+    assert "const clearTwoFactorPanelLocation" in script
+    assert 'url.searchParams.delete("account_panel")' in script
+    assert 'url.hash = "userAccountSection"' in script
+    assert 'scrollToAccountProfile("auto")' in script
 
 
 def test_pending_two_factor_setup_confirmation_copy_is_less_alarming():

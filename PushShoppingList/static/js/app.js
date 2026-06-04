@@ -435,14 +435,30 @@ function initPhoneCountryInputs() {
     }
 }
 
-function toggleUserProfileEditor() {
+function toggleUserProfileEditor(open = null) {
     const form = document.getElementById("userProfileEditForm");
 
     if (!form) {
         return false;
     }
 
-    form.hidden = !form.hidden;
+    const shouldOpen = typeof open === "boolean" ? open : form.hidden;
+    form.hidden = !shouldOpen;
+
+    if (shouldOpen) {
+        const accountMenu = document.querySelector("[data-account-menu]");
+
+        if (accountMenu) {
+            accountMenu.open = false;
+        }
+
+        document.querySelectorAll(
+            "[data-push-notifications-panel], [data-two-factor-panel], [data-delete-account-panel]"
+        ).forEach(panel => {
+            panel.hidden = true;
+        });
+    }
+
     return false;
 }
 
