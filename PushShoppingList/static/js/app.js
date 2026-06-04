@@ -376,6 +376,11 @@ function normalizedPhoneValue(localValue, countrySelect) {
 
 function initPhoneCountryInputs() {
     document.querySelectorAll("[data-phone-field]").forEach(field => {
+        if (field.dataset.phoneInitialized === "1") {
+            return;
+        }
+
+        field.dataset.phoneInitialized = "1";
         const select = field.querySelector("[data-phone-country]");
         const input = field.querySelector("[data-phone-local]");
 
@@ -417,7 +422,8 @@ function initPhoneCountryInputs() {
 
     const forgotForm = document.getElementById("forgotPasswordForm");
 
-    if (forgotForm) {
+    if (forgotForm && forgotForm.dataset.phoneInitialized !== "1") {
+        forgotForm.dataset.phoneInitialized = "1";
         forgotForm.addEventListener("submit", () => {
             const selected = forgotForm.querySelector('input[name="reset_method"]:checked');
             const input = document.getElementById("forgotPasswordIdentityInput");
@@ -15936,6 +15942,7 @@ document.addEventListener("DOMContentLoaded", function () {
     restoreOpenStorePanels();
     restoreViewBehaviorSettings();
     restoreItemCheckState();
+    initPhoneCountryInputs();
     bindRecipeUrlLogDragAndDrop();
     bindRecipeViewDragAndDrop();
     bindCurrentRecipeUrlSummaryToggles();
