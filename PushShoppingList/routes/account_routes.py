@@ -19,6 +19,7 @@ from PushShoppingList.services.email_service import send_two_factor_recovery_ema
 from PushShoppingList.services.sms_service import password_reset_sms_configured
 from PushShoppingList.services.sms_service import send_password_reset_sms
 from PushShoppingList.services.sms_service import send_phone_verification_sms
+from PushShoppingList.services.admin_support_service import open_admin_support_record
 from PushShoppingList.services.user_account_service import authenticate_user
 from PushShoppingList.services.user_account_service import cancel_two_factor_setup
 from PushShoppingList.services.user_account_service import cancel_two_factor_sign_in
@@ -30,6 +31,7 @@ from PushShoppingList.services.user_account_service import discard_pending_accou
 from PushShoppingList.services.user_account_service import disable_two_factor
 from PushShoppingList.services.user_account_service import enable_two_factor
 from PushShoppingList.services.user_account_service import regenerate_two_factor_backup_codes
+from PushShoppingList.services.user_account_service import is_admin_user
 from PushShoppingList.services.user_account_service import request_account_delete
 from PushShoppingList.services.user_account_service import request_password_reset
 from PushShoppingList.services.user_account_service import request_phone_verification
@@ -49,6 +51,11 @@ from PushShoppingList.services.user_account_service import verify_phone_code
 account_bp = Blueprint("account_bp", __name__)
 TWO_FACTOR_TRUST_COOKIE = "shopping_2fa_trust"
 TWO_FACTOR_TRUST_MAX_AGE = 30 * 24 * 60 * 60
+ADMIN_SUPPORT_SESSION_KEYS = (
+    "admin_support_selected_user",
+    "admin_support_reason",
+    "admin_support_errors",
+)
 
 
 def flash_account_result(result, success_message):
@@ -80,6 +87,11 @@ def json_account_result(result, success_status=200, error_status=400):
         "success": False,
         "errors": result.get("errors", ["Something went wrong. Please try again."]),
     }), error_status
+
+
+def clear_admin_support_session():
+    for key in ADMIN_SUPPORT_SESSION_KEYS:
+        session.pop(key, None)
 
 
 def password_reset_link(token):
@@ -212,6 +224,7 @@ def firebase_login_route():
 
 @account_bp.route("/auth/logout", methods=["POST"])
 def firebase_logout_route():
+    clear_admin_support_session()
     sign_out_user()
     return jsonify({"success": True, "authenticated": False, "user": None})
 
@@ -496,9 +509,40 @@ def complete_password_reset_route():
 
 @account_bp.route("/account/sign-out", methods=["POST"])
 def sign_out_route():
+    clear_admin_support_session()
     sign_out_user()
     flash("Signed out. You are using the guest workspace.", "success")
     return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+
+@account_bp.route("/account/admin-support", methods=["POST"])
+def open_admin_support_record_route():
+    admin_user = current_public_user()
+
+    if not is_admin_user(admin_user):
+        clear_admin_support_session()
+        flash("Admin access is required.", "error")
+        return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+    reason = request.form.get("support_reason", "")
+    result = open_admin_support_record(
+        admin_user,
+        request.form.get("target_user_id", ""),
+        reason,
+    )
+    session["admin_support_reason"] = str(reason or "").strip()[:300]
+
+    if result.get("ok"):
+        session["admin_support_selected_user"] = result.get("selected_user") or {}
+        session.pop("admin_support_errors", None)
+    else:
+        session["admin_support_errors"] = result.get(
+            "errors",
+            ["Unable to open that support record."],
+        )
+        session.pop("admin_support_selected_user", None)
+
+    return redirect(url_for("main_bp.index", _anchor="adminSupportSection"))
 
 
 @account_bp.route("/account/profile", methods=["POST"])

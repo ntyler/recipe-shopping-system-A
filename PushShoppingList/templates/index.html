@@ -27,6 +27,10 @@
 
 <main id="appContent" class="app-content">
     {% include "sections/user_account.html" %}
+    {% if admin_support_dashboard and admin_support_dashboard.is_admin %}
+        <div class="app-section-divider" aria-hidden="true"></div>
+        {% include "sections/admin_support.html" %}
+    {% endif %}
     <div class="app-section-divider recipe-entry-section-divider" aria-hidden="true"></div>
     {% include "sections/ai_pantry.html" %}
     {% include "sections/enter_recipe_links.html" %}

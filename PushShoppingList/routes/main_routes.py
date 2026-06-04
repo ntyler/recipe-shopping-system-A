@@ -83,6 +83,7 @@ from PushShoppingList.services.store_settings_service import load_store_settings
 from PushShoppingList.services.firebase_auth_service import firebase_web_config
 from PushShoppingList.services.user_account_service import current_public_user
 from PushShoppingList.services.user_account_service import public_two_factor_recovery_user
+from PushShoppingList.services.admin_support_service import admin_support_dashboard_for_user
 
 main_bp = Blueprint("main_bp", __name__)
 address_openai_client = None
@@ -1395,6 +1396,12 @@ def index():
         food_rule_status=shopping_item_food_rule_status,
         feedback_dashboard=feedback_dashboard_for_user(active_public_user),
         feedback_messages=session.pop("feedback_messages", []),
+        admin_support_dashboard=admin_support_dashboard_for_user(
+            active_public_user,
+            selected_user=session.get("admin_support_selected_user"),
+            errors=session.pop("admin_support_errors", []),
+            reason=session.get("admin_support_reason", ""),
+        ),
         password_reset_token=request.args.get("reset_token", ""),
         two_factor_recovery_token=two_factor_recovery_token,
         two_factor_recovery_user=public_two_factor_recovery_user(two_factor_recovery_token),

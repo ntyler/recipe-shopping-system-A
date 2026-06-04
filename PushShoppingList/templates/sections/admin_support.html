@@ -1,0 +1,135 @@
+{% set admin_support = admin_support_dashboard|default({}) %}
+{% if admin_support.is_admin %}
+<section id="adminSupportSection" class="recipe-card admin-support-card">
+    <div class="admin-support-header">
+        <div>
+            <h2>Admin Support</h2>
+            <p>Read-only user account checks are logged.</p>
+        </div>
+        <span class="admin-support-count">{{ admin_support.users|length }} accounts</span>
+    </div>
+
+    {% if admin_support.errors %}
+        <div class="admin-support-messages" aria-live="polite">
+            {% for error in admin_support.errors %}
+                <div class="admin-support-message error">{{ error }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {% set selected_user = admin_support.selected_user %}
+    <form class="admin-support-form"
+          method="POST"
+          action="{{ url_for('account_bp.open_admin_support_record_route') }}">
+        <label>
+            <span>Account</span>
+            <select name="target_user_id" required>
+                <option value="">Choose account</option>
+                {% for user in admin_support.users %}
+                    <option value="{{ user.user_id }}"
+                            {% if selected_user and selected_user.user_id == user.user_id %}selected{% endif %}>
+                        {{ user.display_name or user.email }} - {{ user.email }}
+                    </option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="admin-support-reason-field">
+            <span>Reason</span>
+            <input type="text"
+                   name="support_reason"
+                   value="{{ admin_support.reason }}"
+                   maxlength="300"
+                   required>
+        </label>
+        <button type="submit" class="admin-support-submit-btn">Open Support Record</button>
+    </form>
+
+    {% if selected_user %}
+        <div class="admin-support-selected">
+            <div class="admin-support-selected-header">
+                <div>
+                    <h3>{{ selected_user.display_name or selected_user.email }}</h3>
+                    <span>{{ selected_user.email }}</span>
+                </div>
+                <span class="admin-support-role">{{ selected_user.role }}</span>
+            </div>
+
+            <dl class="admin-support-detail-grid">
+                <div>
+                    <dt>Username</dt>
+                    <dd>{{ selected_user.username or "Not set" }}</dd>
+                </div>
+                <div>
+                    <dt>Provider</dt>
+                    <dd>{{ selected_user.provider_label or selected_user.auth_provider }}</dd>
+                </div>
+                <div>
+                    <dt>Status</dt>
+                    <dd>{{ selected_user.account_status }}</dd>
+                </div>
+                <div>
+                    <dt>Email Verified</dt>
+                    <dd>{{ "Yes" if selected_user.email_verified else "No" }}</dd>
+                </div>
+                <div>
+                    <dt>Phone Verified</dt>
+                    <dd>{{ "Yes" if selected_user.phone_verified else "No" }}</dd>
+                </div>
+                <div>
+                    <dt>Two-Factor</dt>
+                    <dd>{{ "Enabled" if selected_user.two_factor_enabled else "Disabled" }}</dd>
+                </div>
+                <div>
+                    <dt>Backup Codes</dt>
+                    <dd>{{ selected_user.two_factor_backup_codes_remaining }}</dd>
+                </div>
+                <div>
+                    <dt>Notifications</dt>
+                    <dd>{{ "Enabled" if selected_user.notifications_enabled else "Disabled" }}</dd>
+                </div>
+                <div>
+                    <dt>Created</dt>
+                    <dd>{{ selected_user.created_at_label or "Unknown" }}</dd>
+                </div>
+                <div>
+                    <dt>Last Sign-In</dt>
+                    <dd>{{ selected_user.last_sign_in_at_label or "Unknown" }}</dd>
+                </div>
+                <div>
+                    <dt>Workspace</dt>
+                    <dd>{{ "Found" if selected_user.workspace.workspace_exists else "Not found" }}</dd>
+                </div>
+                <div>
+                    <dt>Recipe Files</dt>
+                    <dd>{{ selected_user.workspace.saved_recipe_files }}</dd>
+                </div>
+                <div>
+                    <dt>Uploaded Files</dt>
+                    <dd>{{ selected_user.workspace.uploaded_files }}</dd>
+                </div>
+            </dl>
+        </div>
+    {% endif %}
+
+    {% if admin_support.recent_audit %}
+        <div class="admin-support-audit">
+            <div class="admin-support-audit-header">
+                <h3>Recent Support Access</h3>
+            </div>
+            <ol class="admin-support-audit-list">
+                {% for entry in admin_support.recent_audit %}
+                    <li>
+                        <div class="admin-support-audit-top">
+                            <strong>{{ entry.target_email }}</strong>
+                            <span>{{ entry.timestamp_label }}</span>
+                        </div>
+                        <div class="admin-support-audit-meta">
+                            {{ entry.admin_email }} - {{ entry.reason }}
+                        </div>
+                    </li>
+                {% endfor %}
+            </ol>
+        </div>
+    {% endif %}
+</section>
+{% endif %}
