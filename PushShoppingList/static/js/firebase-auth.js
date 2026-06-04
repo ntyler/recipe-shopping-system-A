@@ -533,6 +533,23 @@ function bindTwoFactorPanel() {
         });
     };
 
+    const scrollToAccountProfile = (behavior = "smooth") => {
+        const target = document.querySelector(".user-account-profile")
+            || document.getElementById("userAccountSection");
+
+        if (!target) {
+            return;
+        }
+
+        window.requestAnimationFrame(() => {
+            target.scrollIntoView({ behavior, block: "start" });
+            const menuSummary = document.querySelector("[data-account-menu] summary");
+            if (menuSummary) {
+                menuSummary.focus({ preventScroll: true });
+            }
+        });
+    };
+
     document.querySelectorAll("[data-two-factor-open]").forEach((button) => {
         button.addEventListener("click", () => {
             panel.hidden = false;
@@ -569,6 +586,7 @@ function bindTwoFactorPanel() {
         closeButton.addEventListener("click", () => {
             panel.hidden = true;
             window.sessionStorage.removeItem(TWO_FACTOR_PANEL_RETURN_KEY);
+            scrollToAccountProfile("smooth");
         });
     }
 }

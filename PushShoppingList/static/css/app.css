@@ -4788,10 +4788,7 @@ body {
         }
 
         #accountTwoFactorPanel .user-two-factor-recovery-request-form {
-            padding: 12px;
-            border: 1px solid #2f4054;
-            border-radius: 8px;
-            background: #0b1118;
+            padding-top: 10px;
         }
 
         #accountTwoFactorPanel .user-two-factor-recovery-request-form h4 {

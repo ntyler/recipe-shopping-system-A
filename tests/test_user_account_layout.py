@@ -68,6 +68,15 @@ def test_two_factor_panel_forms_return_to_panel_after_refresh():
     assert "scrollToPanel(\"auto\")" in script
 
 
+def test_two_factor_close_returns_to_account_profile():
+    script = (ROOT / "PushShoppingList/static/js/firebase-auth.js").read_text(encoding="utf-8")
+
+    assert "const scrollToAccountProfile" in script
+    assert 'document.querySelector(".user-account-profile")' in script
+    assert 'document.getElementById("userAccountSection")' in script
+    assert 'scrollToAccountProfile("smooth")' in script
+
+
 def test_pending_two_factor_setup_confirmation_copy_is_less_alarming():
     template = (ROOT / "PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")
 
@@ -80,6 +89,7 @@ def test_pending_two_factor_setup_confirmation_copy_is_less_alarming():
 
 def test_two_factor_disable_has_code_and_email_recovery_paths():
     template = (ROOT / "PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
     assert "Use your authenticator app or a backup code to disable two-factor authentication now." in template
     assert "action=\"{{ url_for('account_bp.disable_two_factor_route') }}\"" in template
@@ -89,6 +99,12 @@ def test_two_factor_disable_has_code_and_email_recovery_paths():
     assert "Email Disable Verification Link" in template
     assert "Email a one-time verification link to {{ current_user.email }}" in template
     assert "Disable Two-Factor Authentication for {{ two_factor_recovery_user.email }}" in template
+
+    recovery_style_start = css.index("#accountTwoFactorPanel .user-two-factor-recovery-request-form {")
+    recovery_style_end = css.index("}", recovery_style_start)
+    recovery_style = css[recovery_style_start:recovery_style_end]
+    assert "border:" not in recovery_style
+    assert "background:" not in recovery_style
 
 
 def test_regenerate_backup_codes_returns_to_top_of_account_section():
