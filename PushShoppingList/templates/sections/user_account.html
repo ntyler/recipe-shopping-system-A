@@ -121,10 +121,22 @@
                 <span>Email</span>
                 <input type="email" name="email" value="{{ current_user.email }}" required autocomplete="email">
             </label>
-            <label>
-                <span>Phone</span>
-                <input type="tel" name="phone" value="{{ current_user.phone }}" autocomplete="tel">
-            </label>
+            <div class="user-phone-field" data-phone-field>
+                <label class="user-phone-country-label">
+                    <span>Country</span>
+                    <select data-phone-country autocomplete="tel-country-code"></select>
+                </label>
+                <label class="user-phone-local-label">
+                    <span>Phone</span>
+                    <input type="tel"
+                           name="phone"
+                           value="{{ current_user.phone }}"
+                           data-phone-local
+                           autocomplete="tel-national"
+                           inputmode="tel"
+                           placeholder="309 660 6603">
+                </label>
+            </div>
             <label>
                 <span>New Password</span>
                 <input type="password" name="password" autocomplete="new-password">
@@ -334,10 +346,21 @@
                         <span>Email</span>
                         <input type="email" name="email" required autocomplete="email">
                     </label>
-                    <label>
-                        <span>Phone</span>
-                        <input type="tel" name="phone" autocomplete="tel">
-                    </label>
+                    <div class="user-phone-field" data-phone-field>
+                        <label class="user-phone-country-label">
+                            <span>Country</span>
+                            <select data-phone-country autocomplete="tel-country-code"></select>
+                        </label>
+                        <label class="user-phone-local-label">
+                            <span>Phone</span>
+                            <input type="tel"
+                                   name="phone"
+                                   data-phone-local
+                                   autocomplete="tel-national"
+                                   inputmode="tel"
+                                   placeholder="309 660 6603">
+                        </label>
+                    </div>
                     <label>
                         <span>Password</span>
                         <input type="password" name="password" required autocomplete="new-password">
@@ -403,6 +426,16 @@
                             Enter your username or email and the app will prepare a one-time local reset link.
                         {% endif %}
                     </p>
+                    <div id="forgotPasswordPhoneCountryWrap"
+                         class="user-phone-reset-country"
+                         hidden>
+                        <label class="user-phone-country-label">
+                            <span>Country</span>
+                            <select id="forgotPasswordPhoneCountry"
+                                    data-phone-country
+                                    autocomplete="tel-country-code"></select>
+                        </label>
+                    </div>
                     <label>
                         <span id="forgotPasswordIdentityLabel">Username or Email</span>
                         <input id="forgotPasswordIdentityInput"

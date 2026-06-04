@@ -200,13 +200,13 @@ def find_user_by_identity_in_payload(payload, identity):
 
 
 def find_user_by_phone_in_payload(payload, phone):
-    phone_key = normalize_phone_lookup(phone)
+    phone_keys = phone_lookup_candidates(phone)
 
-    if not phone_key:
+    if not phone_keys:
         return None
 
     for user in payload.get("users", []):
-        if normalize_phone_lookup(user.get("phone")) == phone_key:
+        if phone_lookup_candidates(user.get("phone")) & phone_keys:
             return user
 
     return None
@@ -218,6 +218,44 @@ def normalize_identity(value):
 
 def normalize_phone_lookup(value):
     return "".join(PHONE_DIGITS_PATTERN.findall(str(value or "")))
+
+
+def phone_lookup_candidates(value):
+    digits = normalize_phone_lookup(value)
+
+    if not digits:
+        return set()
+
+    candidates = {digits}
+
+    if len(digits) == 10:
+        candidates.add(f"1{digits}")
+    elif len(digits) == 11 and digits.startswith("1"):
+        candidates.add(digits[1:])
+
+    return candidates
+
+
+def normalize_phone_for_storage(phone):
+    phone = str(phone or "").strip()
+    digits = normalize_phone_lookup(phone)
+
+    if not digits:
+        return ""
+
+    if phone.startswith("+"):
+        return f"+{digits}"
+
+    if len(digits) == 10:
+        return f"+1{digits}"
+
+    if len(digits) == 11 and digits.startswith("1"):
+        return f"+{digits}"
+
+    if len(digits) > 10:
+        return f"+{digits}"
+
+    return digits
 
 
 def validate_phone(phone):
@@ -268,8 +306,8 @@ def create_user(username, email, password, confirm_password, avatar_file=None, p
     errors = validate_account_fields(username, email, password, confirm_password, require_password=True, phone=phone)
     username = str(username or "").strip()
     email = str(email or "").strip()
-    phone = str(phone or "").strip()
-    phone_key = normalize_phone_lookup(phone)
+    phone = normalize_phone_for_storage(phone)
+    phone_keys = phone_lookup_candidates(phone)
     payload = load_users()
 
     if username and any(normalize_identity(user.get("username")) == normalize_identity(username) for user in payload["users"]):
@@ -278,7 +316,7 @@ def create_user(username, email, password, confirm_password, avatar_file=None, p
     if email and any(normalize_identity(user.get("email")) == normalize_identity(email) for user in payload["users"]):
         errors.append("That email is already in use.")
 
-    if phone_key and any(normalize_phone_lookup(user.get("phone")) == phone_key for user in payload["users"]):
+    if phone_keys and any(phone_lookup_candidates(user.get("phone")) & phone_keys for user in payload["users"]):
         errors.append("That phone number is already in use.")
 
     if errors:
@@ -802,8 +840,8 @@ def update_user_profile(user_id, username, email, password="", confirm_password=
     )
     username = str(username or "").strip()
     email = str(email or "").strip()
-    phone = str(phone or "").strip()
-    phone_key = normalize_phone_lookup(phone)
+    phone = normalize_phone_for_storage(phone)
+    phone_keys = phone_lookup_candidates(phone)
 
     for existing in payload["users"]:
         if existing.get("user_id") == user_id:
@@ -812,7 +850,7 @@ def update_user_profile(user_id, username, email, password="", confirm_password=
             errors.append("That username is already in use.")
         if normalize_identity(existing.get("email")) == normalize_identity(email):
             errors.append("That email is already in use.")
-        if phone_key and normalize_phone_lookup(existing.get("phone")) == phone_key:
+        if phone_keys and phone_lookup_candidates(existing.get("phone")) & phone_keys:
             errors.append("That phone number is already in use.")
 
     if errors:

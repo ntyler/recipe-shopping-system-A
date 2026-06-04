@@ -4771,7 +4771,8 @@ body {
             letter-spacing: 0.04em;
         }
 
-        .user-account-form input {
+        .user-account-form input,
+        .user-account-form select {
             width: 100%;
             min-height: 38px;
             padding: 8px 10px;
@@ -4781,6 +4782,36 @@ body {
             color: #fff;
             box-sizing: border-box;
             font-size: 15px;
+        }
+
+        .user-account-form select {
+            appearance: auto;
+        }
+
+        .user-phone-field,
+        .user-phone-reset-country {
+            display: grid;
+            grid-template-columns: minmax(180px, 0.72fr) minmax(0, 1fr);
+            gap: 8px;
+            align-items: end;
+            min-width: 0;
+        }
+
+        .user-account-edit-form .user-phone-field {
+            grid-column: 1 / -1;
+        }
+
+        .user-phone-reset-country {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .user-phone-reset-country[hidden] {
+            display: none;
+        }
+
+        .user-phone-country-label,
+        .user-phone-local-label {
+            min-width: 0;
         }
 
         .user-account-form input[type="file"] {
@@ -10025,7 +10056,8 @@ body {
             }
 
             .user-ntfy-link-row,
-            .user-ntfy-topic {
+            .user-ntfy-topic,
+            .user-phone-field {
                 grid-template-columns: minmax(0, 1fr);
             }
 
