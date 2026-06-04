@@ -312,7 +312,9 @@ def cancel_two_factor_sign_in_route():
 
 @account_bp.route("/account/2fa/recovery/request", methods=["POST"])
 def request_two_factor_recovery_route():
-    result = request_two_factor_recovery(session.get("pending_2fa_user_id"))
+    result = request_two_factor_recovery(
+        session.get("pending_2fa_user_id") or session.get("user_id")
+    )
 
     if result.get("ok"):
         session.pop("two_factor_recovery_link", None)
@@ -359,7 +361,17 @@ def complete_two_factor_recovery_route():
 
     if result.get("ok"):
         session.pop("two_factor_recovery_link", None)
-        flash("Two-factor authentication disabled. Sign in with your password and set up a new authenticator.", "success")
+        recovered_user = result.get("user") or {}
+        recovered_email = str(recovered_user.get("email") or "").strip()
+        flash(
+            (
+                f"Two-factor authentication disabled for {recovered_email}. "
+                "Sign in with your password and set up a new authenticator."
+            )
+            if recovered_email
+            else "Two-factor authentication disabled. Sign in with your password and set up a new authenticator.",
+            "success",
+        )
         response.delete_cookie(TWO_FACTOR_TRUST_COOKIE)
         return response
 

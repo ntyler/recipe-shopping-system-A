@@ -4708,6 +4708,46 @@ body {
             letter-spacing: 0.04em;
         }
 
+        .user-account-token-target {
+            display: grid;
+            gap: 5px;
+            padding: 10px;
+            border: 1px solid #2f4054;
+            border-radius: 8px;
+            background: #0b1118;
+            color: #dbeafe;
+            text-align: center;
+        }
+
+        .user-account-token-target span {
+            color: #93c5fd;
+            font-size: 12px;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+
+        .user-account-token-target strong {
+            color: #f8fafc;
+            font-size: 18px;
+            font-weight: 900;
+        }
+
+        .user-account-token-target code {
+            color: #d8ffe4;
+            font-family: Consolas, Monaco, monospace;
+            font-weight: 900;
+            overflow-wrap: anywhere;
+        }
+
+        .user-account-token-target.error {
+            border-color: #a33a3a;
+            background: #351417;
+        }
+
+        .user-account-token-target.error code {
+            color: #ffd4d4;
+        }
+
         .user-delete-account-card,
         .user-phone-verification-card,
         .user-two-factor-card {
@@ -4731,6 +4771,21 @@ body {
             gap: 10px;
             min-width: 0;
             margin: 0;
+        }
+
+        #accountTwoFactorPanel .user-two-factor-recovery-request-form {
+            padding: 12px;
+            border: 1px solid #2f4054;
+            border-radius: 8px;
+            background: #0b1118;
+        }
+
+        #accountTwoFactorPanel .user-two-factor-recovery-request-form h4 {
+            margin: 0;
+            color: #f8fafc;
+            font-size: 18px;
+            font-weight: 900;
+            text-align: center;
         }
 
         .user-two-factor-setup-box {

@@ -69,14 +69,29 @@
               method="POST"
               action="{{ url_for('account_bp.complete_two_factor_recovery_route') }}">
             <h3>Recover Two-Factor Access</h3>
+            {% if two_factor_recovery_user|default(none) %}
+                <div class="user-account-token-target">
+                    <span>Recovery account</span>
+                    <strong>{{ two_factor_recovery_user.display_name }}</strong>
+                    <code>{{ two_factor_recovery_user.email }}</code>
+                </div>
+            {% else %}
+                <div class="user-account-token-target error">
+                    <span>Recovery account</span>
+                    <strong>Unable to verify this recovery link.</strong>
+                    <code>Request a new two-factor recovery email.</code>
+                </div>
+            {% endif %}
             <p class="user-account-form-note">
                 This will disable two-factor authentication after verification. Local accounts must also enter the current password.
             </p>
             <input type="hidden" name="two_factor_recovery_token" value="{{ two_factor_recovery_token }}">
-            <label>
-                <span>Current Password (local accounts only)</span>
-                <input type="password" name="password" autocomplete="current-password">
-            </label>
+            {% if two_factor_recovery_user|default(none) and two_factor_recovery_user.auth_provider != "firebase" %}
+                <label>
+                    <span>Current Password</span>
+                    <input type="password" name="password" required autocomplete="current-password">
+                </label>
+            {% endif %}
             <button type="submit" class="danger">Disable Two-Factor Authentication</button>
         </form>
     {% endif %}
@@ -109,7 +124,15 @@
         </div>
     {% endif %}
 
-    {% if current_user %}
+    {% if current_user and two_factor_recovery_token|default("") %}
+        <div class="user-account-reset-panel" aria-live="polite">
+            <strong>Signed-in browser session</strong>
+            <span>
+                You are currently signed in as {{ current_user.email }}, but the recovery form above is for
+                {% if two_factor_recovery_user|default(none) %}{{ two_factor_recovery_user.email }}{% else %}the account tied to that recovery link{% endif %}.
+            </span>
+        </div>
+    {% elif current_user %}
         <div class="user-account-profile">
             <div class="user-account-avatar-wrap">
                 {% if current_user.avatar_path %}
@@ -431,6 +454,16 @@
                                autocomplete="one-time-code">
                     </label>
                     <button type="submit" class="danger">Disable Two-Factor Authentication</button>
+                </form>
+
+                <form class="user-two-factor-inline-form user-two-factor-recovery-request-form"
+                      method="POST"
+                      action="{{ url_for('account_bp.request_two_factor_recovery_route') }}">
+                    <h4>Lost authenticator or backup codes?</h4>
+                    <p class="user-account-form-note">
+                        Email a one-time recovery link to this account. Local accounts confirm the current password from that link.
+                    </p>
+                    <button type="submit">Email Recovery Link</button>
                 </form>
             {% elif two_factor_setup %}
                 <p class="user-account-form-note">

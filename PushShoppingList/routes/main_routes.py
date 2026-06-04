@@ -82,6 +82,7 @@ from PushShoppingList.services.shopping_list_service import save_items
 from PushShoppingList.services.store_settings_service import load_store_settings
 from PushShoppingList.services.firebase_auth_service import firebase_web_config
 from PushShoppingList.services.user_account_service import current_public_user
+from PushShoppingList.services.user_account_service import public_two_factor_recovery_user
 
 main_bp = Blueprint("main_bp", __name__)
 address_openai_client = None
@@ -1320,6 +1321,7 @@ def build_store_view(items, item_state, available_stores, enabled_stores):
 @main_bp.route("/")
 def index():
     active_public_user = current_public_user()
+    two_factor_recovery_token = request.args.get("two_factor_recovery_token", "")
     items = load_items()
     store_settings = load_store_settings()
     recipe_urls = recipe_url_rows()
@@ -1394,7 +1396,8 @@ def index():
         feedback_dashboard=feedback_dashboard_for_user(active_public_user),
         feedback_messages=session.pop("feedback_messages", []),
         password_reset_token=request.args.get("reset_token", ""),
-        two_factor_recovery_token=request.args.get("two_factor_recovery_token", ""),
+        two_factor_recovery_token=two_factor_recovery_token,
+        two_factor_recovery_user=public_two_factor_recovery_user(two_factor_recovery_token),
         account_delete_token=request.args.get("account_delete_token", ""),
         app_css_version=static_asset_version("css/app.css"),
         app_js_version=static_asset_version("js/app.js"),

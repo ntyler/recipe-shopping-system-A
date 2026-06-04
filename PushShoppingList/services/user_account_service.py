@@ -1216,6 +1216,15 @@ def recover_two_factor_with_token(token, password):
     return {"ok": True, "user": public_user(user)}
 
 
+def public_two_factor_recovery_user(token):
+    token = str(token or "").strip()
+
+    if not token:
+        return None
+
+    return public_user(find_user_by_two_factor_recovery_token(load_users(), token))
+
+
 def find_user_by_two_factor_recovery_token(payload, token):
     for user in payload.get("users", []):
         recovery = user.get("two_factor_recovery") if isinstance(user, dict) else None
