@@ -444,8 +444,7 @@
 
                     <form class="user-two-factor-inline-form"
                           method="POST"
-                          action="{{ url_for('account_bp.regenerate_two_factor_backup_codes_route') }}"
-                          data-two-factor-return-form>
+                          action="{{ url_for('account_bp.regenerate_two_factor_backup_codes_route') }}">
                         {% if current_user.auth_provider != "firebase" %}
                             <label>
                                 <span>Current Password</span>

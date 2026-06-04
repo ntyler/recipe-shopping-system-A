@@ -701,4 +701,7 @@ def regenerate_two_factor_backup_codes_route():
         session["two_factor_backup_codes"] = result.get("backup_codes", [])
 
     flash_account_result(result, "Backup codes regenerated.")
+    if result.get("ok"):
+        return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
     return two_factor_panel_redirect()

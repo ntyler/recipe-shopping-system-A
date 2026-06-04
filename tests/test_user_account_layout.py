@@ -89,3 +89,15 @@ def test_two_factor_disable_has_code_and_email_recovery_paths():
     assert "Email Disable Verification Link" in template
     assert "Email a one-time verification link to {{ current_user.email }}" in template
     assert "Disable Two-Factor Authentication for {{ two_factor_recovery_user.email }}" in template
+
+
+def test_regenerate_backup_codes_returns_to_top_of_account_section():
+    route = (ROOT / "PushShoppingList/routes/account_routes.py").read_text(encoding="utf-8")
+    template = (ROOT / "PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")
+
+    form_start = template.index("regenerate_two_factor_backup_codes_route")
+    form_end = template.index("</form>", form_start)
+    regenerate_form = template[form_start:form_end]
+
+    assert 'return redirect(url_for("main_bp.index", _anchor="userAccountSection"))' in route
+    assert "data-two-factor-return-form" not in regenerate_form
