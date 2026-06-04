@@ -2,7 +2,12 @@ __pycache__/
 *.pyc
 venv/
 .env
+.env.local
+.env.*
 local_env.bat
+firebase-service-account*.json
+serviceAccountKey.json
+*.service-account.json
 .vscode/
 .idea/
 PushShoppingList/services/recipe-extractor/data/extract_progress.json
@@ -14,6 +19,8 @@ PushShoppingList/services/recipe-extractor/data/home_address_history.json
 PushShoppingList/services/recipe-extractor/data/store_settings.json
 PushShoppingList/services/recipe-extractor/data/shopping_item_state.json
 PushShoppingList/services/recipe-extractor/data/pdf/
+PushShoppingList/services/recipe-extractor/data/pdf_cloud_records.json
+PushShoppingList/services/recipe-extractor/data/pdf_dropbox_links.json
 PushShoppingList/services/recipe-extractor/data/pdf_share_links.json
 PushShoppingList/services/recipe-extractor/data/logs/
 PushShoppingList/services/recipe-extractor/data/raw/*_PDF_ERROR.txt

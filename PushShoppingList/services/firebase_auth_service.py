@@ -1,6 +1,6 @@
+import json
+import logging
 import os
-
-import requests
 
 
 DEFAULT_FIREBASE_WEB_CONFIG = {
@@ -12,7 +12,8 @@ DEFAULT_FIREBASE_WEB_CONFIG = {
     "appId": "1:1084430352486:web:71b25f380928a61bdfeda7",
     "measurementId": "G-J44GKNGRDY",
 }
-FIREBASE_ACCOUNTS_LOOKUP_URL = "https://identitytoolkit.googleapis.com/v1/accounts:lookup"
+FIREBASE_ADMIN_APP_NAME = "recipe_shopping_app"
+LOGGER = logging.getLogger(__name__)
 
 
 def env_value(*names, default=""):
@@ -65,45 +66,93 @@ def firebase_web_config():
     }
 
 
+def firebase_admin_app():
+    try:
+        import firebase_admin
+        from firebase_admin import credentials
+    except Exception:
+        LOGGER.error("Firebase Admin SDK is not installed. Add firebase-admin to requirements and install it.")
+        return None, {
+            "ok": False,
+            "code": "firebase_admin_sdk_missing",
+            "errors": ["Backend Firebase Admin SDK is not installed."],
+        }
+
+    try:
+        return firebase_admin.get_app(FIREBASE_ADMIN_APP_NAME), {"ok": True}
+    except ValueError:
+        pass
+
+    service_account_path = env_value("FIREBASE_SERVICE_ACCOUNT_PATH")
+    service_account_json = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON", "").strip()
+
+    if service_account_path:
+        try:
+            credential = credentials.Certificate(service_account_path)
+        except Exception as err:
+            LOGGER.error("Firebase service account path could not be loaded: %s", err.__class__.__name__)
+            return None, {
+                "ok": False,
+                "code": "firebase_admin_credentials_invalid",
+                "errors": ["Backend Firebase Admin credentials could not be loaded from FIREBASE_SERVICE_ACCOUNT_PATH."],
+            }
+    elif service_account_json:
+        try:
+            credential = credentials.Certificate(json.loads(service_account_json))
+        except Exception as err:
+            LOGGER.error("Firebase service account JSON could not be loaded: %s", err.__class__.__name__)
+            return None, {
+                "ok": False,
+                "code": "firebase_admin_credentials_invalid",
+                "errors": ["Backend Firebase Admin credentials could not be loaded from FIREBASE_SERVICE_ACCOUNT_JSON."],
+            }
+    else:
+        LOGGER.error(
+            "Firebase Admin credentials are missing. Set FIREBASE_SERVICE_ACCOUNT_PATH or FIREBASE_SERVICE_ACCOUNT_JSON."
+        )
+        return None, {
+            "ok": False,
+            "code": "firebase_admin_credentials_missing",
+            "errors": [
+                "Backend Firebase Admin credentials are missing. Set FIREBASE_SERVICE_ACCOUNT_PATH or FIREBASE_SERVICE_ACCOUNT_JSON."
+            ],
+        }
+
+    try:
+        return firebase_admin.initialize_app(credential, name=FIREBASE_ADMIN_APP_NAME), {"ok": True}
+    except Exception as err:
+        LOGGER.error("Firebase Admin initialization failed: %s", err.__class__.__name__)
+        return None, {
+            "ok": False,
+            "code": "firebase_admin_initialization_failed",
+            "errors": ["Backend Firebase Admin initialization failed."],
+        }
+
+
 def firebase_user_from_id_token(id_token):
     id_token = str(id_token or "").strip()
-    api_key = firebase_web_config().get("apiKey", "")
 
     if not id_token:
         return {"ok": False, "errors": ["Firebase ID token is missing."]}
 
-    if not api_key:
-        return {"ok": False, "errors": ["Firebase web API key is not configured."]}
+    admin_app, app_result = firebase_admin_app()
+
+    if not app_result.get("ok"):
+        return app_result
 
     try:
-        response = requests.post(
-            FIREBASE_ACCOUNTS_LOOKUP_URL,
-            params={"key": api_key},
-            json={"idToken": id_token},
-            timeout=15,
-        )
+        from firebase_admin import auth
+
+        firebase_user = auth.verify_id_token(id_token, app=admin_app)
     except Exception as err:
-        return {"ok": False, "errors": [f"Firebase token verification failed. {err}"]}
+        LOGGER.warning("Firebase ID token verification failed: %s", err.__class__.__name__)
+        return {
+            "ok": False,
+            "code": "firebase_token_verification_failed",
+            "errors": ["Backend Firebase token verification failed."],
+        }
 
-    try:
-        payload = response.json()
-    except Exception:
-        payload = {}
-
-    if response.status_code >= 400:
-        message = (
-            payload.get("error", {}).get("message")
-            if isinstance(payload.get("error"), dict)
-            else ""
-        )
-        return {"ok": False, "errors": [message or "Firebase ID token is invalid."]}
-
-    users = payload.get("users") if isinstance(payload, dict) else None
-    if not users:
-        return {"ok": False, "errors": ["Firebase ID token is invalid."]}
-
-    firebase_user = users[0]
-    if not str(firebase_user.get("localId") or "").strip():
+    if not str(firebase_user.get("uid") or "").strip():
         return {"ok": False, "errors": ["Firebase user id is missing."]}
 
     return {"ok": True, "firebase_user": firebase_user}

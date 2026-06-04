@@ -153,7 +153,13 @@ def firebase_login_route():
     token_result = firebase_user_from_id_token(payload.get("idToken"))
 
     if not token_result.get("ok"):
-        return json_account_result(token_result, error_status=401)
+        status = 503 if token_result.get("code") in {
+            "firebase_admin_credentials_missing",
+            "firebase_admin_credentials_invalid",
+            "firebase_admin_initialization_failed",
+            "firebase_admin_sdk_missing",
+        } else 401
+        return json_account_result(token_result, error_status=status)
 
     result = sign_in_firebase_user(
         token_result.get("firebase_user") or {},

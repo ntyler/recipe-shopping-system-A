@@ -35,6 +35,8 @@ Core libraries used by the project:
 - `selenium`: browser fallback for blocked recipe pages
 - `undetected-chromedriver`: Chrome fallback for sites that return 403 to direct downloads
 - `webdriver-manager`: ChromeDriver helper/fallback support
+- `boto3`: Cloudflare R2 PDF uploads
+- `firebase-admin`: backend verification for Firebase Authentication ID tokens
 
 ## Environment Variables
 
@@ -66,6 +68,51 @@ $env:SHOPPING_APP_PASSWORD_RESET_BASE_URL="http://127.0.0.1:5083"
 ```
 
 When using `start_app.bat`, place the same values in an untracked `local_env.bat` file. A safe template is included at `local_env.example.bat`, and `start_app.bat` loads `local_env.bat` before starting Flask.
+
+Optional Firebase Authentication settings:
+
+```powershell
+$env:FIREBASE_API_KEY="your_web_api_key"
+$env:FIREBASE_AUTH_DOMAIN="your-project.firebaseapp.com"
+$env:FIREBASE_PROJECT_ID="your-project-id"
+$env:FIREBASE_STORAGE_BUCKET="your-project.firebasestorage.app"
+$env:FIREBASE_MESSAGING_SENDER_ID="your_sender_id"
+$env:FIREBASE_APP_ID="your_web_app_id"
+$env:FIREBASE_MEASUREMENT_ID="your_measurement_id"
+```
+
+The app has local-development Firebase web defaults for the Recipe Shopping App project. For backend verification, set one of these and keep the service account file untracked:
+
+```powershell
+$env:FIREBASE_SERVICE_ACCOUNT_PATH="C:\path\to\firebase-service-account.json"
+```
+
+or:
+
+```powershell
+$env:FIREBASE_SERVICE_ACCOUNT_JSON='{"type":"service_account", "...":"..."}'
+```
+
+Firebase Console setup:
+
+1. Confirm Email/Password is enabled under Authentication > Sign-in method.
+2. Confirm Google is enabled under Authentication > Sign-in method.
+3. Open Authentication > Settings > Authorized domains.
+4. Add `localhost`, `127.0.0.1`, and the current `trycloudflare.com` domain when testing through a temporary Cloudflare Tunnel.
+5. Do not include `https://` when adding authorized domains.
+
+Optional Cloudflare R2 settings for public recipe PDF links:
+
+```powershell
+$env:R2_ACCOUNT_ID="your_account_id"
+$env:R2_ENDPOINT="https://your_account_id.r2.cloudflarestorage.com"
+$env:R2_ACCESS_KEY_ID="your_r2_access_key"
+$env:R2_SECRET_ACCESS_KEY="your_r2_secret_key"
+$env:R2_BUCKET_NAME="your_bucket"
+$env:R2_PUBLIC_BASE_URL="https://your_public_r2_domain"
+```
+
+Public PDF links are built as `R2_PUBLIC_BASE_URL + "/" + r2_object_key`. Do not use localhost, 127.0.0.1, or trycloudflare URLs as public PDF share links.
 
 Optional recipe-fetch controls:
 
@@ -342,6 +389,28 @@ $env:NTFY_TOPIC="nathaniel-shopping-list-12345"
 ```
 
 Notifications are best treated as convenience alerts. The actual UI sync comes from the Flask page polling the extraction progress file.
+
+## Firebase Auth Manual Test Checklist
+
+1. Confirm Email/Password is enabled in Firebase Console.
+2. Confirm Google is enabled in Firebase Console.
+3. Confirm `localhost` and `127.0.0.1` are authorized domains.
+4. Start the Flask app.
+5. Open the app signed out.
+6. Confirm no false "Firebase Authentication is not enabled" warning appears.
+7. Create an account with email/password.
+8. Confirm the backend Flask session is created.
+9. Sign out.
+10. Sign in with email/password.
+11. Test forgot password.
+12. Test Google sign-in.
+13. Sign in as `ntylerbert@gmail.com` and confirm the Admin role and Admin access enabled badge.
+14. Sign in as another user and confirm the User role.
+15. Confirm signed-out users cannot manage protected sections.
+16. Confirm a signed-in admin user can upload a PDF to Cloudflare R2.
+17. Confirm Copy PDF Link copies an R2 URL.
+18. Confirm the copied PDF link does not contain localhost, 127.0.0.1, or trycloudflare.
+19. Confirm secrets and generated PDFs are not shown in `git status`.
 
 ## Important Data Files
 

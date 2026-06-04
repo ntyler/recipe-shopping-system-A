@@ -21,6 +21,10 @@ const localDevelopmentFirebaseConfig = {
     measurementId: "G-J44GKNGRDY"
 };
 
+window.shoppingFirebaseAuthStatus = window.shoppingFirebaseAuthStatus || {
+    initialized: false
+};
+
 function firebaseConfigFromPage() {
     const element = document.getElementById("firebaseWebConfig");
 
@@ -39,11 +43,71 @@ function firebaseConfigFromPage() {
     }
 }
 
+function firebaseWarningElement() {
+    return document.getElementById("firebaseAuthSetupWarning");
+}
+
+function showFirebaseAuthWarning(message) {
+    const warning = firebaseWarningElement();
+
+    if (!warning) {
+        return;
+    }
+
+    warning.textContent = message || "Firebase Authentication could not be initialized.";
+    warning.hidden = false;
+}
+
+function hideFirebaseAuthWarning() {
+    const warning = firebaseWarningElement();
+
+    if (warning) {
+        warning.textContent = "";
+        warning.hidden = true;
+    }
+}
+
+window.showShoppingFirebaseAuthWarning = showFirebaseAuthWarning;
+window.hideShoppingFirebaseAuthWarning = hideFirebaseAuthWarning;
+
+function missingFirebaseConfig(config) {
+    return ["apiKey", "authDomain", "projectId", "appId"].some((key) => !String(config[key] || "").trim());
+}
+
+function isDevelopmentHost() {
+    return ["", "localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+}
+
 const firebaseConfig = firebaseConfigFromPage();
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-const auth = getAuth(app);
-const googleProvider = new GoogleAuthProvider();
+let app = null;
+let analytics = null;
+let auth = null;
+let googleProvider = null;
+
+if (missingFirebaseConfig(firebaseConfig)) {
+    showFirebaseAuthWarning("Firebase config is missing. Check the Flask Firebase web config values.");
+} else {
+    try {
+        const initializedApp = initializeApp(firebaseConfig);
+        const initializedAnalytics = getAnalytics(initializedApp);
+        const initializedAuth = getAuth(initializedApp);
+        const initializedGoogleProvider = new GoogleAuthProvider();
+
+        app = initializedApp;
+        analytics = initializedAnalytics;
+        auth = initializedAuth;
+        googleProvider = initializedGoogleProvider;
+        window.shoppingFirebaseAuthStatus.initialized = true;
+        hideFirebaseAuthWarning();
+
+        if (isDevelopmentHost()) {
+            console.log("Firebase Auth initialized.");
+        }
+    } catch (error) {
+        console.warn("Firebase Auth initialization failed.", error);
+        showFirebaseAuthWarning("Firebase Authentication failed to initialize. Check the Firebase web config.");
+    }
+}
 
 let backendSession = null;
 let explicitAuthInProgress = false;
@@ -80,7 +144,7 @@ function firebaseErrorMessage(error) {
     }
 
     if (code === "auth/configuration-not-found") {
-        return "Firebase Authentication is not enabled for this project. In Firebase Console, enable Authentication and turn on Email/Password and Google providers.";
+        return "Firebase rejected this sign-in method. Confirm Email/Password and Google providers are enabled.";
     }
 
     return String(error && error.message || "Firebase authentication failed.");
@@ -147,7 +211,9 @@ async function backendJson(url, options = {}) {
     const payload = await response.json().catch(() => ({}));
 
     if (!response.ok || payload.success === false) {
-        const message = Array.isArray(payload.errors) ? payload.errors.join(" ") : "The server could not complete authentication.";
+        const message = Array.isArray(payload.errors)
+            ? payload.errors.join(" ")
+            : (payload.error || payload.message || "The server could not complete authentication.");
         throw new Error(message);
     }
 
@@ -179,6 +245,28 @@ function reloadAccountSection() {
     window.location.reload();
 }
 
+function firebaseUserProfile(firebaseUser, extra = {}) {
+    const providerData = Array.isArray(firebaseUser.providerData) ? firebaseUser.providerData : [];
+    const primaryProvider = providerData.find((provider) => provider && provider.providerId) || {};
+
+    return {
+        display_name: firebaseUser.displayName || "",
+        email: firebaseUser.email || "",
+        picture: firebaseUser.photoURL || "",
+        provider: primaryProvider.providerId || "",
+        ...extra
+    };
+}
+
+function disableFirebaseAuthForms(message) {
+    document.querySelectorAll(
+        "[data-firebase-create-form], [data-firebase-sign-in-form], [data-firebase-forgot-form], [data-firebase-sign-out-form]"
+    ).forEach((form) => {
+        setBusy(form, true);
+        setStatus(form, message || "Firebase Authentication is not ready.", "error");
+    });
+}
+
 function bindCreateAccountForm() {
     const form = document.querySelector("[data-firebase-create-form]");
 
@@ -203,12 +291,12 @@ function bindCreateAccountForm() {
         explicitAuthInProgress = true;
         try {
             const credential = await createUserWithEmailAndPassword(auth, email, password);
-            await syncFirebaseUser(credential.user, {
+            await syncFirebaseUser(credential.user, firebaseUserProfile(credential.user, {
                 first_name: formValue(form, "first_name"),
                 last_name: formValue(form, "last_name"),
                 username: formValue(form, "username"),
                 email
-            });
+            }));
             setStatus(form, "Account created. Signing you in...", "success");
             reloadAccountSection();
         } catch (error) {
@@ -238,7 +326,7 @@ function bindSignInForm() {
                 formValue(form, "identity"),
                 String((form.elements.password || {}).value || "")
             );
-            await syncFirebaseUser(credential.user);
+            await syncFirebaseUser(credential.user, firebaseUserProfile(credential.user));
             setStatus(form, "Signed in. Loading your workspace...", "success");
             reloadAccountSection();
         } catch (error) {
@@ -257,7 +345,7 @@ function bindSignInForm() {
 
             try {
                 const credential = await signInWithPopup(auth, googleProvider);
-                await syncFirebaseUser(credential.user);
+                await syncFirebaseUser(credential.user, firebaseUserProfile(credential.user));
                 setStatus(form, "Signed in with Google. Loading your workspace...", "success");
                 reloadAccountSection();
             } catch (error) {
@@ -323,7 +411,11 @@ function bindFirebaseForms() {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
-    bindFirebaseForms();
+    if (auth) {
+        bindFirebaseForms();
+    } else {
+        disableFirebaseAuthForms("Firebase Authentication could not be initialized.");
+    }
 
     try {
         await loadBackendSession();
@@ -332,28 +424,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 });
 
-onAuthStateChanged(auth, async (firebaseUser) => {
-    if (explicitAuthInProgress) {
-        return;
-    }
-
-    try {
-        const session = await loadBackendSession();
-
-        if (firebaseUser && !session.authenticated) {
-            await syncFirebaseUser(firebaseUser);
-            reloadAccountSection();
+if (auth) {
+    onAuthStateChanged(auth, async (firebaseUser) => {
+        if (explicitAuthInProgress) {
             return;
         }
 
-        if (!firebaseUser && session.user && session.user.auth_provider === "firebase") {
-            await logoutBackend();
-            reloadAccountSection();
+        try {
+            const session = await loadBackendSession();
+
+            if (firebaseUser && !session.authenticated) {
+                await syncFirebaseUser(firebaseUser, firebaseUserProfile(firebaseUser));
+                reloadAccountSection();
+                return;
+            }
+
+            if (!firebaseUser && session.user && session.user.auth_provider === "firebase") {
+                await logoutBackend();
+                reloadAccountSection();
+            }
+        } catch (error) {
+            console.warn("Firebase auth state sync failed.", error);
         }
-    } catch (error) {
-        console.warn("Firebase auth state sync failed.", error);
-    }
-});
+    });
+}
 
 window.shoppingFirebaseAuth = {
     app,

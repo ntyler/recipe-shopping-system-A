@@ -115,6 +115,11 @@
                     <img class="user-account-avatar"
                          src="{{ url_for('static', filename=current_user.avatar_path) }}"
                          alt="{{ current_user.display_name }} avatar">
+                {% elif current_user.picture %}
+                    <img class="user-account-avatar"
+                         src="{{ current_user.picture }}"
+                         alt="{{ current_user.display_name }} avatar"
+                         referrerpolicy="no-referrer">
                 {% else %}
                     <div class="user-account-avatar user-account-avatar-fallback" aria-hidden="true">
                         {{ current_user.display_name[:1]|upper }}
@@ -128,6 +133,13 @@
                     <div class="user-account-email">{{ current_user.username }}</div>
                 {% endif %}
                 <div class="user-account-email">{{ current_user.email }}</div>
+                <div class="user-account-meta">
+                    <span>{{ current_user.role }}</span>
+                    <span>{{ current_user.provider_label }}</span>
+                    {% if current_user.is_admin %}
+                        <span>Admin access enabled</span>
+                    {% endif %}
+                </div>
             </div>
 
             <div class="user-account-actions">
@@ -363,6 +375,10 @@
         <p class="helper-text user-account-helper">
             You are using the guest workspace. Sign in to keep recipes, stores, product picks, and preferences private to your account.
         </p>
+        <div id="firebaseAuthSetupWarning"
+             class="user-firebase-status user-firebase-warning error"
+             aria-live="polite"
+             hidden></div>
 
         <div class="user-account-forms">
             {% if pending_two_factor_sign_in %}

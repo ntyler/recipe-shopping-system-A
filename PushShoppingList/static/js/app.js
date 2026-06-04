@@ -6151,6 +6151,11 @@ async function copyPdfCloudflareLink(button) {
         return false;
     }
 
+    if (!isShareablePublicPdfUrl(publicUrl)) {
+        setPdfShareStatus(row, "Cloudflare PDF link is not ready yet.", true);
+        return false;
+    }
+
     try {
         if (navigator.clipboard && navigator.clipboard.writeText) {
             await navigator.clipboard.writeText(publicUrl);
@@ -7587,7 +7592,7 @@ function updateRecipeEditorPdfControls(recipe) {
         pdfPublicUrlField.hidden = !pdfPublicUrl;
         if (pdfPublicUrlLink) {
             const hasPublicPdfUrl = Boolean(pdfPublicUrl);
-            const canOpenPublicPdfUrl = hasPublicPdfUrl && isLegitimateWebUrl(pdfPublicUrl);
+            const canOpenPublicPdfUrl = hasPublicPdfUrl && isShareablePublicPdfUrl(pdfPublicUrl);
             pdfPublicUrlLink.href = canOpenPublicPdfUrl ? pdfPublicUrl : "#";
             pdfPublicUrlLink.hidden = !canOpenPublicPdfUrl;
             pdfPublicUrlLink.setAttribute("aria-disabled", canOpenPublicPdfUrl ? "false" : "true");
@@ -11137,6 +11142,24 @@ function isLegitimateWebUrl(value) {
     }
 }
 
+function isShareablePublicPdfUrl(value) {
+    if (!isLegitimateWebUrl(value)) {
+        return false;
+    }
+
+    try {
+        const url = new URL(String(value || "").trim());
+        const hostname = url.hostname.toLowerCase();
+
+        return !(
+            ["127.0.0.1", "localhost", "::1"].includes(hostname)
+            || hostname.endsWith(".trycloudflare.com")
+        );
+    } catch (err) {
+        return false;
+    }
+}
+
 async function createRecipePdfFromSourceUrl(sourceUrl) {
     const pdfResponse = await fetch("/api/source_url_pdf", {
         method: "POST",
@@ -11252,6 +11275,11 @@ async function copyRecipeEditorPdfLink(button) {
 
     if (!publicUrl) {
         setRecipeEditStatus("Cloud PDF link is not ready yet.", true);
+        return false;
+    }
+
+    if (!isShareablePublicPdfUrl(publicUrl)) {
+        setRecipeEditStatus("Cloudflare PDF link is not ready yet.", true);
         return false;
     }
 

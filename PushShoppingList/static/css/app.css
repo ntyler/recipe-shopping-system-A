@@ -4631,6 +4631,11 @@ body {
             color: #ffd4d4;
         }
 
+        .user-firebase-warning {
+            max-width: 720px;
+            margin: 0 auto 12px;
+        }
+
         .user-password-reset-methods {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5010,6 +5015,26 @@ body {
             color: #cbd5e1;
             font-weight: 700;
             overflow-wrap: anywhere;
+        }
+
+        .user-account-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+            color: #dbeafe;
+            font-size: 12px;
+            font-weight: 900;
+        }
+
+        .user-account-meta span {
+            display: inline-flex;
+            align-items: center;
+            min-height: 22px;
+            padding: 2px 8px;
+            border: 1px solid #466480;
+            border-radius: 999px;
+            background: #142338;
         }
 
         .user-account-phone {

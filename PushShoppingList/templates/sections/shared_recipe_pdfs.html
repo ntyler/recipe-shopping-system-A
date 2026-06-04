@@ -11,7 +11,11 @@
          data-collapse-content="shared-recipe-pdfs"
          data-collapse-default="expanded"
          data-collapse-mobile-default="collapsed">
-        {% if current_user %}
+        {% if not current_user %}
+            <div class="pdf-share-empty">Sign in to manage cloud-hosted recipe PDFs.</div>
+        {% elif not current_user.is_admin %}
+            <div class="pdf-share-empty">Admin access is required to manage cloud-hosted recipe PDFs.</div>
+        {% else %}
             {% set pdf_rows = pdf_share_view.pdfs if pdf_share_view and pdf_share_view.pdfs else [] %}
             {% if pdf_rows %}
                 <div class="pdf-share-list">
@@ -41,7 +45,7 @@
                                    data-pdf-open-link>Open PDF</a>
                                 <button type="button"
                                         class="pdf-share-action-btn secondary"
-                                        onclick="return copyPdfCloudflareLink(this)">Copy Cloudflare Link</button>
+                                        onclick="return copyPdfCloudflareLink(this)">Copy PDF Link</button>
                                 {% if pdf.local_available %}
                                     <button type="button"
                                             class="pdf-share-action-btn"
@@ -55,23 +59,6 @@
                                        readonly
                                        aria-label="Cloudflare PDF URL for {{ pdf.original_filename or pdf.pdf_filename }}">
                             </div>
-                            <div class="pdf-share-active" {% if not active_share %}hidden{% endif %}>
-                                <input class="pdf-share-url"
-                                       type="text"
-                                       value="{{ active_share.share_url if active_share else '' }}"
-                                       readonly
-                                       aria-label="Share URL for {{ pdf.original_filename or pdf.pdf_filename }}">
-                                <button type="button"
-                                        class="pdf-share-action-btn secondary"
-                                        onclick="return copyPdfShareLink(this)">Copy Link</button>
-                                <button type="button"
-                                        class="pdf-share-action-btn danger"
-                                        data-pdf-share-token="{{ active_share.token if active_share else '' }}"
-                                        onclick="return revokePdfShareLink(this)">Revoke Link</button>
-                                <span class="pdf-share-expires">
-                                    {% if active_share %}Expires {{ active_share.expires_at }}{% endif %}
-                                </span>
-                            </div>
                             <div class="pdf-share-status" aria-live="polite"></div>
                         </article>
                     {% endfor %}
@@ -79,8 +66,6 @@
             {% else %}
                 <div class="pdf-share-empty">No recipe PDFs found.</div>
             {% endif %}
-        {% else %}
-            <div class="pdf-share-empty">Sign in to manage recipe PDF share links.</div>
         {% endif %}
     </div>
 </section>

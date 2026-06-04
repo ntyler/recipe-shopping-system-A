@@ -1,8 +1,12 @@
 import os
 
 from flask import Flask
+from flask import flash
+from flask import jsonify
+from flask import redirect
 from flask import request
 from flask import session
+from flask import url_for
 
 from PushShoppingList.routes.account_routes import account_bp
 from PushShoppingList.routes.feedback_routes import feedback_bp
@@ -15,7 +19,85 @@ from PushShoppingList.routes.product_routes import product_bp
 from PushShoppingList.services.email_service import password_reset_email_configured
 from PushShoppingList.services.sms_service import password_reset_sms_configured
 from PushShoppingList.services.user_account_service import current_public_user
+from PushShoppingList.services.user_account_service import current_user
+from PushShoppingList.services.user_account_service import is_admin_user
 from PushShoppingList.services.user_account_service import pending_two_factor_setup
+
+
+PUBLIC_ENDPOINTS = {
+    "main_bp.index",
+    "static",
+    "account_bp.firebase_session_route",
+    "account_bp.firebase_login_route",
+    "account_bp.firebase_logout_route",
+    "account_bp.create_account_route",
+    "account_bp.verify_account_creation_route",
+    "account_bp.sign_in_route",
+    "account_bp.verify_two_factor_route",
+    "account_bp.cancel_two_factor_sign_in_route",
+    "account_bp.request_two_factor_recovery_route",
+    "account_bp.open_two_factor_recovery_route",
+    "account_bp.complete_two_factor_recovery_route",
+    "account_bp.request_password_reset_route",
+    "account_bp.open_password_reset_route",
+    "account_bp.complete_password_reset_route",
+    "account_bp.sign_out_route",
+    "recipe_bp.recipe_archive_pdf_route",
+    "recipe_bp.recipe_cover_image_route",
+    "pdf_bp.share_pdf_route",
+    "pdf_bp.download_shared_pdf_route",
+    "feedback_bp.submit_feedback_route",
+}
+
+PROTECTED_BLUEPRINTS = {
+    "main_bp",
+    "pantry_bp",
+    "pdf_bp",
+    "product_bp",
+    "recipe_bp",
+    "store_bp",
+    "feedback_bp",
+}
+
+ADMIN_ENDPOINTS = {
+    "pdf_bp.pdfs_route",
+    "pdf_bp.view_pdf_route",
+    "pdf_bp.create_pdf_share_route",
+    "pdf_bp.revoke_pdf_share_route",
+    "pdf_bp.upload_pdf_to_cloudflare_route",
+    "feedback_bp.update_feedback_admin_route",
+    "feedback_bp.mark_feedback_read_route",
+}
+
+
+def wants_json_response():
+    return (
+        request.path.startswith("/api/")
+        or request.path.startswith("/auth/")
+        or request.path == "/recipe_pdf_link"
+        or request.headers.get("X-Requested-With") == "fetch"
+        or request.accept_mimetypes.best == "application/json"
+    )
+
+
+def auth_required_response():
+    if wants_json_response():
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "Sign in before managing this workspace.",
+        }), 401
+
+    flash("Sign in before managing this workspace.", "error")
+    return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+
+def admin_required_response():
+    return jsonify({
+        "ok": False,
+        "success": False,
+        "error": "Admin access is required.",
+    }), 403
 
 
 def create_app():
@@ -35,6 +117,29 @@ def create_app():
     app.register_blueprint(recipe_bp)
     app.register_blueprint(store_bp)
     app.register_blueprint(product_bp)
+
+    @app.before_request
+    def protect_workspace_routes():
+        if request.method == "OPTIONS":
+            return None
+
+        endpoint = request.endpoint or ""
+
+        if endpoint in PUBLIC_ENDPOINTS:
+            return None
+
+        blueprint = endpoint.split(".", 1)[0] if "." in endpoint else ""
+        if blueprint not in PROTECTED_BLUEPRINTS:
+            return None
+
+        user = current_user()
+        if not user:
+            return auth_required_response()
+
+        if endpoint in ADMIN_ENDPOINTS and not is_admin_user(user):
+            return admin_required_response()
+
+        return None
 
     @app.context_processor
     def inject_current_user():

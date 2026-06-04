@@ -30,10 +30,8 @@
     <div class="app-section-divider recipe-entry-section-divider" aria-hidden="true"></div>
     {% include "sections/ai_pantry.html" %}
     {% include "sections/enter_recipe_links.html" %}
-    {% if current_user and current_user.is_admin %}
-        <div class="app-section-divider" aria-hidden="true"></div>
-        {% include "sections/shared_recipe_pdfs.html" %}
-    {% endif %}
+    <div class="app-section-divider" aria-hidden="true"></div>
+    {% include "sections/shared_recipe_pdfs.html" %}
     {% include "sections/edit_items.html" %}
     {% include "sections/current_recipe_url_log.html" %}
     {% include "sections/cookbooks.html" %}
@@ -48,6 +46,30 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="{{ url_for('static', filename='js/app.js', v=app_js_version) }}"></script>
 <script id="firebaseWebConfig" type="application/json">{{ firebase_web_config|tojson }}</script>
+<script>
+window.shoppingFirebaseAuthStatus = window.shoppingFirebaseAuthStatus || { initialized: false };
+window.addEventListener("error", function (event) {
+    var filename = String(event.filename || "");
+    var message = String(event.message || "");
+    var warning = document.getElementById("firebaseAuthSetupWarning");
+    if (!warning || (!filename.includes("firebase-auth.js") && !message.toLowerCase().includes("firebase"))) {
+        return;
+    }
+    warning.textContent = "Firebase Auth SDK failed to load. Check network access to the gstatic Firebase SDK imports.";
+    warning.hidden = false;
+});
+window.addEventListener("DOMContentLoaded", function () {
+    setTimeout(function () {
+        var warning = document.getElementById("firebaseAuthSetupWarning");
+        var hasSignedOutFirebaseForms = document.querySelector("[data-firebase-create-form], [data-firebase-sign-in-form]");
+        if (!warning || !hasSignedOutFirebaseForms || window.shoppingFirebaseAuthStatus.initialized) {
+            return;
+        }
+        warning.textContent = "Firebase Auth SDK failed to load. Check network access to the gstatic Firebase SDK imports.";
+        warning.hidden = false;
+    }, 8000);
+});
+</script>
 <script type="module" src="{{ url_for('static', filename='js/firebase-auth.js', v=firebase_auth_js_version) }}"></script>
 
 </body>

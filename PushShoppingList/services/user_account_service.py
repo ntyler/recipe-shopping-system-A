@@ -34,7 +34,7 @@ AVATAR_UPLOAD_DIR = Path(os.getenv("SHOPPING_APP_AVATAR_UPLOAD_DIR", PACKAGE_DIR
 ALLOWED_AVATAR_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 PHONE_DIGITS_PATTERN = re.compile(r"\d+")
-ADMIN_EMAIL = os.getenv("SHOPPING_APP_ADMIN_EMAIL", "ntylerbert@gmail.com").strip().lower()
+ADMIN_EMAIL = "ntylerbert@gmail.com"
 PASSWORD_RESET_TTL_HOURS = 1
 ACCOUNT_DELETE_TTL_HOURS = 1
 ACCOUNT_VERIFICATION_TTL_HOURS = 24
@@ -141,7 +141,10 @@ def public_user(user):
         "username": user.get("username", ""),
         "email": user.get("email", ""),
         "auth_provider": user.get("auth_provider", "local"),
+        "provider": provider_label(user),
+        "provider_label": provider_label(user),
         "firebase_uid": user.get("firebase_uid", ""),
+        "picture": user.get("picture", ""),
         "email_verified_at": user.get("email_verified_at", ""),
         "email_verified": account_email_verified(user),
         "account_status": account_status(user),
@@ -154,14 +157,50 @@ def public_user(user):
         "created_at": user.get("created_at", ""),
         "updated_at": user.get("updated_at", ""),
         "is_admin": is_admin_user(user),
+        "role": "Admin" if is_admin_user(user) else "User",
         "two_factor_enabled": bool(two_factor.get("enabled")),
         "two_factor_backup_codes_remaining": backup_codes_remaining(two_factor) if two_factor.get("enabled") else 0,
     }
 
 
+def is_admin_email(email):
+    return str(email or "").strip().lower() == ADMIN_EMAIL
+
+
 def is_admin_user(user):
-    email = str((user or {}).get("email") or "").strip().lower()
-    return bool(ADMIN_EMAIL and email == ADMIN_EMAIL)
+    return is_admin_email((user or {}).get("email"))
+
+
+def provider_label(user):
+    provider = str((user or {}).get("auth_provider") or "local").strip().lower()
+
+    if provider == "firebase":
+        return "Firebase Authentication"
+
+    return "Local Account"
+
+
+def firebase_provider_ids(firebase_user, sign_in_provider=""):
+    providers = set()
+    sign_in_provider = str(sign_in_provider or "").strip()
+
+    if sign_in_provider:
+        providers.add(sign_in_provider)
+
+    provider_info = firebase_user.get("providerUserInfo", [])
+    if isinstance(provider_info, list):
+        for provider in provider_info:
+            if isinstance(provider, dict) and str(provider.get("providerId") or "").strip():
+                providers.add(str(provider.get("providerId")).strip())
+
+    firebase_claims = firebase_user.get("firebase")
+    identities = firebase_claims.get("identities") if isinstance(firebase_claims, dict) else {}
+    if isinstance(identities, dict):
+        for provider_id in identities.keys():
+            if str(provider_id or "").strip():
+                providers.add(str(provider_id).strip())
+
+    return sorted(providers)
 
 
 def user_display_name(user):
@@ -273,9 +312,29 @@ def name_parts_from_display_name(display_name):
 
 def sign_in_firebase_user(firebase_user, profile=None):
     profile = profile if isinstance(profile, dict) else {}
-    firebase_uid = str(firebase_user.get("localId") or "").strip()
+    firebase_claims = firebase_user.get("firebase") if isinstance(firebase_user.get("firebase"), dict) else {}
+    sign_in_provider = str(
+        firebase_claims.get("sign_in_provider")
+        or profile.get("provider")
+        or profile.get("provider_id")
+        or ""
+    ).strip()
+    firebase_uid = str(firebase_user.get("uid") or firebase_user.get("localId") or "").strip()
     email = str(firebase_user.get("email") or profile.get("email") or "").strip()
-    display_name = str(firebase_user.get("displayName") or profile.get("display_name") or "").strip()
+    display_name = str(
+        firebase_user.get("name")
+        or firebase_user.get("displayName")
+        or profile.get("display_name")
+        or profile.get("displayName")
+        or ""
+    ).strip()
+    picture = str(
+        firebase_user.get("picture")
+        or firebase_user.get("photoUrl")
+        or profile.get("picture")
+        or profile.get("photoURL")
+        or ""
+    ).strip()
     first_name = str(profile.get("first_name") or "").strip()
     last_name = str(profile.get("last_name") or "").strip()
     username = str(profile.get("username") or email or display_name or firebase_uid).strip()
@@ -305,6 +364,7 @@ def sign_in_firebase_user(firebase_user, profile=None):
             "email": email,
             "auth_provider": "firebase",
             "firebase_uid": firebase_uid,
+            "picture": picture,
             "account_status": "active",
             "email_verified_at": timestamp,
             "phone": "",
@@ -331,22 +391,27 @@ def sign_in_firebase_user(firebase_user, profile=None):
             user["username"] = username
         user["auth_provider"] = "firebase"
         user["firebase_uid"] = firebase_uid
+        if picture:
+            user["picture"] = picture
         user["account_status"] = "active"
         user["email_verified_at"] = user.get("email_verified_at") or timestamp
         user.pop("account_verification", None)
 
-    provider_ids = [
-        str(provider.get("providerId") or "").strip()
-        for provider in firebase_user.get("providerUserInfo", [])
-        if isinstance(provider, dict) and str(provider.get("providerId") or "").strip()
-    ]
+    provider_ids = firebase_provider_ids(firebase_user, sign_in_provider)
     user["firebase_provider_ids"] = provider_ids
-    user["firebase_email_verified"] = bool(firebase_user.get("emailVerified"))
+    user["firebase_sign_in_provider"] = sign_in_provider
+    user["firebase_email_verified"] = bool(firebase_user.get("email_verified") or firebase_user.get("emailVerified"))
     user["firebase_last_login_at"] = timestamp
     user["updated_at"] = timestamp
     save_users(payload)
 
     session["user_id"] = user["user_id"]
+    session["firebase_uid"] = firebase_uid
+    session["email"] = email
+    session["display_name"] = display_name or user_display_name(user)
+    session["picture"] = picture or user.get("picture", "")
+    session["provider"] = "Firebase Authentication"
+    session["is_admin"] = is_admin_user(user)
     session.pop("pending_2fa_user_id", None)
     session.pop("account_verification_link", None)
     return {"ok": True, "created": created, "user": public_user(user)}
@@ -1258,6 +1323,12 @@ def find_user_by_id_in_payload(payload, user_id):
 
 def sign_out_user():
     session.pop("user_id", None)
+    session.pop("firebase_uid", None)
+    session.pop("email", None)
+    session.pop("display_name", None)
+    session.pop("picture", None)
+    session.pop("provider", None)
+    session.pop("is_admin", None)
     session.pop("pending_2fa_user_id", None)
     session.pop("two_factor_recovery_link", None)
     session.pop("account_delete_link", None)
