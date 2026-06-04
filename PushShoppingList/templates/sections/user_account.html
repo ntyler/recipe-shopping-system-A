@@ -223,13 +223,21 @@
                     </p>
                 {% else %}
                     <p class="user-account-form-note">
-                        Verify {{ current_user.phone }} before relying on phone-based account recovery.
+                        {% if password_reset_sms_configured %}
+                            Verify {{ current_user.phone }} before relying on phone-based account recovery.
+                        {% else %}
+                            Text messaging is not configured. Generate a local code to verify {{ current_user.phone }}.
+                        {% endif %}
                     </p>
                     <form class="user-phone-verification-request-form"
                           method="POST"
                           action="{{ url_for('account_bp.request_phone_verification_route') }}">
                         <button type="submit" class="secondary">
-                            Send Verification Text
+                            {% if password_reset_sms_configured %}
+                                Send Verification Text
+                            {% else %}
+                                Generate Local Verification Code
+                            {% endif %}
                         </button>
                     </form>
                     <form class="user-phone-verification-confirm-form"
