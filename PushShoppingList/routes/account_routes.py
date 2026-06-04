@@ -9,6 +9,7 @@ from flask import session
 from flask import url_for
 
 from PushShoppingList.services.email_service import password_reset_email_configured
+from PushShoppingList.services.email_service import send_account_delete_email
 from PushShoppingList.services.email_service import send_password_reset_email
 from PushShoppingList.services.email_service import send_two_factor_recovery_email
 from PushShoppingList.services.sms_service import password_reset_sms_configured
@@ -18,9 +19,11 @@ from PushShoppingList.services.user_account_service import cancel_two_factor_set
 from PushShoppingList.services.user_account_service import cancel_two_factor_sign_in
 from PushShoppingList.services.user_account_service import complete_two_factor_sign_in
 from PushShoppingList.services.user_account_service import create_user
+from PushShoppingList.services.user_account_service import delete_account_with_token
 from PushShoppingList.services.user_account_service import disable_two_factor
 from PushShoppingList.services.user_account_service import enable_two_factor
 from PushShoppingList.services.user_account_service import regenerate_two_factor_backup_codes
+from PushShoppingList.services.user_account_service import request_account_delete
 from PushShoppingList.services.user_account_service import request_password_reset
 from PushShoppingList.services.user_account_service import request_two_factor_recovery
 from PushShoppingList.services.user_account_service import recover_two_factor_with_token
@@ -73,6 +76,26 @@ def two_factor_recovery_link(token):
 
     return url_for(
         "account_bp.open_two_factor_recovery_route",
+        token=token,
+        _external=True,
+    )
+
+
+def account_delete_link(token):
+    path = url_for(
+        "account_bp.open_account_delete_route",
+        token=token,
+    )
+    base_url = (
+        str(os.getenv("SHOPPING_APP_ACCOUNT_LINK_BASE_URL") or "").strip().rstrip("/")
+        or str(os.getenv("SHOPPING_APP_PASSWORD_RESET_BASE_URL") or "").strip().rstrip("/")
+    )
+
+    if base_url:
+        return f"{base_url}{path}"
+
+    return url_for(
+        "account_bp.open_account_delete_route",
         token=token,
         _external=True,
     )
@@ -316,6 +339,65 @@ def update_profile_route():
     )
     flash_account_result(result, "Profile updated.")
     return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+
+@account_bp.route("/account/delete/request", methods=["POST"])
+def request_account_delete_route():
+    result = request_account_delete(session.get("user_id"))
+
+    if result.get("ok"):
+        session.pop("account_delete_link", None)
+        delete_link = account_delete_link(result["token"])
+
+        if password_reset_email_configured():
+            email_result = send_account_delete_email(result.get("user"), delete_link)
+
+            if not email_result.get("ok"):
+                flash(
+                    email_result.get("error")
+                    or "Account deletion email could not be sent. Check SMTP settings.",
+                    "error",
+                )
+                return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+        else:
+            session["account_delete_link"] = delete_link
+            flash(
+                "Email is not configured yet, so a local account deletion verification link is available below.",
+                "success",
+            )
+            return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+        flash("An account deletion verification email has been sent.", "success")
+    else:
+        flash_account_result(result, "")
+
+    return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+
+@account_bp.route("/account/delete/<token>", methods=["GET"])
+def open_account_delete_route(token):
+    return redirect(url_for("main_bp.index", account_delete_token=token, _anchor="userAccountSection"))
+
+
+@account_bp.route("/account/delete/complete", methods=["POST"])
+def complete_account_delete_route():
+    result = delete_account_with_token(request.form.get("account_delete_token"))
+    response = make_response(redirect(url_for("main_bp.index", _anchor="userAccountSection")))
+
+    if result.get("ok"):
+        session.pop("account_delete_link", None)
+        flash("Account deleted. You are using the guest workspace.", "success")
+        response.delete_cookie(TWO_FACTOR_TRUST_COOKIE)
+        return response
+
+    flash_account_result(result, "")
+    return redirect(
+        url_for(
+            "main_bp.index",
+            account_delete_token=request.form.get("account_delete_token", ""),
+            _anchor="userAccountSection",
+        )
+    )
 
 
 @account_bp.route("/account/2fa/start", methods=["POST"])

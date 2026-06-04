@@ -4552,6 +4552,17 @@ body {
             text-decoration: none;
         }
 
+        .user-account-delete-link-panel {
+            border-color: #a33a3a;
+            background: #351417;
+            color: #ffd4d4;
+        }
+
+        .user-account-delete-link-panel a {
+            border-color: #f87171;
+            background: #7f1212;
+        }
+
         .user-account-form {
             display: grid;
             gap: 10px;
@@ -4654,8 +4665,13 @@ body {
             letter-spacing: 0.04em;
         }
 
+        .user-delete-account-card,
         .user-two-factor-card {
             margin-top: 14px;
+        }
+
+        .user-delete-account-card {
+            border-color: #7f1d1d;
         }
 
         .user-two-factor-sign-in-form {
@@ -4852,6 +4868,7 @@ body {
             color: #fff;
         }
 
+        .user-account-form .user-delete-account-title-toggle,
         .user-account-form .user-ntfy-title-toggle,
         .user-account-form .user-two-factor-title-toggle {
             justify-content: center;
@@ -4864,6 +4881,15 @@ body {
             text-align: center;
         }
 
+        .user-account-form .user-delete-account-title-toggle {
+            color: #ffd4d4;
+        }
+
+        .user-account-form .user-delete-account-title-toggle:hover,
+        .user-account-form .user-delete-account-title-toggle:focus-visible {
+            background: #351417;
+        }
+
         .user-account-form .user-ntfy-title-toggle:hover,
         .user-account-form .user-ntfy-title-toggle:focus-visible,
         .user-account-form .user-two-factor-title-toggle:hover,
@@ -4871,13 +4897,21 @@ body {
             background: #172331;
         }
 
+        .user-delete-account-content,
         .user-ntfy-content,
         .user-two-factor-content {
             display: grid;
             gap: 10px;
         }
 
+        .user-delete-account-content form {
+            display: grid;
+            gap: 10px;
+            margin: 0;
+        }
+
         .user-password-reset-form,
+        .user-account-delete-confirm-form,
         .user-account-forgot-form,
         .user-two-factor-sign-in-form,
         .user-two-factor-recovery-form,

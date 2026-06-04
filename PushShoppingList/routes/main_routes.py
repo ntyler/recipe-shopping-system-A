@@ -1394,6 +1394,7 @@ def index():
         feedback_messages=session.pop("feedback_messages", []),
         password_reset_token=request.args.get("reset_token", ""),
         two_factor_recovery_token=request.args.get("two_factor_recovery_token", ""),
+        account_delete_token=request.args.get("account_delete_token", ""),
         app_css_version=static_asset_version("css/app.css"),
         app_js_version=static_asset_version("js/app.js"),
     )

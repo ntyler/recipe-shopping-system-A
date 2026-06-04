@@ -2,6 +2,7 @@ import json
 import os
 import re
 import secrets
+import shutil
 import uuid
 from datetime import datetime
 from datetime import timedelta
@@ -22,6 +23,8 @@ from PushShoppingList.services.two_factor_service import totp_qr_data_uri
 from PushShoppingList.services.two_factor_service import totp_uri
 from PushShoppingList.services.two_factor_service import verify_backup_code
 from PushShoppingList.services.two_factor_service import verify_totp_code
+from PushShoppingList.services.storage_service import USER_DATA_DIR
+from PushShoppingList.services.storage_service import safe_user_id
 from PushShoppingList.services.user_workspace_seed_service import seed_new_user_rule_workspace
 
 
@@ -33,6 +36,7 @@ EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 PHONE_DIGITS_PATTERN = re.compile(r"\d+")
 ADMIN_EMAIL = os.getenv("SHOPPING_APP_ADMIN_EMAIL", "ntylerbert@gmail.com").strip().lower()
 PASSWORD_RESET_TTL_HOURS = 1
+ACCOUNT_DELETE_TTL_HOURS = 1
 TWO_FACTOR_TRUST_DAYS = 30
 TWO_FACTOR_RECOVERY_TTL_MINUTES = 30
 NTFY_TOPIC_PREFIX = os.getenv("SHOPPING_APP_NTFY_TOPIC_PREFIX", "shopping-user").strip() or "shopping-user"
@@ -475,6 +479,118 @@ def find_user_by_reset_token(payload, token):
     return None
 
 
+def request_account_delete(user_id):
+    user_id = str(user_id or "").strip()
+
+    if not user_id:
+        return {"ok": False, "errors": ["Sign in before requesting account deletion."]}
+
+    payload = load_users()
+    user = find_user_by_id_in_payload(payload, user_id)
+
+    if not user:
+        return {"ok": False, "errors": ["Sign in again before requesting account deletion."]}
+
+    token = secrets.token_urlsafe(32)
+    timestamp = now_iso()
+    user["account_delete"] = {
+        "token_hash": generate_password_hash(token),
+        "created_at": timestamp,
+        "expires_at": (
+            datetime.utcnow().replace(microsecond=0)
+            + timedelta(hours=ACCOUNT_DELETE_TTL_HOURS)
+        ).isoformat() + "Z",
+    }
+    user["updated_at"] = timestamp
+    save_users(payload)
+    return {"ok": True, "sent": True, "token": token, "user": public_user(user)}
+
+
+def delete_account_with_token(token):
+    token = str(token or "").strip()
+
+    if not token:
+        return {"ok": False, "errors": ["Account deletion link is missing. Request a new verification email."]}
+
+    payload = load_users()
+    user = find_user_by_account_delete_token(payload, token)
+
+    if not user:
+        return {
+            "ok": False,
+            "errors": ["That account deletion link is invalid or expired. Request a new verification email."],
+        }
+
+    user_id = str(user.get("user_id") or "")
+    deleted_user = public_user(user)
+    payload["users"] = [
+        item
+        for item in payload.get("users", [])
+        if str(item.get("user_id") or "") != user_id
+    ]
+    save_users(payload)
+    delete_user_avatar(user)
+    delete_user_workspace(user_id)
+    sign_out_user()
+    return {"ok": True, "user": deleted_user}
+
+
+def find_user_by_account_delete_token(payload, token):
+    for user in payload.get("users", []):
+        account_delete = user.get("account_delete") if isinstance(user, dict) else None
+
+        if not isinstance(account_delete, dict):
+            continue
+
+        expires_at = parse_iso_datetime(account_delete.get("expires_at"))
+        if not expires_at or expires_at < datetime.utcnow():
+            continue
+
+        token_hash = str(account_delete.get("token_hash") or "")
+        if token_hash and check_password_hash(token_hash, token):
+            return user
+
+    return None
+
+
+def delete_user_workspace(user_id):
+    user_id = safe_user_id(user_id)
+
+    if not user_id:
+        return False
+
+    try:
+        base = USER_DATA_DIR.resolve()
+        target = (USER_DATA_DIR / user_id).resolve()
+
+        if target == base or base not in target.parents or not target.exists():
+            return False
+
+        shutil.rmtree(target)
+        return True
+    except Exception:
+        return False
+
+
+def delete_user_avatar(user):
+    avatar_path = str((user or {}).get("avatar_path") or "").strip()
+
+    if not avatar_path:
+        return False
+
+    try:
+        avatar_file = (AVATAR_UPLOAD_DIR / Path(avatar_path).name).resolve()
+        upload_dir = AVATAR_UPLOAD_DIR.resolve()
+
+        if upload_dir not in avatar_file.parents or not avatar_file.exists():
+            return False
+
+        avatar_file.unlink()
+        return True
+    except Exception:
+        return False
+
+
 def request_two_factor_recovery(user_id):
     """Create an email recovery token only after the password sign-in step succeeds."""
     user_id = str(user_id or "").strip()
@@ -821,6 +937,7 @@ def sign_out_user():
     session.pop("user_id", None)
     session.pop("pending_2fa_user_id", None)
     session.pop("two_factor_recovery_link", None)
+    session.pop("account_delete_link", None)
 
 
 def update_user_profile(user_id, username, email, password="", confirm_password="", avatar_file=None, phone=""):

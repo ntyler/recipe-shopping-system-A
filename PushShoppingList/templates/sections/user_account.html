@@ -28,6 +28,15 @@
         </div>
     {% endif %}
 
+    {% set local_account_delete_link = session.get("account_delete_link") %}
+    {% if local_account_delete_link %}
+        <div class="user-account-reset-panel user-account-delete-link-panel" aria-live="polite">
+            <strong>Local account deletion verification link</strong>
+            <span>Email is not configured, so use this one-time local link to verify account deletion.</span>
+            <a href="{{ local_account_delete_link }}">Verify Account Deletion</a>
+        </div>
+    {% endif %}
+
     {% if password_reset_token|default("") %}
         <form class="user-account-form user-password-reset-form"
               method="POST"
@@ -60,6 +69,21 @@
                 <input type="password" name="password" required autocomplete="current-password">
             </label>
             <button type="submit" class="danger">Disable Two-Factor Authentication</button>
+        </form>
+    {% endif %}
+
+    {% if account_delete_token|default("") %}
+        <form class="user-account-form user-account-delete-confirm-form"
+              method="POST"
+              action="{{ url_for('account_bp.complete_account_delete_route') }}">
+            <h3>Delete Account</h3>
+            <p class="user-account-form-note">
+                This verification link is active. Submitting below permanently deletes the verified account and signs it out.
+            </p>
+            <input type="hidden" name="account_delete_token" value="{{ account_delete_token }}">
+            <button type="submit" class="danger">
+                Permanently Delete Account
+            </button>
         </form>
     {% endif %}
 
@@ -298,6 +322,31 @@
                     <button type="submit">Set Up Authenticator App</button>
                 </form>
             {% endif %}
+            </div>
+        </div>
+
+        <div class="user-account-form user-delete-account-card">
+            <button type="button"
+                    class="card-collapse-toggle user-delete-account-title-toggle"
+                    data-collapse-toggle="user-delete-account"
+                    aria-expanded="false"
+                    onclick="toggleCardCollapse('user-delete-account')">
+                <span>Delete Account</span>
+            </button>
+            <div class="card-collapse-content user-delete-account-content collapsed"
+                 data-collapse-content="user-delete-account"
+                 data-collapse-storage-key="user-delete-account:{{ current_user.user_id }}"
+                 data-collapse-default="collapsed"
+                 data-collapse-mobile-default="collapsed">
+                <p class="user-account-form-note">
+                    Send a one-time verification link to {{ current_user.email }} before deleting this account.
+                </p>
+                <form method="POST"
+                      action="{{ url_for('account_bp.request_account_delete_route') }}">
+                    <button type="submit" class="danger">
+                        Send Delete Verification Email
+                    </button>
+                </form>
             </div>
         </div>
     {% else %}
