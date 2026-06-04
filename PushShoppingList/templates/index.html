@@ -13,7 +13,9 @@
 
 <h1>Shopping List</h1>
 
-{% include "sections/screen_settings.html" %}
+{% if current_user and current_user.is_admin %}
+    {% include "sections/screen_settings.html" %}
+{% endif %}
 
 {% if message %}
 <div class="message">{{ message }}</div>

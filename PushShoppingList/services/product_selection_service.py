@@ -1210,6 +1210,99 @@ def product_choices_by_item():
     return hydrate_saved_product_choices(load_product_choices().get("items", {}))
 
 
+def store_price_cells_for_item(
+    product_choices,
+    item_key,
+    available_stores,
+    enabled_stores,
+    selected_store_key="",
+):
+    choice = (product_choices or {}).get(item_key or "", {})
+    if not isinstance(choice, dict):
+        choice = {}
+
+    selected_product = choice.get("selected_product") if isinstance(choice.get("selected_product"), dict) else {}
+    selected_store_key = (selected_store_key or selected_product.get("store_key") or "").strip()
+    store_results = store_results_by_key(choice)
+    cells = []
+
+    for store_key in enabled_stores or []:
+        store = (available_stores or {}).get(store_key, {})
+        store_result = store_results.get(store_key, {})
+        best_product = store_result.get("best_product") if isinstance(store_result.get("best_product"), dict) else {}
+
+        if not best_product and selected_product.get("store_key") == store_key:
+            best_product = selected_product
+
+        price = (
+            best_product.get("price")
+            or store_result.get("price")
+            or store_result.get("selected_price")
+            or ""
+        )
+        price_value = parse_price_amount(price)
+        label = (
+            store.get("label")
+            or store_result.get("store_name")
+            or best_product.get("store_name")
+            or str(store_key).title()
+        )
+        product_name = best_product.get("product_name") or store_result.get("best_product_match") or ""
+        unit_price = best_product.get("unit_price") or store_result.get("unit_price") or ""
+        display_price = price or "--"
+        title_parts = [label]
+        if product_name:
+            title_parts.append(product_name)
+        if price:
+            title_parts.append(price)
+        if unit_price:
+            title_parts.append(unit_price)
+
+        cells.append({
+            "store_key": store_key,
+            "label": label,
+            "display_price": display_price,
+            "price_value": price_value,
+            "product_name": product_name,
+            "unit_price": unit_price,
+            "is_selected": store_key == selected_store_key,
+            "is_cheapest": False,
+            "title": " - ".join(title_parts),
+        })
+
+    numeric_values = [
+        cell["price_value"]
+        for cell in cells
+        if cell["price_value"] is not None
+    ]
+    if numeric_values:
+        cheapest = min(numeric_values)
+        for cell in cells:
+            cell["is_cheapest"] = cell["price_value"] == cheapest
+
+    return cells
+
+
+def store_results_by_key(choice):
+    if not isinstance(choice, dict):
+        return {}
+
+    results = {}
+    keyed = choice.get("store_results")
+    if isinstance(keyed, dict):
+        results.update({
+            key: value
+            for key, value in keyed.items()
+            if isinstance(value, dict)
+        })
+
+    for result in choice.get("store_results_list", []) or []:
+        if isinstance(result, dict) and result.get("store_key"):
+            results[result["store_key"]] = result
+
+    return results
+
+
 def hydrate_saved_product_choices(items):
     if not isinstance(items, dict):
         return {}

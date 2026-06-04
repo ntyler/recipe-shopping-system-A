@@ -5239,6 +5239,127 @@ function filterPantryItems(value) {
     });
 }
 
+function pantryInventoryForFeelingPrompt() {
+    return Array.from(document.querySelectorAll("[data-pantry-item]"))
+        .map(item => {
+            const ingredient = String(item.dataset.pantryIngredient || "").trim();
+            const product = String(item.dataset.pantryProduct || "").trim();
+            const quantity = String(item.dataset.pantryQuantity || "").trim();
+            const unit = String(item.dataset.pantryUnit || "").trim();
+            const category = String(item.dataset.pantryCategory || "").trim();
+            const amount = [quantity, unit].filter(Boolean).join(" ");
+            const details = [
+                product && product !== ingredient ? product : "",
+                amount,
+                category,
+            ].filter(Boolean);
+
+            if (!ingredient) {
+                return "";
+            }
+
+            return details.length ? `${ingredient} (${details.join(", ")})` : ingredient;
+        })
+        .filter(Boolean)
+        .slice(0, 40);
+}
+
+function pantryRecipeTitlesForFeelingPrompt() {
+    return Array.from(document.querySelectorAll("#aiPantryCookWithWhatIHave .ai-pantry-recipe-card h4"))
+        .map(title => title.textContent.trim())
+        .filter(Boolean)
+        .slice(0, 12);
+}
+
+function setPantryFeelingStatus(message, isError = false) {
+    const status = document.getElementById("pantryFeelingStatus");
+
+    if (!status) {
+        return;
+    }
+
+    status.textContent = message || "";
+    status.classList.toggle("error", Boolean(isError));
+}
+
+function buildPantryFeelingPrompt(form) {
+    const activeForm = form && form.querySelector
+        ? form
+        : document.querySelector(".ai-pantry-feeling-form");
+    const feelingInput = activeForm ? activeForm.querySelector("#pantryFeelingInput") : null;
+    const constraintsInput = activeForm ? activeForm.querySelector("#pantryFeelingConstraints") : null;
+    const servingsInput = activeForm ? activeForm.querySelector("#pantryFeelingServings") : null;
+    const output = activeForm ? activeForm.querySelector("#pantryFeelingPromptOutput") : null;
+    const feeling = feelingInput ? feelingInput.value.trim() : "";
+    const constraints = constraintsInput ? constraintsInput.value.trim() : "";
+    const servings = servingsInput ? servingsInput.value.trim() : "";
+
+    if (!feeling) {
+        setPantryFeelingStatus("Enter a cuisine, mood, or genre first.", true);
+        if (feelingInput) {
+            feelingInput.focus();
+        }
+        return false;
+    }
+
+    const pantryItems = pantryInventoryForFeelingPrompt();
+    const recipeTitles = pantryRecipeTitlesForFeelingPrompt();
+    const promptParts = [
+        `I want to cook something in this style or mood: ${feeling}.`,
+        servings ? `Target servings: ${servings}.` : "",
+        constraints ? `Constraints or preferences: ${constraints}.` : "",
+        pantryItems.length
+            ? `Pantry inventory I can use:\n- ${pantryItems.join("\n- ")}`
+            : "No pantry inventory is saved yet, so suggest a practical recipe idea and list the missing ingredients clearly.",
+        recipeTitles.length
+            ? `Recipes already in my app that may be useful:\n- ${recipeTitles.join("\n- ")}`
+            : "",
+        "Suggest 3 meal ideas that fit the mood. Pick the best one, explain why, list ingredients I already have, list missing ingredients, and give concise cooking steps.",
+    ].filter(Boolean);
+
+    if (output) {
+        output.value = promptParts.join("\n\n");
+        output.focus();
+        output.setSelectionRange(0, 0);
+    }
+
+    setPantryFeelingStatus("Prompt built.");
+    return false;
+}
+
+async function copyPantryFeelingPrompt(button) {
+    const form = button ? button.closest(".ai-pantry-feeling-form") : document.querySelector(".ai-pantry-feeling-form");
+    const output = form ? form.querySelector("#pantryFeelingPromptOutput") : null;
+
+    if (!output) {
+        return false;
+    }
+
+    if (!output.value.trim()) {
+        buildPantryFeelingPrompt(form);
+    }
+
+    if (!output.value.trim()) {
+        return false;
+    }
+
+    try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(output.value);
+        } else {
+            output.select();
+            document.execCommand("copy");
+        }
+        setPantryFeelingStatus("Prompt copied.");
+    } catch (err) {
+        console.warn("Unable to copy pantry feeling prompt.", err);
+        output.select();
+        setPantryFeelingStatus("Prompt selected. Use Ctrl+C to copy.", true);
+    }
+
+    return false;
+}
+
 function checkedShoppingItemsForPantry() {
     return Array.from(document.querySelectorAll("#sectionView .row"))
         .filter(row => {
@@ -11263,19 +11384,28 @@ function cssEscape(value) {
 function bindStoreButtons() {
     document.querySelectorAll(".store-btn").forEach(button => {
         button.addEventListener("click", async () => {
-            const row = button.closest(".row");
+            const rowKey = button.dataset.rowKey || button.dataset.itemKey || "";
+            const row = button.closest(".row") || (rowKey
+                ? document.querySelector(`.row[data-key="${cssEscape(rowKey)}"]`)
+                : null);
+            const buttonScope = button.closest(".item-row-menu") || row;
             const itemKey = button.dataset.itemKey || (row ? row.dataset.key : "");
             const storeKey = button.dataset.store || "";
             const wasActive = button.classList.contains("active");
+            const wasMenuButton = Boolean(button.closest(".recipe-edit-row-menu"));
 
-            if (row) {
-                row.querySelectorAll(".store-btn").forEach(rowButton => {
-                    rowButton.classList.remove("active");
+            if (buttonScope) {
+                buttonScope.querySelectorAll(".store-btn").forEach(scopeButton => {
+                    scopeButton.classList.remove("active");
                 });
             }
 
             if (!wasActive) {
                 button.classList.add("active");
+            }
+
+            if (wasMenuButton) {
+                closeRecipeEditRowMenus();
             }
 
             if (itemKey) {
@@ -11288,7 +11418,7 @@ function bindStoreButtons() {
 
             const itemText = row ? row.querySelector(".item-text") : null;
             const searchBaseUrl = button.dataset.storeUrl || "";
-            const ingredient = itemText ? itemText.textContent.trim() : "";
+            const ingredient = button.dataset.itemName || (itemText ? itemText.textContent.trim() : "");
 
             if (searchBaseUrl && ingredient) {
                 window.open(`${searchBaseUrl}${encodeURIComponent(ingredient)}`, "_blank", "noopener");

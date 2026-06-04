@@ -802,6 +802,7 @@ class ProductSelectionServiceTest(unittest.TestCase):
         css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
         script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
 
+        self.assertIn("{% if current_user and current_user.is_admin %}", index_template)
         self.assertLess(
             index_template.index('{% include "sections/screen_settings.html" %}'),
             index_template.index('<main id="appContent"'),

@@ -68,6 +68,7 @@ from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_
 from PushShoppingList.services.recipe_extract_service import recipe_scaling_from_data
 from PushShoppingList.services.recipe_extract_service import scaling_multiplier_label
 from PushShoppingList.services.product_selection_service import product_choices_by_item
+from PushShoppingList.services.product_selection_service import store_price_cells_for_item
 from PushShoppingList.services.rules_display_service import load_rules_display
 from PushShoppingList.services.shopping_list_service import load_items
 from PushShoppingList.services.shopping_list_service import add_items
@@ -1333,6 +1334,7 @@ def index():
         ),
         recipe_view_rows=recipe_rows,
         product_choices=product_choices,
+        item_store_price_cells=store_price_cells_for_item,
         pantry_items=pantry_items,
         pantry_recipe_matches=pantry_recipe_matches_for_view(recipe_rows, pantry_items),
         pantry_receipt_review=session.get("pantry_receipt_review", {}),

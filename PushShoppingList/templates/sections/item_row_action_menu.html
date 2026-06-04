@@ -1,0 +1,57 @@
+<div class="item-row-menu-wrap recipe-edit-row-menu-wrap">
+    <button type="button"
+            class="item-row-menu-btn recipe-edit-row-menu-btn"
+            aria-label="Actions for {{ item_menu_display_name }}"
+            aria-haspopup="true"
+            aria-expanded="false"
+            onclick="return toggleRecipeEditRowMenu(this, event)">
+        <span>Actions</span>
+    </button>
+    <div class="item-row-menu recipe-edit-row-menu overflow-menu" hidden>
+        <div class="overflow-menu-section">
+            <div class="overflow-menu-section-title">Stores</div>
+            {% for store_key in enabled_stores %}
+                {% set store = available_stores.get(store_key) %}
+                {% if store %}
+                    <button type="button"
+                            class="store-btn item-menu-store-btn {% if purchase_state.get('store') == store_key %}active{% endif %}"
+                            data-store="{{ store_key }}"
+                            data-store-url="{{ store.url }}"
+                            data-item-key="{{ purchase_key }}"
+                            data-row-key="{{ item_key }}"
+                            data-item-name="{{ item_menu_store_search_name|default(item_menu_display_name) }}"
+                            onclick="setTimeout(closeRecipeEditRowMenus, 0)">
+                        {{ store.label }}
+                    </button>
+                {% endif %}
+            {% endfor %}
+        </div>
+
+        <div class="overflow-menu-section">
+            <div class="overflow-menu-section-title">Item</div>
+            {% if item_menu_show_products is not defined or item_menu_show_products %}
+                <form method="POST"
+                      action="/find_products"
+                      class="product-search-form item-menu-form"
+                      onsubmit="saveScroll(); closeRecipeEditRowMenus();">
+                    <input type="hidden" name="item" value="{{ purchase_group }}">
+                    <button type="submit" class="product-search-btn item-menu-button">Products</button>
+                </form>
+            {% endif %}
+
+            <button type="button"
+                    class="edit-qty-btn item-menu-button"
+                    data-item-key="{{ item_key }}"
+                    data-item-name="{{ item_menu_display_name }}"
+                    data-buy-as="{{ purchasable_item }}"
+                    data-purchase-group="{{ purchase_group }}"
+                    data-purchase-group-key="{{ purchase_key }}"
+                    data-current-qty="{{ item_menu_current_qty|default('') }}"
+                    data-recipe-qty-sources='{{ item_menu_qty_sources|default([])|tojson }}'
+                    data-manual-qty="{{ item_menu_manual_qty|default('') }}"
+                    onclick="openItemQtyEditor(this); closeRecipeEditRowMenus(); return false;">
+                Edit
+            </button>
+        </div>
+    </div>
+</div>

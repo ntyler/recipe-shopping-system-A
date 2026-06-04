@@ -24,6 +24,7 @@
             <a href="#aiPantryAddItems">Add Items</a>
             <a href="#aiPantryUploadReceipt">Upload Receipt</a>
             <a href="#aiPantryCookWithWhatIHave">Cook With What I Have</a>
+            <a href="#aiPantryCookWhatImFeeling">Cook What I'm Feeling</a>
             <a href="#aiPantryMissingIngredients">Missing Ingredients</a>
         </nav>
 
@@ -51,6 +52,11 @@
                     {% for item in pantry_items %}
                         <article class="ai-pantry-item"
                                  data-pantry-item
+                                 data-pantry-ingredient="{{ item.ingredient_name }}"
+                                 data-pantry-product="{{ item.product_name }}"
+                                 data-pantry-quantity="{{ item.quantity }}"
+                                 data-pantry-unit="{{ item.unit }}"
+                                 data-pantry-category="{{ item.category }}"
                                  data-pantry-search="{{ (item.ingredient_name ~ ' ' ~ item.product_name ~ ' ' ~ item.category ~ ' ' ~ item.source)|lower }}">
                             <div class="ai-pantry-item-main">
                                 <h4>{{ item.ingredient_name }}</h4>
@@ -245,6 +251,51 @@
             {% else %}
                 <div class="ai-pantry-empty">Save recipes and pantry items to see recipe suggestions.</div>
             {% endif %}
+        </section>
+
+        <section id="aiPantryCookWhatImFeeling" class="ai-pantry-section">
+            <div class="ai-pantry-section-header">
+                <h3>Cook What I'm Feeling</h3>
+            </div>
+            <form class="ai-pantry-feeling-form" onsubmit="return buildPantryFeelingPrompt(this);">
+                <div class="ai-pantry-feeling-grid">
+                    <label>
+                        <span>Cuisine / mood / genre</span>
+                        <input id="pantryFeelingInput"
+                               name="feeling"
+                               placeholder="cozy Mexican, spicy noodles, high-protein breakfast">
+                    </label>
+                    <label>
+                        <span>Constraints</span>
+                        <input id="pantryFeelingConstraints"
+                               name="constraints"
+                               placeholder="quick, vegetarian, fewer dishes">
+                    </label>
+                    <label>
+                        <span>Servings</span>
+                        <input id="pantryFeelingServings"
+                               name="servings"
+                               type="number"
+                               min="1"
+                               max="24"
+                               value="2">
+                    </label>
+                </div>
+                <div class="ai-pantry-feeling-actions">
+                    <button type="submit" class="ai-pantry-action-btn">Build Prompt</button>
+                    <button type="button"
+                            class="ai-pantry-action-btn secondary"
+                            onclick="return copyPantryFeelingPrompt(this)">
+                        Copy Prompt
+                    </button>
+                </div>
+                <textarea id="pantryFeelingPromptOutput"
+                          class="ai-pantry-feeling-output"
+                          rows="8"
+                          readonly
+                          placeholder="Your cooking prompt will appear here."></textarea>
+                <div id="pantryFeelingStatus" class="ai-pantry-status-line" aria-live="polite"></div>
+            </form>
         </section>
 
         <section id="aiPantryMissingIngredients" class="ai-pantry-section">

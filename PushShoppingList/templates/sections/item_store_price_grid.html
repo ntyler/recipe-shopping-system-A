@@ -1,0 +1,26 @@
+{% set item_price_cells = item_store_price_cells(product_choices, product_choice_key, available_stores, enabled_stores, selected_store_key) %}
+{% if item_price_cells %}
+    <div class="item-store-price-panel"
+         aria-label="Store prices for {{ store_price_item_label }}">
+        <div class="item-store-price-grid"
+             style="--store-price-count: {{ item_price_cells|length }};">
+            {% for cell in item_price_cells %}
+                <div class="item-store-price-header">
+                    {{ cell.label }}
+                </div>
+            {% endfor %}
+            {% for cell in item_price_cells %}
+                <div class="item-store-price-cell {% if cell.is_cheapest %}cheapest{% endif %} {% if cell.is_selected %}selected{% endif %}"
+                     data-store-key="{{ cell.store_key }}"
+                     title="{{ cell.title }}">
+                    <span class="item-store-price-value {% if not cell.price_value %}item-store-price-empty{% endif %}">
+                        {{ cell.display_price }}
+                    </span>
+                    {% if cell.unit_price %}
+                        <span class="item-store-unit-price">{{ cell.unit_price }}</span>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+{% endif %}
