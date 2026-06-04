@@ -37,6 +37,15 @@
         </div>
     {% endif %}
 
+    {% set local_phone_verification_code = session.get("phone_verification_code") %}
+    {% if local_phone_verification_code %}
+        <div class="user-account-reset-panel user-phone-verification-local-panel" aria-live="polite">
+            <strong>Local phone verification code</strong>
+            <span>Text messaging is not configured, so enter this local code to verify your phone.</span>
+            <code>{{ local_phone_verification_code }}</code>
+        </div>
+    {% endif %}
+
     {% if password_reset_token|default("") %}
         <form class="user-account-form user-password-reset-form"
               method="POST"
@@ -117,7 +126,14 @@
                 <div class="user-account-name">{{ current_user.username }}</div>
                 <div class="user-account-email">{{ current_user.email }}</div>
                 {% if current_user.phone %}
-                    <div class="user-account-phone">{{ current_user.phone }}</div>
+                    <div class="user-account-phone">
+                        <span>{{ current_user.phone }}</span>
+                        {% if current_user.phone_verified %}
+                            <span class="user-phone-status verified">Verified</span>
+                        {% else %}
+                            <span class="user-phone-status unverified">Unverified</span>
+                        {% endif %}
+                    </div>
                 {% endif %}
             </div>
 
@@ -177,6 +193,49 @@
                 <button type="submit">Save Profile</button>
             </div>
         </form>
+
+        <div class="user-account-form user-phone-verification-card">
+            <h3>Phone Verification</h3>
+            {% if current_user.phone %}
+                {% if current_user.phone_verified %}
+                    <p class="user-account-form-note">
+                        {{ current_user.phone }} is verified.
+                    </p>
+                {% else %}
+                    <p class="user-account-form-note">
+                        Verify {{ current_user.phone }} before relying on phone-based account recovery.
+                    </p>
+                    <form class="user-phone-verification-request-form"
+                          method="POST"
+                          action="{{ url_for('account_bp.request_phone_verification_route') }}">
+                        <button type="submit" class="secondary">
+                            Send Verification Text
+                        </button>
+                    </form>
+                    <form class="user-phone-verification-confirm-form"
+                          method="POST"
+                          action="{{ url_for('account_bp.confirm_phone_verification_route') }}">
+                        <label>
+                            <span>Verification Code</span>
+                            <input type="text"
+                                   name="phone_verification_code"
+                                   inputmode="numeric"
+                                   autocomplete="one-time-code"
+                                   maxlength="6"
+                                   placeholder="123456"
+                                   required>
+                        </label>
+                        <button type="submit">
+                            Verify Phone
+                        </button>
+                    </form>
+                {% endif %}
+            {% else %}
+                <p class="user-account-form-note">
+                    Add and save a phone number before verifying it.
+                </p>
+            {% endif %}
+        </div>
 
         {% if current_user.ntfy_url %}
             <div class="user-account-form user-ntfy-card">

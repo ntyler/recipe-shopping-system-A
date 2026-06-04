@@ -345,5 +345,20 @@
   "rating": 0,
   "reflection_notes": [],
   "chatgpt_feedback": "",
-  "chatgpt_feedback_created_at": ""
+  "chatgpt_feedback_created_at": "",
+  "pdf": {
+    "local_path": "D:\\GitHub\\recipe-shopping-system-A\\PushShoppingList\\services\\recipe-extractor\\data\\pdf\\forkinthekitchen_com_vegetarian-green-enchiladas-verde.pdf",
+    "r2_object_key": "recipe-pdfs/forkinthekitchen_com_vegetarian-green-enchiladas-verde.pdf",
+    "r2_public_url": "https://pub-c0815444ad5143baade63b3e205bf1b4.r2.dev/recipe-pdfs/forkinthekitchen_com_vegetarian-green-enchiladas-verde.pdf",
+    "uploaded_at": "2026-06-04T06:58:17Z",
+    "cloud_status": "uploaded",
+    "cloudflare_r2": {
+      "provider": "cloudflare_r2",
+      "bucket": "recipe-shopping-pdfs",
+      "object_key": "recipe-pdfs/forkinthekitchen_com_vegetarian-green-enchiladas-verde.pdf",
+      "public_url": "https://pub-c0815444ad5143baade63b3e205bf1b4.r2.dev/recipe-pdfs/forkinthekitchen_com_vegetarian-green-enchiladas-verde.pdf",
+      "uploaded_at": "2026-06-04T06:58:17Z",
+      "cloud_status": "uploaded"
+    }
+  }
 }

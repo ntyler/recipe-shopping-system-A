@@ -37,6 +37,7 @@ PHONE_DIGITS_PATTERN = re.compile(r"\d+")
 ADMIN_EMAIL = os.getenv("SHOPPING_APP_ADMIN_EMAIL", "ntylerbert@gmail.com").strip().lower()
 PASSWORD_RESET_TTL_HOURS = 1
 ACCOUNT_DELETE_TTL_HOURS = 1
+PHONE_VERIFICATION_TTL_MINUTES = 10
 TWO_FACTOR_TRUST_DAYS = 30
 TWO_FACTOR_RECOVERY_TTL_MINUTES = 30
 NTFY_TOPIC_PREFIX = os.getenv("SHOPPING_APP_NTFY_TOPIC_PREFIX", "shopping-user").strip() or "shopping-user"
@@ -136,6 +137,8 @@ def public_user(user):
         "username": user.get("username", ""),
         "email": user.get("email", ""),
         "phone": user.get("phone", ""),
+        "phone_verified_at": user.get("phone_verified_at", ""),
+        "phone_verified": bool(user.get("phone") and user.get("phone_verified_at")),
         "ntfy_topic": ntfy_topic,
         "ntfy_url": ntfy_subscription_url(ntfy_topic),
         "avatar_path": user.get("avatar_path", ""),
@@ -410,6 +413,9 @@ def request_password_reset(identity, delivery_method="email"):
     if not user:
         return {"ok": True, "sent": False}
 
+    if delivery_method == "phone" and not user.get("phone_verified_at"):
+        return {"ok": True, "sent": False}
+
     token = secrets.token_urlsafe(32)
     timestamp = now_iso()
     user["password_reset"] = {
@@ -458,6 +464,84 @@ def reset_password_with_token(token, password, confirm_password):
     user["updated_at"] = now_iso()
     save_users(payload)
     session.pop("user_id", None)
+    return {"ok": True, "user": public_user(user)}
+
+
+def phone_verification_code():
+    return f"{secrets.randbelow(1000000):06d}"
+
+
+def request_phone_verification(user_id):
+    user_id = str(user_id or "").strip()
+
+    if not user_id:
+        return {"ok": False, "errors": ["Sign in before verifying your phone number."]}
+
+    payload = load_users()
+    user = find_user_by_id_in_payload(payload, user_id)
+
+    if not user:
+        return {"ok": False, "errors": ["Sign in again before verifying your phone number."]}
+
+    if not str(user.get("phone") or "").strip():
+        return {"ok": False, "errors": ["Add a phone number before requesting a verification code."]}
+
+    code = phone_verification_code()
+    timestamp = now_iso()
+    user["phone_verification"] = {
+        "code_hash": generate_password_hash(code),
+        "phone": user.get("phone", ""),
+        "created_at": timestamp,
+        "expires_at": (
+            datetime.utcnow().replace(microsecond=0)
+            + timedelta(minutes=PHONE_VERIFICATION_TTL_MINUTES)
+        ).isoformat() + "Z",
+    }
+    user["updated_at"] = timestamp
+    save_users(payload)
+    return {"ok": True, "code": code, "user": public_user(user)}
+
+
+def verify_phone_code(user_id, code):
+    user_id = str(user_id or "").strip()
+    code = str(code or "").strip()
+
+    if not user_id:
+        return {"ok": False, "errors": ["Sign in before verifying your phone number."]}
+
+    if not code:
+        return {"ok": False, "errors": ["Enter the verification code from the text message."]}
+
+    payload = load_users()
+    user = find_user_by_id_in_payload(payload, user_id)
+
+    if not user:
+        return {"ok": False, "errors": ["Sign in again before verifying your phone number."]}
+
+    verification = user.get("phone_verification") if isinstance(user.get("phone_verification"), dict) else None
+
+    if not verification:
+        return {"ok": False, "errors": ["Request a new phone verification code first."]}
+
+    expires_at = parse_iso_datetime(verification.get("expires_at"))
+    if not expires_at or expires_at < datetime.utcnow():
+        user.pop("phone_verification", None)
+        save_users(payload)
+        return {"ok": False, "errors": ["That phone verification code expired. Request a new code."]}
+
+    if str(verification.get("phone") or "") != str(user.get("phone") or ""):
+        user.pop("phone_verification", None)
+        save_users(payload)
+        return {"ok": False, "errors": ["The phone number changed. Request a new verification code."]}
+
+    code_hash = str(verification.get("code_hash") or "")
+    if not code_hash or not check_password_hash(code_hash, code):
+        return {"ok": False, "errors": ["That phone verification code did not match."]}
+
+    user["phone_verified_at"] = now_iso()
+    user.pop("phone_verification", None)
+    user["updated_at"] = now_iso()
+    save_users(payload)
     return {"ok": True, "user": public_user(user)}
 
 
@@ -938,6 +1022,7 @@ def sign_out_user():
     session.pop("pending_2fa_user_id", None)
     session.pop("two_factor_recovery_link", None)
     session.pop("account_delete_link", None)
+    session.pop("phone_verification_code", None)
 
 
 def update_user_profile(user_id, username, email, password="", confirm_password="", avatar_file=None, phone=""):
@@ -973,6 +1058,7 @@ def update_user_profile(user_id, username, email, password="", confirm_password=
     if errors:
         return {"ok": False, "errors": errors}
 
+    previous_phone = str(user.get("phone") or "")
     avatar_result = save_avatar_upload(avatar_file, user_id)
     if not avatar_result.get("ok"):
         return {"ok": False, "errors": avatar_result.get("errors", ["Avatar upload failed."])}
@@ -984,6 +1070,9 @@ def update_user_profile(user_id, username, email, password="", confirm_password=
         user["password_hash"] = generate_password_hash(password)
     if avatar_result.get("avatar_path"):
         user["avatar_path"] = avatar_result["avatar_path"]
+    if phone != previous_phone:
+        user.pop("phone_verified_at", None)
+        user.pop("phone_verification", None)
     user["updated_at"] = now_iso()
     save_users(payload)
     return {"ok": True, "user": public_user(user)}

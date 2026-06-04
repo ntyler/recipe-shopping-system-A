@@ -4563,6 +4563,20 @@ body {
             background: #7f1212;
         }
 
+        .user-phone-verification-local-panel code {
+            justify-self: center;
+            min-width: 96px;
+            padding: 5px 10px;
+            border: 1px solid #19c36b;
+            border-radius: 7px;
+            background: #0b1118;
+            color: #d8ffe4;
+            font-family: Consolas, Monaco, monospace;
+            font-size: 18px;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+        }
+
         .user-account-form {
             display: grid;
             gap: 10px;
@@ -4666,6 +4680,7 @@ body {
         }
 
         .user-delete-account-card,
+        .user-phone-verification-card,
         .user-two-factor-card {
             margin-top: 14px;
         }
@@ -4815,6 +4830,8 @@ body {
 
         .user-account-edit-form .user-phone-field {
             grid-column: 1 / -1;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
         }
 
         .user-phone-reset-country {
@@ -4910,6 +4927,18 @@ body {
             margin: 0;
         }
 
+        .user-phone-verification-card {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .user-phone-verification-request-form,
+        .user-phone-verification-confirm-form {
+            display: grid;
+            gap: 10px;
+            min-width: 0;
+            margin: 0;
+        }
+
         .user-password-reset-form,
         .user-account-delete-confirm-form,
         .user-account-forgot-form,
@@ -4957,6 +4986,36 @@ body {
             color: #cbd5e1;
             font-weight: 700;
             overflow-wrap: anywhere;
+        }
+
+        .user-account-phone {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .user-phone-status {
+            display: inline-flex;
+            align-items: center;
+            min-height: 20px;
+            padding: 2px 7px;
+            border: 1px solid currentColor;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 900;
+            line-height: 1;
+            text-transform: uppercase;
+        }
+
+        .user-phone-status.verified {
+            color: #b9f6ca;
+            background: #073d24;
+        }
+
+        .user-phone-status.unverified {
+            color: #ffd4d4;
+            background: #351417;
         }
 
         .user-account-actions {
@@ -10095,6 +10154,7 @@ body {
 
             .user-ntfy-link-row,
             .user-ntfy-topic,
+            .user-account-edit-form .user-phone-field,
             .user-phone-field {
                 grid-template-columns: minmax(0, 1fr);
             }

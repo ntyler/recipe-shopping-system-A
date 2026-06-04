@@ -14,6 +14,7 @@ from PushShoppingList.services.email_service import send_password_reset_email
 from PushShoppingList.services.email_service import send_two_factor_recovery_email
 from PushShoppingList.services.sms_service import password_reset_sms_configured
 from PushShoppingList.services.sms_service import send_password_reset_sms
+from PushShoppingList.services.sms_service import send_phone_verification_sms
 from PushShoppingList.services.user_account_service import authenticate_user
 from PushShoppingList.services.user_account_service import cancel_two_factor_setup
 from PushShoppingList.services.user_account_service import cancel_two_factor_sign_in
@@ -25,12 +26,14 @@ from PushShoppingList.services.user_account_service import enable_two_factor
 from PushShoppingList.services.user_account_service import regenerate_two_factor_backup_codes
 from PushShoppingList.services.user_account_service import request_account_delete
 from PushShoppingList.services.user_account_service import request_password_reset
+from PushShoppingList.services.user_account_service import request_phone_verification
 from PushShoppingList.services.user_account_service import request_two_factor_recovery
 from PushShoppingList.services.user_account_service import recover_two_factor_with_token
 from PushShoppingList.services.user_account_service import reset_password_with_token
 from PushShoppingList.services.user_account_service import sign_out_user
 from PushShoppingList.services.user_account_service import start_two_factor_setup
 from PushShoppingList.services.user_account_service import update_user_profile
+from PushShoppingList.services.user_account_service import verify_phone_code
 
 
 account_bp = Blueprint("account_bp", __name__)
@@ -338,6 +341,54 @@ def update_profile_route():
         phone=request.form.get("phone"),
     )
     flash_account_result(result, "Profile updated.")
+    return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+
+@account_bp.route("/account/phone/verification/request", methods=["POST"])
+def request_phone_verification_route():
+    result = request_phone_verification(session.get("user_id"))
+
+    if result.get("ok"):
+        session.pop("phone_verification_code", None)
+
+        if password_reset_sms_configured():
+            sms_result = send_phone_verification_sms(result.get("user"), result.get("code"))
+
+            if not sms_result.get("ok"):
+                flash(
+                    sms_result.get("error")
+                    or "Phone verification text could not be sent. Check SMS settings.",
+                    "error",
+                )
+                return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+        else:
+            session["phone_verification_code"] = result.get("code")
+            flash(
+                "Text messaging is not configured yet, so a local phone verification code is available below.",
+                "success",
+            )
+            return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+        flash("A phone verification code has been sent.", "success")
+    else:
+        flash_account_result(result, "")
+
+    return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+
+@account_bp.route("/account/phone/verification/confirm", methods=["POST"])
+def confirm_phone_verification_route():
+    result = verify_phone_code(
+        session.get("user_id"),
+        request.form.get("phone_verification_code"),
+    )
+
+    if result.get("ok"):
+        session.pop("phone_verification_code", None)
+        flash("Phone number verified.", "success")
+    else:
+        flash_account_result(result, "")
+
     return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
 
 

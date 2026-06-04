@@ -73,3 +73,61 @@ def send_password_reset_sms(user, reset_url):
         }
 
     return {"ok": True, "configured": True}
+
+
+def send_phone_verification_sms(user, code):
+    config = sms_config()
+
+    if not password_reset_sms_configured():
+        return {
+            "ok": False,
+            "configured": False,
+            "error": "Phone verification text messaging is not configured.",
+        }
+
+    recipient = str((user or {}).get("phone") or "").strip()
+
+    if not recipient:
+        return {
+            "ok": False,
+            "configured": True,
+            "error": "This account does not have a phone number.",
+        }
+
+    try:
+        response = requests.post(
+            f"https://api.twilio.com/2010-04-01/Accounts/{config['account_sid']}/Messages.json",
+            data={
+                "From": config["from_phone"],
+                "To": recipient,
+                "Body": (
+                    "Your Recipe Shopping System phone verification code is "
+                    f"{code}. This code expires in 10 minutes."
+                ),
+            },
+            auth=(config["account_sid"], config["auth_token"]),
+            timeout=15,
+        )
+    except Exception as err:
+        return {
+            "ok": False,
+            "configured": True,
+            "error": f"Phone verification text could not be sent. Check SMS settings. {err}",
+        }
+
+    if response.status_code >= 400:
+        error = "Phone verification text could not be sent. Check SMS settings."
+        try:
+            payload = response.json()
+            error = str(payload.get("message") or error)
+        except Exception:
+            if response.text:
+                error = response.text[:240]
+
+        return {
+            "ok": False,
+            "configured": True,
+            "error": error,
+        }
+
+    return {"ok": True, "configured": True}

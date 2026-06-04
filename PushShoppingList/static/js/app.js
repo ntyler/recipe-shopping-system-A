@@ -499,8 +499,8 @@ function updateForgotPasswordResetMethod() {
 
         if (note) {
             note.textContent = smsConfigured
-                ? "Enter the phone number on your account and the app will text a one-time reset link."
-                : "Enter the phone number on your account and the app will prepare a one-time local reset link.";
+                ? "Enter the verified phone number on your account and the app will text a one-time reset link."
+                : "Enter the verified phone number on your account and the app will prepare a one-time local reset link.";
         }
 
         if (button) {
