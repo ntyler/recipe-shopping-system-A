@@ -6335,6 +6335,10 @@ function populateRecipeEditor(recipe, originalUrl) {
         prep_time: recipe.prep_time || "",
         inactive_time: recipe.inactive_time || "",
         cook_time: recipe.cook_time || "",
+        rating: recipe.rating || 0,
+        reflection_notes: recipe.reflection_notes || [],
+        chatgpt_feedback: recipe.chatgpt_feedback || "",
+        chatgpt_feedback_created_at: recipe.chatgpt_feedback_created_at || "",
         scaling: recipe.scaling || {},
         ingredients: recipe.ingredients || [],
         equipment: recipe.equipment || [],
@@ -6353,6 +6357,7 @@ function populateRecipeEditor(recipe, originalUrl) {
     setValue("recipeEditPrepTime", recipe.prep_time || "");
     setValue("recipeEditInactiveTime", recipe.inactive_time || "");
     setValue("recipeEditCookTime", recipe.cook_time || "");
+    setRecipeRating(recipe.rating || 0);
     setRecipeEditorCookbook(recipe, originalUrl);
     populateRecipeScalingControls(recipe.scaling || {}, recipe.servings || "");
     updateRecipeEditorPdfControls(recipe);
@@ -6373,6 +6378,7 @@ function populateRecipeEditor(recipe, originalUrl) {
     const equipmentWrap = document.getElementById("recipeEditEquipment");
     const instructionWrap = document.getElementById("recipeEditInstructions");
     const nutritionWrap = document.getElementById("recipeEditNutrition");
+    const reflectionWrap = document.getElementById("recipeEditReflectionNotes");
 
     if (ingredientWrap) {
         ingredientWrap.innerHTML = "";
@@ -6404,6 +6410,11 @@ function populateRecipeEditor(recipe, originalUrl) {
         if (!recipe.nutrition || !recipe.nutrition.length) {
             addRecipeNutritionRow();
         }
+    }
+
+    if (reflectionWrap) {
+        reflectionWrap.innerHTML = "";
+        (recipe.reflection_notes || []).forEach(item => addRecipeReflectionNoteRow(item));
     }
 
     updateRecipeEditStickyOffsets();
@@ -6543,7 +6554,7 @@ function openRecipeEditorPdf(link, event) {
 }
 
 function updateRecipeEditStickyOffsets() {
-    document.querySelectorAll(".recipe-edit-equipment-section, .recipe-edit-instructions-section, .recipe-edit-nutrition-section")
+    document.querySelectorAll(".recipe-edit-equipment-section, .recipe-edit-instructions-section, .recipe-edit-nutrition-section, .recipe-edit-reflection-section")
         .forEach(section => {
             const sectionHeader = section.querySelector(".recipe-edit-section-header");
 
@@ -6563,6 +6574,46 @@ function setValue(id, value) {
     if (element) {
         element.value = value;
     }
+}
+
+function normalizeRecipeRatingValue(value) {
+    const rating = parseInt(value, 10);
+
+    if (!Number.isFinite(rating)) {
+        return 0;
+    }
+
+    return Math.max(0, Math.min(5, rating));
+}
+
+function currentRecipeRating() {
+    const input = document.getElementById("recipeEditRating");
+    return normalizeRecipeRatingValue(input ? input.value : 0);
+}
+
+function setRecipeRating(value) {
+    const rating = normalizeRecipeRatingValue(value);
+    const input = document.getElementById("recipeEditRating");
+
+    if (input) {
+        input.value = String(rating);
+    }
+
+    updateRecipeRatingStars(rating);
+    return false;
+}
+
+function updateRecipeRatingStars(rating) {
+    const normalizedRating = normalizeRecipeRatingValue(rating);
+
+    document.querySelectorAll("#recipeEditRatingStars .recipe-edit-rating-star").forEach(button => {
+        const value = normalizeRecipeRatingValue(button.dataset.ratingValue);
+        const active = value > 0 && value <= normalizedRating;
+
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-checked", value === normalizedRating ? "true" : "false");
+        button.textContent = active ? "\u2605" : "\u2606";
+    });
 }
 
 function setRecipeEditStatus(message, isError = false) {
@@ -7110,6 +7161,8 @@ function scrollRecipeEditorToSection(sectionKey) {
         equipment: ".recipe-edit-equipment-section",
         instructions: ".recipe-edit-instructions-section",
         nutrition: ".recipe-edit-nutrition-section",
+        notes: ".recipe-edit-reflection-section",
+        reflection: ".recipe-edit-reflection-section",
     }[normalized];
     const section = selector ? document.querySelector(selector) : null;
 
@@ -7133,6 +7186,7 @@ function scrollRecipeEditorToSection(sectionKey) {
         ".recipe-edit-equipment-row input, " +
         ".recipe-edit-instruction-row textarea, " +
         ".recipe-edit-nutrition-row input, " +
+        ".recipe-edit-reflection-note-row textarea, " +
         "input, textarea, select"
     );
 
@@ -7795,7 +7849,7 @@ function toggleRecipeIngredientRowMenu(button, event = null) {
 }
 
 function recipeEditMovableRowSelector() {
-    return ".recipe-edit-ingredient-row, .recipe-edit-equipment-row, .recipe-edit-instruction-row, .recipe-edit-nutrition-row, .recipe-edit-cookbook-field, .recipe-url-summary-row, .store-manager-row, .recipe-view-card, .cookbook-card, .cookbook-recipe-card, .rules-group, .rules-editor-food-row";
+    return ".recipe-edit-ingredient-row, .recipe-edit-equipment-row, .recipe-edit-instruction-row, .recipe-edit-nutrition-row, .recipe-edit-reflection-note-row, .recipe-edit-cookbook-field, .recipe-url-summary-row, .store-manager-row, .recipe-view-card, .cookbook-card, .cookbook-recipe-card, .rules-group, .rules-editor-food-row";
 }
 
 function recipeEditMoveSelectorForRow(row) {
@@ -7817,6 +7871,10 @@ function recipeEditMoveSelectorForRow(row) {
 
     if (row.classList.contains("recipe-edit-nutrition-row")) {
         return ".recipe-edit-nutrition-row";
+    }
+
+    if (row.classList.contains("recipe-edit-reflection-note-row")) {
+        return ".recipe-edit-reflection-note-row";
     }
 
     if (row.classList.contains("recipe-url-summary-row")) {
@@ -9520,6 +9578,193 @@ function normalizeNutritionKey(value) {
     return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
 }
 
+function recipeReflectionTimestamp(value = "") {
+    const parsed = value ? new Date(value) : new Date();
+
+    if (Number.isNaN(parsed.getTime())) {
+        return new Date().toISOString();
+    }
+
+    return parsed.toISOString();
+}
+
+function formatRecipeReflectionTimestamp(value) {
+    const parsed = value ? new Date(value) : null;
+
+    if (!parsed || Number.isNaN(parsed.getTime())) {
+        return "";
+    }
+
+    return parsed.toLocaleString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+    });
+}
+
+function recipeReflectionNoteId(value = "") {
+    const existing = String(value || "").trim();
+
+    if (existing) {
+        return existing;
+    }
+
+    return `note-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function addRecipeReflectionNoteRow(note = {}) {
+    const wrap = document.getElementById("recipeEditReflectionNotes");
+
+    if (!wrap) {
+        return null;
+    }
+
+    const createdAt = String(note.created_at || "").trim() || recipeReflectionTimestamp();
+    const feedbackCreatedAt = String(note.chatgpt_feedback_created_at || "").trim();
+    const feedback = String(note.chatgpt_feedback || "").trim();
+    const row = document.createElement("div");
+
+    row.className = "recipe-edit-reflection-note-row";
+    row.innerHTML = `
+        <span class="recipe-edit-row-handle" aria-hidden="true">${recipeEditSvgIcon("drag")}</span>
+        <div class="recipe-edit-reflection-note-main">
+            <div class="recipe-edit-reflection-note-meta">
+                <span>Added ${escapeHtml(formatRecipeReflectionTimestamp(createdAt) || createdAt)}</span>
+                ${feedbackCreatedAt ? `<span data-note-feedback-time>Feedback ${escapeHtml(formatRecipeReflectionTimestamp(feedbackCreatedAt) || feedbackCreatedAt)}</span>` : `<span data-note-feedback-time hidden></span>`}
+            </div>
+            <textarea data-field="text" rows="3" placeholder="What worked, what changed, or what should be tried next time?">${escapeHtml(note.text || "")}</textarea>
+            <input type="hidden" data-field="note_id" value="${escapeAttribute(recipeReflectionNoteId(note.note_id))}">
+            <input type="hidden" data-field="created_at" value="${escapeAttribute(createdAt)}">
+            <input type="hidden" data-field="chatgpt_feedback_created_at" value="${escapeAttribute(feedbackCreatedAt)}">
+            <textarea data-field="chatgpt_feedback" hidden>${escapeHtml(feedback)}</textarea>
+            <div class="recipe-edit-note-feedback" data-note-feedback${feedback ? "" : " hidden"}>${escapeHtml(feedback)}</div>
+        </div>
+        <div class="recipe-edit-reflection-note-actions">
+            <button type="button"
+                    class="recipe-edit-note-feedback-btn"
+                    onclick="return askRecipeNoteFeedback(this)">
+                Ask ChatGPT
+            </button>
+            <div class="recipe-edit-row-menu-wrap">
+                <button type="button"
+                        class="recipe-edit-row-menu-btn"
+                        aria-label="Note actions"
+                        title="Note actions"
+                        aria-haspopup="true"
+                        aria-expanded="false"
+                        onclick="return toggleRecipeEditRowMenu(this, event)">
+                    <span aria-hidden="true"></span>
+                </button>
+                <div class="recipe-edit-row-menu" hidden>
+                    <button type="button" onclick="moveRecipeEditRow(this, -1)">Move note up</button>
+                    <button type="button" onclick="moveRecipeEditRow(this, 1)">Move note down</button>
+                    <button type="button" class="delete" onclick="removeRecipeEditRow(this)">Delete note</button>
+                </div>
+            </div>
+        </div>
+    `;
+    wrap.appendChild(row);
+    bindRecipeEditDragAndDrop(row);
+    return row;
+}
+
+function collectRecipeReflectionNotes() {
+    return [...document.querySelectorAll("#recipeEditReflectionNotes .recipe-edit-reflection-note-row")]
+        .map(row => {
+            const item = fieldValuesFromRow(row);
+            const text = String(item.text || "").trim();
+
+            return {
+                note_id: recipeReflectionNoteId(item.note_id),
+                text,
+                created_at: String(item.created_at || "").trim() || recipeReflectionTimestamp(),
+                chatgpt_feedback: String(item.chatgpt_feedback || "").trim(),
+                chatgpt_feedback_created_at: String(item.chatgpt_feedback_created_at || "").trim(),
+            };
+        })
+        .filter(item => item.text);
+}
+
+function applyRecipeNoteFeedbackToRow(row, feedback, createdAt) {
+    const feedbackText = String(feedback || "").trim();
+    const timestamp = String(createdAt || "").trim() || recipeReflectionTimestamp();
+    const feedbackDisplay = row ? row.querySelector("[data-note-feedback]") : null;
+    const feedbackInput = row ? row.querySelector('[data-field="chatgpt_feedback"]') : null;
+    const feedbackTimeInput = row ? row.querySelector('[data-field="chatgpt_feedback_created_at"]') : null;
+    const feedbackTime = row ? row.querySelector("[data-note-feedback-time]") : null;
+
+    if (feedbackInput) {
+        feedbackInput.value = feedbackText;
+    }
+
+    if (feedbackTimeInput) {
+        feedbackTimeInput.value = timestamp;
+    }
+
+    if (feedbackDisplay) {
+        feedbackDisplay.textContent = feedbackText;
+        feedbackDisplay.hidden = !feedbackText;
+    }
+
+    if (feedbackTime) {
+        feedbackTime.textContent = `Feedback ${formatRecipeReflectionTimestamp(timestamp) || timestamp}`;
+        feedbackTime.hidden = !feedbackText;
+    }
+}
+
+async function askRecipeNoteFeedback(button) {
+    const row = button ? button.closest(".recipe-edit-reflection-note-row") : null;
+    const noteInput = row ? row.querySelector('[data-field="text"]') : null;
+    const note = noteInput ? noteInput.value.trim() : "";
+
+    if (!row || !note) {
+        setRecipeEditStatus("Add a recipe note before asking ChatGPT for feedback.", true);
+        return false;
+    }
+
+    const originalText = button ? button.textContent : "";
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Asking...";
+    }
+
+    try {
+        setRecipeEditStatus("Asking ChatGPT for note feedback...");
+        const payload = collectRecipeEditorPayload();
+        const response = await fetch("/api/recipe_note_feedback", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                note,
+                recipe: payload.recipe,
+            }),
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to get note feedback.");
+        }
+
+        applyRecipeNoteFeedbackToRow(row, data.feedback || "", data.created_at || "");
+        setRecipeEditStatus("ChatGPT feedback added. Save Recipe to keep it.");
+    } catch (err) {
+        console.warn("Unable to get recipe note feedback.", err);
+        setRecipeEditStatus(err.message || "Unable to get note feedback.", true);
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = originalText || "Ask ChatGPT";
+        }
+    }
+
+    return false;
+}
+
 function removeRecipeEditRow(button) {
     const row = button ? button.closest(recipeEditMovableRowSelector()) : null;
 
@@ -9850,6 +10095,7 @@ function normalizeRecipeEditorSnapshot(recipe) {
         quantity: String(parseRecipeScaleMultiplier(recipe.quantity || "1") || 1),
         servings: String(recipe.servings || "").trim(),
         cover_image: normalizeRecipeCoverImageSnapshot(recipe.cover_image || {}),
+        rating: String(normalizeRecipeRatingValue(recipe.rating || 0)),
         level: String(recipe.level || "").trim(),
         total_time: String(recipe.total_time || "").trim(),
         prep_time: String(recipe.prep_time || "").trim(),
@@ -9883,7 +10129,22 @@ function normalizeRecipeEditorSnapshot(recipe) {
             key: String(item.key || "").trim(),
             value: String(item.value || "").trim(),
         })),
+        reflection_notes: normalizeRecipeReflectionNotesSnapshot(recipe.reflection_notes || []),
+        chatgpt_feedback: String(recipe.chatgpt_feedback || "").trim(),
+        chatgpt_feedback_created_at: String(recipe.chatgpt_feedback_created_at || "").trim(),
     };
+}
+
+function normalizeRecipeReflectionNotesSnapshot(notes) {
+    return (Array.isArray(notes) ? notes : [])
+        .map(item => ({
+            note_id: String(item.note_id || "").trim(),
+            text: String(item.text || "").trim(),
+            created_at: String(item.created_at || "").trim(),
+            chatgpt_feedback: String(item.chatgpt_feedback || "").trim(),
+            chatgpt_feedback_created_at: String(item.chatgpt_feedback_created_at || "").trim(),
+        }))
+        .filter(item => item.text);
 }
 
 function normalizeRecipeScalingSnapshot(scaling) {
@@ -9917,6 +10178,7 @@ function buildRecipeSaveProgressItems(recipe) {
         ["Source URL", "source_url"],
         ["Quantity", "quantity"],
         ["Servings", "servings"],
+        ["Rating", "rating"],
         ["Level", "level"],
         ["Total", "total_time"],
         ["Prep", "prep_time"],
@@ -9947,11 +10209,19 @@ function buildRecipeSaveProgressItems(recipe) {
         ["Equipment", previous.equipment.length, next.equipment.length],
         ["Instructions", previous.instructions.length, next.instructions.length],
         ["Nutrition", previous.nutrition.length, next.nutrition.length],
+        ["Reflection notes", previous.reflection_notes.length, next.reflection_notes.length],
     ].forEach(([label, beforeCount, afterCount]) => {
         if (beforeCount !== afterCount) {
             detailLines.push(`${label}: ${beforeCount} -> ${afterCount}`);
         }
     });
+
+    if (
+        previous.reflection_notes.length === next.reflection_notes.length
+        && JSON.stringify(previous.reflection_notes) !== JSON.stringify(next.reflection_notes)
+    ) {
+        detailLines.push("Reflection notes updated.");
+    }
 
     return [
         {
@@ -10159,6 +10429,9 @@ function collectRecipeEditorPayload() {
             quantity,
             servings: document.getElementById("recipeEditServings").value.trim(),
             cover_image: collectRecipeEditorCoverImage(),
+            rating: currentRecipeRating(),
+            chatgpt_feedback: recipeEditOriginalSnapshot ? recipeEditOriginalSnapshot.chatgpt_feedback || "" : "",
+            chatgpt_feedback_created_at: recipeEditOriginalSnapshot ? recipeEditOriginalSnapshot.chatgpt_feedback_created_at || "" : "",
             level: document.getElementById("recipeEditLevel").value.trim(),
             total_time: document.getElementById("recipeEditTotalTime").value.trim(),
             prep_time: document.getElementById("recipeEditPrepTime").value.trim(),
@@ -10169,6 +10442,7 @@ function collectRecipeEditorPayload() {
             equipment: collectRecipeEquipmentRows(),
             instructions: collectRecipeInstructionRows(),
             nutrition: collectRecipeNutritionRows(),
+            reflection_notes: collectRecipeReflectionNotes(),
         },
     };
 }

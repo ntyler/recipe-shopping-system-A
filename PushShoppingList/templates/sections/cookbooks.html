@@ -178,6 +178,13 @@
                                                                            onclick="event.stopPropagation()">
                                                                             {{ recipe.name }}
                                                                         </a>
+                                                                        {% if recipe.rating %}
+                                                                            <span class="recipe-rating-display"
+                                                                                  aria-label="{{ recipe.rating }} out of 5 stars"
+                                                                                  title="{{ recipe.rating }} out of 5 stars">
+                                                                                {{ recipe.rating_stars }}
+                                                                            </span>
+                                                                        {% endif %}
                                                                     </span>
                                                                 </div>
                                                                 {% if recipe.food_rule_status and recipe.food_rule_status.needs_review %}

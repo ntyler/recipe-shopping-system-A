@@ -128,6 +128,10 @@ def create_new_recipe():
         "equipment": [],
         "instructions": [],
         "nutrition": empty_recipe_nutrition(),
+        "rating": 0,
+        "reflection_notes": [],
+        "chatgpt_feedback": "",
+        "chatgpt_feedback_created_at": "",
         "scaling": normalize_recipe_scaling_metadata(),
     }
 
@@ -195,6 +199,10 @@ def load_editable_recipe(url):
                 recipe_data.get("nutrition", {}),
                 include_defaults=recipe_url_type(url) == "Manual",
             ),
+            "rating": normalize_recipe_rating(recipe_data.get("rating")),
+            "reflection_notes": normalize_reflection_notes(recipe_data.get("reflection_notes")),
+            "chatgpt_feedback": str(recipe_data.get("chatgpt_feedback") or "").strip(),
+            "chatgpt_feedback_created_at": str(recipe_data.get("chatgpt_feedback_created_at") or "").strip(),
             "pdf_path": pdf["path"],
             "pdf_available": pdf["available"],
         },
@@ -446,6 +454,21 @@ def save_editable_recipe(original_url, payload):
             existing_data.get("instructions", []),
         ),
         "nutrition": sanitize_nutrition(payload.get("nutrition", [])),
+        "rating": normalize_recipe_rating(payload.get("rating")),
+        "reflection_notes": sanitize_reflection_notes(
+            payload.get("reflection_notes", []),
+            existing_data.get("reflection_notes", []),
+        ),
+        "chatgpt_feedback": str(
+            payload.get("chatgpt_feedback")
+            or existing_data.get("chatgpt_feedback")
+            or ""
+        ).strip(),
+        "chatgpt_feedback_created_at": str(
+            payload.get("chatgpt_feedback_created_at")
+            or existing_data.get("chatgpt_feedback_created_at")
+            or ""
+        ).strip(),
     }
     if cover_image:
         recipe_data["cover_image"] = cover_image
@@ -763,6 +786,89 @@ def estimate_recipe_nutrition(payload):
         "ok": True,
         "nutrition": rows,
     }
+
+
+def recipe_note_feedback(payload):
+    payload = payload if isinstance(payload, dict) else {}
+    note_text = str(payload.get("note") or payload.get("text") or "").strip()
+
+    if not note_text:
+        return {
+            "ok": False,
+            "error": "Add a recipe note before asking ChatGPT for feedback.",
+        }
+
+    if not os.getenv("OPENAI_API_KEY"):
+        return {
+            "ok": False,
+            "error": "Missing OPENAI_API_KEY environment variable.",
+        }
+
+    prompt = build_recipe_note_feedback_prompt(payload, note_text)
+
+    try:
+        response = get_openai_client().chat.completions.create(
+            model=os.getenv("OPENAI_RECIPE_NOTE_MODEL", MODEL),
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a practical cooking coach. Give concise, useful feedback on recipe reflection notes.",
+                },
+                {
+                    "role": "user",
+                    "content": prompt,
+                },
+            ],
+            temperature=0.2,
+        )
+        feedback = str(response.choices[0].message.content or "").strip()
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": f"Recipe note feedback failed: {exc}",
+        }
+
+    if not feedback:
+        return {
+            "ok": False,
+            "error": "ChatGPT did not return feedback for this note.",
+        }
+
+    return {
+        "ok": True,
+        "feedback": feedback,
+        "created_at": now_iso(),
+    }
+
+
+def build_recipe_note_feedback_prompt(payload, note_text):
+    recipe = payload.get("recipe") if isinstance(payload.get("recipe"), dict) else payload
+    recipe_payload = {
+        "title": str(recipe.get("recipe_title") or recipe.get("display_name") or "").strip(),
+        "rating": normalize_recipe_rating(recipe.get("rating")),
+        "servings": str(recipe.get("servings") or "").strip(),
+        "total_time": str(recipe.get("total_time") or "").strip(),
+        "prep_time": str(recipe.get("prep_time") or "").strip(),
+        "cook_time": str(recipe.get("cook_time") or "").strip(),
+        "ingredients": nutrition_prompt_ingredients(recipe.get("ingredients", [])),
+        "instructions": nutrition_prompt_instructions(recipe.get("instructions", [])),
+    }
+
+    return f"""
+Review this cook's reflection note and give useful feedback.
+
+Rules:
+- Be concise: 3-5 bullets max.
+- Focus on practical cooking adjustments, timing, flavor, texture, and what to try next time.
+- Use the recipe context, but do not invent facts the note does not support.
+- If the note is mostly positive, suggest one small experiment for next time.
+
+Recipe context:
+{json.dumps(recipe_payload, ensure_ascii=False, indent=2)}
+
+Reflection note:
+{note_text}
+"""
 
 
 def generate_recipe_step_image(payload):
@@ -1806,6 +1912,83 @@ def sanitize_nutrition(value):
         nutrition["other"] = other
 
     return nutrition
+
+
+def now_iso():
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def normalize_recipe_rating(value):
+    try:
+        rating = int(value)
+    except (TypeError, ValueError):
+        return 0
+
+    return max(0, min(5, rating))
+
+
+def normalize_reflection_notes(value):
+    if isinstance(value, str):
+        value = [{"text": value}] if value.strip() else []
+
+    if not isinstance(value, list):
+        return []
+
+    notes = []
+    for item in value:
+        if not isinstance(item, dict):
+            item = {"text": item}
+
+        text = str(item.get("text") or item.get("note") or "").strip()
+        if not text:
+            continue
+
+        notes.append({
+            "note_id": str(item.get("note_id") or item.get("id") or uuid.uuid4().hex).strip(),
+            "text": text,
+            "created_at": str(item.get("created_at") or item.get("timestamp") or now_iso()).strip(),
+            "chatgpt_feedback": str(item.get("chatgpt_feedback") or "").strip(),
+            "chatgpt_feedback_created_at": str(item.get("chatgpt_feedback_created_at") or "").strip(),
+        })
+
+    return notes
+
+
+def sanitize_reflection_notes(value, existing_value=None):
+    existing_notes = {
+        str(item.get("note_id") or ""): item
+        for item in normalize_reflection_notes(existing_value)
+        if item.get("note_id")
+    }
+    sanitized = []
+
+    for item in value if isinstance(value, list) else []:
+        if not isinstance(item, dict):
+            item = {"text": item}
+
+        text = str(item.get("text") or item.get("note") or "").strip()
+        if not text:
+            continue
+
+        note_id = str(item.get("note_id") or item.get("id") or "").strip()
+        existing = existing_notes.get(note_id, {}) if note_id else {}
+        sanitized.append({
+            "note_id": note_id or uuid.uuid4().hex,
+            "text": text,
+            "created_at": str(item.get("created_at") or existing.get("created_at") or now_iso()).strip(),
+            "chatgpt_feedback": str(
+                item.get("chatgpt_feedback")
+                or existing.get("chatgpt_feedback")
+                or ""
+            ).strip(),
+            "chatgpt_feedback_created_at": str(
+                item.get("chatgpt_feedback_created_at")
+                or existing.get("chatgpt_feedback_created_at")
+                or ""
+            ).strip(),
+        })
+
+    return sanitized
 
 
 def nullable_string(value):

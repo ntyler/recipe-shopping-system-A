@@ -233,6 +233,8 @@ def recipe_view_rows(recipe_urls):
             "scaling_options": recipe_log_scaling_options(recipe_data, recipe_quantity),
             "archive_pdf_available": recipe_archive_pdf_exists(recipe["url"]),
             "food_rule_status": recipe_food_rule_status(recipe_data),
+            "rating": recipe_rating_for_view(recipe_data),
+            "rating_stars": recipe_rating_stars_for_view(recipe_data),
             "base_servings": recipe_data.get("servings"),
             "scaled_servings": scaled_servings or scale_servings(recipe_data.get("servings"), recipe_quantity),
             "serving_basis": nutrition_summary["serving_basis"],
@@ -254,6 +256,21 @@ def recipe_view_nutrition_summary(nutrition):
         "serving_basis": clean_display_text(nutrition.get("serving_basis")),
         "calories": clean_display_text(nutrition.get("calories")),
     }
+
+
+def recipe_rating_for_view(recipe_data):
+    try:
+        rating = int((recipe_data or {}).get("rating") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+    return max(0, min(5, rating))
+
+
+def recipe_rating_stars_for_view(recipe_data):
+    rating = recipe_rating_for_view(recipe_data)
+
+    return "\u2605" * rating + "\u2606" * (5 - rating)
 
 
 def apply_cookbook_assignments_to_recipe_rows(rows, cookbook_assignments):
@@ -291,6 +308,8 @@ def recipe_url_log_rows(recipe_urls, cookbook_assignments=None):
             "source_display_url": recipe_source_display_url(recipe["url"]),
             "cover_image": recipe_cover_image_for_view(recipe["url"], recipe_data, recipe_meta),
             "food_rule_status": recipe_food_rule_status(recipe_data),
+            "rating": recipe_rating_for_view(recipe_data),
+            "rating_stars": recipe_rating_stars_for_view(recipe_data),
             "archive_pdf_available": recipe_archive_pdf_exists(recipe["url"]),
             "base_servings": recipe_data.get("servings"),
             "scaled_servings": scaled_servings or scale_servings(recipe_data.get("servings"), recipe_quantity),
@@ -393,6 +412,8 @@ def cookbook_view_for_render(recipe_rows):
             recipe["quantity"] = recipe_quantity
             recipe["scaling_options"] = recipe_log_scaling_options(recipe_data, recipe_quantity)
             recipe["food_rule_status"] = recipe_food_rule_status(recipe_data)
+            recipe["rating"] = recipe_rating_for_view(recipe_data)
+            recipe["rating_stars"] = recipe_rating_stars_for_view(recipe_data)
             recipe["archive_pdf_available"] = recipe_archive_pdf_exists(recipe_url)
             recipe["base_servings"] = recipe.get("base_servings") or recipe_data.get("servings")
             recipe["scaled_servings"] = (

@@ -37,6 +37,7 @@ from PushShoppingList.services.recipe_edit_service import estimate_recipe_nutrit
 from PushShoppingList.services.recipe_edit_service import generate_recipe_equipment_image
 from PushShoppingList.services.recipe_edit_service import generate_recipe_step_image
 from PushShoppingList.services.recipe_edit_service import load_editable_recipe
+from PushShoppingList.services.recipe_edit_service import recipe_note_feedback
 from PushShoppingList.services.recipe_edit_service import save_editable_recipe
 from PushShoppingList.services.recipe_edit_service import save_recipe_cover_image_upload
 from PushShoppingList.services.recipe_edit_service import save_recipe_detail_image_upload
@@ -428,6 +429,15 @@ def api_recipe_nutrition_estimate_route():
     data = request.get_json(silent=True) or {}
     recipe = data.get("recipe", data)
     result = estimate_recipe_nutrition(recipe)
+    status = 200 if result.get("ok") else 400
+
+    return jsonify(result), status
+
+
+@recipe_bp.route("/api/recipe_note_feedback", methods=["POST"])
+def api_recipe_note_feedback_route():
+    data = request.get_json(silent=True) or {}
+    result = recipe_note_feedback(data)
     status = 200 if result.get("ok") else 400
 
     return jsonify(result), status

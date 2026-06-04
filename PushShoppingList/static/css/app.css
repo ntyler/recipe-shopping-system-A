@@ -2880,6 +2880,24 @@ body {
             outline: none;
         }
 
+        .recipe-rating-display {
+            display: inline-flex;
+            align-items: center;
+            min-height: 22px;
+            margin-left: 6px;
+            padding: 2px 6px;
+            border: 1px solid #6b580f;
+            border-radius: 6px;
+            background: #1f1b10;
+            color: #fbbf24;
+            font-size: 13px;
+            font-weight: 900;
+            letter-spacing: 0;
+            line-height: 1;
+            white-space: nowrap;
+            vertical-align: middle;
+        }
+
         .recipe-jump-highlight {
             animation: recipe-jump-pulse 1.2s ease-out 1;
         }
@@ -6615,7 +6633,8 @@ body {
         .recipe-edit-ingredients-section .recipe-edit-section-header,
         .recipe-edit-equipment-section .recipe-edit-section-header,
         .recipe-edit-instructions-section .recipe-edit-section-header,
-        .recipe-edit-nutrition-section .recipe-edit-section-header {
+        .recipe-edit-nutrition-section .recipe-edit-section-header,
+        .recipe-edit-reflection-section .recipe-edit-section-header {
             position: sticky;
             top: 66px;
             z-index: 4;
@@ -6657,6 +6676,72 @@ body {
 
         .recipe-edit-wide {
             grid-column: 1 / -1;
+        }
+
+        .recipe-edit-rating-field {
+            display: grid;
+            gap: 8px;
+            padding: 10px 12px;
+            border: 1px solid #2f3638;
+            border-radius: 8px;
+            background: #151919;
+        }
+
+        .recipe-edit-rating-label {
+            color: #cbd5d1;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            line-height: 1.2;
+            text-transform: uppercase;
+        }
+
+        .recipe-edit-rating-stars {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .recipe-edit-rating-star,
+        .recipe-edit-rating-clear {
+            width: auto;
+            min-width: 38px;
+            height: 38px;
+            margin: 0;
+            border-radius: 6px;
+            border: 1px solid #3f4750;
+            background: #1b2021;
+            color: #818996;
+            line-height: 1;
+        }
+
+        .recipe-edit-rating-star {
+            padding: 0;
+            font-size: 22px;
+            letter-spacing: 0;
+        }
+
+        .recipe-edit-rating-clear {
+            min-width: 70px;
+            padding: 0 12px;
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .recipe-edit-rating-star.active {
+            border-color: #a16207;
+            background: #211d11;
+            color: #fbbf24;
+        }
+
+        .recipe-edit-rating-star:hover,
+        .recipe-edit-rating-star:focus-visible,
+        .recipe-edit-rating-clear:hover,
+        .recipe-edit-rating-clear:focus-visible {
+            border-color: #fbbf24;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.22);
         }
 
         .recipe-edit-pdf-panel {
@@ -6813,7 +6898,8 @@ body {
 
         .recipe-edit-equipment,
         .recipe-edit-instructions,
-        .recipe-edit-nutrition {
+        .recipe-edit-nutrition,
+        .recipe-edit-reflection-notes {
             display: grid;
             gap: 8px;
             margin-top: 10px;
@@ -7034,6 +7120,106 @@ body {
 
         .recipe-edit-nutrition-row .recipe-edit-remove-row {
             justify-self: end;
+        }
+
+        .recipe-edit-reflection-notes {
+            gap: 10px;
+        }
+
+        .recipe-edit-reflection-note-row {
+            display: grid;
+            grid-template-columns: 34px minmax(0, 1fr) auto;
+            gap: 10px;
+            align-items: start;
+            padding: 12px;
+            border: 1px solid #2f3638;
+            border-radius: 8px;
+            background: #151919;
+        }
+
+        .recipe-edit-reflection-note-main {
+            display: grid;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .recipe-edit-reflection-note-meta {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            color: #9ca3af;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0;
+            line-height: 1.25;
+            text-transform: none;
+        }
+
+        .recipe-edit-reflection-note-main textarea[data-field="text"] {
+            min-height: 86px;
+            resize: vertical;
+        }
+
+        .recipe-edit-reflection-note-actions {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .recipe-edit-note-feedback-btn {
+            width: auto;
+            min-width: 116px;
+            margin: 0;
+            padding: 9px 12px;
+            border-radius: 6px;
+            background: #155e75;
+            color: #e0f2fe;
+            font-size: 13px;
+            font-weight: 800;
+            line-height: 1.1;
+        }
+
+        .recipe-edit-note-feedback-btn:hover,
+        .recipe-edit-note-feedback-btn:focus-visible {
+            background: #0e7490;
+            outline: none;
+        }
+
+        .recipe-edit-note-feedback-btn:disabled {
+            cursor: wait;
+            opacity: 0.72;
+        }
+
+        .recipe-edit-note-feedback {
+            padding: 10px 12px;
+            border: 1px solid #2d4157;
+            border-radius: 6px;
+            background: #101822;
+            color: #e5edf5;
+            font-size: 13px;
+            font-weight: 700;
+            line-height: 1.38;
+            white-space: pre-wrap;
+        }
+
+        .recipe-edit-note-feedback[hidden] {
+            display: none;
+        }
+
+        @media (max-width: 760px) {
+            .recipe-edit-reflection-note-row {
+                grid-template-columns: 30px minmax(0, 1fr);
+            }
+
+            .recipe-edit-reflection-note-actions {
+                grid-column: 2;
+                flex-wrap: wrap;
+            }
+
+            .recipe-edit-note-feedback-btn {
+                flex: 1 1 150px;
+            }
         }
 
         .recipe-edit-text-row {

@@ -232,6 +232,13 @@
                                    title="{{ recipe.source_display_url }}">
                                     {{ recipe.name }}
                                 </a>
+                                {% if recipe.rating %}
+                                    <span class="recipe-rating-display"
+                                          aria-label="{{ recipe.rating }} out of 5 stars"
+                                          title="{{ recipe.rating }} out of 5 stars">
+                                        {{ recipe.rating_stars }}
+                                    </span>
+                                {% endif %}
                                 {% if recipe.food_rule_status.needs_review %}
                                     <button type="button"
                                             class="food-rule-marker recipe-log-food-review-btn recipe-view-title-food-review-btn"

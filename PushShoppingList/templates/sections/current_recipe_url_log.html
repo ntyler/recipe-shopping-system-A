@@ -97,6 +97,13 @@
                                            title="{{ recipe.source_display_url }}"
                                            onclick="event.stopPropagation()"
                                            data-recipe-url="{{ recipe.url }}">{{ recipe.name }}</a>
+                                        {% if recipe.rating %}
+                                            <span class="recipe-rating-display"
+                                                  aria-label="{{ recipe.rating }} out of 5 stars"
+                                                  title="{{ recipe.rating }} out of 5 stars">
+                                                {{ recipe.rating_stars }}
+                                            </span>
+                                        {% endif %}
                                     </span>
                                 </div>
                                 {% if recipe.food_rule_status.needs_review %}
@@ -602,6 +609,31 @@
                         <span>Servings</span>
                         <input type="text" name="servings" id="recipeEditServings">
                     </label>
+                    <div class="recipe-edit-rating-field recipe-edit-wide">
+                        <span class="recipe-edit-rating-label">Rating</span>
+                        <input type="hidden" id="recipeEditRating" value="0">
+                        <div id="recipeEditRatingStars"
+                             class="recipe-edit-rating-stars"
+                             role="radiogroup"
+                             aria-label="Recipe rating">
+                            {% for rating_value in range(1, 6) %}
+                                <button type="button"
+                                        class="recipe-edit-rating-star"
+                                        data-rating-value="{{ rating_value }}"
+                                        role="radio"
+                                        aria-checked="false"
+                                        aria-label="{{ rating_value }} star{% if rating_value != 1 %}s{% endif %}"
+                                        onclick="return setRecipeRating({{ rating_value }});">
+                                    &#9733;
+                                </button>
+                            {% endfor %}
+                            <button type="button"
+                                    class="recipe-edit-rating-clear"
+                                    onclick="return setRecipeRating(0);">
+                                Clear
+                            </button>
+                        </div>
+                    </div>
                     <label>
                         <span>Recipe Amount</span>
                         <select name="scaling_multiplier"
@@ -881,6 +913,25 @@
                         <span></span>
                     </div>
                 </div>
+            </section>
+
+            <section class="recipe-edit-section recipe-edit-reflection-section">
+                <div class="recipe-edit-section-header">
+                    <div class="recipe-edit-section-title">
+                        <span class="recipe-edit-panel-icon recipe-edit-panel-icon-reflection" aria-hidden="true"></span>
+                        <div>
+                            <h3>Reflection Notes</h3>
+                            <p>Timestamped notes about what worked, what changed, and what to try next time.</p>
+                        </div>
+                    </div>
+                    <div class="recipe-edit-section-actions">
+                        <button type="button" onclick="addRecipeReflectionNoteRow()">
+                            <span class="recipe-edit-button-icon" aria-hidden="true">+</span>
+                            <span>Add Note</span>
+                        </button>
+                    </div>
+                </div>
+                <div id="recipeEditReflectionNotes" class="recipe-edit-reflection-notes"></div>
             </section>
 
             <div class="recipe-edit-actions">

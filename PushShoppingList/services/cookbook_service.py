@@ -150,6 +150,7 @@ def clean_recipe_record(value):
         "source_href": source_href,
         "source_display_url": source_display_url,
         "quantity": quantity,
+        "rating": clean_recipe_rating(value.get("rating")),
         "archive_pdf_available": bool(value.get("archive_pdf_available")),
         "base_servings": clean_text(value.get("base_servings")),
         "scaled_servings": clean_text(value.get("scaled_servings")),
@@ -163,6 +164,15 @@ def clean_recipe_record(value):
         record["cover_image"] = cover_image
 
     return record
+
+
+def clean_recipe_rating(value):
+    try:
+        rating = int(value)
+    except (TypeError, ValueError):
+        return 0
+
+    return max(0, min(5, rating))
 
 
 def recipe_snapshot_lookup(recipe_rows):
