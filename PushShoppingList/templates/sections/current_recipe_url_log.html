@@ -504,16 +504,6 @@
                         <h3>Recipe Information</h3>
                     </div>
                     <div class="recipe-edit-info-actions">
-                        <a id="recipeEditPdfButtonPanel"
-                           class="recipe-edit-pdf-button recipe-edit-header-pdf-button"
-                           href="#"
-                           target="_blank"
-                           rel="noopener noreferrer"
-                           onclick="return openRecipeEditorPdf(this, event)"
-                           hidden>
-                            <span class="recipe-edit-button-icon" aria-hidden="true">â†“</span>
-                            <span>Open PDF</span>
-                        </a>
                         <div class="recipe-edit-section-menu-wrap recipe-edit-info-menu-wrap">
                             <button type="button"
                                     class="recipe-edit-row-menu-btn recipe-edit-section-menu-btn"
@@ -689,29 +679,47 @@
                         </div>
                     </div>
                     <label>
-                        <span>Recipe Amount</span>
+                        <span class="recipe-edit-label-line">
+                            <span>Recipe Amount</span>
+                            <span class="recipe-edit-label-description">&mdash; Servings, yield, or portions the recipe makes.</span>
+                        </span>
                         <select name="scaling_multiplier"
                                 id="recipeEditScaleMultiplier"
                                 onchange="applyRecipeScaleMultiplier(this)"></select>
                     </label>
                     <label>
-                        <span>Level</span>
+                        <span class="recipe-edit-label-line">
+                            <span>Level</span>
+                            <span class="recipe-edit-label-description">&mdash; Estimated recipe difficulty.</span>
+                        </span>
                         <input type="text" name="level" id="recipeEditLevel">
                     </label>
                     <label>
-                        <span>Total</span>
+                        <span class="recipe-edit-label-line">
+                            <span>Total</span>
+                            <span class="recipe-edit-label-description">&mdash; Full start-to-finish recipe time.</span>
+                        </span>
                         <input type="text" name="total_time" id="recipeEditTotalTime">
                     </label>
                     <label>
-                        <span>Prep</span>
+                        <span class="recipe-edit-label-line">
+                            <span>Prep</span>
+                            <span class="recipe-edit-label-description">&mdash; Hands-on preparation time.</span>
+                        </span>
                         <input type="text" name="prep_time" id="recipeEditPrepTime">
                     </label>
                     <label>
-                        <span>Inactive</span>
+                        <span class="recipe-edit-label-line">
+                            <span>Inactive</span>
+                            <span class="recipe-edit-label-description">&mdash; Waiting/resting/chilling/rising time.</span>
+                        </span>
                         <input type="text" name="inactive_time" id="recipeEditInactiveTime">
                     </label>
                     <label>
-                        <span>Cook</span>
+                        <span class="recipe-edit-label-line">
+                            <span>Cook</span>
+                            <span class="recipe-edit-label-description">&mdash; Time spent cooking, baking, or heating.</span>
+                        </span>
                         <input type="text" name="cook_time" id="recipeEditCookTime">
                     </label>
                     <div id="recipeEditCookbookField"
