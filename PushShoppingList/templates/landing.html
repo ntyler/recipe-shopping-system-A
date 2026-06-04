@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>AI Grocery Shopping Assistant</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/landing.css') }}">
+</head>
+<body>
+    <header class="site-header">
+        <a class="brand" href="{{ url_for('main_bp.landing') }}">AI Grocery Assistant</a>
+        <nav class="nav-links" aria-label="Landing page navigation">
+            <a href="#benefits">Benefits</a>
+            <a href="#how-it-works">How it works</a>
+            <a href="#investors">Investors</a>
+            <a class="nav-cta" href="{{ url_for('main_bp.index') }}">Open App</a>
+        </nav>
+    </header>
+
+    <main>
+        <section class="hero section-shell">
+            <div class="hero-copy">
+                <p class="eyebrow">Recipe planning • pantry confidence • store matching</p>
+                <h1>Turn recipes into a smarter grocery list in seconds.</h1>
+                <p class="hero-subtitle">Paste recipe links, scan your pantry, choose your stores, and let AI organize what you actually need to buy.</p>
+                <div class="hero-actions">
+                    <a class="button primary" href="#beta">Join the Beta</a>
+                    <a class="button secondary" href="{{ url_for('main_bp.index') }}">View Demo App</a>
+                </div>
+                <div class="trust-row" aria-label="Supported shopping workflows">
+                    <span>Recipe import</span>
+                    <span>Pantry photos</span>
+                    <span>Receipt checks</span>
+                    <span>Nearby stores</span>
+                </div>
+            </div>
+            <div class="hero-card" aria-label="Product workflow preview">
+                <div class="mock-window">
+                    <div class="mock-toolbar"><span></span><span></span><span></span></div>
+                    <div class="mock-content">
+                        <div class="mock-pill">Tonight's recipes</div>
+                        <h2>Cauliflower Pasta + Crispy Falafel</h2>
+                        <div class="mock-step active">1. Extract ingredients from recipe URLs</div>
+                        <div class="mock-step">2. Check pantry and receipt history</div>
+                        <div class="mock-step">3. Match items to ALDI, Kroger, Meijer, Walmart, Target, and Costco</div>
+                        <div class="mock-list">
+                            <span>Organic eggs</span><strong>$ / unit</strong>
+                            <span>Garlic</span><strong>in pantry?</strong>
+                            <span>Half and half</span><strong>best match</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="problem section-shell">
+            <div class="section-heading">
+                <p class="eyebrow">The problem</p>
+                <h2>Grocery planning is fragmented across too many tabs.</h2>
+                <p>You find a recipe, scroll through ads, copy ingredients, check your pantry, search store apps, compare products, and still forget something. This tool brings the whole process into one flow.</p>
+            </div>
+            <div class="pain-grid">
+                <article>Forgotten items</article>
+                <article>Duplicate purchases</article>
+                <article>Manual recipe copying</article>
+                <article>Slow store searching</article>
+            </div>
+        </section>
+
+        <section id="benefits" class="section-shell">
+            <div class="section-heading">
+                <p class="eyebrow">Benefits</p>
+                <h2>Built for the full recipe-to-cart workflow.</h2>
+            </div>
+            <div class="card-grid three">
+                <article class="feature-card"><span>🔗</span><h3>Import recipes faster</h3><p>Paste recipe URLs and extract ingredients, servings, instructions, and recipe names without manual copy/paste.</p></article>
+                <article class="feature-card"><span>🧾</span><h3>Build a clean list</h3><p>Group shopping items by grocery section, recipe, or store so the list is easier to use in real life.</p></article>
+                <article class="feature-card"><span>🥫</span><h3>Avoid buying duplicates</h3><p>Use pantry photos, spice photos, and receipt history to increase confidence in what you already have.</p></article>
+                <article class="feature-card"><span>🛒</span><h3>Find better matches</h3><p>Rank grocery products by match quality, price, size, organic preference, stock, and nearby store availability.</p></article>
+                <article class="feature-card"><span>📍</span><h3>Shop preferred stores</h3><p>Support workflows for ALDI, Kroger, Meijer, Walmart, Target, Costco, and future custom stores.</p></article>
+                <article class="feature-card"><span>⏱️</span><h3>Save time weekly</h3><p>Reduce repeated searching, forgotten ingredients, and last-minute grocery decision fatigue.</p></article>
+            </div>
+        </section>
+
+        <section id="how-it-works" class="section-shell split-section">
+            <div class="section-heading left">
+                <p class="eyebrow">How it works</p>
+                <h2>From meal idea to store-ready list.</h2>
+                <p>The product acts as the missing layer between recipe inspiration, household inventory, and grocery checkout.</p>
+            </div>
+            <ol class="steps">
+                <li><strong>Add recipes</strong><span>Paste links, upload a photo, or enter items manually.</span></li>
+                <li><strong>AI organizes ingredients</strong><span>Items are cleaned, grouped, and tied back to each recipe.</span></li>
+                <li><strong>Check pantry, spices, and receipts</strong><span>See which items may already be available at home.</span></li>
+                <li><strong>Choose stores</strong><span>Enable the stores that matter for your grocery trip.</span></li>
+                <li><strong>Review and shop</strong><span>Open store links, compare matches, and build the final trip.</span></li>
+            </ol>
+        </section>
+
+        <section class="section-shell use-cases">
+            <div class="section-heading">
+                <p class="eyebrow">Use cases</p>
+                <h2>Useful for everyday grocery decisions.</h2>
+            </div>
+            <div class="tag-grid">
+                <span>Weekly meal planning</span><span>Family grocery trips</span><span>Budget shopping</span><span>Online pickup</span><span>Pantry cleanout</span><span>Reducing food waste</span><span>Recipe testing</span><span>Store comparison</span>
+            </div>
+        </section>
+
+        <section class="section-shell feature-table-section">
+            <div class="section-heading">
+                <p class="eyebrow">Feature map</p>
+                <h2>What the prototype is designed to support.</h2>
+            </div>
+            <div class="feature-table" role="table" aria-label="Feature benefits">
+                <div><strong>Recipe URL import</strong><span>No manual copying</span></div>
+                <div><strong>Smart extraction</strong><span>Cleaner grocery lists</span></div>
+                <div><strong>Pantry photo scan</strong><span>Fewer duplicate purchases</span></div>
+                <div><strong>Receipt cross-checking</strong><span>Higher confidence in owned items</span></div>
+                <div><strong>Store toggles</strong><span>Shop where you want</span></div>
+                <div><strong>Product ranking</strong><span>Better matches faster</span></div>
+                <div><strong>Organic preference</strong><span>Prioritizes buying style</span></div>
+                <div><strong>Admin workflow</strong><span>Shows users what changed</span></div>
+                <div><strong>Feedback section</strong><span>Captures tester input</span></div>
+            </div>
+        </section>
+
+        <section id="investors" class="section-shell investor-section">
+            <div>
+                <p class="eyebrow">Investor / partner angle</p>
+                <h2>The missing layer between recipes and grocery checkout.</h2>
+                <p>This product connects meal intent to grocery purchase decisions. It can grow from a consumer meal-planning assistant into a product-matching, retailer-integration, and recipe-commerce platform.</p>
+            </div>
+            <div class="business-grid">
+                <article><strong>Consumer SaaS</strong><span>Premium planning, pantry, and household workflows.</span></article>
+                <article><strong>Affiliate revenue</strong><span>Store links, pickup flows, and cart handoff opportunities.</span></article>
+                <article><strong>Recipe partnerships</strong><span>Creator tools that convert recipes into shoppable lists.</span></article>
+                <article><strong>Retail integrations</strong><span>White-label matching for grocery and meal platforms.</span></article>
+            </div>
+        </section>
+
+        <section id="beta" class="section-shell beta-section">
+            <div class="section-heading">
+                <p class="eyebrow">Beta</p>
+                <h2>Help shape the future of AI grocery shopping.</h2>
+                <p>Looking for early testers who cook from online recipes, shop at common grocery stores, and want faster planning.</p>
+            </div>
+            <form class="beta-form" action="mailto:ntylerbert@gmail.com" method="post" enctype="text/plain">
+                <label>Name<input name="name" type="text" placeholder="Your name"></label>
+                <label>Email<input name="email" type="email" placeholder="you@example.com"></label>
+                <label>Favorite grocery stores<input name="stores" type="text" placeholder="ALDI, Kroger, Meijer..."></label>
+                <label>Biggest grocery-planning frustration<textarea name="frustration" rows="4" placeholder="Tell me what slows you down."></textarea></label>
+                <button class="button primary" type="submit">Join the Beta</button>
+            </form>
+        </section>
+    </main>
+</body>
+</html>
