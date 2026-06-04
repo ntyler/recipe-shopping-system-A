@@ -224,6 +224,15 @@ function reloadAccountSection() {
     window.location.reload();
 }
 
+function hasAccountActionToken() {
+    const params = new URLSearchParams(window.location.search);
+    return Boolean(
+        params.get("two_factor_recovery_token")
+        || params.get("reset_token")
+        || params.get("account_delete_token")
+    );
+}
+
 function handleFirebaseBackendLogin(result, form, successMessage) {
     if (result && result.requires_2fa) {
         setStatus(form, "Enter your authenticator code to finish signing in.", "success");
@@ -856,6 +865,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 if (auth) {
     onAuthStateChanged(auth, async (firebaseUser) => {
         if (explicitAuthInProgress) {
+            return;
+        }
+
+        if (hasAccountActionToken()) {
             return;
         }
 

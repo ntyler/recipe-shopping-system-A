@@ -170,7 +170,7 @@ def send_two_factor_recovery_email(user, recovery_url):
             "Use this one-time link to recover two-factor access:",
             recovery_url,
             "",
-            "This link expires in 30 minutes and still requires your current password.",
+            "This link expires in 30 minutes. Local accounts must also enter the current password.",
             "If you did not request this recovery, change your password and ignore this email.",
         ])
     )

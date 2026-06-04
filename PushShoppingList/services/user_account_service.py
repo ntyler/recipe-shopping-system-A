@@ -1211,8 +1211,7 @@ def recover_two_factor_with_token(token, password):
     user.pop("two_factor_recovery", None)
     user["updated_at"] = now_iso()
     save_users(payload)
-    session.pop("user_id", None)
-    session.pop("pending_2fa_user_id", None)
+    sign_out_user()
     return {"ok": True, "user": public_user(user)}
 
 

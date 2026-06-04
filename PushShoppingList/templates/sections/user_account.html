@@ -83,7 +83,7 @@
                 </div>
             {% endif %}
             <p class="user-account-form-note">
-                This will disable two-factor authentication after verification. Local accounts must also enter the current password.
+                This recovery link only affects the account shown above. Local accounts must also enter the current password.
             </p>
             <input type="hidden" name="two_factor_recovery_token" value="{{ two_factor_recovery_token }}">
             {% if two_factor_recovery_user|default(none) and two_factor_recovery_user.auth_provider != "firebase" %}
@@ -92,7 +92,15 @@
                     <input type="password" name="password" required autocomplete="current-password">
                 </label>
             {% endif %}
-            <button type="submit" class="danger">Disable Two-Factor Authentication</button>
+            <button type="submit"
+                    class="danger"
+                    {% if not two_factor_recovery_user|default(none) %}disabled{% endif %}>
+                {% if two_factor_recovery_user|default(none) %}
+                    Disable Two-Factor Authentication for {{ two_factor_recovery_user.email }}
+                {% else %}
+                    Recovery Link Invalid
+                {% endif %}
+            </button>
         </form>
     {% endif %}
 
