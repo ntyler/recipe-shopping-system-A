@@ -32,6 +32,9 @@ def test_shared_recipe_pdf_section_is_wired_into_main_page():
     assert ".pdf-cloudflare-url" in css
     assert "Upload to Cloudflare" in read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     assert "Copy PDF Link" in read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    assert "recipeEditLocalPdfDownloadButton" in read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    assert "Download Local PDF" in read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    assert "{% if current_user and current_user.is_admin %}" in read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     assert "R2_PUBLIC_BASE_URL" in read_text("PushShoppingList/services/cloudflare_r2_storage.py")
     assert "function createPdfShareLink" in js
     assert "function copyPdfShareLink" in js
@@ -40,6 +43,7 @@ def test_shared_recipe_pdf_section_is_wired_into_main_page():
     assert "function copyPdfCloudflareLink" in js
     assert "function uploadRecipeEditorPdfToCloudflare" in js
     assert "function copyRecipeEditorPdfLink" in js
+    assert "recipeArchivePdfDownloadUrl" in js
 
 
 def test_recipe_entry_divider_and_ai_pantry_centering_are_wired():

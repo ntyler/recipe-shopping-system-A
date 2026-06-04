@@ -3,6 +3,7 @@ import json
 from flask import Blueprint
 from flask import abort
 from flask import flash
+from flask import Response
 from flask import jsonify
 from flask import redirect
 from flask import request
@@ -58,6 +59,7 @@ from PushShoppingList.services.recipe_quantity_service import update_recipe_ingr
 from PushShoppingList.services.recipe_quantity_service import update_recipe_quantity
 from PushShoppingList.services.shopping_list_service import add_items
 from PushShoppingList.services.user_account_service import current_user
+from PushShoppingList.services.user_account_service import is_admin_user
 
 recipe_bp = Blueprint("recipe_bp", __name__)
 
@@ -546,9 +548,15 @@ def api_upload_recipe_pdf_to_cloudflare_route():
 @recipe_bp.route("/recipe_archive_pdf", methods=["GET"])
 def recipe_archive_pdf_route():
     url = str(request.args.get("url", "") or "").strip()
+    wants_download = str(request.args.get("download", "") or "").strip().lower() in {"1", "true", "yes"}
 
     if not url:
         abort(404)
+
+    if wants_download:
+        user = current_user()
+        if not is_admin_user(user):
+            return Response("Admin access is required to download local recipe PDFs.", status=403)
 
     pdf_path = recipe_archive_pdf_path(url)
 
@@ -558,7 +566,7 @@ def recipe_archive_pdf_route():
     return send_file(
         pdf_path,
         mimetype="application/pdf",
-        as_attachment=False,
+        as_attachment=wants_download,
         download_name=pdf_path.name,
     )
 

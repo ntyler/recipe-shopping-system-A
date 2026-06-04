@@ -2,6 +2,7 @@ from urllib.parse import urlparse
 
 from app import app
 from PushShoppingList.routes import pdf_routes
+from PushShoppingList.routes import recipe_routes
 from PushShoppingList.services import pdf_share_service
 
 
@@ -118,3 +119,32 @@ def test_pdf_cloudflare_upload_route_returns_public_url(monkeypatch, tmp_path):
     assert data["success"] is True
     assert data["pdf_public_url"] == "https://public.example.com/recipe-pdfs/route-sample.pdf"
     assert data["pdf_object_key"] == "recipe-pdfs/route-sample.pdf"
+
+
+def test_local_recipe_pdf_download_requires_admin(monkeypatch, tmp_path):
+    pdf_path = tmp_path / "local-recipe.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n")
+    monkeypatch.setattr(recipe_routes, "recipe_archive_pdf_path", lambda url: pdf_path)
+    monkeypatch.setattr(recipe_routes, "current_user", lambda: {"email": "cook@example.com"})
+    monkeypatch.setattr(recipe_routes, "is_admin_user", lambda user: False)
+
+    with app.test_client() as client:
+        response = client.get("/recipe_archive_pdf?url=manual%3A%2F%2Frecipe%2Ftest&download=1")
+
+    assert response.status_code == 403
+
+
+def test_admin_can_download_local_recipe_pdf(monkeypatch, tmp_path):
+    pdf_path = tmp_path / "local-recipe.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n")
+    monkeypatch.setattr(recipe_routes, "recipe_archive_pdf_path", lambda url: pdf_path)
+    monkeypatch.setattr(recipe_routes, "current_user", lambda: {"email": "admin@example.com"})
+    monkeypatch.setattr(recipe_routes, "is_admin_user", lambda user: True)
+
+    with app.test_client() as client:
+        response = client.get("/recipe_archive_pdf?url=manual%3A%2F%2Frecipe%2Ftest&download=1")
+
+    assert response.status_code == 200
+    assert response.mimetype == "application/pdf"
+    assert response.headers["Content-Disposition"].startswith("attachment;")
+    assert response.data.startswith(b"%PDF")

@@ -6984,6 +6984,7 @@ function updateRecipeEditorPdfControls(recipe) {
     const pdfButton = document.getElementById("recipeEditPdfButton");
     const pdfPanelButton = document.getElementById("recipeEditPdfButtonPanel");
     const pdfMenuButton = document.getElementById("recipeEditPdfMenuButton");
+    const localPdfDownloadButton = document.getElementById("recipeEditLocalPdfDownloadButton");
     const deletePdfButton = document.getElementById("recipeEditDeletePdfButton");
     const copyPdfLinkButton = document.getElementById("recipeEditCopyPdfLinkButton");
     const uploadPdfButton = document.getElementById("recipeEditUploadPdfButton");
@@ -7018,6 +7019,11 @@ function updateRecipeEditorPdfControls(recipe) {
         deletePdfButton.hidden = !hasLocalPdf && !pdfPublicUrl;
     }
 
+    if (localPdfDownloadButton) {
+        localPdfDownloadButton.hidden = !hasLocalPdf;
+        localPdfDownloadButton.href = hasLocalPdf ? recipeArchivePdfDownloadUrl(sourceUrl) : "#";
+    }
+
     if (copyPdfLinkButton) {
         copyPdfLinkButton.hidden = !pdfPublicUrl;
         copyPdfLinkButton.dataset.pdfPublicUrl = pdfPublicUrl;
@@ -7030,6 +7036,10 @@ function updateRecipeEditorPdfControls(recipe) {
 
 function recipeArchivePdfUrl(sourceUrl) {
     return `/recipe_archive_pdf?url=${encodeURIComponent(sourceUrl || "")}`;
+}
+
+function recipeArchivePdfDownloadUrl(sourceUrl) {
+    return `/recipe_archive_pdf?url=${encodeURIComponent(sourceUrl || "")}&download=1`;
 }
 
 function openRecipeEditorPdf(link, event) {

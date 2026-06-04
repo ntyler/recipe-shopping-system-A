@@ -534,6 +534,15 @@
                                    hidden>
                                     Open PDF
                                 </a>
+                                {% if current_user and current_user.is_admin %}
+                                    <a id="recipeEditLocalPdfDownloadButton"
+                                       class="recipe-edit-menu-link"
+                                       href="#"
+                                       download
+                                       hidden>
+                                        Download Local PDF
+                                    </a>
+                                {% endif %}
                                 <button type="button"
                                         id="recipeEditCopyPdfLinkButton"
                                         class="recipe-edit-copy-pdf-link-button"
