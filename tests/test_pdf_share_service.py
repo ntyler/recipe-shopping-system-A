@@ -86,6 +86,39 @@ def test_corrupt_pdf_share_metadata_recovers(monkeypatch, tmp_path):
     assert pdf_share_service.load_share_links() == {"links": []}
 
 
+def test_list_available_pdfs_includes_cloudflare_only_rows(monkeypatch, tmp_path):
+    pdf_dir, _metadata_file = configure_pdf_share_paths(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        pdf_share_service,
+        "cloudflare_pdf_metadata_rows",
+        lambda: [{
+            "pdf_filename": "uploaded.pdf",
+            "source_url": "manual://recipe/test",
+            "object_key": "recipe-pdfs/uploaded.pdf",
+            "public_url": "https://public.example.com/recipe-pdfs/uploaded.pdf",
+            "uploaded_at": "2026-06-04T12:00:00Z",
+        }],
+    )
+
+    rows = pdf_share_service.list_available_pdfs()
+
+    assert pdf_dir.exists()
+    assert rows == [{
+        "pdf_filename": "uploaded.pdf",
+        "original_filename": "uploaded.pdf",
+        "size": 0,
+        "size_label": "Cloudflare R2",
+        "modified_at": "2026-06-04T12:00:00Z",
+        "modified_label": "2026-06-04T12:00:00Z",
+        "active_share": None,
+        "local_available": False,
+        "recipe_url": "manual://recipe/test",
+        "r2_object_key": "recipe-pdfs/uploaded.pdf",
+        "r2_public_url": "https://public.example.com/recipe-pdfs/uploaded.pdf",
+        "r2_uploaded_at": "2026-06-04T12:00:00Z",
+    }]
+
+
 def test_share_record_without_valid_expiration_is_not_active():
     assert pdf_share_service.is_share_expired({"expires_at": ""}) is True
     assert pdf_share_service.is_share_active({"token": "abc", "expires_at": ""}) is False

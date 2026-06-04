@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 
 import requests
 
+from PushShoppingList.services import cloudflare_r2_storage
 from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.cookbook_service import ensure_unclassified_cookbook_for_recipes
 from PushShoppingList.services.cookbook_service import recipe_cookbook_assignments
@@ -167,7 +168,7 @@ def load_editable_recipe(url):
     recipe_data = load_recipe_output(url) or {"source_url": url}
     meta = load_recipe_ingredients().get(normalize_recipe_url_key(url), {})
     cookbook_assignment = recipe_cookbook_assignments().get(normalize_recipe_url_key(url), {})
-    pdf = editable_recipe_pdf_info(url)
+    pdf = editable_recipe_pdf_info(url, recipe_data)
     scaling = normalize_recipe_scaling_metadata(recipe_data.get("scaling"))
     if recipe_data.get("servings") and not scaling.get("base_servings"):
         scaling["base_servings"] = str(recipe_data.get("servings") or "").strip()
@@ -205,6 +206,10 @@ def load_editable_recipe(url):
             "chatgpt_feedback_created_at": str(recipe_data.get("chatgpt_feedback_created_at") or "").strip(),
             "pdf_path": pdf["path"],
             "pdf_available": pdf["available"],
+            "pdf_local_available": pdf["local_available"],
+            "pdf_public_url": pdf["public_url"],
+            "pdf_object_key": pdf["object_key"],
+            "pdf_uploaded_at": pdf["uploaded_at"],
         },
         "food_rules": load_food_rules(),
         "store_sections": list(STORE_SECTION_ORDER.keys()),
@@ -249,12 +254,18 @@ def editable_recipe_cover_image(url, recipe_data, recipe_meta=None):
     }
 
 
-def editable_recipe_pdf_info(url):
+def editable_recipe_pdf_info(url, recipe_data=None):
     pdf_path = recipe_archive_pdf_path(url)
+    metadata = normalize_recipe_pdf_storage_metadata(recipe_data or load_recipe_output(url) or {})
+    public_url = metadata.get("public_url", "")
 
     return {
         "path": str(pdf_path),
-        "available": pdf_path.exists(),
+        "available": pdf_path.exists() or bool(public_url),
+        "local_available": pdf_path.exists(),
+        "public_url": public_url,
+        "object_key": metadata.get("object_key", ""),
+        "uploaded_at": metadata.get("uploaded_at", ""),
     }
 
 
@@ -263,6 +274,276 @@ def editable_recipe_source_display_url(url):
         return str(recipe_archive_pdf_path(url))
 
     return url
+
+
+def utc_iso_now():
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def normalize_recipe_pdf_storage_metadata(recipe_data):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    pdf_metadata = recipe_data.get("pdf") if isinstance(recipe_data.get("pdf"), dict) else {}
+    r2_metadata = pdf_metadata.get("cloudflare_r2") if isinstance(pdf_metadata.get("cloudflare_r2"), dict) else {}
+
+    return {
+        "local_path": str(pdf_metadata.get("local_path") or "").strip(),
+        "object_key": str(r2_metadata.get("object_key") or "").strip(),
+        "public_url": str(r2_metadata.get("public_url") or "").strip(),
+        "uploaded_at": str(r2_metadata.get("uploaded_at") or "").strip(),
+        "bucket": str(r2_metadata.get("bucket") or "").strip(),
+    }
+
+
+def save_recipe_pdf_storage_metadata(url, upload_result, local_pdf_path=None):
+    url = str(url or "").strip()
+    upload_result = upload_result if isinstance(upload_result, dict) else {}
+
+    if not url:
+        return {
+            "ok": False,
+            "error": "Recipe URL is required.",
+        }
+
+    recipe_data = load_recipe_output(url)
+    if not recipe_data:
+        return {
+            "ok": False,
+            "error": "Recipe data was not found.",
+        }
+
+    object_key = str(upload_result.get("object_key") or "").strip()
+    public_url = str(upload_result.get("public_url") or "").strip()
+
+    if not object_key or not public_url:
+        return {
+            "ok": False,
+            "error": "Cloudflare R2 upload metadata is incomplete.",
+        }
+
+    pdf_metadata = recipe_data.get("pdf") if isinstance(recipe_data.get("pdf"), dict) else {}
+    pdf_metadata["local_path"] = str(local_pdf_path or recipe_archive_pdf_path(url))
+    pdf_metadata["cloudflare_r2"] = {
+        "provider": "cloudflare_r2",
+        "bucket": str(upload_result.get("bucket") or os.getenv("R2_BUCKET_NAME", "")).strip(),
+        "object_key": object_key,
+        "public_url": public_url,
+        "uploaded_at": utc_iso_now(),
+    }
+    recipe_data["pdf"] = pdf_metadata
+    save_recipe_output(url, recipe_data)
+
+    return {
+        "ok": True,
+        "metadata": normalize_recipe_pdf_storage_metadata(recipe_data),
+    }
+
+
+def recipe_url_for_pdf_filename(pdf_filename):
+    filename = Path(str(pdf_filename or "")).name
+
+    if not filename or Path(filename).suffix.lower() != ".pdf":
+        return ""
+
+    for json_path in OUTPUT_FOLDER.glob("*.json"):
+        if json_path.name == "sorted_ingredients.json":
+            continue
+
+        try:
+            data = json.loads(json_path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+
+        source_url = str(data.get("source_url") or "").strip()
+        if source_url and recipe_archive_pdf_path(source_url).name == filename:
+            return source_url
+
+    return ""
+
+
+def recipe_pdf_storage_metadata_for_filename(pdf_filename):
+    filename = Path(str(pdf_filename or "")).name
+    source_url = recipe_url_for_pdf_filename(filename)
+
+    if not source_url:
+        return {}
+
+    recipe_data = load_recipe_output(source_url) or {}
+    metadata = normalize_recipe_pdf_storage_metadata(recipe_data)
+
+    if not metadata.get("public_url"):
+        return {}
+
+    return {
+        **metadata,
+        "source_url": source_url,
+        "pdf_filename": filename,
+    }
+
+
+def list_recipe_pdf_storage_metadata():
+    rows = []
+
+    for json_path in OUTPUT_FOLDER.glob("*.json"):
+        if json_path.name == "sorted_ingredients.json":
+            continue
+
+        try:
+            recipe_data = json.loads(json_path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+
+        source_url = str(recipe_data.get("source_url") or "").strip()
+        metadata = normalize_recipe_pdf_storage_metadata(recipe_data)
+        public_url = metadata.get("public_url", "")
+        object_key = metadata.get("object_key", "")
+
+        if not source_url or not public_url:
+            continue
+
+        filename = (
+            Path(metadata.get("local_path") or "").name
+            or Path(object_key).name
+            or recipe_archive_pdf_path(source_url).name
+        )
+        rows.append({
+            **metadata,
+            "source_url": source_url,
+            "pdf_filename": filename,
+            "recipe_title": recipe_data.get("recipe_title") or "",
+        })
+
+    return rows
+
+
+def cloudflare_upload_success(upload_result):
+    return bool(upload_result and (upload_result.get("ok") or upload_result.get("code") == "duplicate_object"))
+
+
+def delete_uploaded_local_pdf_if_configured(pdf_path):
+    path = Path(pdf_path)
+
+    if not cloudflare_r2_storage.delete_local_pdf_after_upload():
+        return False, ""
+
+    try:
+        path.unlink(missing_ok=True)
+        return True, ""
+    except PermissionError:
+        return False, "PDF uploaded to Cloudflare R2, but the local file is open and could not be deleted."
+    except OSError as exc:
+        return False, f"PDF uploaded to Cloudflare R2, but the local file could not be deleted: {exc}"
+
+
+def upload_local_pdf_path_to_cloudflare(local_pdf_path, url=""):
+    path = Path(local_pdf_path)
+    upload_result = cloudflare_r2_storage.upload_pdf(path)
+
+    if not cloudflare_upload_success(upload_result):
+        return {
+            "ok": False,
+            "success": False,
+            "url": str(url or ""),
+            "pdf_path": str(path),
+            "pdf_available": path.exists(),
+            "pdf_local_available": path.exists(),
+            "cloudflare_upload": upload_result,
+            "error": upload_result.get("error", "Unable to upload PDF to Cloudflare R2."),
+        }
+
+    if str(url or "").strip():
+        save_recipe_pdf_storage_metadata(url, upload_result, path)
+
+    deleted_local_pdf, delete_warning = delete_uploaded_local_pdf_if_configured(path)
+    public_url = str(upload_result.get("public_url") or "").strip()
+    object_key = str(upload_result.get("object_key") or "").strip()
+
+    return {
+        "ok": True,
+        "success": True,
+        "url": str(url or ""),
+        "pdf_path": str(path),
+        "pdf_available": path.exists() or bool(public_url),
+        "pdf_local_available": path.exists(),
+        "pdf_public_url": public_url,
+        "pdf_object_key": object_key,
+        "pdf_uploaded_at": utc_iso_now(),
+        "deleted_local_pdf": deleted_local_pdf,
+        "delete_warning": delete_warning,
+        "already_exists": upload_result.get("code") == "duplicate_object",
+        "cloudflare_upload": upload_result,
+    }
+
+
+def upload_recipe_pdf_to_cloudflare(url):
+    url = str(url or "").strip()
+
+    if not url:
+        return {
+            "ok": False,
+            "success": False,
+            "error": "Recipe URL is required.",
+        }
+
+    pdf_path = recipe_archive_pdf_path(url)
+    recipe_data = load_recipe_output(url) or {}
+    existing_metadata = normalize_recipe_pdf_storage_metadata(recipe_data)
+
+    if not pdf_path.exists():
+        if existing_metadata.get("public_url"):
+            return {
+                "ok": True,
+                "success": True,
+                "url": url,
+                "pdf_path": str(pdf_path),
+                "pdf_available": True,
+                "pdf_local_available": False,
+                "pdf_public_url": existing_metadata.get("public_url", ""),
+                "pdf_object_key": existing_metadata.get("object_key", ""),
+                "pdf_uploaded_at": existing_metadata.get("uploaded_at", ""),
+                "already_exists": True,
+                "cloudflare_upload": {
+                    "ok": True,
+                    "object_key": existing_metadata.get("object_key", ""),
+                    "public_url": existing_metadata.get("public_url", ""),
+                },
+            }
+
+        return {
+            "ok": False,
+            "success": False,
+            "url": url,
+            "pdf_path": str(pdf_path),
+            "pdf_available": False,
+            "pdf_local_available": False,
+            "error": "Create the recipe PDF before uploading it to Cloudflare R2.",
+        }
+
+    return upload_local_pdf_path_to_cloudflare(pdf_path, url=url)
+
+
+def maybe_upload_generated_recipe_pdf_to_cloudflare(url, pdf_path):
+    if not cloudflare_r2_storage.has_any_r2_config():
+        return None
+
+    return upload_local_pdf_path_to_cloudflare(pdf_path, url=url)
+
+
+def attach_cloudflare_pdf_result(result, upload_result):
+    if not upload_result:
+        return result
+
+    result["cloudflare_upload"] = upload_result.get("cloudflare_upload", upload_result)
+    result["pdf_public_url"] = upload_result.get("pdf_public_url", "")
+    result["pdf_object_key"] = upload_result.get("pdf_object_key", "")
+    result["pdf_uploaded_at"] = upload_result.get("pdf_uploaded_at", "")
+    result["pdf_local_available"] = upload_result.get("pdf_local_available", result.get("pdf_local_available", False))
+    result["pdf_available"] = upload_result.get("pdf_available", result.get("pdf_available", False))
+    result["deleted_local_pdf"] = upload_result.get("deleted_local_pdf", False)
+
+    if upload_result.get("delete_warning"):
+        result["delete_warning"] = upload_result["delete_warning"]
+
+    return result
 
 
 def recipe_information_fields(recipe_data, url=""):
@@ -339,13 +620,16 @@ def create_editable_recipe_pdf(url):
     )
     pdf_path = recipe_archive_pdf_path(url)
     saved_path = write_recipe_page_pdf(url, html_text, None, pdf_path)
-
-    return {
+    upload_result = maybe_upload_generated_recipe_pdf_to_cloudflare(url, saved_path)
+    result = {
         "ok": True,
         "url": url,
         "pdf_path": str(saved_path),
         "pdf_available": True,
+        "pdf_local_available": Path(saved_path).exists(),
     }
+
+    return attach_cloudflare_pdf_result(result, upload_result)
 
 
 def create_source_url_pdf(url):
@@ -367,14 +651,17 @@ def create_source_url_pdf(url):
         }
 
     pdf_path = recipe_archive_pdf_path(url)
-
-    return {
-        "ok": pdf_path.exists(),
+    upload_result = maybe_upload_generated_recipe_pdf_to_cloudflare(url, pdf_path) if pdf_path.exists() else None
+    result = {
+        "ok": pdf_path.exists() or bool(upload_result and upload_result.get("pdf_public_url")),
         "url": url,
         "pdf_path": str(pdf_path),
-        "pdf_available": pdf_path.exists(),
-        "error": None if pdf_path.exists() else "PDF file was not created.",
+        "pdf_available": pdf_path.exists() or bool(upload_result and upload_result.get("pdf_public_url")),
+        "pdf_local_available": pdf_path.exists(),
+        "error": None if pdf_path.exists() or bool(upload_result and upload_result.get("pdf_public_url")) else "PDF file was not created.",
     }
+
+    return attach_cloudflare_pdf_result(result, upload_result)
 
 
 def is_web_source_url(url):

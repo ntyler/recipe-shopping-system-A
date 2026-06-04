@@ -5493,6 +5493,114 @@ function updatePdfShareRow(row, data) {
     }
 }
 
+function updatePdfCloudflareRow(row, data) {
+    const publicUrl = data.pdf_public_url || data.public_url || "";
+    const openLink = row ? row.querySelector("[data-pdf-open-link]") : null;
+    const panel = row ? row.querySelector(".pdf-cloudflare-active") : null;
+    const input = row ? row.querySelector(".pdf-cloudflare-url") : null;
+
+    if (!row || !publicUrl) {
+        return;
+    }
+
+    row.dataset.pdfPublicUrl = publicUrl;
+
+    if (openLink) {
+        openLink.href = publicUrl;
+    }
+
+    if (input) {
+        input.value = publicUrl;
+    }
+
+    if (panel) {
+        panel.hidden = false;
+    }
+}
+
+async function uploadPdfToCloudflare(button) {
+    const row = pdfShareRowForButton(button);
+    const pdfFilename = row ? row.dataset.pdfFilename : "";
+
+    if (!row || !pdfFilename) {
+        return false;
+    }
+
+    const originalText = button ? button.textContent : "";
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Uploading...";
+    }
+
+    try {
+        const response = await fetch("/pdfs/cloudflare_upload", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "fetch",
+            },
+            body: JSON.stringify({ pdf_filename: pdfFilename }),
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || "Unable to upload PDF to Cloudflare.");
+        }
+
+        updatePdfCloudflareRow(row, data);
+        setPdfShareStatus(
+            row,
+            data.already_exists
+                ? "Cloudflare PDF link saved."
+                : "Uploaded to Cloudflare."
+        );
+    } catch (err) {
+        console.warn("Unable to upload PDF to Cloudflare.", err);
+        setPdfShareStatus(row, err.message || "Unable to upload PDF to Cloudflare.", true);
+    } finally {
+        if (button && button.isConnected) {
+            button.disabled = false;
+            button.textContent = originalText || "Upload to Cloudflare";
+        }
+    }
+
+    return false;
+}
+
+async function copyPdfCloudflareLink(button) {
+    const row = pdfShareRowForButton(button);
+    const input = row ? row.querySelector(".pdf-cloudflare-url") : null;
+    const publicUrl = (
+        (row && row.dataset.pdfPublicUrl ? row.dataset.pdfPublicUrl : "")
+        || (input ? input.value.trim() : "")
+    );
+
+    if (!publicUrl) {
+        setPdfShareStatus(row, "Upload to Cloudflare first.", true);
+        return false;
+    }
+
+    try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(publicUrl);
+        } else if (input) {
+            input.select();
+            document.execCommand("copy");
+        }
+
+        setPdfShareStatus(row, "PDF link copied.");
+    } catch (err) {
+        console.warn("Unable to copy Cloudflare PDF link.", err);
+        if (input) {
+            input.select();
+        }
+        setPdfShareStatus(row, "PDF link selected. Use Ctrl+C to copy.", true);
+    }
+
+    return false;
+}
+
 async function createPdfShareLink(button) {
     const row = pdfShareRowForButton(button);
     const pdfFilename = row ? row.dataset.pdfFilename : "";
@@ -6871,17 +6979,31 @@ function setRecipeEditorCookbook(recipe, fallbackUrl = "") {
 
 function updateRecipeEditorPdfControls(recipe) {
     const pdfPathInput = document.getElementById("recipeEditPdfPath");
+    const pdfPublicUrlField = document.getElementById("recipeEditPdfPublicUrlField");
+    const pdfPublicUrlInput = document.getElementById("recipeEditPdfPublicUrl");
     const pdfButton = document.getElementById("recipeEditPdfButton");
     const pdfPanelButton = document.getElementById("recipeEditPdfButtonPanel");
     const pdfMenuButton = document.getElementById("recipeEditPdfMenuButton");
     const deletePdfButton = document.getElementById("recipeEditDeletePdfButton");
+    const copyPdfLinkButton = document.getElementById("recipeEditCopyPdfLinkButton");
+    const uploadPdfButton = document.getElementById("recipeEditUploadPdfButton");
     const sourceUrl = recipe && recipe.source_url ? recipe.source_url : "";
     const pdfPath = recipe && recipe.pdf_path ? recipe.pdf_path : "";
-    const hasPdf = Boolean(recipe && recipe.pdf_available && sourceUrl);
-    const archiveUrl = hasPdf ? recipeArchivePdfUrl(sourceUrl) : "#";
+    const pdfPublicUrl = recipe && recipe.pdf_public_url ? recipe.pdf_public_url : "";
+    const hasLocalPdf = Boolean(recipe && (recipe.pdf_local_available || (recipe.pdf_available && !pdfPublicUrl)) && sourceUrl);
+    const hasPdf = Boolean(recipe && sourceUrl && (pdfPublicUrl || recipe.pdf_available || hasLocalPdf));
+    const archiveUrl = hasPdf ? (pdfPublicUrl || recipeArchivePdfUrl(sourceUrl)) : "#";
 
     if (pdfPathInput) {
         pdfPathInput.value = pdfPath;
+    }
+
+    if (pdfPublicUrlInput) {
+        pdfPublicUrlInput.value = pdfPublicUrl;
+    }
+
+    if (pdfPublicUrlField) {
+        pdfPublicUrlField.hidden = !pdfPublicUrl;
     }
 
     [pdfButton, pdfPanelButton, pdfMenuButton].forEach((button) => {
@@ -6893,7 +7015,16 @@ function updateRecipeEditorPdfControls(recipe) {
     });
 
     if (deletePdfButton) {
-        deletePdfButton.hidden = !hasPdf;
+        deletePdfButton.hidden = !hasLocalPdf && !pdfPublicUrl;
+    }
+
+    if (copyPdfLinkButton) {
+        copyPdfLinkButton.hidden = !pdfPublicUrl;
+        copyPdfLinkButton.dataset.pdfPublicUrl = pdfPublicUrl;
+    }
+
+    if (uploadPdfButton) {
+        uploadPdfButton.hidden = !sourceUrl || !hasLocalPdf || Boolean(pdfPublicUrl);
     }
 }
 
@@ -10239,6 +10370,10 @@ async function saveRecipeEditor(event) {
                 source_url: pdfData.url || sourceUrl,
                 pdf_path: pdfData.pdf_path || "",
                 pdf_available: true,
+                pdf_local_available: Boolean(pdfData.pdf_local_available),
+                pdf_public_url: pdfData.pdf_public_url || "",
+                pdf_object_key: pdfData.pdf_object_key || "",
+                pdf_uploaded_at: pdfData.pdf_uploaded_at || "",
             };
             updateRecipeSaveProgressItem(pdfProgressIndex, "done", "Created");
         }
@@ -10341,6 +10476,10 @@ async function createRecipeEditorPdf(button) {
             source_url: pdfData.url || sourceUrl,
             pdf_path: pdfData.pdf_path || "",
             pdf_available: true,
+            pdf_local_available: Boolean(pdfData.pdf_local_available),
+            pdf_public_url: pdfData.pdf_public_url || "",
+            pdf_object_key: pdfData.pdf_object_key || "",
+            pdf_uploaded_at: pdfData.pdf_uploaded_at || "",
         });
         setRecipeEditStatus("PDF created.");
         showRecipeQuantityUpdatedMessage("", "", "", "Recipe PDF created.");
@@ -10406,6 +10545,98 @@ async function createRecipePdfFromSavedRecipe(sourceUrl) {
     }
 
     return pdfData;
+}
+
+async function uploadRecipeEditorPdfToCloudflare(button) {
+    const originalText = button ? button.textContent : "";
+    const sourceInput = document.getElementById("recipeEditSourceUrl");
+    const originalInput = document.getElementById("recipeEditOriginalUrl");
+    const sourceUrl = (
+        (sourceInput ? sourceInput.value.trim() : "")
+        || (originalInput ? originalInput.value.trim() : "")
+        || ""
+    );
+
+    if (!sourceUrl) {
+        setRecipeEditStatus("Recipe URL is required before uploading the PDF.", true);
+        return false;
+    }
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Uploading...";
+    }
+
+    try {
+        setRecipeEditStatus("Uploading PDF to Cloudflare...");
+
+        const response = await fetch("/api/recipe_pdf/cloudflare_upload", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ url: sourceUrl }),
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to upload PDF to Cloudflare.");
+        }
+
+        updateRecipeEditorPdfControls({
+            source_url: data.url || sourceUrl,
+            pdf_path: data.pdf_path || "",
+            pdf_available: data.pdf_available !== false,
+            pdf_local_available: Boolean(data.pdf_local_available),
+            pdf_public_url: data.pdf_public_url || "",
+            pdf_object_key: data.pdf_object_key || "",
+            pdf_uploaded_at: data.pdf_uploaded_at || "",
+        });
+        setRecipeEditStatus(data.already_exists ? "Cloudflare PDF link saved." : "PDF uploaded to Cloudflare.");
+        showRecipeQuantityUpdatedMessage("", "", "", data.already_exists ? "Cloudflare PDF link saved." : "PDF uploaded to Cloudflare.");
+    } catch (err) {
+        console.warn("Unable to upload recipe PDF to Cloudflare.", err);
+        setRecipeEditStatus(err.message || "Unable to upload PDF to Cloudflare.", true);
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = originalText || "Upload to Cloudflare";
+        }
+    }
+
+    return false;
+}
+
+async function copyRecipeEditorPdfLink(button) {
+    const publicUrlInput = document.getElementById("recipeEditPdfPublicUrl");
+    const publicUrl = (
+        (button && button.dataset.pdfPublicUrl ? button.dataset.pdfPublicUrl : "")
+        || (publicUrlInput ? publicUrlInput.value.trim() : "")
+    );
+
+    if (!publicUrl) {
+        setRecipeEditStatus("Upload to Cloudflare first.", true);
+        return false;
+    }
+
+    try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(publicUrl);
+        } else if (publicUrlInput) {
+            publicUrlInput.select();
+            document.execCommand("copy");
+        }
+
+        setRecipeEditStatus("PDF link copied.");
+    } catch (err) {
+        console.warn("Unable to copy recipe PDF link.", err);
+        if (publicUrlInput) {
+            publicUrlInput.select();
+        }
+        setRecipeEditStatus("PDF link selected. Use Ctrl+C to copy.", true);
+    }
+
+    return false;
 }
 
 async function deleteRecipeEditorPdf(button) {

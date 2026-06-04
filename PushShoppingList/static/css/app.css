@@ -441,7 +441,8 @@ body {
             cursor: wait;
         }
 
-        .pdf-share-active {
+        .pdf-share-active,
+        .pdf-cloudflare-active {
             grid-column: 1 / -1;
             display: grid;
             grid-template-columns: minmax(0, 1fr) auto auto;
@@ -449,11 +450,13 @@ body {
             align-items: center;
         }
 
-        .pdf-share-active[hidden] {
+        .pdf-share-active[hidden],
+        .pdf-cloudflare-active[hidden] {
             display: none;
         }
 
-        .pdf-share-url {
+        .pdf-share-url,
+        .pdf-cloudflare-url {
             width: 100%;
             min-width: 0;
             height: 32px;
@@ -496,7 +499,8 @@ body {
 
         @media (max-width: 650px) {
             .pdf-share-row,
-            .pdf-share-active {
+            .pdf-share-active,
+            .pdf-cloudflare-active {
                 grid-template-columns: 1fr;
             }
 

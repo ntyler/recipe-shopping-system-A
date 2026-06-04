@@ -20,22 +20,45 @@
                         <article class="pdf-share-row"
                                  data-pdf-share-row
                                  data-pdf-filename="{{ pdf.pdf_filename }}"
-                                 data-pdf-share-token="{{ active_share.token if active_share else '' }}">
+                                 data-pdf-share-token="{{ active_share.token if active_share else '' }}"
+                                 data-pdf-public-url="{{ pdf.r2_public_url or '' }}"
+                                 data-pdf-recipe-url="{{ pdf.recipe_url or '' }}">
                             <div class="pdf-share-main">
                                 <h3>{{ pdf.original_filename or pdf.pdf_filename }}</h3>
                                 <div class="pdf-share-meta">
                                     <span>{{ pdf.size_label }}</span>
                                     <span>{{ pdf.modified_label }}</span>
+                                    {% if pdf.r2_public_url %}
+                                        <span>Cloudflare R2</span>
+                                    {% endif %}
                                 </div>
                             </div>
                             <div class="pdf-share-actions">
                                 <a class="pdf-share-action-link"
                                    href="{{ pdf.view_url }}"
                                    target="_blank"
-                                   rel="noopener noreferrer">View PDF</a>
+                                   rel="noopener noreferrer"
+                                   data-pdf-open-link>Open PDF</a>
                                 <button type="button"
-                                        class="pdf-share-action-btn"
-                                        onclick="return createPdfShareLink(this)">Create Share Link</button>
+                                        class="pdf-share-action-btn secondary"
+                                        onclick="return copyPdfCloudflareLink(this)">Copy PDF Link</button>
+                                {% if pdf.local_available %}
+                                    <button type="button"
+                                            class="pdf-share-action-btn"
+                                            onclick="return uploadPdfToCloudflare(this)">Upload to Cloudflare</button>
+                                {% endif %}
+                                {% if pdf.local_available %}
+                                    <button type="button"
+                                            class="pdf-share-action-btn"
+                                            onclick="return createPdfShareLink(this)">Create Share Link</button>
+                                {% endif %}
+                            </div>
+                            <div class="pdf-cloudflare-active" {% if not pdf.r2_public_url %}hidden{% endif %}>
+                                <input class="pdf-cloudflare-url"
+                                       type="text"
+                                       value="{{ pdf.r2_public_url or '' }}"
+                                       readonly
+                                       aria-label="Cloudflare PDF URL for {{ pdf.original_filename or pdf.pdf_filename }}">
                             </div>
                             <div class="pdf-share-active" {% if not active_share %}hidden{% endif %}>
                                 <input class="pdf-share-url"

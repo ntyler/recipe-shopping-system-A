@@ -42,6 +42,7 @@ from PushShoppingList.services.recipe_edit_service import save_editable_recipe
 from PushShoppingList.services.recipe_edit_service import save_recipe_cover_image_upload
 from PushShoppingList.services.recipe_edit_service import save_recipe_detail_image_upload
 from PushShoppingList.services.recipe_edit_service import create_source_url_pdf
+from PushShoppingList.services.recipe_edit_service import upload_recipe_pdf_to_cloudflare
 from PushShoppingList.services.recipe_image_progress_service import load_recipe_image_progress
 from PushShoppingList.services.recipe_ingredient_service import remove_recipe_and_unused_ingredients
 from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
@@ -527,6 +528,16 @@ def api_delete_recipe_pdf_route():
     data = request.get_json(silent=True) or {}
     url = str(data.get("url", "") or "").strip()
     result = delete_editable_recipe_pdf(url)
+    status = 200 if result.get("ok") else 400
+
+    return jsonify(result), status
+
+
+@recipe_bp.route("/api/recipe_pdf/cloudflare_upload", methods=["POST"])
+def api_upload_recipe_pdf_to_cloudflare_route():
+    data = request.get_json(silent=True) or {}
+    url = str(data.get("url", "") or "").strip()
+    result = upload_recipe_pdf_to_cloudflare(url)
     status = 200 if result.get("ok") else 400
 
     return jsonify(result), status

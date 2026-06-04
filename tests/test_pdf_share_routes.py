@@ -83,3 +83,38 @@ def test_authenticated_pdf_view_rejects_traversal(monkeypatch, tmp_path):
         response = client.get("/pdfs/view/../route-sample.pdf")
 
     assert response.status_code == 404
+
+
+def test_pdf_cloudflare_upload_route_returns_public_url(monkeypatch, tmp_path):
+    configure_pdf_share_routes(
+        monkeypatch,
+        tmp_path,
+        current_user={
+            "user_id": "user-1",
+            "email": "cook@example.com",
+        },
+    )
+    monkeypatch.setattr(pdf_routes, "recipe_url_for_pdf_filename", lambda filename: "manual://recipe/test")
+    monkeypatch.setattr(
+        pdf_routes,
+        "upload_local_pdf_path_to_cloudflare",
+        lambda pdf_path, url="": {
+            "ok": True,
+            "success": True,
+            "url": url,
+            "pdf_path": str(pdf_path),
+            "pdf_public_url": f"https://public.example.com/recipe-pdfs/{pdf_path.name}",
+            "pdf_object_key": f"recipe-pdfs/{pdf_path.name}",
+            "pdf_available": True,
+            "pdf_local_available": True,
+        },
+    )
+
+    with app.test_client() as client:
+        response = client.post("/pdfs/cloudflare_upload", json={"pdf_filename": "route-sample.pdf"})
+
+    data = response.get_json()
+    assert response.status_code == 200
+    assert data["success"] is True
+    assert data["pdf_public_url"] == "https://public.example.com/recipe-pdfs/route-sample.pdf"
+    assert data["pdf_object_key"] == "recipe-pdfs/route-sample.pdf"

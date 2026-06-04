@@ -167,10 +167,37 @@ def active_share_for_pdf(pdf_filename, payload=None):
     return None
 
 
+def cloudflare_pdf_metadata_rows():
+    try:
+        from PushShoppingList.services.recipe_edit_service import list_recipe_pdf_storage_metadata
+    except Exception:
+        return []
+
+    try:
+        return list_recipe_pdf_storage_metadata()
+    except Exception:
+        return []
+
+
+def cloudflare_pdf_metadata_by_filename():
+    rows = {}
+
+    for row in cloudflare_pdf_metadata_rows():
+        filename = Path(str(row.get("pdf_filename") or "")).name
+        public_url = str(row.get("public_url") or "").strip()
+
+        if filename and public_url:
+            rows[filename] = row
+
+    return rows
+
+
 def list_available_pdfs():
     pdf_dir = pdf_storage_dir()
     payload = load_share_links()
+    r2_metadata = cloudflare_pdf_metadata_by_filename()
     rows = []
+    seen_filenames = set()
 
     for path in sorted(pdf_dir.glob("*.pdf"), key=lambda item: item.name.lower()):
         if not path.is_file():
@@ -179,6 +206,8 @@ def list_available_pdfs():
         stat = path.stat()
         modified = datetime.utcfromtimestamp(stat.st_mtime).replace(microsecond=0)
         active_share = active_share_for_pdf(path.name, payload)
+        r2_row = r2_metadata.get(path.name, {})
+        seen_filenames.add(path.name)
         rows.append({
             "pdf_filename": path.name,
             "original_filename": path.name,
@@ -187,6 +216,31 @@ def list_available_pdfs():
             "modified_at": iso_from_datetime(modified),
             "modified_label": modified.strftime("%Y-%m-%d %H:%M UTC"),
             "active_share": active_share,
+            "local_available": True,
+            "recipe_url": r2_row.get("source_url", ""),
+            "r2_object_key": r2_row.get("object_key", ""),
+            "r2_public_url": r2_row.get("public_url", ""),
+            "r2_uploaded_at": r2_row.get("uploaded_at", ""),
+        })
+
+    for filename, r2_row in sorted(r2_metadata.items(), key=lambda item: item[0].lower()):
+        if filename in seen_filenames:
+            continue
+
+        uploaded_at = str(r2_row.get("uploaded_at") or "").strip()
+        rows.append({
+            "pdf_filename": filename,
+            "original_filename": filename,
+            "size": 0,
+            "size_label": "Cloudflare R2",
+            "modified_at": uploaded_at,
+            "modified_label": uploaded_at or "Uploaded to Cloudflare R2",
+            "active_share": None,
+            "local_available": False,
+            "recipe_url": r2_row.get("source_url", ""),
+            "r2_object_key": r2_row.get("object_key", ""),
+            "r2_public_url": r2_row.get("public_url", ""),
+            "r2_uploaded_at": uploaded_at,
         })
 
     return rows

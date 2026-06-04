@@ -104,7 +104,10 @@ def pdf_share_view_for_render():
 
         rows.append({
             **row,
-            "view_url": url_for("pdf_bp.view_pdf_route", pdf_filename=row["pdf_filename"]),
+            "view_url": (
+                row.get("r2_public_url")
+                or url_for("pdf_bp.view_pdf_route", pdf_filename=row["pdf_filename"])
+            ),
             "active_share": active_share,
         })
 

@@ -17,6 +17,8 @@ from PushShoppingList.services.pdf_share_service import record_share_access
 from PushShoppingList.services.pdf_share_service import resolve_share_token
 from PushShoppingList.services.pdf_share_service import revoke_share_token
 from PushShoppingList.services.pdf_share_service import safe_resolve_pdf_path
+from PushShoppingList.services.recipe_edit_service import recipe_url_for_pdf_filename
+from PushShoppingList.services.recipe_edit_service import upload_local_pdf_path_to_cloudflare
 from PushShoppingList.services.user_account_service import current_public_user
 
 
@@ -63,7 +65,10 @@ def hydrate_pdf_share_view():
 
         rows.append({
             **row,
-            "view_url": url_for("pdf_bp.view_pdf_route", pdf_filename=row["pdf_filename"]),
+            "view_url": (
+                row.get("r2_public_url")
+                or url_for("pdf_bp.view_pdf_route", pdf_filename=row["pdf_filename"])
+            ),
             "active_share": active_share,
         })
 
@@ -160,6 +165,31 @@ def revoke_pdf_share_route():
         "ok": True,
         "success": True,
     })
+
+
+@pdf_bp.route("/pdfs/cloudflare_upload", methods=["POST"])
+def upload_pdf_to_cloudflare_route():
+    account_response = require_pdf_account(wants_json=True)
+
+    if not isinstance(account_response, dict):
+        return account_response
+
+    payload = request.get_json(silent=True) or {}
+    pdf_filename = str(payload.get("pdf_filename") or request.form.get("pdf_filename") or "").strip()
+    pdf_path = safe_resolve_pdf_path(pdf_filename)
+
+    if not pdf_path or not pdf_path.exists():
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "PDF file was not found.",
+        }), 400
+
+    recipe_url = recipe_url_for_pdf_filename(pdf_path.name)
+    result = upload_local_pdf_path_to_cloudflare(pdf_path, url=recipe_url)
+    status = 200 if result.get("ok") else 400
+
+    return jsonify(result), status
 
 
 @pdf_bp.route("/share/pdf/<token>")

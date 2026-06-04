@@ -391,7 +391,7 @@
                        onclick="return openRecipeEditorPdf(this, event)"
                        hidden>
                         <span class="recipe-edit-button-icon" aria-hidden="true">Ã¢â€ â€œ</span>
-                        <span>Open recipe PDF</span>
+                        <span>Open PDF</span>
                     </a>
                     <div class="recipe-edit-section-menu-wrap recipe-edit-header-menu-wrap">
                         <button type="button"
@@ -512,7 +512,7 @@
                            onclick="return openRecipeEditorPdf(this, event)"
                            hidden>
                             <span class="recipe-edit-button-icon" aria-hidden="true">â†“</span>
-                            <span>Open recipe PDF</span>
+                            <span>Open PDF</span>
                         </a>
                         <div class="recipe-edit-section-menu-wrap recipe-edit-info-menu-wrap">
                             <button type="button"
@@ -532,8 +532,22 @@
                                    rel="noopener noreferrer"
                                    onclick="return openRecipeEditorPdf(this, event)"
                                    hidden>
-                                    Open recipe PDF
+                                    Open PDF
                                 </a>
+                                <button type="button"
+                                        id="recipeEditCopyPdfLinkButton"
+                                        class="recipe-edit-copy-pdf-link-button"
+                                        onclick="return copyRecipeEditorPdfLink(this)"
+                                        hidden>
+                                    Copy PDF Link
+                                </button>
+                                <button type="button"
+                                        id="recipeEditUploadPdfButton"
+                                        class="recipe-edit-upload-pdf-button"
+                                        onclick="return uploadRecipeEditorPdfToCloudflare(this)"
+                                        hidden>
+                                    Upload to Cloudflare
+                                </button>
                                 <button type="button"
                                         id="recipeEditCreatePdfButton"
                                         class="recipe-edit-create-pdf-button"
@@ -604,6 +618,10 @@
                     <label>
                         <span>PDF Path</span>
                         <input type="text" id="recipeEditPdfPath" readonly>
+                    </label>
+                    <label id="recipeEditPdfPublicUrlField" hidden>
+                        <span>PDF Public URL</span>
+                        <input type="text" id="recipeEditPdfPublicUrl" readonly>
                     </label>
                     <label>
                         <span>Servings</span>
@@ -718,7 +736,7 @@
                                onclick="return openRecipeEditorPdf(this, event)"
                                hidden>
                                 <span class="recipe-edit-button-icon" aria-hidden="true">↓</span>
-                                <span>Open recipe PDF</span>
+                                <span>Open PDF</span>
                             </a>
                             <button type="button"
                                     id="recipeEditCreatePdfButtonLegacy"
