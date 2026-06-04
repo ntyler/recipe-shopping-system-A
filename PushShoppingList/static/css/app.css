@@ -10554,6 +10554,24 @@ body {
                 text-align: center;
             }
 
+            .user-account-detail-list {
+                justify-self: center;
+                width: min(100%, 240px);
+                text-align: left;
+            }
+
+            .user-account-detail-list div {
+                grid-template-columns: minmax(0, 1fr);
+                gap: 2px;
+                justify-items: start;
+            }
+
+            .user-account-detail-list dt,
+            .user-account-detail-list dd {
+                width: 100%;
+                text-align: left;
+            }
+
             .user-account-actions {
                 width: 100%;
                 justify-content: stretch;

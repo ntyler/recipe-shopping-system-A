@@ -43,6 +43,20 @@ def test_account_settings_editor_has_header_close_and_closes_menu():
     assert "accountMenu.open = false" in script
 
 
+def test_mobile_account_dates_stack_left_aligned():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    mobile_start = css.index("@media (max-width: 650px)", css.index(".user-account-profile"))
+    detail_start = css.index(".user-account-detail-list {", mobile_start)
+    detail_end = css.index(".user-account-actions", detail_start)
+    mobile_detail_css = css[detail_start:detail_end]
+
+    assert "width: min(100%, 240px);" in mobile_detail_css
+    assert "text-align: left;" in mobile_detail_css
+    assert "grid-template-columns: minmax(0, 1fr);" in mobile_detail_css
+    assert "justify-items: start;" in mobile_detail_css
+
+
 def test_account_action_token_pages_stay_focused_and_visible():
     index_template = (ROOT / "PushShoppingList/templates/index.html").read_text(encoding="utf-8")
     account_template = (ROOT / "PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")
