@@ -64,6 +64,11 @@ def read_legacy_store_settings(tmp_path):
     return json.loads((legacy_store_data_dir(tmp_path) / "store_settings.json").read_text(encoding="utf-8"))
 
 
+def read_legacy_store_credentials(tmp_path):
+    credentials_file = legacy_store_data_dir(tmp_path) / "store_credentials.json"
+    return json.loads(credentials_file.read_text(encoding="utf-8"))
+
+
 def read_store_credentials(tmp_path, user_id):
     credentials_file = store_data_dir(tmp_path, user_id) / "store_credentials.json"
     return json.loads(credentials_file.read_text(encoding="utf-8"))
@@ -176,8 +181,54 @@ def test_store_options_toggle_controls_render_without_admin():
     assert 'name="enabled_stores"' in html
     assert 'data-store-toggle-menu-action="aldi"' in html
     assert "Activate store" in html
-    assert "Edit login" not in html
+    assert "Edit login" in html
+    assert "Username / Email" in html
+    assert "Password" in html
     assert "Delete store" not in html
+
+
+def test_guest_can_update_store_credentials(monkeypatch, tmp_path):
+    configure_user_data(monkeypatch, tmp_path)
+    monkeypatch.setattr(storage_service, "LEGACY_EXTRACTOR_DIR", tmp_path / "legacy-extractor")
+    write_legacy_store_settings(
+        tmp_path,
+        {
+            "stores": {
+                "aldi": {
+                    "label": "Aldi",
+                    "url": "https://aldi.example/search?q=",
+                    "urlStoreSelector": "https://aldi.example/stores",
+                },
+            },
+            "enabled_stores": ["aldi"],
+        },
+    )
+    app = create_app()
+
+    with app.test_client() as client:
+        response = client.post(
+            "/update_store/aldi",
+            data={
+                "ajax": "1",
+                "store_label": "Should Not Change",
+                "store_url": "https://changed.example/search?q=",
+                "urlStoreSelector": "https://changed.example/stores",
+                "store_username": "guest@example.com",
+                "store_password": "guest-secret",
+            },
+            headers={"X-Requested-With": "fetch"},
+        )
+
+    assert response.status_code == 200
+    settings = read_legacy_store_settings(tmp_path)
+    assert settings["stores"]["aldi"]["label"] == "Aldi"
+    assert settings["stores"]["aldi"]["url"] == "https://aldi.example/search?q="
+
+    credentials = read_legacy_store_credentials(tmp_path)
+    assert credentials["credentials"]["aldi"] == {
+        "username": "guest@example.com",
+        "password": "guest-secret",
+    }
 
 
 def test_guest_can_toggle_enabled_stores(monkeypatch, tmp_path):

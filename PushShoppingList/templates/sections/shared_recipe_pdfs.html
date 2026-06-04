@@ -1,0 +1,68 @@
+<section id="sharedRecipePdfsSection" class="app-card pdf-share-card">
+    <button type="button"
+            class="card-collapse-toggle pdf-share-toggle"
+            data-collapse-toggle="shared-recipe-pdfs"
+            aria-expanded="true"
+            onclick="toggleCardCollapse('shared-recipe-pdfs')">
+        <span>Shared Recipe PDFs</span>
+    </button>
+
+    <div class="card-collapse-content pdf-share-content"
+         data-collapse-content="shared-recipe-pdfs"
+         data-collapse-default="expanded"
+         data-collapse-mobile-default="collapsed">
+        {% if current_user %}
+            {% set pdf_rows = pdf_share_view.pdfs if pdf_share_view and pdf_share_view.pdfs else [] %}
+            {% if pdf_rows %}
+                <div class="pdf-share-list">
+                    {% for pdf in pdf_rows %}
+                        {% set active_share = pdf.active_share %}
+                        <article class="pdf-share-row"
+                                 data-pdf-share-row
+                                 data-pdf-filename="{{ pdf.pdf_filename }}"
+                                 data-pdf-share-token="{{ active_share.token if active_share else '' }}">
+                            <div class="pdf-share-main">
+                                <h3>{{ pdf.original_filename or pdf.pdf_filename }}</h3>
+                                <div class="pdf-share-meta">
+                                    <span>{{ pdf.size_label }}</span>
+                                    <span>{{ pdf.modified_label }}</span>
+                                </div>
+                            </div>
+                            <div class="pdf-share-actions">
+                                <a class="pdf-share-action-link"
+                                   href="{{ pdf.view_url }}"
+                                   target="_blank"
+                                   rel="noopener noreferrer">View PDF</a>
+                                <button type="button"
+                                        class="pdf-share-action-btn"
+                                        onclick="return createPdfShareLink(this)">Create Share Link</button>
+                            </div>
+                            <div class="pdf-share-active" {% if not active_share %}hidden{% endif %}>
+                                <input class="pdf-share-url"
+                                       type="text"
+                                       value="{{ active_share.share_url if active_share else '' }}"
+                                       readonly
+                                       aria-label="Share URL for {{ pdf.original_filename or pdf.pdf_filename }}">
+                                <button type="button"
+                                        class="pdf-share-action-btn secondary"
+                                        onclick="return copyPdfShareLink(this)">Copy Link</button>
+                                <button type="button"
+                                        class="pdf-share-action-btn danger"
+                                        data-pdf-share-token="{{ active_share.token if active_share else '' }}"
+                                        onclick="return revokePdfShareLink(this)">Revoke Link</button>
+                                <span class="pdf-share-expires">
+                                    {% if active_share %}Expires {{ active_share.expires_at }}{% endif %}
+                                </span>
+                            </div>
+                            <div class="pdf-share-status" aria-live="polite"></div>
+                        </article>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="pdf-share-empty">No recipe PDFs found.</div>
+            {% endif %}
+        {% else %}
+            <div class="pdf-share-empty">Sign in to manage recipe PDF share links.</div>
+        {% endif %}
+    </div>
+</section>

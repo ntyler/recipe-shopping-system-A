@@ -34,6 +34,8 @@ from PushShoppingList.services.cookbook_service import reorder_cookbooks
 from PushShoppingList.services.home_address_service import load_home_address
 from PushShoppingList.services.home_address_service import load_home_address_history
 from PushShoppingList.services.home_address_service import save_home_address
+from PushShoppingList.services.home_address_service import delete_home_address_history_entry
+from PushShoppingList.services.home_address_service import update_home_address_history_label
 from PushShoppingList.services.home_store_location_service import DEFAULT_STORE_SEARCH_RADIUS_MILES
 from PushShoppingList.services.home_store_location_service import format_store_search_radius
 from PushShoppingList.services.home_store_location_service import load_nearest_store_results
@@ -46,6 +48,7 @@ from PushShoppingList.services.item_state_service import save_item_purchase_mapp
 from PushShoppingList.services.pantry_service import pantry_items_for_view
 from PushShoppingList.services.pantry_service import pantry_recipe_matches_for_view
 from PushShoppingList.services.pantry_service import receipt_history_for_view
+from PushShoppingList.services.pdf_share_service import list_available_pdfs
 from PushShoppingList.services.purchase_mapping_service import purchase_mapping_for_item
 from PushShoppingList.services.purchase_mapping_service import purchase_mapping_for_recipe_ingredient
 from PushShoppingList.services.purchase_mapping_service import purchase_mapping_lookup_for_items
@@ -86,6 +89,29 @@ def static_asset_version(filename):
         return int(os.path.getmtime(os.path.join(current_app.static_folder, filename)))
     except OSError:
         return 1
+
+
+def pdf_share_view_for_render():
+    rows = []
+
+    for row in list_available_pdfs():
+        active_share = row.get("active_share")
+        if active_share:
+            active_share = {
+                **active_share,
+                "share_url": url_for("pdf_bp.share_pdf_route", token=active_share.get("token"), _external=True),
+            }
+
+        rows.append({
+            **row,
+            "view_url": url_for("pdf_bp.view_pdf_route", pdf_filename=row["pdf_filename"]),
+            "active_share": active_share,
+        })
+
+    return {
+        "pdfs": rows,
+    }
+
 
 US_STATE_ABBREVIATIONS = {
     "alabama": "AL",
@@ -1342,6 +1368,7 @@ def index():
         pantry_receipt_review=session.get("pantry_receipt_review", {}),
         pantry_receipt_history=receipt_history_for_view(),
         pantry_messages=session.pop("pantry_messages", []),
+        pdf_share_view=pdf_share_view_for_render(),
         normalize=normalize,
         is_section_header=is_section_header,
         food_rules=load_food_rules(),
@@ -1568,6 +1595,24 @@ def save_home_address_route():
         return jsonify(response)
 
     return redirect("/#storeOptionsSection" if nearest_store_results is not None else "/#home-address-section")
+
+
+@main_bp.route("/api/home_address_history/<entry_id>/label", methods=["POST"])
+def update_home_address_history_label_route(entry_id):
+    data = request.get_json(silent=True) or {}
+    label = data.get("label") if "label" in data else request.form.get("label", "")
+    result = update_home_address_history_label(entry_id, label)
+    status = 200 if result.get("ok") else 404
+
+    return jsonify(result), status
+
+
+@main_bp.route("/api/home_address_history/<entry_id>/delete", methods=["POST"])
+def delete_home_address_history_entry_route(entry_id):
+    result = delete_home_address_history_entry(entry_id)
+    status = 200 if result.get("ok") else 404
+
+    return jsonify(result), status
 
 
 @main_bp.route("/api/reverse_geocode", methods=["POST"])

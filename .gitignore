@@ -14,6 +14,7 @@ PushShoppingList/services/recipe-extractor/data/home_address_history.json
 PushShoppingList/services/recipe-extractor/data/store_settings.json
 PushShoppingList/services/recipe-extractor/data/shopping_item_state.json
 PushShoppingList/services/recipe-extractor/data/pdf/
+PushShoppingList/services/recipe-extractor/data/pdf_share_links.json
 PushShoppingList/services/recipe-extractor/data/logs/
 PushShoppingList/services/recipe-extractor/data/raw/*_PDF_ERROR.txt
 PushShoppingList/services/recipe-extractor/data/raw/*_SOCIAL_PDF_API_RESPONSE.txt

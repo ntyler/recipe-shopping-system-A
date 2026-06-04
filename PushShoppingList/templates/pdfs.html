@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Shared Recipe PDFs</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=app_css_version) }}">
+</head>
+<body>
+<main id="appContent" class="app-content">
+    {% include "sections/shared_recipe_pdfs.html" %}
+</main>
+
+<script src="{{ url_for('static', filename='js/app.js', v=app_js_version) }}"></script>
+</body>
+</html>

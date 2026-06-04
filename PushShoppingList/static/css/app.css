@@ -254,6 +254,18 @@ body {
             margin-bottom: 6px;
         }
 
+        .app-section-divider {
+            max-width: 900px;
+            height: 1px;
+            margin: 18px auto;
+            background: #2d3438;
+        }
+
+        .recipe-entry-section-divider {
+            margin-top: 6px;
+            margin-bottom: 18px;
+        }
+
         .helper-text {
             text-align: center;
             color: #aaa;
@@ -332,6 +344,170 @@ body {
         .recipe-import-actions .extract-btn,
         .recipe-import-actions .recipe-media-upload-btn {
             margin-top: 0;
+        }
+
+        .pdf-share-card {
+            border: 0;
+            background: transparent;
+            box-shadow: none;
+        }
+
+        .pdf-share-toggle {
+            justify-content: center;
+            text-align: center;
+        }
+
+        .pdf-share-content {
+            margin-top: 14px;
+        }
+
+        .pdf-share-list {
+            display: grid;
+            gap: 10px;
+        }
+
+        .pdf-share-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 10px 12px;
+            align-items: center;
+            padding: 12px;
+            border: 1px solid #34424a;
+            border-radius: 8px;
+            background: #15191a;
+            box-sizing: border-box;
+        }
+
+        .pdf-share-main {
+            min-width: 0;
+        }
+
+        .pdf-share-main h3 {
+            margin: 0 0 6px 0;
+            color: #f3f4f6;
+            font-size: 15px;
+            overflow-wrap: anywhere;
+        }
+
+        .pdf-share-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            color: #b8c1c8;
+            font-size: 12px;
+        }
+
+        .pdf-share-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .pdf-share-action-btn,
+        .pdf-share-action-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: auto;
+            min-width: 112px;
+            height: 32px;
+            min-height: 32px;
+            margin: 0;
+            padding: 2px 12px;
+            border: 1px solid #2b76ad;
+            border-radius: 7px;
+            background: #155a8a;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 800;
+            line-height: 1.1;
+            text-decoration: none;
+            box-sizing: border-box;
+        }
+
+        .pdf-share-action-btn.secondary {
+            border-color: #4b5563;
+            background: #2f3842;
+        }
+
+        .pdf-share-action-btn.danger {
+            border-color: #8f1f2a;
+            background: #7f151b;
+        }
+
+        .pdf-share-action-btn:disabled {
+            opacity: 0.65;
+            cursor: wait;
+        }
+
+        .pdf-share-active {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto auto;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .pdf-share-active[hidden] {
+            display: none;
+        }
+
+        .pdf-share-url {
+            width: 100%;
+            min-width: 0;
+            height: 32px;
+            padding: 6px 9px;
+            border: 1px solid #4b5563;
+            border-radius: 7px;
+            background: #101415;
+            color: #d9f8ff;
+            font-size: 12px;
+            box-sizing: border-box;
+        }
+
+        .pdf-share-expires {
+            grid-column: 1 / -1;
+            color: #aeb8bf;
+            font-size: 12px;
+        }
+
+        .pdf-share-status,
+        .pdf-share-empty {
+            color: #cbd5e1;
+            font-size: 13px;
+        }
+
+        .pdf-share-status {
+            grid-column: 1 / -1;
+            min-height: 16px;
+        }
+
+        .pdf-share-status.error {
+            color: #ffb4b4;
+        }
+
+        .pdf-share-empty {
+            padding: 12px;
+            border: 1px dashed #47535a;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        @media (max-width: 650px) {
+            .pdf-share-row,
+            .pdf-share-active {
+                grid-template-columns: 1fr;
+            }
+
+            .pdf-share-actions {
+                justify-content: stretch;
+            }
+
+            .pdf-share-action-btn,
+            .pdf-share-action-link {
+                width: 100%;
+            }
         }
 
         .extract-btn,
@@ -2177,7 +2353,7 @@ body {
 
         .home-address-history-item {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
+            grid-template-columns: minmax(0, 1fr) minmax(160px, 230px) auto;
             align-items: center;
             gap: 10px;
             padding: 10px;
@@ -2205,11 +2381,60 @@ body {
             line-height: 1.35;
         }
 
-        .home-address-history-use-btn {
-            width: auto;
-            min-width: 58px;
+        .home-address-history-title-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            gap: 6px;
+            min-width: 0;
+        }
+
+        .home-address-history-title-row label {
+            display: grid;
+            gap: 3px;
             margin: 0;
-            padding: 8px 12px;
+            min-width: 0;
+            color: #94a3b8;
+            font-size: 11px;
+            font-weight: 900;
+            line-height: 1.2;
+            text-transform: uppercase;
+        }
+
+        .home-address-history-title-input {
+            width: 100%;
+            min-width: 0;
+            height: 32px;
+            padding: 7px 9px;
+            border: 1px solid #4b5563;
+            border-radius: 7px;
+            background: #101415;
+            color: #fff;
+            font-size: 13px;
+            text-transform: none;
+            box-sizing: border-box;
+        }
+
+        .home-address-history-title-input:focus {
+            border-color: #00cc66;
+            box-shadow: 0 0 0 3px rgba(0,204,102,0.16);
+            outline: none;
+        }
+
+        .home-address-history-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .home-address-history-use-btn,
+        .home-address-history-title-btn,
+        .home-address-history-remove-btn {
+            width: auto;
+            min-width: 64px;
+            height: 32px;
+            margin: 0;
+            padding: 7px 12px;
             border: 1px solid #315e8f;
             border-radius: 8px;
             background: #123d68;
@@ -2218,10 +2443,46 @@ body {
             font-weight: 900;
         }
 
+        .home-address-history-title-btn {
+            border-color: #286f65;
+            background: #0f514b;
+        }
+
+        .home-address-history-remove-btn {
+            border-color: #8f1f2a;
+            background: #65171d;
+        }
+
         .home-address-history-use-btn:hover,
+        .home-address-history-title-btn:hover,
+        .home-address-history-remove-btn:hover,
         .home-address-history-use-btn:focus-visible {
             background: #155a92;
             outline: none;
+        }
+
+        .home-address-history-title-btn:hover,
+        .home-address-history-title-btn:focus-visible {
+            background: #0f766e;
+            outline: none;
+        }
+
+        .home-address-history-remove-btn:hover,
+        .home-address-history-remove-btn:focus-visible {
+            background: #8a1f28;
+            outline: none;
+        }
+
+        .home-address-history-status {
+            grid-column: 1 / -1;
+            min-height: 16px;
+            color: #94a3b8;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .home-address-history-status.error {
+            color: #ffb4b4;
         }
 
         .home-address-history-empty {
@@ -4068,6 +4329,16 @@ body {
         .item-check {
             transform: scale(1.2);
             cursor: pointer;
+        }
+
+        .item-text {
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .item-text:focus-visible {
+            outline: 2px solid #38bdf8;
+            outline-offset: 3px;
         }
 
         .checked-item-text {
@@ -9577,7 +9848,14 @@ body {
                 grid-template-columns: minmax(0, 1fr);
             }
 
-            .home-address-history-use-btn {
+            .home-address-history-actions,
+            .home-address-history-title-row {
+                width: 100%;
+            }
+
+            .home-address-history-use-btn,
+            .home-address-history-title-btn,
+            .home-address-history-remove-btn {
                 width: 100%;
             }
 
@@ -14803,6 +15081,8 @@ body {
     border: 0;
     background: transparent;
     box-shadow: none;
+    justify-content: center;
+    text-align: center;
 }
 
 #aiPantrySection .ai-pantry-toggle:hover,

@@ -75,10 +75,7 @@ def add_store_route():
 def update_store_route(store_key):
     user = current_public_user()
 
-    if not user:
-        return forbidden_store_response("Sign in before updating store login details.")
-
-    if is_admin_user(user):
+    if user and is_admin_user(user):
         settings = update_store(store_key, request.form)
     else:
         settings = update_store_credentials(store_key, request.form)

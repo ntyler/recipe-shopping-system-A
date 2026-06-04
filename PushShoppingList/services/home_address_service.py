@@ -1,4 +1,6 @@
 import json
+import hashlib
+import uuid
 from datetime import datetime
 from datetime import timezone
 from pathlib import Path
@@ -13,6 +15,7 @@ HOME_ADDRESS_HISTORY_FILE = scoped_extractor_data_path("home_address_history.jso
 MAX_HOME_ADDRESS_HISTORY = 25
 
 DEFAULT_HOME_ADDRESS = {
+    "label": "",
     "street": "5905 Arlo Drive",
     "apartment": "Apt 2213",
     "city": "Indianapolis",
@@ -22,6 +25,7 @@ DEFAULT_HOME_ADDRESS = {
     "country": "United States",
 }
 EMPTY_HOME_ADDRESS = {
+    "label": "",
     "street": "",
     "apartment": "",
     "city": "",
@@ -54,6 +58,7 @@ def load_home_address():
 
 def save_home_address(form_data):
     data = {
+        "label": str(form_data.get("address_label", "") or "").strip(),
         "street": str(form_data.get("address_street", "") or "").strip(),
         "apartment": str(form_data.get("address_apartment", "") or "").strip(),
         "city": str(form_data.get("address_city", "") or "").strip(),
@@ -96,10 +101,21 @@ def save_home_address_history_entry(address):
     if not full_address:
         return load_home_address_history()
 
+    existing_entry = next(
+        (
+            existing
+            for existing in load_home_address_history(limit=None)
+            if existing.get("full_address") == full_address
+        ),
+        {},
+    )
+    label = str(address.get("label") or "").strip() or existing_entry.get("label", "")
     entry = {
         key: str(address.get(key, "") or "").strip()
         for key in EMPTY_HOME_ADDRESS
     }
+    entry["id"] = existing_entry.get("id") or uuid.uuid4().hex
+    entry["label"] = label
     entry["full_address"] = full_address
     entry["saved_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -141,7 +157,7 @@ def save_home_address_history(history):
 
         cleaned.append({
             key: normalized.get(key, "")
-            for key in [*EMPTY_HOME_ADDRESS.keys(), "full_address", "saved_at"]
+            for key in ["id", *EMPTY_HOME_ADDRESS.keys(), "full_address", "saved_at"]
         })
 
     HOME_ADDRESS_HISTORY_FILE.write_text(
@@ -163,11 +179,70 @@ def normalize_home_address_history_entry(entry):
     if not full_address:
         return None
 
+    normalized["id"] = str(entry.get("id") or home_address_history_id(entry, full_address)).strip()
+    normalized["label"] = str(entry.get("label") or entry.get("title") or "").strip()
     saved_at = str(entry.get("saved_at") or entry.get("timestamp") or "").strip()
     normalized["full_address"] = full_address
     normalized["saved_at"] = saved_at
     normalized["saved_at_display"] = format_home_address_history_timestamp(saved_at)
     return normalized
+
+
+def home_address_history_id(entry, full_address):
+    seed = "|".join([
+        str(full_address or ""),
+        str(entry.get("saved_at") or entry.get("timestamp") or ""),
+    ])
+    return hashlib.sha1(seed.encode("utf-8")).hexdigest()[:16]
+
+
+def update_home_address_history_label(entry_id, label):
+    entry_id = str(entry_id or "").strip()
+    label = str(label or "").strip()
+    history = load_home_address_history(limit=None)
+    updated = False
+
+    for entry in history:
+        if entry.get("id") == entry_id:
+            entry["label"] = label
+            updated = True
+            break
+
+    if not updated:
+        return {
+            "ok": False,
+            "error": "Saved address was not found.",
+            "home_address_history": history,
+        }
+
+    save_home_address_history(history)
+    return {
+        "ok": True,
+        "home_address_history": load_home_address_history(),
+    }
+
+
+def delete_home_address_history_entry(entry_id):
+    entry_id = str(entry_id or "").strip()
+    history = load_home_address_history(limit=None)
+    next_history = [
+        entry
+        for entry in history
+        if entry.get("id") != entry_id
+    ]
+
+    if len(next_history) == len(history):
+        return {
+            "ok": False,
+            "error": "Saved address was not found.",
+            "home_address_history": history,
+        }
+
+    save_home_address_history(next_history)
+    return {
+        "ok": True,
+        "home_address_history": load_home_address_history(),
+    }
 
 
 def format_home_address_history_timestamp(saved_at):

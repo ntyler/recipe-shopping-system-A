@@ -18,6 +18,7 @@
 
         <form id="homeAddressForm" method="POST" action="/save_home_address" onsubmit="return saveHomeAddress(event);">
             <div class="address-grid">
+                <input name="address_label" value="{{ home_address.label }}" placeholder="Address title, e.g. Home">
                 <input name="address_street" value="{{ home_address.street }}" placeholder="Street, e.g. 5905 Arlo Drive">
                 <input name="address_apartment" value="{{ home_address.apartment }}" placeholder="Apartment, e.g. Apt 2213">
                 <input name="address_city" value="{{ home_address.city }}" placeholder="City, e.g. Indianapolis">
@@ -80,18 +81,43 @@
                                     {{ history_item.full_address }}
                                 </a>
                             </div>
-                            <button type="button"
-                                    class="home-address-history-use-btn"
-                                    data-address-street="{{ history_item.street }}"
-                                    data-address-apartment="{{ history_item.apartment }}"
-                                    data-address-city="{{ history_item.city }}"
-                                    data-address-county="{{ history_item.county }}"
-                                    data-address-state="{{ history_item.state }}"
-                                    data-address-zip="{{ history_item.zip }}"
-                                    data-address-country="{{ history_item.country }}"
-                                    onclick="return useHomeAddressHistoryEntry(this);">
-                                Use
-                            </button>
+                            <div class="home-address-history-title-row">
+                                <label>
+                                    <span>Title</span>
+                                    <input type="text"
+                                           class="home-address-history-title-input"
+                                           value="{{ history_item.label }}"
+                                           placeholder="Home">
+                                </label>
+                                <button type="button"
+                                        class="home-address-history-title-btn"
+                                        data-home-address-history-id="{{ history_item.id }}"
+                                        onclick="return saveHomeAddressHistoryTitle(this);">
+                                    Save Title
+                                </button>
+                            </div>
+                            <div class="home-address-history-actions">
+                                <button type="button"
+                                        class="home-address-history-use-btn"
+                                        data-address-label="{{ history_item.label }}"
+                                        data-address-street="{{ history_item.street }}"
+                                        data-address-apartment="{{ history_item.apartment }}"
+                                        data-address-city="{{ history_item.city }}"
+                                        data-address-county="{{ history_item.county }}"
+                                        data-address-state="{{ history_item.state }}"
+                                        data-address-zip="{{ history_item.zip }}"
+                                        data-address-country="{{ history_item.country }}"
+                                        onclick="return useHomeAddressHistoryEntry(this);">
+                                    Use
+                                </button>
+                                <button type="button"
+                                        class="home-address-history-remove-btn"
+                                        data-home-address-history-id="{{ history_item.id }}"
+                                        onclick="return removeHomeAddressHistoryEntry(this);">
+                                    Remove
+                                </button>
+                            </div>
+                            <div class="home-address-history-status" aria-live="polite"></div>
                         </li>
                     {% endfor %}
                 </ol>

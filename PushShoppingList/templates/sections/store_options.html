@@ -1,6 +1,6 @@
 {% set can_manage_stores = current_user and current_user.is_admin %}
 {% set can_toggle_stores = true %}
-{% set can_edit_store_credentials = current_user %}
+{% set can_edit_store_credentials = true %}
 <div class="app-card"
      id="storeOptionsSection"
      data-store-can-manage="{{ 'true' if can_manage_stores else 'false' }}"
@@ -123,6 +123,12 @@
 
             <div class="address-actions-grid">
                 <button form="homeAddressForm" type="submit" name="action" value="run_find_nearest" class="nearest-stores-btn">Find Nearest Stores</button>
+                <button type="button"
+                        class="request-store-feedback-btn"
+                        data-feedback-store-request
+                        onclick="return openStoreRequestFeedback(this);">
+                    Request Store
+                </button>
                 <div class="active-store-search store-options-toolbar-search">
                     <input id="activeStoreSearchInput"
                            type="search"
@@ -131,12 +137,6 @@
                            aria-label="Search stores by name"
                            oninput="filterActiveStores(this.value)">
                 </div>
-                <button type="button"
-                        class="request-store-feedback-btn"
-                        data-feedback-store-request
-                        onclick="return openStoreRequestFeedback(this);">
-                    Request Store
-                </button>
             </div>
         </div>
     </div>
@@ -147,8 +147,6 @@
                 This is your editable store list. Check stores to include them in product searches.
             {% elif can_edit_store_credentials %}
                 Check stores to include them in product searches. Store definitions are managed by the administrator.
-            {% else %}
-                Check stores to include them in product searches. Sign in to save store login details.
             {% endif %}
         </p>
 

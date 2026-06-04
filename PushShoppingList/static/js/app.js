@@ -5247,19 +5247,50 @@ function restoreItemCheckState() {
 
         const key = row.dataset.key;
         checkbox.checked = localStorage.getItem(`item-checked:${key}`) === "1";
-        row.classList.toggle("row-checked", checkbox.checked);
-        if (itemText) {
-            itemText.classList.toggle("checked-item-text", checkbox.checked);
-        }
+        syncItemCheckedState(row, checkbox, itemText);
 
         checkbox.addEventListener("change", () => {
-            row.classList.toggle("row-checked", checkbox.checked);
-            if (itemText) {
-                itemText.classList.toggle("checked-item-text", checkbox.checked);
-            }
+            syncItemCheckedState(row, checkbox, itemText);
             localStorage.setItem(`item-checked:${key}`, checkbox.checked ? "1" : "0");
         });
+
+        if (itemText && itemText.dataset.itemTextToggleBound !== "1") {
+            itemText.dataset.itemTextToggleBound = "1";
+            itemText.tabIndex = 0;
+            itemText.setAttribute("role", "button");
+            itemText.setAttribute("aria-label", `Toggle ${itemText.textContent.trim()}`);
+            itemText.addEventListener("click", () => {
+                toggleItemCheckbox(row, checkbox, itemText, key);
+            });
+            itemText.addEventListener("keydown", event => {
+                if (event.key !== "Enter" && event.key !== " ") {
+                    return;
+                }
+
+                event.preventDefault();
+                toggleItemCheckbox(row, checkbox, itemText, key);
+            });
+        }
     });
+}
+
+function syncItemCheckedState(row, checkbox, itemText) {
+    row.classList.toggle("row-checked", checkbox.checked);
+    if (itemText) {
+        itemText.classList.toggle("checked-item-text", checkbox.checked);
+        itemText.setAttribute("aria-pressed", checkbox.checked ? "true" : "false");
+    }
+}
+
+function toggleItemCheckbox(row, checkbox, itemText, key) {
+    if (!checkbox) {
+        return;
+    }
+
+    checkbox.checked = !checkbox.checked;
+    syncItemCheckedState(row, checkbox, itemText);
+    localStorage.setItem(`item-checked:${key}`, checkbox.checked ? "1" : "0");
+    checkbox.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
 function filterPantryItems(value) {
@@ -5397,6 +5428,171 @@ async function copyPantryFeelingPrompt(button) {
         console.warn("Unable to copy pantry feeling prompt.", err);
         output.select();
         setPantryFeelingStatus("Prompt selected. Use Ctrl+C to copy.", true);
+    }
+
+    return false;
+}
+
+function pdfShareRowForButton(button) {
+    return button ? button.closest("[data-pdf-share-row]") : null;
+}
+
+function setPdfShareStatus(row, message, isError = false) {
+    const status = row ? row.querySelector(".pdf-share-status") : null;
+
+    if (!status) {
+        return;
+    }
+
+    status.textContent = message || "";
+    status.classList.toggle("error", Boolean(isError));
+}
+
+function updatePdfShareRow(row, data) {
+    const panel = row ? row.querySelector(".pdf-share-active") : null;
+    const input = row ? row.querySelector(".pdf-share-url") : null;
+    const expires = row ? row.querySelector(".pdf-share-expires") : null;
+    const revokeButton = row ? row.querySelector(".pdf-share-action-btn.danger") : null;
+
+    if (!row || !panel || !input) {
+        return;
+    }
+
+    row.dataset.pdfShareToken = data.token || "";
+    input.value = data.share_url || "";
+    panel.hidden = !input.value;
+
+    if (expires) {
+        expires.textContent = data.expires_at ? `Expires ${data.expires_at}` : "";
+    }
+
+    if (revokeButton) {
+        revokeButton.dataset.pdfShareToken = data.token || "";
+    }
+}
+
+async function createPdfShareLink(button) {
+    const row = pdfShareRowForButton(button);
+    const pdfFilename = row ? row.dataset.pdfFilename : "";
+
+    if (!row || !pdfFilename) {
+        return false;
+    }
+
+    const originalText = button ? button.textContent : "";
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Creating...";
+    }
+
+    try {
+        const response = await fetch("/pdfs/share", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "fetch",
+            },
+            body: JSON.stringify({ pdf_filename: pdfFilename }),
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || "Unable to create PDF share link.");
+        }
+
+        updatePdfShareRow(row, data);
+        setPdfShareStatus(row, data.created ? "Share link created." : "Share link ready.");
+    } catch (err) {
+        console.warn("Unable to create PDF share link.", err);
+        setPdfShareStatus(row, err.message || "Unable to create PDF share link.", true);
+    } finally {
+        if (button && button.isConnected) {
+            button.disabled = false;
+            button.textContent = originalText;
+        }
+    }
+
+    return false;
+}
+
+async function copyPdfShareLink(button) {
+    const row = pdfShareRowForButton(button);
+    const input = row ? row.querySelector(".pdf-share-url") : null;
+    const shareUrl = input ? input.value.trim() : "";
+
+    if (!shareUrl) {
+        setPdfShareStatus(row, "Create a share link first.", true);
+        return false;
+    }
+
+    try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(shareUrl);
+        } else if (input) {
+            input.select();
+            document.execCommand("copy");
+        }
+
+        setPdfShareStatus(row, "Share link copied.");
+    } catch (err) {
+        console.warn("Unable to copy PDF share link.", err);
+        if (input) {
+            input.select();
+        }
+        setPdfShareStatus(row, "Share link selected. Use Ctrl+C to copy.", true);
+    }
+
+    return false;
+}
+
+async function revokePdfShareLink(button) {
+    const row = pdfShareRowForButton(button);
+    const token = row
+        ? ((button && button.dataset.pdfShareToken) || row.dataset.pdfShareToken || "")
+        : "";
+
+    if (!row || !token) {
+        setPdfShareStatus(row, "No active share link to revoke.", true);
+        return false;
+    }
+
+    const originalText = button ? button.textContent : "";
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Revoking...";
+    }
+
+    try {
+        const response = await fetch("/pdfs/share/revoke", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "fetch",
+            },
+            body: JSON.stringify({ token }),
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || "Unable to revoke PDF share link.");
+        }
+
+        updatePdfShareRow(row, {
+            token: "",
+            share_url: "",
+            expires_at: "",
+        });
+        setPdfShareStatus(row, "Share link revoked.");
+    } catch (err) {
+        console.warn("Unable to revoke PDF share link.", err);
+        setPdfShareStatus(row, err.message || "Unable to revoke PDF share link.", true);
+    } finally {
+        if (button && button.isConnected) {
+            button.disabled = false;
+            button.textContent = originalText;
+        }
     }
 
     return false;
@@ -13390,6 +13586,7 @@ function useHomeAddressHistoryEntry(button) {
         return false;
     }
 
+    setHomeAddressField(form, "address_label", button.dataset.addressLabel || "");
     setHomeAddressField(form, "address_street", button.dataset.addressStreet || "");
     setHomeAddressField(form, "address_apartment", button.dataset.addressApartment || "");
     setHomeAddressField(form, "address_city", button.dataset.addressCity || "");
@@ -13434,9 +13631,18 @@ function createHomeAddressHistoryItem(entry) {
     const copy = document.createElement("div");
     const time = document.createElement("span");
     const link = document.createElement("a");
-    const button = document.createElement("button");
+    const titleRow = document.createElement("div");
+    const titleLabel = document.createElement("label");
+    const titleText = document.createElement("span");
+    const titleInput = document.createElement("input");
+    const titleButton = document.createElement("button");
+    const actions = document.createElement("div");
+    const useButton = document.createElement("button");
+    const removeButton = document.createElement("button");
+    const status = document.createElement("div");
 
     item.className = "home-address-history-item";
+    item.dataset.homeAddressHistoryId = (entry && entry.id) || "";
     copy.className = "home-address-history-copy";
     time.className = "home-address-history-time";
     time.textContent = (entry && (entry.saved_at_display || entry.saved_at)) || "Saved";
@@ -13449,21 +13655,159 @@ function createHomeAddressHistoryItem(entry) {
     link.onclick = event => openStoreAddressMap(link, event);
     updateHomeAddressMapLink(link, address);
 
-    button.type = "button";
-    button.className = "home-address-history-use-btn";
-    button.textContent = "Use";
-    button.dataset.addressStreet = (entry && entry.street) || "";
-    button.dataset.addressApartment = (entry && entry.apartment) || "";
-    button.dataset.addressCity = (entry && entry.city) || "";
-    button.dataset.addressCounty = (entry && entry.county) || "";
-    button.dataset.addressState = (entry && entry.state) || "";
-    button.dataset.addressZip = (entry && entry.zip) || "";
-    button.dataset.addressCountry = (entry && entry.country) || "";
-    button.onclick = () => useHomeAddressHistoryEntry(button);
+    titleRow.className = "home-address-history-title-row";
+    titleText.textContent = "Title";
+    titleInput.type = "text";
+    titleInput.className = "home-address-history-title-input";
+    titleInput.value = (entry && entry.label) || "";
+    titleInput.placeholder = "Home";
+    titleLabel.append(titleText, titleInput);
+
+    titleButton.type = "button";
+    titleButton.className = "home-address-history-title-btn";
+    titleButton.textContent = "Save Title";
+    titleButton.dataset.homeAddressHistoryId = (entry && entry.id) || "";
+    titleButton.onclick = () => saveHomeAddressHistoryTitle(titleButton);
+    titleRow.append(titleLabel, titleButton);
+
+    actions.className = "home-address-history-actions";
+
+    useButton.type = "button";
+    useButton.className = "home-address-history-use-btn";
+    useButton.textContent = "Use";
+    useButton.dataset.addressLabel = (entry && entry.label) || "";
+    useButton.dataset.addressStreet = (entry && entry.street) || "";
+    useButton.dataset.addressApartment = (entry && entry.apartment) || "";
+    useButton.dataset.addressCity = (entry && entry.city) || "";
+    useButton.dataset.addressCounty = (entry && entry.county) || "";
+    useButton.dataset.addressState = (entry && entry.state) || "";
+    useButton.dataset.addressZip = (entry && entry.zip) || "";
+    useButton.dataset.addressCountry = (entry && entry.country) || "";
+    useButton.onclick = () => useHomeAddressHistoryEntry(useButton);
+
+    removeButton.type = "button";
+    removeButton.className = "home-address-history-remove-btn";
+    removeButton.textContent = "Remove";
+    removeButton.dataset.homeAddressHistoryId = (entry && entry.id) || "";
+    removeButton.onclick = () => removeHomeAddressHistoryEntry(removeButton);
+    actions.append(useButton, removeButton);
+
+    status.className = "home-address-history-status";
+    status.setAttribute("aria-live", "polite");
 
     copy.append(time, link);
-    item.append(copy, button);
+    item.append(copy, titleRow, actions, status);
     return item;
+}
+
+function homeAddressHistoryRowForButton(button) {
+    return button ? button.closest(".home-address-history-item") : null;
+}
+
+function setHomeAddressHistoryStatus(row, message, isError = false) {
+    const status = row ? row.querySelector(".home-address-history-status") : null;
+
+    if (!status) {
+        return;
+    }
+
+    status.textContent = message || "";
+    status.classList.toggle("error", Boolean(isError));
+}
+
+async function saveHomeAddressHistoryTitle(button) {
+    const row = homeAddressHistoryRowForButton(button);
+    const input = row ? row.querySelector(".home-address-history-title-input") : null;
+    const entryId = row
+        ? ((button && button.dataset.homeAddressHistoryId) || row.dataset.homeAddressHistoryId || "")
+        : "";
+    const originalText = button ? button.textContent : "";
+
+    if (!row || !entryId || !input) {
+        return false;
+    }
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Saving...";
+    }
+
+    try {
+        const response = await fetch(`/api/home_address_history/${encodeURIComponent(entryId)}/label`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "fetch",
+            },
+            body: JSON.stringify({ label: input.value.trim() }),
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error(data.error || "Unable to save address title.");
+        }
+
+        updateHomeAddressHistory(data.home_address_history || []);
+        showRecipeQuantityUpdatedMessage("", "", "", "Address title saved.");
+    } catch (err) {
+        console.warn("Unable to save address title.", err);
+        setHomeAddressHistoryStatus(row, err.message || "Unable to save address title.", true);
+    } finally {
+        if (button && button.isConnected) {
+            button.disabled = false;
+            button.textContent = originalText;
+        }
+    }
+
+    return false;
+}
+
+async function removeHomeAddressHistoryEntry(button) {
+    const row = homeAddressHistoryRowForButton(button);
+    const entryId = row
+        ? ((button && button.dataset.homeAddressHistoryId) || row.dataset.homeAddressHistoryId || "")
+        : "";
+    const originalText = button ? button.textContent : "";
+
+    if (!row || !entryId) {
+        return false;
+    }
+
+    if (!window.confirm("Remove this saved address?")) {
+        return false;
+    }
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Removing...";
+    }
+
+    try {
+        const response = await fetch(`/api/home_address_history/${encodeURIComponent(entryId)}/delete`, {
+            method: "POST",
+            headers: {
+                "X-Requested-With": "fetch",
+            },
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error(data.error || "Unable to remove saved address.");
+        }
+
+        updateHomeAddressHistory(data.home_address_history || []);
+        showRecipeQuantityUpdatedMessage("", "", "", "Saved address removed.");
+    } catch (err) {
+        console.warn("Unable to remove saved address.", err);
+        setHomeAddressHistoryStatus(row, err.message || "Unable to remove saved address.", true);
+    } finally {
+        if (button && button.isConnected) {
+            button.disabled = false;
+            button.textContent = originalText;
+        }
+    }
+
+    return false;
 }
 
 function homeAddressGoogleMapsUrl(address) {

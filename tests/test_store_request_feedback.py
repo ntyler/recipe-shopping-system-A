@@ -55,6 +55,19 @@ def test_store_request_button_starts_feedback_workflow():
     assert "Store selector/location URL:" in script
 
 
+def test_store_request_button_is_directly_under_find_nearest_stores():
+    store_template = open(
+        "PushShoppingList/templates/sections/store_options.html",
+        encoding="utf-8",
+    ).read()
+
+    find_index = store_template.index("Find Nearest Stores")
+    request_index = store_template.index("Request Store")
+    search_index = store_template.index("Search stores by name")
+
+    assert find_index < request_index < search_index
+
+
 def test_feedback_support_header_counts_current_user_requests(monkeypatch, tmp_path):
     monkeypatch.setattr(feedback_service, "FEEDBACK_FILE", tmp_path / "feedback.json")
     monkeypatch.setattr(feedback_service, "FEEDBACK_UPLOAD_DIR", tmp_path / "uploads")
