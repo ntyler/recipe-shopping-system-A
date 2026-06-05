@@ -1,4 +1,5 @@
 import json
+from io import BytesIO
 
 from PushShoppingList.app import create_app
 from PushShoppingList.services import feedback_service
@@ -60,6 +61,7 @@ def configure_feedback(monkeypatch, tmp_path):
 
     monkeypatch.setattr(accounts, "USERS_FILE", users_file)
     monkeypatch.setattr(feedback_service, "FEEDBACK_FILE", feedback_file)
+    monkeypatch.setattr(feedback_service, "FEEDBACK_UPLOAD_DIR", tmp_path / "uploads")
     accounts.save_users({"users": [
         make_user("user-1", "user1@example.com"),
         make_user("user-2", "user2@example.com"),
@@ -82,6 +84,11 @@ def unread_notification(feedback_file):
 def stored_feedback(feedback_file):
     payload = json.loads(feedback_file.read_text(encoding="utf-8"))
     return payload["feedback"][0]
+
+
+def stored_feedback_items(feedback_file):
+    payload = json.loads(feedback_file.read_text(encoding="utf-8"))
+    return payload["feedback"]
 
 
 def test_feedback_owner_can_mark_updates_read(monkeypatch, tmp_path):
@@ -175,3 +182,59 @@ def test_feedback_admin_update_saves_priority_support_comment_and_public_identit
         assert any(entry["event"] == "Support Update Added" for entry in feedback["timeline"])
         assert any(entry["event"] == "Resolution Notes Added" for entry in feedback["timeline"])
         assert any("RSL-FB-1001" in notification["message"] for notification in feedback["notifications"])
+
+
+def test_feedback_submit_labels_attachments_for_ticket_display(monkeypatch, tmp_path):
+    feedback_file = configure_feedback(monkeypatch, tmp_path)
+    app = create_app()
+
+    with app.test_client() as client:
+        sign_in(client, "user-1")
+
+        response = client.post(
+            "/feedback/submit",
+            data={
+                "feedback_type": "Bug Report",
+                "subject": "Upload labels",
+                "description": "Files should be visible in the ticket.",
+                "screenshot": (BytesIO(b"fake image"), "screen.png"),
+                "attachment": (BytesIO(b"fake pdf"), "details.pdf"),
+            },
+            content_type="multipart/form-data",
+        )
+
+        feedback = stored_feedback_items(feedback_file)[-1]
+        dashboard = feedback_service.feedback_dashboard_for_user(make_user("user-1", "user1@example.com"))
+        view = next(item for item in dashboard["my_feedback"] if item["feedback_id"] == feedback["feedback_id"])
+
+        assert response.status_code == 302
+        assert feedback["attachments"][0]["attachment_type"] == "screenshot"
+        assert feedback["attachments"][1]["attachment_type"] == "file"
+        assert [item["display_label"] for item in view["user_attachments"]] == ["Screenshot", "Uploaded File"]
+        assert [item["original_name"] for item in view["user_attachments"]] == ["screen.png", "details.pdf"]
+
+
+def test_feedback_user_view_uses_public_support_identity(monkeypatch, tmp_path):
+    feedback_file = configure_feedback(monkeypatch, tmp_path)
+    payload = json.loads(feedback_file.read_text(encoding="utf-8"))
+    payload["feedback"][0]["timeline"].append({
+        "event": "Investigating",
+        "timestamp": "2026-06-04T13:30:00Z",
+        "actorPrivateEmail": "ntylerbert@gmail.com",
+        "actorType": "support",
+    })
+    payload["feedback"][0]["comments"] = [{
+        "commentText": "Support reply.",
+        "authorEmail": "ntylerbert@gmail.com",
+        "authorPrivateEmail": "ntylerbert@gmail.com",
+        "authorType": "support",
+        "createdAt": "2026-06-04T13:35:00Z",
+    }]
+    feedback_file.write_text(json.dumps(payload), encoding="utf-8")
+
+    dashboard = feedback_service.feedback_dashboard_for_user(make_user("user-1", "user1@example.com"))
+    feedback = dashboard["my_feedback"][0]
+
+    assert feedback["timeline"][-1]["display_actor"] == "support@recipeshoppinglist.com"
+    assert feedback["comments"][0]["display_author"] == "support@recipeshoppinglist.com"
+    assert feedback["comments"][0]["author_type_label"] == "Support Team"

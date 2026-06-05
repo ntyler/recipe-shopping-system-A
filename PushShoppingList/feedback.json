@@ -8,25 +8,49 @@
         "email": "freepdfjobsearch@gmail.com"
       },
       "created_at": "2026-06-04T22:35:28Z",
-      "updated_at": "2026-06-04T22:38:29Z",
+      "updated_at": "2026-06-05T01:21:49Z",
       "feedback_type": "Bug Report",
       "subject": "asdfasdf",
       "description": "asdfasdf",
       "attachments": [],
       "status": "Investigating",
+      "priority": "Normal",
       "admin_notes": "aASDfasxdfg",
       "resolution_notes": "bbb bbbbbbbbbbbbbbb",
       "admin_attachments": [],
       "timeline": [
         {
+          "event": "Submitted",
           "status": "Submitted",
           "timestamp": "2026-06-04T22:35:28Z",
-          "actor": "freepdfjobsearch@gmail.com"
+          "actor": "freepdfjobsearch@gmail.com",
+          "actorUid": "",
+          "actorEmail": "freepdfjobsearch@gmail.com",
+          "actorPrivateEmail": "freepdfjobsearch@gmail.com",
+          "actorPublicEmail": "",
+          "actorType": "user"
         },
         {
+          "event": "Investigating",
           "status": "Investigating",
           "timestamp": "2026-06-04T22:38:29Z",
-          "actor": "ntylerbert@gmail.com"
+          "actor": "ntylerbert@gmail.com",
+          "actorUid": "",
+          "actorEmail": "ntylerbert@gmail.com",
+          "actorPrivateEmail": "ntylerbert@gmail.com",
+          "actorPublicEmail": "support@recipeshoppinglist.com",
+          "actorType": "support"
+        },
+        {
+          "event": "User Comment Added",
+          "status": "Investigating",
+          "timestamp": "2026-06-05T01:21:49Z",
+          "actor": "freepdfjobsearch@gmail.com",
+          "actorUid": "be46f4d862d74336b7ecbf73b9eb0adf",
+          "actorEmail": "freepdfjobsearch@gmail.com",
+          "actorPrivateEmail": "freepdfjobsearch@gmail.com",
+          "actorPublicEmail": "freepdfjobsearch@gmail.com",
+          "actorType": "user"
         }
       ],
       "notifications": [
@@ -36,6 +60,18 @@
           "message": "Your feedback FB-1001 was updated: Status changed to Investigating.",
           "created_at": "2026-06-04T22:38:29Z",
           "read_at": "2026-06-04T23:06:11Z"
+        }
+      ],
+      "comments": [
+        {
+          "commentId": "c5b99c609e254ed9895d245c6205d48e",
+          "commentText": "nope",
+          "authorUid": "be46f4d862d74336b7ecbf73b9eb0adf",
+          "authorEmail": "freepdfjobsearch@gmail.com",
+          "authorPrivateEmail": "freepdfjobsearch@gmail.com",
+          "authorPublicEmail": "freepdfjobsearch@gmail.com",
+          "authorType": "user",
+          "createdAt": "2026-06-05T01:21:49Z"
         }
       ]
     }

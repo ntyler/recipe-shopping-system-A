@@ -224,79 +224,120 @@
 
             <div class="user-account-actions">
                 <details class="user-account-menu" data-account-menu>
-                    <summary>Account Menu</summary>
-                    <div class="user-account-menu-panel">
-                        <button type="button"
-                                class="secondary"
-                                onclick="return toggleUserProfileEditor()">
-                            Account Settings
-                        </button>
-                        {% if has_account_notices %}
+                    <summary aria-label="Open account menu"
+                             aria-haspopup="menu"
+                             aria-expanded="false"
+                             title="Account menu">
+                        <span class="user-account-menu-trigger-icon" aria-hidden="true"></span>
+                        <span class="sr-only">Account Menu</span>
+                    </summary>
+                    <div class="user-account-menu-panel" role="menu" aria-label="Account">
+                        <div class="user-account-menu-heading">Account</div>
+
+                        <div class="user-account-menu-section">
+                            <div class="user-account-menu-section-title">Profile</div>
                             <button type="button"
-                                    class="secondary"
-                                    aria-controls="accountNoticesPanel"
-                                    onclick="return toggleAccountNoticesPanel()">
-                                Account Notices
+                                    class="user-account-menu-item"
+                                    role="menuitem"
+                                    onclick="return toggleUserProfileEditor()">
+                                Account Settings
                             </button>
-                        {% endif %}
-                        {% if current_user.auth_provider == "firebase" %}
-                            <button type="button"
-                                    class="secondary"
-                                    data-firebase-change-password
-                                    data-user-email="{{ current_user.email }}">
-                                Change Password
-                            </button>
-                            {% if current_user.email_verified %}
+                            {% if has_account_notices %}
                                 <button type="button"
-                                        class="secondary user-account-menu-disabled"
-                                        disabled
-                                        aria-disabled="true">
-                                    Email Verified
-                                </button>
-                            {% else %}
-                                <button type="button"
-                                        class="secondary"
-                                        data-firebase-verify-email>
-                                    Verify Email
+                                        class="user-account-menu-item"
+                                        role="menuitem"
+                                        aria-controls="accountNoticesPanel"
+                                        onclick="return toggleAccountNoticesPanel()">
+                                    Account Notices
                                 </button>
                             {% endif %}
-                        {% else %}
+                        </div>
+
+                        <div class="user-account-menu-section">
+                            <div class="user-account-menu-section-title">Security</div>
+                            {% if current_user.auth_provider == "firebase" %}
+                                <button type="button"
+                                        class="user-account-menu-item"
+                                        role="menuitem"
+                                        data-firebase-change-password
+                                        data-user-email="{{ current_user.email }}">
+                                    Change Password
+                                </button>
+                                {% if current_user.email_verified %}
+                                    <button type="button"
+                                            class="user-account-menu-item user-account-menu-disabled"
+                                            disabled
+                                            aria-disabled="true">
+                                        Email Verified
+                                    </button>
+                                {% else %}
+                                    <button type="button"
+                                            class="user-account-menu-item"
+                                            role="menuitem"
+                                            data-firebase-verify-email>
+                                        Verify Email
+                                    </button>
+                                {% endif %}
+                            {% else %}
+                                <button type="button"
+                                        class="user-account-menu-item"
+                                        role="menuitem"
+                                        onclick="return toggleUserProfileEditor()">
+                                    Change Password
+                                </button>
+                            {% endif %}
                             <button type="button"
-                                    class="secondary"
-                                    onclick="return toggleUserProfileEditor()">
-                                Change Password
+                                    class="user-account-menu-item"
+                                    role="menuitem"
+                                    data-two-factor-open
+                                    aria-controls="accountTwoFactorPanel">
+                                Two-Factor Authentication
                             </button>
-                        {% endif %}
-                        <button type="button"
-                                class="secondary"
-                                data-two-factor-open
-                                aria-controls="accountTwoFactorPanel">
-                            Two-Factor Authentication
-                        </button>
-                        <button type="button"
-                                class="secondary"
-                                data-push-notifications-open
-                                aria-controls="accountPushNotificationsPanel">
-                            Push Notifications
-                        </button>
-                        <button type="button"
-                                class="secondary"
-                                aria-controls="feedbackSupportSection"
-                                onclick="return openFeedbackSupportSection()">
-                            Feedback &amp; Support
-                        </button>
-                        <button type="button"
-                                class="danger"
-                                data-delete-account-open
-                                aria-controls="accountDeletePanel">
-                            Delete Account
-                        </button>
-                        <form id="firebaseSignOutForm"
-                              data-firebase-sign-out-form
-                              method="POST"
-                              action="{{ url_for('account_bp.sign_out_route') }}">
-                            <button type="submit" class="danger">Sign Out</button>
-                        </form>
+                        </div>
+
+                        <div class="user-account-menu-section">
+                            <div class="user-account-menu-section-title">Notifications</div>
+                            <button type="button"
+                                    class="user-account-menu-item"
+                                    role="menuitem"
+                                    data-push-notifications-open
+                                    aria-controls="accountPushNotificationsPanel">
+                                Push Notifications
+                            </button>
+                        </div>
+
+                        <div class="user-account-menu-section">
+                            <div class="user-account-menu-section-title">Support</div>
+                            <button type="button"
+                                    class="user-account-menu-item"
+                                    role="menuitem"
+                                    aria-controls="feedbackSupportSection"
+                                    onclick="return openFeedbackSupportSection()">
+                                Feedback &amp; Support
+                            </button>
+                        </div>
+
+                        <div class="user-account-menu-section">
+                            <div class="user-account-menu-section-title">Account</div>
+                            <button type="button"
+                                    class="user-account-menu-item user-account-menu-danger"
+                                    role="menuitem"
+                                    data-delete-account-open
+                                    aria-controls="accountDeletePanel">
+                                Delete Account
+                            </button>
+                            <form id="firebaseSignOutForm"
+                                  class="user-account-menu-form"
+                                  data-firebase-sign-out-form
+                                  method="POST"
+                                  action="{{ url_for('account_bp.sign_out_route') }}">
+                                <button type="submit"
+                                        class="user-account-menu-item user-account-menu-danger"
+                                        role="menuitem">
+                                    Sign Out
+                                </button>
+                            </form>
+                        </div>
                         <div class="user-account-menu-status"
                              data-account-menu-status
                              aria-live="polite"
@@ -516,6 +557,10 @@
                  aria-live="polite"
                  hidden></div>
         </div>
+
+        {% set feedback_support_account_panel = true %}
+        {% include "sections/feedback_support.html" %}
+        {% set feedback_support_account_panel = false %}
 
         {% set two_factor_panel_open = two_factor_setup or request.args.get("account_panel") == "two_factor" %}
         <div id="accountTwoFactorPanel"

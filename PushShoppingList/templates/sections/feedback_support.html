@@ -1,3 +1,11 @@
+{% set feedback_support_account_panel = feedback_support_account_panel|default(false) %}
+{% if feedback_support_account_panel %}
+<section id="feedbackSupportSection"
+         class="user-account-form user-feedback-support-panel feedback-support-card"
+         data-feedback-support-panel
+         hidden>
+    <div class="feedback-support-content">
+{% else %}
 <section id="feedbackSupportSection" class="app-card feedback-support-card">
     <button type="button"
             class="card-collapse-toggle feedback-support-title-toggle"
@@ -17,6 +25,7 @@
          data-collapse-content="feedback-support"
          data-collapse-default="collapsed"
          data-collapse-mobile-default="collapsed">
+{% endif %}
     <div class="user-push-panel-header feedback-support-panel-header">
         <h3>Feedback &amp; Support</h3>
         <button type="button"
@@ -68,6 +77,7 @@
                     <span>Description</span>
                     <textarea id="feedbackDescriptionInput" name="description" required></textarea>
                 </label>
+                <div class="feedback-form-attachments-heading">Attachments</div>
                 <label>
                     <span>Attach Screenshot</span>
                     <input type="file" name="screenshot" accept="image/png,image/jpeg,image/webp,image/gif">
@@ -90,11 +100,20 @@
     <section class="my-feedback-section" aria-labelledby="myFeedbackTitle">
         <div class="feedback-section-heading-row">
             <h3 id="myFeedbackTitle">📋 My Feedback</h3>
-            {% if feedback_dashboard.unread_count %}
-                <span class="feedback-unread-total">
-                    {{ feedback_dashboard.unread_count }} unread update{% if feedback_dashboard.unread_count != 1 %}s{% endif %}
-                </span>
-            {% endif %}
+            <div class="feedback-section-actions">
+                {% if feedback_dashboard.unread_count %}
+                    <span class="feedback-unread-total">
+                        {{ feedback_dashboard.unread_count }} unread update{% if feedback_dashboard.unread_count != 1 %}s{% endif %}
+                    </span>
+                {% endif %}
+                {% if current_user and feedback_dashboard.my_feedback %}
+                    <button type="button"
+                            class="feedback-collapse-all-btn"
+                            onclick="return collapseAllFeedbackTickets()">
+                        Collapse All Feedback
+                    </button>
+                {% endif %}
+            </div>
         </div>
 
         {% if current_user and feedback_dashboard.my_feedback %}

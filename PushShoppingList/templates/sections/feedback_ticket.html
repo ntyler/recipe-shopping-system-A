@@ -1,24 +1,34 @@
-<article id="feedback-{{ feedback.feedback_id }}" class="feedback-ticket{% if feedback.unread_notifications_count %} has-unread{% endif %}">
-    <div class="feedback-ticket-top">
-        <div>
-            <div class="feedback-ticket-id">{{ feedback.display_feedback_id }}</div>
-            <h4>{{ feedback.subject }}</h4>
-            <div class="feedback-ticket-meta">
+{% set feedback_body_id = "feedback-body-" ~ feedback.feedback_id %}
+<article id="feedback-{{ feedback.feedback_id }}"
+         class="feedback-ticket{% if feedback.unread_notifications_count %} has-unread{% endif %}"
+         data-feedback-ticket>
+    <button type="button"
+            class="feedback-ticket-summary"
+            data-feedback-ticket-toggle
+            aria-expanded="false"
+            aria-controls="{{ feedback_body_id }}"
+            onclick="return toggleFeedbackTicket(this)">
+        <span class="feedback-ticket-summary-main">
+            <span class="feedback-ticket-id">{{ feedback.display_feedback_id }}</span>
+            <span class="feedback-ticket-summary-subject">{{ feedback.subject }}</span>
+            <span class="feedback-ticket-meta">
                 <span>{{ feedback.feedback_type }}</span>
-                <span>Submitted {{ feedback.display_created_at }}</span>
                 <span>Last Updated {{ feedback.display_updated_at }}</span>
-            </div>
-        </div>
-        <div class="feedback-status-wrap">
-            {% if feedback.unread_notifications_count %}
-                <span class="feedback-unread-badge">Unread</span>
-            {% endif %}
-            <span class="feedback-status">{{ feedback.status }}</span>
-            <span class="feedback-priority feedback-priority-{{ feedback.priority_key }}">{{ feedback.priority }} Priority</span>
-        </div>
-    </div>
+            </span>
+        </span>
+        <span class="feedback-ticket-summary-side">
+            <span class="feedback-ticket-badges">
+                {% if feedback.unread_notifications_count %}
+                    <span class="feedback-unread-badge">Unread</span>
+                {% endif %}
+                <span class="feedback-status">{{ feedback.status }}</span>
+                <span class="feedback-priority feedback-priority-{{ feedback.priority_key }}">{{ feedback.priority }} Priority</span>
+            </span>
+            <span class="feedback-ticket-chevron" aria-hidden="true"></span>
+        </span>
+    </button>
 
-    <div class="feedback-ticket-body">
+    <div id="{{ feedback_body_id }}" class="feedback-ticket-body" data-feedback-ticket-body hidden>
         <div class="feedback-ticket-description">{{ feedback.description }}</div>
 
         {% if feedback.latest_notification_message %}
@@ -33,8 +43,8 @@
 
         {% if feedback.admin_notes %}
             <div class="feedback-admin-update">
-                <strong>Support Update</strong>
-                <small>From {{ feedback.support_public_email }}</small>
+                <strong>Support Team</strong>
+                <small>{{ feedback.support_public_email }}</small>
                 <span>{{ feedback.admin_notes }}</span>
             </div>
         {% endif %}
@@ -46,19 +56,28 @@
             </div>
         {% endif %}
 
-        {% if feedback.attachments or feedback.admin_attachments %}
-            <div class="feedback-attachment-list">
-                {% for attachment in feedback.attachments %}
-                    <a href="{{ url_for('static', filename=attachment.path) }}" target="_blank" rel="noopener noreferrer">
-                        {{ attachment.original_name }}
-                    </a>
-                {% endfor %}
-                {% for attachment in feedback.admin_attachments %}
-                    <a href="{{ url_for('static', filename=attachment.path) }}" target="_blank" rel="noopener noreferrer">
-                        {{ attachment.original_name }}
-                    </a>
-                {% endfor %}
-            </div>
+        {% if feedback.user_attachments or feedback.support_attachments %}
+            <section class="feedback-attachments" aria-label="Ticket attachments">
+                <strong>Attachments</strong>
+                <ul class="feedback-attachment-list">
+                    {% for attachment in feedback.user_attachments %}
+                        <li>
+                            <span>{{ attachment.display_label }}</span>
+                            <a href="{{ url_for('static', filename=attachment.path) }}" target="_blank" rel="noopener noreferrer">
+                                {{ attachment.original_name }}
+                            </a>
+                        </li>
+                    {% endfor %}
+                    {% for attachment in feedback.support_attachments %}
+                        <li>
+                            <span>{{ attachment.display_label }}</span>
+                            <a href="{{ url_for('static', filename=attachment.path) }}" target="_blank" rel="noopener noreferrer">
+                                {{ attachment.original_name }}
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </section>
         {% endif %}
 
         {% if feedback.comments %}
@@ -83,7 +102,7 @@
             <ol class="feedback-timeline">
                 {% for event in feedback.timeline %}
                     <li>
-                        <span>{{ event.event }}</span>
+                        <strong>{{ event.event }}</strong>
                         <small>
                             {{ event.display_date }}
                             {% if event.display_actor %} by {{ event.display_actor }}{% endif %}

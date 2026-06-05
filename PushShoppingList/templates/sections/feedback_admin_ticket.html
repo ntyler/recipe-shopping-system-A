@@ -66,7 +66,7 @@
             <ol class="feedback-timeline">
                 {% for event in feedback.timeline %}
                     <li>
-                        <span>{{ event.event }}</span>
+                        <strong>{{ event.event }}</strong>
                         <small>
                             {{ event.display_date }}
                             {% if event.display_actor %} by {{ event.display_actor }}{% endif %}

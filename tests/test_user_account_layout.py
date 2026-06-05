@@ -27,6 +27,41 @@ def test_verified_email_menu_action_is_disabled():
     assert ".user-account-menu-disabled" in css
 
 
+def test_account_menu_uses_compact_grouped_dropdown_style():
+    template = (ROOT / "PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+
+    menu_start = template.index('<details class="user-account-menu" data-account-menu>')
+    menu_end = template.index("</details>", menu_start)
+    menu_markup = template[menu_start:menu_end]
+
+    assert 'aria-haspopup="menu"' in menu_markup
+    assert 'aria-expanded="false"' in menu_markup
+    assert 'role="menu"' in menu_markup
+    assert 'role="menuitem"' in menu_markup
+    assert 'class="sr-only">Account Menu</span>' in menu_markup
+    assert "user-account-menu-heading" in menu_markup
+    assert "user-account-menu-trigger-icon" in menu_markup
+    for label in ("Profile", "Security", "Notifications", "Support", "Account"):
+        assert f">{label}</div>" in menu_markup
+    assert "user-account-menu-item" in menu_markup
+    assert "user-account-menu-danger" in menu_markup
+    assert 'class="secondary"' not in menu_markup
+    assert 'class="danger"' not in menu_markup
+    assert ".user-account-menu-panel {" in css
+    assert "width: min(320px, calc(100vw - 32px));" in css
+    assert "overflow-y: auto;" in css
+    assert "var(--submenu-bg)" in css
+    assert ".user-account-menu-section-title" in css
+    assert ".user-account-menu-panel .user-account-menu-item" in css
+    assert ".user-account-menu-panel .user-account-menu-danger" in css
+    assert "function bindAccountMenuDropdowns()" in script
+    assert "function closeAccountMenuDropdown(menu, options = {})" in script
+    assert 'event.target.closest("[data-account-menu]")' in script
+    assert 'event.key !== "Escape"' in script
+
+
 def test_account_settings_editor_has_header_close_and_closes_menu():
     template = (ROOT / "PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
@@ -125,24 +160,76 @@ def test_admin_support_view_is_admin_only_reasoned_and_audited():
 
 def test_feedback_support_follows_account_and_closes_to_profile():
     index_template = (ROOT / "PushShoppingList/templates/index.html").read_text(encoding="utf-8")
+    account_template = (ROOT / "PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")
     feedback_template = (ROOT / "PushShoppingList/templates/sections/feedback_support.html").read_text(encoding="utf-8")
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    firebase_script = (ROOT / "PushShoppingList/static/js/firebase-auth.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
     account_include = '{% include "sections/user_account.html" %}'
     feedback_include = '{% include "sections/feedback_support.html" %}'
-    ai_pantry_include = '{% include "sections/ai_pantry.html" %}'
+    push_panel_marker = 'data-push-notifications-panel'
+    two_factor_panel_marker = 'data-two-factor-panel'
 
-    assert index_template.index(account_include) < index_template.index(feedback_include)
-    assert index_template.index(feedback_include) < index_template.index(ai_pantry_include)
+    assert index_template.index(account_include) < index_template.index("{% if not current_user %}")
     assert index_template.count(feedback_include) == 1
+    assert account_template.index(push_panel_marker) < account_template.index(feedback_include)
+    assert account_template.index(feedback_include) < account_template.index(two_factor_panel_marker)
+    assert "{% set feedback_support_account_panel = true %}" in account_template
+    assert "data-feedback-support-panel" in feedback_template
+    assert "user-feedback-support-panel" in feedback_template
     assert "data-feedback-support-close" in feedback_template
     assert "onclick=\"return closeFeedbackSupportSection()\"" in feedback_template
     assert "user-push-panel-header feedback-support-panel-header" in feedback_template
     assert "function closeFeedbackSupportSection()" in script
     assert 'toggleCardCollapse("feedback-support")' in script
+    assert "function hideAccountPanelsForFeedback(exceptPanel = null)" in script
+    assert "[data-feedback-support-panel]" in script
+    assert "[data-feedback-support-panel]" in firebase_script
     assert 'scrollToUserAccountProfile("auto")' in script
+    assert ".user-feedback-support-panel" in css
     assert ".feedback-support-content" in css
+
+
+def test_feedback_support_tickets_are_compact_collapsible_portal_rows():
+    support_template = (ROOT / "PushShoppingList/templates/sections/feedback_support.html").read_text(encoding="utf-8")
+    ticket_template = (ROOT / "PushShoppingList/templates/sections/feedback_ticket.html").read_text(encoding="utf-8")
+    admin_ticket_template = (ROOT / "PushShoppingList/templates/sections/feedback_admin_ticket.html").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+
+    assert "feedback-form-attachments-heading" in support_template
+    assert "Attachments" in support_template
+    assert "Collapse All Feedback" in support_template
+    assert "collapseAllFeedbackTickets()" in support_template
+    assert "data-feedback-ticket" in ticket_template
+    assert "data-feedback-ticket-toggle" in ticket_template
+    assert 'aria-expanded="false"' in ticket_template
+    assert "data-feedback-ticket-body hidden" in ticket_template
+    assert "feedback-ticket-badges" in ticket_template
+    assert "Last Updated {{ feedback.display_updated_at }}" in ticket_template
+    assert "Support Team" in ticket_template
+    assert "{{ feedback.support_public_email }}" in ticket_template
+    assert "feedback.user_attachments" in ticket_template
+    assert "attachment.display_label" in ticket_template
+    assert "<strong>{{ event.event }}</strong>" in ticket_template
+    assert "<strong>{{ event.event }}</strong>" in admin_ticket_template
+    assert ".feedback-ticket-summary" in css
+    assert ".feedback-ticket-badges" in css
+    assert ".feedback-ticket-body[hidden]" in css
+    assert ".feedback-form-attachments-heading" in css
+    assert ".feedback-section-actions" in css
+    assert ".feedback-collapse-all-btn" in css
+    assert ".feedback-attachments" in css
+    assert ".feedback-timeline::before" in css
+    assert "function toggleFeedbackTicket(toggle)" in script
+    assert "function collapseAllFeedbackTickets()" in script
+    assert "function bindFeedbackTickets()" in script
+    assert 'window.matchMedia("(max-width: 650px)")' in script
+    assert "closeSiblingFeedbackTickets(ticket)" in script
+    assert "expandFeedbackTicketFromHash()" in script
+    assert "bindFeedbackTickets();" in script
+    assert "bindAccountMenuDropdowns();" in script
 
 
 def test_account_action_token_pages_stay_focused_and_visible():

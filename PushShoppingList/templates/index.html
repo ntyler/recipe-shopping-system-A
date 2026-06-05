@@ -13,6 +13,25 @@
 
 <h1>Shopping List</h1>
 
+<div class="shopping-global-collapse-controls" data-global-collapse-controls>
+    <div class="shopping-global-collapse-actions">
+        <button type="button"
+                class="shopping-global-collapse-btn"
+                onclick="return collapseAllShoppingListPage()">
+            Collapse All
+        </button>
+        <button type="button"
+                class="shopping-global-collapse-btn secondary"
+                onclick="return expandAllShoppingListPage()">
+            Expand All
+        </button>
+    </div>
+    <div class="shopping-global-collapse-status"
+         data-global-collapse-status
+         aria-live="polite"
+         hidden></div>
+</div>
+
 {% if current_user and current_user.is_admin %}
     {% include "sections/screen_settings.html" %}
 {% endif %}
@@ -27,7 +46,9 @@
 
 <main id="appContent" class="app-content">
     {% include "sections/user_account.html" %}
-    {% include "sections/feedback_support.html" %}
+    {% if not current_user %}
+        {% include "sections/feedback_support.html" %}
+    {% endif %}
     {% if admin_support_dashboard and admin_support_dashboard.is_admin %}
         <div class="app-section-divider" aria-hidden="true"></div>
         {% include "sections/admin_support.html" %}

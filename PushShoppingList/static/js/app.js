@@ -515,7 +515,7 @@ function toggleUserProfileEditor(open = null) {
         closeAccountMenu();
 
         document.querySelectorAll(
-            "[data-account-notices-panel], [data-push-notifications-panel], [data-two-factor-panel], [data-delete-account-panel]"
+            "[data-account-notices-panel], [data-push-notifications-panel], [data-feedback-support-panel], [data-two-factor-panel], [data-delete-account-panel]"
         ).forEach(panel => {
             panel.hidden = true;
         });
@@ -566,7 +566,7 @@ function toggleAccountNoticesPanel(open = null) {
         closeAccountMenu();
 
         document.querySelectorAll(
-            "#userProfileEditForm, [data-push-notifications-panel], [data-two-factor-panel], [data-delete-account-panel]"
+            "#userProfileEditForm, [data-push-notifications-panel], [data-feedback-support-panel], [data-two-factor-panel], [data-delete-account-panel]"
         ).forEach(otherPanel => {
             otherPanel.hidden = true;
         });
@@ -608,6 +608,78 @@ function toggleAccountAccessHistory(button) {
     button.setAttribute("aria-expanded", open ? "true" : "false");
     button.textContent = open ? "Hide account access history" : "View account access history";
     return false;
+}
+
+function closeAccountMenuDropdown(menu, options = {}) {
+    if (!menu) {
+        return;
+    }
+
+    const wasOpen = Boolean(menu.open);
+    menu.open = false;
+    const summary = menu.querySelector("summary");
+
+    if (summary) {
+        summary.setAttribute("aria-expanded", "false");
+
+        if (wasOpen && options.focusTrigger) {
+            summary.focus({ preventScroll: true });
+        }
+    }
+}
+
+function syncAccountMenuDropdownState(menu) {
+    const summary = menu ? menu.querySelector("summary") : null;
+
+    if (summary) {
+        summary.setAttribute("aria-expanded", menu.open ? "true" : "false");
+    }
+}
+
+function bindAccountMenuDropdowns() {
+    const menus = document.querySelectorAll("[data-account-menu]");
+
+    menus.forEach(menu => {
+        if (menu.dataset.accountMenuDropdownBound === "1") {
+            return;
+        }
+
+        menu.dataset.accountMenuDropdownBound = "1";
+        syncAccountMenuDropdownState(menu);
+        menu.addEventListener("toggle", () => syncAccountMenuDropdownState(menu));
+    });
+
+    if (document.documentElement.dataset.accountMenuGlobalBound === "1") {
+        return;
+    }
+
+    document.documentElement.dataset.accountMenuGlobalBound = "1";
+    document.addEventListener("click", event => {
+        if (event.target && event.target.closest && event.target.closest("[data-account-menu]")) {
+            return;
+        }
+
+        document.querySelectorAll("[data-account-menu][open]").forEach(menu => {
+            closeAccountMenuDropdown(menu);
+        });
+    });
+
+    document.addEventListener("keydown", event => {
+        if (event.key !== "Escape") {
+            return;
+        }
+
+        let closedAny = false;
+        document.querySelectorAll("[data-account-menu][open]").forEach(menu => {
+            closeAccountMenuDropdown(menu, { focusTrigger: true });
+            closedAny = true;
+        });
+
+        if (closedAny) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+    });
 }
 
 function toggleForgotPasswordForm() {
@@ -4866,6 +4938,25 @@ function setSavedCardCollapseState(key, content, state) {
     }
 }
 
+function setCardCollapseContentCollapsed(content, collapsed) {
+    if (!content) {
+        return;
+    }
+
+    const key = content.dataset.collapseContent;
+    const isCollapsed = Boolean(collapsed);
+    const card = content.closest(".app-card");
+
+    content.classList.toggle("collapsed", isCollapsed);
+
+    if (card) {
+        card.classList.toggle("card-collapsed", isCollapsed);
+    }
+
+    setSavedCardCollapseState(key, content, isCollapsed ? "collapsed" : "expanded");
+    updateCardCollapseToggleState(key, isCollapsed);
+}
+
 function toggleCardCollapse(key) {
     const content = document.querySelector(`[data-collapse-content="${key}"]`);
     const storeOptionsStickyTop = key === "store-options"
@@ -4876,15 +4967,8 @@ function toggleCardCollapse(key) {
         return;
     }
 
-    const isCollapsed = content.classList.toggle("collapsed");
-    const card = content.closest(".app-card");
-    setSavedCardCollapseState(key, content, isCollapsed ? "collapsed" : "expanded");
-
-    if (card) {
-        card.classList.toggle("card-collapsed", isCollapsed);
-    }
-
-    updateCardCollapseToggleState(key, isCollapsed);
+    const isCollapsed = !content.classList.contains("collapsed");
+    setCardCollapseContentCollapsed(content, isCollapsed);
 
     window.setTimeout(initStoreLocationMaps, 0);
     scheduleAddStoreStickyVisibilityUpdate();
@@ -4896,6 +4980,183 @@ function toggleCardCollapse(key) {
     if (key === "rules" && isCollapsed) {
         window.setTimeout(scrollRulesIntoView, 0);
     }
+}
+
+function setAllCardCollapseContentCollapsed(collapsed) {
+    document.querySelectorAll("[data-collapse-content]").forEach(content => {
+        setCardCollapseContentCollapsed(content, collapsed);
+    });
+
+    window.setTimeout(initStoreLocationMaps, 0);
+    scheduleAddStoreStickyVisibilityUpdate();
+}
+
+function setShoppingListSiblingRowsCollapsed(headerSelector, stopSelector, collapsed) {
+    document.querySelectorAll(headerSelector).forEach(header => {
+        let sibling = header.nextElementSibling;
+
+        while (sibling && !sibling.matches(stopSelector)) {
+            sibling.classList.toggle("collapsed-by-header", collapsed);
+            sibling = sibling.nextElementSibling;
+        }
+    });
+}
+
+function setShoppingListViewRowsCollapsed(collapsed) {
+    setShoppingListSiblingRowsCollapsed(
+        "#sectionView .section-header-row",
+        ".section-header-row",
+        collapsed
+    );
+    setShoppingListSiblingRowsCollapsed(
+        "#storeView .store-section-header",
+        ".store-section-header, .store-header-row",
+        collapsed
+    );
+}
+
+function setAllRecipeViewNestedPanelsCollapsed(collapsed) {
+    document.querySelectorAll("[data-recipe-view-card]").forEach(card => {
+        const toggle = card.querySelector("[data-recipe-card-toggle]");
+        const key = card.dataset.recipeCardKey || (toggle ? toggle.dataset.recipeCardKey : "");
+
+        if (!collapsed) {
+            setRecipeCardCollapsed(card, toggle, false);
+
+            if (key) {
+                localStorage.setItem(`recipe-card-collapsed:${key}`, "0");
+            }
+        }
+
+        card.querySelectorAll(".detail-toggle, .nutrition-toggle").forEach(detailToggle => {
+            const parts = recipeDetailSectionParts(detailToggle);
+
+            if (!parts.content) {
+                return;
+            }
+
+            setRecipeDetailSectionCollapsed(detailToggle, collapsed);
+            localStorage.setItem(parts.storageKey, collapsed ? "1" : "0");
+        });
+
+        card.querySelectorAll('.collapsible-header[data-collapse-scope="recipe-section"]').forEach(header => {
+            const title = header.querySelector(".header-title");
+            const collapseKey = header.dataset.collapseKey || (title ? normalizeSectionKey(title.textContent) : "");
+            const icon = header.querySelector(".header-toggle-icon");
+
+            setSectionCollapsed(header, icon, collapsed);
+
+            if (collapseKey) {
+                localStorage.setItem(`section-collapsed:${collapseKey}`, collapsed ? "1" : "0");
+            }
+        });
+
+        if (collapsed) {
+            setRecipeCardCollapsed(card, toggle, true);
+
+            if (key) {
+                localStorage.setItem(`recipe-card-collapsed:${key}`, "1");
+            }
+        }
+    });
+}
+
+function setAllCookbookPanelsCollapsed(collapsed) {
+    document.querySelectorAll("[data-cookbook-card]").forEach(card => {
+        const storageKey = cookbookCardCollapseStorageKey(card.dataset.cookbookId || "");
+
+        setCookbookCardCollapsed(card, collapsed);
+
+        if (storageKey) {
+            localStorage.setItem(storageKey, collapsed ? "collapsed" : "expanded");
+        }
+    });
+
+    document.querySelectorAll("[data-cookbook-recipe-card]").forEach(card => {
+        const storageKey = cookbookRecipeCollapseStorageKey(card.dataset.cookbookRecipeKey || "");
+
+        setCookbookRecipeCollapsed(card, collapsed);
+
+        if (storageKey) {
+            localStorage.setItem(storageKey, collapsed ? "collapsed" : "expanded");
+        }
+    });
+}
+
+function setRecipeCoverImagesVisibleForGlobal(visible) {
+    document.querySelectorAll(
+        ".recipe-view-title-media, .recipe-view-body-media, .recipe-url-summary-main, .recipe-cover-image"
+    ).forEach(element => {
+        element.classList.toggle("recipe-global-image-hidden", !visible);
+        element.setAttribute("aria-hidden", visible ? "false" : "true");
+    });
+}
+
+function setAllShoppingListRecipeImagesVisible(visible) {
+    setRecipeImageContainersVisible(
+        document.querySelectorAll("[data-recipe-edit-title-image-panel], [data-equipment-image-panel], [data-step-image-panel]"),
+        visible
+    );
+    setRecipeCoverImagesVisibleForGlobal(visible);
+}
+
+function closeShoppingListExpandedPanels() {
+    if (typeof closeRecipeEditRowMenus === "function") {
+        closeRecipeEditRowMenus();
+    }
+
+    if (typeof closeProductAlternatives === "function") {
+        closeProductAlternatives();
+    }
+
+    if (typeof closeProductPromptModal === "function") {
+        closeProductPromptModal();
+    }
+
+    if (typeof closeTestGrabAldiModal === "function") {
+        closeTestGrabAldiModal();
+    }
+
+    if (typeof closeRecipeImageLightbox === "function") {
+        closeRecipeImageLightbox();
+    }
+
+    document.querySelectorAll("details[open]").forEach(details => {
+        details.open = false;
+    });
+}
+
+function setShoppingGlobalCollapseStatus(message) {
+    const status = document.querySelector("[data-global-collapse-status]");
+
+    if (!status) {
+        return;
+    }
+
+    status.hidden = false;
+    status.textContent = message;
+}
+
+function collapseAllShoppingListPage() {
+    closeShoppingListExpandedPanels();
+    setAllCardCollapseContentCollapsed(true);
+    setShoppingListViewRowsCollapsed(true);
+    setAllRecipeViewNestedPanelsCollapsed(true);
+    setAllCookbookPanelsCollapsed(true);
+    setAllShoppingListRecipeImagesVisible(false);
+    setShoppingGlobalCollapseStatus("Everything collapsed.");
+    return false;
+}
+
+function expandAllShoppingListPage() {
+    closeShoppingListExpandedPanels();
+    setAllCardCollapseContentCollapsed(false);
+    setShoppingListViewRowsCollapsed(false);
+    setAllRecipeViewNestedPanelsCollapsed(false);
+    setAllCookbookPanelsCollapsed(false);
+    setAllShoppingListRecipeImagesVisible(recipeImagesShownByDefault());
+    setShoppingGlobalCollapseStatus("Everything expanded.");
+    return false;
 }
 
 function storeOptionsStickyStackTop() {
@@ -15202,12 +15463,137 @@ const STORE_REQUEST_FEEDBACK_DESCRIPTION = [
     "Notes:"
 ].join("\n");
 
+function hideAccountPanelsForFeedback(exceptPanel = null) {
+    document.querySelectorAll(
+        "#userProfileEditForm, [data-account-notices-panel], [data-push-notifications-panel], [data-feedback-support-panel], [data-two-factor-panel], [data-delete-account-panel]"
+    ).forEach(panel => {
+        if (panel !== exceptPanel) {
+            panel.hidden = true;
+        }
+    });
+}
+
+function feedbackSupportFocusTarget(section) {
+    if (!section) {
+        return null;
+    }
+
+    if (section.matches("[data-feedback-support-panel]")) {
+        return section.querySelector("[data-feedback-support-close]")
+            || section.querySelector("#feedbackSubjectInput")
+            || section.querySelector("button, input, select, textarea");
+    }
+
+    return section.querySelector("#feedbackSubjectInput")
+        || section.querySelector(".feedback-sign-in-panel")
+        || section.querySelector(".feedback-support-title-toggle");
+}
+
+function isFeedbackMobileLayout() {
+    return window.matchMedia && window.matchMedia("(max-width: 650px)").matches;
+}
+
+function setFeedbackTicketExpanded(ticket, expanded) {
+    if (!ticket) {
+        return;
+    }
+
+    const open = Boolean(expanded);
+    const toggle = ticket.querySelector("[data-feedback-ticket-toggle]");
+    const body = ticket.querySelector("[data-feedback-ticket-body]");
+
+    ticket.classList.toggle("feedback-ticket-expanded", open);
+
+    if (toggle) {
+        toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+
+    if (body) {
+        body.hidden = !open;
+    }
+}
+
+function closeSiblingFeedbackTickets(ticket) {
+    if (!ticket || !isFeedbackMobileLayout()) {
+        return;
+    }
+
+    const list = ticket.closest(".feedback-ticket-list");
+    const selector = "[data-feedback-ticket].feedback-ticket-expanded";
+
+    (list || document).querySelectorAll(selector).forEach(otherTicket => {
+        if (otherTicket !== ticket) {
+            setFeedbackTicketExpanded(otherTicket, false);
+        }
+    });
+}
+
+function toggleFeedbackTicket(toggle) {
+    const ticket = toggle ? toggle.closest("[data-feedback-ticket]") : null;
+
+    if (!ticket) {
+        return false;
+    }
+
+    const shouldOpen = toggle.getAttribute("aria-expanded") !== "true";
+
+    if (shouldOpen) {
+        closeSiblingFeedbackTickets(ticket);
+    }
+
+    setFeedbackTicketExpanded(ticket, shouldOpen);
+    return false;
+}
+
+function collapseAllFeedbackTickets() {
+    document.querySelectorAll("[data-feedback-ticket]").forEach(ticket => {
+        setFeedbackTicketExpanded(ticket, false);
+    });
+
+    return false;
+}
+
+function expandFeedbackTicketFromHash() {
+    const hash = window.location.hash || "";
+
+    if (!hash.startsWith("#feedback-")) {
+        return;
+    }
+
+    const ticket = document.getElementById(hash.slice(1));
+
+    if (!ticket || !ticket.matches("[data-feedback-ticket]")) {
+        return;
+    }
+
+    closeSiblingFeedbackTickets(ticket);
+    setFeedbackTicketExpanded(ticket, true);
+}
+
+function bindFeedbackTickets() {
+    document.querySelectorAll("[data-feedback-ticket]").forEach(ticket => {
+        if (ticket.dataset.feedbackTicketBound === "1") {
+            return;
+        }
+
+        ticket.dataset.feedbackTicketBound = "1";
+        setFeedbackTicketExpanded(ticket, ticket.classList.contains("feedback-ticket-expanded"));
+    });
+
+    if (document.documentElement.dataset.feedbackTicketsGlobalBound !== "1") {
+        document.documentElement.dataset.feedbackTicketsGlobalBound = "1";
+        window.addEventListener("hashchange", expandFeedbackTicketFromHash);
+    }
+
+    expandFeedbackTicketFromHash();
+}
+
 function openFeedbackSupportSection() {
     const section = document.getElementById("feedbackSupportSection");
     const content = document.querySelector('[data-collapse-content="feedback-support"]');
     const menu = document.querySelector("[data-account-menu]");
 
-    if (!section || !content) {
+    if (!section) {
         return false;
     }
 
@@ -15215,16 +15601,17 @@ function openFeedbackSupportSection() {
         menu.open = false;
     }
 
-    if (content.classList.contains("collapsed")) {
+    if (section.matches("[data-feedback-support-panel]")) {
+        section.hidden = false;
+        hideAccountPanelsForFeedback(section);
+    } else if (content && content.classList.contains("collapsed")) {
         toggleCardCollapse("feedback-support");
     }
 
     window.setTimeout(() => {
         section.scrollIntoView({ behavior: "smooth", block: "start" });
 
-        const focusTarget = section.querySelector("#feedbackSubjectInput")
-            || section.querySelector(".feedback-sign-in-panel")
-            || section.querySelector(".feedback-support-title-toggle");
+        const focusTarget = feedbackSupportFocusTarget(section);
         if (focusTarget && typeof focusTarget.focus === "function") {
             focusTarget.focus({ preventScroll: true });
         }
@@ -15234,9 +15621,12 @@ function openFeedbackSupportSection() {
 }
 
 function closeFeedbackSupportSection() {
+    const section = document.getElementById("feedbackSupportSection");
     const content = document.querySelector('[data-collapse-content="feedback-support"]');
 
-    if (content && !content.classList.contains("collapsed")) {
+    if (section && section.matches("[data-feedback-support-panel]")) {
+        section.hidden = true;
+    } else if (content && !content.classList.contains("collapsed")) {
         toggleCardCollapse("feedback-support");
     }
 
@@ -15253,11 +15643,14 @@ function openStoreRequestFeedback(button) {
     const section = document.getElementById("feedbackSupportSection");
     const content = document.querySelector('[data-collapse-content="feedback-support"]');
 
-    if (!section || !content) {
+    if (!section) {
         return false;
     }
 
-    if (content.classList.contains("collapsed")) {
+    if (section.matches("[data-feedback-support-panel]")) {
+        section.hidden = false;
+        hideAccountPanelsForFeedback(section);
+    } else if (content && content.classList.contains("collapsed")) {
         toggleCardCollapse("feedback-support");
     }
 
@@ -16054,6 +16447,8 @@ async function refreshStoreMarkup(options = {}) {
     restoreOpenStorePanels();
     restoreViewBehaviorSettings();
     restoreItemCheckState();
+    bindAccountMenuDropdowns();
+    bindFeedbackTickets();
     initPhoneCountryInputs();
     bindRecipeUrlLogDragAndDrop();
     bindRecipeViewDragAndDrop();
@@ -16245,6 +16640,8 @@ document.addEventListener("DOMContentLoaded", function () {
     restoreOpenStorePanels();
     restoreViewBehaviorSettings();
     restoreItemCheckState();
+    bindAccountMenuDropdowns();
+    bindFeedbackTickets();
     initPhoneCountryInputs();
     bindRecipeUrlLogDragAndDrop();
     bindRecipeViewDragAndDrop();

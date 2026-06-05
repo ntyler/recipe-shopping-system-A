@@ -161,6 +161,11 @@ def normalize_attachments(attachments):
             "path": stored_path,
             "uploaded_at": str(attachment.get("uploaded_at") or now_iso()),
             "uploaded_by": str(attachment.get("uploaded_by") or "").strip(),
+            "attachment_type": clean_attachment_type(
+                attachment.get("attachment_type")
+                or attachment.get("kind")
+                or attachment.get("type")
+            ),
         })
 
     return normalized
@@ -312,7 +317,7 @@ def feedback_view(item, current_user=None, include_user=False):
             **comment,
             "display_created_at": format_display_datetime(comment.get("createdAt")),
             "display_author": comment_author_for_view(comment, include_private=include_user and viewer_is_admin),
-            "author_type_label": "Support" if comment.get("authorType") == "support" else "You",
+            "author_type_label": "Support Team" if comment.get("authorType") == "support" else "You",
         }
         for comment in item.get("comments", [])
     ]
@@ -327,6 +332,8 @@ def feedback_view(item, current_user=None, include_user=False):
         "support_public_email": SUPPORT_EMAIL,
         "timeline": timeline,
         "comments": comments,
+        "user_attachments": display_attachments(item.get("attachments", []), support=False),
+        "support_attachments": display_attachments(item.get("admin_attachments", []), support=True),
         "unread_notifications_count": len([notification for notification in notifications if not notification.get("read_at")]),
         "latest_notification_message": display_notification_message(last_notification.get("message", ""), item),
         "latest_notification_at": format_display_datetime(last_notification.get("created_at")),
@@ -356,6 +363,30 @@ def public_support_email_for_private(email):
         return SUPPORT_EMAIL
 
     return public_email
+
+
+def display_attachments(attachments, support=False):
+    return [
+        {
+            **attachment,
+            "display_label": attachment_display_label(attachment, index, support=support),
+        }
+        for index, attachment in enumerate(attachments if isinstance(attachments, list) else [])
+        if isinstance(attachment, dict) and attachment.get("path")
+    ]
+
+
+def attachment_display_label(attachment, index=0, support=False):
+    attachment_type = clean_attachment_type((attachment or {}).get("attachment_type"))
+
+    if support or attachment_type == "support":
+        return "Support Attachment"
+    if attachment_type == "screenshot":
+        return "Screenshot"
+    if attachment_type == "file":
+        return "Uploaded File"
+
+    return "Screenshot" if index == 0 else "Uploaded File"
 
 
 def timeline_actor_for_view(entry, include_private=False):
@@ -435,17 +466,25 @@ def create_feedback(user, form, files):
     payload = load_feedback_payload()
     timestamp = now_iso()
     feedback_id = next_feedback_id(payload)
-    attachment_result = save_feedback_uploads(
-        [
-            *files.getlist("screenshot"),
-            *files.getlist("attachment"),
-        ],
+    screenshot_result = save_feedback_uploads(
+        files.getlist("screenshot"),
         feedback_id,
         "user",
+        attachment_type="screenshot",
     )
+    attachment_result = save_feedback_uploads(
+        files.getlist("attachment"),
+        feedback_id,
+        "user",
+        attachment_type="file",
+    )
+    upload_errors = [
+        *screenshot_result.get("errors", []),
+        *attachment_result.get("errors", []),
+    ]
 
-    if not attachment_result.get("ok"):
-        return {"ok": False, "errors": attachment_result.get("errors", ["Attachment upload failed."])}
+    if upload_errors:
+        return {"ok": False, "errors": upload_errors or ["Attachment upload failed."]}
 
     record = {
         "feedback_id": feedback_id,
@@ -459,7 +498,10 @@ def create_feedback(user, form, files):
         "feedback_type": feedback_type,
         "subject": subject,
         "description": description,
-        "attachments": attachment_result.get("attachments", []),
+        "attachments": [
+            *screenshot_result.get("attachments", []),
+            *attachment_result.get("attachments", []),
+        ],
         "status": "Submitted",
         "priority": "Normal",
         "admin_notes": "",
@@ -513,6 +555,7 @@ def update_feedback_as_admin(admin_user, feedback_id, form, files):
         files.getlist("admin_attachment"),
         item["feedback_id"],
         "admin",
+        attachment_type="support",
     )
 
     if not attachment_result.get("ok"):
@@ -757,9 +800,10 @@ def mark_feedback_notifications_read(user, feedback_id):
     return {"ok": True}
 
 
-def save_feedback_uploads(uploads, feedback_id, actor):
+def save_feedback_uploads(uploads, feedback_id, actor, attachment_type=""):
     attachments = []
     errors = []
+    attachment_type = clean_attachment_type(attachment_type)
 
     for upload in uploads:
         if not upload or not getattr(upload, "filename", ""):
@@ -783,6 +827,7 @@ def save_feedback_uploads(uploads, feedback_id, actor):
             "path": f"uploads/feedback/{feedback_slug}/{stored_name}",
             "uploaded_at": now_iso(),
             "uploaded_by": actor,
+            "attachment_type": attachment_type,
         })
 
     if errors:
@@ -847,6 +892,11 @@ def clean_timeline_event(value):
 def clean_author_type(value):
     value = str(value or "").strip().lower()
     return value if value in {"user", "support", "system"} else ""
+
+
+def clean_attachment_type(value):
+    value = str(value or "").strip().lower()
+    return value if value in {"screenshot", "file", "support"} else ""
 
 
 def infer_actor_type(actor_email, event):

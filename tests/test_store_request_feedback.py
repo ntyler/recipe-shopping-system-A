@@ -194,7 +194,7 @@ def test_feedback_ticket_portal_renders_public_support_identity(monkeypatch, tmp
         )
 
     assert "RSL-FB-1001" in html
-    assert "Support Update" in html
+    assert "Support Team" in html
     assert "Admin Update" not in html
     assert "support@recipeshoppinglist.com" in html
     assert "ntylerbert@gmail.com" not in html
