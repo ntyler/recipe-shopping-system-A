@@ -139,6 +139,34 @@ def test_openai_usage_can_record_for_explicit_user_from_worker_thread(tmp_path, 
     assert dashboard["monthly_request_count"] == 1
 
 
+def test_recipe_import_activity_counts_without_inflating_api_usage(tmp_path, monkeypatch):
+    monkeypatch.setattr(storage_service, "USER_DATA_DIR", tmp_path / "users")
+    monkeypatch.setattr(openai_usage_service, "active_user_id", lambda: "user-123")
+
+    record = openai_usage_service.record_app_activity(
+        "recipe-import",
+        metadata={
+            "source": "api-url",
+            "recipeUrl": "https://example.com/recipe",
+            "ingredientCount": 8,
+        },
+    )
+    dashboard = openai_usage_service.openai_usage_dashboard_for_user({"user_id": "user-123"})
+
+    assert record["recordType"] == "app-activity"
+    assert record["feature"] == "recipe-import"
+    assert record["totalTokens"] == 0
+    assert record["metadata"]["ingredientCount"] == 8
+    assert dashboard["monthly_recipe_import_count"] == 1
+    assert dashboard["monthly_request_count"] == 0
+    assert dashboard["monthly_total_tokens"] == 0
+    assert dashboard["monthly_estimated_cost_label"] == "Not available yet"
+    assert dashboard["monthly_billable_cost_label"] == "Not available yet"
+    assert dashboard["has_usage"] is False
+    assert dashboard["has_activity"] is True
+    assert dashboard["last_used_at_label"] == "Not recorded yet"
+
+
 def test_openai_usage_dashboard_counts_user_friendly_activity_groups(tmp_path, monkeypatch):
     monkeypatch.setattr(storage_service, "USER_DATA_DIR", tmp_path / "users")
     monkeypatch.setattr(openai_usage_service, "active_user_id", lambda: "user-123")
@@ -303,6 +331,7 @@ def test_openai_usage_tracking_is_wired_to_app_openai_call_sites():
         path.read_text(encoding="utf-8")
         for path in [
             ROOT / "PushShoppingList/routes/main_routes.py",
+            ROOT / "PushShoppingList/routes/recipe_routes.py",
             ROOT / "PushShoppingList/services/recipe_extract_service.py",
             ROOT / "PushShoppingList/services/product_selection_service.py",
             ROOT / "PushShoppingList/services/food_rules_service.py",
@@ -315,3 +344,5 @@ def test_openai_usage_tracking_is_wired_to_app_openai_call_sites():
 
     for feature in expected_features:
         assert f'"{feature}"' in source_text
+
+    assert '"recipe-import"' in source_text

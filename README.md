@@ -252,7 +252,7 @@ Account Menu groups and items:
   - `Account Settings`: edit first name, last name, username, email, and uploaded logo/avatar.
   - `Account Notices`: opens recent and historical admin-support account access notices when the account has them.
 - `Usage & Billing`
-  - `AI Usage & Billing`: opens OpenAI API usage and billing totals for this app, including plan, billing type, monthly API budget, API requests, input/output/total tokens, raw estimated API cost, billable AI cost, activity counters, budget status, lifetime tokens, and last API request. The dashboard records usage from this app's OpenAI API responses in per-user `openai_usage.json`; it does not expose ChatGPT app, ChatGPT website, ChatGPT Plus/Pro subscription, or OpenAI API usage from other apps.
+  - `AI Usage & Billing`: opens OpenAI API usage and billing totals for this app, including plan, billing type, monthly API budget, API requests, input/output/total tokens, raw estimated API cost, billable AI cost, activity counters, budget status, lifetime tokens, and last API request. The dashboard records usage from this app's OpenAI API responses in per-user `openai_usage.json`; it does not expose ChatGPT app, ChatGPT website, ChatGPT Plus/Pro subscription, or OpenAI API usage from other apps. App activity counters such as `Recipe Imports` count successful app actions even when the recipe was imported from structured recipe data without an OpenAI API request.
 - `Security`
   - `Change Password`: sends the Firebase password reset/change flow for Firebase users.
   - `Verify Email` or `Email Verified`: verified accounts show a disabled `Email Verified` item instead of an action button.

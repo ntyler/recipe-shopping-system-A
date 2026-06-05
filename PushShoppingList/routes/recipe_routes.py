@@ -61,6 +61,7 @@ from PushShoppingList.services.recipe_url_service import save_recipe_urls
 from PushShoppingList.services.recipe_quantity_service import update_recipe_ingredient_quantity
 from PushShoppingList.services.recipe_quantity_service import update_recipe_quantity
 from PushShoppingList.services.shopping_list_service import add_items
+from PushShoppingList.services.openai_usage_service import record_app_activity
 from PushShoppingList.services.user_account_service import current_user
 from PushShoppingList.services.user_account_service import is_admin_user
 
@@ -105,6 +106,19 @@ def ensure_recipe_has_default_cookbook(url, recipe_metadata=None):
         "base_servings": recipe_metadata.get("servings", ""),
         "cover_image": recipe_metadata.get("cover_image") or {},
     }])
+
+
+def record_recipe_import_activity(url, result, source):
+    result = result if isinstance(result, dict) else {}
+    record_app_activity(
+        "recipe-import",
+        metadata={
+            "source": source,
+            "recipeUrl": url,
+            "recipeTitle": result.get("recipe_title") or result.get("name") or "",
+            "ingredientCount": len(result.get("ingredients", [])),
+        },
+    )
 
 
 @recipe_bp.route("/extract_recipe", methods=["POST"])
@@ -154,6 +168,7 @@ def extract_recipe_route():
                 save_recipe_url_name(url, result.get("recipe_title"))
             add_recipe_urls([url])
             ensure_recipe_has_default_cookbook(url, result)
+            record_recipe_import_activity(url, result, "form-url")
             extracted_any = True
             mark_url_done(job_id, urls, index, len(ingredients))
         else:
@@ -196,6 +211,7 @@ def upload_recipe_media_route():
             save_recipe_url_name(recipe_url, result.get("recipe_title"))
         add_recipe_urls([recipe_url])
         ensure_recipe_has_default_cookbook(recipe_url, result)
+        record_recipe_import_activity(recipe_url, result, "media-upload")
         sort_ingredients()
     elif result.get("ok"):
         result = {
@@ -274,6 +290,7 @@ def api_extract_recipe_route():
         save_recipe_url_name(url, result.get("recipe_title"))
     add_recipe_urls([url])
     ensure_recipe_has_default_cookbook(url, result)
+    record_recipe_import_activity(url, result, "api-url")
     progress = mark_url_done(job_id, urls, index, len(ingredients))
     finish_batch_if_ready(job_id, progress)
 

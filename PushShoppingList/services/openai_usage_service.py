@@ -25,6 +25,12 @@ PRODUCT_SEARCH_FEATURES = {
 GENERATED_IMAGE_FEATURES = {
     "recipe-step-image",
 }
+RECIPE_IMPORT_ACTIVITY_FEATURES = {
+    "recipe-import",
+    "recipe-media-import",
+}
+OPENAI_RECORD_TYPE = "openai-api"
+APP_ACTIVITY_RECORD_TYPE = "app-activity"
 DEFAULT_BILLING_CURRENCY = "USD"
 
 
@@ -94,12 +100,40 @@ def record_openai_usage(response, feature, model=None, metadata=None, user_id=No
         "createdAt": now_iso(),
         "month": current_month_key(),
         "userId": record_user_id,
+        "recordType": OPENAI_RECORD_TYPE,
         "feature": resolved_feature,
         "model": resolved_model,
         "promptTokens": usage.get("prompt_tokens", 0),
         "completionTokens": usage.get("completion_tokens", 0),
         "totalTokens": usage.get("total_tokens", 0),
         **billing_costs,
+        "metadata": metadata if isinstance(metadata, dict) else {},
+    })
+    payload = load_openai_usage_payload(usage_file)
+    payload.setdefault("records", []).append(record)
+    save_openai_usage_payload(payload, usage_file)
+    return record
+
+
+def record_app_activity(feature, metadata=None, user_id=None):
+    record_user_id = str(user_id if user_id is not None else active_user_id()).strip()
+    if not record_user_id:
+        return None
+
+    usage_file = openai_usage_file_for_user(record_user_id)
+    record = normalize_usage_record({
+        "createdAt": now_iso(),
+        "month": current_month_key(),
+        "userId": record_user_id,
+        "recordType": APP_ACTIVITY_RECORD_TYPE,
+        "feature": str(feature or "app-activity").strip() or "app-activity",
+        "model": "",
+        "promptTokens": 0,
+        "completionTokens": 0,
+        "totalTokens": 0,
+        "estimatedCostUsd": None,
+        "rawCostUsd": None,
+        "billableCostUsd": None,
         "metadata": metadata if isinstance(metadata, dict) else {},
     })
     payload = load_openai_usage_payload(usage_file)
@@ -377,6 +411,7 @@ def normalize_usage_record(record):
         "createdAt": str(record.get("createdAt") or record.get("created_at") or now_iso()),
         "month": str(record.get("month") or current_month_key()),
         "userId": str(record.get("userId") or record.get("user_id") or "").strip(),
+        "recordType": normalize_record_type(record.get("recordType") or record.get("record_type")),
         "feature": str(record.get("feature") or "openai-api").strip() or "openai-api",
         "model": str(record.get("model") or "").strip(),
         "promptTokens": prompt_tokens,
@@ -402,23 +437,36 @@ def int_or_zero(value):
         return 0
 
 
+def normalize_record_type(value):
+    value = str(value or "").strip().lower()
+    if value == APP_ACTIVITY_RECORD_TYPE:
+        return APP_ACTIVITY_RECORD_TYPE
+    return OPENAI_RECORD_TYPE
+
+
 def openai_usage_dashboard_for_user(user=None):
     user_id = ""
     if isinstance(user, dict):
         user_id = str(user.get("user_id") or "").strip()
     payload = load_openai_usage_payload(openai_usage_file_for_user(user_id))
     records = payload.get("records", [])
+    api_records = [
+        record
+        for record in records
+        if record.get("recordType") != APP_ACTIVITY_RECORD_TYPE
+    ]
     month = current_month_key()
     month_records = [record for record in records if record.get("month") == month]
+    month_api_records = [record for record in api_records if record.get("month") == month]
     monthly_limit = env_int("SHOPPING_APP_OPENAI_MONTHLY_TOKEN_LIMIT")
     monthly_budget = env_float("SHOPPING_APP_OPENAI_MONTHLY_BUDGET_USD")
-    month_prompt = sum_tokens(month_records, "promptTokens")
-    month_completion = sum_tokens(month_records, "completionTokens")
-    month_total = sum_tokens(month_records, "totalTokens")
-    lifetime_total = sum_tokens(records, "totalTokens")
-    estimated_month_cost = sum_record_cost(month_records, "estimatedCostUsd")
-    billable_month_cost = sum_record_cost(month_records, "billableCostUsd")
-    unavailable_cost_label = "Pricing not configured" if month_records else "Not available yet"
+    month_prompt = sum_tokens(month_api_records, "promptTokens")
+    month_completion = sum_tokens(month_api_records, "completionTokens")
+    month_total = sum_tokens(month_api_records, "totalTokens")
+    lifetime_total = sum_tokens(api_records, "totalTokens")
+    estimated_month_cost = sum_record_cost(month_api_records, "estimatedCostUsd")
+    billable_month_cost = sum_record_cost(month_api_records, "billableCostUsd")
+    unavailable_cost_label = "Pricing not configured" if month_api_records else "Not available yet"
     limit_remaining = monthly_limit - month_total if monthly_limit is not None else None
     budget_spend = billable_month_cost if billable_month_cost is not None else (estimated_month_cost or 0)
     budget_remaining = monthly_budget - budget_spend if monthly_budget is not None else None
@@ -441,7 +489,7 @@ def openai_usage_dashboard_for_user(user=None):
         "monthly_prompt_tokens": month_prompt,
         "monthly_completion_tokens": month_completion,
         "monthly_total_tokens": month_total,
-        "monthly_request_count": len(month_records),
+        "monthly_request_count": len(month_api_records),
         "monthly_estimated_cost": estimated_month_cost,
         "monthly_estimated_cost_label": money_label(estimated_month_cost) if estimated_month_cost is not None else unavailable_cost_label,
         "monthly_billable_cost": billable_month_cost,
@@ -458,11 +506,13 @@ def openai_usage_dashboard_for_user(user=None):
         "monthly_generated_image_count": activity_counts["generated_images"],
         "monthly_budget_configured": monthly_budget is not None,
         "lifetime_total_tokens": lifetime_total,
-        "lifetime_request_count": len(records),
-        "last_used_at": latest_record_timestamp(records),
-        "last_used_at_label": display_datetime(latest_record_timestamp(records)),
+        "lifetime_request_count": len(api_records),
+        "last_used_at": latest_record_timestamp(api_records),
+        "last_used_at_label": display_datetime(latest_record_timestamp(api_records)),
         "records_tracked": len(records),
-        "has_usage": bool(records),
+        "api_records_tracked": len(api_records),
+        "has_usage": bool(api_records),
+        "has_activity": bool(records),
         "tracking_note": (
             "This dashboard tracks only OpenAI API usage returned from requests made by this shopping-list app. "
             "ChatGPT website/app subscription usage is separate and cannot be shown here. "
@@ -470,7 +520,7 @@ def openai_usage_dashboard_for_user(user=None):
         ),
         "pricing_note": (
             "Configure OpenAI API pricing rates to calculate Estimated API Cost and Billable AI Cost."
-            if month_records and estimated_month_cost is None
+            if month_api_records and estimated_month_cost is None
             else ""
         ),
         "empty_state_message": (
@@ -488,12 +538,17 @@ def openai_activity_counts(records):
         "product_searches": 0,
         "generated_images": 0,
     }
+    recipe_import_activity_count = 0
+    legacy_recipe_import_count = 0
 
     for record in records:
         feature = str(record.get("feature") or "").strip().lower()
+        record_type = record.get("recordType")
 
-        if feature in RECIPE_IMPORT_FEATURES:
-            counts["recipe_imports"] += 1
+        if feature in RECIPE_IMPORT_ACTIVITY_FEATURES:
+            recipe_import_activity_count += 1
+        elif feature in RECIPE_IMPORT_FEATURES and record_type != APP_ACTIVITY_RECORD_TYPE:
+            legacy_recipe_import_count += 1
         elif feature in PRODUCT_SEARCH_FEATURES:
             counts["product_searches"] += 1
         elif feature in GENERATED_IMAGE_FEATURES:
@@ -501,6 +556,7 @@ def openai_activity_counts(records):
         elif "pantry" in feature or "scan" in feature or "photo" in feature:
             counts["pantry_scans"] += 1
 
+    counts["recipe_imports"] = recipe_import_activity_count or legacy_recipe_import_count
     return counts
 
 
