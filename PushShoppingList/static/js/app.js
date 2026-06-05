@@ -8506,6 +8506,219 @@ let activeFoodReviewRow = null;
 let activeFoodReviewAlternatives = [];
 let recipeEditDraggedRow = null;
 let recipeEditPointerDrag = null;
+const RECIPE_EDIT_CATEGORY_FIELD_NAMES = [
+    "meal_type",
+    "cuisine",
+    "main_ingredient",
+    "cooking_method",
+    "occasion",
+    "dietary_preference",
+    "prep_time_group",
+];
+
+async function fetchRecipeEditorData(url) {
+    const response = await fetch(`/api/recipe?url=${encodeURIComponent(url)}`, {
+        cache: "no-store",
+    });
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+        throw new Error((data && data.error) || "Unable to load recipe.");
+    }
+
+    recipeEditStoreSections = data.store_sections || [];
+    recipeEditFoodRules = data.food_rules || { require: [], avoid: [] };
+    return data.recipe || {};
+}
+
+function recipeEditCategoryValuesFromRecipe(recipe = {}) {
+    const values = {};
+
+    RECIPE_EDIT_CATEGORY_FIELD_NAMES.forEach(field => {
+        values[field] = String(recipe[field] || "").trim();
+    });
+
+    values.custom_categories = Array.isArray(recipe.custom_categories)
+        ? recipe.custom_categories.join(", ")
+        : String(recipe.custom_categories || "").trim();
+
+    return values;
+}
+
+function collectRecipeEditorCategoryValues() {
+    const form = document.getElementById("recipeEditForm");
+    const values = {};
+
+    RECIPE_EDIT_CATEGORY_FIELD_NAMES.forEach(field => {
+        const input = form ? form.elements[field] : null;
+        values[field] = input ? String(input.value || "").trim() : "";
+    });
+
+    const customInput = form ? form.elements.custom_categories : null;
+    values.custom_categories = customInput ? String(customInput.value || "").trim() : "";
+    return values;
+}
+
+function recipeEditCategorySnapshotKey(values = {}) {
+    const normalized = {};
+
+    RECIPE_EDIT_CATEGORY_FIELD_NAMES.forEach(field => {
+        normalized[field] = String(values[field] || "").trim();
+    });
+    normalized.custom_categories = String(values.custom_categories || "").trim();
+    return JSON.stringify(normalized);
+}
+
+function originalRecipeEditCategoryValues() {
+    const form = document.getElementById("recipeEditForm");
+
+    if (!form || !form.dataset.originalCategoryValues) {
+        return {};
+    }
+
+    try {
+        return JSON.parse(form.dataset.originalCategoryValues) || {};
+    } catch (err) {
+        return {};
+    }
+}
+
+function recipeEditCategoryValuesChanged() {
+    const section = document.getElementById("recipeEditCategoriesSection");
+
+    if (!section) {
+        return false;
+    }
+
+    return recipeEditCategorySnapshotKey(collectRecipeEditorCategoryValues())
+        !== recipeEditCategorySnapshotKey(originalRecipeEditCategoryValues());
+}
+
+function recipeEditCategoryValuesHaveAny(values = {}) {
+    return RECIPE_EDIT_CATEGORY_FIELD_NAMES.some(field => String(values[field] || "").trim())
+        || Boolean(String(values.custom_categories || "").trim());
+}
+
+function populateRecipeEditCategories(recipe = {}) {
+    const form = document.getElementById("recipeEditForm");
+    const values = recipeEditCategoryValuesFromRecipe(recipe);
+    const recipeName = document.getElementById("recipeEditCategoryRecipeName");
+    const source = document.getElementById("recipeEditCategorySource");
+
+    if (!form) {
+        return;
+    }
+
+    form.dataset.originalCategoryValues = JSON.stringify(values);
+    form.dataset.categoryUserSet = recipe.category_metadata_user_set ? "1" : "0";
+
+    RECIPE_EDIT_CATEGORY_FIELD_NAMES.forEach(field => {
+        setCookbookCategoryFieldValue(form, field, values[field]);
+    });
+    setCookbookCategoryFieldValue(form, "custom_categories", values.custom_categories);
+
+    if (recipeName) {
+        recipeName.textContent = recipe.display_name || recipe.recipe_title || "Recipe";
+    }
+
+    if (source) {
+        const sourceLabel = recipe.category_metadata_source
+            || (recipe.category_metadata_user_set ? "Saved" : "Inferred");
+        source.textContent = `Categories: ${sourceLabel}`;
+    }
+}
+
+function currentRecipeEditorCookbookId() {
+    const field = document.getElementById("recipeEditCookbookField");
+    return field ? String(field.dataset.currentCookbookId || "").trim() : "";
+}
+
+function recipeEditorCategoryFormData(recipeUrl, values, confirmOverwrite = false) {
+    const formData = new FormData();
+
+    formData.set("recipe_url", recipeUrl || "");
+    RECIPE_EDIT_CATEGORY_FIELD_NAMES.forEach(field => {
+        formData.set(field, values[field] || "");
+    });
+    formData.set("custom_categories", values.custom_categories || "");
+
+    if (confirmOverwrite) {
+        formData.set("confirm_overwrite", "1");
+    }
+
+    return formData;
+}
+
+async function postRecipeEditorCategories(cookbookId, recipeUrl, values, confirmOverwrite = false) {
+    const url = `/api/cookbooks/${encodeURIComponent(cookbookId)}/recipe_categories`;
+    return submitCookbookApi(url, recipeEditorCategoryFormData(recipeUrl, values, confirmOverwrite));
+}
+
+async function postRecipeEditorCategoriesWithConfirmation(cookbookId, recipeUrl, values) {
+    try {
+        return await postRecipeEditorCategories(cookbookId, recipeUrl, values);
+    } catch (err) {
+        const needsConfirmation = err.status === 409
+            && err.data
+            && err.data.conflict === "cookbook_category_overwrite";
+
+        if (!needsConfirmation) {
+            throw err;
+        }
+
+        const recipeName = err.data.recipe_name || "this recipe";
+        const confirmed = window.confirm(`Replace saved cookbook categories for ${recipeName}?`);
+
+        if (!confirmed) {
+            return { ok: true, canceled: true };
+        }
+
+        return postRecipeEditorCategories(cookbookId, recipeUrl, values, true);
+    }
+}
+
+function shouldRetryRecipeCategoryFallback(err) {
+    const message = String((err && err.message) || (err && err.data && err.data.error) || "").toLowerCase();
+    return err && err.status === 400 && message.includes("not found");
+}
+
+async function saveRecipeEditorCategories(savedSourceUrl = "", fallbackUrl = "") {
+    if (!recipeEditCategoryValuesChanged()) {
+        return { skipped: true };
+    }
+
+    const cookbookId = currentRecipeEditorCookbookId();
+
+    if (!cookbookId) {
+        return { skipped: true, reason: "No cookbook assigned." };
+    }
+
+    const values = collectRecipeEditorCategoryValues();
+    const primaryUrl = String(savedSourceUrl || fallbackUrl || recipeEditorCurrentUrl() || "").trim();
+    const fallbackRecipeUrl = String(fallbackUrl || "").trim();
+
+    try {
+        const result = await postRecipeEditorCategoriesWithConfirmation(cookbookId, primaryUrl, values);
+        if (result && result.canceled) {
+            return { canceled: true };
+        }
+    } catch (err) {
+        if (!fallbackRecipeUrl || fallbackRecipeUrl === primaryUrl || !shouldRetryRecipeCategoryFallback(err)) {
+            throw err;
+        }
+
+        const fallbackResult = await postRecipeEditorCategoriesWithConfirmation(cookbookId, fallbackRecipeUrl, values);
+        if (fallbackResult && fallbackResult.canceled) {
+            return { canceled: true };
+        }
+    }
+
+    return {
+        saved: true,
+        values,
+        userSet: recipeEditCategoryValuesHaveAny(values),
+    };
+}
 
 async function openRecipeEditor(button, options = {}) {
     const url = button ? button.dataset.recipeUrl || "" : "";
@@ -8529,18 +8742,8 @@ async function openRecipeEditor(button, options = {}) {
     document.body.classList.add("recipe-editor-open");
 
     try {
-        const response = await fetch(`/api/recipe?url=${encodeURIComponent(url)}`, {
-            cache: "no-store",
-        });
-        const data = await response.json();
-
-        if (!response.ok || !data.ok) {
-            throw new Error((data && data.error) || "Unable to load recipe.");
-        }
-
-        recipeEditStoreSections = data.store_sections || [];
-        recipeEditFoodRules = data.food_rules || { require: [], avoid: [] };
-        populateRecipeEditor(data.recipe, url);
+        const recipe = await fetchRecipeEditorData(url);
+        populateRecipeEditor(recipe, url);
         requestAnimationFrame(updateRecipeEditStickyOffsets);
         setRecipeEditStatus("");
         if (shouldScrollToFoodReview) {
@@ -8627,6 +8830,7 @@ function populateRecipeEditor(recipe, originalUrl) {
     setValue("recipeEditCookTime", recipe.cook_time || "");
     setRecipeRating(recipe.rating || 0);
     setRecipeEditorCookbook(recipe, originalUrl);
+    populateRecipeEditCategories(recipe);
     populateRecipeScalingControls(recipe.scaling || {}, recipe.servings || "");
     updateRecipeEditorPdfControls(recipe);
     setRecipeEditorCoverImage(coverImage, recipe.recipe_title || recipe.display_name || "Recipe title image");
@@ -12152,9 +12356,19 @@ async function saveRecipeEditor(event) {
         const payload = collectRecipeEditorPayload();
         const pdfCreationReason = recipePdfCreationReasonOnSave(payload.recipe);
         const shouldCreatePdf = Boolean(pdfCreationReason);
+        const shouldSaveCategories = recipeEditCategoryValuesChanged();
         const progressItems = buildRecipeSaveProgressItems(payload.recipe);
         let refreshProgressIndex = progressItems.length - 1;
+        let categoryProgressIndex = null;
         let pdfProgressIndex = null;
+        if (shouldSaveCategories) {
+            categoryProgressIndex = refreshProgressIndex;
+            progressItems.splice(refreshProgressIndex, 0, {
+                label: "Cookbook categories",
+                detail: "Saving the recipe menu categories.",
+            });
+            refreshProgressIndex += 1;
+        }
         if (shouldCreatePdf) {
             pdfProgressIndex = refreshProgressIndex;
             progressItems.splice(refreshProgressIndex, 0, {
@@ -12191,6 +12405,19 @@ async function saveRecipeEditor(event) {
                 : payload.recipe.source_url || payload.original_url
         );
 
+        if (shouldSaveCategories) {
+            updateRecipeSaveProgressItem(categoryProgressIndex, "running", "Saving...");
+            setRecipeEditStatus("Saving recipe categories...");
+            const categoryResult = await saveRecipeEditorCategories(sourceUrl, payload.original_url);
+            if (categoryResult.canceled) {
+                updateRecipeSaveProgressItem(categoryProgressIndex, "done", "Skipped");
+            } else if (categoryResult.skipped) {
+                updateRecipeSaveProgressItem(categoryProgressIndex, "done", "No cookbook");
+            } else {
+                updateRecipeSaveProgressItem(categoryProgressIndex, "done", "Saved");
+            }
+        }
+
         if (shouldCreatePdf) {
             updateRecipeSaveProgressItem(pdfProgressIndex, "running", "Generating...");
             setRecipeEditStatus("Generating PDF...");
@@ -12210,6 +12437,13 @@ async function saveRecipeEditor(event) {
 
         updateRecipeSaveProgressItem(refreshProgressIndex, "running", "Refreshing...");
         await refreshStoreMarkup();
+        if (shouldSaveCategories && sourceUrl) {
+            try {
+                recipeForEditor = await fetchRecipeEditorData(sourceUrl);
+            } catch (err) {
+                console.warn("Unable to refresh recipe categories after save.", err);
+            }
+        }
         if (recipeForEditor) {
             populateRecipeEditor(recipeForEditor, recipeForEditor.source_url || sourceUrl);
         }

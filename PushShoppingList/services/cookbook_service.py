@@ -241,6 +241,18 @@ def clean_text_list(value):
     return items
 
 
+def clean_custom_categories(value):
+    if isinstance(value, str):
+        return [
+            text
+            for part in re.split(r"[,\n]+", value)
+            for text in [clean_text(part)]
+            if text
+        ]
+
+    return clean_text_list(value)
+
+
 def clean_cover_image(value):
     if not isinstance(value, dict):
         return {}
@@ -349,7 +361,7 @@ def clean_recipe_record(value):
         "equipment_items": clean_text_list(value.get("equipment_items")),
         "instruction_items": clean_text_list(value.get("instruction_items")),
         "sections": clean_recipe_sections(value.get("sections")),
-        "custom_categories": clean_text_list(value.get("custom_categories")),
+        "custom_categories": clean_custom_categories(value.get("custom_categories")),
         "category_metadata_user_set": bool(value.get("category_metadata_user_set")),
     }
 
@@ -403,6 +415,63 @@ def recipe_ingredients_for_record(recipe):
     return ingredients
 
 
+def text_items_from_records(items, field_names):
+    values = []
+
+    for item in items or []:
+        if isinstance(item, dict):
+            text = ""
+            for field in field_names:
+                text = clean_text(item.get(field))
+                if text:
+                    break
+        else:
+            text = clean_text(item)
+
+        if text:
+            values.append(text)
+
+    return values
+
+
+def ingredient_sections_from_recipe_data(ingredients):
+    section_items = []
+
+    for ingredient in ingredients or []:
+        if isinstance(ingredient, dict):
+            name = clean_text(
+                ingredient.get("ingredient")
+                or ingredient.get("name")
+                or ingredient.get("display_name")
+                or ingredient.get("purchasable_item")
+                or ingredient.get("buy_as")
+                or ingredient.get("original_text")
+            )
+        else:
+            name = clean_text(ingredient)
+
+        if name:
+            section_items.append({"name": name})
+
+    return {"INGREDIENTS": section_items} if section_items else {}
+
+
+def cookbook_recipe_record_for_url(recipe_url):
+    target_key = recipe_key(recipe_url)
+
+    if not target_key:
+        return {}
+
+    payload = load_cookbooks()
+    for cookbook in payload.get("cookbooks", []):
+        for recipe in cookbook.get("recipes", []):
+            record = clean_recipe_record(recipe)
+            if record and recipe_key(record.get("url")) == target_key:
+                return record
+
+    return {}
+
+
 def normalized_label_key(value):
     return re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).strip()
 
@@ -427,7 +496,7 @@ def clean_category_payload(payload):
         field: category_choice_label(field, payload.get(field))
         for field in COOKBOOK_CATEGORY_FIELDS
     }
-    cleaned["custom_categories"] = clean_text_list(payload.get("custom_categories"))
+    cleaned["custom_categories"] = clean_custom_categories(payload.get("custom_categories"))
     return cleaned
 
 
@@ -437,7 +506,7 @@ def stored_category_metadata(recipe):
         field: category_choice_label(field, recipe.get(field))
         for field in COOKBOOK_CATEGORY_FIELDS
     }
-    metadata["custom_categories"] = clean_text_list(recipe.get("custom_categories"))
+    metadata["custom_categories"] = clean_custom_categories(recipe.get("custom_categories"))
     return metadata
 
 
@@ -453,7 +522,7 @@ def category_metadata_changed(left, right):
         if clean_text(left.get(field)) != clean_text(right.get(field)):
             return True
 
-    return clean_text_list(left.get("custom_categories")) != clean_text_list(right.get("custom_categories"))
+    return clean_custom_categories(left.get("custom_categories")) != clean_custom_categories(right.get("custom_categories"))
 
 
 def recipe_text_for_inference(recipe):
@@ -726,6 +795,70 @@ def apply_recipe_menu_metadata(recipe):
     recipe["menu_tags"] = recipe_menu_tags(recipe)
     recipe["menu_search_text"] = recipe_menu_search_text(recipe)
     return recipe
+
+
+def recipe_category_metadata_for_editor(recipe_url, recipe_data=None, recipe_meta=None):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    recipe_meta = recipe_meta if isinstance(recipe_meta, dict) else {}
+    stored_record = cookbook_recipe_record_for_url(recipe_url)
+    stored_metadata = stored_category_metadata(stored_record)
+    record = {
+        **stored_record,
+        "url": clean_text(recipe_url) or stored_record.get("url", ""),
+        "name": (
+            clean_text(recipe_meta.get("name"))
+            or clean_text(recipe_data.get("display_name"))
+            or clean_text(recipe_data.get("recipe_title"))
+            or stored_record.get("name")
+            or clean_text(recipe_url)
+        ),
+        "description": clean_text(recipe_data.get("description")) or stored_record.get("description", ""),
+        "prep_time": clean_text(recipe_data.get("prep_time")) or stored_record.get("prep_time", ""),
+        "cook_time": clean_text(recipe_data.get("cook_time")) or stored_record.get("cook_time", ""),
+        "total_time": clean_text(recipe_data.get("total_time")) or stored_record.get("total_time", ""),
+    }
+
+    sections = ingredient_sections_from_recipe_data(recipe_data.get("ingredients", []))
+    if sections:
+        record["sections"] = sections
+
+    equipment_items = text_items_from_records(
+        recipe_data.get("equipment", []),
+        ("equipment", "text", "name"),
+    )
+    if equipment_items:
+        record["equipment_items"] = equipment_items
+
+    instruction_items = text_items_from_records(
+        recipe_data.get("instructions", []),
+        ("instruction", "text"),
+    )
+    if instruction_items:
+        record["instruction_items"] = instruction_items
+
+    for field in COOKBOOK_CATEGORY_FIELDS:
+        record[field] = stored_metadata.get(field, "")
+
+    record["custom_categories"] = stored_metadata.get("custom_categories", [])
+    record["category_metadata_user_set"] = bool(
+        stored_record.get("category_metadata_user_set")
+    ) or category_metadata_has_values(stored_metadata)
+
+    apply_recipe_menu_metadata(record)
+
+    return {
+        **{
+            field: record.get(field, "")
+            for field in COOKBOOK_CATEGORY_FIELDS
+        },
+        "custom_categories": record.get("custom_categories", []),
+        "restaurant_menu_category": record.get("restaurant_menu_category", ""),
+        "alphabetical_group": record.get("alphabetical_group", ""),
+        "category_metadata_user_set": bool(record.get("category_metadata_user_set")),
+        "category_metadata_source": record.get("category_metadata_source", ""),
+        "short_description": record.get("short_description", ""),
+        "menu_tags": record.get("menu_tags", []),
+    }
 
 
 def recipe_menu_tags(recipe):

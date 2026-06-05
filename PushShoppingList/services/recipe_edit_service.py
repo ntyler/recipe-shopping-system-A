@@ -15,6 +15,7 @@ import requests
 from PushShoppingList.services import cloudflare_r2_storage
 from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.cookbook_service import ensure_unclassified_cookbook_for_recipes
+from PushShoppingList.services.cookbook_service import recipe_category_metadata_for_editor
 from PushShoppingList.services.cookbook_service import recipe_cookbook_assignments
 from PushShoppingList.services.ingredient_text_review_service import annotate_ingredients_for_food_review
 from PushShoppingList.services.recipe_extract_service import MODEL
@@ -176,6 +177,7 @@ def load_editable_recipe(url):
         scaling["base_servings"] = str(recipe_data.get("servings") or "").strip()
     recipe_info = recipe_information_fields(recipe_data, url)
     cover_image = editable_recipe_cover_image(url, recipe_data, meta)
+    category_metadata = recipe_category_metadata_for_editor(url, recipe_data, meta)
 
     return {
         "ok": True,
@@ -212,6 +214,7 @@ def load_editable_recipe(url):
             "pdf_public_url": pdf["public_url"],
             "pdf_object_key": pdf["object_key"],
             "pdf_uploaded_at": pdf["uploaded_at"],
+            **category_metadata,
         },
         "food_rules": load_food_rules(),
         "store_sections": list(STORE_SECTION_ORDER.keys()),
