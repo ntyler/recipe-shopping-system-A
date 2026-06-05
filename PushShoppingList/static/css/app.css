@@ -7887,10 +7887,15 @@ body {
             border: 1px solid #3f4a4a;
             border-radius: 8px;
             background: #101414;
+        }
+
+        .recipe-cover-image,
+        .recipe-step-image[src]:not([hidden]) {
             cursor: zoom-in;
         }
 
-        .recipe-cover-image:focus-visible {
+        .recipe-cover-image:focus-visible,
+        .recipe-step-image[src]:not([hidden]):focus-visible {
             outline: 2px solid #12d6c5;
             outline-offset: 3px;
         }

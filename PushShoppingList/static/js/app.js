@@ -16807,25 +16807,31 @@ function closeRecipeImageLightbox() {
     }
 }
 
+function recipeLightboxImageSelector() {
+    return ".recipe-cover-image, .recipe-step-image[src]:not([hidden])";
+}
+
 function handleRecipeCoverImageClick(event) {
-    const image = event.target.closest ? event.target.closest(".recipe-cover-image") : null;
+    const image = event.target.closest ? event.target.closest(recipeLightboxImageSelector()) : null;
 
     if (!image) {
         return;
     }
 
     event.preventDefault();
+    event.stopPropagation();
     openRecipeImageLightbox(image);
 }
 
 function handleRecipeCoverImageKeydown(event) {
-    const image = event.target.closest ? event.target.closest(".recipe-cover-image") : null;
+    const image = event.target.closest ? event.target.closest(recipeLightboxImageSelector()) : null;
 
     if (!image || (event.key !== "Enter" && event.key !== " ")) {
         return;
     }
 
     event.preventDefault();
+    event.stopPropagation();
     openRecipeImageLightbox(image);
 }
 
@@ -16836,7 +16842,7 @@ function closeRecipeImageLightboxOnEscape(event) {
 }
 
 function decorateRecipeCoverImages() {
-    document.querySelectorAll(".recipe-cover-image").forEach(image => {
+    document.querySelectorAll(recipeLightboxImageSelector()).forEach(image => {
         image.tabIndex = 0;
         image.setAttribute("role", "button");
         image.setAttribute("aria-label", `Enlarge ${image.alt || "recipe image"}`);
@@ -16898,12 +16904,12 @@ document.addEventListener("DOMContentLoaded", function () {
     restoreStoreOptionsListSort();
     initStoreLocationMaps();
     startExtractionProgressPolling();
-    document.addEventListener("click", handleRecipeCoverImageClick);
+    document.addEventListener("click", handleRecipeCoverImageClick, true);
     document.addEventListener("click", handleRecipeEditRowMenuOutsideClick);
     document.addEventListener("scroll", handleRecipeEditRowMenuScrollOrResize, true);
     document.addEventListener("wheel", handleRecipeEditRowMenuScrollOrResize, { passive: true, capture: true });
     document.addEventListener("touchmove", handleRecipeEditRowMenuScrollOrResize, { passive: true, capture: true });
-    document.addEventListener("keydown", handleRecipeCoverImageKeydown);
+    document.addEventListener("keydown", handleRecipeCoverImageKeydown, true);
     document.addEventListener("keydown", closeAddStoreModalOnEscape);
     document.addEventListener("keydown", closeRecipeImageLightboxOnEscape);
     updateAddStoreStickyVisibility();
