@@ -451,8 +451,8 @@ function bindPushNotificationsPanel() {
         closeButton.addEventListener("click", () => {
             panel.hidden = true;
             setPushNotificationsStatus("", "success");
-            if (typeof window.scrollToUserAccountTop === "function") {
-                window.scrollToUserAccountTop("auto");
+            if (typeof window.scrollToUserAccountProfile === "function") {
+                window.scrollToUserAccountProfile("auto");
             }
         });
     }
@@ -537,6 +537,11 @@ function bindTwoFactorPanel() {
     };
 
     const scrollToAccountProfile = (behavior = "smooth") => {
+        if (typeof window.scrollToUserAccountProfile === "function") {
+            window.scrollToUserAccountProfile(behavior);
+            return;
+        }
+
         const target = document.querySelector(".user-account-profile")
             || document.getElementById("userAccountSection");
 

@@ -38,18 +38,20 @@ def test_account_settings_editor_has_header_close_and_closes_menu():
     assert "toggleUserProfileEditor(false)" in template
     assert ".user-account-edit-header" in css
     assert "function toggleUserProfileEditor(open = null)" in script
+    assert "function scrollToUserAccountProfile(behavior = \"auto\")" in script
     assert "function scrollToUserAccountTop(behavior = \"auto\")" in script
+    assert 'document.querySelector(".user-account-profile")' in script
     assert 'document.getElementById("userAccountSection")' in script
     assert 'document.querySelector("[data-account-menu]")' in script
     assert "const isAlreadyOpen = !form.hidden" in script
     assert "if (!explicitState && isAlreadyOpen)" in script
     assert "accountMenu.open = false" in script
     assert "form.scrollIntoView({ behavior: \"smooth\", block: \"start\" })" in script
-    assert 'scrollToUserAccountTop("auto")' in script
+    assert 'scrollToUserAccountProfile("auto")' in script
     assert "form.querySelector(\"[data-user-profile-close]\")" in script
     assert "firstControl.focus({ preventScroll: true })" in script
     assert "#userProfileEditForm, [data-account-notices-panel]" in firebase_script
-    assert 'window.scrollToUserAccountTop("auto")' in firebase_script
+    assert 'window.scrollToUserAccountProfile("auto")' in firebase_script
 
 
 def test_mobile_account_dates_stack_left_aligned():

@@ -16,8 +16,9 @@ function getPublicSupportIdentity(email) {
     return getPublicSupportEmail(email);
 }
 
-function scrollToUserAccountTop(behavior = "auto") {
-    const target = document.getElementById("userAccountSection");
+function scrollToUserAccountProfile(behavior = "auto") {
+    const target = document.querySelector(".user-account-profile")
+        || document.getElementById("userAccountSection");
 
     if (!target) {
         return;
@@ -37,6 +38,10 @@ function scrollToUserAccountTop(behavior = "auto") {
             accountMenuSummary.focus({ preventScroll: true });
         }
     });
+}
+
+function scrollToUserAccountTop(behavior = "auto") {
+    scrollToUserAccountProfile(behavior);
 }
 
 const PHONE_COUNTRIES = [
@@ -517,7 +522,7 @@ function toggleUserProfileEditor(open = null) {
 
         scrollToProfileEditor();
     } else {
-        scrollToUserAccountTop("auto");
+        scrollToUserAccountProfile("auto");
     }
 
     return false;
