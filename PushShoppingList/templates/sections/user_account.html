@@ -258,7 +258,8 @@
                             <button type="button"
                                     class="user-account-menu-item"
                                     role="menuitem"
-                                    onclick="return showUsageDashboardPlaceholder()">
+                                    aria-controls="accountUsageDashboardPanel"
+                                    onclick="return toggleUsageDashboardPanel()">
                                 <span class="user-account-menu-item-icon" aria-hidden="true">📊</span>
                                 <span class="user-account-menu-item-label">Usage Dashboard</span>
                             </button>
@@ -415,6 +416,69 @@
                 </div>
             </div>
         {% endif %}
+
+        <div id="accountUsageDashboardPanel"
+             class="user-account-form user-usage-dashboard-panel"
+             data-usage-dashboard-panel
+             hidden>
+            <div class="app-section-divider recipe-entry-section-divider user-usage-dashboard-divider" aria-hidden="true"></div>
+            <div class="user-push-panel-header user-usage-dashboard-header">
+                <h3>Usage Dashboard</h3>
+                <button type="button"
+                        class="secondary user-push-panel-close"
+                        data-usage-dashboard-close
+                        onclick="return toggleUsageDashboardPanel(false)">
+                    Close
+                </button>
+            </div>
+            <div class="user-usage-dashboard-grid" aria-label="Usage dashboard summary">
+                <article class="user-usage-dashboard-card">
+                    <span>Plan</span>
+                    <strong>Personal Workspace</strong>
+                </article>
+                <article class="user-usage-dashboard-card">
+                    <span>Role</span>
+                    <strong>{{ current_user.role }}</strong>
+                </article>
+                <article class="user-usage-dashboard-card">
+                    <span>Email</span>
+                    <strong>{{ current_user.email_verified_label }}</strong>
+                </article>
+                <article class="user-usage-dashboard-card">
+                    <span>Two-Factor</span>
+                    <strong>{% if current_user.two_factor_enabled %}Enabled{% else %}Disabled{% endif %}</strong>
+                </article>
+                <article class="user-usage-dashboard-card">
+                    <span>Backup Codes</span>
+                    <strong>
+                        {% if current_user.two_factor_enabled %}
+                            {{ current_user.two_factor_backup_codes_remaining }} remaining
+                        {% else %}
+                            Not enabled
+                        {% endif %}
+                    </strong>
+                </article>
+                <article class="user-usage-dashboard-card">
+                    <span>Notifications</span>
+                    <strong>{% if current_user.notifications_enabled %}Enabled{% else %}Disabled{% endif %}</strong>
+                </article>
+                <article class="user-usage-dashboard-card">
+                    <span>Account Notices</span>
+                    <strong>{{ support_access_history|length }} total</strong>
+                </article>
+                <article class="user-usage-dashboard-card">
+                    <span>Created</span>
+                    <strong>{{ current_user.created_at_label or current_user.created_at or "Unknown" }}</strong>
+                </article>
+                <article class="user-usage-dashboard-card">
+                    <span>Last Sign-In</span>
+                    <strong>{{ current_user.last_sign_in_at_label or current_user.last_sign_in_at or "Unknown" }}</strong>
+                </article>
+            </div>
+            <p class="user-usage-dashboard-note">
+                Usage and billing totals are not tracked yet. This panel is ready for future limits, subscription, and usage metrics.
+            </p>
+        </div>
 
         <form id="userProfileEditForm"
               class="user-account-form user-account-edit-form"

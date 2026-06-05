@@ -8,7 +8,7 @@
         "email": "freepdfjobsearch@gmail.com"
       },
       "created_at": "2026-06-04T22:35:28Z",
-      "updated_at": "2026-06-05T01:21:49Z",
+      "updated_at": "2026-06-05T03:12:35Z",
       "feedback_type": "Bug Report",
       "subject": "asdfasdf",
       "description": "asdfasdf",
@@ -51,6 +51,17 @@
           "actorPrivateEmail": "freepdfjobsearch@gmail.com",
           "actorPublicEmail": "freepdfjobsearch@gmail.com",
           "actorType": "user"
+        },
+        {
+          "event": "Support Update Added",
+          "status": "Investigating",
+          "timestamp": "2026-06-05T03:12:35Z",
+          "actor": "support@recipeshoppinglist.com",
+          "actorUid": "476262025aa2477a86c6efd66c77c8b0",
+          "actorEmail": "ntylerbert@gmail.com",
+          "actorPrivateEmail": "ntylerbert@gmail.com",
+          "actorPublicEmail": "support@recipeshoppinglist.com",
+          "actorType": "support"
         }
       ],
       "notifications": [
@@ -60,6 +71,13 @@
           "message": "Your feedback FB-1001 was updated: Status changed to Investigating.",
           "created_at": "2026-06-04T22:38:29Z",
           "read_at": "2026-06-04T23:06:11Z"
+        },
+        {
+          "notification_id": "bbc8b37589764b1794f3946f623110f5",
+          "user_id": "be46f4d862d74336b7ecbf73b9eb0adf",
+          "message": "Support replied to RSL-FB-1001.",
+          "created_at": "2026-06-05T03:12:35Z",
+          "read_at": ""
         }
       ],
       "comments": [
@@ -72,6 +90,16 @@
           "authorPublicEmail": "freepdfjobsearch@gmail.com",
           "authorType": "user",
           "createdAt": "2026-06-05T01:21:49Z"
+        },
+        {
+          "commentId": "afeb07ae059f429caf74b6db68fbb972",
+          "commentText": "not sure what this is...",
+          "authorUid": "476262025aa2477a86c6efd66c77c8b0",
+          "authorEmail": "ntylerbert@gmail.com",
+          "authorPrivateEmail": "ntylerbert@gmail.com",
+          "authorPublicEmail": "support@recipeshoppinglist.com",
+          "authorType": "support",
+          "createdAt": "2026-06-05T03:12:35Z"
         }
       ]
     }

@@ -231,7 +231,7 @@ Account Menu groups and items:
   - `Account Settings`: edit first name, last name, username, email, and uploaded logo/avatar.
   - `Account Notices`: opens recent and historical admin-support account access notices when the account has them.
 - `Usage & Billing`
-  - `Usage Dashboard`: currently shows a placeholder status message until a usage dashboard page is implemented.
+  - `Usage Dashboard`: opens a support-safe account usage summary panel. Usage and billing totals are not tracked yet, but the panel is ready for future limits, subscription, and usage metrics.
 - `Security`
   - `Change Password`: sends the Firebase password reset/change flow for Firebase users.
   - `Verify Email` or `Email Verified`: verified accounts show a disabled `Email Verified` item instead of an action button.

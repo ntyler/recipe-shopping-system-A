@@ -5741,6 +5741,61 @@ body {
             margin: 4px 0 14px;
         }
 
+        .user-usage-dashboard-panel {
+            margin-top: 12px;
+            padding: 0;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .user-usage-dashboard-divider {
+            width: 100%;
+            max-width: none;
+            margin: 4px 0 14px;
+        }
+
+        .user-usage-dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .user-usage-dashboard-card {
+            display: grid;
+            gap: 5px;
+            min-width: 0;
+            padding: 10px;
+            border: 1px solid #2f4054;
+            border-radius: 8px;
+            background: #0b1118;
+            color: #dbeafe;
+        }
+
+        .user-usage-dashboard-card span {
+            color: #cbd5e1;
+            font-size: 12px;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+
+        .user-usage-dashboard-card strong {
+            color: #d8ffe4;
+            font-size: 14px;
+            font-weight: 900;
+            overflow-wrap: anywhere;
+        }
+
+        .user-usage-dashboard-note {
+            margin: 2px 0 0;
+            color: #cbd5e1;
+            font-size: 12px;
+            font-weight: 800;
+            text-align: center;
+        }
+
         .user-feedback-support-panel {
             margin-top: 12px;
             grid-template-columns: minmax(0, 1fr);
@@ -10925,8 +10980,29 @@ body {
             }
 
             .user-account-profile {
-                justify-items: center;
+                grid-template-columns: minmax(0, 1fr) auto;
+                grid-template-areas:
+                    "avatar avatar"
+                    "summary actions";
+                align-items: start;
+                justify-items: stretch;
                 text-align: center;
+            }
+
+            .user-account-avatar-wrap {
+                grid-area: avatar;
+                justify-self: center;
+            }
+
+            .user-account-summary {
+                grid-area: summary;
+                grid-column: 1 / -1;
+                grid-row: 2;
+                box-sizing: border-box;
+                width: 100%;
+                min-width: 0;
+                padding-right: 50px;
+                padding-left: 50px;
             }
 
             .user-account-access-notices-heading,
@@ -10964,6 +11040,7 @@ body {
             .user-account-detail-list {
                 justify-self: center;
                 width: min(100%, 240px);
+                margin: 10px auto 0;
                 text-align: left;
             }
 
@@ -10980,8 +11057,13 @@ body {
             }
 
             .user-account-actions {
-                width: 100%;
-                justify-content: center;
+                grid-area: actions;
+                grid-column: 2;
+                grid-row: 2;
+                align-self: start;
+                justify-self: end;
+                width: auto;
+                justify-content: flex-end;
             }
 
             .user-account-menu {
@@ -10995,11 +11077,11 @@ body {
 
             .user-account-menu-panel {
                 position: absolute;
-                right: 50%;
+                right: 0;
                 width: min(320px, calc(100vw - 28px));
                 max-height: calc(100vh - 24px);
                 margin-top: 0;
-                transform: translateX(50%);
+                transform: none;
                 box-shadow: var(--submenu-shadow);
                 box-sizing: border-box;
             }
@@ -11007,6 +11089,7 @@ body {
             .user-ntfy-link-row,
             .user-ntfy-topic,
             .user-push-status-grid,
+            .user-usage-dashboard-grid,
             .user-push-control-row,
             .user-push-devices,
             .user-push-preferences-grid,

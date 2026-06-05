@@ -515,7 +515,7 @@ function toggleUserProfileEditor(open = null) {
         closeAccountMenu();
 
         document.querySelectorAll(
-            "[data-account-notices-panel], [data-push-notifications-panel], [data-feedback-support-panel], [data-two-factor-panel], [data-delete-account-panel]"
+            "[data-account-notices-panel], [data-usage-dashboard-panel], [data-push-notifications-panel], [data-feedback-support-panel], [data-two-factor-panel], [data-delete-account-panel]"
         ).forEach(panel => {
             panel.hidden = true;
         });
@@ -566,7 +566,7 @@ function toggleAccountNoticesPanel(open = null) {
         closeAccountMenu();
 
         document.querySelectorAll(
-            "#userProfileEditForm, [data-push-notifications-panel], [data-feedback-support-panel], [data-two-factor-panel], [data-delete-account-panel]"
+            "#userProfileEditForm, [data-usage-dashboard-panel], [data-push-notifications-panel], [data-feedback-support-panel], [data-two-factor-panel], [data-delete-account-panel]"
         ).forEach(otherPanel => {
             otherPanel.hidden = true;
         });
@@ -628,14 +628,48 @@ function closeAccountMenuDropdown(menu, options = {}) {
     }
 }
 
-function showUsageDashboardPlaceholder() {
-    const status = document.querySelector("[data-account-menu-status]");
+function toggleUsageDashboardPanel(open = null) {
+    const panel = document.querySelector("[data-usage-dashboard-panel]");
 
-    if (status) {
-        status.textContent = "Usage Dashboard is not available yet.";
-        status.classList.add("success");
-        status.classList.remove("error");
-        status.hidden = false;
+    if (!panel) {
+        return false;
+    }
+
+    const accountMenu = document.querySelector("[data-account-menu]");
+    const closeAccountMenu = () => {
+        if (accountMenu) {
+            accountMenu.open = false;
+        }
+    };
+    const explicitState = typeof open === "boolean";
+    const isAlreadyOpen = !panel.hidden;
+
+    if (!explicitState && isAlreadyOpen) {
+        closeAccountMenu();
+        return false;
+    }
+
+    const shouldOpen = explicitState ? open : true;
+    panel.hidden = !shouldOpen;
+
+    if (shouldOpen) {
+        closeAccountMenu();
+
+        document.querySelectorAll(
+            "#userProfileEditForm, [data-account-notices-panel], [data-push-notifications-panel], [data-feedback-support-panel], [data-two-factor-panel], [data-delete-account-panel]"
+        ).forEach(otherPanel => {
+            otherPanel.hidden = true;
+        });
+
+        window.requestAnimationFrame(() => {
+            panel.scrollIntoView({ behavior: "smooth", block: "start" });
+            const firstControl = panel.querySelector("[data-usage-dashboard-close]");
+            if (firstControl) {
+                firstControl.focus({ preventScroll: true });
+            }
+        });
+    } else if (typeof scrollToUserAccountProfile === "function") {
+        scrollToUserAccountProfile("auto");
     }
 
     return false;
@@ -15478,7 +15512,7 @@ const STORE_REQUEST_FEEDBACK_DESCRIPTION = [
 
 function hideAccountPanelsForFeedback(exceptPanel = null) {
     document.querySelectorAll(
-        "#userProfileEditForm, [data-account-notices-panel], [data-push-notifications-panel], [data-feedback-support-panel], [data-two-factor-panel], [data-delete-account-panel]"
+        "#userProfileEditForm, [data-account-notices-panel], [data-usage-dashboard-panel], [data-push-notifications-panel], [data-feedback-support-panel], [data-two-factor-panel], [data-delete-account-panel]"
     ).forEach(panel => {
         if (panel !== exceptPanel) {
             panel.hidden = true;

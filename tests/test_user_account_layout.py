@@ -80,7 +80,9 @@ def test_account_menu_uses_compact_grouped_dropdown_style():
     assert "flex: 0 0 22px;" in css
     assert ".user-account-menu-item-label" in css
     assert ".user-account-menu-panel .user-account-menu-danger" in css
-    assert "function showUsageDashboardPlaceholder()" in script
+    assert 'aria-controls="accountUsageDashboardPanel"' in menu_markup
+    assert "toggleUsageDashboardPanel()" in menu_markup
+    assert "function toggleUsageDashboardPanel(open = null)" in script
     assert "function bindAccountMenuDropdowns()" in script
     assert "function closeAccountMenuDropdown(menu, options = {})" in script
     assert 'event.target.closest("[data-account-menu]")' in script
@@ -119,6 +121,32 @@ def test_account_settings_editor_has_header_close_and_closes_menu():
     assert 'window.scrollToUserAccountProfile("auto")' in firebase_script
 
 
+def test_usage_dashboard_menu_opens_visible_account_panel():
+    template = (ROOT / "PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    firebase_script = (ROOT / "PushShoppingList/static/js/firebase-auth.js").read_text(encoding="utf-8")
+
+    assert 'id="accountUsageDashboardPanel"' in template
+    assert "data-usage-dashboard-panel" in template
+    assert "<h3>Usage Dashboard</h3>" in template
+    assert "data-usage-dashboard-close" in template
+    assert "toggleUsageDashboardPanel(false)" in template
+    assert "user-usage-dashboard-divider" in template
+    assert "app-section-divider recipe-entry-section-divider user-usage-dashboard-divider" in template
+    assert "user-usage-dashboard-grid" in template
+    assert "Personal Workspace" in template
+    assert "Usage and billing totals are not tracked yet." in template
+    assert ".user-usage-dashboard-panel" in css
+    assert ".user-usage-dashboard-grid" in css
+    assert ".user-usage-dashboard-card" in css
+    assert ".user-usage-dashboard-note" in css
+    assert "function toggleUsageDashboardPanel(open = null)" in script
+    assert "[data-usage-dashboard-panel]" in script
+    assert 'panel.scrollIntoView({ behavior: "smooth", block: "start" })' in script
+    assert "[data-usage-dashboard-panel]" in firebase_script
+
+
 def test_mobile_account_dates_stack_left_aligned():
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
@@ -131,6 +159,37 @@ def test_mobile_account_dates_stack_left_aligned():
     assert "text-align: left;" in mobile_detail_css
     assert "grid-template-columns: minmax(0, 1fr);" in mobile_detail_css
     assert "justify-items: start;" in mobile_detail_css
+
+
+def test_mobile_account_menu_sits_beside_profile_summary():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    mobile_start = css.index("@media (max-width: 650px)", css.index(".user-account-profile"))
+    mobile_end = css.index(".user-ntfy-link-row", mobile_start)
+    mobile_css = css[mobile_start:mobile_end]
+
+    assert "grid-template-columns: minmax(0, 1fr) auto;" in mobile_css
+    assert "grid-template-areas:" in mobile_css
+    assert '"avatar avatar"' in mobile_css
+    assert '"summary actions"' in mobile_css
+    assert ".user-account-avatar-wrap {" in mobile_css
+    assert "grid-area: avatar;" in mobile_css
+    assert "justify-self: center;" in mobile_css
+    assert ".user-account-summary {" in mobile_css
+    assert "grid-area: summary;" in mobile_css
+    assert "grid-column: 1 / -1;" in mobile_css
+    assert "grid-row: 2;" in mobile_css
+    assert "padding-right: 50px;" in mobile_css
+    assert "padding-left: 50px;" in mobile_css
+    assert ".user-account-actions {" in mobile_css
+    assert "grid-area: actions;" in mobile_css
+    assert "grid-column: 2;" in mobile_css
+    assert "align-self: start;" in mobile_css
+    assert "justify-self: end;" in mobile_css
+    assert "width: auto;" in mobile_css
+    assert ".user-account-menu-panel {" in mobile_css
+    assert "right: 0;" in mobile_css
+    assert "transform: none;" in mobile_css
 
 
 def test_admin_support_view_is_admin_only_reasoned_and_audited():
