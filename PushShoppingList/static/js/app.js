@@ -359,7 +359,7 @@ function shouldRestoreAccountPanelOpen(panelKey) {
     return true;
 }
 
-function restoreRememberedAccountPanelOpen() {
+function restoreRememberedAccountPanelOpenWithOptions(options = {}) {
     const panelKey = rememberedAccountPanelKey();
 
     if (!shouldRestoreAccountPanelOpen(panelKey)) {
@@ -381,9 +381,17 @@ function restoreRememberedAccountPanelOpen() {
         closeAccountMenuDropdown(accountMenu);
     }
 
+    if (options.scroll === false) {
+        return;
+    }
+
     window.requestAnimationFrame(() => {
         panel.scrollIntoView({ behavior: "auto", block: "start" });
     });
+}
+
+function restoreRememberedAccountPanelOpen() {
+    restoreRememberedAccountPanelOpenWithOptions();
 }
 
 function rememberUserProfileEditorOpen(open) {
@@ -16903,7 +16911,7 @@ async function refreshStoreMarkup(options = {}) {
     restoreViewBehaviorSettings();
     restoreItemCheckState();
     bindAccountMenuDropdowns();
-    restoreRememberedAccountPanelOpen();
+    restoreRememberedAccountPanelOpenWithOptions({ scroll: false });
     if (document.querySelector("[data-usage-dashboard-panel]:not([hidden])")) {
         scheduleOpenAiUsageDashboardRefresh(250);
     }

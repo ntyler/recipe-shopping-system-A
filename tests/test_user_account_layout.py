@@ -254,8 +254,11 @@ def test_account_panels_remember_open_state_across_refreshes():
     assert "function rememberAccountPanelOpen(panelKey)" in script
     assert "function clearRememberedAccountPanelOpen(panelKey = null)" in script
     assert "function rememberAccountPanelElement(panel, open)" in script
+    assert "function restoreRememberedAccountPanelOpenWithOptions(options = {})" in script
+    assert "if (options.scroll === false)" in script
     assert "function restoreRememberedAccountPanelOpen()" in script
     assert "restoreRememberedAccountPanelOpen();" in script
+    assert "restoreRememberedAccountPanelOpenWithOptions({ scroll: false })" in script
     assert "rememberAccountPanelElement(form, shouldOpen)" in script
     assert "rememberAccountPanelElement(panel, shouldOpen)" in script
     assert "hideRememberedAccountPanels(panel)" in script
