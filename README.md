@@ -225,17 +225,26 @@ The User Account section uses Firebase Authentication on the frontend and Flask 
 - `ntylerbert@gmail.com` is treated as `Admin`; other signed-in users are `User` unless code or stored user data changes.
 - The signed-in account card stays focused on profile photo, name, email, role, email verification status, created date, and last sign-in date.
 
-Account Menu items:
+Account Menu groups and items:
 
-- `Account Settings`: edit first name, last name, username, email, and uploaded logo/avatar.
-- `Account Notices`: opens recent and historical admin-support account access notices when the account has them.
-- `Change Password`: sends the Firebase password reset/change flow for Firebase users.
-- `Verify Email` or `Email Verified`: verified accounts show a disabled `Email Verified` item instead of an action button.
-- `Two-Factor Authentication`: opens the authenticator app and backup-code panel.
-- `Push Notifications`: opens notification status, devices, and preferences.
-- `Feedback & Support`: opens the Feedback & Support section with request count and `support@recipeshoppinglist.com`.
-- `Delete Account`: sends a one-time email verification link before deleting the account.
-- `Sign Out`: signs out of Firebase and clears the Flask session.
+- `Profile`
+  - `Account Settings`: edit first name, last name, username, email, and uploaded logo/avatar.
+  - `Account Notices`: opens recent and historical admin-support account access notices when the account has them.
+- `Usage & Billing`
+  - `Usage Dashboard`: currently shows a placeholder status message until a usage dashboard page is implemented.
+- `Security`
+  - `Change Password`: sends the Firebase password reset/change flow for Firebase users.
+  - `Verify Email` or `Email Verified`: verified accounts show a disabled `Email Verified` item instead of an action button.
+  - `Two-Factor Authentication`: opens the authenticator app and backup-code panel.
+- `Communications`
+  - `Push Notifications`: opens notification status, devices, and preferences.
+  - `Feedback & Support`: opens the Feedback & Support section with request count and `support@recipeshoppinglist.com`.
+- `Session`
+  - `Sign Out`: signs out of Firebase and clears the Flask session.
+- `Danger Zone`
+  - `Delete Account`: sends a one-time email verification link before deleting the account.
+
+The Account Menu should stay compact, left-aligned, and grouped. Menu rows use a fixed icon column so labels line up consistently.
 
 Profile photos use the uploaded logo/avatar first. If the uploaded logo is removed, the account falls back to the Firebase/Google profile photo when available, then to the generated initial avatar.
 
@@ -503,7 +512,7 @@ If the phone cannot connect:
 
 The app can send extraction started/complete/cancelled notifications and account preference test notifications through `ntfy.sh`.
 
-Signed-in users get their own generated topic stored with their account. Open `Account Menu > Push Notifications` to enable/disable notifications, open the topic, copy the topic link, send a test notification, and manage preferences.
+Signed-in users get their own generated topic stored with their account. Open `Account Menu > Communications > Push Notifications` to enable/disable notifications, open the topic, copy the topic link, send a test notification, and manage preferences.
 
 Notification preferences currently include:
 
@@ -545,21 +554,22 @@ Notifications are best treated as convenience alerts. The actual UI sync comes f
 14. Sign in as another user and confirm the User role.
 15. Confirm `Connected via Firebase Authentication` appears only after backend session verification succeeds.
 16. Confirm email verification status is shown. If the email is already verified, the Account Menu item should read `Email Verified` and be disabled.
-17. Confirm Account Menu contains Account Settings, Account Notices when notices exist, Change Password, Verify Email or Email Verified, Two-Factor Authentication, Push Notifications, Feedback & Support, Delete Account, and Sign Out.
-18. Confirm Account Settings can remove an uploaded logo/avatar and falls back to the Firebase/Google profile photo when available.
-19. Confirm normal two-factor disable requires an authenticator code or backup code.
-20. Confirm the public two-factor sign-in challenge does not show an email-disable recovery option.
-21. Confirm a pending two-factor sign-in session cannot request a disable verification email.
-22. Confirm two-factor authentication is account-specific. A disable verification link emailed from a signed-in account should disable only that account's two-factor settings.
-23. Confirm local admin recovery works only from the app host with `PushShoppingList\scripts\disable_2fa.py`, and that non-admin accounts require `--allow-non-admin`.
-24. Confirm account action pages for password reset, signed-in two-factor disable verification, and account deletion do not collapse into a blank screen before the user completes or cancels the action.
-25. Confirm Push Notifications lives inside Account Menu and can enable, disable, send a test notification, and update preferences.
-26. Confirm signed-out users cannot manage protected sections.
-27. Confirm a signed-in admin user can create and upload a PDF to Cloudflare R2.
-28. Confirm Copy PDF Link copies an R2 URL.
-29. Confirm the copied PDF link does not contain localhost, 127.0.0.1, trycloudflare, or the app tunnel hostname.
-30. Confirm `/recipe_archive_pdf?url=<recipe_url>` redirects to the R2 public URL after the first generated upload.
-31. Confirm secrets, service account JSON files, and generated PDFs are not shown in `git status`.
+17. Confirm Account Menu contains Profile, Usage & Billing, Security, Communications, Session, and Danger Zone groups. Confirm rows are left-aligned with a consistent icon column.
+18. Confirm Account Menu contains Account Settings, Account Notices when notices exist, Usage Dashboard, Change Password, Verify Email or Email Verified, Two-Factor Authentication, Push Notifications, Feedback & Support, Sign Out, and Delete Account.
+19. Confirm Account Settings can remove an uploaded logo/avatar and falls back to the Firebase/Google profile photo when available.
+20. Confirm normal two-factor disable requires an authenticator code or backup code.
+21. Confirm the public two-factor sign-in challenge does not show an email-disable recovery option.
+22. Confirm a pending two-factor sign-in session cannot request a disable verification email.
+23. Confirm two-factor authentication is account-specific. A disable verification link emailed from a signed-in account should disable only that account's two-factor settings.
+24. Confirm local admin recovery works only from the app host with `PushShoppingList\scripts\disable_2fa.py`, and that non-admin accounts require `--allow-non-admin`.
+25. Confirm account action pages for password reset, signed-in two-factor disable verification, and account deletion do not collapse into a blank screen before the user completes or cancels the action.
+26. Confirm Push Notifications lives inside Account Menu and can enable, disable, send a test notification, and update preferences.
+27. Confirm signed-out users cannot manage protected sections.
+28. Confirm a signed-in admin user can create and upload a PDF to Cloudflare R2.
+29. Confirm Copy PDF Link copies an R2 URL.
+30. Confirm the copied PDF link does not contain localhost, 127.0.0.1, trycloudflare, or the app tunnel hostname.
+31. Confirm `/recipe_archive_pdf?url=<recipe_url>` redirects to the R2 public URL after the first generated upload.
+32. Confirm secrets, service account JSON files, and generated PDFs are not shown in `git status`.
 
 ## Important Data Files
 

@@ -238,7 +238,8 @@
                                     class="user-account-menu-item"
                                     role="menuitem"
                                     onclick="return toggleUserProfileEditor()">
-                                ⚙ Account Settings
+                                <span class="user-account-menu-item-icon" aria-hidden="true">⚙</span>
+                                <span class="user-account-menu-item-label">Account Settings</span>
                             </button>
                             {% if has_account_notices %}
                                 <button type="button"
@@ -246,9 +247,21 @@
                                         role="menuitem"
                                         aria-controls="accountNoticesPanel"
                                         onclick="return toggleAccountNoticesPanel()">
-                                    🔔 Account Notices
+                                    <span class="user-account-menu-item-icon" aria-hidden="true">🔔</span>
+                                    <span class="user-account-menu-item-label">Account Notices</span>
                                 </button>
                             {% endif %}
+                        </div>
+
+                        <div class="user-account-menu-section">
+                            <div class="user-account-menu-section-title">USAGE &amp; BILLING</div>
+                            <button type="button"
+                                    class="user-account-menu-item"
+                                    role="menuitem"
+                                    onclick="return showUsageDashboardPlaceholder()">
+                                <span class="user-account-menu-item-icon" aria-hidden="true">📊</span>
+                                <span class="user-account-menu-item-label">Usage Dashboard</span>
+                            </button>
                         </div>
 
                         <div class="user-account-menu-section">
@@ -259,21 +272,24 @@
                                         role="menuitem"
                                         data-firebase-change-password
                                         data-user-email="{{ current_user.email }}">
-                                    🔒 Change Password
+                                    <span class="user-account-menu-item-icon" aria-hidden="true">🔒</span>
+                                    <span class="user-account-menu-item-label">Change Password</span>
                                 </button>
                                 {% if current_user.email_verified %}
                                     <button type="button"
                                             class="user-account-menu-item user-account-menu-disabled"
                                             disabled
                                             aria-disabled="true">
-                                        ✅ Email Verified
+                                        <span class="user-account-menu-item-icon" aria-hidden="true">✅</span>
+                                        <span class="user-account-menu-item-label">Email Verified</span>
                                     </button>
                                 {% else %}
                                     <button type="button"
                                             class="user-account-menu-item"
                                             role="menuitem"
                                             data-firebase-verify-email>
-                                        ✅ Verify Email
+                                        <span class="user-account-menu-item-icon" aria-hidden="true">✅</span>
+                                        <span class="user-account-menu-item-label">Verify Email</span>
                                     </button>
                                 {% endif %}
                             {% else %}
@@ -281,7 +297,8 @@
                                         class="user-account-menu-item"
                                         role="menuitem"
                                         onclick="return toggleUserProfileEditor()">
-                                    🔒 Change Password
+                                    <span class="user-account-menu-item-icon" aria-hidden="true">🔒</span>
+                                    <span class="user-account-menu-item-label">Change Password</span>
                                 </button>
                             {% endif %}
                             <button type="button"
@@ -289,7 +306,8 @@
                                     role="menuitem"
                                     data-two-factor-open
                                     aria-controls="accountTwoFactorPanel">
-                                🛡 Two-Factor Authentication
+                                <span class="user-account-menu-item-icon" aria-hidden="true">🛡</span>
+                                <span class="user-account-menu-item-label">Two-Factor Authentication</span>
                             </button>
                         </div>
 
@@ -300,14 +318,16 @@
                                     role="menuitem"
                                     data-push-notifications-open
                                     aria-controls="accountPushNotificationsPanel">
-                                📱 Push Notifications
+                                <span class="user-account-menu-item-icon" aria-hidden="true">📱</span>
+                                <span class="user-account-menu-item-label">Push Notifications</span>
                             </button>
                             <button type="button"
                                     class="user-account-menu-item"
                                     role="menuitem"
                                     aria-controls="feedbackSupportSection"
                                     onclick="return openFeedbackSupportSection()">
-                                💬 Feedback &amp; Support
+                                <span class="user-account-menu-item-icon" aria-hidden="true">💬</span>
+                                <span class="user-account-menu-item-label">Feedback &amp; Support</span>
                             </button>
                         </div>
 
@@ -321,7 +341,8 @@
                                 <button type="submit"
                                         class="user-account-menu-item user-account-menu-danger"
                                         role="menuitem">
-                                    ↪ Sign Out
+                                    <span class="user-account-menu-item-icon" aria-hidden="true">↪</span>
+                                    <span class="user-account-menu-item-label">Sign Out</span>
                                 </button>
                             </form>
                         </div>
@@ -333,7 +354,8 @@
                                     role="menuitem"
                                     data-delete-account-open
                                     aria-controls="accountDeletePanel">
-                                🗑 Delete Account
+                                <span class="user-account-menu-item-icon" aria-hidden="true">🗑</span>
+                                <span class="user-account-menu-item-label">Delete Account</span>
                             </button>
                         </div>
                         <div class="user-account-menu-status"

@@ -628,6 +628,19 @@ function closeAccountMenuDropdown(menu, options = {}) {
     }
 }
 
+function showUsageDashboardPlaceholder() {
+    const status = document.querySelector("[data-account-menu-status]");
+
+    if (status) {
+        status.textContent = "Usage Dashboard is not available yet.";
+        status.classList.add("success");
+        status.classList.remove("error");
+        status.hidden = false;
+    }
+
+    return false;
+}
+
 function syncAccountMenuDropdownState(menu) {
     const summary = menu ? menu.querySelector("summary") : null;
 

@@ -42,24 +42,30 @@ def test_account_menu_uses_compact_grouped_dropdown_style():
     assert 'role="menuitem"' in menu_markup
     assert 'class="sr-only">Account Menu</span>' in menu_markup
     assert "user-account-menu-trigger-icon" in menu_markup
-    for label in ("PROFILE", "SECURITY", "COMMUNICATIONS", "SESSION", "DANGER ZONE"):
+    for label in ("PROFILE", "USAGE &amp; BILLING", "SECURITY", "COMMUNICATIONS", "SESSION", "DANGER ZONE"):
         assert f">{label}</div>" in menu_markup
     for label in (
-        "⚙ Account Settings",
-        "🔔 Account Notices",
-        "🔒 Change Password",
-        "✅ Email Verified",
-        "🛡 Two-Factor Authentication",
-        "📱 Push Notifications",
-        "💬 Feedback &amp; Support",
-        "↪ Sign Out",
-        "🗑 Delete Account",
+        "Account Settings",
+        "Account Notices",
+        "Usage Dashboard",
+        "Change Password",
+        "Email Verified",
+        "Two-Factor Authentication",
+        "Push Notifications",
+        "Feedback &amp; Support",
+        "Sign Out",
+        "Delete Account",
     ):
         assert label in menu_markup
-    assert menu_markup.index(">SESSION</div>") < menu_markup.index("↪ Sign Out")
-    assert menu_markup.index(">DANGER ZONE</div>") < menu_markup.index("🗑 Delete Account")
-    assert menu_markup.index("↪ Sign Out") < menu_markup.index("🗑 Delete Account")
+    assert menu_markup.index(">PROFILE</div>") < menu_markup.index("Account Settings")
+    assert menu_markup.index(">USAGE &amp; BILLING</div>") < menu_markup.index("Usage Dashboard")
+    assert menu_markup.index(">USAGE &amp; BILLING</div>") < menu_markup.index(">SECURITY</div>")
+    assert menu_markup.index(">SESSION</div>") < menu_markup.index("Sign Out")
+    assert menu_markup.index(">DANGER ZONE</div>") < menu_markup.index("Delete Account")
+    assert menu_markup.index("Sign Out") < menu_markup.index("Delete Account")
     assert "user-account-menu-item" in menu_markup
+    assert "user-account-menu-item-icon" in menu_markup
+    assert "user-account-menu-item-label" in menu_markup
     assert "user-account-menu-danger" in menu_markup
     assert 'class="secondary"' not in menu_markup
     assert 'class="danger"' not in menu_markup
@@ -69,7 +75,12 @@ def test_account_menu_uses_compact_grouped_dropdown_style():
     assert "var(--submenu-bg)" in css
     assert ".user-account-menu-section-title" in css
     assert ".user-account-menu-panel .user-account-menu-item" in css
+    assert "justify-content: flex-start;" in css
+    assert ".user-account-menu-item-icon" in css
+    assert "flex: 0 0 22px;" in css
+    assert ".user-account-menu-item-label" in css
     assert ".user-account-menu-panel .user-account-menu-danger" in css
+    assert "function showUsageDashboardPlaceholder()" in script
     assert "function bindAccountMenuDropdowns()" in script
     assert "function closeAccountMenuDropdown(menu, options = {})" in script
     assert 'event.target.closest("[data-account-menu]")' in script
