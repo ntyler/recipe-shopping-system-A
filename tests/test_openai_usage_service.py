@@ -311,6 +311,7 @@ def test_openai_usage_tracking_is_wired_to_app_openai_call_sites():
     expected_features = {
         "address-completion",
         "audio-transcription",
+        "social-video-audio-image-extraction",
         "video-recipe-pdf-extraction",
         "recipe-text-extraction",
         "recipe-image-extraction",

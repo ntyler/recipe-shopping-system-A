@@ -53,6 +53,7 @@ MAX_PAGE_TEXT_CHARS = 35000
 MAX_SOCIAL_VIDEO_PROMPT_CHARS = 12000
 MAX_VIDEO_TRANSCRIPTION_SECONDS = int(os.getenv("MAX_VIDEO_TRANSCRIPTION_SECONDS", "180"))
 MAX_VIDEO_AUDIO_BYTES = int(os.getenv("MAX_VIDEO_AUDIO_BYTES", str(24 * 1024 * 1024)))
+MAX_SOCIAL_VIDEO_IMAGE_URLS = int(os.getenv("MAX_SOCIAL_VIDEO_IMAGE_URLS", "4"))
 OPENAI_FILE_INPUT_MIME_TYPES = {
     "application/pdf",
 }
@@ -1690,6 +1691,15 @@ def extract_recipe_from_social_video_url(recipe_url, progress_callback=None):
         }
 
     local_json_data = extract_recipe_from_social_video_text(recipe_url, page_text)
+    if not isinstance(local_json_data, dict):
+        local_json_data = {
+            "source_url": recipe_url,
+            "ingredients": [],
+            "equipment": [],
+            "instructions": [],
+            "nutrition": empty_nutrition(),
+        }
+
     if cover_image:
         local_json_data["cover_image"] = cover_image
 
@@ -1740,6 +1750,15 @@ def extract_recipe_from_social_video_url(recipe_url, progress_callback=None):
     success, json_data = save_json_response(recipe_url, response_text)
 
     if not success or not json_data:
+        fallback_result = extract_recipe_from_social_video_audio_images(
+            recipe_url,
+            page_text,
+            cover_image=cover_image,
+            progress_callback=progress_callback,
+        )
+        if fallback_result and fallback_result.get("ingredients"):
+            return fallback_result
+
         archive_social_video_text_pdf(
             recipe_url,
             page_text,
@@ -1764,6 +1783,15 @@ def extract_recipe_from_social_video_url(recipe_url, progress_callback=None):
     result = build_extract_result(recipe_url, json_data, "social_video")
 
     if not result.get("ingredients"):
+        fallback_result = extract_recipe_from_social_video_audio_images(
+            recipe_url,
+            page_text,
+            cover_image=cover_image,
+            progress_callback=progress_callback,
+        )
+        if fallback_result and fallback_result.get("ingredients"):
+            return fallback_result
+
         return {
             "ok": False,
             "source_url": recipe_url,
@@ -1995,26 +2023,14 @@ def fetch_social_video_text_with_downloader(recipe_url, progress_callback=None):
     if os.getenv("DISABLE_VIDEO_DOWNLOADER") == "1":
         return None
 
-    try:
-        import yt_dlp
-    except Exception as exc:
-        write_social_downloader_error(recipe_url, f"yt-dlp is not installed: {exc}")
-        return None
-
     if progress_callback:
         progress_callback(
             "checking video metadata with yt-dlp...",
             "Trying video captions, description, and audio when the public page text is unavailable.",
         )
 
-    try:
-        with yt_dlp.YoutubeDL(build_ytdlp_options(recipe_url, download=False)) as ydl:
-            info = ydl.extract_info(recipe_url, download=False)
-    except Exception as exc:
-        write_social_downloader_error(recipe_url, exc)
-        return None
-
-    if not isinstance(info, dict):
+    info = fetch_social_video_ytdlp_info(recipe_url)
+    if not info:
         return None
 
     save_social_video_cover_image(
@@ -2065,6 +2081,26 @@ def fetch_social_video_text_with_downloader(recipe_url, progress_callback=None):
     return "", page_text
 
 
+def fetch_social_video_ytdlp_info(recipe_url):
+    if os.getenv("DISABLE_VIDEO_DOWNLOADER") == "1":
+        return {}
+
+    try:
+        import yt_dlp
+    except Exception as exc:
+        write_social_downloader_error(recipe_url, f"yt-dlp is not installed: {exc}")
+        return {}
+
+    try:
+        with yt_dlp.YoutubeDL(build_ytdlp_options(recipe_url, download=False)) as ydl:
+            info = ydl.extract_info(recipe_url, download=False)
+    except Exception as exc:
+        write_social_downloader_error(recipe_url, exc)
+        return {}
+
+    return info if isinstance(info, dict) else {}
+
+
 def append_social_transcript_text(page_text, transcript):
     transcript = clean_recipe_text(transcript)
 
@@ -2080,6 +2116,124 @@ def append_social_transcript_text(page_text, transcript):
         combined = combined[:MAX_PAGE_TEXT_CHARS]
 
     return combined
+
+
+def extract_recipe_from_social_video_audio_images(recipe_url, page_text="", cover_image=None, progress_callback=None):
+    if not os.getenv("OPENAI_API_KEY"):
+        return None
+
+    if progress_callback:
+        progress_callback(
+            "checking video audio and images with OpenAI...",
+            "Text-only extraction did not find ingredients, so the app is combining audio transcription and video images.",
+        )
+
+    context = build_social_video_audio_image_context(
+        recipe_url,
+        page_text=page_text,
+        cover_image=cover_image,
+        progress_callback=progress_callback,
+    )
+    image_urls = context.get("image_urls", [])
+    combined_text = context.get("text", "")
+
+    if not combined_text and not image_urls:
+        return None
+
+    try:
+        response_text = send_social_video_audio_image_prompt_to_openai(
+            build_social_video_audio_image_prompt(recipe_url, combined_text),
+            image_urls,
+        )
+    except Exception as exc:
+        write_social_downloader_error(recipe_url, f"Social video audio/image OpenAI fallback failed: {exc}")
+        return None
+
+    raw_api_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_SOCIAL_AUDIO_IMAGE_API_RESPONSE.txt"
+    raw_api_path.write_text(response_text, encoding="utf-8")
+
+    try:
+        preview_data = json.loads(clean_json_response(response_text))
+        if isinstance(preview_data, dict):
+            archive_social_video_text_pdf(
+                recipe_url,
+                combined_text,
+                structured_recipe_data=preview_data,
+                progress_callback=progress_callback,
+            )
+    except Exception:
+        pass
+
+    success, json_data = save_json_response(recipe_url, response_text)
+
+    if not success or not isinstance(json_data, dict):
+        return None
+
+    if cover_image and not json_data.get("cover_image"):
+        json_data["cover_image"] = cover_image
+
+    result = build_extract_result(recipe_url, json_data, "social_video_audio_image")
+    return result if result.get("ingredients") else None
+
+
+def build_social_video_audio_image_context(recipe_url, page_text="", cover_image=None, progress_callback=None):
+    info = fetch_social_video_ytdlp_info(recipe_url)
+    image_urls = social_video_image_urls_from_info(info, cover_image=cover_image)
+    text_parts = []
+    page_text = clean_recipe_text(page_text)
+
+    if page_text:
+        text_parts.append(page_text)
+
+    if info:
+        info_text = build_ytdlp_page_text(recipe_url, info)
+        if info_text and info_text not in text_parts:
+            text_parts.append(info_text)
+
+        transcript = transcribe_social_video_audio(
+            recipe_url,
+            info,
+            progress_callback=progress_callback,
+        )
+        if transcript:
+            text_parts.append(f"Audio transcript: {transcript}")
+
+    combined_text = "\n\n".join(part for part in text_parts if part).strip()
+
+    if len(combined_text) > MAX_PAGE_TEXT_CHARS:
+        combined_text = combined_text[:MAX_PAGE_TEXT_CHARS]
+
+    return {
+        "text": combined_text,
+        "image_urls": image_urls[:MAX_SOCIAL_VIDEO_IMAGE_URLS],
+    }
+
+
+def social_video_image_urls_from_info(info, cover_image=None):
+    candidates = []
+    seen = set()
+
+    def add_candidate(candidate):
+        normalized = normalize_recipe_cover_image(
+            candidate,
+            fallback_alt=clean_recipe_text((info or {}).get("title") or "") or "Recipe video image",
+            source="video_thumbnail",
+        )
+        url = str((normalized or {}).get("url") or "").strip()
+        if not url.startswith(("http://", "https://")) or url in seen:
+            return
+        seen.add(url)
+        candidates.append(normalized)
+
+    add_candidate(cover_image)
+
+    if isinstance(info, dict):
+        add_candidate(info.get("thumbnail"))
+        for item in info.get("thumbnails") or []:
+            add_candidate(item)
+
+    candidates = sorted(candidates, key=cover_image_score, reverse=True)
+    return [candidate["url"] for candidate in candidates if candidate.get("url")]
 
 
 def build_ytdlp_options(recipe_url, download=False):
@@ -2807,6 +2961,27 @@ If exact ingredient quantities are not present, leave quantity/unit null rather 
 Ignore comments, hashtags, creator bio text, channel promotions, subscribe reminders, and unrelated social media text.
 
 Social/video text:
+{page_text}
+""",
+    )
+
+
+def build_social_video_audio_image_prompt(recipe_url, page_text):
+    return build_prompt(
+        recipe_url,
+        f"""
+This content came from a social/video recipe URL.
+
+Text-only extraction did not find a complete recipe. Use the available audio transcript, public title/description/caption text, and attached video images/thumbnails together.
+
+Extract a practical recipe only when the audio or images support it.
+- Use audio/transcript details for ingredient quantities and steps when present.
+- Use images to identify visible ingredients, dish type, cookware, and cooking state.
+- If exact quantities are not available, leave quantity and unit null rather than guessing.
+- Ignore comments, hashtags, channel promotions, creator bio text, and unrelated social media text.
+- If the media still does not contain enough recipe information, return ingredients as [].
+
+Social/video text and audio transcript:
 {page_text}
 """,
     )
@@ -4612,6 +4787,42 @@ def send_image_prompt_to_openai(prompt_text, image_path, mime_type):
         temperature=0,
     )
     record_openai_usage(response, "recipe-image-extraction", model=MODEL)
+
+    return response.choices[0].message.content
+
+
+def send_social_video_audio_image_prompt_to_openai(prompt_text, image_urls):
+    content = [{"type": "text", "text": prompt_text}]
+
+    for image_url in image_urls[:MAX_SOCIAL_VIDEO_IMAGE_URLS]:
+        if not str(image_url or "").startswith(("http://", "https://")):
+            continue
+        content.append({
+            "type": "image_url",
+            "image_url": {
+                "url": image_url,
+            },
+        })
+
+    response = get_openai_client().chat.completions.create(
+        model=MODEL,
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You extract recipes from social video audio transcripts and video images. "
+                    "Return only valid JSON."
+                ),
+            },
+            {
+                "role": "user",
+                "content": content,
+            },
+        ],
+        response_format={"type": "json_object"},
+        temperature=0,
+    )
+    record_openai_usage(response, "social-video-audio-image-extraction", model=MODEL)
 
     return response.choices[0].message.content
 

@@ -11,6 +11,7 @@ OPENAI_USAGE_FILE = scoped_package_path("openai_usage.json")
 MAX_USAGE_RECORDS = int(os.getenv("SHOPPING_APP_OPENAI_USAGE_RECORD_LIMIT", "2000"))
 RECIPE_IMPORT_FEATURES = {
     "audio-transcription",
+    "social-video-audio-image-extraction",
     "video-recipe-pdf-extraction",
     "recipe-text-extraction",
     "recipe-image-extraction",
