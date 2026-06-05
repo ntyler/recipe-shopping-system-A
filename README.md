@@ -228,6 +228,7 @@ The User Account section uses Firebase Authentication on the frontend and Flask 
 Account Menu items:
 
 - `Account Settings`: edit first name, last name, username, email, and uploaded logo/avatar.
+- `Account Notices`: opens recent and historical admin-support account access notices when the account has them.
 - `Change Password`: sends the Firebase password reset/change flow for Firebase users.
 - `Verify Email` or `Email Verified`: verified accounts show a disabled `Email Verified` item instead of an action button.
 - `Two-Factor Authentication`: opens the authenticator app and backup-code panel.
@@ -270,7 +271,7 @@ Do not show admins:
 - Store passwords
 - Private recipe, shopping, pantry, receipt, upload, or PDF contents unless the user explicitly asks for help with that specific data.
 
-The account access notice shows the latest two admin-support access events by default. Users can click `View account access history` to show the full sanitized admin-support access history for their account.
+The `Account Notices` menu item opens the latest two admin-support access events. Users can click `View account access history` inside that panel to show the full sanitized admin-support access history for their account.
 
 User-facing support and audit displays must show the public support identity, not a staff member's personal Gmail address. Store admin-support audit rows with both `actorPrivateEmail` for internal tracing and `actorPublicEmail` for user-facing notices/emails. End users should only see `support@recipeshoppinglist.com`; internal admin pages may continue showing `actorPrivateEmail`. Keep private support-admin allowlists on the server side so static user-facing JavaScript bundles do not publish staff Gmail addresses.
 
@@ -543,7 +544,7 @@ Notifications are best treated as convenience alerts. The actual UI sync comes f
 14. Sign in as another user and confirm the User role.
 15. Confirm `Connected via Firebase Authentication` appears only after backend session verification succeeds.
 16. Confirm email verification status is shown. If the email is already verified, the Account Menu item should read `Email Verified` and be disabled.
-17. Confirm Account Menu contains Account Settings, Change Password, Verify Email or Email Verified, Two-Factor Authentication, Push Notifications, Delete Account, and Sign Out.
+17. Confirm Account Menu contains Account Settings, Account Notices when notices exist, Change Password, Verify Email or Email Verified, Two-Factor Authentication, Push Notifications, Delete Account, and Sign Out.
 18. Confirm Account Settings can remove an uploaded logo/avatar and falls back to the Firebase/Google profile photo when available.
 19. Confirm normal two-factor disable requires an authenticator code or backup code.
 20. Confirm the public two-factor sign-in challenge does not show an email-disable recovery option.

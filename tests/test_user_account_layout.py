@@ -48,7 +48,7 @@ def test_account_settings_editor_has_header_close_and_closes_menu():
     assert 'scrollToUserAccountTop("auto")' in script
     assert "form.querySelector(\"[data-user-profile-close]\")" in script
     assert "firstControl.focus({ preventScroll: true })" in script
-    assert "#userProfileEditForm, [data-push-notifications-panel]" in firebase_script
+    assert "#userProfileEditForm, [data-account-notices-panel]" in firebase_script
     assert 'window.scrollToUserAccountTop("auto")' in firebase_script
 
 
@@ -86,7 +86,11 @@ def test_admin_support_view_is_admin_only_reasoned_and_audited():
     assert '"actorPublicEmail":' in service
     assert "get_public_support_identity(actor_private_email)" in service
     assert "support_access_notices" in account_template
-    assert "Account Access Notice" in account_template
+    assert "Account Notices" in account_template
+    assert 'id="accountNoticesPanel"' in account_template
+    assert "data-account-notices-panel" in account_template
+    assert "onclick=\"return toggleAccountNoticesPanel()\"" in account_template
+    assert "onclick=\"return toggleAccountNoticesPanel(false)\"" in account_template
     assert "View account access history" in account_template
     assert "data-account-access-history-toggle" in account_template
     assert "admin_support_history" in account_template
@@ -94,13 +98,18 @@ def test_admin_support_view_is_admin_only_reasoned_and_audited():
     assert "notice.admin_email" not in account_template
     assert "entry.actorPrivateEmail" in support_template
     assert ".user-account-access-notices" in css
+    assert ".user-account-access-notices[hidden]" in css
+    assert ".user-account-access-notices-actions" in css
     assert ".user-account-access-history-toggle" in css
     assert ".user-account-access-list[hidden]" in css
+    firebase_script = (ROOT / "PushShoppingList/static/js/firebase-auth.js").read_text(encoding="utf-8")
+    assert "[data-account-notices-panel]" in firebase_script
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     assert 'const SUPPORT_EMAIL = "support@recipeshoppinglist.com";' in script
     assert "function getPublicSupportIdentity(email)" in script
     assert '"ntylerbert@gmail.com"' not in script
     assert "return SUPPORT_EMAIL;" in script
+    assert "function toggleAccountNoticesPanel(open = null)" in script
     assert "function toggleAccountAccessHistory(button)" in script
     assert "password_hash" not in support_template
     assert "two_factor.secret" not in support_template

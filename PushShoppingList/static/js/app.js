@@ -506,12 +506,63 @@ function toggleUserProfileEditor(open = null) {
         closeAccountMenu();
 
         document.querySelectorAll(
-            "[data-push-notifications-panel], [data-two-factor-panel], [data-delete-account-panel]"
+            "[data-account-notices-panel], [data-push-notifications-panel], [data-two-factor-panel], [data-delete-account-panel]"
         ).forEach(panel => {
             panel.hidden = true;
         });
 
         scrollToProfileEditor();
+    } else {
+        scrollToUserAccountTop("auto");
+    }
+
+    return false;
+}
+
+function toggleAccountNoticesPanel(open = null) {
+    const panel = document.querySelector("[data-account-notices-panel]");
+
+    if (!panel) {
+        return false;
+    }
+
+    const accountMenu = document.querySelector("[data-account-menu]");
+    const closeAccountMenu = () => {
+        if (accountMenu) {
+            accountMenu.open = false;
+        }
+    };
+    const scrollToPanel = () => {
+        window.requestAnimationFrame(() => {
+            panel.scrollIntoView({ behavior: "smooth", block: "start" });
+            const firstControl = panel.querySelector("[data-account-notices-close]")
+                || panel.querySelector("button, input, select, textarea");
+            if (firstControl) {
+                firstControl.focus({ preventScroll: true });
+            }
+        });
+    };
+    const explicitState = typeof open === "boolean";
+    const isAlreadyOpen = !panel.hidden;
+
+    if (!explicitState && isAlreadyOpen) {
+        closeAccountMenu();
+        return false;
+    }
+
+    const shouldOpen = explicitState ? open : true;
+    panel.hidden = !shouldOpen;
+
+    if (shouldOpen) {
+        closeAccountMenu();
+
+        document.querySelectorAll(
+            "#userProfileEditForm, [data-push-notifications-panel], [data-two-factor-panel], [data-delete-account-panel]"
+        ).forEach(otherPanel => {
+            otherPanel.hidden = true;
+        });
+
+        scrollToPanel();
     } else {
         scrollToUserAccountTop("auto");
     }

@@ -32,42 +32,7 @@
 
     {% set support_access_notices = admin_support_notices|default([]) %}
     {% set support_access_history = admin_support_history|default(support_access_notices) %}
-    {% if current_user and support_access_notices and not account_action_token %}
-        <div class="user-account-access-notices"
-             data-account-access-history
-             aria-live="polite">
-            <div class="user-account-access-notices-heading">
-                <div>
-                    <strong>Account Access Notice</strong>
-                    <span data-account-access-history-count
-                          data-recent-label="{{ support_access_notices|length }} recent view{% if support_access_notices|length != 1 %}s{% endif %}"
-                          data-history-label="{{ support_access_history|length }} total view{% if support_access_history|length != 1 %}s{% endif %}">
-                        {{ support_access_notices|length }} recent view{% if support_access_notices|length != 1 %}s{% endif %}
-                    </span>
-                </div>
-                <button type="button"
-                        class="secondary user-account-access-history-toggle"
-                        data-account-access-history-toggle
-                        aria-expanded="false"
-                        onclick="return toggleAccountAccessHistory(this)">
-                    View account access history
-                </button>
-            </div>
-            <div class="user-account-access-list" data-account-access-recent-list>
-                {% for notice in support_access_notices %}
-                    {{ account_access_notice_card(notice) }}
-                {% endfor %}
-            </div>
-            <div class="user-account-access-list"
-                 data-account-access-full-list
-                 hidden>
-                <div class="user-account-access-history-label">Full account access history</div>
-                {% for notice in support_access_history %}
-                    {{ account_access_notice_card(notice) }}
-                {% endfor %}
-            </div>
-        </div>
-    {% endif %}
+    {% set has_account_notices = current_user and support_access_notices and not account_action_token %}
 
     {% set local_password_reset_link = session.get("password_reset_link") %}
     {% if local_password_reset_link %}
@@ -266,6 +231,14 @@
                                 onclick="return toggleUserProfileEditor()">
                             Account Settings
                         </button>
+                        {% if has_account_notices %}
+                            <button type="button"
+                                    class="secondary"
+                                    aria-controls="accountNoticesPanel"
+                                    onclick="return toggleAccountNoticesPanel()">
+                                Account Notices
+                            </button>
+                        {% endif %}
                         {% if current_user.auth_provider == "firebase" %}
                             <button type="button"
                                     class="secondary"
@@ -326,6 +299,54 @@
                 </details>
             </div>
         </div>
+
+        {% if has_account_notices %}
+            <div id="accountNoticesPanel"
+                 class="user-account-access-notices"
+                 data-account-notices-panel
+                 data-account-access-history
+                 aria-live="polite"
+                 hidden>
+                <div class="user-account-access-notices-heading">
+                    <div>
+                        <strong>Account Notices</strong>
+                        <span data-account-access-history-count
+                              data-recent-label="{{ support_access_notices|length }} recent view{% if support_access_notices|length != 1 %}s{% endif %}"
+                              data-history-label="{{ support_access_history|length }} total view{% if support_access_history|length != 1 %}s{% endif %}">
+                            {{ support_access_notices|length }} recent view{% if support_access_notices|length != 1 %}s{% endif %}
+                        </span>
+                    </div>
+                    <div class="user-account-access-notices-actions">
+                        <button type="button"
+                                class="secondary user-account-access-history-toggle"
+                                data-account-access-history-toggle
+                                aria-expanded="false"
+                                onclick="return toggleAccountAccessHistory(this)">
+                            View account access history
+                        </button>
+                        <button type="button"
+                                class="secondary user-account-access-history-toggle"
+                                data-account-notices-close
+                                onclick="return toggleAccountNoticesPanel(false)">
+                            Close
+                        </button>
+                    </div>
+                </div>
+                <div class="user-account-access-list" data-account-access-recent-list>
+                    {% for notice in support_access_notices %}
+                        {{ account_access_notice_card(notice) }}
+                    {% endfor %}
+                </div>
+                <div class="user-account-access-list"
+                     data-account-access-full-list
+                     hidden>
+                    <div class="user-account-access-history-label">Full account access history</div>
+                    {% for notice in support_access_history %}
+                        {{ account_access_notice_card(notice) }}
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
 
         <form id="userProfileEditForm"
               class="user-account-form user-account-edit-form"

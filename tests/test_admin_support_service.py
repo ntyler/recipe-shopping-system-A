@@ -261,7 +261,10 @@ def test_admin_support_route_notice_renders_for_target_user(monkeypatch, tmp_pat
         page = client.get("/")
         html = page.data.decode("utf-8")
 
-    assert "Account Access Notice" in html
+    assert "Account Notices" in html
+    assert 'id="accountNoticesPanel"' in html
+    assert "data-account-notices-panel" in html
+    assert "hidden" in html
     assert "Admin support viewed your account support record." in html
     assert "support@recipeshoppinglist.com" in html
     assert "ntylerbert@gmail.com" not in html

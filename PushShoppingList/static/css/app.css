@@ -4538,6 +4538,10 @@ body {
             color: #f8eed2;
         }
 
+        .user-account-access-notices[hidden] {
+            display: none;
+        }
+
         .user-account-access-notices-heading,
         .user-account-access-notice > div {
             display: flex;
@@ -4551,6 +4555,13 @@ body {
             align-items: baseline;
             gap: 10px;
             min-width: 0;
+        }
+
+        .user-account-access-notices-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 8px;
         }
 
         .user-account-access-notices-heading strong,
@@ -10680,6 +10691,10 @@ body {
                 align-items: flex-start;
                 flex-direction: column;
                 gap: 4px;
+            }
+
+            .user-account-access-notices-actions {
+                width: 100%;
             }
 
             .user-account-access-notices-heading span,
