@@ -450,6 +450,9 @@ function bindPushNotificationsPanel() {
     if (closeButton) {
         closeButton.addEventListener("click", () => {
             panel.hidden = true;
+            if (typeof window.rememberAccountPanelElement === "function") {
+                window.rememberAccountPanelElement(panel, false);
+            }
             setPushNotificationsStatus("", "success");
             if (typeof window.scrollToUserAccountProfile === "function") {
                 window.scrollToUserAccountProfile("auto");
@@ -517,6 +520,12 @@ function hideAccountMenuPanels(exceptPanel = null) {
             panel.hidden = true;
         }
     });
+
+    if (typeof window.rememberAccountPanelElement === "function" && exceptPanel) {
+        window.rememberAccountPanelElement(exceptPanel, true);
+    } else if (typeof window.clearRememberedAccountPanelOpen === "function") {
+        window.clearRememberedAccountPanelOpen();
+    }
 }
 
 function bindTwoFactorPanel() {
@@ -618,6 +627,9 @@ function bindTwoFactorPanel() {
         closeButton.addEventListener("click", () => {
             clearTwoFactorPanelLocation();
             panel.hidden = true;
+            if (typeof window.rememberAccountPanelElement === "function") {
+                window.rememberAccountPanelElement(panel, false);
+            }
             window.sessionStorage.removeItem(TWO_FACTOR_PANEL_RETURN_KEY);
             scrollToAccountProfile("auto");
         });
@@ -655,6 +667,9 @@ function bindDeleteAccountPanel() {
     if (closeButton) {
         closeButton.addEventListener("click", () => {
             panel.hidden = true;
+            if (typeof window.rememberAccountPanelElement === "function") {
+                window.rememberAccountPanelElement(panel, false);
+            }
         });
     }
 }

@@ -48,11 +48,11 @@ Required for recipe extraction and AI sorting:
 $env:OPENAI_API_KEY="your_openai_api_key_here"
 ```
 
-Optional OpenAI API usage dashboard settings:
+Optional OpenAI API usage and billing dashboard settings:
 
 ```powershell
 $env:SHOPPING_APP_OPENAI_PLAN_LABEL="Personal Workspace"
-$env:SHOPPING_APP_OPENAI_SUBSCRIPTION_LABEL="OpenAI API pay-as-you-go"
+$env:SHOPPING_APP_OPENAI_BILLING_TYPE_LABEL="OpenAI API Pay-As-You-Go"
 $env:SHOPPING_APP_OPENAI_MONTHLY_TOKEN_LIMIT="1000000"
 $env:SHOPPING_APP_OPENAI_MONTHLY_BUDGET_USD="25"
 $env:SHOPPING_APP_OPENAI_INPUT_COST_PER_1M_TOKENS="0.15"
@@ -60,7 +60,7 @@ $env:SHOPPING_APP_OPENAI_OUTPUT_COST_PER_1M_TOKENS="0.60"
 $env:SHOPPING_APP_OPENAI_USAGE_RECORD_LIMIT="2000"
 ```
 
-The Usage Dashboard records token usage returned by this app's OpenAI API responses. It cannot show ChatGPT app or website subscription usage, because that usage is separate from this local app dashboard.
+The AI Usage & Billing dashboard records OpenAI API usage returned by this shopping-list app's own API responses. It cannot show ChatGPT app, ChatGPT website, ChatGPT Plus/Pro subscription, or OpenAI API usage from other apps.
 
 Optional ntfy topic for phone/computer extraction notifications:
 
@@ -245,7 +245,7 @@ Account Menu groups and items:
   - `Account Settings`: edit first name, last name, username, email, and uploaded logo/avatar.
   - `Account Notices`: opens recent and historical admin-support account access notices when the account has them.
 - `Usage & Billing`
-  - `Usage Dashboard`: opens OpenAI API usage and billing totals for this app, including plan/subscription labels, monthly token limit, requests, input/output/total tokens, estimated cost, budget, lifetime tokens, and last API use. The dashboard records tokens from this app's OpenAI API responses in per-user `openai_usage.json`; it does not expose ChatGPT app or website subscription usage.
+  - `AI Usage & Billing`: opens OpenAI API usage and billing totals for this app, including plan, billing type, monthly API budget, API requests, input/output/total tokens, estimated API cost, activity counters, budget status, lifetime tokens, and last API request. The dashboard records usage from this app's OpenAI API responses in per-user `openai_usage.json`; it does not expose ChatGPT app, ChatGPT website, ChatGPT Plus/Pro subscription, or OpenAI API usage from other apps.
 - `Security`
   - `Change Password`: sends the Firebase password reset/change flow for Firebase users.
   - `Verify Email` or `Email Verified`: verified accounts show a disabled `Email Verified` item instead of an action button.
@@ -257,6 +257,8 @@ Account Menu groups and items:
   - `Sign Out`: signs out of Firebase and clears the Flask session.
 - `Danger Zone`
   - `Delete Account`: sends a one-time email verification link before deleting the account.
+
+The account panel that is open in this browser is remembered across page refreshes for `Account Settings`, `Account Notices`, `AI Usage & Billing`, `Two-Factor Authentication`, `Push Notifications`, and `Delete Account`. Closing the panel clears that remembered state.
 
 The Account Menu should stay compact, left-aligned, and grouped. Menu rows use a fixed icon column so labels line up consistently.
 
@@ -569,21 +571,22 @@ Notifications are best treated as convenience alerts. The actual UI sync comes f
 15. Confirm `Connected via Firebase Authentication` appears only after backend session verification succeeds.
 16. Confirm email verification status is shown. If the email is already verified, the Account Menu item should read `Email Verified` and be disabled.
 17. Confirm Account Menu contains Profile, Usage & Billing, Security, Communications, Session, and Danger Zone groups. Confirm rows are left-aligned with a consistent icon column.
-18. Confirm Account Menu contains Account Settings, Account Notices when notices exist, Usage Dashboard, Change Password, Verify Email or Email Verified, Two-Factor Authentication, Push Notifications, Feedback & Support, Sign Out, and Delete Account.
+18. Confirm Account Menu contains Account Settings, Account Notices when notices exist, AI Usage & Billing, Change Password, Verify Email or Email Verified, Two-Factor Authentication, Push Notifications, Feedback & Support, Sign Out, and Delete Account.
 19. Confirm Account Settings can remove an uploaded logo/avatar and falls back to the Firebase/Google profile photo when available.
-20. Confirm normal two-factor disable requires an authenticator code or backup code.
-21. Confirm the public two-factor sign-in challenge does not show an email-disable recovery option.
-22. Confirm a pending two-factor sign-in session cannot request a disable verification email.
-23. Confirm two-factor authentication is account-specific. A disable verification link emailed from a signed-in account should disable only that account's two-factor settings.
-24. Confirm local admin recovery works only from the app host with `PushShoppingList\scripts\disable_2fa.py`, and that non-admin accounts require `--allow-non-admin`.
-25. Confirm account action pages for password reset, signed-in two-factor disable verification, and account deletion do not collapse into a blank screen before the user completes or cancels the action.
-26. Confirm Push Notifications lives inside Account Menu and can enable, disable, send a test notification, and update preferences.
-27. Confirm signed-out users cannot manage protected sections.
-28. Confirm a signed-in admin user can create and upload a PDF to Cloudflare R2.
-29. Confirm Copy PDF Link copies an R2 URL.
-30. Confirm the copied PDF link does not contain localhost, 127.0.0.1, trycloudflare, or the app tunnel hostname.
-31. Confirm `/recipe_archive_pdf?url=<recipe_url>` redirects to the R2 public URL after the first generated upload.
-32. Confirm secrets, service account JSON files, and generated PDFs are not shown in `git status`.
+20. Confirm Account Settings, Account Notices, AI Usage & Billing, Two-Factor Authentication, Push Notifications, and Delete Account stay open after a page refresh and clear that remembered state after Close.
+21. Confirm normal two-factor disable requires an authenticator code or backup code.
+22. Confirm the public two-factor sign-in challenge does not show an email-disable recovery option.
+23. Confirm a pending two-factor sign-in session cannot request a disable verification email.
+24. Confirm two-factor authentication is account-specific. A disable verification link emailed from a signed-in account should disable only that account's two-factor settings.
+25. Confirm local admin recovery works only from the app host with `PushShoppingList\scripts\disable_2fa.py`, and that non-admin accounts require `--allow-non-admin`.
+26. Confirm account action pages for password reset, signed-in two-factor disable verification, and account deletion do not collapse into a blank screen before the user completes or cancels the action.
+27. Confirm Push Notifications lives inside Account Menu and can enable, disable, send a test notification, and update preferences.
+28. Confirm signed-out users cannot manage protected sections.
+29. Confirm a signed-in admin user can create and upload a PDF to Cloudflare R2.
+30. Confirm Copy PDF Link copies an R2 URL.
+31. Confirm the copied PDF link does not contain localhost, 127.0.0.1, trycloudflare, or the app tunnel hostname.
+32. Confirm `/recipe_archive_pdf?url=<recipe_url>` redirects to the R2 public URL after the first generated upload.
+33. Confirm secrets, service account JSON files, and generated PDFs are not shown in `git status`.
 
 ## Important Data Files
 
@@ -609,7 +612,7 @@ Common files:
 - `store_settings.json`: store list and enabled stores
 - `extract_progress.json`: current extraction progress for the overlay
 - `product_choices.json`: saved product candidates, per-store picks, overall picked products, direct product links, embedded image placeholders, and ChatGPT prompt file references
-- `openai_usage.json`: per-user OpenAI API token usage recorded from this app's API responses for the Usage Dashboard
+- `openai_usage.json`: per-user OpenAI API token usage recorded from this app's API responses for AI Usage & Billing
 - `product_results.json`: dedicated hybrid shopping results with agent-stage architecture, best products, alternatives, rejected products, rejection reasons, and scoring metadata
 - `product_progress.json`: current Grab Best Products progress overlay state
 - `raw/product_pages/*.html`: fully rendered Selenium grocery search pages saved for product-ranking review

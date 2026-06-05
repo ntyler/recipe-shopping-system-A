@@ -4,6 +4,29 @@ function saveScroll() {
 
 const SUPPORT_EMAIL = "support@recipeshoppinglist.com";
 const SUPPORT_ADMIN_EMAILS = ["ntylerbert@gmail.com"];
+const USER_ACCOUNT_OPEN_PANEL_KEY = "user-account-open-panel";
+const USER_PROFILE_EDITOR_OPEN_KEY = "user-account-settings-open";
+const USER_ACCOUNT_REMEMBERED_PANEL_SELECTORS = {
+    accountSettings: "#userProfileEditForm",
+    accountNotices: "[data-account-notices-panel]",
+    usageDashboard: "[data-usage-dashboard-panel]",
+    twoFactor: "[data-two-factor-panel]",
+    pushNotifications: "[data-push-notifications-panel]",
+    deleteAccount: "[data-delete-account-panel]",
+};
+const USER_ACCOUNT_PANEL_HIDE_SELECTOR = [
+    ...Object.values(USER_ACCOUNT_REMEMBERED_PANEL_SELECTORS),
+    "[data-feedback-support-panel]",
+].join(", ");
+const USER_ACCOUNT_PANEL_HASH_KEYS = {
+    "#userProfileEditForm": "accountSettings",
+    "#accountNoticesPanel": "accountNotices",
+    "#accountUsageDashboardPanel": "usageDashboard",
+    "#accountTwoFactorPanel": "twoFactor",
+    "#accountPushNotificationsPanel": "pushNotifications",
+    "#accountDeletePanel": "deleteAccount",
+    "#feedbackSupportSection": "feedbackSupport",
+};
 
 function getPublicSupportEmail(email) {
     const normalized = (email || "").toLowerCase();
@@ -14,6 +37,163 @@ function getPublicSupportEmail(email) {
 
 function getPublicSupportIdentity(email) {
     return getPublicSupportEmail(email);
+}
+
+function accountPanelElement(panelKey) {
+    const selector = USER_ACCOUNT_REMEMBERED_PANEL_SELECTORS[panelKey];
+    return selector ? document.querySelector(selector) : null;
+}
+
+function accountPanelKeyForElement(panel) {
+    if (!panel || typeof panel.matches !== "function") {
+        return "";
+    }
+
+    return Object.keys(USER_ACCOUNT_REMEMBERED_PANEL_SELECTORS).find(panelKey => (
+        panel.matches(USER_ACCOUNT_REMEMBERED_PANEL_SELECTORS[panelKey])
+    )) || "";
+}
+
+function rememberedAccountPanelKey() {
+    try {
+        const panelKey = localStorage.getItem(USER_ACCOUNT_OPEN_PANEL_KEY);
+        if (USER_ACCOUNT_REMEMBERED_PANEL_SELECTORS[panelKey]) {
+            return panelKey;
+        }
+
+        if (localStorage.getItem(USER_PROFILE_EDITOR_OPEN_KEY) === "1") {
+            return "accountSettings";
+        }
+    } catch (error) {
+        return "";
+    }
+
+    return "";
+}
+
+function rememberAccountPanelOpen(panelKey) {
+    if (!USER_ACCOUNT_REMEMBERED_PANEL_SELECTORS[panelKey]) {
+        clearRememberedAccountPanelOpen();
+        return;
+    }
+
+    try {
+        localStorage.setItem(USER_ACCOUNT_OPEN_PANEL_KEY, panelKey);
+        localStorage.removeItem(USER_PROFILE_EDITOR_OPEN_KEY);
+    } catch (error) {
+        // localStorage can be unavailable in private or restricted contexts.
+    }
+}
+
+function clearRememberedAccountPanelOpen(panelKey = null) {
+    try {
+        const currentPanelKey = localStorage.getItem(USER_ACCOUNT_OPEN_PANEL_KEY);
+
+        if (!panelKey || currentPanelKey === panelKey) {
+            localStorage.removeItem(USER_ACCOUNT_OPEN_PANEL_KEY);
+        }
+
+        if (!panelKey || panelKey === "accountSettings") {
+            localStorage.removeItem(USER_PROFILE_EDITOR_OPEN_KEY);
+        }
+    } catch (error) {
+        // localStorage can be unavailable in private or restricted contexts.
+    }
+}
+
+function rememberAccountPanelElement(panel, open) {
+    const panelKey = accountPanelKeyForElement(panel);
+
+    if (!panelKey) {
+        clearRememberedAccountPanelOpen();
+        return;
+    }
+
+    if (open) {
+        rememberAccountPanelOpen(panelKey);
+    } else {
+        clearRememberedAccountPanelOpen(panelKey);
+    }
+}
+
+function hideRememberedAccountPanels(exceptPanel = null) {
+    document.querySelectorAll(USER_ACCOUNT_PANEL_HIDE_SELECTOR).forEach(panel => {
+        if (panel !== exceptPanel) {
+            panel.hidden = true;
+        }
+    });
+}
+
+function shouldRestoreAccountPanelOpen(panelKey) {
+    if (!USER_ACCOUNT_REMEMBERED_PANEL_SELECTORS[panelKey]) {
+        return false;
+    }
+
+    if (typeof hasAccountActionToken === "function" && hasAccountActionToken()) {
+        return false;
+    }
+
+    const params = new URLSearchParams(window.location.search || "");
+    const queryPanel = params.get("account_panel");
+
+    if (queryPanel && !(panelKey === "twoFactor" && queryPanel === "two_factor")) {
+        return false;
+    }
+
+    const hashPanelKey = USER_ACCOUNT_PANEL_HASH_KEYS[window.location.hash || ""];
+    if (hashPanelKey && hashPanelKey !== panelKey) {
+        return false;
+    }
+
+    if (!accountPanelElement(panelKey)) {
+        clearRememberedAccountPanelOpen(panelKey);
+        return false;
+    }
+
+    return true;
+}
+
+function restoreRememberedAccountPanelOpen() {
+    const panelKey = rememberedAccountPanelKey();
+
+    if (!shouldRestoreAccountPanelOpen(panelKey)) {
+        return;
+    }
+
+    const panel = accountPanelElement(panelKey);
+
+    if (!panel) {
+        clearRememberedAccountPanelOpen(panelKey);
+        return;
+    }
+
+    panel.hidden = false;
+    hideRememberedAccountPanels(panel);
+
+    const accountMenu = document.querySelector("[data-account-menu]");
+    if (accountMenu) {
+        closeAccountMenuDropdown(accountMenu);
+    }
+
+    window.requestAnimationFrame(() => {
+        panel.scrollIntoView({ behavior: "auto", block: "start" });
+    });
+}
+
+function rememberUserProfileEditorOpen(open) {
+    if (open) {
+        rememberAccountPanelOpen("accountSettings");
+    } else {
+        clearRememberedAccountPanelOpen("accountSettings");
+    }
+}
+
+function clearRememberedUserProfileEditorOpen() {
+    clearRememberedAccountPanelOpen("accountSettings");
+}
+
+function restoreUserProfileEditorOpenState() {
+    restoreRememberedAccountPanelOpen();
 }
 
 function scrollToUserAccountProfile(behavior = "auto") {
@@ -510,15 +690,12 @@ function toggleUserProfileEditor(open = null) {
 
     const shouldOpen = explicitState ? open : true;
     form.hidden = !shouldOpen;
+    rememberAccountPanelElement(form, shouldOpen);
 
     if (shouldOpen) {
         closeAccountMenu();
 
-        document.querySelectorAll(
-            "[data-account-notices-panel], [data-usage-dashboard-panel], [data-push-notifications-panel], [data-feedback-support-panel], [data-two-factor-panel], [data-delete-account-panel]"
-        ).forEach(panel => {
-            panel.hidden = true;
-        });
+        hideRememberedAccountPanels(form);
 
         scrollToProfileEditor();
     } else {
@@ -561,15 +738,12 @@ function toggleAccountNoticesPanel(open = null) {
 
     const shouldOpen = explicitState ? open : true;
     panel.hidden = !shouldOpen;
+    rememberAccountPanelElement(panel, shouldOpen);
 
     if (shouldOpen) {
         closeAccountMenu();
 
-        document.querySelectorAll(
-            "#userProfileEditForm, [data-usage-dashboard-panel], [data-push-notifications-panel], [data-feedback-support-panel], [data-two-factor-panel], [data-delete-account-panel]"
-        ).forEach(otherPanel => {
-            otherPanel.hidden = true;
-        });
+        hideRememberedAccountPanels(panel);
 
         scrollToPanel();
     } else {
@@ -651,15 +825,12 @@ function toggleUsageDashboardPanel(open = null) {
 
     const shouldOpen = explicitState ? open : true;
     panel.hidden = !shouldOpen;
+    rememberAccountPanelElement(panel, shouldOpen);
 
     if (shouldOpen) {
         closeAccountMenu();
 
-        document.querySelectorAll(
-            "#userProfileEditForm, [data-account-notices-panel], [data-push-notifications-panel], [data-feedback-support-panel], [data-two-factor-panel], [data-delete-account-panel]"
-        ).forEach(otherPanel => {
-            otherPanel.hidden = true;
-        });
+        hideRememberedAccountPanels(panel);
 
         window.requestAnimationFrame(() => {
             panel.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -15530,13 +15701,8 @@ const STORE_REQUEST_FEEDBACK_DESCRIPTION = [
 ].join("\n");
 
 function hideAccountPanelsForFeedback(exceptPanel = null) {
-    document.querySelectorAll(
-        "#userProfileEditForm, [data-account-notices-panel], [data-usage-dashboard-panel], [data-push-notifications-panel], [data-feedback-support-panel], [data-two-factor-panel], [data-delete-account-panel]"
-    ).forEach(panel => {
-        if (panel !== exceptPanel) {
-            panel.hidden = true;
-        }
-    });
+    hideRememberedAccountPanels(exceptPanel);
+    clearRememberedAccountPanelOpen();
 }
 
 function feedbackSupportFocusTarget(section) {
@@ -15695,6 +15861,8 @@ function closeFeedbackSupportSection() {
     } else if (content && !content.classList.contains("collapsed")) {
         toggleCardCollapse("feedback-support");
     }
+
+    clearRememberedAccountPanelOpen();
 
     if (typeof scrollToUserAccountProfile === "function") {
         scrollToUserAccountProfile("auto");
@@ -16514,6 +16682,7 @@ async function refreshStoreMarkup(options = {}) {
     restoreViewBehaviorSettings();
     restoreItemCheckState();
     bindAccountMenuDropdowns();
+    restoreRememberedAccountPanelOpen();
     bindFeedbackTickets();
     initPhoneCountryInputs();
     bindRecipeUrlLogDragAndDrop();
@@ -16707,6 +16876,7 @@ document.addEventListener("DOMContentLoaded", function () {
     restoreViewBehaviorSettings();
     restoreItemCheckState();
     bindAccountMenuDropdowns();
+    restoreRememberedAccountPanelOpen();
     bindFeedbackTickets();
     initPhoneCountryInputs();
     bindRecipeUrlLogDragAndDrop();

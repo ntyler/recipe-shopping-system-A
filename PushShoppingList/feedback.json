@@ -8,7 +8,7 @@
         "email": "freepdfjobsearch@gmail.com"
       },
       "created_at": "2026-06-04T22:35:28Z",
-      "updated_at": "2026-06-05T03:12:35Z",
+      "updated_at": "2026-06-05T04:25:30Z",
       "feedback_type": "Bug Report",
       "subject": "asdfasdf",
       "description": "asdfasdf",
@@ -62,6 +62,17 @@
           "actorPrivateEmail": "ntylerbert@gmail.com",
           "actorPublicEmail": "support@recipeshoppinglist.com",
           "actorType": "support"
+        },
+        {
+          "event": "User Comment Added",
+          "status": "Investigating",
+          "timestamp": "2026-06-05T04:25:30Z",
+          "actor": "freepdfjobsearch@gmail.com",
+          "actorUid": "be46f4d862d74336b7ecbf73b9eb0adf",
+          "actorEmail": "freepdfjobsearch@gmail.com",
+          "actorPrivateEmail": "freepdfjobsearch@gmail.com",
+          "actorPublicEmail": "freepdfjobsearch@gmail.com",
+          "actorType": "user"
         }
       ],
       "notifications": [
@@ -100,6 +111,16 @@
           "authorPublicEmail": "support@recipeshoppinglist.com",
           "authorType": "support",
           "createdAt": "2026-06-05T03:12:35Z"
+        },
+        {
+          "commentId": "3f43a8f35ceb47b0a46ed532f4b99541",
+          "commentText": "you funny admin!",
+          "authorUid": "be46f4d862d74336b7ecbf73b9eb0adf",
+          "authorEmail": "freepdfjobsearch@gmail.com",
+          "authorPrivateEmail": "freepdfjobsearch@gmail.com",
+          "authorPublicEmail": "freepdfjobsearch@gmail.com",
+          "authorType": "user",
+          "createdAt": "2026-06-05T04:25:30Z"
         }
       ]
     }

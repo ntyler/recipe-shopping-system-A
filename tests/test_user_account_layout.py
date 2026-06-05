@@ -47,7 +47,7 @@ def test_account_menu_uses_compact_grouped_dropdown_style():
     for label in (
         "Account Settings",
         "Account Notices",
-        "Usage Dashboard",
+        "AI Usage &amp; Billing",
         "Change Password",
         "Email Verified",
         "Two-Factor Authentication",
@@ -58,7 +58,7 @@ def test_account_menu_uses_compact_grouped_dropdown_style():
     ):
         assert label in menu_markup
     assert menu_markup.index(">PROFILE</div>") < menu_markup.index("Account Settings")
-    assert menu_markup.index(">USAGE &amp; BILLING</div>") < menu_markup.index("Usage Dashboard")
+    assert menu_markup.index(">USAGE &amp; BILLING</div>") < menu_markup.index("AI Usage &amp; Billing")
     assert menu_markup.index(">USAGE &amp; BILLING</div>") < menu_markup.index(">SECURITY</div>")
     assert menu_markup.index(">SESSION</div>") < menu_markup.index("Sign Out")
     assert menu_markup.index(">DANGER ZONE</div>") < menu_markup.index("Delete Account")
@@ -129,36 +129,106 @@ def test_usage_dashboard_menu_opens_visible_account_panel():
 
     assert 'id="accountUsageDashboardPanel"' in template
     assert "data-usage-dashboard-panel" in template
-    assert "<h3>Usage Dashboard</h3>" in template
+    assert "<h3>AI Usage &amp; Billing</h3>" in template
     assert "data-usage-dashboard-close" in template
     assert "toggleUsageDashboardPanel(false)" in template
     assert "user-usage-dashboard-divider" in template
     assert "app-section-divider recipe-entry-section-divider user-usage-dashboard-divider" in template
+    assert "API Usage Notice" in template
+    assert "This dashboard tracks only OpenAI API usage made by this shopping-list app." in template
+    assert "Does include:" in template
+    assert "Recipe imports processed by this app" in template
+    assert "Pantry/photo scans processed by this app" in template
+    assert "Product searches processed by this app" in template
+    assert "Generated images created by this app" in template
+    assert "Does not include:" in template
+    assert "ChatGPT app usage" in template
+    assert "ChatGPT website usage" in template
+    assert "ChatGPT Plus/Pro subscription usage" in template
+    assert "OpenAI API usage from other apps" in template
     assert "user-usage-dashboard-grid" in template
     assert "Personal Workspace" in template
-    assert "OpenAI API pay-as-you-go" in template
-    assert "Monthly Token Limit" in template
-    assert "This Month" in template
-    assert "Tokens Remaining" in template
-    assert "API Requests" in template
+    assert "OpenAI API Pay-As-You-Go" in template
+    assert "Billing Type" in template
+    assert "Monthly API Budget" in template
+    assert "API Usage This Month" in template
+    assert "Budget Remaining" in template
+    assert "API Requests This Month" in template
     assert "Input Tokens" in template
     assert "Output Tokens" in template
-    assert "Estimated Cost" in template
-    assert "Monthly Budget" in template
+    assert "Estimated API Cost" in template
+    assert "Not available yet" in template
+    assert "Monthly Spend Limit" in template
     assert "Lifetime Tokens" in template
-    assert "Last API Use" in template
-    assert "No ChatGPT/OpenAI API tokens have been recorded yet." in template
-    assert "ChatGPT app or website subscription usage is not exposed to this local dashboard." in template
+    assert "Last API Request" in template
+    assert "Tokens are pieces of text processed by the AI." in template
+    assert "Estimated cost is calculated from OpenAI API usage returned by this app." in template
+    assert "Recipe Imports" in template
+    assert "Pantry Scans" in template
+    assert "Product Searches" in template
+    assert "Generated Images" in template
+    assert "Monthly Spend Controls" in template
+    assert "Alert at 50%" in template
+    assert "Alert at 80%" in template
+    assert "Pause AI features at 100%" in template
+    assert "No monthly API budget configured." in template
+    assert "No OpenAI API usage has been recorded for this app yet." in template
+    assert "When this app makes OpenAI API requests, token usage and estimated costs will appear here." in template
+    assert "Note: ChatGPT website/app subscription usage is separate and cannot be shown in this local dashboard." in template
+    assert "No ChatGPT/OpenAI API tokens have been recorded yet." not in template
     assert ".user-usage-dashboard-panel" in css
+    assert ".user-usage-api-notice" in css
+    assert ".user-usage-info-badge" in css
     assert ".user-usage-dashboard-grid" in css
     assert ".user-usage-dashboard-card" in css
     assert ".user-usage-dashboard-card-wide" in css
+    assert ".user-usage-dashboard-close" in css
+    assert ".user-usage-activity-grid" in css
+    assert ".user-usage-budget-panel" in css
+    assert ".user-usage-budget-badge" in css
     assert ".user-usage-meter" in css
     assert ".user-usage-dashboard-note" in css
     assert "function toggleUsageDashboardPanel(open = null)" in script
     assert "[data-usage-dashboard-panel]" in script
     assert 'panel.scrollIntoView({ behavior: "smooth", block: "start" })' in script
     assert "[data-usage-dashboard-panel]" in firebase_script
+
+
+def test_account_panels_remember_open_state_across_refreshes():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    firebase_script = (ROOT / "PushShoppingList/static/js/firebase-auth.js").read_text(encoding="utf-8")
+
+    assert 'const USER_ACCOUNT_OPEN_PANEL_KEY = "user-account-open-panel";' in script
+    assert "USER_ACCOUNT_REMEMBERED_PANEL_SELECTORS" in script
+    for panel_key in (
+        "accountSettings",
+        "accountNotices",
+        "usageDashboard",
+        "twoFactor",
+        "pushNotifications",
+        "deleteAccount",
+    ):
+        assert panel_key in script
+    for selector in (
+        "#userProfileEditForm",
+        "[data-account-notices-panel]",
+        "[data-usage-dashboard-panel]",
+        "[data-two-factor-panel]",
+        "[data-push-notifications-panel]",
+        "[data-delete-account-panel]",
+    ):
+        assert selector in script
+        assert selector in firebase_script
+    assert "function rememberAccountPanelOpen(panelKey)" in script
+    assert "function clearRememberedAccountPanelOpen(panelKey = null)" in script
+    assert "function rememberAccountPanelElement(panel, open)" in script
+    assert "function restoreRememberedAccountPanelOpen()" in script
+    assert "restoreRememberedAccountPanelOpen();" in script
+    assert "rememberAccountPanelElement(form, shouldOpen)" in script
+    assert "rememberAccountPanelElement(panel, shouldOpen)" in script
+    assert "hideRememberedAccountPanels(panel)" in script
+    assert "window.rememberAccountPanelElement(exceptPanel, true)" in firebase_script
+    assert "window.rememberAccountPanelElement(panel, false)" in firebase_script
 
 
 def test_usage_dashboard_receives_openai_usage_summary_from_route():

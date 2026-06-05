@@ -19,34 +19,34 @@ class FakeResponse:
 
 
 def test_openai_usage_records_response_tokens_and_dashboard_totals(tmp_path, monkeypatch):
-    usage_file = tmp_path / "openai_usage.json"
-    monkeypatch.setattr(openai_usage_service, "OPENAI_USAGE_FILE", usage_file)
+    monkeypatch.setattr(storage_service, "USER_DATA_DIR", tmp_path / "users")
     monkeypatch.setattr(openai_usage_service, "active_user_id", lambda: "user-123")
     monkeypatch.setenv("SHOPPING_APP_OPENAI_MONTHLY_TOKEN_LIMIT", "300")
     monkeypatch.setenv("SHOPPING_APP_OPENAI_MONTHLY_BUDGET_USD", "10")
     monkeypatch.setenv("SHOPPING_APP_OPENAI_INPUT_COST_PER_1M_TOKENS", "5")
     monkeypatch.setenv("SHOPPING_APP_OPENAI_OUTPUT_COST_PER_1M_TOKENS", "15")
     monkeypatch.setenv("SHOPPING_APP_OPENAI_PLAN_LABEL", "Kitchen Test Plan")
-    monkeypatch.setenv("SHOPPING_APP_OPENAI_SUBSCRIPTION_LABEL", "API Usage Billing")
+    monkeypatch.setenv("SHOPPING_APP_OPENAI_BILLING_TYPE_LABEL", "API Usage Billing")
 
     record = openai_usage_service.record_openai_usage(
         FakeResponse(),
-        "unit-test-feature",
+        "recipe-text-extraction",
         metadata={"source": "pytest"},
     )
 
     assert record["userId"] == "user-123"
-    assert record["feature"] == "unit-test-feature"
+    assert record["feature"] == "recipe-text-extraction"
     assert record["model"] == "gpt-test"
     assert record["promptTokens"] == 100
     assert record["completionTokens"] == 50
     assert record["totalTokens"] == 150
     assert record["metadata"] == {"source": "pytest"}
 
-    dashboard = openai_usage_service.openai_usage_dashboard_for_user()
+    dashboard = openai_usage_service.openai_usage_dashboard_for_user({"user_id": "user-123"})
 
     assert dashboard["has_usage"] is True
     assert dashboard["plan_label"] == "Kitchen Test Plan"
+    assert dashboard["billing_type_label"] == "API Usage Billing"
     assert dashboard["subscription_label"] == "API Usage Billing"
     assert dashboard["monthly_token_limit_label"] == "300"
     assert dashboard["monthly_total_tokens"] == 150
@@ -57,9 +57,15 @@ def test_openai_usage_records_response_tokens_and_dashboard_totals(tmp_path, mon
     assert dashboard["limit_percent"] == 50.0
     assert dashboard["monthly_estimated_cost_label"] == "$0.0013"
     assert dashboard["monthly_budget_label"] == "$10.0000"
+    assert dashboard["monthly_budget_remaining_label"] == "$9.9987"
+    assert dashboard["monthly_recipe_import_count"] == 1
+    assert dashboard["monthly_pantry_scan_count"] == 0
+    assert dashboard["monthly_product_search_count"] == 0
+    assert dashboard["monthly_generated_image_count"] == 0
     assert dashboard["lifetime_total_tokens"] == 150
     assert dashboard["last_used_at_label"] != "Not recorded yet"
-    assert "ChatGPT app or website subscription usage is not exposed" in dashboard["tracking_note"]
+    assert "tracks only OpenAI API usage" in dashboard["tracking_note"]
+    assert "ChatGPT website/app subscription usage is separate" in dashboard["tracking_note"]
 
 
 def test_openai_usage_dashboard_defaults_when_no_tokens_are_recorded(tmp_path, monkeypatch):
@@ -74,10 +80,16 @@ def test_openai_usage_dashboard_defaults_when_no_tokens_are_recorded(tmp_path, m
     assert dashboard["monthly_token_limit_label"] == "Not set"
     assert dashboard["monthly_tokens_remaining_label"] == "No limit set"
     assert dashboard["monthly_budget_label"] == "Not set"
-    assert dashboard["monthly_estimated_cost_label"] == "Cost rates not set"
+    assert dashboard["monthly_budget_remaining_label"] == "No budget set"
+    assert dashboard["monthly_estimated_cost_label"] == "Not available yet"
     assert dashboard["monthly_total_tokens"] == 0
     assert dashboard["monthly_request_count"] == 0
+    assert dashboard["monthly_recipe_import_count"] == 0
+    assert dashboard["monthly_pantry_scan_count"] == 0
+    assert dashboard["monthly_product_search_count"] == 0
+    assert dashboard["monthly_generated_image_count"] == 0
     assert dashboard["last_used_at_label"] == "Not recorded yet"
+    assert "No OpenAI API usage has been recorded for this app yet." in dashboard["empty_state_message"]
 
 
 def test_openai_usage_does_not_write_anonymous_usage_file(tmp_path, monkeypatch):
@@ -108,6 +120,26 @@ def test_openai_usage_can_record_for_explicit_user_from_worker_thread(tmp_path, 
     assert usage_file.exists()
     assert dashboard["monthly_total_tokens"] == 150
     assert dashboard["monthly_request_count"] == 1
+
+
+def test_openai_usage_dashboard_counts_user_friendly_activity_groups(tmp_path, monkeypatch):
+    monkeypatch.setattr(storage_service, "USER_DATA_DIR", tmp_path / "users")
+    monkeypatch.setattr(openai_usage_service, "active_user_id", lambda: "user-123")
+
+    for feature in [
+        "recipe-text-extraction",
+        "pantry-photo-scan",
+        "product-page-analysis",
+        "recipe-step-image",
+    ]:
+        openai_usage_service.record_openai_usage(FakeResponse(), feature)
+
+    dashboard = openai_usage_service.openai_usage_dashboard_for_user({"user_id": "user-123"})
+
+    assert dashboard["monthly_recipe_import_count"] == 1
+    assert dashboard["monthly_pantry_scan_count"] == 1
+    assert dashboard["monthly_product_search_count"] == 1
+    assert dashboard["monthly_generated_image_count"] == 1
 
 
 def test_openai_usage_tracking_is_wired_to_app_openai_call_sites():

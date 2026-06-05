@@ -9,6 +9,22 @@ from PushShoppingList.services.storage_service import user_data_root
 
 OPENAI_USAGE_FILE = scoped_package_path("openai_usage.json")
 MAX_USAGE_RECORDS = int(os.getenv("SHOPPING_APP_OPENAI_USAGE_RECORD_LIMIT", "2000"))
+RECIPE_IMPORT_FEATURES = {
+    "audio-transcription",
+    "video-recipe-pdf-extraction",
+    "recipe-text-extraction",
+    "recipe-image-extraction",
+    "recipe-file-extraction",
+}
+PRODUCT_SEARCH_FEATURES = {
+    "product-page-analysis",
+    "rendered-html-product-reasoning",
+    "store-product-ranking",
+    "final-product-selection",
+}
+GENERATED_IMAGE_FEATURES = {
+    "recipe-step-image",
+}
 
 
 def now_iso():
@@ -65,7 +81,7 @@ def record_openai_usage(response, feature, model=None, metadata=None, user_id=No
     if not record_user_id:
         return None
 
-    usage_file = openai_usage_file_for_user(user_id)
+    usage_file = openai_usage_file_for_user(record_user_id)
     record = normalize_usage_record({
         "createdAt": now_iso(),
         "month": current_month_key(),
@@ -164,6 +180,14 @@ def env_int(name):
         return None
 
 
+def env_label(*names, default=""):
+    for name in names:
+        value = str(os.getenv(name, "") or "").strip()
+        if value:
+            return value
+    return default
+
+
 def normalize_usage_record(record):
     prompt_tokens = int_or_zero(record.get("promptTokens") or record.get("prompt_tokens"))
     completion_tokens = int_or_zero(record.get("completionTokens") or record.get("completion_tokens"))
@@ -209,11 +233,19 @@ def openai_usage_dashboard_for_user(user=None):
     lifetime_total = sum_tokens(records, "totalTokens")
     estimated_month_cost = sum_estimated_cost(month_records)
     limit_remaining = monthly_limit - month_total if monthly_limit is not None else None
-    budget_remaining = monthly_budget - estimated_month_cost if monthly_budget is not None and estimated_month_cost is not None else None
+    budget_spend = estimated_month_cost or 0
+    budget_remaining = monthly_budget - budget_spend if monthly_budget is not None else None
+    activity_counts = openai_activity_counts(month_records)
+    billing_type_label = env_label(
+        "SHOPPING_APP_OPENAI_BILLING_TYPE_LABEL",
+        "SHOPPING_APP_OPENAI_SUBSCRIPTION_LABEL",
+        default="OpenAI API Pay-As-You-Go",
+    )
 
     return {
         "plan_label": os.getenv("SHOPPING_APP_OPENAI_PLAN_LABEL", "Personal Workspace"),
-        "subscription_label": os.getenv("SHOPPING_APP_OPENAI_SUBSCRIPTION_LABEL", "OpenAI API pay-as-you-go"),
+        "billing_type_label": billing_type_label,
+        "subscription_label": billing_type_label,
         "month_label": month,
         "monthly_token_limit": monthly_limit,
         "monthly_token_limit_label": number_label(monthly_limit) if monthly_limit is not None else "Not set",
@@ -224,13 +256,18 @@ def openai_usage_dashboard_for_user(user=None):
         "monthly_total_tokens": month_total,
         "monthly_request_count": len(month_records),
         "monthly_estimated_cost": estimated_month_cost,
-        "monthly_estimated_cost_label": money_label(estimated_month_cost) if estimated_month_cost is not None else "Cost rates not set",
+        "monthly_estimated_cost_label": money_label(estimated_month_cost) if estimated_month_cost is not None else "Not available yet",
         "monthly_tokens_remaining": limit_remaining,
         "monthly_tokens_remaining_label": number_label(max(0, limit_remaining)) if limit_remaining is not None else "No limit set",
         "monthly_budget_remaining": budget_remaining,
         "monthly_budget_remaining_label": money_label(max(0, budget_remaining)) if budget_remaining is not None else "No budget set",
         "limit_percent": percent_used(month_total, monthly_limit),
         "budget_percent": percent_used(estimated_month_cost, monthly_budget) if estimated_month_cost is not None else None,
+        "monthly_recipe_import_count": activity_counts["recipe_imports"],
+        "monthly_pantry_scan_count": activity_counts["pantry_scans"],
+        "monthly_product_search_count": activity_counts["product_searches"],
+        "monthly_generated_image_count": activity_counts["generated_images"],
+        "monthly_budget_configured": monthly_budget is not None,
         "lifetime_total_tokens": lifetime_total,
         "lifetime_request_count": len(records),
         "last_used_at": latest_record_timestamp(records),
@@ -238,10 +275,38 @@ def openai_usage_dashboard_for_user(user=None):
         "records_tracked": len(records),
         "has_usage": bool(records),
         "tracking_note": (
-            "These are OpenAI API tokens recorded by this app from API responses. "
-            "ChatGPT app or website subscription usage is not exposed to this local dashboard."
+            "This dashboard tracks only OpenAI API usage returned from requests made by this shopping-list app. "
+            "ChatGPT website/app subscription usage is separate and cannot be shown here."
+        ),
+        "empty_state_message": (
+            "No OpenAI API usage has been recorded for this app yet. "
+            "When this app makes OpenAI API requests, token usage and estimated costs will appear here. "
+            "Note: ChatGPT website/app subscription usage is separate and cannot be shown in this local dashboard."
         ),
     }
+
+
+def openai_activity_counts(records):
+    counts = {
+        "recipe_imports": 0,
+        "pantry_scans": 0,
+        "product_searches": 0,
+        "generated_images": 0,
+    }
+
+    for record in records:
+        feature = str(record.get("feature") or "").strip().lower()
+
+        if feature in RECIPE_IMPORT_FEATURES:
+            counts["recipe_imports"] += 1
+        elif feature in PRODUCT_SEARCH_FEATURES:
+            counts["product_searches"] += 1
+        elif feature in GENERATED_IMAGE_FEATURES:
+            counts["generated_images"] += 1
+        elif "pantry" in feature or "scan" in feature or "photo" in feature:
+            counts["pantry_scans"] += 1
+
+    return counts
 
 
 def sum_tokens(records, key):

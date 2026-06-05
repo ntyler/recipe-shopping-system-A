@@ -5756,11 +5756,107 @@ body {
             margin: 4px 0 14px;
         }
 
+        .user-usage-dashboard-header h3 {
+            text-align: left;
+        }
+
+        .user-usage-dashboard-close {
+            min-width: 76px !important;
+            min-height: 38px;
+            padding: 8px 12px !important;
+            font-size: 13px;
+        }
+
+        .user-usage-api-notice {
+            display: grid;
+            gap: 10px;
+            min-width: 0;
+            padding: 12px;
+            border: 1px solid #2f4054;
+            border-radius: 8px;
+            background: #0b1118;
+            color: #dbeafe;
+            text-align: left;
+        }
+
+        .user-usage-api-notice-copy {
+            display: grid;
+            gap: 6px;
+            min-width: 0;
+        }
+
+        .user-usage-api-notice-copy p,
+        .user-usage-budget-panel p,
+        .user-usage-empty-state p {
+            margin: 0;
+            color: #dbeafe;
+            font-size: 13px;
+            font-weight: 800;
+            line-height: 1.35;
+        }
+
+        .user-usage-info-badge,
+        .user-usage-budget-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: flex-start;
+            width: fit-content;
+            min-height: 24px;
+            padding: 4px 8px;
+            border: 1px solid #2f80ed;
+            border-radius: 999px;
+            background: rgba(30, 128, 201, 0.18);
+            color: #bfdbfe;
+            font-size: 11px;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+
+        .user-usage-budget-badge {
+            border-color: #b7791f;
+            background: rgba(180, 83, 9, 0.18);
+            color: #fde68a;
+        }
+
+        .user-usage-api-notice-columns,
+        .user-usage-budget-grid,
         .user-usage-dashboard-grid {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 8px;
             min-width: 0;
+        }
+
+        .user-usage-api-notice-columns {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .user-usage-api-notice-columns div {
+            min-width: 0;
+            padding: 10px;
+            border: 1px solid #223449;
+            border-radius: 8px;
+            background: #101820;
+        }
+
+        .user-usage-api-notice-columns strong,
+        .user-usage-budget-grid span,
+        .user-usage-dashboard-section-title {
+            color: #cbd5e1;
+            font-size: 12px;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+
+        .user-usage-api-notice-columns ul {
+            display: grid;
+            gap: 5px;
+            margin: 7px 0 0;
+            padding-left: 18px;
+            color: #dbeafe;
+            font-size: 12px;
+            font-weight: 800;
+            line-height: 1.35;
         }
 
         .user-usage-dashboard-card {
@@ -5772,6 +5868,7 @@ body {
             border-radius: 8px;
             background: #0b1118;
             color: #dbeafe;
+            text-align: left;
         }
 
         .user-usage-dashboard-card span {
@@ -5782,7 +5879,7 @@ body {
         }
 
         .user-usage-dashboard-card strong {
-            color: #d8ffe4;
+            color: #eef6ff;
             font-size: 14px;
             font-weight: 900;
             overflow-wrap: anywhere;
@@ -5812,7 +5909,7 @@ body {
             max-width: 100%;
             height: 100%;
             border-radius: inherit;
-            background: linear-gradient(90deg, #1e80c9, #19c36b);
+            background: linear-gradient(90deg, #1d4ed8, #60a5fa);
         }
 
         .user-usage-dashboard-note {
@@ -5820,7 +5917,84 @@ body {
             color: #cbd5e1;
             font-size: 12px;
             font-weight: 800;
-            text-align: center;
+            text-align: left;
+        }
+
+        .user-usage-token-note {
+            padding: 8px 10px;
+            border: 1px solid #223449;
+            border-radius: 8px;
+            background: rgba(30, 128, 201, 0.1);
+        }
+
+        .user-usage-dashboard-section-title {
+            margin: 4px 0 -2px;
+            letter-spacing: 0.04em;
+        }
+
+        .user-usage-activity-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .user-usage-activity-card {
+            border-color: #244a6a;
+            background: rgba(30, 128, 201, 0.1);
+        }
+
+        .user-usage-budget-panel {
+            display: grid;
+            gap: 10px;
+            min-width: 0;
+            padding: 12px;
+            border: 1px solid #2f4054;
+            border-radius: 8px;
+            background: #0b1118;
+            text-align: left;
+        }
+
+        .user-usage-budget-header {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            justify-content: space-between;
+            min-width: 0;
+        }
+
+        .user-usage-budget-header h4 {
+            margin: 0;
+            color: #eef6ff;
+            font-size: 15px;
+            font-weight: 900;
+            text-align: left;
+        }
+
+        .user-usage-budget-grid div {
+            display: grid;
+            gap: 4px;
+            min-width: 0;
+            padding: 10px;
+            border: 1px solid #223449;
+            border-radius: 8px;
+            background: #101820;
+        }
+
+        .user-usage-budget-grid strong {
+            color: #eef6ff;
+            font-size: 13px;
+            font-weight: 900;
+            overflow-wrap: anywhere;
+        }
+
+        .user-usage-empty-state {
+            display: grid;
+            gap: 7px;
+            padding: 10px;
+            border: 1px solid #244a6a;
+            border-radius: 8px;
+            background: rgba(30, 128, 201, 0.08);
         }
 
         .user-feedback-support-panel {
@@ -11116,7 +11290,10 @@ body {
             .user-ntfy-link-row,
             .user-ntfy-topic,
             .user-push-status-grid,
+            .user-usage-api-notice-columns,
             .user-usage-dashboard-grid,
+            .user-usage-activity-grid,
+            .user-usage-budget-grid,
             .user-push-control-row,
             .user-push-devices,
             .user-push-preferences-grid,
@@ -11140,6 +11317,18 @@ body {
 
             .user-push-panel-close {
                 width: 100% !important;
+            }
+
+            .user-usage-dashboard-header {
+                align-items: flex-start;
+            }
+
+            .user-usage-dashboard-header h3 {
+                text-align: left;
+            }
+
+            .user-usage-dashboard-close {
+                width: auto !important;
             }
 
             .screen-settings-card {

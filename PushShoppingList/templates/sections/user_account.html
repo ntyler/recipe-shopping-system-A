@@ -261,7 +261,7 @@
                                     aria-controls="accountUsageDashboardPanel"
                                     onclick="return toggleUsageDashboardPanel()">
                                 <span class="user-account-menu-item-icon" aria-hidden="true">📊</span>
-                                <span class="user-account-menu-item-label">Usage Dashboard</span>
+                                <span class="user-account-menu-item-label">AI Usage &amp; Billing</span>
                             </button>
                         </div>
 
@@ -424,45 +424,71 @@
             {% set openai_usage = openai_usage_dashboard|default({}) %}
             <div class="app-section-divider recipe-entry-section-divider user-usage-dashboard-divider" aria-hidden="true"></div>
             <div class="user-push-panel-header user-usage-dashboard-header">
-                <h3>Usage Dashboard</h3>
+                <h3>AI Usage &amp; Billing</h3>
                 <button type="button"
-                        class="secondary user-push-panel-close"
+                        class="secondary user-push-panel-close user-usage-dashboard-close"
                         data-usage-dashboard-close
                         onclick="return toggleUsageDashboardPanel(false)">
                     Close
                 </button>
             </div>
-            <div class="user-usage-dashboard-grid" aria-label="Usage dashboard summary">
+            <section class="user-usage-api-notice" aria-label="API usage notice">
+                <div class="user-usage-api-notice-copy">
+                    <span class="user-usage-info-badge">API Usage Notice</span>
+                    <p>This dashboard tracks only OpenAI API usage made by this shopping-list app.</p>
+                </div>
+                <div class="user-usage-api-notice-columns">
+                    <div>
+                        <strong>Does include:</strong>
+                        <ul>
+                            <li>Recipe imports processed by this app</li>
+                            <li>Pantry/photo scans processed by this app</li>
+                            <li>Product searches processed by this app</li>
+                            <li>Generated images created by this app</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong>Does not include:</strong>
+                        <ul>
+                            <li>ChatGPT app usage</li>
+                            <li>ChatGPT website usage</li>
+                            <li>ChatGPT Plus/Pro subscription usage</li>
+                            <li>OpenAI API usage from other apps</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+            <div class="user-usage-dashboard-grid" aria-label="AI usage and billing summary">
                 <article class="user-usage-dashboard-card">
                     <span>Plan</span>
                     <strong>{{ openai_usage.plan_label or "Personal Workspace" }}</strong>
                 </article>
                 <article class="user-usage-dashboard-card">
-                    <span>Subscription</span>
-                    <strong>{{ openai_usage.subscription_label or "OpenAI API pay-as-you-go" }}</strong>
+                    <span>Billing Type</span>
+                    <strong>{{ openai_usage.billing_type_label or openai_usage.subscription_label or "OpenAI API Pay-As-You-Go" }}</strong>
                 </article>
                 <article class="user-usage-dashboard-card">
-                    <span>Monthly Token Limit</span>
-                    <strong>{{ openai_usage.monthly_token_limit_label or "Not set" }}</strong>
+                    <span>Monthly API Budget</span>
+                    <strong>{{ openai_usage.monthly_budget_label or "Not set" }}</strong>
                 </article>
                 <article class="user-usage-dashboard-card user-usage-dashboard-card-wide">
-                    <span>This Month</span>
+                    <span>API Usage This Month</span>
                     <strong>{{ "{:,}".format(openai_usage.monthly_total_tokens|default(0)) }} tokens</strong>
-                    {% if openai_usage.limit_percent is defined and openai_usage.limit_percent is not none %}
-                        <div class="user-usage-meter" aria-label="Monthly token limit used">
-                            <span style="width: {{ openai_usage.limit_percent }}%"></span>
+                    {% if openai_usage.budget_percent is defined and openai_usage.budget_percent is not none %}
+                        <div class="user-usage-meter" aria-label="Monthly API budget used">
+                            <span style="width: {{ openai_usage.budget_percent }}%"></span>
                         </div>
-                        <small>{{ openai_usage.limit_percent }}% of monthly token limit used</small>
+                        <small>{{ openai_usage.budget_percent }}% of monthly API budget used</small>
                     {% else %}
-                        <small>No monthly token limit configured</small>
+                        <small>OpenAI API tokens returned from this app</small>
                     {% endif %}
                 </article>
                 <article class="user-usage-dashboard-card">
-                    <span>Tokens Remaining</span>
-                    <strong>{{ openai_usage.monthly_tokens_remaining_label or "No limit set" }}</strong>
+                    <span>Budget Remaining</span>
+                    <strong>{{ openai_usage.monthly_budget_remaining_label or "No budget set" }}</strong>
                 </article>
                 <article class="user-usage-dashboard-card">
-                    <span>API Requests</span>
+                    <span>API Requests This Month</span>
                     <strong>{{ "{:,}".format(openai_usage.monthly_request_count|default(0)) }}</strong>
                 </article>
                 <article class="user-usage-dashboard-card">
@@ -474,11 +500,11 @@
                     <strong>{{ "{:,}".format(openai_usage.monthly_completion_tokens|default(0)) }}</strong>
                 </article>
                 <article class="user-usage-dashboard-card">
-                    <span>Estimated Cost</span>
-                    <strong>{{ openai_usage.monthly_estimated_cost_label or "Cost rates not set" }}</strong>
+                    <span>Estimated API Cost</span>
+                    <strong>{{ openai_usage.monthly_estimated_cost_label or "Not available yet" }}</strong>
                 </article>
                 <article class="user-usage-dashboard-card">
-                    <span>Monthly Budget</span>
+                    <span>Monthly Spend Limit</span>
                     <strong>{{ openai_usage.monthly_budget_label or "Not set" }}</strong>
                 </article>
                 <article class="user-usage-dashboard-card">
@@ -486,17 +512,73 @@
                     <strong>{{ "{:,}".format(openai_usage.lifetime_total_tokens|default(0)) }}</strong>
                 </article>
                 <article class="user-usage-dashboard-card">
-                    <span>Last API Use</span>
+                    <span>Last API Request</span>
                     <strong>{{ openai_usage.last_used_at_label or "Not recorded yet" }}</strong>
                 </article>
             </div>
-            <p class="user-usage-dashboard-note">
+            <p class="user-usage-dashboard-note user-usage-token-note">
+                Tokens are pieces of text processed by the AI. Estimated cost is calculated from OpenAI API usage returned by this app.
+            </p>
+            <div class="user-usage-dashboard-section-title">App Activity This Month</div>
+            <div class="user-usage-activity-grid" aria-label="App AI activity counters">
+                <article class="user-usage-dashboard-card user-usage-activity-card">
+                    <span>Recipe Imports</span>
+                    <strong>{{ "{:,}".format(openai_usage.monthly_recipe_import_count|default(0)) }}</strong>
+                </article>
+                <article class="user-usage-dashboard-card user-usage-activity-card">
+                    <span>Pantry Scans</span>
+                    <strong>{{ "{:,}".format(openai_usage.monthly_pantry_scan_count|default(0)) }}</strong>
+                </article>
+                <article class="user-usage-dashboard-card user-usage-activity-card">
+                    <span>Product Searches</span>
+                    <strong>{{ "{:,}".format(openai_usage.monthly_product_search_count|default(0)) }}</strong>
+                </article>
+                <article class="user-usage-dashboard-card user-usage-activity-card">
+                    <span>Generated Images</span>
+                    <strong>{{ "{:,}".format(openai_usage.monthly_generated_image_count|default(0)) }}</strong>
+                </article>
+            </div>
+            <section class="user-usage-budget-panel" aria-label="Monthly spend controls">
+                <div class="user-usage-budget-header">
+                    <h4>Monthly Spend Controls</h4>
+                    {% if openai_usage.monthly_budget_configured %}
+                        <span class="user-usage-info-badge">Configured</span>
+                    {% else %}
+                        <span class="user-usage-budget-badge">Not configured</span>
+                    {% endif %}
+                </div>
+                {% if openai_usage.monthly_budget_configured %}
+                    <div class="user-usage-budget-grid">
+                        <div>
+                            <span>Monthly API Budget</span>
+                            <strong>{{ openai_usage.monthly_budget_label or "Not set" }}</strong>
+                        </div>
+                        <div>
+                            <span>Alert at 50%</span>
+                            <strong>Ready</strong>
+                        </div>
+                        <div>
+                            <span>Alert at 80%</span>
+                            <strong>Ready</strong>
+                        </div>
+                        <div>
+                            <span>Pause AI features at 100%</span>
+                            <strong>Ready</strong>
+                        </div>
+                    </div>
+                {% else %}
+                    <p>No monthly API budget configured.</p>
+                {% endif %}
+            </section>
+            <div class="user-usage-dashboard-note user-usage-empty-state">
                 {% if openai_usage.has_usage %}
                     {{ openai_usage.tracking_note }}
                 {% else %}
-                    No ChatGPT/OpenAI API tokens have been recorded yet. New API responses from this app will appear here when OpenAI returns token usage. ChatGPT app or website subscription usage is not exposed to this local dashboard.
+                    <p>No OpenAI API usage has been recorded for this app yet.</p>
+                    <p>When this app makes OpenAI API requests, token usage and estimated costs will appear here.</p>
+                    <p>Note: ChatGPT website/app subscription usage is separate and cannot be shown in this local dashboard.</p>
                 {% endif %}
-            </p>
+            </div>
         </div>
 
         <form id="userProfileEditForm"
