@@ -9,8 +9,10 @@ import requests
 
 from PushShoppingList.services.storage_service import scoped_extractor_data_path
 from PushShoppingList.services.user_account_service import current_user
+from PushShoppingList.services.user_account_service import notification_topic
 from PushShoppingList.services.user_account_service import notification_preference_enabled
 from PushShoppingList.services.user_account_service import normalize_ntfy_topic
+from PushShoppingList.services.user_account_service import record_notification_sent
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -302,6 +304,9 @@ def send_ntfy(title, message, preference_key=""):
             headers={"Title": str(title)},
             timeout=5,
         )
+        user = current_user()
+        if user:
+            record_notification_sent(user.get("user_id"))
     except Exception:
         pass
 
@@ -312,7 +317,7 @@ def active_ntfy_topic(preference_key=""):
     if user and not notification_preference_enabled(user, preference_key):
         return ""
 
-    topic = normalize_ntfy_topic((user or {}).get("ntfy_topic"))
+    topic = notification_topic(user or {})
 
     if topic:
         return topic

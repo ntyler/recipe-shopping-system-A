@@ -5741,6 +5741,76 @@ body {
             margin: 4px 0 14px;
         }
 
+        .user-push-overview {
+            display: grid;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .user-push-state-card {
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr);
+            gap: 10px;
+            align-items: center;
+            min-width: 0;
+            padding: 12px;
+            border: 1px solid #2f4054;
+            border-radius: 8px;
+            background: #0b1118;
+            color: #dbeafe;
+            text-align: left;
+        }
+
+        .user-push-state-card.enabled {
+            border-color: #0f9f6e;
+            background: rgba(5, 78, 53, 0.28);
+        }
+
+        .user-push-state-card.disabled {
+            border-color: #5b6778;
+        }
+
+        .user-push-state-dot,
+        .user-push-device-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 999px;
+            background: #ef4444;
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.16);
+        }
+
+        .user-push-state-card.enabled .user-push-state-dot,
+        .user-push-device-status.connected .user-push-device-dot {
+            background: #22c55e;
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.16);
+        }
+
+        .user-push-device-status.pending .user-push-device-dot {
+            background: #f59e0b;
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.16);
+        }
+
+        .user-push-state-card strong {
+            display: block;
+            color: #eef6ff;
+            font-size: 16px;
+            font-weight: 900;
+            line-height: 1.2;
+        }
+
+        .user-push-state-card.enabled strong {
+            color: #d8ffe4;
+        }
+
+        .user-push-state-card p {
+            margin: 3px 0 0;
+            color: #cbd5e1;
+            font-size: 13px;
+            font-weight: 800;
+            line-height: 1.35;
+        }
+
         .user-usage-dashboard-panel {
             margin-top: 12px;
             padding: 0;
@@ -6025,13 +6095,13 @@ body {
         .user-push-status-grid,
         .user-push-control-row {
             display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-template-columns: repeat(4, minmax(0, 1fr));
             gap: 8px;
             min-width: 0;
         }
 
         .user-push-status-grid {
-            grid-template-columns: minmax(150px, 0.35fr) minmax(0, 1fr);
+            grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
         .user-push-status-card {
@@ -6068,13 +6138,33 @@ body {
         }
 
         .user-push-subsection,
-        .user-push-preferences {
+        .user-push-preferences,
+        .user-push-advanced-settings {
             min-width: 0;
             margin: 0;
             padding: 10px;
             border: 1px solid #2f4054;
             border-radius: 8px;
             background: #0b1118;
+        }
+
+        .user-push-advanced-settings {
+            display: block;
+        }
+
+        .user-push-advanced-settings summary {
+            cursor: pointer;
+            color: #dbeafe;
+            font-size: 13px;
+            font-weight: 900;
+            list-style-position: inside;
+        }
+
+        .user-push-advanced-body {
+            display: grid;
+            gap: 10px;
+            margin-top: 10px;
+            min-width: 0;
         }
 
         .user-push-subsection h4,
@@ -6128,10 +6218,25 @@ body {
         }
 
         .user-push-devices small {
+            display: flex;
+            gap: 7px;
+            align-items: center;
             color: #9ed0ff;
             font-size: 11px;
             font-weight: 800;
             line-height: 1.2;
+        }
+
+        .user-push-device-status.connected small {
+            color: #d8ffe4;
+        }
+
+        .user-push-device-status.pending small {
+            color: #fde68a;
+        }
+
+        .user-push-device-status.not-connected small {
+            color: #ffd4d4;
         }
 
         .user-push-preference input[type="checkbox"] {

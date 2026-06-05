@@ -654,6 +654,10 @@
              class="user-account-form user-push-notifications-panel"
              data-push-notifications-panel
              data-notifications-enabled="{% if current_user.notifications_enabled %}1{% else %}0{% endif %}"
+             data-notification-topic="{{ current_user.notification_topic }}"
+             data-ntfy-url="{{ current_user.ntfy_url }}"
+             data-ntfy-deep-link="{{ current_user.ntfy_deep_link }}"
+             data-web-push-public-key="{{ current_user.web_push_public_key }}"
              hidden>
             <div class="app-section-divider recipe-entry-section-divider user-push-notifications-divider" aria-hidden="true"></div>
             <div class="user-push-panel-header">
@@ -665,82 +669,51 @@
                 </button>
             </div>
 
-            <div class="user-push-status-grid">
-                <div class="user-push-status-card">
-                    <span>Status:</span>
-                    <strong data-push-notifications-status-label>
-                        {% if current_user.notifications_enabled %}Enabled{% else %}Disabled{% endif %}
-                    </strong>
-                </div>
-                {% if current_user.ntfy_url %}
-                    <div class="user-push-status-card">
-                        <span>Topic</span>
-                        <code>{{ current_user.ntfy_topic }}</code>
-                    </div>
-                {% endif %}
-            </div>
-
-            {% if current_user.ntfy_url %}
-                <div class="user-ntfy-content">
-                    <div class="user-ntfy-link-row user-push-link-row">
-                        <a class="user-ntfy-link"
-                           href="{{ current_user.ntfy_url }}"
-                           target="_blank"
-                           rel="noopener noreferrer">
-                            Open ntfy Topic
-                        </a>
-                        <button type="button"
-                                class="secondary"
-                                data-ntfy-url="{{ current_user.ntfy_url }}"
-                                onclick="return copyAccountNtfyLink(this)">
-                            Copy Link
-                        </button>
+            <section class="user-push-overview" aria-label="Notification status">
+                <div class="user-push-state-card {% if current_user.notifications_enabled %}enabled{% else %}disabled{% endif %}"
+                     data-push-state-card>
+                    <span class="user-push-state-dot" aria-hidden="true"></span>
+                    <div>
+                        <strong data-push-notifications-status-label>
+                            Notifications {% if current_user.notifications_enabled %}Enabled{% else %}Disabled{% endif %}
+                        </strong>
+                        <p data-push-notifications-summary>
+                            {% if current_user.notifications_enabled %}
+                                You'll be notified when selected shopping-list events finish.
+                            {% else %}
+                                Enable notifications to get updates from this app on this device.
+                            {% endif %}
+                        </p>
                     </div>
                 </div>
-            {% endif %}
 
-            <div class="user-push-control-row">
-                <button type="button" data-push-notifications-enable>
-                    Enable Notifications
-                </button>
-                <button type="button"
-                        class="secondary"
-                        data-push-notifications-disable>
-                    Disable Notifications
-                </button>
-                <button type="button"
-                        class="secondary"
-                        data-push-notifications-test>
-                    Send Test Notification
-                </button>
-            </div>
-
-            <section class="user-push-subsection" aria-label="Devices">
-                <h4>Devices</h4>
-                <ul class="user-push-devices">
-                    {% if current_user.notification_devices %}
-                        {% for device in current_user.notification_devices %}
-                            <li>
-                                <span>{{ device.name }}</span>
-                                <small>{{ device.status }}{% if device.last_seen_at_label %} - {{ device.last_seen_at_label }}{% endif %}</small>
-                            </li>
-                        {% endfor %}
-                    {% else %}
-                        {% for device in current_user.supported_notification_devices %}
-                            <li>
-                                <span>{{ device }}</span>
-                                <small>Ready to connect</small>
-                            </li>
-                        {% endfor %}
-                    {% endif %}
-                </ul>
+                <div class="user-push-control-row">
+                    <button type="button" data-push-notifications-enable>
+                        Enable Notifications
+                    </button>
+                    <button type="button"
+                            class="secondary"
+                            data-push-device-subscribe>
+                        Subscribe on Device
+                    </button>
+                    <button type="button"
+                            class="secondary"
+                            data-push-notifications-test>
+                        Test Notification
+                    </button>
+                    <button type="button"
+                            class="secondary user-push-disable-button"
+                            data-push-notifications-disable>
+                        Disable Notifications
+                    </button>
+                </div>
             </section>
 
             <fieldset class="user-push-preferences">
-                <legend>Notification Preferences</legend>
+                <legend>You'll be notified when:</legend>
                 <div class="user-push-preferences-grid">
                     {% for preference in current_user.notification_preference_options %}
-                        <label class="user-push-preference">
+                        <label class="user-push-preference {% if preference.key == 'cloudflare_upload_complete' %}user-push-preference-advanced{% endif %}">
                             <input type="checkbox"
                                    data-notification-preference="{{ preference.key }}"
                                    {% if preference.enabled %}checked{% endif %}>
@@ -749,6 +722,57 @@
                     {% endfor %}
                 </div>
             </fieldset>
+
+            <section class="user-push-subsection" aria-label="Devices">
+                <h4>Devices</h4>
+                <ul class="user-push-devices">
+                    {% for device in current_user.notification_devices %}
+                        <li class="user-push-device-status {{ device.status_class }}"
+                            data-notification-device="{{ device.key }}">
+                            <span>{{ device.name }}</span>
+                            <small>
+                                <span class="user-push-device-dot" aria-hidden="true"></span>
+                                <span data-notification-device-status>{{ device.status }}</span>
+                                {% if device.last_seen_at_label %} - {{ device.last_seen_at_label }}{% endif %}
+                            </small>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </section>
+
+            <details class="user-push-advanced-settings" data-push-advanced-settings>
+                <summary>Advanced Settings</summary>
+                <div class="user-push-advanced-body">
+                    <div class="user-push-status-grid">
+                        <div class="user-push-status-card">
+                            <span>Topic</span>
+                            <code data-push-notification-topic>{{ current_user.notification_topic or "Not created yet" }}</code>
+                        </div>
+                        <div class="user-push-status-card">
+                            <span>Last Test</span>
+                            <strong data-push-last-test-label>{{ current_user.last_test_notification_label or "Not sent yet" }}</strong>
+                        </div>
+                    </div>
+
+                    <div class="user-ntfy-content">
+                        <div class="user-ntfy-link-row user-push-link-row">
+                            <a class="user-ntfy-link"
+                               data-push-history-link
+                               href="{{ current_user.ntfy_url or '#' }}"
+                               target="_blank"
+                               rel="noopener noreferrer">
+                                View Notification History
+                            </a>
+                            <button type="button"
+                                    class="secondary"
+                                    data-ntfy-url="{{ current_user.ntfy_url or '' }}"
+                                    onclick="return copyAccountNtfyLink(this)">
+                                Copy Link
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </details>
 
             <div class="user-ntfy-copy-status user-push-panel-status"
                  data-push-notifications-status

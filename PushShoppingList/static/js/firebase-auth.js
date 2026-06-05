@@ -322,7 +322,7 @@ function setPushNotificationsBusy(panel, busy) {
     }
 
     panel.querySelectorAll(
-        "[data-push-notifications-enable], [data-push-notifications-disable], [data-push-notifications-test], [data-notification-preference]"
+        "[data-push-notifications-enable], [data-push-device-subscribe], [data-push-notifications-disable], [data-push-notifications-test], [data-notification-preference]"
     ).forEach((control) => {
         control.disabled = busy;
     });
@@ -349,6 +349,8 @@ function updatePushNotificationControls(panel, enabled) {
 
     const normalizedEnabled = Boolean(enabled);
     const statusLabel = panel.querySelector("[data-push-notifications-status-label]");
+    const statusSummary = panel.querySelector("[data-push-notifications-summary]");
+    const stateCard = panel.querySelector("[data-push-state-card]");
     const enableButton = panel.querySelector("[data-push-notifications-enable]");
     const disableButton = panel.querySelector("[data-push-notifications-disable]");
     const testButton = panel.querySelector("[data-push-notifications-test]");
@@ -356,11 +358,23 @@ function updatePushNotificationControls(panel, enabled) {
     panel.dataset.notificationsEnabled = normalizedEnabled ? "1" : "0";
 
     if (statusLabel) {
-        statusLabel.textContent = normalizedEnabled ? "Enabled" : "Disabled";
+        statusLabel.textContent = normalizedEnabled ? "Notifications Enabled" : "Notifications Disabled";
+    }
+
+    if (statusSummary) {
+        statusSummary.textContent = normalizedEnabled
+            ? "You'll be notified when selected shopping-list events finish."
+            : "Enable notifications to get updates from this app on this device.";
+    }
+
+    if (stateCard) {
+        stateCard.classList.toggle("enabled", normalizedEnabled);
+        stateCard.classList.toggle("disabled", !normalizedEnabled);
     }
 
     if (enableButton) {
-        enableButton.disabled = normalizedEnabled;
+        enableButton.disabled = false;
+        enableButton.textContent = normalizedEnabled ? "Notifications Enabled" : "Enable Notifications";
     }
 
     if (disableButton) {
@@ -378,6 +392,8 @@ function applyNotificationSettingsUser(panel, user) {
     }
 
     updatePushNotificationControls(panel, Boolean(user.notifications_enabled));
+    updatePushNotificationTopicUi(panel, user);
+    updatePushNotificationDevices(panel, user.notification_devices || []);
 
     const preferences = user.notification_preferences || {};
     panel.querySelectorAll("[data-notification-preference]").forEach((input) => {
@@ -389,7 +405,163 @@ function applyNotificationSettingsUser(panel, user) {
     });
 }
 
-async function saveNotificationSettings(panel, enabled = null) {
+function updatePushNotificationTopicUi(panel, user) {
+    if (!panel || !user) {
+        return;
+    }
+
+    const topic = String(user.notification_topic || user.ntfy_topic || "").trim();
+    const historyUrl = String(user.ntfy_url || "").trim();
+    const deepLink = String(user.ntfy_deep_link || "").trim();
+    const topicNode = panel.querySelector("[data-push-notification-topic]");
+    const historyLink = panel.querySelector("[data-push-history-link]");
+    const copyButton = panel.querySelector("[data-ntfy-url]");
+    const lastTest = panel.querySelector("[data-push-last-test-label]");
+
+    panel.dataset.notificationTopic = topic;
+    panel.dataset.ntfyUrl = historyUrl;
+    panel.dataset.ntfyDeepLink = deepLink;
+
+    if (topicNode) {
+        topicNode.textContent = topic || "Not created yet";
+    }
+
+    if (historyLink) {
+        historyLink.href = historyUrl || "#";
+    }
+
+    if (copyButton) {
+        copyButton.dataset.ntfyUrl = historyUrl;
+    }
+
+    if (lastTest) {
+        lastTest.textContent = user.last_test_notification_label || "Not sent yet";
+    }
+}
+
+function updatePushNotificationDevices(panel, devices) {
+    if (!panel || !Array.isArray(devices)) {
+        return;
+    }
+
+    devices.forEach((device) => {
+        const key = String(device.key || "").trim();
+        const item = key ? panel.querySelector(`[data-notification-device="${key}"]`) : null;
+
+        if (!item) {
+            return;
+        }
+
+        const status = String(device.status || "Not Connected").trim() || "Not Connected";
+        const statusClass = String(device.status_class || status.toLowerCase().replace(/\s+/g, "-")).trim();
+        const statusNode = item.querySelector("[data-notification-device-status]");
+
+        item.classList.remove("connected", "pending", "not-connected");
+        item.classList.add(statusClass);
+
+        if (statusNode) {
+            statusNode.textContent = status;
+        }
+    });
+}
+
+function notificationDeviceType() {
+    const ua = navigator.userAgent || "";
+
+    if (/iphone|ipad|ipod/i.test(ua)) {
+        return "iphone";
+    }
+
+    if (/android/i.test(ua)) {
+        return "android";
+    }
+
+    return "browser";
+}
+
+function urlBase64ToUint8Array(base64String) {
+    const padding = "=".repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+
+    for (let i = 0; i < rawData.length; i += 1) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+
+    return outputArray;
+}
+
+async function buildBrowserPushSubscription(panel) {
+    if (!("Notification" in window)) {
+        return {
+            permission: "unsupported",
+            subscription: null,
+            message: "Browser notifications are not supported here."
+        };
+    }
+
+    let permission = Notification.permission;
+
+    if (permission === "default") {
+        permission = await Notification.requestPermission();
+    }
+
+    if (permission !== "granted") {
+        return {
+            permission,
+            subscription: null,
+            message: "Notification permission was not granted."
+        };
+    }
+
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+        return {
+            permission,
+            subscription: null,
+            message: "Browser push is not supported here."
+        };
+    }
+
+    let registration = null;
+
+    try {
+        registration = await navigator.serviceWorker.register("/static/js/push-notifications-sw.js");
+    } catch (error) {
+        return {
+            permission,
+            subscription: null,
+            message: "Browser permission is enabled, but the service worker could not be registered."
+        };
+    }
+
+    const publicKey = String(panel.dataset.webPushPublicKey || "").trim();
+
+    if (!publicKey) {
+        return {
+            permission,
+            subscription: null,
+            message: "Browser permission is enabled. Add SHOPPING_APP_WEB_PUSH_PUBLIC_KEY to store a browser push subscription."
+        };
+    }
+
+    let subscription = await registration.pushManager.getSubscription();
+
+    if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(publicKey)
+        });
+    }
+
+    return {
+        permission,
+        subscription: subscription.toJSON ? subscription.toJSON() : subscription,
+        message: "Browser notifications connected."
+    };
+}
+
+async function saveNotificationSettings(panel, enabled = null, options = {}) {
     const body = {
         preferences: collectNotificationPreferences(panel)
     };
@@ -398,8 +570,20 @@ async function saveNotificationSettings(panel, enabled = null) {
         body.enabled = enabled;
     }
 
+    if (options.browserPermission !== undefined) {
+        body.browser_permission = options.browserPermission;
+    }
+
+    if (options.browserSubscription) {
+        body.browser_push_subscription = options.browserSubscription;
+    }
+
+    if (options.device) {
+        body.device = options.device;
+    }
+
     setPushNotificationsBusy(panel, true);
-    setPushNotificationsStatus("Saving notification settings...", "success");
+    setPushNotificationsStatus(options.statusMessage || "Saving notification settings...", "success");
 
     try {
         const result = await backendJson("/account/notifications", {
@@ -407,12 +591,80 @@ async function saveNotificationSettings(panel, enabled = null) {
             body: JSON.stringify(body)
         });
         applyNotificationSettingsUser(panel, result.user);
-        setPushNotificationsStatus("Notification settings saved.", "success");
+        setPushNotificationsStatus(options.successMessage || "Notification settings saved.", "success");
+        return result;
+    } catch (error) {
+        setPushNotificationsStatus(error.message, "error");
+        throw error;
+    } finally {
+        setPushNotificationsBusy(panel, false);
+        updatePushNotificationControls(panel, panel.dataset.notificationsEnabled === "1");
+    }
+}
+
+async function enablePushNotifications(panel) {
+    setPushNotificationsBusy(panel, true);
+    setPushNotificationsStatus("Enabling notifications...", "success");
+
+    try {
+        const browserPush = await buildBrowserPushSubscription(panel);
+        const result = await saveNotificationSettings(panel, true, {
+            browserPermission: browserPush.permission,
+            browserSubscription: browserPush.subscription,
+            statusMessage: "Saving notification subscription...",
+            successMessage: browserPush.subscription
+                ? "Notifications Enabled."
+                : `Notifications Enabled. ${browserPush.message}`
+        });
+
+        applyNotificationSettingsUser(panel, result.user);
+
+        if (!browserPush.subscription && notificationDeviceType() !== "browser") {
+            await subscribeCurrentDeviceToNtfy(panel, { silent: true });
+        }
     } catch (error) {
         setPushNotificationsStatus(error.message, "error");
     } finally {
         setPushNotificationsBusy(panel, false);
         updatePushNotificationControls(panel, panel.dataset.notificationsEnabled === "1");
+    }
+}
+
+async function subscribeCurrentDeviceToNtfy(panel, options = {}) {
+    const deviceType = notificationDeviceType();
+    const isBrowserDevice = deviceType === "browser";
+
+    if (isBrowserDevice && !options.forceBrowserHistory) {
+        setPushNotificationsStatus("Browser notifications are handled by Enable Notifications.", "success");
+        return;
+    }
+
+    try {
+        const result = await backendJson("/account/notifications/device-subscribe", {
+            method: "POST",
+            body: JSON.stringify({ device_type: deviceType })
+        });
+        applyNotificationSettingsUser(panel, result.user);
+
+        const deepLink = String(result.deep_link || panel.dataset.ntfyDeepLink || "").trim();
+        const historyUrl = String(result.history_url || panel.dataset.ntfyUrl || "").trim();
+
+        if (deepLink) {
+            window.location.href = deepLink;
+            window.setTimeout(() => {
+                if (historyUrl) {
+                    window.open(historyUrl, "_blank", "noopener,noreferrer");
+                }
+            }, 900);
+        } else if (historyUrl) {
+            window.open(historyUrl, "_blank", "noopener,noreferrer");
+        }
+
+        if (!options.silent) {
+            setPushNotificationsStatus("Subscription opened on this device.", "success");
+        }
+    } catch (error) {
+        setPushNotificationsStatus(error.message, "error");
     }
 }
 
@@ -463,7 +715,14 @@ function bindPushNotificationsPanel() {
     const enableButton = panel.querySelector("[data-push-notifications-enable]");
     if (enableButton) {
         enableButton.addEventListener("click", () => {
-            saveNotificationSettings(panel, true);
+            enablePushNotifications(panel);
+        });
+    }
+
+    const deviceSubscribeButton = panel.querySelector("[data-push-device-subscribe]");
+    if (deviceSubscribeButton) {
+        deviceSubscribeButton.addEventListener("click", () => {
+            subscribeCurrentDeviceToNtfy(panel, { forceBrowserHistory: true });
         });
     }
 
@@ -491,7 +750,7 @@ function bindPushNotificationsPanel() {
                     body: JSON.stringify({})
                 });
                 applyNotificationSettingsUser(panel, result.user);
-                setPushNotificationsStatus("Test notification sent.", "success");
+                setPushNotificationsStatus("Notification sent successfully", "success");
             } catch (error) {
                 setPushNotificationsStatus(error.message, "error");
             } finally {

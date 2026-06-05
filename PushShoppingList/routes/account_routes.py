@@ -44,6 +44,7 @@ from PushShoppingList.services.user_account_service import send_test_notificatio
 from PushShoppingList.services.user_account_service import sign_out_user
 from PushShoppingList.services.user_account_service import sign_in_firebase_user
 from PushShoppingList.services.user_account_service import start_two_factor_setup
+from PushShoppingList.services.user_account_service import start_device_notification_subscription
 from PushShoppingList.services.user_account_service import update_notification_settings
 from PushShoppingList.services.user_account_service import update_user_profile
 from PushShoppingList.services.user_account_service import verify_account_creation
@@ -595,6 +596,19 @@ def update_notification_settings_route():
         session.get("user_id"),
         enabled=payload.get("enabled") if "enabled" in payload else None,
         preferences=payload.get("preferences") if isinstance(payload.get("preferences"), dict) else None,
+        browser_subscription=payload.get("browser_push_subscription") if isinstance(payload.get("browser_push_subscription"), dict) else None,
+        browser_permission=payload.get("browser_permission") if "browser_permission" in payload else None,
+        device_info=payload.get("device") if isinstance(payload.get("device"), dict) else None,
+    )
+    return json_account_result(result)
+
+
+@account_bp.route("/account/notifications/device-subscribe", methods=["POST"])
+def start_device_notification_subscription_route():
+    payload = request.get_json(silent=True) or {}
+    result = start_device_notification_subscription(
+        session.get("user_id"),
+        payload.get("device_type") or payload.get("device") or "",
     )
     return json_account_result(result)
 

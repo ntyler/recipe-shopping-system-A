@@ -48,6 +48,7 @@ PHONE_VERIFICATION_TTL_MINUTES = 10
 TWO_FACTOR_TRUST_DAYS = 30
 TWO_FACTOR_RECOVERY_TTL_MINUTES = 30
 NTFY_TOPIC_PREFIX = os.getenv("SHOPPING_APP_NTFY_TOPIC_PREFIX", "shopping-user").strip() or "shopping-user"
+WEB_PUSH_PUBLIC_KEY = os.getenv("SHOPPING_APP_WEB_PUSH_PUBLIC_KEY", os.getenv("VAPID_PUBLIC_KEY", "")).strip()
 NOTIFICATION_PREFERENCE_OPTIONS = (
     ("recipe_import_complete", "Recipe Import Complete"),
     ("recipe_pdf_generated", "Recipe PDF Generated"),
@@ -61,7 +62,11 @@ DEFAULT_NOTIFICATION_PREFERENCES = {
     key: True
     for key, _label in NOTIFICATION_PREFERENCE_OPTIONS
 }
-SUPPORTED_NOTIFICATION_DEVICES = ("Windows PC", "iPhone", "Browser")
+SUPPORTED_NOTIFICATION_DEVICES = (
+    {"key": "browser", "name": "Browser"},
+    {"key": "iphone", "name": "iPhone"},
+    {"key": "android", "name": "Android"},
+)
 
 
 def now_iso():
@@ -129,6 +134,25 @@ def generate_ntfy_topic():
     return normalize_ntfy_topic(f"{prefix}-{secrets.token_urlsafe(24)}")
 
 
+def notification_topic(user):
+    if not isinstance(user, dict):
+        return ""
+
+    return normalize_ntfy_topic(user.get("notification_topic") or user.get("ntfy_topic"))
+
+
+def ensure_user_notification_topic_fields(user):
+    if not isinstance(user, dict):
+        return ""
+
+    topic = notification_topic(user) or generate_ntfy_topic()
+    user["notification_topic"] = topic
+    user["ntfy_topic"] = topic
+    user["ntfy_topic_created_at"] = user.get("ntfy_topic_created_at") or now_iso()
+    user["notification_topic_created_at"] = user.get("notification_topic_created_at") or user["ntfy_topic_created_at"]
+    return topic
+
+
 def ntfy_subscription_url(topic):
     topic = normalize_ntfy_topic(topic)
 
@@ -136,6 +160,15 @@ def ntfy_subscription_url(topic):
         return ""
 
     return f"https://ntfy.sh/{topic}"
+
+
+def ntfy_deep_link(topic):
+    topic = normalize_ntfy_topic(topic)
+
+    if not topic:
+        return ""
+
+    return f"ntfy://subscribe/{topic}"
 
 
 def normalize_notification_preferences(preferences):
@@ -149,14 +182,44 @@ def normalize_notification_preferences(preferences):
     return normalized
 
 
+def normalize_notification_device_key(value):
+    value = str(value or "").strip().lower()
+    value = re.sub(r"[^a-z0-9]+", "_", value).strip("_")
+
+    aliases = {
+        "windows_pc": "browser",
+        "desktop": "browser",
+        "chrome": "browser",
+        "edge": "browser",
+        "phone": "iphone",
+        "ios": "iphone",
+    }
+    return aliases.get(value, value)
+
+
+def normalize_notification_device_status(status):
+    status = str(status or "").strip().lower()
+
+    if status in {"connected", "registered", "subscribed", "enabled"}:
+        return "Connected"
+
+    if status in {"pending", "requested", "opened", "waiting"}:
+        return "Pending"
+
+    return "Not Connected"
+
+
 def normalize_notification_devices(devices):
     normalized = []
+    seen = set()
 
     for device in devices if isinstance(devices, list) else []:
         if isinstance(device, str):
             name = device.strip()
             if name:
-                normalized.append({"name": name, "status": "Registered"})
+                key = normalize_notification_device_key(name)
+                normalized.append({"key": key, "name": name, "status": "Connected"})
+                seen.add(key)
             continue
 
         if not isinstance(device, dict):
@@ -166,14 +229,89 @@ def normalize_notification_devices(devices):
         if not name:
             continue
 
+        key = normalize_notification_device_key(device.get("key") or name)
+        if key in seen:
+            continue
+
         normalized.append({
+            "key": key,
             "name": name,
-            "status": str(device.get("status") or "Registered").strip() or "Registered",
+            "status": normalize_notification_device_status(device.get("status")),
             "last_seen_at": str(device.get("last_seen_at") or "").strip(),
             "last_seen_at_label": display_datetime(device.get("last_seen_at")),
         })
+        seen.add(key)
 
     return normalized
+
+
+def upsert_notification_device(user, key, name, status, timestamp=None):
+    if not isinstance(user, dict):
+        return
+
+    key = normalize_notification_device_key(key)
+    status = normalize_notification_device_status(status)
+    timestamp = timestamp or now_iso()
+    devices = normalize_notification_devices(user.get("notification_devices"))
+
+    for device in devices:
+        if normalize_notification_device_key(device.get("key") or device.get("name")) == key:
+            device["name"] = name or device.get("name") or key.title()
+            device["status"] = status
+            device["last_seen_at"] = timestamp
+            device["last_seen_at_label"] = display_datetime(timestamp)
+            user["notification_devices"] = devices
+            return
+
+    devices.append({
+        "key": key,
+        "name": name or key.title(),
+        "status": status,
+        "last_seen_at": timestamp,
+        "last_seen_at_label": display_datetime(timestamp),
+    })
+    user["notification_devices"] = devices
+
+
+def notification_device_statuses(user):
+    devices = {
+        normalize_notification_device_key(device.get("key") or device.get("name")): device
+        for device in normalize_notification_devices((user or {}).get("notification_devices"))
+    }
+    enabled = notifications_enabled(user)
+    browser_subscription = (user or {}).get("browser_push_subscription")
+    browser_connected = isinstance(browser_subscription, dict) and bool(browser_subscription.get("endpoint"))
+    permission = str((user or {}).get("browser_notification_permission") or "").strip().lower()
+    result = []
+
+    for supported in SUPPORTED_NOTIFICATION_DEVICES:
+        key = supported["key"]
+        name = supported["name"]
+        stored = devices.get(key, {})
+        status = normalize_notification_device_status(stored.get("status"))
+
+        if not enabled:
+            status = "Not Connected"
+        elif key == "browser":
+            if browser_connected:
+                status = "Connected"
+            elif permission == "denied":
+                status = "Not Connected"
+            else:
+                status = status if stored else "Pending"
+        else:
+            status = status if stored else "Pending"
+
+        result.append({
+            "key": key,
+            "name": name,
+            "status": status,
+            "status_class": status.lower().replace(" ", "-"),
+            "last_seen_at": str(stored.get("last_seen_at") or "").strip(),
+            "last_seen_at_label": display_datetime(stored.get("last_seen_at")),
+        })
+
+    return result
 
 
 def notifications_enabled(user):
@@ -188,7 +326,7 @@ def notifications_enabled(user):
     if isinstance(value, str) and value.strip().lower() in {"0", "false", "no", "off", "disabled"}:
         return False
 
-    return bool(normalize_ntfy_topic(user.get("ntfy_topic")))
+    return bool(notification_topic(user))
 
 
 def notification_preference_enabled(user, preference_key=""):
@@ -213,11 +351,10 @@ def ensure_user_ntfy_topic(user_id):
     if not user:
         return None
 
-    topic = normalize_ntfy_topic(user.get("ntfy_topic"))
+    topic = notification_topic(user)
 
-    if not topic or topic != str(user.get("ntfy_topic") or ""):
-        user["ntfy_topic"] = topic or generate_ntfy_topic()
-        user["ntfy_topic_created_at"] = user.get("ntfy_topic_created_at") or now_iso()
+    if not topic or topic != str(user.get("notification_topic") or "") or topic != str(user.get("ntfy_topic") or ""):
+        ensure_user_notification_topic_fields(user)
         user["updated_at"] = now_iso()
         save_users(payload)
 
@@ -228,7 +365,7 @@ def public_user(user):
     if not isinstance(user, dict):
         return None
     two_factor = user.get("two_factor") if isinstance(user.get("two_factor"), dict) else {}
-    ntfy_topic = normalize_ntfy_topic(user.get("ntfy_topic"))
+    ntfy_topic = notification_topic(user)
     is_firebase = str(user.get("auth_provider") or "").strip().lower() == "firebase"
     email_verified = bool(user.get("firebase_email_verified")) if is_firebase else account_email_verified(user)
     last_sign_in_at = user.get("firebase_last_login_at") or user.get("last_login_at") or ""
@@ -253,8 +390,10 @@ def public_user(user):
         "phone": user.get("phone", ""),
         "phone_verified_at": user.get("phone_verified_at", ""),
         "phone_verified": bool(user.get("phone") and user.get("phone_verified_at")),
+        "notification_topic": ntfy_topic,
         "ntfy_topic": ntfy_topic,
         "ntfy_url": ntfy_subscription_url(ntfy_topic),
+        "ntfy_deep_link": ntfy_deep_link(ntfy_topic),
         "notifications_enabled": notifications_enabled(user),
         "notification_preferences": notification_preferences,
         "notification_preference_options": [
@@ -265,8 +404,19 @@ def public_user(user):
             }
             for key, label in NOTIFICATION_PREFERENCE_OPTIONS
         ],
-        "notification_devices": normalize_notification_devices(user.get("notification_devices")),
+        "notification_devices": notification_device_statuses(user),
         "supported_notification_devices": list(SUPPORTED_NOTIFICATION_DEVICES),
+        "browser_push_connected": bool(
+            isinstance(user.get("browser_push_subscription"), dict)
+            and user.get("browser_push_subscription", {}).get("endpoint")
+        ),
+        "web_push_public_key": WEB_PUSH_PUBLIC_KEY,
+        "last_notification_sent": user.get("last_notification_sent", ""),
+        "last_notification_sent_label": display_datetime(user.get("last_notification_sent")),
+        "last_notification_received": user.get("last_notification_received", ""),
+        "last_notification_received_label": display_datetime(user.get("last_notification_received")),
+        "last_test_notification": user.get("last_test_notification", ""),
+        "last_test_notification_label": display_datetime(user.get("last_test_notification")),
         "avatar_path": user.get("avatar_path", ""),
         "created_at": user.get("created_at", ""),
         "created_at_label": display_datetime(user.get("created_at")),
@@ -363,10 +513,13 @@ def current_user():
 
     user = find_user_by_id(user_id)
 
-    stored_ntfy_topic = str((user or {}).get("ntfy_topic") or "")
-    normalized_ntfy_topic = normalize_ntfy_topic(stored_ntfy_topic)
+    topic = notification_topic(user or {})
 
-    if user and (not normalized_ntfy_topic or normalized_ntfy_topic != stored_ntfy_topic):
+    if user and (
+        not topic
+        or topic != str((user or {}).get("notification_topic") or "")
+        or topic != str((user or {}).get("ntfy_topic") or "")
+    ):
         user = ensure_user_ntfy_topic(user_id) or user
 
     return user
@@ -537,16 +690,24 @@ def sign_in_firebase_user(firebase_user, profile=None, trusted_device_token=""):
             "account_status": "active",
             "email_verified_at": timestamp,
             "phone": "",
-            "ntfy_topic": generate_ntfy_topic(),
+            "notification_topic": generate_ntfy_topic(),
+            "ntfy_topic": "",
             "ntfy_topic_created_at": timestamp,
             "notifications_enabled": True,
             "notification_preferences": DEFAULT_NOTIFICATION_PREFERENCES.copy(),
             "notification_devices": [],
+            "browser_push_subscription": {},
+            "browser_notification_permission": "",
+            "last_notification_sent": "",
+            "last_notification_received": "",
+            "last_test_notification": "",
             "password_hash": "",
             "avatar_path": "",
             "created_at": timestamp,
             "updated_at": timestamp,
         }
+        user["ntfy_topic"] = user["notification_topic"]
+        user["notification_topic_created_at"] = timestamp
         seed_result = seed_new_user_rule_workspace(user_id)
         if not seed_result.get("ok"):
             return {"ok": False, "errors": seed_result.get("errors", ["Unable to initialize account rules."])}
@@ -753,16 +914,24 @@ def create_user(
             ).isoformat() + "Z",
         },
         "phone": phone,
-        "ntfy_topic": generate_ntfy_topic(),
+        "notification_topic": generate_ntfy_topic(),
+        "ntfy_topic": "",
         "ntfy_topic_created_at": timestamp,
         "notifications_enabled": True,
         "notification_preferences": DEFAULT_NOTIFICATION_PREFERENCES.copy(),
         "notification_devices": [],
+        "browser_push_subscription": {},
+        "browser_notification_permission": "",
+        "last_notification_sent": "",
+        "last_notification_received": "",
+        "last_test_notification": "",
         "password_hash": generate_password_hash(password),
         "avatar_path": "",
         "created_at": timestamp,
         "updated_at": timestamp,
     }
+    user["ntfy_topic"] = user["notification_topic"]
+    user["notification_topic_created_at"] = timestamp
     avatar_result = save_avatar_upload(avatar_file, user_id)
 
     if not avatar_result.get("ok"):
@@ -1703,7 +1872,14 @@ def update_user_profile(
     return {"ok": True, "user": public_user(user)}
 
 
-def update_notification_settings(user_id, enabled=None, preferences=None):
+def update_notification_settings(
+    user_id,
+    enabled=None,
+    preferences=None,
+    browser_subscription=None,
+    browser_permission=None,
+    device_info=None,
+):
     payload = load_users()
     user = find_user_by_id_in_payload(payload, user_id)
 
@@ -1713,16 +1889,88 @@ def update_notification_settings(user_id, enabled=None, preferences=None):
     if enabled is not None:
         user["notifications_enabled"] = bool(enabled)
 
-        if user["notifications_enabled"] and not normalize_ntfy_topic(user.get("ntfy_topic")):
-            user["ntfy_topic"] = generate_ntfy_topic()
-            user["ntfy_topic_created_at"] = user.get("ntfy_topic_created_at") or now_iso()
+        if user["notifications_enabled"]:
+            ensure_user_notification_topic_fields(user)
 
     if isinstance(preferences, dict):
         user["notification_preferences"] = normalize_notification_preferences(preferences)
 
+    timestamp = now_iso()
+
+    if enabled is False:
+        for supported in SUPPORTED_NOTIFICATION_DEVICES:
+            upsert_notification_device(user, supported["key"], supported["name"], "Not Connected", timestamp)
+
+    if browser_permission is not None:
+        user["browser_notification_permission"] = str(browser_permission or "").strip().lower()
+
+    if isinstance(browser_subscription, dict) and browser_subscription.get("endpoint"):
+        user["browser_push_subscription"] = browser_subscription
+        user["browser_push_subscription_updated_at"] = timestamp
+        upsert_notification_device(user, "browser", "Browser", "Connected", timestamp)
+    elif user.get("notifications_enabled") and str(browser_permission or "").strip().lower() == "denied":
+        upsert_notification_device(user, "browser", "Browser", "Not Connected", timestamp)
+    elif user.get("notifications_enabled") and browser_permission is not None:
+        upsert_notification_device(user, "browser", "Browser", "Pending", timestamp)
+
+    if isinstance(device_info, dict):
+        device_key = normalize_notification_device_key(device_info.get("key") or device_info.get("type"))
+        device_name = str(device_info.get("name") or "").strip()
+        if device_key:
+            upsert_notification_device(
+                user,
+                device_key,
+                device_name or device_key.title(),
+                device_info.get("status") or "Pending",
+                timestamp,
+            )
+
     user["updated_at"] = now_iso()
     save_users(payload)
     return {"ok": True, "user": public_user(user)}
+
+
+def start_device_notification_subscription(user_id, device_type):
+    payload = load_users()
+    user = find_user_by_id_in_payload(payload, user_id)
+
+    if not user:
+        return {"ok": False, "errors": ["Sign in again before connecting notifications."]}
+
+    topic = ensure_user_notification_topic_fields(user)
+    user["notifications_enabled"] = True
+    device_key = normalize_notification_device_key(device_type)
+    device_name = {
+        "iphone": "iPhone",
+        "android": "Android",
+        "browser": "Browser",
+    }.get(device_key, "Device")
+
+    if device_key:
+        upsert_notification_device(user, device_key, device_name, "Pending", now_iso())
+
+    user["updated_at"] = now_iso()
+    save_users(payload)
+    return {
+        "ok": True,
+        "user": public_user(user),
+        "topic": topic,
+        "deep_link": ntfy_deep_link(topic),
+        "history_url": ntfy_subscription_url(topic),
+    }
+
+
+def record_notification_sent(user_id, timestamp=None):
+    payload = load_users()
+    user = find_user_by_id_in_payload(payload, user_id)
+
+    if not user:
+        return
+
+    timestamp = timestamp or now_iso()
+    user["last_notification_sent"] = timestamp
+    user["updated_at"] = timestamp
+    save_users(payload)
 
 
 def send_test_notification(user_id):
@@ -1735,26 +1983,27 @@ def send_test_notification(user_id):
     if not notifications_enabled(user):
         return {"ok": False, "errors": ["Enable push notifications before sending a test notification."]}
 
-    topic = normalize_ntfy_topic(user.get("ntfy_topic"))
+    topic = notification_topic(user)
 
     if not topic:
-        user["ntfy_topic"] = generate_ntfy_topic()
-        user["ntfy_topic_created_at"] = user.get("ntfy_topic_created_at") or now_iso()
-        user["updated_at"] = now_iso()
-        save_users(payload)
-        topic = user["ntfy_topic"]
+        topic = ensure_user_notification_topic_fields(user)
 
     try:
         response = requests.post(
             f"https://ntfy.sh/{topic}",
-            data=b"Recipe Shopping push notifications are connected.",
-            headers={"Title": "Recipe Shopping test notification"},
+            data=b"Test notification from Recipe Shopping List",
+            headers={"Title": "Recipe Shopping List"},
             timeout=5,
         )
         response.raise_for_status()
     except Exception:
         return {"ok": False, "errors": ["The test notification could not be sent. Try again in a moment."]}
 
+    timestamp = now_iso()
+    user["last_test_notification"] = timestamp
+    user["last_notification_sent"] = timestamp
+    user["updated_at"] = timestamp
+    save_users(payload)
     return {"ok": True, "user": public_user(user)}
 
 
