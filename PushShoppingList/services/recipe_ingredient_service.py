@@ -50,7 +50,7 @@ def save_ingredients_for_recipe(url, ingredients, recipe_metadata=None):
     record = {
         "url": url,
         "quantity": existing.get("quantity", 1),
-        "name": existing.get("name"),
+        "name": existing.get("name") or recipe_metadata.get("display_name") or recipe_metadata.get("recipe_title"),
         "scaled_servings": existing.get("scaled_servings"),
         "scaled_ingredients": existing.get("scaled_ingredients", {}),
         "ingredients": unique_ingredients(ingredients),

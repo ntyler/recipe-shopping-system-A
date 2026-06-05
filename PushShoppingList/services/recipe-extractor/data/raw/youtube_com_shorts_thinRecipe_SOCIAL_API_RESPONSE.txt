@@ -1,0 +1,15 @@
+
+        {
+          "source_url": "https://www.youtube.com/shorts/thinRecipe",
+          "recipe_title": "New way to make dinner",
+          "ingredients": [
+            {"original_text": "ground beef sauce", "ingredient": "ground beef sauce", "quantity": null, "unit": null},
+            {"original_text": "heavy cream", "ingredient": "heavy cream", "quantity": null, "unit": null}
+          ],
+          "equipment": [],
+          "instructions": [
+            {"step_number": 1, "instruction": "Add ingredients.", "equipment_used": []}
+          ],
+          "nutrition": {"other": []}
+        }
+        

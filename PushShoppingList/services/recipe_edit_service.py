@@ -183,7 +183,7 @@ def load_editable_recipe(url):
             "source_url": recipe_data.get("source_url") or url,
             "source_display_url": editable_recipe_source_display_url(recipe_data.get("source_url") or url),
             "type": recipe_url_type(url),
-            "display_name": meta.get("name") or recipe_data.get("recipe_title") or "",
+            "display_name": meta.get("name") or recipe_data.get("display_name") or recipe_data.get("recipe_title") or "",
             "quantity": normalize_recipe_quantity(meta.get("quantity", 1)),
             "cookbook_id": cookbook_assignment.get("cookbook_id", ""),
             "cookbook_name": cookbook_assignment.get("cookbook_name", ""),
@@ -2094,7 +2094,7 @@ def update_recipe_ingredient_record(url, quantity, recipe_data):
     record = {
         "url": url,
         "quantity": quantity,
-        "name": existing.get("name"),
+        "name": existing.get("name") or recipe_data.get("display_name") or recipe_data.get("recipe_title"),
         "scaled_servings": existing.get("scaled_servings"),
         "scaled_ingredients": existing.get("scaled_ingredients", {}),
         "ingredients": extract_ingredients_from_result(recipe_data),

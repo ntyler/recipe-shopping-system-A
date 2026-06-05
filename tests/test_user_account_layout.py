@@ -166,7 +166,31 @@ def test_usage_dashboard_menu_opens_visible_account_panel():
     assert "Tokens are pieces of text processed by the AI." in template
     assert "Estimated API cost is calculated from OpenAI API usage returned by this app." in template
     assert "Billable AI Cost uses this app's configured pricing ledger for user pass-through costs." in template
+    for metric in (
+        "plan_label",
+        "billing_type_label",
+        "monthly_budget_label",
+        "monthly_total_tokens_label",
+        "monthly_budget_remaining_label",
+        "monthly_request_count_label",
+        "monthly_prompt_tokens_label",
+        "monthly_completion_tokens_label",
+        "monthly_estimated_cost_label",
+        "monthly_billable_cost_label",
+        "lifetime_total_tokens_label",
+        "last_used_at_label",
+        "monthly_recipe_import_count_label",
+        "monthly_pantry_scan_count_label",
+        "monthly_product_search_count_label",
+        "monthly_generated_image_count_label",
+    ):
+        assert f'data-openai-usage-metric="{metric}"' in template
+    assert "data-openai-usage-budget-meter" in template
+    assert "data-openai-usage-budget-text" in template
+    assert "data-openai-usage-budget-badge" in template
+    assert "data-openai-usage-empty-state" in template
     assert "user-usage-pricing-note" in template
+    assert "data-openai-usage-pricing-note" in template
     assert "Recipe Imports" in template
     assert "Pantry Scans" in template
     assert "Product Searches" in template
@@ -193,6 +217,10 @@ def test_usage_dashboard_menu_opens_visible_account_panel():
     assert ".user-usage-meter" in css
     assert ".user-usage-dashboard-note" in css
     assert "function toggleUsageDashboardPanel(open = null)" in script
+    assert "function applyOpenAiUsageDashboard(dashboard)" in script
+    assert "function refreshOpenAiUsageDashboard()" in script
+    assert "function syncOpenAiUsageDashboardFromResponse(data, options = {})" in script
+    assert 'fetch(`/api/openai_usage_dashboard?t=${Date.now()}`' in script
     assert "[data-usage-dashboard-panel]" in script
     assert 'panel.scrollIntoView({ behavior: "smooth", block: "start" })' in script
     assert "[data-usage-dashboard-panel]" in firebase_script
@@ -238,8 +266,39 @@ def test_account_panels_remember_open_state_across_refreshes():
 def test_usage_dashboard_receives_openai_usage_summary_from_route():
     route = (ROOT / "PushShoppingList/routes/main_routes.py").read_text(encoding="utf-8")
 
+    assert '@main_bp.route("/api/openai_usage_dashboard", methods=["GET"])' in route
+    assert "def api_openai_usage_dashboard_route():" in route
+    assert '"dashboard": openai_usage_dashboard_for_user(current_public_user())' in route
     assert "openai_usage_dashboard_for_user" in route
     assert "openai_usage_dashboard=openai_usage_dashboard_for_user(active_public_user)" in route
+
+
+def test_usage_dashboard_refreshes_after_openai_routines():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    recipe_routes = (ROOT / "PushShoppingList/routes/recipe_routes.py").read_text(encoding="utf-8")
+    product_routes = (ROOT / "PushShoppingList/routes/product_routes.py").read_text(encoding="utf-8")
+    main_routes = (ROOT / "PushShoppingList/routes/main_routes.py").read_text(encoding="utf-8")
+
+    assert script.count("syncOpenAiUsageDashboardFromResponse(data)") >= 8
+    assert "scheduleOpenAiUsageDashboardRefresh(0)" in script
+    assert "recipeImageProgressUsageRefreshKeys" in script
+    assert "scheduleOpenAiUsageDashboardRefresh(250)" in script
+    for endpoint in (
+        "/api/extract_recipe",
+        "/api/recipe_nutrition_estimate",
+        "/api/recipe_note_feedback",
+        "/api/recipe_step_image",
+        "/api/recipe_equipment_image",
+        "/api/food_review_alternatives",
+    ):
+        assert endpoint in script
+    assert "/api/food_rules/suggest" in script
+    assert "/test-grab-aldi" in script
+    assert "with_openai_usage_dashboard(result)" in recipe_routes
+    assert "with_openai_usage_dashboard(result)" in product_routes
+    assert '"openai_usage_dashboard": openai_usage_dashboard_for_user(current_user())' in recipe_routes
+    assert '"openai_usage_dashboard": openai_usage_dashboard_for_user(current_user())' in product_routes
+    assert '"openai_usage_dashboard": openai_usage_dashboard_for_user(current_public_user())' in main_routes
 
 
 def test_mobile_account_dates_stack_left_aligned():

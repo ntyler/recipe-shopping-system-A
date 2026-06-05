@@ -99,6 +99,14 @@ def static_asset_version(filename):
         return 1
 
 
+@main_bp.route("/api/openai_usage_dashboard", methods=["GET"])
+def api_openai_usage_dashboard_route():
+    return jsonify({
+        "ok": True,
+        "dashboard": openai_usage_dashboard_for_user(current_public_user()),
+    })
+
+
 def pdf_share_view_for_render():
     rows = []
 
@@ -1759,6 +1767,7 @@ def complete_address_route():
         "ok": True,
         "address": completed_address,
         "source": completion_source,
+        "openai_usage_dashboard": openai_usage_dashboard_for_user(current_public_user()),
     })
 
 

@@ -61,6 +61,7 @@ from PushShoppingList.services.recipe_url_service import save_recipe_urls
 from PushShoppingList.services.recipe_quantity_service import update_recipe_ingredient_quantity
 from PushShoppingList.services.recipe_quantity_service import update_recipe_quantity
 from PushShoppingList.services.shopping_list_service import add_items
+from PushShoppingList.services.openai_usage_service import openai_usage_dashboard_for_user
 from PushShoppingList.services.openai_usage_service import record_app_activity
 from PushShoppingList.services.user_account_service import current_user
 from PushShoppingList.services.user_account_service import is_admin_user
@@ -94,7 +95,12 @@ def require_account_for_food_review():
 
 def ensure_recipe_has_default_cookbook(url, recipe_metadata=None):
     recipe_metadata = recipe_metadata if isinstance(recipe_metadata, dict) else {}
-    recipe_title = str(recipe_metadata.get("recipe_title") or recipe_metadata.get("name") or "").strip()
+    recipe_title = str(
+        recipe_metadata.get("display_name")
+        or recipe_metadata.get("recipe_title")
+        or recipe_metadata.get("name")
+        or ""
+    ).strip()
 
     ensure_unclassified_cookbook_for_recipes([{
         "url": url,
@@ -115,10 +121,20 @@ def record_recipe_import_activity(url, result, source):
         metadata={
             "source": source,
             "recipeUrl": url,
-            "recipeTitle": result.get("recipe_title") or result.get("name") or "",
+            "recipeTitle": result.get("display_name") or result.get("recipe_title") or result.get("name") or "",
             "ingredientCount": len(result.get("ingredients", [])),
         },
     )
+
+
+def with_openai_usage_dashboard(result):
+    if not isinstance(result, dict):
+        return result
+
+    return {
+        **result,
+        "openai_usage_dashboard": openai_usage_dashboard_for_user(current_user()),
+    }
 
 
 @recipe_bp.route("/extract_recipe", methods=["POST"])
@@ -164,8 +180,8 @@ def extract_recipe_route():
         if result.get("ok") and ingredients:
             add_items(ingredients)
             save_ingredients_for_recipe(url, ingredients, result)
-            if result.get("recipe_title"):
-                save_recipe_url_name(url, result.get("recipe_title"))
+            if result.get("display_name") or result.get("recipe_title"):
+                save_recipe_url_name(url, result.get("display_name") or result.get("recipe_title"))
             add_recipe_urls([url])
             ensure_recipe_has_default_cookbook(url, result)
             record_recipe_import_activity(url, result, "form-url")
@@ -207,8 +223,8 @@ def upload_recipe_media_route():
         ingredients = result.get("ingredients", [])
         add_items(ingredients)
         save_ingredients_for_recipe(recipe_url, ingredients, result)
-        if result.get("recipe_title"):
-            save_recipe_url_name(recipe_url, result.get("recipe_title"))
+        if result.get("display_name") or result.get("recipe_title"):
+            save_recipe_url_name(recipe_url, result.get("display_name") or result.get("recipe_title"))
         add_recipe_urls([recipe_url])
         ensure_recipe_has_default_cookbook(recipe_url, result)
         record_recipe_import_activity(recipe_url, result, "media-upload")
@@ -282,19 +298,19 @@ def api_extract_recipe_route():
         progress = mark_url_failed(job_id, urls, index, result.get("error") or NO_INGREDIENTS_ERROR)
         finish_batch_if_ready(job_id, progress)
 
-        return jsonify(result), 400
+        return jsonify(with_openai_usage_dashboard(result)), 400
 
     add_items(ingredients)
     save_ingredients_for_recipe(url, ingredients, result)
-    if result.get("recipe_title"):
-        save_recipe_url_name(url, result.get("recipe_title"))
+    if result.get("display_name") or result.get("recipe_title"):
+        save_recipe_url_name(url, result.get("display_name") or result.get("recipe_title"))
     add_recipe_urls([url])
     ensure_recipe_has_default_cookbook(url, result)
     record_recipe_import_activity(url, result, "api-url")
     progress = mark_url_done(job_id, urls, index, len(ingredients))
     finish_batch_if_ready(job_id, progress)
 
-    return jsonify(result)
+    return jsonify(with_openai_usage_dashboard(result))
 
 
 @recipe_bp.route("/api/start_extract_progress", methods=["POST"])
@@ -454,7 +470,7 @@ def api_recipe_nutrition_estimate_route():
     result = estimate_recipe_nutrition(recipe)
     status = 200 if result.get("ok") else 400
 
-    return jsonify(result), status
+    return jsonify(with_openai_usage_dashboard(result)), status
 
 
 @recipe_bp.route("/api/recipe_note_feedback", methods=["POST"])
@@ -463,7 +479,7 @@ def api_recipe_note_feedback_route():
     result = recipe_note_feedback(data)
     status = 200 if result.get("ok") else 400
 
-    return jsonify(result), status
+    return jsonify(with_openai_usage_dashboard(result)), status
 
 
 @recipe_bp.route("/api/recipe_step_image", methods=["POST"])
@@ -472,7 +488,7 @@ def api_recipe_step_image_route():
     result = generate_recipe_step_image(data)
     status = 200 if result.get("ok") else 400
 
-    return jsonify(result), status
+    return jsonify(with_openai_usage_dashboard(result)), status
 
 
 @recipe_bp.route("/api/recipe_equipment_image", methods=["POST"])
@@ -481,7 +497,7 @@ def api_recipe_equipment_image_route():
     result = generate_recipe_equipment_image(data)
     status = 200 if result.get("ok") else 400
 
-    return jsonify(result), status
+    return jsonify(with_openai_usage_dashboard(result)), status
 
 
 @recipe_bp.route("/api/recipe_cover_image", methods=["POST"])
@@ -698,7 +714,7 @@ def api_food_review_alternatives_route():
     result = suggest_food_review_alternatives(data)
     status = 200 if result.get("ok") else 400
 
-    return jsonify(result), status
+    return jsonify(with_openai_usage_dashboard(result)), status
 
 
 @recipe_bp.route("/remove_recipe", methods=["POST"])

@@ -461,100 +461,100 @@
             <div class="user-usage-dashboard-grid" aria-label="AI usage and billing summary">
                 <article class="user-usage-dashboard-card">
                     <span>Plan</span>
-                    <strong>{{ openai_usage.plan_label or "Personal Workspace" }}</strong>
+                    <strong data-openai-usage-metric="plan_label">{{ openai_usage.plan_label or "Personal Workspace" }}</strong>
                 </article>
                 <article class="user-usage-dashboard-card">
                     <span>Billing Type</span>
-                    <strong>{{ openai_usage.billing_type_label or openai_usage.subscription_label or "OpenAI API Pay-As-You-Go" }}</strong>
+                    <strong data-openai-usage-metric="billing_type_label">{{ openai_usage.billing_type_label or openai_usage.subscription_label or "OpenAI API Pay-As-You-Go" }}</strong>
                 </article>
                 <article class="user-usage-dashboard-card">
                     <span>Monthly API Budget</span>
-                    <strong>{{ openai_usage.monthly_budget_label or "Not set" }}</strong>
+                    <strong data-openai-usage-metric="monthly_budget_label">{{ openai_usage.monthly_budget_label or "Not set" }}</strong>
                 </article>
                 <article class="user-usage-dashboard-card user-usage-dashboard-card-wide">
                     <span>API Usage This Month</span>
-                    <strong>{{ "{:,}".format(openai_usage.monthly_total_tokens|default(0)) }} tokens</strong>
+                    <strong data-openai-usage-metric="monthly_total_tokens_label">{{ "{:,}".format(openai_usage.monthly_total_tokens|default(0)) }} tokens</strong>
                     {% if openai_usage.budget_percent is defined and openai_usage.budget_percent is not none %}
                         <div class="user-usage-meter" aria-label="Monthly API budget used">
-                            <span style="width: {{ openai_usage.budget_percent }}%"></span>
+                            <span data-openai-usage-budget-meter style="width: {{ openai_usage.budget_percent }}%"></span>
                         </div>
-                        <small>{{ openai_usage.budget_percent }}% of monthly API budget used</small>
+                        <small data-openai-usage-budget-text>{{ openai_usage.budget_percent }}% of monthly API budget used</small>
                     {% else %}
-                        <small>OpenAI API tokens returned from this app</small>
+                        <small data-openai-usage-budget-text>OpenAI API tokens returned from this app</small>
                     {% endif %}
                 </article>
                 <article class="user-usage-dashboard-card">
                     <span>Budget Remaining</span>
-                    <strong>{{ openai_usage.monthly_budget_remaining_label or "No budget set" }}</strong>
+                    <strong data-openai-usage-metric="monthly_budget_remaining_label">{{ openai_usage.monthly_budget_remaining_label or "No budget set" }}</strong>
                 </article>
                 <article class="user-usage-dashboard-card">
                     <span>API Requests This Month</span>
-                    <strong>{{ "{:,}".format(openai_usage.monthly_request_count|default(0)) }}</strong>
+                    <strong data-openai-usage-metric="monthly_request_count_label">{{ "{:,}".format(openai_usage.monthly_request_count|default(0)) }}</strong>
                 </article>
                 <article class="user-usage-dashboard-card">
                     <span>Input Tokens</span>
-                    <strong>{{ "{:,}".format(openai_usage.monthly_prompt_tokens|default(0)) }}</strong>
+                    <strong data-openai-usage-metric="monthly_prompt_tokens_label">{{ "{:,}".format(openai_usage.monthly_prompt_tokens|default(0)) }}</strong>
                 </article>
                 <article class="user-usage-dashboard-card">
                     <span>Output Tokens</span>
-                    <strong>{{ "{:,}".format(openai_usage.monthly_completion_tokens|default(0)) }}</strong>
+                    <strong data-openai-usage-metric="monthly_completion_tokens_label">{{ "{:,}".format(openai_usage.monthly_completion_tokens|default(0)) }}</strong>
                 </article>
                 <article class="user-usage-dashboard-card">
                     <span>Estimated API Cost</span>
-                    <strong>{{ openai_usage.monthly_estimated_cost_label or "Not available yet" }}</strong>
+                    <strong data-openai-usage-metric="monthly_estimated_cost_label">{{ openai_usage.monthly_estimated_cost_label or "Not available yet" }}</strong>
                 </article>
                 <article class="user-usage-dashboard-card">
                     <span>Billable AI Cost</span>
-                    <strong>{{ openai_usage.monthly_billable_cost_label or "Not available yet" }}</strong>
+                    <strong data-openai-usage-metric="monthly_billable_cost_label">{{ openai_usage.monthly_billable_cost_label or "Not available yet" }}</strong>
                     <small>Configured app ledger amount</small>
                 </article>
                 <article class="user-usage-dashboard-card">
                     <span>Monthly Spend Limit</span>
-                    <strong>{{ openai_usage.monthly_budget_label or "Not set" }}</strong>
+                    <strong data-openai-usage-metric="monthly_budget_label">{{ openai_usage.monthly_budget_label or "Not set" }}</strong>
                 </article>
                 <article class="user-usage-dashboard-card">
                     <span>Lifetime Tokens</span>
-                    <strong>{{ "{:,}".format(openai_usage.lifetime_total_tokens|default(0)) }}</strong>
+                    <strong data-openai-usage-metric="lifetime_total_tokens_label">{{ "{:,}".format(openai_usage.lifetime_total_tokens|default(0)) }}</strong>
                 </article>
                 <article class="user-usage-dashboard-card">
                     <span>Last API Request</span>
-                    <strong>{{ openai_usage.last_used_at_label or "Not recorded yet" }}</strong>
+                    <strong data-openai-usage-metric="last_used_at_label">{{ openai_usage.last_used_at_label or "Not recorded yet" }}</strong>
                 </article>
             </div>
             <p class="user-usage-dashboard-note user-usage-token-note">
                 Tokens are pieces of text processed by the AI. Estimated API cost is calculated from OpenAI API usage returned by this app. Billable AI Cost uses this app's configured pricing ledger for user pass-through costs.
             </p>
-            {% if openai_usage.pricing_note %}
-                <p class="user-usage-dashboard-note user-usage-pricing-note">
-                    {{ openai_usage.pricing_note }}
-                </p>
-            {% endif %}
+            <p class="user-usage-dashboard-note user-usage-pricing-note"
+               data-openai-usage-pricing-note
+               {% if not openai_usage.pricing_note %}hidden{% endif %}>
+                {{ openai_usage.pricing_note }}
+            </p>
             <div class="user-usage-dashboard-section-title">App Activity This Month</div>
             <div class="user-usage-activity-grid" aria-label="App AI activity counters">
                 <article class="user-usage-dashboard-card user-usage-activity-card">
                     <span>Recipe Imports</span>
-                    <strong>{{ "{:,}".format(openai_usage.monthly_recipe_import_count|default(0)) }}</strong>
+                    <strong data-openai-usage-metric="monthly_recipe_import_count_label">{{ "{:,}".format(openai_usage.monthly_recipe_import_count|default(0)) }}</strong>
                 </article>
                 <article class="user-usage-dashboard-card user-usage-activity-card">
                     <span>Pantry Scans</span>
-                    <strong>{{ "{:,}".format(openai_usage.monthly_pantry_scan_count|default(0)) }}</strong>
+                    <strong data-openai-usage-metric="monthly_pantry_scan_count_label">{{ "{:,}".format(openai_usage.monthly_pantry_scan_count|default(0)) }}</strong>
                 </article>
                 <article class="user-usage-dashboard-card user-usage-activity-card">
                     <span>Product Searches</span>
-                    <strong>{{ "{:,}".format(openai_usage.monthly_product_search_count|default(0)) }}</strong>
+                    <strong data-openai-usage-metric="monthly_product_search_count_label">{{ "{:,}".format(openai_usage.monthly_product_search_count|default(0)) }}</strong>
                 </article>
                 <article class="user-usage-dashboard-card user-usage-activity-card">
                     <span>Generated Images</span>
-                    <strong>{{ "{:,}".format(openai_usage.monthly_generated_image_count|default(0)) }}</strong>
+                    <strong data-openai-usage-metric="monthly_generated_image_count_label">{{ "{:,}".format(openai_usage.monthly_generated_image_count|default(0)) }}</strong>
                 </article>
             </div>
             <section class="user-usage-budget-panel" aria-label="Monthly spend controls">
                 <div class="user-usage-budget-header">
                     <h4>Monthly Spend Controls</h4>
                     {% if openai_usage.monthly_budget_configured %}
-                        <span class="user-usage-info-badge">Configured</span>
+                        <span class="user-usage-info-badge" data-openai-usage-budget-badge>Configured</span>
                     {% else %}
-                        <span class="user-usage-budget-badge">Not configured</span>
+                        <span class="user-usage-budget-badge" data-openai-usage-budget-badge>Not configured</span>
                     {% endif %}
                 </div>
                 {% if openai_usage.monthly_budget_configured %}
@@ -580,7 +580,7 @@
                     <p>No monthly API budget configured.</p>
                 {% endif %}
             </section>
-            <div class="user-usage-dashboard-note user-usage-empty-state">
+            <div class="user-usage-dashboard-note user-usage-empty-state" data-openai-usage-empty-state>
                 {% if openai_usage.has_usage %}
                     {{ openai_usage.tracking_note }}
                 {% else %}

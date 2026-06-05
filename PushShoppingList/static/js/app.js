@@ -39,6 +39,212 @@ function getPublicSupportIdentity(email) {
     return getPublicSupportEmail(email);
 }
 
+let openAiUsageDashboardRefreshTimer = null;
+let openAiUsageDashboardRefreshPromise = null;
+
+function formatOpenAiUsageNumber(value) {
+    const number = Number(value || 0);
+    if (!Number.isFinite(number)) {
+        return "0";
+    }
+
+    return Math.max(0, Math.trunc(number)).toLocaleString();
+}
+
+function openAiUsageMetricText(dashboard, metric) {
+    const data = dashboard && typeof dashboard === "object" ? dashboard : {};
+
+    switch (metric) {
+        case "plan_label":
+            return data.plan_label || "Personal Workspace";
+        case "billing_type_label":
+            return data.billing_type_label || data.subscription_label || "OpenAI API Pay-As-You-Go";
+        case "monthly_budget_label":
+            return data.monthly_budget_label || "Not set";
+        case "monthly_total_tokens_label":
+            return `${formatOpenAiUsageNumber(data.monthly_total_tokens)} tokens`;
+        case "monthly_budget_remaining_label":
+            return data.monthly_budget_remaining_label || "No budget set";
+        case "monthly_request_count_label":
+            return formatOpenAiUsageNumber(data.monthly_request_count);
+        case "monthly_prompt_tokens_label":
+            return formatOpenAiUsageNumber(data.monthly_prompt_tokens);
+        case "monthly_completion_tokens_label":
+            return formatOpenAiUsageNumber(data.monthly_completion_tokens);
+        case "monthly_estimated_cost_label":
+            return data.monthly_estimated_cost_label || "Not available yet";
+        case "monthly_billable_cost_label":
+            return data.monthly_billable_cost_label || "Not available yet";
+        case "lifetime_total_tokens_label":
+            return formatOpenAiUsageNumber(data.lifetime_total_tokens);
+        case "last_used_at_label":
+            return data.last_used_at_label || "Not recorded yet";
+        case "monthly_recipe_import_count_label":
+            return formatOpenAiUsageNumber(data.monthly_recipe_import_count);
+        case "monthly_pantry_scan_count_label":
+            return formatOpenAiUsageNumber(data.monthly_pantry_scan_count);
+        case "monthly_product_search_count_label":
+            return formatOpenAiUsageNumber(data.monthly_product_search_count);
+        case "monthly_generated_image_count_label":
+            return formatOpenAiUsageNumber(data.monthly_generated_image_count);
+        default:
+            return "";
+    }
+}
+
+function openAiUsageDashboardFromResponse(data) {
+    if (!data || typeof data !== "object") {
+        return null;
+    }
+
+    if (data.openai_usage_dashboard && typeof data.openai_usage_dashboard === "object") {
+        return data.openai_usage_dashboard;
+    }
+
+    if (data.dashboard && typeof data.dashboard === "object") {
+        return data.dashboard;
+    }
+
+    return null;
+}
+
+function setOpenAiUsageBudgetState(dashboard) {
+    const data = dashboard && typeof dashboard === "object" ? dashboard : {};
+    const meter = document.querySelector("[data-openai-usage-budget-meter]");
+    const budgetText = document.querySelector("[data-openai-usage-budget-text]");
+    const badge = document.querySelector("[data-openai-usage-budget-badge]");
+    const percent = Number(data.budget_percent);
+
+    if (meter) {
+        if (Number.isFinite(percent)) {
+            meter.style.width = `${Math.max(0, Math.min(100, percent))}%`;
+        } else {
+            meter.style.width = "0%";
+        }
+    }
+
+    if (budgetText) {
+        budgetText.textContent = Number.isFinite(percent)
+            ? `${percent}% of monthly API budget used`
+            : "OpenAI API tokens returned from this app";
+    }
+
+    if (badge) {
+        const configured = Boolean(data.monthly_budget_configured);
+        badge.textContent = configured ? "Configured" : "Not configured";
+        badge.classList.toggle("user-usage-info-badge", configured);
+        badge.classList.toggle("user-usage-budget-badge", !configured);
+    }
+}
+
+function setOpenAiUsageEmptyState(dashboard) {
+    const emptyState = document.querySelector("[data-openai-usage-empty-state]");
+    const data = dashboard && typeof dashboard === "object" ? dashboard : {};
+
+    if (!emptyState) {
+        return;
+    }
+
+    emptyState.replaceChildren();
+
+    if (data.has_usage) {
+        emptyState.textContent = data.tracking_note || (
+            "This dashboard tracks only OpenAI API usage returned from requests made by this shopping-list app. " +
+            "ChatGPT website/app subscription usage is separate and cannot be shown here."
+        );
+        return;
+    }
+
+    [
+        "No OpenAI API usage has been recorded for this app yet.",
+        "When this app makes OpenAI API requests, token usage and estimated costs will appear here.",
+        "Note: ChatGPT website/app subscription usage is separate and cannot be shown in this local dashboard.",
+    ].forEach(message => {
+        const paragraph = document.createElement("p");
+        paragraph.textContent = message;
+        emptyState.appendChild(paragraph);
+    });
+}
+
+function setOpenAiUsagePricingNote(dashboard) {
+    const note = document.querySelector("[data-openai-usage-pricing-note]");
+    const data = dashboard && typeof dashboard === "object" ? dashboard : {};
+    const message = String(data.pricing_note || "").trim();
+
+    if (!note) {
+        return;
+    }
+
+    note.textContent = message;
+    note.hidden = !message;
+}
+
+function applyOpenAiUsageDashboard(dashboard) {
+    if (!dashboard || typeof dashboard !== "object") {
+        return false;
+    }
+
+    document.querySelectorAll("[data-openai-usage-metric]").forEach(element => {
+        const text = openAiUsageMetricText(dashboard, element.dataset.openaiUsageMetric || "");
+        if (text) {
+            element.textContent = text;
+        }
+    });
+
+    setOpenAiUsageBudgetState(dashboard);
+    setOpenAiUsagePricingNote(dashboard);
+    setOpenAiUsageEmptyState(dashboard);
+    return true;
+}
+
+async function refreshOpenAiUsageDashboard() {
+    if (openAiUsageDashboardRefreshPromise) {
+        return openAiUsageDashboardRefreshPromise;
+    }
+
+    openAiUsageDashboardRefreshPromise = fetch(`/api/openai_usage_dashboard?t=${Date.now()}`, {
+        cache: "no-store",
+    })
+        .then(response => (response.ok ? response.json() : null))
+        .then(data => {
+            const dashboard = openAiUsageDashboardFromResponse(data);
+            if (dashboard) {
+                applyOpenAiUsageDashboard(dashboard);
+            }
+        })
+        .catch(err => {
+            console.warn("Unable to refresh AI usage dashboard.", err);
+        })
+        .finally(() => {
+            openAiUsageDashboardRefreshPromise = null;
+        });
+
+    return openAiUsageDashboardRefreshPromise;
+}
+
+function scheduleOpenAiUsageDashboardRefresh(delay = 500) {
+    if (!document.querySelector("[data-usage-dashboard-panel]")) {
+        return;
+    }
+
+    window.clearTimeout(openAiUsageDashboardRefreshTimer);
+    openAiUsageDashboardRefreshTimer = window.setTimeout(refreshOpenAiUsageDashboard, delay);
+}
+
+function syncOpenAiUsageDashboardFromResponse(data, options = {}) {
+    const dashboard = openAiUsageDashboardFromResponse(data);
+
+    if (dashboard && applyOpenAiUsageDashboard(dashboard)) {
+        return true;
+    }
+
+    if (options.refresh !== false) {
+        scheduleOpenAiUsageDashboardRefresh(options.delay || 700);
+    }
+
+    return false;
+}
+
 function accountPanelElement(panelKey) {
     const selector = USER_ACCOUNT_REMEMBERED_PANEL_SELECTORS[panelKey];
     return selector ? document.querySelector(selector) : null;
@@ -829,6 +1035,7 @@ function toggleUsageDashboardPanel(open = null) {
 
     if (shouldOpen) {
         closeAccountMenu();
+        scheduleOpenAiUsageDashboardRefresh(0);
 
         hideRememberedAccountPanels(panel);
 
@@ -1503,6 +1710,7 @@ async function grabBestProducts(event) {
             body: formData,
         });
         const data = await response.json();
+        syncOpenAiUsageDashboardFromResponse(data);
 
         if (!response.ok || !data.ok) {
             throw new Error((data && data.error) || "Unable to grab best products.");
@@ -1665,6 +1873,7 @@ async function runTestGrabAldi(ingredient, button) {
             }),
         });
         data = await response.json();
+        syncOpenAiUsageDashboardFromResponse(data);
 
         if (!response.ok || !data.ok) {
             const errors = data && Array.isArray(data.errors) ? data.errors.filter(Boolean).join(" ") : "";
@@ -2938,6 +3147,7 @@ async function addFoodRestrictionsWithChatGPT(button) {
             }),
         });
         const data = await response.json();
+        syncOpenAiUsageDashboardFromResponse(data);
 
         if (!response.ok || !data.ok) {
             throw new Error((data && data.error) || "Unable to add food restrictions.");
@@ -3280,6 +3490,7 @@ async function suggestRulesFoodRule(section, button) {
             }),
         });
         const data = await response.json();
+        syncOpenAiUsageDashboardFromResponse(data);
 
         if (!response.ok || !data.ok) {
             throw new Error((data && data.error) || "Unable to add food restrictions.");
@@ -9046,6 +9257,7 @@ async function openFoodReviewAlternatives(marker) {
             body: JSON.stringify(foodReviewPayloadFromRow(row)),
         });
         const data = await response.json();
+        syncOpenAiUsageDashboardFromResponse(data);
 
         if (!response.ok || !data.ok) {
             throw new Error((data && data.error) || "Unable to load alternatives.");
@@ -11338,6 +11550,7 @@ async function estimateRecipeNutrition(button) {
             body: JSON.stringify(payload),
         });
         const data = await response.json();
+        syncOpenAiUsageDashboardFromResponse(data);
 
         if (!response.ok || !data.ok) {
             throw new Error((data && data.error) || "Unable to estimate nutrition.");
@@ -11564,6 +11777,7 @@ async function askRecipeNoteFeedback(button) {
             }),
         });
         const data = await response.json();
+        syncOpenAiUsageDashboardFromResponse(data);
 
         if (!response.ok || !data.ok) {
             throw new Error((data && data.error) || "Unable to get note feedback.");
@@ -13530,6 +13744,7 @@ let recipeImageProgressChannel = null;
 let recipeImageProgressPollTimer = null;
 let recipeImageProgressPollInFlight = false;
 const recipeImageProgressItemsByKey = new Map();
+const recipeImageProgressUsageRefreshKeys = new Set();
 
 function normalizeRecipeImageProgressKind(kind) {
     return String(kind || "").trim().toLowerCase() === "equipment" ? "equipment" : "step";
@@ -13748,6 +13963,10 @@ function applyRecipeImageProgressItem(rawItem) {
 
         if (item.state === "done") {
             setRecipeImagePanelComplete(panel, item);
+            if (item.key && !recipeImageProgressUsageRefreshKeys.has(item.key)) {
+                recipeImageProgressUsageRefreshKeys.add(item.key);
+                scheduleOpenAiUsageDashboardRefresh(250);
+            }
             return;
         }
 
@@ -14088,6 +14307,7 @@ async function generateRecipeStepImage(button) {
         } catch (err) {
             data = {};
         }
+        syncOpenAiUsageDashboardFromResponse(data);
 
         if (!response.ok || !data.ok || !data.step_image_url) {
             throw new Error((data && data.error) || "Unable to generate this step image.");
@@ -14158,6 +14378,7 @@ async function generateRecipeEquipmentImage(button) {
         } catch (err) {
             data = {};
         }
+        syncOpenAiUsageDashboardFromResponse(data);
 
         if (!response.ok || !data.ok || !data.equipment_image_url) {
             throw new Error((data && data.error) || "Unable to generate this equipment image.");
@@ -16683,6 +16904,9 @@ async function refreshStoreMarkup(options = {}) {
     restoreItemCheckState();
     bindAccountMenuDropdowns();
     restoreRememberedAccountPanelOpen();
+    if (document.querySelector("[data-usage-dashboard-panel]:not([hidden])")) {
+        scheduleOpenAiUsageDashboardRefresh(250);
+    }
     bindFeedbackTickets();
     initPhoneCountryInputs();
     bindRecipeUrlLogDragAndDrop();
@@ -17033,6 +17257,15 @@ async function startRecipeExtractionUrls(urls) {
                 index: index,
                 job_id: jobId,
             }),
+        }).then(async response => {
+            let data = {};
+            try {
+                data = await response.json();
+            } catch (err) {
+                data = {};
+            }
+            syncOpenAiUsageDashboardFromResponse(data);
+            return response;
         }).catch(err => {
             if (!cancelExtractRequested) {
                 throw err;

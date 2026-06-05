@@ -17,15 +17,27 @@ from PushShoppingList.services.product_selection_service import product_choice_f
 from PushShoppingList.services.product_selection_service import product_choices_by_item
 from PushShoppingList.services.product_selection_service import product_prompt_for_item
 from PushShoppingList.services.product_selection_service import select_product_choice
+from PushShoppingList.services.openai_usage_service import openai_usage_dashboard_for_user
 from PushShoppingList.services.rules_display_service import save_home_store_rule_text
 from PushShoppingList.services.rules_display_service import save_rules_display_section
 from PushShoppingList.services.store_settings_service import save_enabled_stores
+from PushShoppingList.services.user_account_service import current_user
 from PushShoppingList.scripts.aldi import run_test_grab_aldi
 from PushShoppingList.scripts.test_grab_aldi_eggs import select_test_grab_product
 from PushShoppingList.scripts.test_grab_aldi_eggs import test_grab_choice_from_result
 from PushShoppingList.scripts.test_grab_aldi_eggs import test_grab_products
 
 product_bp = Blueprint("product_bp", __name__)
+
+
+def with_openai_usage_dashboard(result):
+    if not isinstance(result, dict):
+        return result
+
+    return {
+        **result,
+        "openai_usage_dashboard": openai_usage_dashboard_for_user(current_user()),
+    }
 
 
 @product_bp.route("/api/products")
@@ -71,7 +83,7 @@ def api_suggest_food_rules_route():
     )
     status = 200 if result.get("ok") else 400
 
-    return jsonify(result), status
+    return jsonify(with_openai_usage_dashboard(result)), status
 
 
 @product_bp.route("/api/rules_display/home_stores", methods=["POST"])
@@ -113,7 +125,7 @@ def preview_grab_best_products_route():
     result = grab_best_products(job_id=request.form.get("job_id"))
 
     if wants_json_response():
-        return jsonify(result)
+        return jsonify(with_openai_usage_dashboard(result))
 
     return redirect("/")
 
@@ -122,8 +134,9 @@ def preview_grab_best_products_route():
 def api_grab_best_products_route():
     data = request.get_json(silent=True) or {}
     items = data.get("items") if isinstance(data.get("items"), list) else None
+    result = grab_best_products(items=items, job_id=data.get("job_id"))
 
-    return jsonify(grab_best_products(items=items, job_id=data.get("job_id")))
+    return jsonify(with_openai_usage_dashboard(result))
 
 
 @product_bp.route("/test_grab_products", methods=["POST"])
@@ -134,7 +147,7 @@ def test_grab_products_route():
     )
 
     if wants_json_response():
-        return jsonify(result)
+        return jsonify(with_openai_usage_dashboard(result))
 
     return redirect("/")
 
@@ -142,10 +155,12 @@ def test_grab_products_route():
 @product_bp.route("/api/test_grab_products", methods=["POST"])
 def api_test_grab_products_route():
     data = request.get_json(silent=True) or {}
-    return jsonify(test_grab_products(
+    result = test_grab_products(
         job_id=data.get("job_id"),
         ingredient=data.get("ingredient") or data.get("search_term"),
-    ))
+    )
+
+    return jsonify(with_openai_usage_dashboard(result))
 
 
 @product_bp.route("/test-grab-aldi", methods=["POST"])
@@ -166,7 +181,7 @@ def test_grab_aldi_route():
         job_id=data.get("job_id"),
     )
 
-    return jsonify(result)
+    return jsonify(with_openai_usage_dashboard(result))
 
 
 @product_bp.route("/api/test_grab_result")
@@ -231,7 +246,7 @@ def find_products_route():
     result = grab_best_products(items=[item], job_id=request.form.get("job_id"))
 
     if wants_json_response():
-        return jsonify(result)
+        return jsonify(with_openai_usage_dashboard(result))
 
     return redirect("/")
 
