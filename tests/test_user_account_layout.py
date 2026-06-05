@@ -287,14 +287,25 @@ def test_two_factor_panel_forms_return_to_panel_after_refresh():
     route = (ROOT / "PushShoppingList/routes/account_routes.py").read_text(encoding="utf-8")
     template = (ROOT / "PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")
     script = (ROOT / "PushShoppingList/static/js/firebase-auth.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
     assert "def two_factor_panel_redirect" in route
     assert 'account_panel", "two_factor"' in route
     assert '_anchor="accountTwoFactorPanel"' in route
     assert 'request.args.get("account_panel") == "two_factor"' in template
     assert "data-two-factor-return-form" in template
+    assert "user-two-factor-divider" in template
+    assert "app-section-divider recipe-entry-section-divider user-two-factor-divider" in template
     assert "TWO_FACTOR_PANEL_RETURN_KEY" in script
     assert "scrollToPanel(\"auto\")" in script
+    assert ".user-two-factor-divider" in css
+
+    two_factor_css_start = css.index(".user-two-factor-card {")
+    two_factor_css_end = css.index(".user-two-factor-divider", two_factor_css_start)
+    two_factor_css = css[two_factor_css_start:two_factor_css_end]
+    assert "padding: 0;" in two_factor_css
+    assert "border: 0;" in two_factor_css
+    assert "background: transparent;" in two_factor_css
 
 
 def test_two_factor_close_returns_to_account_profile():
