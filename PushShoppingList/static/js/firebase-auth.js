@@ -451,6 +451,9 @@ function bindPushNotificationsPanel() {
         closeButton.addEventListener("click", () => {
             panel.hidden = true;
             setPushNotificationsStatus("", "success");
+            if (typeof window.scrollToUserAccountTop === "function") {
+                window.scrollToUserAccountTop("auto");
+            }
         });
     }
 

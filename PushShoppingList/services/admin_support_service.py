@@ -8,6 +8,7 @@ from PushShoppingList.services.email_service import send_admin_support_access_em
 from PushShoppingList.services.storage_service import USER_DATA_DIR
 from PushShoppingList.services.storage_service import safe_user_id
 from PushShoppingList.services.user_account_service import display_datetime
+from PushShoppingList.services.user_account_service import get_public_support_identity
 from PushShoppingList.services.user_account_service import is_admin_user
 from PushShoppingList.services.user_account_service import load_users
 from PushShoppingList.services.user_account_service import public_user
@@ -59,7 +60,7 @@ def recent_support_audit_entries(limit=20):
     return [audit_entry_for_render(entry) for entry in entries[:limit]]
 
 
-def support_access_notices_for_user(user, limit=3):
+def support_access_notices_for_user(user, limit=2):
     user_id = str((user or {}).get("user_id") or "").strip()
     email = str((user or {}).get("email") or "").strip().lower()
 
@@ -85,13 +86,24 @@ def support_access_notices_for_user(user, limit=3):
 
 
 def audit_entry_for_render(entry):
+    actor_uid = str(entry.get("actorUid") or entry.get("admin_user_id") or "")
+    actor_private_email = str(entry.get("actorPrivateEmail") or entry.get("admin_email") or "")
+    actor_public_email = str(
+        entry.get("actorPublicEmail")
+        or get_public_support_identity(actor_private_email)
+    )
+
     return {
         "audit_id": str(entry.get("audit_id") or ""),
         "action": str(entry.get("action") or ""),
         "timestamp": str(entry.get("timestamp") or ""),
         "timestamp_label": display_datetime(entry.get("timestamp")) or str(entry.get("timestamp") or ""),
-        "admin_user_id": str(entry.get("admin_user_id") or ""),
-        "admin_email": str(entry.get("admin_email") or ""),
+        "actorUid": actor_uid,
+        "actorPrivateEmail": actor_private_email,
+        "actorPublicEmail": actor_public_email,
+        "admin_user_id": actor_uid,
+        "admin_email": actor_private_email,
+        "admin_public_email": actor_public_email,
         "target_user_id": str(entry.get("target_user_id") or ""),
         "target_email": str(entry.get("target_email") or ""),
         "reason": str(entry.get("reason") or ""),
@@ -187,12 +199,16 @@ def safe_account_detail(user):
 
 
 def record_support_access(admin_user, target_user, reason):
+    actor_private_email = str((admin_user or {}).get("email") or "")
     entry = {
         "audit_id": uuid.uuid4().hex,
         "action": AUDIT_ACTION,
         "timestamp": now_iso(),
+        "actorUid": str((admin_user or {}).get("user_id") or ""),
+        "actorPrivateEmail": actor_private_email,
+        "actorPublicEmail": get_public_support_identity(actor_private_email),
         "admin_user_id": str((admin_user or {}).get("user_id") or ""),
-        "admin_email": str((admin_user or {}).get("email") or ""),
+        "admin_email": actor_private_email,
         "target_user_id": str((target_user or {}).get("user_id") or ""),
         "target_email": str((target_user or {}).get("email") or ""),
         "reason": normalize_reason(reason),

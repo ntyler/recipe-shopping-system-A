@@ -1405,7 +1405,7 @@ def index():
             errors=session.pop("admin_support_errors", []),
             reason=session.get("admin_support_reason", ""),
         ),
-        admin_support_notices=admin_support_history[:3],
+        admin_support_notices=admin_support_history[:2],
         admin_support_history=admin_support_history,
         password_reset_token=request.args.get("reset_token", ""),
         two_factor_recovery_token=two_factor_recovery_token,

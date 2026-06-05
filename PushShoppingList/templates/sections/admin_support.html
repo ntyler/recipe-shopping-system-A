@@ -124,7 +124,7 @@
                             <span>{{ entry.timestamp_label }}</span>
                         </div>
                         <div class="admin-support-audit-meta">
-                            {{ entry.admin_email }} - {{ entry.reason }}
+                            {{ entry.actorPrivateEmail or entry.admin_email }} - {{ entry.reason }}
                         </div>
                     </li>
                 {% endfor %}

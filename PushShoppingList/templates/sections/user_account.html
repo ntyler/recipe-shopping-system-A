@@ -20,7 +20,7 @@
             <dl>
                 <div>
                     <dt>Admin</dt>
-                    <dd>{{ notice.admin_email or "Administrator" }}</dd>
+                    <dd>{{ notice.actorPublicEmail or notice.admin_public_email or "Administrator" }}</dd>
                 </div>
                 <div>
                     <dt>Reason</dt>

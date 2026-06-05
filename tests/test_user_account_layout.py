@@ -38,14 +38,18 @@ def test_account_settings_editor_has_header_close_and_closes_menu():
     assert "toggleUserProfileEditor(false)" in template
     assert ".user-account-edit-header" in css
     assert "function toggleUserProfileEditor(open = null)" in script
+    assert "function scrollToUserAccountTop(behavior = \"auto\")" in script
+    assert 'document.getElementById("userAccountSection")' in script
     assert 'document.querySelector("[data-account-menu]")' in script
     assert "const isAlreadyOpen = !form.hidden" in script
     assert "if (!explicitState && isAlreadyOpen)" in script
     assert "accountMenu.open = false" in script
     assert "form.scrollIntoView({ behavior: \"smooth\", block: \"start\" })" in script
+    assert 'scrollToUserAccountTop("auto")' in script
     assert "form.querySelector(\"[data-user-profile-close]\")" in script
     assert "firstControl.focus({ preventScroll: true })" in script
     assert "#userProfileEditForm, [data-push-notifications-panel]" in firebase_script
+    assert 'window.scrollToUserAccountTop("auto")' in firebase_script
 
 
 def test_mobile_account_dates_stack_left_aligned():
@@ -77,15 +81,27 @@ def test_admin_support_view_is_admin_only_reasoned_and_audited():
     assert "open_admin_support_record_route" in route
     assert "is_admin_user(admin_user)" in route
     assert "record_support_access" in service
+    assert '"actorUid":' in service
+    assert '"actorPrivateEmail":' in service
+    assert '"actorPublicEmail":' in service
+    assert "get_public_support_identity(actor_private_email)" in service
     assert "support_access_notices" in account_template
     assert "Account Access Notice" in account_template
     assert "View account access history" in account_template
     assert "data-account-access-history-toggle" in account_template
     assert "admin_support_history" in account_template
+    assert "notice.actorPublicEmail" in account_template
+    assert "notice.admin_email" not in account_template
+    assert "entry.actorPrivateEmail" in support_template
     assert ".user-account-access-notices" in css
     assert ".user-account-access-history-toggle" in css
     assert ".user-account-access-list[hidden]" in css
-    assert "function toggleAccountAccessHistory(button)" in (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    assert 'const SUPPORT_EMAIL = "support@recipeshoppinglist.com";' in script
+    assert "function getPublicSupportIdentity(email)" in script
+    assert '"ntylerbert@gmail.com"' not in script
+    assert "return SUPPORT_EMAIL;" in script
+    assert "function toggleAccountAccessHistory(button)" in script
     assert "password_hash" not in support_template
     assert "two_factor.secret" not in support_template
     assert ".admin-support-card" in css

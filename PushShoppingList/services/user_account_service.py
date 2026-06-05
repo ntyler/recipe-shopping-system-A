@@ -37,6 +37,10 @@ ALLOWED_AVATAR_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 PHONE_DIGITS_PATTERN = re.compile(r"\d+")
 ADMIN_EMAIL = "ntylerbert@gmail.com"
+SUPPORT_EMAIL = "support@recipeshoppinglist.com"
+SUPPORT_ADMIN_EMAILS = (
+    "ntylerbert@gmail.com",
+)
 PASSWORD_RESET_TTL_HOURS = 1
 ACCOUNT_DELETE_TTL_HOURS = 1
 ACCOUNT_VERIFICATION_TTL_HOURS = 24
@@ -276,8 +280,26 @@ def public_user(user):
     }
 
 
+def normalize_email_key(email):
+    return str(email or "").strip().lower()
+
+
+def is_support_admin_email(email):
+    return normalize_email_key(email) in SUPPORT_ADMIN_EMAILS
+
+
+def get_public_support_identity(email):
+    email = str(email or "").strip()
+
+    if is_support_admin_email(email):
+        return SUPPORT_EMAIL
+
+    return email
+
+
 def is_admin_email(email):
-    return str(email or "").strip().lower() == ADMIN_EMAIL
+    email_key = normalize_email_key(email)
+    return email_key == normalize_email_key(ADMIN_EMAIL) or email_key in SUPPORT_ADMIN_EMAILS
 
 
 def is_admin_user(user):

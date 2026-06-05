@@ -270,7 +270,9 @@ Do not show admins:
 - Store passwords
 - Private recipe, shopping, pantry, receipt, upload, or PDF contents unless the user explicitly asks for help with that specific data.
 
-Users can click `View account access history` in the account access notice to show the full sanitized admin-support access history for their account.
+The account access notice shows the latest two admin-support access events by default. Users can click `View account access history` to show the full sanitized admin-support access history for their account.
+
+User-facing support and audit displays must show the public support identity, not a staff member's personal Gmail address. Store admin-support audit rows with both `actorPrivateEmail` for internal tracing and `actorPublicEmail` for user-facing notices/emails. End users should only see `support@recipeshoppinglist.com`; internal admin pages may continue showing `actorPrivateEmail`. Keep private support-admin allowlists on the server side so static user-facing JavaScript bundles do not publish staff Gmail addresses.
 
 Two-factor authentication is account-specific:
 

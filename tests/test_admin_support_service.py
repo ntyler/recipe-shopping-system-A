@@ -23,8 +23,8 @@ def configure_admin_support(monkeypatch, tmp_path):
 def admin_user():
     return {
         "user_id": "admin",
-        "username": "admin@example.com",
-        "email": "admin@example.com",
+        "username": "ntylerbert@gmail.com",
+        "email": "ntylerbert@gmail.com",
         "first_name": "Admin",
         "last_name": "User",
         "created_at": "2026-06-04T12:00:00Z",
@@ -111,9 +111,14 @@ def test_admin_support_record_is_sanitized_and_audited(monkeypatch, tmp_path):
 
     audit_entries = support.load_audit_entries()
     assert len(audit_entries) == 1
-    assert audit_entries[0]["admin_email"] == "admin@example.com"
+    assert audit_entries[0]["actorUid"] == "admin"
+    assert audit_entries[0]["actorPrivateEmail"] == "ntylerbert@gmail.com"
+    assert audit_entries[0]["actorPublicEmail"] == "support@recipeshoppinglist.com"
+    assert audit_entries[0]["admin_email"] == "ntylerbert@gmail.com"
     assert audit_entries[0]["target_email"] == "customer@example.com"
     assert audit_entries[0]["reason"] == "helping with login issue"
+    assert result["audit_entry"]["actorPrivateEmail"] == "ntylerbert@gmail.com"
+    assert result["audit_entry"]["actorPublicEmail"] == "support@recipeshoppinglist.com"
     assert result["email_notice"]["configured"] is False
 
 
@@ -140,8 +145,10 @@ def test_admin_support_record_emails_user_when_configured(monkeypatch, tmp_path)
     assert result["email_notice"]["ok"] is True
     assert len(sent) == 1
     assert sent[0][0]["email"] == "customer@example.com"
-    assert sent[0][1]["email"] == "admin@example.com"
+    assert sent[0][1]["email"] == "ntylerbert@gmail.com"
     assert sent[0][2]["reason"] == "checking verification state"
+    assert sent[0][2]["actorPrivateEmail"] == "ntylerbert@gmail.com"
+    assert sent[0][2]["actorPublicEmail"] == "support@recipeshoppinglist.com"
 
 
 def test_support_access_notices_for_user_are_recent_and_targeted(monkeypatch, tmp_path):
@@ -159,7 +166,10 @@ def test_support_access_notices_for_user_are_recent_and_targeted(monkeypatch, tm
     notices = support.support_access_notices_for_user(target_user())
 
     assert [notice["reason"] for notice in notices] == ["second reason", "first reason"]
-    assert notices[0]["admin_email"] == "admin@example.com"
+    assert notices[0]["actorPrivateEmail"] == "ntylerbert@gmail.com"
+    assert notices[0]["actorPublicEmail"] == "support@recipeshoppinglist.com"
+    assert notices[0]["admin_email"] == "ntylerbert@gmail.com"
+    assert notices[0]["admin_public_email"] == "support@recipeshoppinglist.com"
     assert [
         notice["reason"]
         for notice in support.support_access_notices_for_user(target_user(), limit=None)
@@ -253,13 +263,39 @@ def test_admin_support_route_notice_renders_for_target_user(monkeypatch, tmp_pat
 
     assert "Account Access Notice" in html
     assert "Admin support viewed your account support record." in html
-    assert "admin@example.com" in html
+    assert "support@recipeshoppinglist.com" in html
+    assert "ntylerbert@gmail.com" not in html
     assert "checking verification state" in html
     assert "first support check" in html
     assert "View account access history" in html
-    assert 'data-recent-label="3 recent views"' in html
+    assert 'data-recent-label="2 recent views"' in html
     assert 'data-history-label="4 total views"' in html
     assert "Full account access history" in html
+
+
+def test_admin_support_internal_audit_can_show_private_actor_email(monkeypatch, tmp_path):
+    configure_admin_support(monkeypatch, tmp_path)
+    accounts.save_users({"users": [admin_user(), target_user()]})
+    app = create_app()
+
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["user_id"] = "admin"
+
+        response = client.post(
+            "/account/admin-support",
+            data={
+                "target_user_id": "customer",
+                "support_reason": "checking verification state",
+            },
+        )
+        assert response.status_code == 302
+
+        page = client.get("/")
+        html = page.data.decode("utf-8")
+
+    assert "Recent Support Access" in html
+    assert "ntylerbert@gmail.com - checking verification state" in html
 
 
 def test_admin_support_route_reports_configured_email_failure(monkeypatch, tmp_path):
@@ -366,7 +402,8 @@ def test_admin_support_access_email_explains_visible_and_hidden_data(monkeypatch
 
     assert message["To"] == "customer@example.com"
     assert "account support record was viewed" in message["Subject"]
-    assert "Admin: admin@example.com" in body
+    assert "Admin: support@recipeshoppinglist.com" in body
+    assert "ntylerbert@gmail.com" not in body
     assert "Reason: checking verification state" in body
     assert "account status, sign-in metadata, security settings, and workspace counts" in body
     assert "passwords, two-factor secrets, backup code values, home address, store passwords" in body

@@ -5,6 +5,8 @@ import sys
 from email.message import EmailMessage
 from email.utils import formataddr
 
+from PushShoppingList.services.user_account_service import get_public_support_identity
+
 
 DEFAULT_FROM_NAME = "Recipe Shopping System"
 
@@ -351,7 +353,12 @@ def send_admin_support_access_email(user, admin_user, audit_entry):
 
     recipient = str((user or {}).get("email") or "").strip()
     username = str((user or {}).get("username") or "there").strip()
-    admin_email = str((admin_user or {}).get("email") or "an administrator").strip()
+    admin_email = str(
+        (audit_entry or {}).get("actorPublicEmail")
+        or (audit_entry or {}).get("admin_public_email")
+        or get_public_support_identity((admin_user or {}).get("email"))
+        or "an administrator"
+    ).strip()
     timestamp_label = str(
         (audit_entry or {}).get("timestamp_label")
         or (audit_entry or {}).get("timestamp")

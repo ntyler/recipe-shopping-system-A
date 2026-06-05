@@ -2,6 +2,39 @@ function saveScroll() {
     localStorage.setItem("scrollY", window.scrollY);
 }
 
+const SUPPORT_EMAIL = "support@recipeshoppinglist.com";
+
+function getPublicSupportIdentity(email) {
+    if (email === SUPPORT_EMAIL) {
+        return SUPPORT_EMAIL;
+    }
+
+    return email;
+}
+
+function scrollToUserAccountTop(behavior = "auto") {
+    const target = document.getElementById("userAccountSection");
+
+    if (!target) {
+        return;
+    }
+
+    const scrollToTarget = (scrollBehavior = behavior) => {
+        target.scrollIntoView({ behavior: scrollBehavior, block: "start" });
+    };
+
+    window.requestAnimationFrame(() => {
+        scrollToTarget();
+        window.requestAnimationFrame(() => scrollToTarget("auto"));
+        window.setTimeout(() => scrollToTarget("auto"), 120);
+
+        const accountMenuSummary = document.querySelector("[data-account-menu] summary");
+        if (accountMenuSummary) {
+            accountMenuSummary.focus({ preventScroll: true });
+        }
+    });
+}
+
 const PHONE_COUNTRIES = [
     ["AF", "Afghanistan", "93"],
     ["AX", "Aland Islands", "358"],
@@ -479,6 +512,8 @@ function toggleUserProfileEditor(open = null) {
         });
 
         scrollToProfileEditor();
+    } else {
+        scrollToUserAccountTop("auto");
     }
 
     return false;
