@@ -35,10 +35,12 @@ def test_shopping_list_has_global_collapse_controls():
     button_end = css.index(".shopping-global-collapse-btn.secondary", button_start)
     button_css = css[button_start:button_end]
     assert "width: 100%;" in button_css
-    assert "padding: 14px;" in button_css
+    assert "height: 32px;" in button_css
+    assert "min-height: 32px;" in button_css
+    assert "padding: 2px 12px;" in button_css
     assert "font-family: inherit;" in button_css
-    assert "font-size: 18px;" in button_css
-    assert "line-height: normal;" in button_css
+    assert "font-size: 13px;" in button_css
+    assert "line-height: 1.1;" in button_css
     assert "min-height: 44px;" not in button_css
     assert "font-weight: 850;" not in button_css
 
@@ -58,7 +60,21 @@ def test_global_collapse_action_targets_page_sections_and_nested_panels():
     assert "setShoppingListViewRowsCollapsed(true)" in script
     assert "setAllRecipeViewNestedPanelsCollapsed(true)" in script
     assert "setAllCookbookPanelsCollapsed(true)" in script
-    assert "setAllShoppingListRecipeImagesVisible(false)" in script
+    assert 'setAllShoppingListRecipeImagesVisible(false, { keepTitleImages: true })' in script
     assert 'setShoppingGlobalCollapseStatus("Everything collapsed.")' in script
     assert "setAllShoppingListRecipeImagesVisible(recipeImagesShownByDefault())" in script
     assert ".recipe-global-image-hidden" in css
+
+
+def test_global_collapse_keeps_recipe_title_images_visible():
+    script = read_text("PushShoppingList/static/js/app.js")
+
+    assert "RECIPE_TITLE_IMAGE_SELECTOR" in script
+    assert "[data-recipe-edit-title-image-panel]" in script
+    assert ".recipe-url-summary-main" in script
+    assert ".recipe-view-title-media" in script
+    assert ".recipe-view-body-media" in script
+    assert ".recipe-cover-image" in script
+    assert "const keepTitleImages = Boolean(options.keepTitleImages);" in script
+    assert 'element.classList.remove("recipe-global-image-hidden");' in script
+    assert 'setAllShoppingListRecipeImagesVisible(false, { keepTitleImages: true })' in script

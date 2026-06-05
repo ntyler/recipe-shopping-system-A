@@ -5522,21 +5522,46 @@ function setAllCookbookPanelsCollapsed(collapsed) {
     });
 }
 
-function setRecipeCoverImagesVisibleForGlobal(visible) {
+const RECIPE_TITLE_IMAGE_SELECTOR = [
+    "[data-recipe-edit-title-image-panel]",
+    ".recipe-view-title-media",
+    ".recipe-view-body-media",
+    ".recipe-url-summary-main",
+    ".recipe-cover-image",
+].join(", ");
+
+function setRecipeCoverImagesVisibleForGlobal(visible, options = {}) {
+    const keepTitleImages = Boolean(options.keepTitleImages);
+
     document.querySelectorAll(
         ".recipe-view-title-media, .recipe-view-body-media, .recipe-url-summary-main, .recipe-cover-image"
     ).forEach(element => {
+        if (keepTitleImages && element.matches(RECIPE_TITLE_IMAGE_SELECTOR)) {
+            element.classList.remove("recipe-global-image-hidden");
+            element.setAttribute("aria-hidden", "false");
+            return;
+        }
+
         element.classList.toggle("recipe-global-image-hidden", !visible);
         element.setAttribute("aria-hidden", visible ? "false" : "true");
     });
 }
 
-function setAllShoppingListRecipeImagesVisible(visible) {
+function setAllShoppingListRecipeImagesVisible(visible, options = {}) {
+    const keepTitleImages = Boolean(options.keepTitleImages);
+    const panelSelector = keepTitleImages
+        ? "[data-equipment-image-panel], [data-step-image-panel]"
+        : "[data-recipe-edit-title-image-panel], [data-equipment-image-panel], [data-step-image-panel]";
+
     setRecipeImageContainersVisible(
-        document.querySelectorAll("[data-recipe-edit-title-image-panel], [data-equipment-image-panel], [data-step-image-panel]"),
+        document.querySelectorAll(panelSelector),
         visible
     );
-    setRecipeCoverImagesVisibleForGlobal(visible);
+    setRecipeCoverImagesVisibleForGlobal(visible, options);
+
+    if (keepTitleImages) {
+        keepRecipeCoverImagesVisible();
+    }
 }
 
 function closeShoppingListExpandedPanels() {
@@ -5582,7 +5607,7 @@ function collapseAllShoppingListPage() {
     setShoppingListViewRowsCollapsed(true);
     setAllRecipeViewNestedPanelsCollapsed(true);
     setAllCookbookPanelsCollapsed(true);
-    setAllShoppingListRecipeImagesVisible(false);
+    setAllShoppingListRecipeImagesVisible(false, { keepTitleImages: true });
     setShoppingGlobalCollapseStatus("Everything collapsed.");
     return false;
 }
@@ -14935,8 +14960,17 @@ function keepRecipeCoverImagesVisible(scope = document) {
         return;
     }
 
-    scope.querySelectorAll(".recipe-view-title-media, .recipe-view-body-media, .recipe-cover-image").forEach(element => {
+    const elements = [];
+
+    if (scope.matches && scope.matches(RECIPE_TITLE_IMAGE_SELECTOR)) {
+        elements.push(scope);
+    }
+
+    elements.push(...scope.querySelectorAll(RECIPE_TITLE_IMAGE_SELECTOR));
+
+    elements.forEach(element => {
         element.classList.remove("recipe-image-visibility-hidden");
+        element.classList.remove("recipe-global-image-hidden");
         element.setAttribute("aria-hidden", "false");
     });
 }
