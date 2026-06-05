@@ -157,12 +157,15 @@ def test_usage_dashboard_menu_opens_visible_account_panel():
     assert "Input Tokens" in template
     assert "Output Tokens" in template
     assert "Estimated API Cost" in template
+    assert "Billable AI Cost" in template
+    assert "Configured app ledger amount" in template
     assert "Not available yet" in template
     assert "Monthly Spend Limit" in template
     assert "Lifetime Tokens" in template
     assert "Last API Request" in template
     assert "Tokens are pieces of text processed by the AI." in template
-    assert "Estimated cost is calculated from OpenAI API usage returned by this app." in template
+    assert "Estimated API cost is calculated from OpenAI API usage returned by this app." in template
+    assert "Billable AI Cost uses this app's configured pricing ledger for user pass-through costs." in template
     assert "Recipe Imports" in template
     assert "Pantry Scans" in template
     assert "Product Searches" in template

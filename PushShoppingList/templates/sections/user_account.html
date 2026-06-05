@@ -504,6 +504,11 @@
                     <strong>{{ openai_usage.monthly_estimated_cost_label or "Not available yet" }}</strong>
                 </article>
                 <article class="user-usage-dashboard-card">
+                    <span>Billable AI Cost</span>
+                    <strong>{{ openai_usage.monthly_billable_cost_label or "Not available yet" }}</strong>
+                    <small>Configured app ledger amount</small>
+                </article>
+                <article class="user-usage-dashboard-card">
                     <span>Monthly Spend Limit</span>
                     <strong>{{ openai_usage.monthly_budget_label or "Not set" }}</strong>
                 </article>
@@ -517,7 +522,7 @@
                 </article>
             </div>
             <p class="user-usage-dashboard-note user-usage-token-note">
-                Tokens are pieces of text processed by the AI. Estimated cost is calculated from OpenAI API usage returned by this app.
+                Tokens are pieces of text processed by the AI. Estimated API cost is calculated from OpenAI API usage returned by this app. Billable AI Cost uses this app's configured pricing ledger for user pass-through costs.
             </p>
             <div class="user-usage-dashboard-section-title">App Activity This Month</div>
             <div class="user-usage-activity-grid" aria-label="App AI activity counters">

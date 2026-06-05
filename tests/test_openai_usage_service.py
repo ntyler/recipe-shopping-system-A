@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from PushShoppingList.services import openai_usage_service
@@ -16,6 +17,11 @@ class FakeUsage:
 class FakeResponse:
     usage = FakeUsage()
     model = "gpt-test"
+
+
+class FakeNoTokenResponse:
+    usage = {}
+    model = "image-test"
 
 
 def test_openai_usage_records_response_tokens_and_dashboard_totals(tmp_path, monkeypatch):
@@ -40,6 +46,15 @@ def test_openai_usage_records_response_tokens_and_dashboard_totals(tmp_path, mon
     assert record["promptTokens"] == 100
     assert record["completionTokens"] == 50
     assert record["totalTokens"] == 150
+    assert record["estimatedCostUsd"] == 0.00125
+    assert record["rawCostUsd"] == 0.00125
+    assert record["billableCostUsd"] == 0.00125
+    assert record["billingCurrency"] == "USD"
+    assert record["pricingSource"] == "default"
+    assert record["inputCostPer1MTokens"] == 5.0
+    assert record["outputCostPer1MTokens"] == 15.0
+    assert record["fixedFeatureCostUsd"] is None
+    assert record["markupPercent"] == 0
     assert record["metadata"] == {"source": "pytest"}
 
     dashboard = openai_usage_service.openai_usage_dashboard_for_user({"user_id": "user-123"})
@@ -56,6 +71,7 @@ def test_openai_usage_records_response_tokens_and_dashboard_totals(tmp_path, mon
     assert dashboard["monthly_tokens_remaining_label"] == "150"
     assert dashboard["limit_percent"] == 50.0
     assert dashboard["monthly_estimated_cost_label"] == "$0.0013"
+    assert dashboard["monthly_billable_cost_label"] == "$0.0013"
     assert dashboard["monthly_budget_label"] == "$10.0000"
     assert dashboard["monthly_budget_remaining_label"] == "$9.9987"
     assert dashboard["monthly_recipe_import_count"] == 1
@@ -82,6 +98,7 @@ def test_openai_usage_dashboard_defaults_when_no_tokens_are_recorded(tmp_path, m
     assert dashboard["monthly_budget_label"] == "Not set"
     assert dashboard["monthly_budget_remaining_label"] == "No budget set"
     assert dashboard["monthly_estimated_cost_label"] == "Not available yet"
+    assert dashboard["monthly_billable_cost_label"] == "Not available yet"
     assert dashboard["monthly_total_tokens"] == 0
     assert dashboard["monthly_request_count"] == 0
     assert dashboard["monthly_recipe_import_count"] == 0
@@ -139,6 +156,76 @@ def test_openai_usage_dashboard_counts_user_friendly_activity_groups(tmp_path, m
     assert dashboard["monthly_recipe_import_count"] == 1
     assert dashboard["monthly_pantry_scan_count"] == 1
     assert dashboard["monthly_product_search_count"] == 1
+    assert dashboard["monthly_generated_image_count"] == 1
+
+
+def test_openai_usage_records_billable_ledger_with_model_rates_fixed_cost_and_markup(tmp_path, monkeypatch):
+    monkeypatch.setattr(storage_service, "USER_DATA_DIR", tmp_path / "users")
+    monkeypatch.setattr(openai_usage_service, "active_user_id", lambda: "user-123")
+    monkeypatch.setenv(
+        "SHOPPING_APP_OPENAI_MODEL_RATES_JSON",
+        json.dumps({
+            "gpt-test": {
+                "inputCostPer1MTokens": 10,
+                "outputCostPer1MTokens": 20,
+                "billableMarkupPercent": 25,
+            }
+        }),
+    )
+    monkeypatch.setenv(
+        "SHOPPING_APP_OPENAI_FEATURE_COSTS_JSON",
+        json.dumps({
+            "recipe-step-image": {
+                "fixedCostUsd": 0.02,
+            }
+        }),
+    )
+    monkeypatch.setenv("SHOPPING_APP_OPENAI_MONTHLY_BUDGET_USD", "1")
+
+    record = openai_usage_service.record_openai_usage(
+        FakeResponse(),
+        "recipe-step-image",
+    )
+    dashboard = openai_usage_service.openai_usage_dashboard_for_user({"user_id": "user-123"})
+
+    assert record["pricingSource"] == "model+feature"
+    assert record["inputCostPer1MTokens"] == 10.0
+    assert record["outputCostPer1MTokens"] == 20.0
+    assert record["fixedFeatureCostUsd"] == 0.02
+    assert record["markupPercent"] == 25.0
+    assert record["estimatedCostUsd"] == 0.022
+    assert record["rawCostUsd"] == 0.022
+    assert record["billableCostUsd"] == 0.0275
+    assert dashboard["monthly_estimated_cost_label"] == "$0.0220"
+    assert dashboard["monthly_billable_cost_label"] == "$0.0275"
+    assert dashboard["monthly_budget_remaining_label"] == "$0.9725"
+    assert dashboard["monthly_generated_image_count"] == 1
+    assert "Billable AI Cost uses this app's configured pricing ledger" in dashboard["tracking_note"]
+
+
+def test_openai_usage_records_fixed_feature_cost_without_token_usage(tmp_path, monkeypatch):
+    monkeypatch.setattr(storage_service, "USER_DATA_DIR", tmp_path / "users")
+    monkeypatch.setattr(openai_usage_service, "active_user_id", lambda: "user-123")
+    monkeypatch.setenv(
+        "SHOPPING_APP_OPENAI_FEATURE_COSTS_JSON",
+        json.dumps({
+            "recipe-step-image": 0.04,
+        }),
+    )
+
+    record = openai_usage_service.record_openai_usage(
+        FakeNoTokenResponse(),
+        "recipe-step-image",
+    )
+    dashboard = openai_usage_service.openai_usage_dashboard_for_user({"user_id": "user-123"})
+
+    assert record["totalTokens"] == 0
+    assert record["pricingSource"] == "feature"
+    assert record["estimatedCostUsd"] == 0.04
+    assert record["billableCostUsd"] == 0.04
+    assert dashboard["monthly_request_count"] == 1
+    assert dashboard["monthly_estimated_cost_label"] == "$0.0400"
+    assert dashboard["monthly_billable_cost_label"] == "$0.0400"
     assert dashboard["monthly_generated_image_count"] == 1
 
 

@@ -25,6 +25,7 @@ PRODUCT_SEARCH_FEATURES = {
 GENERATED_IMAGE_FEATURES = {
     "recipe-step-image",
 }
+DEFAULT_BILLING_CURRENCY = "USD"
 
 
 def now_iso():
@@ -73,8 +74,15 @@ def save_openai_usage_payload(payload, usage_file=None):
 
 def record_openai_usage(response, feature, model=None, metadata=None, user_id=None):
     usage = extract_openai_usage(response)
+    resolved_feature = str(feature or "openai-api").strip() or "openai-api"
+    resolved_model = str(model or extract_response_model(response) or "").strip()
+    billing_costs = estimate_openai_billing_costs(
+        usage,
+        model=resolved_model,
+        feature=resolved_feature,
+    )
 
-    if not usage.get("total_tokens"):
+    if not usage.get("total_tokens") and billing_costs.get("estimatedCostUsd") is None:
         return None
 
     record_user_id = str(user_id if user_id is not None else active_user_id()).strip()
@@ -86,12 +94,12 @@ def record_openai_usage(response, feature, model=None, metadata=None, user_id=No
         "createdAt": now_iso(),
         "month": current_month_key(),
         "userId": record_user_id,
-        "feature": str(feature or "openai-api").strip() or "openai-api",
-        "model": str(model or extract_response_model(response) or "").strip(),
+        "feature": resolved_feature,
+        "model": resolved_model,
         "promptTokens": usage.get("prompt_tokens", 0),
         "completionTokens": usage.get("completion_tokens", 0),
         "totalTokens": usage.get("total_tokens", 0),
-        "estimatedCostUsd": estimate_usage_cost_usd(usage),
+        **billing_costs,
         "metadata": metadata if isinstance(metadata, dict) else {},
     })
     payload = load_openai_usage_payload(usage_file)
@@ -143,17 +151,175 @@ def extract_response_model(response):
 
 
 def estimate_usage_cost_usd(usage):
+    return estimate_openai_billing_costs(usage).get("estimatedCostUsd")
+
+
+def estimate_openai_billing_costs(usage, model=None, feature=None):
+    pricing = openai_pricing_config(model=model, feature=feature)
+    input_rate = pricing.get("inputCostPer1MTokens")
+    output_rate = pricing.get("outputCostPer1MTokens")
+    fixed_feature_cost = pricing.get("fixedFeatureCostUsd")
+    token_cost = None
+
+    if input_rate is not None and output_rate is not None:
+        token_cost = (
+            (usage.get("prompt_tokens", 0) / 1_000_000) * input_rate
+            + (usage.get("completion_tokens", 0) / 1_000_000) * output_rate
+        )
+
+    raw_cost = None
+    if token_cost is not None or fixed_feature_cost is not None:
+        raw_cost = round((token_cost or 0) + (fixed_feature_cost or 0), 6)
+
+    markup_percent = pricing.get("markupPercent")
+    if markup_percent is None:
+        markup_percent = 0
+
+    billable_cost = None
+    if raw_cost is not None:
+        billable_cost = round(raw_cost * (1 + (markup_percent / 100)), 6)
+
+    return {
+        "estimatedCostUsd": raw_cost,
+        "rawCostUsd": raw_cost,
+        "billableCostUsd": billable_cost,
+        "billingCurrency": pricing.get("billingCurrency") or DEFAULT_BILLING_CURRENCY,
+        "pricingSource": pricing.get("pricingSource") or "unconfigured",
+        "inputCostPer1MTokens": input_rate,
+        "outputCostPer1MTokens": output_rate,
+        "fixedFeatureCostUsd": fixed_feature_cost,
+        "markupPercent": markup_percent,
+    }
+
+
+def openai_pricing_config(model=None, feature=None):
+    model_rates = env_json_object("SHOPPING_APP_OPENAI_MODEL_RATES_JSON")
+    feature_costs = env_json_object("SHOPPING_APP_OPENAI_FEATURE_COSTS_JSON")
+    model_config = lookup_case_insensitive(model_rates, model)
+    feature_config = lookup_case_insensitive(feature_costs, feature)
+    default_markup = env_float("SHOPPING_APP_OPENAI_BILLING_MARKUP_PERCENT")
+    default_markup = default_markup if default_markup is not None else 0
+    default_currency = env_label(
+        "SHOPPING_APP_OPENAI_BILLING_CURRENCY",
+        default=DEFAULT_BILLING_CURRENCY,
+    ).upper()
+
     input_rate = env_float("SHOPPING_APP_OPENAI_INPUT_COST_PER_1M_TOKENS")
     output_rate = env_float("SHOPPING_APP_OPENAI_OUTPUT_COST_PER_1M_TOKENS")
+    fixed_feature_cost = None
+    markup_percent = default_markup
+    pricing_parts = []
 
-    if input_rate is None or output_rate is None:
+    if isinstance(model_config, dict):
+        model_input_rate = config_float(
+            model_config,
+            "inputCostPer1MTokens",
+            "input_cost_per_1m_tokens",
+            "input_rate_per_1m",
+        )
+        model_output_rate = config_float(
+            model_config,
+            "outputCostPer1MTokens",
+            "output_cost_per_1m_tokens",
+            "output_rate_per_1m",
+        )
+        input_rate = model_input_rate if model_input_rate is not None else input_rate
+        output_rate = model_output_rate if model_output_rate is not None else output_rate
+        model_markup = config_float(
+            model_config,
+            "billableMarkupPercent",
+            "markupPercent",
+            "markup_percent",
+        )
+        if model_markup is not None:
+            markup_percent = model_markup
+        pricing_parts.append("model")
+
+    if isinstance(feature_config, dict):
+        fixed_feature_cost = config_float(
+            feature_config,
+            "fixedFeatureCostUsd",
+            "fixedCostUsd",
+            "fixed_cost_usd",
+            "costUsd",
+            "cost_usd",
+        )
+        feature_markup = config_float(
+            feature_config,
+            "billableMarkupPercent",
+            "markupPercent",
+            "markup_percent",
+        )
+        if feature_markup is not None:
+            markup_percent = feature_markup
+        pricing_parts.append("feature")
+    elif feature_config is not None:
+        fixed_feature_cost = float_or_none(feature_config)
+        pricing_parts.append("feature")
+
+    if not pricing_parts and input_rate is not None and output_rate is not None:
+        pricing_parts.append("default")
+
+    return {
+        "inputCostPer1MTokens": input_rate,
+        "outputCostPer1MTokens": output_rate,
+        "fixedFeatureCostUsd": fixed_feature_cost,
+        "markupPercent": markup_percent,
+        "billingCurrency": default_currency or DEFAULT_BILLING_CURRENCY,
+        "pricingSource": "+".join(pricing_parts) if pricing_parts else "unconfigured",
+    }
+
+
+def env_json_object(name):
+    value = str(os.getenv(name, "") or "").strip()
+
+    if not value:
+        return {}
+
+    try:
+        payload = json.loads(value)
+    except (TypeError, ValueError):
+        return {}
+
+    return payload if isinstance(payload, dict) else {}
+
+
+def lookup_case_insensitive(payload, key):
+    key = str(key or "").strip().lower()
+    if not isinstance(payload, dict) or not key:
         return None
 
-    cost = (
-        (usage.get("prompt_tokens", 0) / 1_000_000) * input_rate
-        + (usage.get("completion_tokens", 0) / 1_000_000) * output_rate
-    )
-    return round(cost, 6)
+    for candidate, value in payload.items():
+        if str(candidate or "").strip().lower() == key:
+            return value
+    return None
+
+
+def config_float(payload, *names):
+    if not isinstance(payload, dict):
+        return None
+
+    normalized = {
+        str(key or "").strip().lower(): value
+        for key, value in payload.items()
+    }
+
+    for name in names:
+        value = normalized.get(str(name or "").strip().lower())
+        converted = float_or_none(value)
+        if converted is not None:
+            return converted
+    return None
+
+
+def float_or_none(value):
+    if value is None:
+        return None
+
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def env_float(name):
@@ -195,6 +361,17 @@ def normalize_usage_record(record):
 
     if not total_tokens:
         total_tokens = prompt_tokens + completion_tokens
+    estimated_cost = float_or_none(record.get("estimatedCostUsd"))
+    raw_cost = float_or_none(record.get("rawCostUsd"))
+    billable_cost = float_or_none(record.get("billableCostUsd"))
+
+    if raw_cost is None:
+        raw_cost = estimated_cost
+    if billable_cost is None:
+        billable_cost = raw_cost
+    pricing_source = str(record.get("pricingSource") or "").strip()
+    if not pricing_source:
+        pricing_source = "legacy" if billable_cost is not None else "unconfigured"
 
     return {
         "createdAt": str(record.get("createdAt") or record.get("created_at") or now_iso()),
@@ -205,7 +382,15 @@ def normalize_usage_record(record):
         "promptTokens": prompt_tokens,
         "completionTokens": completion_tokens,
         "totalTokens": total_tokens,
-        "estimatedCostUsd": record.get("estimatedCostUsd"),
+        "estimatedCostUsd": estimated_cost,
+        "rawCostUsd": raw_cost,
+        "billableCostUsd": billable_cost,
+        "billingCurrency": str(record.get("billingCurrency") or DEFAULT_BILLING_CURRENCY).strip().upper() or DEFAULT_BILLING_CURRENCY,
+        "pricingSource": pricing_source,
+        "inputCostPer1MTokens": float_or_none(record.get("inputCostPer1MTokens")),
+        "outputCostPer1MTokens": float_or_none(record.get("outputCostPer1MTokens")),
+        "fixedFeatureCostUsd": float_or_none(record.get("fixedFeatureCostUsd")),
+        "markupPercent": float_or_none(record.get("markupPercent")) or 0,
         "metadata": record.get("metadata") if isinstance(record.get("metadata"), dict) else {},
     }
 
@@ -231,9 +416,10 @@ def openai_usage_dashboard_for_user(user=None):
     month_completion = sum_tokens(month_records, "completionTokens")
     month_total = sum_tokens(month_records, "totalTokens")
     lifetime_total = sum_tokens(records, "totalTokens")
-    estimated_month_cost = sum_estimated_cost(month_records)
+    estimated_month_cost = sum_cost(month_records, "estimatedCostUsd")
+    billable_month_cost = sum_cost(month_records, "billableCostUsd")
     limit_remaining = monthly_limit - month_total if monthly_limit is not None else None
-    budget_spend = estimated_month_cost or 0
+    budget_spend = billable_month_cost if billable_month_cost is not None else (estimated_month_cost or 0)
     budget_remaining = monthly_budget - budget_spend if monthly_budget is not None else None
     activity_counts = openai_activity_counts(month_records)
     billing_type_label = env_label(
@@ -257,12 +443,14 @@ def openai_usage_dashboard_for_user(user=None):
         "monthly_request_count": len(month_records),
         "monthly_estimated_cost": estimated_month_cost,
         "monthly_estimated_cost_label": money_label(estimated_month_cost) if estimated_month_cost is not None else "Not available yet",
+        "monthly_billable_cost": billable_month_cost,
+        "monthly_billable_cost_label": money_label(billable_month_cost) if billable_month_cost is not None else "Not available yet",
         "monthly_tokens_remaining": limit_remaining,
         "monthly_tokens_remaining_label": number_label(max(0, limit_remaining)) if limit_remaining is not None else "No limit set",
         "monthly_budget_remaining": budget_remaining,
         "monthly_budget_remaining_label": money_label(max(0, budget_remaining)) if budget_remaining is not None else "No budget set",
         "limit_percent": percent_used(month_total, monthly_limit),
-        "budget_percent": percent_used(estimated_month_cost, monthly_budget) if estimated_month_cost is not None else None,
+        "budget_percent": percent_used(budget_spend, monthly_budget) if monthly_budget is not None and budget_spend is not None else None,
         "monthly_recipe_import_count": activity_counts["recipe_imports"],
         "monthly_pantry_scan_count": activity_counts["pantry_scans"],
         "monthly_product_search_count": activity_counts["product_searches"],
@@ -276,7 +464,8 @@ def openai_usage_dashboard_for_user(user=None):
         "has_usage": bool(records),
         "tracking_note": (
             "This dashboard tracks only OpenAI API usage returned from requests made by this shopping-list app. "
-            "ChatGPT website/app subscription usage is separate and cannot be shown here."
+            "ChatGPT website/app subscription usage is separate and cannot be shown here. "
+            "Billable AI Cost uses this app's configured pricing ledger and can differ from the raw OpenAI API estimate."
         ),
         "empty_state_message": (
             "No OpenAI API usage has been recorded for this app yet. "
@@ -313,10 +502,10 @@ def sum_tokens(records, key):
     return sum(int_or_zero(record.get(key)) for record in records)
 
 
-def sum_estimated_cost(records):
+def sum_cost(records, key):
     values = []
     for record in records:
-        value = record.get("estimatedCostUsd")
+        value = record.get(key)
         if value is None:
             continue
         try:

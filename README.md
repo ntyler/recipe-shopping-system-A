@@ -57,10 +57,15 @@ $env:SHOPPING_APP_OPENAI_MONTHLY_TOKEN_LIMIT="1000000"
 $env:SHOPPING_APP_OPENAI_MONTHLY_BUDGET_USD="25"
 $env:SHOPPING_APP_OPENAI_INPUT_COST_PER_1M_TOKENS="0.15"
 $env:SHOPPING_APP_OPENAI_OUTPUT_COST_PER_1M_TOKENS="0.60"
+$env:SHOPPING_APP_OPENAI_BILLING_MARKUP_PERCENT="0"
+$env:SHOPPING_APP_OPENAI_MODEL_RATES_JSON='{"gpt-4.1-mini":{"inputCostPer1MTokens":0.15,"outputCostPer1MTokens":0.60,"billableMarkupPercent":0}}'
+$env:SHOPPING_APP_OPENAI_FEATURE_COSTS_JSON='{"recipe-step-image":{"fixedCostUsd":0.04}}'
 $env:SHOPPING_APP_OPENAI_USAGE_RECORD_LIMIT="2000"
 ```
 
 The AI Usage & Billing dashboard records OpenAI API usage returned by this shopping-list app's own API responses. It cannot show ChatGPT app, ChatGPT website, ChatGPT Plus/Pro subscription, or OpenAI API usage from other apps.
+
+For user pass-through billing, the app stores an app-owned billing ledger in each user's `openai_usage.json`. Each new record can include raw estimated API cost, configured billable cost, token rates, fixed feature charges, markup percentage, and pricing source. Use `SHOPPING_APP_OPENAI_MODEL_RATES_JSON` for model-specific token rates, `SHOPPING_APP_OPENAI_FEATURE_COSTS_JSON` for fixed charges such as generated images, and `SHOPPING_APP_OPENAI_BILLING_MARKUP_PERCENT` for a default markup. Keep those settings aligned with your current OpenAI API pricing before charging users.
 
 Optional ntfy topic for phone/computer extraction notifications:
 
@@ -245,7 +250,7 @@ Account Menu groups and items:
   - `Account Settings`: edit first name, last name, username, email, and uploaded logo/avatar.
   - `Account Notices`: opens recent and historical admin-support account access notices when the account has them.
 - `Usage & Billing`
-  - `AI Usage & Billing`: opens OpenAI API usage and billing totals for this app, including plan, billing type, monthly API budget, API requests, input/output/total tokens, estimated API cost, activity counters, budget status, lifetime tokens, and last API request. The dashboard records usage from this app's OpenAI API responses in per-user `openai_usage.json`; it does not expose ChatGPT app, ChatGPT website, ChatGPT Plus/Pro subscription, or OpenAI API usage from other apps.
+  - `AI Usage & Billing`: opens OpenAI API usage and billing totals for this app, including plan, billing type, monthly API budget, API requests, input/output/total tokens, raw estimated API cost, billable AI cost, activity counters, budget status, lifetime tokens, and last API request. The dashboard records usage from this app's OpenAI API responses in per-user `openai_usage.json`; it does not expose ChatGPT app, ChatGPT website, ChatGPT Plus/Pro subscription, or OpenAI API usage from other apps.
 - `Security`
   - `Change Password`: sends the Firebase password reset/change flow for Firebase users.
   - `Verify Email` or `Email Verified`: verified accounts show a disabled `Email Verified` item instead of an action button.
@@ -612,7 +617,7 @@ Common files:
 - `store_settings.json`: store list and enabled stores
 - `extract_progress.json`: current extraction progress for the overlay
 - `product_choices.json`: saved product candidates, per-store picks, overall picked products, direct product links, embedded image placeholders, and ChatGPT prompt file references
-- `openai_usage.json`: per-user OpenAI API token usage recorded from this app's API responses for AI Usage & Billing
+- `openai_usage.json`: per-user OpenAI API token usage and app-owned billing ledger records, including raw estimated cost, billable cost, configured rates, markup, fixed feature charges, and pricing source for AI Usage & Billing
 - `product_results.json`: dedicated hybrid shopping results with agent-stage architecture, best products, alternatives, rejected products, rejection reasons, and scoring metadata
 - `product_progress.json`: current Grab Best Products progress overlay state
 - `raw/product_pages/*.html`: fully rendered Selenium grocery search pages saved for product-ranking review
