@@ -1705,22 +1705,45 @@ def extract_recipe_from_social_video_url(recipe_url, progress_callback=None):
         local_json_data["cover_image"] = cover_image
 
     if structured_recipe_data_is_usable(local_json_data):
+        result_json_data = local_json_data
+        extraction_method = "social_video_text"
+
+        if os.getenv("OPENAI_API_KEY"):
+            enriched_json_data = extract_video_recipe_pdf_data_with_openai(
+                recipe_url,
+                page_text,
+                progress_callback=progress_callback,
+            )
+
+            if structured_recipe_data_is_usable(enriched_json_data):
+                result_json_data = enriched_json_data
+                extraction_method = "social_video_text_openai_estimates"
+
+                if cover_image:
+                    result_json_data["cover_image"] = cover_image
+
         archive_social_video_text_pdf(
             recipe_url,
             page_text,
-            structured_recipe_data=local_json_data,
-            prefer_openai=True,
+            structured_recipe_data=result_json_data,
+            prefer_openai=False,
             progress_callback=progress_callback,
         )
-        save_extracted_recipe_json(recipe_url, local_json_data)
+        save_extracted_recipe_json(recipe_url, result_json_data)
 
         if progress_callback:
-            progress_callback(
-                "recipe text parsed without OpenAI API fallback.",
-                "The public video description included ingredient and cooking-step sections.",
-            )
+            if extraction_method == "social_video_text_openai_estimates":
+                progress_callback(
+                    "video recipe estimates added.",
+                    "ChatGPT filled missing recipe amount, timing, quantities, and nutrition where the video text supported estimates.",
+                )
+            else:
+                progress_callback(
+                    "recipe text parsed without OpenAI API fallback.",
+                    "The public video description included ingredient and cooking-step sections.",
+                )
 
-        return build_extract_result(recipe_url, local_json_data, "social_video_text")
+        return build_extract_result(recipe_url, result_json_data, extraction_method)
 
     if not os.getenv("OPENAI_API_KEY"):
         archive_social_video_text_pdf(
@@ -2992,12 +3015,12 @@ def build_social_video_prompt(recipe_url, page_text):
 This content came from a social/video recipe URL.
 
 Extract the recipe from the public title, caption, description, and transcript text below.
-If exact ingredient quantities are not present, leave quantity/unit null rather than guessing.
 Ignore comments, hashtags, creator bio text, channel promotions, subscribe reminders, and unrelated social media text.
 
 Social/video text:
 {page_text}
 """,
+        additional_rules=social_video_estimation_rules(),
     )
 
 
@@ -3012,14 +3035,32 @@ Text-only extraction did not find a complete recipe. Use the available audio tra
 Extract a practical recipe only when the audio or images support it.
 - Use audio/transcript details for ingredient quantities and steps when present.
 - Use images to identify visible ingredients, dish type, cookware, and cooking state.
-- If exact quantities are not available, leave quantity and unit null rather than guessing.
 - Ignore comments, hashtags, channel promotions, creator bio text, and unrelated social media text.
 - If the media still does not contain enough recipe information, return ingredients as [].
 
 Social/video text and audio transcript:
 {page_text}
 """,
+        additional_rules=social_video_estimation_rules(),
     )
+
+
+def social_video_estimation_rules():
+    return """
+========================
+SOCIAL / VIDEO ESTIMATION OVERRIDE
+========================
+These override rules apply only because this source is a social/video recipe.
+- If the video, transcript, caption, title, description, thumbnail, or attached frames support the recipe but exact metadata is missing, estimate reasonable values instead of leaving them null.
+- Fill servings with the recipe amount, yield, portions, or best practical estimate, such as "4 servings", "6 portions", or "1 9-inch pan".
+- Fill level with an estimated difficulty such as "Easy", "Intermediate", or "Advanced".
+- Fill total_time, prep_time, inactive_time, and cook_time with practical estimates using units, such as "45 min", "1 hr 15 min", or "0 min".
+- Use inactive_time for waiting, resting, chilling, cooling, or rising time when implied by the food or method. Use "0 min" when none is implied.
+- For visible or clearly mentioned ingredients, estimate quantity and unit when the exact amount is not provided. Keep estimates practical for a home cook.
+- Mark optional true only for garnishes, toppings, substitutions, "to taste", "as desired", or clearly optional ingredients.
+- Fill nutrition as an estimated per serving basis when nutrition is not provided. Set serving_basis to "per serving (estimated)" and fill common nutrition fields with values and units.
+- Do not invent a recipe from unrelated media. If the source does not show or describe enough to identify the dish and core ingredients, return ingredients as [].
+"""
 
 
 def is_forbidden_response(exc):
@@ -3787,18 +3828,24 @@ This content came from a social/video recipe URL.
 Create a clean recipe export from the public title, caption, description, and transcript text below.
 The PDF will be built from your JSON, so prioritize complete recipe sections:
 - recipe_title
-- servings when present
+- servings / recipe amount
+- level
+- total_time
+- prep_time
+- inactive_time
+- cook_time
 - ingredients with quantity, unit, ingredient, and preparation split out
 - equipment inferred from the recipe actions
 - ordered instructions with temperatures, times, and equipment_used when present
+- nutrition as an estimated per serving basis when exact nutrition is not provided
 
 If the video text mentions an ingredient quantity in spoken instructions instead of a formal ingredient list, extract that quantity.
-If an exact quantity is not present, leave quantity and unit null rather than guessing.
 Ignore comments, hashtags, creator bio text, channel promotions, subscribe reminders, and unrelated social media text.
 
 Social/video text:
 {page_text}
 """,
+        additional_rules=social_video_estimation_rules(),
     )
 
 
@@ -3817,6 +3864,7 @@ def build_video_text_pdf_html(recipe_url, page_text, recipe_title="", recipe_dat
     title = html.escape(title_value)
     source_url = html.escape(str(recipe_url or ""))
     body_html = format_video_recipe_data_for_pdf(recipe_data)
+    title_image_html = format_video_recipe_title_image_for_pdf(recipe_data)
 
     if not body_html:
         body_html = format_labeled_text_for_pdf(page_text)
@@ -3846,6 +3894,17 @@ def build_video_text_pdf_html(recipe_url, page_text, recipe_title="", recipe_dat
             color: #555;
             font-size: 12px;
             overflow-wrap: anywhere;
+        }}
+        .title-image {{
+            margin: 0 0 22px 0;
+            page-break-inside: avoid;
+        }}
+        .title-image img {{
+            display: block;
+            width: 100%;
+            max-height: 320px;
+            object-fit: cover;
+            border-radius: 8px;
         }}
         h2 {{
             border-bottom: 1px solid #ddd;
@@ -3925,6 +3984,7 @@ def build_video_text_pdf_html(recipe_url, page_text, recipe_title="", recipe_dat
 <body>
     <h1>{title}</h1>
     <div class="source">Source: {source_url}</div>
+    {title_image_html}
     {body_html}
 </body>
 </html>
@@ -3939,6 +3999,66 @@ def video_recipe_pdf_title(recipe_data, fallback_title=""):
             return title
 
     return fallback_title or "Video Recipe"
+
+
+def format_video_recipe_title_image_for_pdf(recipe_data):
+    if not isinstance(recipe_data, dict):
+        return ""
+
+    cover_image = recipe_data.get("cover_image") or {}
+
+    if not isinstance(cover_image, dict) or not cover_image:
+        return ""
+
+    src = recipe_pdf_cover_image_src(cover_image)
+
+    if not src:
+        return ""
+
+    alt = clean_cover_image_text(
+        cover_image.get("alt")
+        or recipe_data.get("recipe_title")
+        or "Recipe title image"
+    )
+
+    return (
+        "<figure class=\"title-image\">"
+        f"<img src=\"{html.escape(src, quote=True)}\" alt=\"{html.escape(alt, quote=True)}\">"
+        "</figure>"
+    )
+
+
+def recipe_pdf_cover_image_src(cover_image):
+    if not isinstance(cover_image, dict):
+        return ""
+
+    image_path = recipe_cover_image_file_path(cover_image)
+
+    if image_path:
+        mime_type = (
+            clean_cover_image_text(cover_image.get("mime_type"))
+            or mimetypes.guess_type(str(image_path))[0]
+            or "image/jpeg"
+        )
+
+        try:
+            image_data = base64.b64encode(image_path.read_bytes()).decode("ascii")
+        except OSError:
+            image_data = ""
+
+        if image_data:
+            return f"data:{mime_type};base64,{image_data}"
+
+    for key in ("src", "url"):
+        value = clean_cover_image_text(cover_image.get(key))
+
+        if not value or value.startswith("/"):
+            continue
+
+        if value.startswith("data:image/") or cover_image_url_looks_usable(value):
+            return value
+
+    return ""
 
 
 def format_video_recipe_data_for_pdf(recipe_data):
@@ -3976,10 +4096,20 @@ def format_video_recipe_data_for_pdf(recipe_data):
 
 def format_video_recipe_meta_for_pdf(recipe_data):
     items = []
-    servings = clean_recipe_text(recipe_data.get("servings") or "")
+    fields = [
+        ("servings", "Recipe Amount"),
+        ("level", "Level"),
+        ("total_time", "Total"),
+        ("prep_time", "Prep"),
+        ("inactive_time", "Inactive"),
+        ("cook_time", "Cook"),
+    ]
 
-    if servings:
-        items.append(f"<span>Servings: {html.escape(servings)}</span>")
+    for key, label in fields:
+        value = clean_recipe_text(recipe_data.get(key) or "")
+
+        if value:
+            items.append(f"<span>{html.escape(label)}: {html.escape(value)}</span>")
 
     return f"<div class=\"meta\">{''.join(items)}</div>" if items else ""
 
@@ -4345,7 +4475,10 @@ def fetch_recipe_page_text(recipe_url):
 # =========================================================
 # PROMPT
 # =========================================================
-def build_prompt(recipe_url, page_text):
+def build_prompt(recipe_url, page_text, additional_rules=""):
+    additional_rules_text = str(additional_rules or "").strip()
+    additional_rules_block = f"\n{additional_rules_text}\n" if additional_rules_text else ""
+
     return f"""
 Extract the recipe information from this web page:
 
@@ -4672,6 +4805,7 @@ RECIPE INFO RULES
 - Preserve the displayed wording, such as "Intermediate", "1 hr 55 min", or "30 min".
 - If a value is missing, use null.
 
+{additional_rules_block}
 ========================
 FINAL OUTPUT FORMAT
 ========================
@@ -5629,6 +5763,11 @@ def build_extract_result(recipe_url, json_data, extraction_method):
         "recipe_title": json_data.get("recipe_title"),
         "cover_image": json_data.get("cover_image") or {},
         "servings": json_data.get("servings"),
+        "level": json_data.get("level"),
+        "total_time": json_data.get("total_time"),
+        "prep_time": json_data.get("prep_time"),
+        "inactive_time": json_data.get("inactive_time"),
+        "cook_time": json_data.get("cook_time"),
         "scaling": json_data.get("scaling"),
         "ingredients": ingredients,
         "equipment": json_data.get("equipment", []),

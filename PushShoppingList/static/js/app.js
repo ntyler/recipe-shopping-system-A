@@ -11351,7 +11351,7 @@ async function estimateRecipeNutrition(button) {
     } finally {
         if (button) {
             button.disabled = false;
-            button.textContent = originalText || "Estimate per serving_basis";
+            button.textContent = originalText || "Estimate per serving basis";
         }
     }
 
