@@ -87,17 +87,25 @@ def support_access_notices_for_user(user, limit=2):
 
 def audit_entry_for_render(entry):
     actor_uid = str(entry.get("actorUid") or entry.get("admin_user_id") or "")
-    actor_private_email = str(entry.get("actorPrivateEmail") or entry.get("admin_email") or "")
+    actor_private_email = str(
+        entry.get("actorPrivateEmail")
+        or entry.get("actorEmail")
+        or entry.get("admin_email")
+        or ""
+    )
     actor_public_email = str(
         entry.get("actorPublicEmail")
         or get_public_support_identity(actor_private_email)
     )
+    created_at = str(entry.get("createdAt") or entry.get("timestamp") or "")
+    target_user_email = str(entry.get("targetUserEmail") or entry.get("target_email") or "")
 
     return {
         "audit_id": str(entry.get("audit_id") or ""),
         "action": str(entry.get("action") or ""),
-        "timestamp": str(entry.get("timestamp") or ""),
-        "timestamp_label": display_datetime(entry.get("timestamp")) or str(entry.get("timestamp") or ""),
+        "timestamp": created_at,
+        "timestamp_label": display_datetime(created_at) or created_at,
+        "createdAt": created_at,
         "actorUid": actor_uid,
         "actorPrivateEmail": actor_private_email,
         "actorPublicEmail": actor_public_email,
@@ -105,7 +113,8 @@ def audit_entry_for_render(entry):
         "admin_email": actor_private_email,
         "admin_public_email": actor_public_email,
         "target_user_id": str(entry.get("target_user_id") or ""),
-        "target_email": str(entry.get("target_email") or ""),
+        "target_email": target_user_email,
+        "targetUserEmail": target_user_email,
         "reason": str(entry.get("reason") or ""),
     }
 
@@ -200,17 +209,21 @@ def safe_account_detail(user):
 
 def record_support_access(admin_user, target_user, reason):
     actor_private_email = str((admin_user or {}).get("email") or "")
+    created_at = now_iso()
+    target_user_email = str((target_user or {}).get("email") or "")
     entry = {
         "audit_id": uuid.uuid4().hex,
         "action": AUDIT_ACTION,
-        "timestamp": now_iso(),
+        "timestamp": created_at,
+        "createdAt": created_at,
         "actorUid": str((admin_user or {}).get("user_id") or ""),
         "actorPrivateEmail": actor_private_email,
         "actorPublicEmail": get_public_support_identity(actor_private_email),
         "admin_user_id": str((admin_user or {}).get("user_id") or ""),
         "admin_email": actor_private_email,
         "target_user_id": str((target_user or {}).get("user_id") or ""),
-        "target_email": str((target_user or {}).get("email") or ""),
+        "target_email": target_user_email,
+        "targetUserEmail": target_user_email,
         "reason": normalize_reason(reason),
     }
     entries = load_audit_entries()

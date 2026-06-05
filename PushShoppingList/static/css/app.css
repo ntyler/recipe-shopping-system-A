@@ -15867,6 +15867,16 @@ body {
     line-height: 1.35;
 }
 
+.feedback-support-contact {
+    font-size: 13px;
+    font-weight: 900;
+}
+
+.feedback-support-contact a {
+    color: #93c5fd;
+    overflow-wrap: anywhere;
+}
+
 .feedback-messages {
     display: grid;
     gap: 8px;

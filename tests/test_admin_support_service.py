@@ -116,9 +116,13 @@ def test_admin_support_record_is_sanitized_and_audited(monkeypatch, tmp_path):
     assert audit_entries[0]["actorPublicEmail"] == "support@recipeshoppinglist.com"
     assert audit_entries[0]["admin_email"] == "ntylerbert@gmail.com"
     assert audit_entries[0]["target_email"] == "customer@example.com"
+    assert audit_entries[0]["targetUserEmail"] == "customer@example.com"
+    assert audit_entries[0]["createdAt"]
     assert audit_entries[0]["reason"] == "helping with login issue"
     assert result["audit_entry"]["actorPrivateEmail"] == "ntylerbert@gmail.com"
     assert result["audit_entry"]["actorPublicEmail"] == "support@recipeshoppinglist.com"
+    assert result["audit_entry"]["targetUserEmail"] == "customer@example.com"
+    assert result["audit_entry"]["createdAt"]
     assert result["email_notice"]["configured"] is False
 
 
@@ -170,6 +174,8 @@ def test_support_access_notices_for_user_are_recent_and_targeted(monkeypatch, tm
     assert notices[0]["actorPublicEmail"] == "support@recipeshoppinglist.com"
     assert notices[0]["admin_email"] == "ntylerbert@gmail.com"
     assert notices[0]["admin_public_email"] == "support@recipeshoppinglist.com"
+    assert notices[0]["targetUserEmail"] == "customer@example.com"
+    assert notices[0]["createdAt"]
     assert [
         notice["reason"]
         for notice in support.support_access_notices_for_user(target_user(), limit=None)
@@ -178,6 +184,29 @@ def test_support_access_notices_for_user_are_recent_and_targeted(monkeypatch, tm
         notice["reason"]
         for notice in support.support_access_notices_for_user(target_user(), limit=1)
     ] == ["second reason"]
+
+
+def test_old_support_logs_fallback_to_public_actor_email(monkeypatch, tmp_path):
+    configure_admin_support(monkeypatch, tmp_path)
+    support.save_audit_entries([
+        {
+            "audit_id": "legacy-1",
+            "action": "view_account_support_record",
+            "timestamp": "2026-06-04T22:33:00Z",
+            "actorEmail": "ntylerbert@gmail.com",
+            "target_email": "customer@example.com",
+            "target_user_id": "customer",
+            "reason": "legacy reason",
+        }
+    ])
+
+    notices = support.support_access_notices_for_user(target_user(), limit=None)
+
+    assert len(notices) == 1
+    assert notices[0]["actorPrivateEmail"] == "ntylerbert@gmail.com"
+    assert notices[0]["actorPublicEmail"] == "support@recipeshoppinglist.com"
+    assert notices[0]["targetUserEmail"] == "customer@example.com"
+    assert notices[0]["createdAt"] == "2026-06-04T22:33:00Z"
 
 
 def test_admin_support_requires_admin_and_reason(monkeypatch, tmp_path):

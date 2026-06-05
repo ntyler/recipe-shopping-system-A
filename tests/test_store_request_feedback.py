@@ -116,3 +116,19 @@ def test_feedback_support_header_counts_current_user_requests(monkeypatch, tmp_p
     assert "feedback-support-header-count" in html
     assert re.search(r"feedback-support-header-count\">\s*2\s*requests", html)
     assert not re.search(r"feedback-support-header-count\">\s*3\s*requests", html)
+    assert "support@recipeshoppinglist.com" in html
+
+
+def test_feedback_support_header_shows_zero_request_count_for_guest():
+    app = create_app()
+    with app.test_request_context("/"):
+        html = render_template(
+            "sections/feedback_support.html",
+            current_user=None,
+            feedback_dashboard=feedback_service.feedback_dashboard_for_user(None),
+            feedback_messages=[],
+        )
+
+    assert "feedback-support-header-count" in html
+    assert re.search(r"feedback-support-header-count\">\s*0\s*requests", html)
+    assert "support@recipeshoppinglist.com" in html

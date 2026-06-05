@@ -3,13 +3,17 @@ function saveScroll() {
 }
 
 const SUPPORT_EMAIL = "support@recipeshoppinglist.com";
+const SUPPORT_ADMIN_EMAILS = ["ntylerbert@gmail.com"];
+
+function getPublicSupportEmail(email) {
+    const normalized = (email || "").toLowerCase();
+    return SUPPORT_ADMIN_EMAILS.includes(normalized)
+        ? SUPPORT_EMAIL
+        : email;
+}
 
 function getPublicSupportIdentity(email) {
-    if (email === SUPPORT_EMAIL) {
-        return SUPPORT_EMAIL;
-    }
-
-    return email;
+    return getPublicSupportEmail(email);
 }
 
 function scrollToUserAccountTop(behavior = "auto") {
@@ -15192,6 +15196,37 @@ const STORE_REQUEST_FEEDBACK_DESCRIPTION = [
     "Why this store should be added:",
     "Notes:"
 ].join("\n");
+
+function openFeedbackSupportSection() {
+    const section = document.getElementById("feedbackSupportSection");
+    const content = document.querySelector('[data-collapse-content="feedback-support"]');
+    const menu = document.querySelector("[data-account-menu]");
+
+    if (!section || !content) {
+        return false;
+    }
+
+    if (menu) {
+        menu.open = false;
+    }
+
+    if (content.classList.contains("collapsed")) {
+        toggleCardCollapse("feedback-support");
+    }
+
+    window.setTimeout(() => {
+        section.scrollIntoView({ behavior: "smooth", block: "start" });
+
+        const focusTarget = section.querySelector("#feedbackSubjectInput")
+            || section.querySelector(".feedback-sign-in-panel")
+            || section.querySelector(".feedback-support-title-toggle");
+        if (focusTarget && typeof focusTarget.focus === "function") {
+            focusTarget.focus({ preventScroll: true });
+        }
+    }, 0);
+
+    return false;
+}
 
 function openStoreRequestFeedback(button) {
     closeRecipeEditRowMenus();

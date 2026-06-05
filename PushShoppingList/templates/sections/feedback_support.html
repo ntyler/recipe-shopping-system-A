@@ -6,12 +6,10 @@
             onclick="toggleCardCollapse('feedback-support')">
         <span class="feedback-support-title-text">
             <span>💬 Feedback &amp; Support</span>
-            {% if current_user %}
-                <span class="feedback-support-header-count">
-                    {{ feedback_dashboard.my_feedback | length }}
-                    request{% if (feedback_dashboard.my_feedback | length) != 1 %}s{% endif %}
-                </span>
-            {% endif %}
+            <span class="feedback-support-header-count">
+                {{ feedback_dashboard.my_feedback | length }}
+                request{% if (feedback_dashboard.my_feedback | length) != 1 %}s{% endif %}
+            </span>
         </span>
     </button>
 
@@ -22,6 +20,10 @@
     <div class="feedback-support-header">
         <p>
             Help us improve the shopping experience. Submit bugs, feature requests, product matching issues, recipe extraction problems, or general feedback.
+        </p>
+        <p class="feedback-support-contact">
+            Support email:
+            <a href="mailto:support@recipeshoppinglist.com">support@recipeshoppinglist.com</a>
         </p>
     </div>
 

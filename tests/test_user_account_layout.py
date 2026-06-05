@@ -91,6 +91,9 @@ def test_admin_support_view_is_admin_only_reasoned_and_audited():
     assert "data-account-notices-panel" in account_template
     assert "onclick=\"return toggleAccountNoticesPanel()\"" in account_template
     assert "onclick=\"return toggleAccountNoticesPanel(false)\"" in account_template
+    assert "Feedback &amp; Support" in account_template
+    assert "onclick=\"return openFeedbackSupportSection()\"" in account_template
+    assert 'aria-controls="feedbackSupportSection"' in account_template
     assert "View account access history" in account_template
     assert "data-account-access-history-toggle" in account_template
     assert "admin_support_history" in account_template
@@ -106,9 +109,11 @@ def test_admin_support_view_is_admin_only_reasoned_and_audited():
     assert "[data-account-notices-panel]" in firebase_script
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     assert 'const SUPPORT_EMAIL = "support@recipeshoppinglist.com";' in script
+    assert 'const SUPPORT_ADMIN_EMAILS = ["ntylerbert@gmail.com"];' in script
+    assert "function getPublicSupportEmail(email)" in script
     assert "function getPublicSupportIdentity(email)" in script
-    assert '"ntylerbert@gmail.com"' not in script
-    assert "return SUPPORT_EMAIL;" in script
+    assert "? SUPPORT_EMAIL" in script
+    assert "function openFeedbackSupportSection()" in script
     assert "function toggleAccountNoticesPanel(open = null)" in script
     assert "function toggleAccountAccessHistory(button)" in script
     assert "password_hash" not in support_template
