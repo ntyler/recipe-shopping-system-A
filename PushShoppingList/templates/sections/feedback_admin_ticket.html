@@ -1,22 +1,40 @@
-<article id="feedback-{{ feedback.feedback_id }}" class="feedback-ticket feedback-admin-ticket">
-    <div class="feedback-ticket-top">
-        <div>
-            <div class="feedback-ticket-id">{{ feedback.display_feedback_id }}</div>
-            <h4>{{ feedback.subject }}</h4>
-            <div class="feedback-ticket-meta">
+{% set feedback_body_id = "admin-feedback-body-" ~ feedback.feedback_id %}
+<article id="feedback-{{ feedback.feedback_id }}"
+         class="feedback-ticket feedback-admin-ticket"
+         data-feedback-ticket>
+    <button type="button"
+            class="feedback-ticket-summary"
+            data-feedback-ticket-toggle
+            aria-expanded="false"
+            aria-controls="{{ feedback_body_id }}"
+            onclick="return toggleFeedbackTicket(this)">
+        <span class="feedback-ticket-summary-main">
+            <span class="feedback-ticket-id">{{ feedback.display_feedback_id }}</span>
+            <span class="feedback-ticket-summary-subject">{{ feedback.subject }}</span>
+            <span class="feedback-ticket-meta">
                 <span>{{ feedback.feedback_type }}</span>
                 <span>{{ feedback.user.username or "Unknown user" }}</span>
                 <span>{{ feedback.user.email or "No email" }}</span>
-                <span>Submitted {{ feedback.display_created_at }}</span>
-            </div>
-        </div>
-        <div class="feedback-status-wrap">
-            <span class="feedback-status">{{ feedback.status }}</span>
-            <span class="feedback-priority feedback-priority-{{ feedback.priority_key }}">{{ feedback.priority }} Priority</span>
-        </div>
-    </div>
+                <span>Last Updated {{ feedback.display_updated_at }}</span>
+            </span>
+        </span>
+        <span class="feedback-ticket-summary-side">
+            <span class="feedback-ticket-badges">
+                <span class="feedback-status">{{ feedback.status }}</span>
+                <span class="feedback-priority feedback-priority-{{ feedback.priority_key }}">{{ feedback.priority }} Priority</span>
+            </span>
+            <span class="feedback-ticket-chevron" aria-hidden="true"></span>
+        </span>
+    </button>
 
-    <div class="feedback-ticket-body">
+    <div id="{{ feedback_body_id }}" class="feedback-ticket-body" data-feedback-ticket-body hidden>
+        <div class="feedback-admin-requester">
+            <strong>Requester</strong>
+            <span>{{ feedback.user.username or "Unknown user" }}</span>
+            <span>{{ feedback.user.email or "No email" }}</span>
+            <small>Submitted {{ feedback.display_created_at }}</small>
+        </div>
+
         <div class="feedback-ticket-description">{{ feedback.description }}</div>
 
         {% if feedback.admin_notes %}
@@ -34,14 +52,28 @@
             </div>
         {% endif %}
 
-        {% if feedback.attachments %}
-            <div class="feedback-attachment-list">
-                {% for attachment in feedback.attachments %}
-                    <a href="{{ url_for('static', filename=attachment.path) }}" target="_blank" rel="noopener noreferrer">
-                        {{ attachment.original_name }}
-                    </a>
-                {% endfor %}
-            </div>
+        {% if feedback.user_attachments or feedback.support_attachments %}
+            <section class="feedback-attachments" aria-label="Ticket attachments">
+                <strong>Attachments</strong>
+                <ul class="feedback-attachment-list">
+                    {% for attachment in feedback.user_attachments %}
+                        <li>
+                            <span>{{ attachment.display_label }}</span>
+                            <a href="{{ url_for('static', filename=attachment.path) }}" target="_blank" rel="noopener noreferrer">
+                                {{ attachment.original_name }}
+                            </a>
+                        </li>
+                    {% endfor %}
+                    {% for attachment in feedback.support_attachments %}
+                        <li>
+                            <span>{{ attachment.display_label }}</span>
+                            <a href="{{ url_for('static', filename=attachment.path) }}" target="_blank" rel="noopener noreferrer">
+                                {{ attachment.original_name }}
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </section>
         {% endif %}
 
         {% if feedback.comments %}

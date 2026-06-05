@@ -133,9 +133,18 @@
         <section class="admin-feedback-section" aria-labelledby="adminFeedbackTitle">
             <div class="feedback-section-heading-row">
                 <h3 id="adminFeedbackTitle">Admin Feedback Queue</h3>
-                <span class="feedback-admin-count">
-                    {{ feedback_dashboard.admin_feedback | length }} request{% if (feedback_dashboard.admin_feedback | length) != 1 %}s{% endif %}
-                </span>
+                <div class="feedback-section-actions">
+                    <span class="feedback-admin-count">
+                        {{ feedback_dashboard.admin_feedback | length }} request{% if (feedback_dashboard.admin_feedback | length) != 1 %}s{% endif %}
+                    </span>
+                    {% if feedback_dashboard.admin_feedback %}
+                        <button type="button"
+                                class="feedback-collapse-all-btn"
+                                onclick="return collapseAllFeedbackTickets()">
+                            Collapse All Feedback
+                        </button>
+                    {% endif %}
+                </div>
             </div>
 
             {% if feedback_dashboard.admin_feedback %}

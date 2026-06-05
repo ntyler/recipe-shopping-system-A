@@ -300,6 +300,8 @@ def test_feedback_support_tickets_are_compact_collapsible_portal_rows():
     assert "feedback-form-attachments-heading" in support_template
     assert "Attachments" in support_template
     assert "Collapse All Feedback" in support_template
+    assert "adminFeedbackTitle" in support_template
+    assert "feedback-admin-count" in support_template
     assert "collapseAllFeedbackTickets()" in support_template
     assert "data-feedback-ticket" in ticket_template
     assert "data-feedback-ticket-toggle" in ticket_template
@@ -313,6 +315,17 @@ def test_feedback_support_tickets_are_compact_collapsible_portal_rows():
     assert "attachment.display_label" in ticket_template
     assert "<strong>{{ event.event }}</strong>" in ticket_template
     assert "<strong>{{ event.event }}</strong>" in admin_ticket_template
+    assert "data-feedback-ticket" in admin_ticket_template
+    assert "data-feedback-ticket-toggle" in admin_ticket_template
+    assert 'aria-expanded="false"' in admin_ticket_template
+    assert "data-feedback-ticket-body hidden" in admin_ticket_template
+    assert "feedback-ticket-summary" in admin_ticket_template
+    assert "feedback-ticket-badges" in admin_ticket_template
+    assert "Last Updated {{ feedback.display_updated_at }}" in admin_ticket_template
+    assert "feedback-admin-requester" in admin_ticket_template
+    assert "feedback.user_attachments" in admin_ticket_template
+    assert "feedback.support_attachments" in admin_ticket_template
+    assert "feedback-ticket-top" not in admin_ticket_template
     assert ".feedback-ticket-summary" in css
     assert ".feedback-ticket-badges" in css
     assert ".feedback-ticket-body[hidden]" in css
@@ -320,6 +333,7 @@ def test_feedback_support_tickets_are_compact_collapsible_portal_rows():
     assert ".feedback-section-actions" in css
     assert ".feedback-collapse-all-btn" in css
     assert ".feedback-attachments" in css
+    assert ".feedback-admin-requester" in css
     assert ".feedback-timeline::before" in css
     assert "function toggleFeedbackTicket(toggle)" in script
     assert "function collapseAllFeedbackTickets()" in script
