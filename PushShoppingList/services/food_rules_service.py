@@ -5,6 +5,7 @@ from pathlib import Path
 
 from openai import OpenAI
 
+from PushShoppingList.services.openai_usage_service import record_openai_usage
 from PushShoppingList.services.storage_service import scoped_extractor_data_path
 
 
@@ -179,6 +180,7 @@ def suggest_food_rules_from_prompt(prompt, current_rules=None, section=None):
             response_format={"type": "json_object"},
             temperature=0.1,
         )
+        record_openai_usage(response, "food-rules", model=MODEL)
         data = json.loads(clean_json_response(response.choices[0].message.content))
     except Exception as exc:
         return {

@@ -5,6 +5,7 @@ from fractions import Fraction
 
 from openai import OpenAI
 
+from PushShoppingList.services.openai_usage_service import record_openai_usage
 from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
 from PushShoppingList.services.recipe_url_service import normalize_recipe_quantity
@@ -215,6 +216,7 @@ Output shape:
         temperature=0,
     )
 
+    record_openai_usage(response, "recipe-quantity-scaling", model=MODEL)
     data = json.loads(clean_json_response(response.choices[0].message.content))
     return normalize_scaled_values(data)
 

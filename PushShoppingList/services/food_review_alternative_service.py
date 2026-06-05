@@ -6,6 +6,7 @@ from openai import OpenAI
 
 from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.food_rules_service import term_matches
+from PushShoppingList.services.openai_usage_service import record_openai_usage
 
 
 MODEL = os.getenv("OPENAI_FOOD_REVIEW_MODEL", os.getenv("OPENAI_RECIPE_MODEL", "gpt-4o-mini"))
@@ -59,6 +60,7 @@ def suggest_food_review_alternatives(payload):
             response_format={"type": "json_object"},
             temperature=0.2,
         )
+        record_openai_usage(response, "food-review-alternatives", model=MODEL)
         data = json.loads(clean_json_response(response.choices[0].message.content))
     except Exception as exc:
         return {

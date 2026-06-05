@@ -5788,6 +5788,33 @@ body {
             overflow-wrap: anywhere;
         }
 
+        .user-usage-dashboard-card-wide {
+            grid-column: span 2;
+        }
+
+        .user-usage-dashboard-card small {
+            color: #aeb8c8;
+            font-size: 11px;
+            font-weight: 800;
+            line-height: 1.25;
+        }
+
+        .user-usage-meter {
+            height: 8px;
+            overflow: hidden;
+            border: 1px solid #2f4054;
+            border-radius: 999px;
+            background: #0b1118;
+        }
+
+        .user-usage-meter span {
+            display: block;
+            max-width: 100%;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #1e80c9, #19c36b);
+        }
+
         .user-usage-dashboard-note {
             margin: 2px 0 0;
             color: #cbd5e1;
@@ -11098,6 +11125,10 @@ body {
                 grid-template-columns: minmax(0, 1fr);
             }
 
+            .user-usage-dashboard-card-wide {
+                grid-column: auto;
+            }
+
             .user-push-panel-header {
                 align-items: stretch;
                 flex-direction: column;
@@ -15842,6 +15873,84 @@ body {
         min-height: 92px;
         padding: 18px;
     }
+}
+
+.recipe-edit-ingredients.recipe-edit-ingredients-collapsed .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded),
+.recipe-edit-ingredient-row.recipe-edit-row-collapsed {
+    grid-template-columns: 22px 40px minmax(0, 1fr) 38px;
+    gap: 10px 12px;
+    align-items: center;
+    min-height: 0;
+    padding: 10px 14px;
+}
+
+.recipe-edit-ingredients.recipe-edit-ingredients-collapsed .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) .recipe-edit-row-handle,
+.recipe-edit-ingredients.recipe-edit-ingredients-collapsed .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) .recipe-edit-row-number,
+.recipe-edit-ingredients.recipe-edit-ingredients-collapsed .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) .recipe-edit-ingredient-name-label,
+.recipe-edit-ingredients.recipe-edit-ingredients-collapsed .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) .recipe-edit-row-menu-wrap,
+.recipe-edit-ingredient-row.recipe-edit-row-collapsed .recipe-edit-row-handle,
+.recipe-edit-ingredient-row.recipe-edit-row-collapsed .recipe-edit-row-number,
+.recipe-edit-ingredient-row.recipe-edit-row-collapsed .recipe-edit-ingredient-name-label,
+.recipe-edit-ingredient-row.recipe-edit-row-collapsed .recipe-edit-row-menu-wrap {
+    grid-row: 1;
+    align-self: center;
+}
+
+.recipe-edit-ingredients.recipe-edit-ingredients-collapsed .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) .recipe-edit-row-handle,
+.recipe-edit-ingredient-row.recipe-edit-row-collapsed .recipe-edit-row-handle {
+    grid-column: 1 / 2;
+    margin-top: 0;
+}
+
+.recipe-edit-ingredients.recipe-edit-ingredients-collapsed .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) .recipe-edit-row-number,
+.recipe-edit-ingredient-row.recipe-edit-row-collapsed .recipe-edit-row-number {
+    grid-column: 2 / 3;
+    width: 34px;
+    height: 34px;
+    font-size: 15px;
+}
+
+.recipe-edit-ingredients.recipe-edit-ingredients-collapsed .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) .recipe-edit-ingredient-name-label,
+.recipe-edit-ingredient-row.recipe-edit-row-collapsed .recipe-edit-ingredient-name-label {
+    grid-column: 3 / 4;
+    display: flex;
+    justify-self: stretch;
+    min-width: 0;
+}
+
+.recipe-edit-ingredients.recipe-edit-ingredients-collapsed .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) .recipe-edit-ingredient-title-line,
+.recipe-edit-ingredient-row.recipe-edit-row-collapsed .recipe-edit-ingredient-title-line {
+    gap: 5px;
+    min-width: 0;
+    padding-right: 0;
+}
+
+.recipe-edit-ingredients.recipe-edit-ingredients-collapsed .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) .recipe-edit-ingredient-name-label [data-field="ingredient"],
+.recipe-edit-ingredient-row.recipe-edit-row-collapsed .recipe-edit-ingredient-name-label [data-field="ingredient"] {
+    min-height: 22px;
+    font-size: 16px;
+}
+
+.recipe-edit-ingredients.recipe-edit-ingredients-collapsed .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) .recipe-edit-ingredient-badge,
+.recipe-edit-ingredient-row.recipe-edit-row-collapsed .recipe-edit-ingredient-badge {
+    min-height: 20px;
+    padding: 2px 7px;
+    font-size: 10px;
+}
+
+.recipe-edit-ingredients.recipe-edit-ingredients-collapsed .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) .recipe-edit-row-menu-wrap,
+.recipe-edit-ingredient-row.recipe-edit-row-collapsed .recipe-edit-row-menu-wrap {
+    grid-column: 4 / 5;
+    justify-self: end;
+    min-width: 38px;
+}
+
+.recipe-edit-ingredients.recipe-edit-ingredients-collapsed .recipe-edit-ingredient-row:not(.recipe-edit-row-expanded) .recipe-edit-row-menu-btn,
+.recipe-edit-ingredient-row.recipe-edit-row-collapsed .recipe-edit-row-menu-btn {
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+    min-height: 34px;
 }
 
 .recipe-edit-equipment-row:not(:has([data-equipment-image-panel]:not(.recipe-image-visibility-hidden))) {

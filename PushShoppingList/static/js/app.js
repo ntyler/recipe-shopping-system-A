@@ -10144,8 +10144,9 @@ function toggleRecipeIngredientsCollapsed(button) {
     return false;
 }
 
-function autoSortRecipeIngredients() {
+function autoSortRecipeIngredients(mode = "ingredient") {
     const list = document.getElementById("recipeEditIngredients");
+    const sortMode = mode === "store_section" ? "store_section" : "ingredient";
 
     if (!list) {
         return false;
@@ -10155,14 +10156,32 @@ function autoSortRecipeIngredients() {
         .sort((left, right) => {
             const leftValues = fieldValuesFromRow(left);
             const rightValues = fieldValuesFromRow(right);
-            const leftKey = `${leftValues.store_section || ""} ${leftValues.ingredient || ""}`.toLowerCase();
-            const rightKey = `${rightValues.store_section || ""} ${rightValues.ingredient || ""}`.toLowerCase();
+
+            if (sortMode === "store_section") {
+                const sectionCompare = recipeIngredientSortKey(leftValues.store_section)
+                    .localeCompare(recipeIngredientSortKey(rightValues.store_section));
+
+                if (sectionCompare) {
+                    return sectionCompare;
+                }
+            }
+
+            const leftKey = recipeIngredientSortKey(leftValues.ingredient);
+            const rightKey = recipeIngredientSortKey(rightValues.ingredient);
             return leftKey.localeCompare(rightKey);
         })
         .forEach(row => list.appendChild(row));
 
     updateRecipeIngredientRowIndexes();
+    closeRecipeEditRowMenus();
     return false;
+}
+
+function recipeIngredientSortKey(value) {
+    return String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, " ");
 }
 
 function syncRecipeIngredientPurchaseGroup(input) {

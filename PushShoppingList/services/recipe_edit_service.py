@@ -53,6 +53,7 @@ from PushShoppingList.services.recipe_url_service import save_recipe_url_quantit
 from PushShoppingList.services.recipe_quantity_service import update_recipe_quantity
 from PushShoppingList.services.recipe_image_progress_service import finish_recipe_image_progress
 from PushShoppingList.services.recipe_image_progress_service import start_recipe_image_progress
+from PushShoppingList.services.openai_usage_service import record_openai_usage
 from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
 
 
@@ -1328,6 +1329,11 @@ def estimate_recipe_nutrition(payload):
             response_format={"type": "json_object"},
             temperature=0,
         )
+        record_openai_usage(
+            response,
+            "nutrition-estimate",
+            model=os.getenv("OPENAI_NUTRITION_MODEL", MODEL),
+        )
         content = response.choices[0].message.content
         data = json.loads(clean_json_response(content))
     except Exception as exc:
@@ -1387,6 +1393,11 @@ def recipe_note_feedback(payload):
                 },
             ],
             temperature=0.2,
+        )
+        record_openai_usage(
+            response,
+            "recipe-note-feedback",
+            model=os.getenv("OPENAI_RECIPE_NOTE_MODEL", MODEL),
         )
         feedback = str(response.choices[0].message.content or "").strip()
     except Exception as exc:
@@ -1797,6 +1808,12 @@ def request_recipe_step_image_bytes(prompt):
             size=size,
             quality=quality,
             n=1,
+        )
+        record_openai_usage(
+            response,
+            "recipe-step-image",
+            model=model,
+            metadata={"size": size, "quality": quality},
         )
     except Exception as exc:
         if "timeout" in str(exc).lower() or "timed out" in str(exc).lower():

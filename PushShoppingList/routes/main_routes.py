@@ -81,6 +81,8 @@ from PushShoppingList.services.shopping_list_service import add_items
 from PushShoppingList.services.shopping_list_service import save_items
 from PushShoppingList.services.store_settings_service import load_store_settings
 from PushShoppingList.services.firebase_auth_service import firebase_web_config
+from PushShoppingList.services.openai_usage_service import openai_usage_dashboard_for_user
+from PushShoppingList.services.openai_usage_service import record_openai_usage
 from PushShoppingList.services.user_account_service import current_public_user
 from PushShoppingList.services.user_account_service import public_two_factor_recovery_user
 from PushShoppingList.services.admin_support_service import admin_support_dashboard_for_user
@@ -1398,6 +1400,7 @@ def index():
         rules_display=load_rules_display(),
         food_rule_status=shopping_item_food_rule_status,
         feedback_dashboard=feedback_dashboard_for_user(active_public_user),
+        openai_usage_dashboard=openai_usage_dashboard_for_user(active_public_user),
         feedback_messages=session.pop("feedback_messages", []),
         admin_support_dashboard=admin_support_dashboard_for_user(
             active_public_user,
@@ -2069,6 +2072,11 @@ Output shape:
             ],
             response_format={"type": "json_object"},
             temperature=0,
+        )
+        record_openai_usage(
+            response,
+            "address-completion",
+            model=os.getenv("OPENAI_ADDRESS_MODEL", "gpt-4o-mini"),
         )
         data = json.loads(clean_json_response(response.choices[0].message.content))
     except Exception as exc:

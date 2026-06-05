@@ -31,6 +31,7 @@ from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.home_address_service import load_home_address
 from PushShoppingList.services.item_state_service import load_item_state
 from PushShoppingList.services.item_state_service import save_item_store
+from PushShoppingList.services.openai_usage_service import record_openai_usage
 from PushShoppingList.services.purchase_mapping_service import display_quantity_for_purchase_group
 from PushShoppingList.services.purchase_mapping_service import purchase_group_records_for_items
 from PushShoppingList.services.purchase_mapping_service import purchase_mapping_for_item
@@ -45,6 +46,7 @@ from PushShoppingList.services.recipe_url_service import recipe_url_rows
 from PushShoppingList.services.rules_display_service import load_rules_display
 from PushShoppingList.services.shopping_list_service import load_items
 from PushShoppingList.services.store_settings_service import load_store_settings
+from PushShoppingList.services.storage_service import active_user_id
 from PushShoppingList.services.storage_service import scoped_extractor_data_path
 
 
@@ -1578,6 +1580,7 @@ def find_store_result(choice, store_key):
 
 
 def grab_best_products(items=None, job_id=None):
+    usage_user_id = active_user_id()
     shopping_items = items if items is not None else load_items()
     raw_ingredients = [
         str(item or "").strip()
@@ -1710,6 +1713,7 @@ def grab_best_products(items=None, job_id=None):
                     home_location,
                     store_locations,
                     job_id,
+                    usage_user_id=usage_user_id,
                 ): download
                 for download in downloads
             }
@@ -1740,6 +1744,7 @@ def grab_best_products(items=None, job_id=None):
                             item_records,
                             quantity_context=quantity_context_by_item.get(normalize_item_key(ingredient), {}),
                             job_id=job_id,
+                            usage_user_id=usage_user_id,
                         )
                         results_by_ingredient[ingredient] = record
                         saved_ingredients.add(ingredient)
@@ -1795,6 +1800,7 @@ def grab_best_products(items=None, job_id=None):
                 item_records,
                 quantity_context=quantity_context_by_item.get(normalize_item_key(ingredient), {}),
                 job_id=job_id,
+                usage_user_id=usage_user_id,
             )
 
         results.append(record)
@@ -1867,12 +1873,14 @@ def save_product_record_for_ingredient(
     item_records,
     quantity_context=None,
     job_id=None,
+    usage_user_id=None,
 ):
     record = build_product_choice_record_from_results(
         ingredient,
         store_results,
         full_address,
         quantity_context=quantity_context,
+        usage_user_id=usage_user_id,
     )
     record = compact_product_value_for_storage(record)
     item_records[record["item_key"]] = record
@@ -1951,6 +1959,7 @@ def search_store_products_for_download(
     home_location,
     store_locations,
     job_id=None,
+    usage_user_id=None,
     product_agent_prompt_builder=None,
     browser_visible=False,
     browser_visual_pause_seconds=0,
@@ -2057,6 +2066,7 @@ def search_store_products_for_download(
             store_locations.get(store_key, {}),
             search_term=search_term,
             search_url=search_url,
+            usage_user_id=usage_user_id,
             product_agent_prompt_builder=product_agent_prompt_builder,
             browser_visible=browser_visible,
             browser_visual_pause_seconds=browser_visual_pause_seconds,
@@ -2078,6 +2088,7 @@ def search_store_products_for_download(
             store_name,
             job_id=job_id,
             progress_index=index,
+            usage_user_id=usage_user_id,
         )
         candidates = embed_product_candidate_images(
             candidates,
@@ -2178,7 +2189,13 @@ def search_store_products_for_download(
     }
 
 
-def build_product_choice_record_from_results(ingredient, store_results, full_address, quantity_context=None):
+def build_product_choice_record_from_results(
+    ingredient,
+    store_results,
+    full_address,
+    quantity_context=None,
+    usage_user_id=None,
+):
     candidates = []
     skip_reasons = []
     quantity_context = quantity_context or first_quantity_context(store_results)
@@ -2205,12 +2222,14 @@ def build_product_choice_record_from_results(ingredient, store_results, full_add
         candidates,
         full_address=full_address,
         quantity_context=quantity_context,
+        usage_user_id=usage_user_id,
     )
     candidates = apply_chatgpt_final_product_selection(
         ingredient,
         candidates,
         full_address=full_address,
         quantity_context=quantity_context,
+        usage_user_id=usage_user_id,
     )
     candidates = apply_validation_layer(ingredient, candidates)
     store_product_results_list = build_store_product_results(
@@ -2793,6 +2812,7 @@ def enrich_product_candidates_from_pages(
     store_name,
     job_id=None,
     progress_index=None,
+    usage_user_id=None,
 ):
     enriched = []
     skip_detail_when_cards_are_rankable = any(
@@ -2857,6 +2877,7 @@ def enrich_product_candidates_from_pages(
             candidate,
             ingredient,
             use_chatgpt_analysis=use_chatgpt_analysis,
+            usage_user_id=usage_user_id,
         ))
 
     return enriched
@@ -3044,7 +3065,7 @@ def image_bytes_to_data_uri(content, content_type=""):
     )
 
 
-def enrich_product_candidate_from_page(candidate, ingredient, use_chatgpt_analysis=False):
+def enrich_product_candidate_from_page(candidate, ingredient, use_chatgpt_analysis=False, usage_user_id=None):
     product_url = candidate.get("product_url", "")
     fetch = fetch_product_page_html(
         product_url,
@@ -3073,7 +3094,7 @@ def enrich_product_candidate_from_page(candidate, ingredient, use_chatgpt_analys
     apply_product_details_to_candidate(candidate, details, fetch, ingredient)
 
     if use_chatgpt_analysis:
-        apply_chatgpt_product_page_analysis(candidate, html_text, ingredient)
+        apply_chatgpt_product_page_analysis(candidate, html_text, ingredient, usage_user_id=usage_user_id)
 
     return candidate
 
@@ -3446,8 +3467,8 @@ def apply_product_details_to_candidate(candidate, details, fetch, ingredient):
         )
 
 
-def apply_chatgpt_product_page_analysis(candidate, html_text, ingredient):
-    analysis = analyze_product_page_with_chatgpt(candidate, html_text, ingredient)
+def apply_chatgpt_product_page_analysis(candidate, html_text, ingredient, usage_user_id=None):
+    analysis = analyze_product_page_with_chatgpt(candidate, html_text, ingredient, usage_user_id=usage_user_id)
     candidate["chatgpt_analysis"] = analysis
 
     if analysis.get("status") != "done":
@@ -3563,7 +3584,7 @@ def deterministic_candidate_food_rule_status(candidate):
     return annotated.get("food_rule_status", {}) or {}
 
 
-def analyze_product_page_with_chatgpt(candidate, html_text, ingredient):
+def analyze_product_page_with_chatgpt(candidate, html_text, ingredient, usage_user_id=None):
     client = get_product_analysis_client()
 
     if not client:
@@ -3602,6 +3623,12 @@ def analyze_product_page_with_chatgpt(candidate, html_text, ingredient):
                 response_format={"type": "json_object"},
                 temperature=0.1,
             )
+        record_openai_usage(
+            response,
+            "product-page-analysis",
+            model=PRODUCT_ANALYSIS_MODEL,
+            user_id=usage_user_id,
+        )
         data = json.loads(clean_json_response(response.choices[0].message.content))
     except Exception as exc:
         return {
@@ -4003,6 +4030,7 @@ def search_store_products(
     store_location,
     search_term=None,
     search_url=None,
+    usage_user_id=None,
     product_agent_prompt_builder=None,
     browser_visible=False,
     browser_visual_pause_seconds=0,
@@ -4029,6 +4057,7 @@ def search_store_products(
             home_location,
             store_location,
             search_term=search_term,
+            usage_user_id=usage_user_id,
             product_agent_prompt_builder=product_agent_prompt_builder,
             browser_visible=browser_visible,
             browser_visual_pause_seconds=browser_visual_pause_seconds,
@@ -4113,6 +4142,7 @@ def search_store_products_with_browser_agent(
     home_location,
     store_location,
     search_term=None,
+    usage_user_id=None,
     product_agent_prompt_builder=None,
     browser_visible=False,
     browser_visual_pause_seconds=0,
@@ -4247,6 +4277,7 @@ def search_store_products_with_browser_agent(
                     store_location,
                     rendered_page,
                     visible_cards,
+                    usage_user_id=usage_user_id,
                     prompt_builder=product_agent_prompt_builder,
                 )
             rendered_candidates = parse_product_candidates_from_html(
@@ -5297,6 +5328,7 @@ def identify_rendered_html_products_with_chatgpt(
     store_location,
     rendered_page,
     visible_cards,
+    usage_user_id=None,
     prompt_builder=None,
 ):
     client = get_product_analysis_client()
@@ -5340,6 +5372,12 @@ def identify_rendered_html_products_with_chatgpt(
                 response_format={"type": "json_object"},
                 temperature=0,
             )
+        record_openai_usage(
+            response,
+            "rendered-html-product-reasoning",
+            model=PRODUCT_ANALYSIS_MODEL,
+            user_id=usage_user_id,
+        )
         data = json.loads(clean_json_response(response.choices[0].message.content))
     except Exception as exc:
         return [], [f"{store_name}: ChatGPT rendered-HTML product reasoning failed: {exc}"]
@@ -7579,7 +7617,13 @@ def rank_product_candidates(ingredient, candidates, quantity_context=None):
     return sorted(ranked, key=lambda item: item.get("score", 0), reverse=True)
 
 
-def apply_chatgpt_store_product_rankings(ingredient, candidates, full_address="", quantity_context=None):
+def apply_chatgpt_store_product_rankings(
+    ingredient,
+    candidates,
+    full_address="",
+    quantity_context=None,
+    usage_user_id=None,
+):
     if not product_final_selection_agent_enabled():
         return candidates
 
@@ -7603,6 +7647,7 @@ def apply_chatgpt_store_product_rankings(ingredient, candidates, full_address=""
             full_address=full_address,
             quantity_context=quantity_context,
             allowed_ids=allowed_ids,
+            usage_user_id=usage_user_id,
         )
 
         apply_store_product_ranking_selection(rankable, selection)
@@ -7649,7 +7694,14 @@ def chatgpt_store_ranking_priority(ingredient, candidate):
     return score
 
 
-def choose_store_products_with_chatgpt(ingredient, candidates, full_address="", quantity_context=None, allowed_ids=None):
+def choose_store_products_with_chatgpt(
+    ingredient,
+    candidates,
+    full_address="",
+    quantity_context=None,
+    allowed_ids=None,
+    usage_user_id=None,
+):
     client = get_product_analysis_client()
 
     if not client:
@@ -7689,6 +7741,12 @@ def choose_store_products_with_chatgpt(ingredient, candidates, full_address="", 
                 response_format={"type": "json_object"},
                 temperature=0,
             )
+        record_openai_usage(
+            response,
+            "store-product-ranking",
+            model=PRODUCT_ANALYSIS_MODEL,
+            user_id=usage_user_id,
+        )
         data = json.loads(clean_json_response(response.choices[0].message.content))
     except Exception as exc:
         return {
@@ -7979,7 +8037,13 @@ def apply_store_product_ranking_selection(candidates, selection):
     return candidates
 
 
-def apply_chatgpt_final_product_selection(ingredient, candidates, full_address="", quantity_context=None):
+def apply_chatgpt_final_product_selection(
+    ingredient,
+    candidates,
+    full_address="",
+    quantity_context=None,
+    usage_user_id=None,
+):
     if not product_final_selection_agent_enabled():
         return candidates
 
@@ -8004,6 +8068,7 @@ def apply_chatgpt_final_product_selection(ingredient, candidates, full_address="
         full_address=full_address,
         quantity_context=quantity_context,
         selectable_ids=selectable_ids,
+        usage_user_id=usage_user_id,
     )
 
     if selection.get("status") != "done":
@@ -8052,7 +8117,14 @@ def apply_chatgpt_final_product_selection(ingredient, candidates, full_address="
     return sorted(candidates, key=lambda item: item.get("score", 0), reverse=True)
 
 
-def choose_best_product_with_chatgpt(ingredient, candidates, full_address="", quantity_context=None, selectable_ids=None):
+def choose_best_product_with_chatgpt(
+    ingredient,
+    candidates,
+    full_address="",
+    quantity_context=None,
+    selectable_ids=None,
+    usage_user_id=None,
+):
     client = get_product_analysis_client()
 
     if not client:
@@ -8093,6 +8165,12 @@ def choose_best_product_with_chatgpt(ingredient, candidates, full_address="", qu
                 response_format={"type": "json_object"},
                 temperature=0,
             )
+        record_openai_usage(
+            response,
+            "final-product-selection",
+            model=PRODUCT_ANALYSIS_MODEL,
+            user_id=usage_user_id,
+        )
         data = json.loads(clean_json_response(response.choices[0].message.content))
     except Exception as exc:
         return {

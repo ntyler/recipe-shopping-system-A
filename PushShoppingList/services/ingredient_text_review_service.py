@@ -4,6 +4,7 @@ import re
 
 from openai import OpenAI
 
+from PushShoppingList.services.openai_usage_service import record_openai_usage
 from PushShoppingList.services.storage_service import active_user_id
 
 
@@ -162,6 +163,7 @@ def request_chatgpt_ingredient_reviews(candidates):
         response_format={"type": "json_object"},
         temperature=0,
     )
+    record_openai_usage(response, "ingredient-text-review", model=MODEL)
     data = json.loads(clean_json_response(response.choices[0].message.content))
     reviews = data.get("reviews", [])
     by_index = {}

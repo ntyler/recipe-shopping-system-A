@@ -136,15 +136,36 @@ def test_usage_dashboard_menu_opens_visible_account_panel():
     assert "app-section-divider recipe-entry-section-divider user-usage-dashboard-divider" in template
     assert "user-usage-dashboard-grid" in template
     assert "Personal Workspace" in template
-    assert "Usage and billing totals are not tracked yet." in template
+    assert "OpenAI API pay-as-you-go" in template
+    assert "Monthly Token Limit" in template
+    assert "This Month" in template
+    assert "Tokens Remaining" in template
+    assert "API Requests" in template
+    assert "Input Tokens" in template
+    assert "Output Tokens" in template
+    assert "Estimated Cost" in template
+    assert "Monthly Budget" in template
+    assert "Lifetime Tokens" in template
+    assert "Last API Use" in template
+    assert "No ChatGPT/OpenAI API tokens have been recorded yet." in template
+    assert "ChatGPT app or website subscription usage is not exposed to this local dashboard." in template
     assert ".user-usage-dashboard-panel" in css
     assert ".user-usage-dashboard-grid" in css
     assert ".user-usage-dashboard-card" in css
+    assert ".user-usage-dashboard-card-wide" in css
+    assert ".user-usage-meter" in css
     assert ".user-usage-dashboard-note" in css
     assert "function toggleUsageDashboardPanel(open = null)" in script
     assert "[data-usage-dashboard-panel]" in script
     assert 'panel.scrollIntoView({ behavior: "smooth", block: "start" })' in script
     assert "[data-usage-dashboard-panel]" in firebase_script
+
+
+def test_usage_dashboard_receives_openai_usage_summary_from_route():
+    route = (ROOT / "PushShoppingList/routes/main_routes.py").read_text(encoding="utf-8")
+
+    assert "openai_usage_dashboard_for_user" in route
+    assert "openai_usage_dashboard=openai_usage_dashboard_for_user(active_public_user)" in route
 
 
 def test_mobile_account_dates_stack_left_aligned():

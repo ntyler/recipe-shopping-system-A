@@ -48,6 +48,20 @@ Required for recipe extraction and AI sorting:
 $env:OPENAI_API_KEY="your_openai_api_key_here"
 ```
 
+Optional OpenAI API usage dashboard settings:
+
+```powershell
+$env:SHOPPING_APP_OPENAI_PLAN_LABEL="Personal Workspace"
+$env:SHOPPING_APP_OPENAI_SUBSCRIPTION_LABEL="OpenAI API pay-as-you-go"
+$env:SHOPPING_APP_OPENAI_MONTHLY_TOKEN_LIMIT="1000000"
+$env:SHOPPING_APP_OPENAI_MONTHLY_BUDGET_USD="25"
+$env:SHOPPING_APP_OPENAI_INPUT_COST_PER_1M_TOKENS="0.15"
+$env:SHOPPING_APP_OPENAI_OUTPUT_COST_PER_1M_TOKENS="0.60"
+$env:SHOPPING_APP_OPENAI_USAGE_RECORD_LIMIT="2000"
+```
+
+The Usage Dashboard records token usage returned by this app's OpenAI API responses. It cannot show ChatGPT app or website subscription usage, because that usage is separate from this local app dashboard.
+
 Optional ntfy topic for phone/computer extraction notifications:
 
 ```powershell
@@ -231,7 +245,7 @@ Account Menu groups and items:
   - `Account Settings`: edit first name, last name, username, email, and uploaded logo/avatar.
   - `Account Notices`: opens recent and historical admin-support account access notices when the account has them.
 - `Usage & Billing`
-  - `Usage Dashboard`: opens a support-safe account usage summary panel. Usage and billing totals are not tracked yet, but the panel is ready for future limits, subscription, and usage metrics.
+  - `Usage Dashboard`: opens OpenAI API usage and billing totals for this app, including plan/subscription labels, monthly token limit, requests, input/output/total tokens, estimated cost, budget, lifetime tokens, and last API use. The dashboard records tokens from this app's OpenAI API responses in per-user `openai_usage.json`; it does not expose ChatGPT app or website subscription usage.
 - `Security`
   - `Change Password`: sends the Firebase password reset/change flow for Firebase users.
   - `Verify Email` or `Email Verified`: verified accounts show a disabled `Email Verified` item instead of an action button.
@@ -595,6 +609,7 @@ Common files:
 - `store_settings.json`: store list and enabled stores
 - `extract_progress.json`: current extraction progress for the overlay
 - `product_choices.json`: saved product candidates, per-store picks, overall picked products, direct product links, embedded image placeholders, and ChatGPT prompt file references
+- `openai_usage.json`: per-user OpenAI API token usage recorded from this app's API responses for the Usage Dashboard
 - `product_results.json`: dedicated hybrid shopping results with agent-stage architecture, best products, alternatives, rejected products, rejection reasons, and scoring metadata
 - `product_progress.json`: current Grab Best Products progress overlay state
 - `raw/product_pages/*.html`: fully rendered Selenium grocery search pages saved for product-ranking review

@@ -421,6 +421,7 @@
              class="user-account-form user-usage-dashboard-panel"
              data-usage-dashboard-panel
              hidden>
+            {% set openai_usage = openai_usage_dashboard|default({}) %}
             <div class="app-section-divider recipe-entry-section-divider user-usage-dashboard-divider" aria-hidden="true"></div>
             <div class="user-push-panel-header user-usage-dashboard-header">
                 <h3>Usage Dashboard</h3>
@@ -434,49 +435,67 @@
             <div class="user-usage-dashboard-grid" aria-label="Usage dashboard summary">
                 <article class="user-usage-dashboard-card">
                     <span>Plan</span>
-                    <strong>Personal Workspace</strong>
+                    <strong>{{ openai_usage.plan_label or "Personal Workspace" }}</strong>
                 </article>
                 <article class="user-usage-dashboard-card">
-                    <span>Role</span>
-                    <strong>{{ current_user.role }}</strong>
+                    <span>Subscription</span>
+                    <strong>{{ openai_usage.subscription_label or "OpenAI API pay-as-you-go" }}</strong>
                 </article>
                 <article class="user-usage-dashboard-card">
-                    <span>Email</span>
-                    <strong>{{ current_user.email_verified_label }}</strong>
+                    <span>Monthly Token Limit</span>
+                    <strong>{{ openai_usage.monthly_token_limit_label or "Not set" }}</strong>
+                </article>
+                <article class="user-usage-dashboard-card user-usage-dashboard-card-wide">
+                    <span>This Month</span>
+                    <strong>{{ "{:,}".format(openai_usage.monthly_total_tokens|default(0)) }} tokens</strong>
+                    {% if openai_usage.limit_percent is defined and openai_usage.limit_percent is not none %}
+                        <div class="user-usage-meter" aria-label="Monthly token limit used">
+                            <span style="width: {{ openai_usage.limit_percent }}%"></span>
+                        </div>
+                        <small>{{ openai_usage.limit_percent }}% of monthly token limit used</small>
+                    {% else %}
+                        <small>No monthly token limit configured</small>
+                    {% endif %}
                 </article>
                 <article class="user-usage-dashboard-card">
-                    <span>Two-Factor</span>
-                    <strong>{% if current_user.two_factor_enabled %}Enabled{% else %}Disabled{% endif %}</strong>
+                    <span>Tokens Remaining</span>
+                    <strong>{{ openai_usage.monthly_tokens_remaining_label or "No limit set" }}</strong>
                 </article>
                 <article class="user-usage-dashboard-card">
-                    <span>Backup Codes</span>
-                    <strong>
-                        {% if current_user.two_factor_enabled %}
-                            {{ current_user.two_factor_backup_codes_remaining }} remaining
-                        {% else %}
-                            Not enabled
-                        {% endif %}
-                    </strong>
+                    <span>API Requests</span>
+                    <strong>{{ "{:,}".format(openai_usage.monthly_request_count|default(0)) }}</strong>
                 </article>
                 <article class="user-usage-dashboard-card">
-                    <span>Notifications</span>
-                    <strong>{% if current_user.notifications_enabled %}Enabled{% else %}Disabled{% endif %}</strong>
+                    <span>Input Tokens</span>
+                    <strong>{{ "{:,}".format(openai_usage.monthly_prompt_tokens|default(0)) }}</strong>
                 </article>
                 <article class="user-usage-dashboard-card">
-                    <span>Account Notices</span>
-                    <strong>{{ support_access_history|length }} total</strong>
+                    <span>Output Tokens</span>
+                    <strong>{{ "{:,}".format(openai_usage.monthly_completion_tokens|default(0)) }}</strong>
                 </article>
                 <article class="user-usage-dashboard-card">
-                    <span>Created</span>
-                    <strong>{{ current_user.created_at_label or current_user.created_at or "Unknown" }}</strong>
+                    <span>Estimated Cost</span>
+                    <strong>{{ openai_usage.monthly_estimated_cost_label or "Cost rates not set" }}</strong>
                 </article>
                 <article class="user-usage-dashboard-card">
-                    <span>Last Sign-In</span>
-                    <strong>{{ current_user.last_sign_in_at_label or current_user.last_sign_in_at or "Unknown" }}</strong>
+                    <span>Monthly Budget</span>
+                    <strong>{{ openai_usage.monthly_budget_label or "Not set" }}</strong>
+                </article>
+                <article class="user-usage-dashboard-card">
+                    <span>Lifetime Tokens</span>
+                    <strong>{{ "{:,}".format(openai_usage.lifetime_total_tokens|default(0)) }}</strong>
+                </article>
+                <article class="user-usage-dashboard-card">
+                    <span>Last API Use</span>
+                    <strong>{{ openai_usage.last_used_at_label or "Not recorded yet" }}</strong>
                 </article>
             </div>
             <p class="user-usage-dashboard-note">
-                Usage and billing totals are not tracked yet. This panel is ready for future limits, subscription, and usage metrics.
+                {% if openai_usage.has_usage %}
+                    {{ openai_usage.tracking_note }}
+                {% else %}
+                    No ChatGPT/OpenAI API tokens have been recorded yet. New API responses from this app will appear here when OpenAI returns token usage. ChatGPT app or website subscription usage is not exposed to this local dashboard.
+                {% endif %}
             </p>
         </div>
 

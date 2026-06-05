@@ -23,6 +23,7 @@ from bs4 import BeautifulSoup
 from openai import OpenAI
 
 from PushShoppingList.services import cloudflare_r2_storage
+from PushShoppingList.services.openai_usage_service import record_openai_usage
 from PushShoppingList.services.purchase_mapping_service import apply_purchase_mapping_to_ingredient
 from PushShoppingList.services.storage_service import scoped_extractor_data_path
 from PushShoppingList.services.storage_service import scoped_extractor_path
@@ -2378,6 +2379,11 @@ def send_audio_transcription_to_openai(audio_path):
             file=audio_file,
             response_format="text",
         )
+        record_openai_usage(
+            response,
+            "audio-transcription",
+            model=os.getenv("OPENAI_TRANSCRIPTION_MODEL", "whisper-1"),
+        )
 
     return str(response or "")
 
@@ -3557,6 +3563,7 @@ def send_video_recipe_pdf_prompt_to_openai(prompt_text):
         response_format={"type": "json_object"},
         temperature=0,
     )
+    record_openai_usage(response, "video-recipe-pdf-extraction", model=MODEL)
 
     return response.choices[0].message.content
 
@@ -4572,6 +4579,7 @@ def send_prompt_to_openai(prompt_text):
         response_format={"type": "json_object"},
         temperature=0,
     )
+    record_openai_usage(response, "recipe-text-extraction", model=MODEL)
 
     return response.choices[0].message.content
 
@@ -4603,6 +4611,7 @@ def send_image_prompt_to_openai(prompt_text, image_path, mime_type):
         response_format={"type": "json_object"},
         temperature=0,
     )
+    record_openai_usage(response, "recipe-image-extraction", model=MODEL)
 
     return response.choices[0].message.content
 
@@ -4635,6 +4644,7 @@ def send_file_prompt_to_openai(prompt_text, file_path, mime_type, filename):
         response_format={"type": "json_object"},
         temperature=0,
     )
+    record_openai_usage(response, "recipe-file-extraction", model=MODEL)
 
     return response.choices[0].message.content
 
