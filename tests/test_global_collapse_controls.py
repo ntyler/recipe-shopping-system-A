@@ -24,6 +24,24 @@ def test_shopping_list_has_global_collapse_controls():
     assert ".shopping-global-collapse-status" in css
     assert "@media (max-width: 650px)" in css
 
+    actions_start = css.index(".shopping-global-collapse-actions {")
+    actions_end = css.index(".shopping-global-collapse-btn {", actions_start)
+    actions_css = css[actions_start:actions_end]
+    assert "display: grid;" in actions_css
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in actions_css
+    assert "gap: 10px;" in actions_css
+
+    button_start = css.index(".shopping-global-collapse-btn {")
+    button_end = css.index(".shopping-global-collapse-btn.secondary", button_start)
+    button_css = css[button_start:button_end]
+    assert "width: 100%;" in button_css
+    assert "padding: 14px;" in button_css
+    assert "font-family: inherit;" in button_css
+    assert "font-size: 18px;" in button_css
+    assert "line-height: normal;" in button_css
+    assert "min-height: 44px;" not in button_css
+    assert "font-weight: 850;" not in button_css
+
 
 def test_global_collapse_action_targets_page_sections_and_nested_panels():
     script = read_text("PushShoppingList/static/js/app.js")

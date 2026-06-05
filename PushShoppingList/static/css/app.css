@@ -20,32 +20,39 @@ body {
         .shopping-global-collapse-controls {
             max-width: 900px;
             margin: -4px auto 18px;
+            padding: 0 22px;
             display: grid;
             justify-items: center;
             gap: 8px;
+            box-sizing: border-box;
         }
 
         .shopping-global-collapse-actions {
-            display: flex;
-            justify-content: center;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 10px;
-            flex-wrap: wrap;
             width: 100%;
         }
 
         .shopping-global-collapse-btn {
-            min-height: 44px;
-            min-width: 150px;
+            width: 100%;
+            height: 32px;
+            min-height: 32px;
+            min-width: 0;
             margin: 0;
-            padding: 10px 18px;
+            padding: 2px 12px;
             border: 1px solid #2f6fa8;
             border-radius: 8px;
             background: #155a95;
             color: #f7fbff;
-            font-size: 15px;
-            font-weight: 850;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 800;
+            line-height: 1.1;
+            text-align: center;
             cursor: pointer;
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+            box-sizing: border-box;
         }
 
         .shopping-global-collapse-btn.secondary {
@@ -81,12 +88,11 @@ body {
         @media (max-width: 650px) {
             .shopping-global-collapse-controls {
                 margin-top: 0;
-                padding: 0 4px;
+                padding: 0 16px;
             }
 
             .shopping-global-collapse-actions {
-                display: grid;
-                grid-template-columns: minmax(0, 1fr);
+                grid-template-columns: repeat(2, minmax(0, 1fr));
             }
 
             .shopping-global-collapse-btn {
@@ -924,7 +930,7 @@ body {
         }
 
         .store-options-sticky-toolbar .address-actions-grid {
-            grid-template-columns: minmax(0, 1fr);
+            grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
         body.store-addresses-hidden .store-location-details > .store-detail-line,
@@ -961,6 +967,7 @@ body {
         }
 
         .store-options-toolbar-search {
+            grid-column: 1 / -1;
             width: 100%;
             min-width: 0;
             max-width: none;

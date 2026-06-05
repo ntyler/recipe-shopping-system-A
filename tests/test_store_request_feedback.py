@@ -56,17 +56,22 @@ def test_store_request_button_starts_feedback_workflow():
     assert "Store selector/location URL:" in script
 
 
-def test_store_request_button_is_directly_under_find_nearest_stores():
+def test_store_request_button_sits_next_to_find_nearest_stores():
     store_template = open(
         "PushShoppingList/templates/sections/store_options.html",
         encoding="utf-8",
     ).read()
+    css = open("PushShoppingList/static/css/app.css", encoding="utf-8").read()
 
     find_index = store_template.index("Find Nearest Stores")
     request_index = store_template.index("Request Store")
     search_index = store_template.index("Search stores by name")
 
     assert find_index < request_index < search_index
+    assert ".store-options-sticky-toolbar .address-actions-grid" in css
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in css
+    assert ".store-options-toolbar-search" in css
+    assert "grid-column: 1 / -1;" in css
 
 
 def test_feedback_support_header_counts_current_user_requests(monkeypatch, tmp_path):
