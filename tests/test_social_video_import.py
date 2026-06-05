@@ -138,3 +138,36 @@ def test_social_video_import_uses_audio_and_images_when_text_only_extraction_fin
     assert "Audio transcript" in calls["prompt"]
     assert "jackfruit" in calls["prompt"]
     assert calls["image_urls"]
+
+
+def test_youtube_audio_download_uses_android_player_client_by_default(monkeypatch):
+    monkeypatch.delenv("YTDLP_YOUTUBE_PLAYER_CLIENTS", raising=False)
+
+    options = recipe_extract_service.build_ytdlp_options(
+        "https://www.youtube.com/shorts/Xao87NNSfiM",
+        download=True,
+    )
+
+    assert options["extractor_args"]["youtube"]["player_client"] == ["android"]
+
+
+def test_youtube_player_client_can_be_configured(monkeypatch):
+    monkeypatch.setenv("YTDLP_YOUTUBE_PLAYER_CLIENTS", "android,web")
+
+    options = recipe_extract_service.build_ytdlp_options(
+        "https://www.youtube.com/shorts/Xao87NNSfiM",
+        download=True,
+    )
+
+    assert options["extractor_args"]["youtube"]["player_client"] == ["android", "web"]
+
+
+def test_youtube_player_client_can_be_disabled(monkeypatch):
+    monkeypatch.setenv("YTDLP_YOUTUBE_PLAYER_CLIENTS", "off")
+
+    options = recipe_extract_service.build_ytdlp_options(
+        "https://www.youtube.com/shorts/Xao87NNSfiM",
+        download=True,
+    )
+
+    assert "extractor_args" not in options

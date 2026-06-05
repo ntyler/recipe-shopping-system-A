@@ -54,6 +54,7 @@ MAX_SOCIAL_VIDEO_PROMPT_CHARS = 12000
 MAX_VIDEO_TRANSCRIPTION_SECONDS = int(os.getenv("MAX_VIDEO_TRANSCRIPTION_SECONDS", "180"))
 MAX_VIDEO_AUDIO_BYTES = int(os.getenv("MAX_VIDEO_AUDIO_BYTES", str(24 * 1024 * 1024)))
 MAX_SOCIAL_VIDEO_IMAGE_URLS = int(os.getenv("MAX_SOCIAL_VIDEO_IMAGE_URLS", "4"))
+DEFAULT_YOUTUBE_AUDIO_PLAYER_CLIENTS = ("android",)
 OPENAI_FILE_INPUT_MIME_TYPES = {
     "application/pdf",
 }
@@ -2248,6 +2249,7 @@ def build_ytdlp_options(recipe_url, download=False):
     }
     cookie_file = os.getenv("YTDLP_COOKIES_FILE")
     cookies_from_browser = os.getenv("YTDLP_COOKIES_FROM_BROWSER")
+    youtube_player_clients = ytdlp_youtube_player_clients(recipe_url, download=download)
 
     if cookie_file:
         options["cookiefile"] = cookie_file
@@ -2259,6 +2261,13 @@ def build_ytdlp_options(recipe_url, download=False):
             if part.strip()
         )
 
+    if youtube_player_clients:
+        options["extractor_args"] = {
+            "youtube": {
+                "player_client": youtube_player_clients,
+            }
+        }
+
     if download:
         options.update({
             "format": "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
@@ -2266,6 +2275,32 @@ def build_ytdlp_options(recipe_url, download=False):
         })
 
     return options
+
+
+def ytdlp_youtube_player_clients(recipe_url, download=False):
+    if not is_youtube_url(recipe_url):
+        return []
+
+    configured_clients = os.getenv("YTDLP_YOUTUBE_PLAYER_CLIENTS")
+    if configured_clients is not None:
+        configured_clients = configured_clients.strip()
+        if configured_clients.lower() in {"", "none", "off", "disabled"}:
+            return []
+        return [
+            client.strip()
+            for client in configured_clients.split(",")
+            if client.strip()
+        ]
+
+    if download:
+        return list(DEFAULT_YOUTUBE_AUDIO_PLAYER_CLIENTS)
+
+    return []
+
+
+def is_youtube_url(recipe_url):
+    host = urlparse(recipe_url or "").netloc.lower()
+    return "youtube.com" in host or "youtu.be" in host
 
 
 def build_ytdlp_page_text(recipe_url, info):
