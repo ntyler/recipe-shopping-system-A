@@ -22,15 +22,18 @@ from PushShoppingList.services.feedback_service import feedback_dashboard_for_us
 from PushShoppingList.services.cookbook_service import cookbook_view
 from PushShoppingList.services.cookbook_service import create_cookbook
 from PushShoppingList.services.cookbook_service import cookbook_recipes_for_urls
+from PushShoppingList.services.cookbook_service import CookbookCategoryOverwriteConflict
 from PushShoppingList.services.cookbook_service import CookbookRecipeConflict
 from PushShoppingList.services.cookbook_service import delete_cookbook
 from PushShoppingList.services.cookbook_service import ensure_unclassified_cookbook_for_recipes
 from PushShoppingList.services.cookbook_service import move_recipes_to_cookbook
+from PushShoppingList.services.cookbook_service import prepare_cookbook_menu_view
 from PushShoppingList.services.cookbook_service import recipe_ingredients_for_record
 from PushShoppingList.services.cookbook_service import recipe_cookbook_assignments
 from PushShoppingList.services.cookbook_service import remove_recipe_from_cookbook
 from PushShoppingList.services.cookbook_service import rename_cookbook
 from PushShoppingList.services.cookbook_service import reorder_cookbooks
+from PushShoppingList.services.cookbook_service import update_cookbook_recipe_categories
 from PushShoppingList.services.home_address_service import load_home_address
 from PushShoppingList.services.home_address_service import load_home_address_history
 from PushShoppingList.services.home_address_service import save_home_address
@@ -285,6 +288,10 @@ def recipe_view_rows(recipe_urls):
             "source_display_url": recipe_source_display_url(recipe["url"]),
             "pdf_public_url": recipe_pdf_public_url(recipe["url"]),
             "cover_image": cover_image,
+            "description": recipe_description_for_view(recipe_data),
+            "prep_time": recipe_data.get("prep_time", ""),
+            "cook_time": recipe_data.get("cook_time", ""),
+            "total_time": recipe_data.get("total_time", ""),
             "quantity": recipe_quantity,
             "scaling_options": recipe_log_scaling_options(recipe_data, recipe_quantity),
             "archive_pdf_available": recipe_archive_pdf_exists(recipe["url"]),
@@ -312,6 +319,18 @@ def recipe_view_nutrition_summary(nutrition):
         "serving_basis": clean_display_text(nutrition.get("serving_basis")),
         "calories": clean_display_text(nutrition.get("calories")),
     }
+
+
+def recipe_description_for_view(recipe_data):
+    if not isinstance(recipe_data, dict):
+        return ""
+
+    for key in ("description", "summary", "recipe_description", "excerpt"):
+        value = clean_display_text(recipe_data.get(key))
+        if value:
+            return value
+
+    return ""
 
 
 def recipe_rating_for_view(recipe_data):
@@ -364,6 +383,10 @@ def recipe_url_log_rows(recipe_urls, cookbook_assignments=None):
             "source_display_url": recipe_source_display_url(recipe["url"]),
             "pdf_public_url": recipe_pdf_public_url(recipe["url"]),
             "cover_image": recipe_cover_image_for_view(recipe["url"], recipe_data, recipe_meta),
+            "description": recipe_description_for_view(recipe_data),
+            "prep_time": recipe_data.get("prep_time", ""),
+            "cook_time": recipe_data.get("cook_time", ""),
+            "total_time": recipe_data.get("total_time", ""),
             "food_rule_status": recipe_food_rule_status(recipe_data),
             "rating": recipe_rating_for_view(recipe_data),
             "rating_stars": recipe_rating_stars_for_view(recipe_data),
@@ -467,6 +490,10 @@ def cookbook_view_for_render(recipe_rows):
             recipe["source_href"] = recipe.get("source_href") or recipe_source_href(recipe_url)
             recipe["source_display_url"] = recipe.get("source_display_url") or recipe_source_display_url(recipe_url)
             recipe["quantity"] = recipe_quantity
+            recipe["description"] = recipe.get("description") or recipe_description_for_view(recipe_data)
+            recipe["prep_time"] = recipe.get("prep_time") or recipe_data.get("prep_time", "")
+            recipe["cook_time"] = recipe.get("cook_time") or recipe_data.get("cook_time", "")
+            recipe["total_time"] = recipe.get("total_time") or recipe_data.get("total_time", "")
             recipe["scaling_options"] = recipe_log_scaling_options(recipe_data, recipe_quantity)
             recipe["food_rule_status"] = recipe_food_rule_status(recipe_data)
             recipe["rating"] = recipe_rating_for_view(recipe_data)
@@ -486,7 +513,7 @@ def cookbook_view_for_render(recipe_rows):
     for recipe in view.get("recipes", []):
         recipe["cover_image"] = cookbook_cover_image_for_view(recipe)
 
-    return view
+    return prepare_cookbook_menu_view(view)
 
 
 def recipe_log_scaling_options(recipe_data, selected_multiplier):
@@ -1547,6 +1574,39 @@ def remove_cookbook_recipe_route():
             request.form.get("cookbook_id", ""),
             request.form.get("recipe_url", ""),
         )
+    except ValueError as err:
+        return jsonify({"ok": False, "error": str(err)}), 400
+
+    return jsonify({"ok": True})
+
+
+@main_bp.route("/api/cookbooks/<cookbook_id>/recipe_categories", methods=["POST"])
+def update_cookbook_recipe_categories_route(cookbook_id):
+    categories = {
+        "meal_type": request.form.get("meal_type", ""),
+        "cuisine": request.form.get("cuisine", ""),
+        "main_ingredient": request.form.get("main_ingredient", ""),
+        "cooking_method": request.form.get("cooking_method", ""),
+        "occasion": request.form.get("occasion", ""),
+        "dietary_preference": request.form.get("dietary_preference", ""),
+        "prep_time_group": request.form.get("prep_time_group", ""),
+        "custom_categories": request.form.get("custom_categories", ""),
+    }
+
+    try:
+        update_cookbook_recipe_categories(
+            cookbook_id,
+            request.form.get("recipe_url", ""),
+            categories,
+            confirm_overwrite=request.form.get("confirm_overwrite") == "1",
+        )
+    except CookbookCategoryOverwriteConflict as err:
+        return jsonify({
+            "ok": False,
+            "error": str(err),
+            "conflict": "cookbook_category_overwrite",
+            "recipe_name": err.recipe_name,
+        }), 409
     except ValueError as err:
         return jsonify({"ok": False, "error": str(err)}), 400
 

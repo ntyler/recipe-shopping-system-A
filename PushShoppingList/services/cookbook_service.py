@@ -1,6 +1,8 @@
 import json
 import re
 import threading
+from datetime import datetime
+from datetime import timezone
 from pathlib import Path
 
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
@@ -10,6 +12,182 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 COOKBOOKS_FILE = scoped_package_path("cookbooks.json")
 COOKBOOKS_LOCK = threading.RLock()
 UNCLASSIFIED_COOKBOOK_NAME = "unclassified"
+COOKBOOK_CATEGORY_FIELDS = (
+    "meal_type",
+    "cuisine",
+    "main_ingredient",
+    "cooking_method",
+    "occasion",
+    "dietary_preference",
+    "prep_time_group",
+)
+
+COOKBOOK_MENU_MODES = (
+    {
+        "key": "restaurant_menu",
+        "label": "🍽️ Restaurant Menu",
+        "section_field": "restaurant_menu_category",
+        "sections": (
+            "🥖 Starters",
+            "🥗 Salads",
+            "🥣 Soups",
+            "🍝 Pasta",
+            "🐔 Chicken Entrees",
+            "🥩 Beef Entrees",
+            "🐟 Seafood",
+            "🥬 Vegetarian",
+            "🍚 Sides",
+            "🍰 Desserts",
+            "🍹 Drinks",
+        ),
+        "fallback": "🍽️ Other Recipes",
+    },
+    {
+        "key": "cuisine",
+        "label": "🌎 Cuisine",
+        "section_field": "cuisine",
+        "sections": (
+            "🇺🇸 American",
+            "🇲🇽 Mexican",
+            "🇮🇹 Italian",
+            "🇯🇵 Japanese",
+            "🇹🇭 Thai",
+            "🇨🇳 Chinese",
+            "🇮🇳 Indian",
+            "🇫🇷 French",
+            "🌍 Other / Fusion",
+        ),
+        "fallback": "🌍 Other / Fusion",
+    },
+    {
+        "key": "main_ingredient",
+        "label": "🥩 Main Ingredient",
+        "section_field": "main_ingredient",
+        "sections": (
+            "🐔 Chicken",
+            "🥩 Beef",
+            "🐷 Pork",
+            "🐟 Seafood",
+            "🥚 Eggs",
+            "🫘 Beans",
+            "🥬 Vegetarian",
+            "🌱 Vegan",
+            "🍝 Pasta",
+            "🍚 Rice / Grains",
+            "🥔 Potatoes",
+            "🧀 Cheese",
+        ),
+        "fallback": "🍽️ Other",
+    },
+    {
+        "key": "meal_type",
+        "label": "🍳 Meal Type",
+        "section_field": "meal_type",
+        "sections": (
+            "🍳 Breakfast",
+            "🥪 Lunch",
+            "🍽️ Dinner",
+            "🥗 Side Dish",
+            "🍰 Dessert",
+            "🍹 Drink",
+            "🥣 Soup",
+            "🍱 Meal Prep",
+            "🍿 Snack",
+        ),
+        "fallback": "🍽️ Dinner",
+    },
+    {
+        "key": "cooking_method",
+        "label": "🔥 Cooking Method",
+        "section_field": "cooking_method",
+        "sections": (
+            "🔥 Grilled",
+            "🍳 Skillet",
+            "🥘 One Pot",
+            "🍲 Slow Cooker",
+            "♨️ Oven Baked",
+            "🥗 No Cook",
+            "🧊 Make Ahead",
+            "⚡ Quick Meal",
+        ),
+        "fallback": "🍽️ Other",
+    },
+    {
+        "key": "occasion",
+        "label": "🎉 Occasion",
+        "section_field": "occasion",
+        "sections": (
+            "❤️ Date Night",
+            "👨‍👩‍👧 Family Dinner",
+            "🎉 Party Food",
+            "🏈 Game Day",
+            "🎄 Holiday",
+            "☀️ Summer",
+            "❄️ Winter",
+            "🧺 Potluck",
+        ),
+        "fallback": "🍽️ Everyday",
+    },
+    {
+        "key": "dietary_preference",
+        "label": "🥗 Dietary Preference",
+        "section_field": "dietary_preference",
+        "sections": (
+            "🥩 High Protein",
+            "🥗 Low Carb",
+            "🌱 Vegetarian",
+            "🌾 Gluten Free",
+            "🥛 Dairy Free",
+            "🧂 Low Sodium",
+            "🔥 Spicy",
+            "🍬 Low Sugar",
+        ),
+        "fallback": "🍽️ Flexible",
+    },
+    {
+        "key": "prep_time",
+        "label": "⏱️ Prep Time",
+        "section_field": "prep_time_group",
+        "sections": (
+            "⚡ Under 15 Minutes",
+            "⏱️ 15–30 Minutes",
+            "🕐 30–60 Minutes",
+            "⏳ Over 1 Hour",
+            "🧊 Make Ahead",
+        ),
+        "fallback": "⏱️ Time Not Set",
+    },
+    {
+        "key": "alphabetical",
+        "label": "🔤 Alphabetical",
+        "section_field": "alphabetical_group",
+        "sections": tuple(chr(value) for value in range(ord("A"), ord("Z") + 1)),
+        "fallback": "#",
+    },
+    {
+        "key": "custom_categories",
+        "label": "⭐ Custom Categories",
+        "section_field": "custom_categories",
+        "sections": (
+            "⭐ Sophia’s Favorites",
+            "🛒 Tyler’s Meal Prep",
+            "🧪 Things We Want To Try",
+            "☀️ Summer BBQ",
+            "🍽️ Weeknight Dinners",
+        ),
+        "fallback": "⭐ Uncategorized",
+    },
+)
+
+COOKBOOK_CATEGORY_CHOICES = {
+    "meal_type": next(mode["sections"] for mode in COOKBOOK_MENU_MODES if mode["key"] == "meal_type"),
+    "cuisine": next(mode["sections"] for mode in COOKBOOK_MENU_MODES if mode["key"] == "cuisine"),
+    "main_ingredient": next(mode["sections"] for mode in COOKBOOK_MENU_MODES if mode["key"] == "main_ingredient"),
+    "cooking_method": next(mode["sections"] for mode in COOKBOOK_MENU_MODES if mode["key"] == "cooking_method"),
+    "occasion": next(mode["sections"] for mode in COOKBOOK_MENU_MODES if mode["key"] == "occasion"),
+    "dietary_preference": next(mode["sections"] for mode in COOKBOOK_MENU_MODES if mode["key"] == "dietary_preference"),
+    "prep_time_group": next(mode["sections"] for mode in COOKBOOK_MENU_MODES if mode["key"] == "prep_time"),
+}
 
 
 class CookbookRecipeConflict(ValueError):
@@ -18,6 +196,16 @@ class CookbookRecipeConflict(ValueError):
         count = len(conflicts)
         recipe_label = "recipe" if count == 1 else "recipes"
         super().__init__(f"{count} selected {recipe_label} already exists in this cookbook.")
+
+
+class CookbookCategoryOverwriteConflict(ValueError):
+    def __init__(self, recipe_name):
+        self.recipe_name = recipe_name
+        super().__init__("This recipe already has saved cookbook categories. Confirm before replacing them.")
+
+
+def now_iso():
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def normalize_text(value):
@@ -150,6 +338,10 @@ def clean_recipe_record(value):
         "source_href": source_href,
         "source_display_url": source_display_url,
         "quantity": quantity,
+        "description": clean_text(value.get("description")),
+        "prep_time": clean_text(value.get("prep_time")),
+        "cook_time": clean_text(value.get("cook_time")),
+        "total_time": clean_text(value.get("total_time")),
         "rating": clean_recipe_rating(value.get("rating")),
         "archive_pdf_available": bool(value.get("archive_pdf_available")),
         "base_servings": clean_text(value.get("base_servings")),
@@ -157,7 +349,13 @@ def clean_recipe_record(value):
         "equipment_items": clean_text_list(value.get("equipment_items")),
         "instruction_items": clean_text_list(value.get("instruction_items")),
         "sections": clean_recipe_sections(value.get("sections")),
+        "custom_categories": clean_text_list(value.get("custom_categories")),
+        "category_metadata_user_set": bool(value.get("category_metadata_user_set")),
     }
+
+    for field in COOKBOOK_CATEGORY_FIELDS:
+        record[field] = clean_text(value.get(field))
+
     cover_image = clean_cover_image(value.get("cover_image"))
 
     if cover_image:
@@ -203,6 +401,456 @@ def recipe_ingredients_for_record(recipe):
                 seen.add(ingredient_key)
 
     return ingredients
+
+
+def normalized_label_key(value):
+    return re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).strip()
+
+
+def category_choice_label(field, value):
+    text = clean_text(value)
+
+    if not text:
+        return ""
+
+    text_key = normalized_label_key(text)
+    for choice in COOKBOOK_CATEGORY_CHOICES.get(field, ()):
+        if normalized_label_key(choice) == text_key:
+            return choice
+
+    return text
+
+
+def clean_category_payload(payload):
+    payload = payload if isinstance(payload, dict) else {}
+    cleaned = {
+        field: category_choice_label(field, payload.get(field))
+        for field in COOKBOOK_CATEGORY_FIELDS
+    }
+    cleaned["custom_categories"] = clean_text_list(payload.get("custom_categories"))
+    return cleaned
+
+
+def stored_category_metadata(recipe):
+    recipe = recipe if isinstance(recipe, dict) else {}
+    metadata = {
+        field: category_choice_label(field, recipe.get(field))
+        for field in COOKBOOK_CATEGORY_FIELDS
+    }
+    metadata["custom_categories"] = clean_text_list(recipe.get("custom_categories"))
+    return metadata
+
+
+def category_metadata_has_values(metadata):
+    return any(metadata.get(field) for field in COOKBOOK_CATEGORY_FIELDS) or bool(metadata.get("custom_categories"))
+
+
+def category_metadata_changed(left, right):
+    left = left if isinstance(left, dict) else {}
+    right = right if isinstance(right, dict) else {}
+
+    for field in COOKBOOK_CATEGORY_FIELDS:
+        if clean_text(left.get(field)) != clean_text(right.get(field)):
+            return True
+
+    return clean_text_list(left.get("custom_categories")) != clean_text_list(right.get("custom_categories"))
+
+
+def recipe_text_for_inference(recipe):
+    parts = [
+        recipe.get("name"),
+        recipe.get("description"),
+        recipe.get("prep_time"),
+        recipe.get("cook_time"),
+        recipe.get("total_time"),
+    ]
+    parts.extend(recipe.get("equipment_items") or [])
+    parts.extend(recipe.get("instruction_items") or [])
+    parts.extend(recipe_ingredients_for_record(recipe))
+    return normalize_text(" ".join(clean_text(part) for part in parts if clean_text(part)))
+
+
+def text_has_any(text, *terms):
+    return any(term in text for term in terms)
+
+
+def duration_minutes(value):
+    text = normalize_text(value)
+
+    if not text:
+        return None
+
+    minutes = 0.0
+    matched = False
+
+    for number, unit in re.findall(r"(\d+(?:\.\d+)?)\s*(hours?|hrs?|hr|h|minutes?|mins?|min|m)\b", text):
+        amount = float(number)
+        matched = True
+        if unit.startswith("h"):
+            minutes += amount * 60
+        else:
+            minutes += amount
+
+    if matched:
+        return int(round(minutes))
+
+    if re.fullmatch(r"\d+(?:\.\d+)?", text):
+        return int(round(float(text)))
+
+    return None
+
+
+def infer_prep_time_group(recipe, text):
+    if text_has_any(text, "make ahead", "overnight", "freezer"):
+        return "🧊 Make Ahead"
+
+    minutes = duration_minutes(recipe.get("prep_time")) or duration_minutes(recipe.get("total_time"))
+
+    if minutes is None:
+        title_match = re.search(r"\b(\d{1,3})\s*(?:minute|min)\b", text)
+        minutes = int(title_match.group(1)) if title_match else None
+
+    if minutes is None:
+        return ""
+    if minutes < 15:
+        return "⚡ Under 15 Minutes"
+    if minutes <= 30:
+        return "⏱️ 15–30 Minutes"
+    if minutes <= 60:
+        return "🕐 30–60 Minutes"
+    return "⏳ Over 1 Hour"
+
+
+def infer_recipe_categories(recipe):
+    text = recipe_text_for_inference(recipe)
+    metadata = {
+        "meal_type": "",
+        "cuisine": "",
+        "main_ingredient": "",
+        "cooking_method": "",
+        "occasion": "",
+        "dietary_preference": "",
+        "prep_time_group": "",
+    }
+
+    if text_has_any(text, "margarita", "cocktail", "latte", "smoothie", "lemonade", "drink", "beverage"):
+        metadata["meal_type"] = "🍹 Drink"
+    elif text_has_any(text, "cake", "cookie", "brownie", "pie", "cobbler", "muffin", "chocolate", "dessert", "ice cream"):
+        metadata["meal_type"] = "🍰 Dessert"
+    elif text_has_any(text, "soup", "stew", "chowder", "bisque"):
+        metadata["meal_type"] = "🥣 Soup"
+    elif text_has_any(text, "breakfast", "pancake", "waffle", "omelet", "frittata", "scramble"):
+        metadata["meal_type"] = "🍳 Breakfast"
+    elif text_has_any(text, "sandwich", "wrap", "panini"):
+        metadata["meal_type"] = "🥪 Lunch"
+    elif text_has_any(text, "side dish", "side", "potatoes", "rice pilaf"):
+        metadata["meal_type"] = "🥗 Side Dish"
+    elif text_has_any(text, "meal prep", "meal-prep", "bowl"):
+        metadata["meal_type"] = "🍱 Meal Prep"
+    elif text_has_any(text, "snack", "pretzel", "popcorn", "dip"):
+        metadata["meal_type"] = "🍿 Snack"
+    else:
+        metadata["meal_type"] = "🍽️ Dinner"
+
+    if text_has_any(text, "taco", "burrito", "enchilada", "fajita", "salsa", "queso", "margarita", "carnitas", "verde", "tortilla"):
+        metadata["cuisine"] = "🇲🇽 Mexican"
+    elif text_has_any(text, "alfredo", "pasta", "ravioli", "lasagna", "spaghetti", "pizza", "parmesan", "risotto", "pesto"):
+        metadata["cuisine"] = "🇮🇹 Italian"
+    elif text_has_any(text, "sushi", "ramen", "teriyaki", "miso", "udon"):
+        metadata["cuisine"] = "🇯🇵 Japanese"
+    elif text_has_any(text, "thai", "pad thai", "coconut curry", "thai basil"):
+        metadata["cuisine"] = "🇹🇭 Thai"
+    elif text_has_any(text, "stir fry", "lo mein", "fried rice", "dumpling", "kung pao"):
+        metadata["cuisine"] = "🇨🇳 Chinese"
+    elif text_has_any(text, "tikka", "masala", "dal", "naan", "paneer", "garam", "vindaloo"):
+        metadata["cuisine"] = "🇮🇳 Indian"
+    elif text_has_any(text, "quiche", "ratatouille", "crepe", "souffle", "croissant", "coq au vin"):
+        metadata["cuisine"] = "🇫🇷 French"
+    elif text_has_any(text, "burger", "chili", "bbq", "barbecue", "meatloaf", "casserole", "mac and cheese", "pancake", "muffin"):
+        metadata["cuisine"] = "🇺🇸 American"
+    else:
+        metadata["cuisine"] = "🌍 Other / Fusion"
+
+    if text_has_any(text, "vegan", "tofu", "tempeh"):
+        metadata["main_ingredient"] = "🌱 Vegan"
+    elif text_has_any(text, "chicken", "turkey"):
+        metadata["main_ingredient"] = "🐔 Chicken"
+    elif text_has_any(text, "beef", "steak", "ground beef", "short rib", "brisket"):
+        metadata["main_ingredient"] = "🥩 Beef"
+    elif text_has_any(text, "pork", "bacon", "ham", "sausage", "prosciutto"):
+        metadata["main_ingredient"] = "🐷 Pork"
+    elif text_has_any(text, "fish", "salmon", "tuna", "shrimp", "crab", "cod", "seafood", "lobster"):
+        metadata["main_ingredient"] = "🐟 Seafood"
+    elif text_has_any(text, "egg", "eggs", "omelet", "frittata"):
+        metadata["main_ingredient"] = "🥚 Eggs"
+    elif text_has_any(text, "bean", "beans", "lentil", "chickpea", "black bean"):
+        metadata["main_ingredient"] = "🫘 Beans"
+    elif text_has_any(text, "pasta", "spaghetti", "ravioli", "lasagna", "noodle", "macaroni"):
+        metadata["main_ingredient"] = "🍝 Pasta"
+    elif text_has_any(text, "rice", "quinoa", "grain", "farro", "barley"):
+        metadata["main_ingredient"] = "🍚 Rice / Grains"
+    elif text_has_any(text, "potato", "potatoes", "sweet potato"):
+        metadata["main_ingredient"] = "🥔 Potatoes"
+    elif text_has_any(text, "cheese", "ricotta", "mozzarella", "cheddar", "parmesan"):
+        metadata["main_ingredient"] = "🧀 Cheese"
+    elif text_has_any(text, "vegetarian", "vegetable", "spinach", "mushroom", "salad"):
+        metadata["main_ingredient"] = "🥬 Vegetarian"
+
+    if text_has_any(text, "grill", "grilled", "bbq", "barbecue"):
+        metadata["cooking_method"] = "🔥 Grilled"
+    elif text_has_any(text, "skillet", "pan fry", "pan-fry", "saute", "sauté"):
+        metadata["cooking_method"] = "🍳 Skillet"
+    elif text_has_any(text, "one pot", "one-pot", "dutch oven"):
+        metadata["cooking_method"] = "🥘 One Pot"
+    elif text_has_any(text, "slow cooker", "crockpot", "crock pot"):
+        metadata["cooking_method"] = "🍲 Slow Cooker"
+    elif text_has_any(text, "baked", "bake", "oven", "roast", "casserole"):
+        metadata["cooking_method"] = "♨️ Oven Baked"
+    elif metadata["meal_type"] == "🍹 Drink" or text_has_any(text, "no cook", "no-cook", "salad"):
+        metadata["cooking_method"] = "🥗 No Cook"
+    elif text_has_any(text, "make ahead", "overnight", "freezer"):
+        metadata["cooking_method"] = "🧊 Make Ahead"
+    elif text_has_any(text, "quick", "easy") or (duration_minutes(recipe.get("total_time")) or 999) <= 30:
+        metadata["cooking_method"] = "⚡ Quick Meal"
+
+    if text_has_any(text, "date night", "steak", "lobster", "alfredo"):
+        metadata["occasion"] = "❤️ Date Night"
+    elif text_has_any(text, "party", "appetizer", "sliders", "dip"):
+        metadata["occasion"] = "🎉 Party Food"
+    elif text_has_any(text, "game day", "wings", "nachos", "buffalo", "chili"):
+        metadata["occasion"] = "🏈 Game Day"
+    elif text_has_any(text, "holiday", "christmas", "thanksgiving", "easter"):
+        metadata["occasion"] = "🎄 Holiday"
+    elif text_has_any(text, "summer", "bbq", "barbecue", "grilled"):
+        metadata["occasion"] = "☀️ Summer"
+    elif text_has_any(text, "winter", "soup", "stew", "chili"):
+        metadata["occasion"] = "❄️ Winter"
+    elif text_has_any(text, "potluck", "casserole", "pasta salad"):
+        metadata["occasion"] = "🧺 Potluck"
+    elif metadata["meal_type"] == "🍽️ Dinner":
+        metadata["occasion"] = "👨‍👩‍👧 Family Dinner"
+
+    if metadata["main_ingredient"] in {"🐔 Chicken", "🥩 Beef", "🐷 Pork", "🐟 Seafood", "🥚 Eggs"} or "protein" in text:
+        metadata["dietary_preference"] = "🥩 High Protein"
+    if text_has_any(text, "low carb", "keto") or (metadata["meal_type"] == "🥗 Side Dish" and "salad" in text):
+        metadata["dietary_preference"] = "🥗 Low Carb"
+    if metadata["main_ingredient"] == "🌱 Vegan" or "vegan" in text:
+        metadata["dietary_preference"] = "🌱 Vegetarian"
+    elif metadata["main_ingredient"] == "🥬 Vegetarian" or "vegetarian" in text:
+        metadata["dietary_preference"] = "🌱 Vegetarian"
+    if text_has_any(text, "gluten free", "gluten-free"):
+        metadata["dietary_preference"] = "🌾 Gluten Free"
+    if text_has_any(text, "dairy free", "dairy-free"):
+        metadata["dietary_preference"] = "🥛 Dairy Free"
+    if text_has_any(text, "low sodium", "low-sodium"):
+        metadata["dietary_preference"] = "🧂 Low Sodium"
+    if text_has_any(text, "spicy", "jalapeno", "jalapeño", "buffalo", "hot sauce"):
+        metadata["dietary_preference"] = "🔥 Spicy"
+    if text_has_any(text, "low sugar", "low-sugar", "sugar free", "sugar-free"):
+        metadata["dietary_preference"] = "🍬 Low Sugar"
+
+    metadata["prep_time_group"] = infer_prep_time_group(recipe, text)
+    metadata["restaurant_menu_category"] = infer_restaurant_menu_category(metadata, text)
+    metadata["alphabetical_group"] = infer_alphabetical_group(recipe.get("name"))
+    return metadata
+
+
+def infer_restaurant_menu_category(metadata, text):
+    meal_type = metadata.get("meal_type")
+    main = metadata.get("main_ingredient")
+
+    if meal_type == "🍹 Drink":
+        return "🍹 Drinks"
+    if meal_type == "🍰 Dessert":
+        return "🍰 Desserts"
+    if text_has_any(text, "starter", "appetizer", "dip", "snack", "pretzel"):
+        return "🥖 Starters"
+    if text_has_any(text, "salad"):
+        return "🥗 Salads"
+    if meal_type == "🥣 Soup":
+        return "🥣 Soups"
+    if main == "🍝 Pasta" or text_has_any(text, "pasta", "alfredo", "ravioli", "lasagna", "spaghetti"):
+        return "🍝 Pasta"
+    if main == "🐔 Chicken":
+        return "🐔 Chicken Entrees"
+    if main == "🥩 Beef":
+        return "🥩 Beef Entrees"
+    if main == "🐟 Seafood":
+        return "🐟 Seafood"
+    if main in {"🥬 Vegetarian", "🌱 Vegan"}:
+        return "🥬 Vegetarian"
+    if meal_type == "🥗 Side Dish":
+        return "🍚 Sides"
+    return ""
+
+
+def infer_alphabetical_group(name):
+    match = re.search(r"[A-Za-z]", str(name or ""))
+    return match.group(0).upper() if match else "#"
+
+
+def recipe_short_description(recipe):
+    description = clean_text(recipe.get("description"))
+
+    if description:
+        return description
+
+    ingredients = recipe_ingredients_for_record(recipe)[:3]
+    if ingredients:
+        return f"Featuring {', '.join(ingredients)}."
+
+    instructions = clean_text(" ".join(recipe.get("instruction_items") or []))
+    if instructions:
+        return instructions[:137].rstrip() + ("..." if len(instructions) > 137 else "")
+
+    return ""
+
+
+def apply_recipe_menu_metadata(recipe):
+    if not isinstance(recipe, dict):
+        return recipe
+
+    stored = stored_category_metadata(recipe)
+    manual = bool(recipe.get("category_metadata_user_set")) or category_metadata_has_values(stored)
+    inferred = infer_recipe_categories(recipe)
+
+    for field in COOKBOOK_CATEGORY_FIELDS:
+        recipe[field] = stored.get(field) or inferred.get(field, "")
+
+    recipe["custom_categories"] = stored.get("custom_categories") or []
+    recipe["restaurant_menu_category"] = inferred.get("restaurant_menu_category", "")
+    recipe["alphabetical_group"] = inferred.get("alphabetical_group", "#")
+    recipe["category_metadata_user_set"] = manual
+    recipe["category_metadata_source"] = "Saved" if manual else "Inferred"
+    recipe["short_description"] = recipe_short_description(recipe)
+    recipe["menu_tags"] = recipe_menu_tags(recipe)
+    recipe["menu_search_text"] = recipe_menu_search_text(recipe)
+    return recipe
+
+
+def recipe_menu_tags(recipe):
+    tags = []
+    seen = set()
+
+    for field in ("meal_type", "cuisine", "main_ingredient", "cooking_method", "dietary_preference", "prep_time_group"):
+        value = clean_text(recipe.get(field))
+        key = normalize_text(value)
+        if value and key not in seen:
+            tags.append(value)
+            seen.add(key)
+
+    for category in clean_text_list(recipe.get("custom_categories")):
+        key = normalize_text(category)
+        if key not in seen:
+            tags.append(category)
+            seen.add(key)
+
+    return tags
+
+
+def recipe_menu_search_text(recipe):
+    parts = [
+        recipe.get("name"),
+        recipe.get("short_description"),
+        recipe.get("meal_type"),
+        recipe.get("cuisine"),
+        recipe.get("main_ingredient"),
+        recipe.get("cooking_method"),
+        recipe.get("occasion"),
+        recipe.get("dietary_preference"),
+        recipe.get("prep_time_group"),
+        recipe.get("restaurant_menu_category"),
+    ]
+    parts.extend(recipe.get("custom_categories") or [])
+    parts.extend(recipe_ingredients_for_record(recipe))
+    return normalize_text(" ".join(clean_text(part) for part in parts if clean_text(part)))
+
+
+def cookbook_menu_sort_options():
+    return [
+        {
+            "key": mode["key"],
+            "label": mode["label"],
+        }
+        for mode in COOKBOOK_MENU_MODES
+    ]
+
+
+def cookbook_category_choices():
+    return {
+        field: list(choices)
+        for field, choices in COOKBOOK_CATEGORY_CHOICES.items()
+    }
+
+
+def recipe_section_labels_for_mode(recipe, mode):
+    field = mode.get("section_field", "")
+
+    if mode.get("key") == "custom_categories":
+        return clean_text_list(recipe.get("custom_categories")) or [mode.get("fallback")]
+
+    value = clean_text(recipe.get(field))
+    return [value or mode.get("fallback")]
+
+
+def cookbook_menu_sections(recipes):
+    sections_by_mode = {}
+
+    for mode in COOKBOOK_MENU_MODES:
+        ordered_labels = list(mode.get("sections") or [])
+        section_recipes = {label: [] for label in ordered_labels}
+        fallback = mode.get("fallback")
+
+        if fallback and fallback not in section_recipes:
+            section_recipes[fallback] = []
+
+        for recipe in recipes or []:
+            for label in recipe_section_labels_for_mode(recipe, mode):
+                label = clean_text(label) or fallback
+
+                if not label:
+                    continue
+
+                if label not in section_recipes:
+                    section_recipes[label] = []
+                    ordered_labels.append(label)
+
+                section_recipes[label].append(recipe)
+
+        labels = [
+            label
+            for label in ordered_labels
+            if label in section_recipes
+        ]
+        if fallback and fallback in section_recipes and fallback not in labels:
+            labels.append(fallback)
+
+        sections_by_mode[mode["key"]] = [
+            {
+                "label": label,
+                "recipes": section_recipes.get(label, []),
+            }
+            for label in labels
+        ]
+
+    return sections_by_mode
+
+
+def prepare_cookbook_menu_view(view):
+    view = view if isinstance(view, dict) else {}
+    view["menu_sort_options"] = cookbook_menu_sort_options()
+    view["category_choices"] = cookbook_category_choices()
+
+    for cookbook in view.get("cookbooks", []):
+        for recipe in cookbook.get("recipes", []):
+            apply_recipe_menu_metadata(recipe)
+
+        cookbook["menu_sections"] = cookbook_menu_sections(cookbook.get("recipes", []))
+
+    for recipe in view.get("recipes", []):
+        apply_recipe_menu_metadata(recipe)
+
+    return view
 
 
 def normalize_cookbooks_payload(payload):
@@ -659,6 +1307,49 @@ def remove_recipe_from_cookbook(cookbook_id, recipe_url):
         return save_cookbooks(payload)
 
 
+def update_cookbook_recipe_categories(cookbook_id, recipe_url, categories, confirm_overwrite=False):
+    target_key = recipe_key(recipe_url)
+
+    if not target_key:
+        raise ValueError("Recipe is required.")
+
+    cleaned_categories = clean_category_payload(categories)
+
+    with COOKBOOKS_LOCK:
+        payload = load_cookbooks()
+        target = find_cookbook(payload, cookbook_id)
+
+        if target is None:
+            raise ValueError("Cookbook was not found.")
+
+        recipe = None
+        for candidate in target.get("recipes", []):
+            if recipe_key(candidate.get("url")) == target_key:
+                recipe = candidate
+                break
+
+        if recipe is None:
+            raise ValueError("Recipe was not found in this cookbook.")
+
+        existing_metadata = stored_category_metadata(recipe)
+        has_manual_metadata = bool(recipe.get("category_metadata_user_set")) or category_metadata_has_values(existing_metadata)
+
+        if (
+            has_manual_metadata
+            and category_metadata_changed(existing_metadata, cleaned_categories)
+            and not confirm_overwrite
+        ):
+            raise CookbookCategoryOverwriteConflict(recipe.get("name") or recipe_url)
+
+        for field in COOKBOOK_CATEGORY_FIELDS:
+            recipe[field] = cleaned_categories.get(field, "")
+
+        recipe["custom_categories"] = cleaned_categories.get("custom_categories", [])
+        recipe["category_metadata_user_set"] = category_metadata_has_values(cleaned_categories)
+        recipe["category_metadata_updated_at"] = now_iso() if recipe["category_metadata_user_set"] else ""
+        return save_cookbooks(payload)
+
+
 def purge_recipe_from_all_cookbooks(recipe_url):
     target_key = recipe_key(recipe_url)
 
@@ -781,7 +1472,9 @@ def cookbook_view(recipe_rows):
             "assigned": bool(cookbook_name),
         })
 
-    return {
+    view = {
         "cookbooks": view_cookbooks,
         "recipes": recipes,
     }
+
+    return prepare_cookbook_menu_view(view)

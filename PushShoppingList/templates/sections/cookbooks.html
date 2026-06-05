@@ -38,6 +38,23 @@
                 </div>
             </form>
 
+            <div class="cookbook-menu-heading" data-cookbook-menu-heading>
+                <div>
+                    <h3>📖 Cookbook Menu</h3>
+                    <p>Browse your cookbook like a restaurant menu.</p>
+                </div>
+                <label class="cookbook-menu-mode-control" for="cookbookMenuModeSelect">
+                    <span>Sort Cookbook By</span>
+                    <select id="cookbookMenuModeSelect"
+                            data-cookbook-menu-mode-select
+                            aria-label="Sort Cookbook By">
+                        {% for option in cookbook_view.menu_sort_options %}
+                            <option value="{{ option.key }}">{{ option.label }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+            </div>
+
         </div>
 
         <div id="cookbookStatus" class="cookbook-status" aria-live="polite"></div>
@@ -49,9 +66,9 @@
                         <input id="cookbookRecipeSearchInput"
                                class="cookbook-recipe-search"
                                type="search"
-                               placeholder="Search recipes by name"
+                               placeholder="Search recipes, ingredients, cuisine, meal type, custom category"
                                autocomplete="off"
-                               aria-label="Search cookbook recipes by name"
+                               aria-label="Search cookbook recipes"
                                data-cookbook-recipe-search>
                     </div>
                     <form id="restoreCookbookRecipesForm"
@@ -134,6 +151,110 @@
 
                                 <div class="cookbook-card-body" data-cookbook-body>
                                     {% if cookbook.recipes %}
+                                        <div class="cookbook-menu-browser"
+                                             data-cookbook-menu-browser
+                                             data-cookbook-id="{{ cookbook.id }}">
+                                            {% for option in cookbook_view.menu_sort_options %}
+                                                <div class="cookbook-menu-view"
+                                                     data-cookbook-menu-view="{{ option.key }}"
+                                                     {% if not loop.first %}hidden{% endif %}>
+                                                    {% for section in cookbook.menu_sections[option.key] %}
+                                                        <details class="cookbook-menu-section"
+                                                                 data-cookbook-menu-section
+                                                                 open>
+                                                            <summary>
+                                                                <span>{{ section.label }}</span>
+                                                                <small>{{ section.recipes | length }} recipe{% if section.recipes | length != 1 %}s{% endif %}</small>
+                                                            </summary>
+                                                            {% if section.recipes %}
+                                                                <div class="cookbook-menu-recipe-grid">
+                                                                    {% for recipe in section.recipes %}
+                                                                        <article class="cookbook-menu-recipe-card{% if recipe.cover_image and recipe.cover_image.src %} cookbook-menu-recipe-card-with-image{% endif %}"
+                                                                                 data-cookbook-menu-recipe
+                                                                                 data-cookbook-id="{{ cookbook.id }}"
+                                                                                 data-recipe-url="{{ recipe.url }}"
+                                                                                 data-cookbook-recipe-name="{{ recipe.name }}"
+                                                                                 data-cookbook-search-text="{{ recipe.menu_search_text }}"
+                                                                                 data-cookbook-category-user-set="{% if recipe.category_metadata_user_set %}1{% else %}0{% endif %}">
+                                                                            {% if recipe.cover_image and recipe.cover_image.src %}
+                                                                                <img class="recipe-cover-image cookbook-menu-recipe-image"
+                                                                                     src="{{ recipe.cover_image.src }}"
+                                                                                     alt="{{ recipe.cover_image.alt or recipe.name }}"
+                                                                                     loading="lazy">
+                                                                            {% endif %}
+                                                                            <div class="cookbook-menu-recipe-main">
+                                                                                <h4>{{ recipe.name }}</h4>
+                                                                                {% if recipe.short_description %}
+                                                                                    <p>{{ recipe.short_description }}</p>
+                                                                                {% endif %}
+                                                                                <div class="cookbook-menu-recipe-meta">
+                                                                                    {% if recipe.prep_time %}
+                                                                                        <span>Prep: {{ recipe.prep_time }}</span>
+                                                                                    {% endif %}
+                                                                                    {% if recipe.cook_time %}
+                                                                                        <span>Cook: {{ recipe.cook_time }}</span>
+                                                                                    {% endif %}
+                                                                                    {% if recipe.base_servings %}
+                                                                                        <span>Servings: {{ recipe.base_servings }}</span>
+                                                                                    {% endif %}
+                                                                                </div>
+                                                                                <div class="cookbook-menu-tags" aria-label="Recipe categories">
+                                                                                    {% for tag in recipe.menu_tags %}
+                                                                                        <span>{{ tag }}</span>
+                                                                                    {% endfor %}
+                                                                                </div>
+                                                                                <div class="cookbook-menu-recipe-actions">
+                                                                                    <button type="button"
+                                                                                            class="cookbook-menu-action"
+                                                                                            data-recipe-url="{{ recipe.url }}"
+                                                                                            onclick="openRecipeEditor(this); return false;">
+                                                                                        View Recipe
+                                                                                    </button>
+                                                                                    <button type="button"
+                                                                                            class="cookbook-menu-action secondary"
+                                                                                            data-recipe-url="{{ recipe.url }}"
+                                                                                            onclick="return restoreSingleCookbookRecipe(this)">
+                                                                                        Add Ingredients to Shopping List
+                                                                                    </button>
+                                                                                    <button type="button"
+                                                                                            class="cookbook-menu-action secondary"
+                                                                                            data-cookbook-id="{{ cookbook.id }}"
+                                                                                            data-recipe-url="{{ recipe.url }}"
+                                                                                            data-recipe-name="{{ recipe.name }}"
+                                                                                            data-category-meal-type="{{ recipe.meal_type }}"
+                                                                                            data-category-cuisine="{{ recipe.cuisine }}"
+                                                                                            data-category-main-ingredient="{{ recipe.main_ingredient }}"
+                                                                                            data-category-cooking-method="{{ recipe.cooking_method }}"
+                                                                                            data-category-occasion="{{ recipe.occasion }}"
+                                                                                            data-category-dietary-preference="{{ recipe.dietary_preference }}"
+                                                                                            data-category-prep-time-group="{{ recipe.prep_time_group }}"
+                                                                                            data-category-custom-categories="{{ recipe.custom_categories | join(', ') }}"
+                                                                                            data-category-user-set="{% if recipe.category_metadata_user_set %}1{% else %}0{% endif %}"
+                                                                                            onclick="return openCookbookCategoryEditor(this)">
+                                                                                        Edit Categories
+                                                                                    </button>
+                                                                                </div>
+                                                                                <small class="cookbook-menu-category-source">
+                                                                                    Categories: {{ recipe.category_metadata_source }}
+                                                                                </small>
+                                                                            </div>
+                                                                        </article>
+                                                                    {% endfor %}
+                                                                </div>
+                                                            {% endif %}
+                                                            <div class="cookbook-empty cookbook-menu-section-empty"
+                                                                 data-cookbook-menu-empty
+                                                                 {% if section.recipes %}hidden{% endif %}>
+                                                                No recipes found in this category yet.
+                                                            </div>
+                                                        </details>
+                                                    {% endfor %}
+                                                </div>
+                                            {% endfor %}
+                                        </div>
+
+                                        <details class="cookbook-organizer-details" data-cookbook-organizer-details>
+                                            <summary>Recipe Organizer</summary>
                                         <div class="cookbook-recipe-list"
                                              data-cookbook-recipe-list
                                              data-cookbook-id="{{ cookbook.id }}">
@@ -144,6 +265,7 @@
                                                          data-recipe-url="{{ recipe.url }}"
                                                          data-cookbook-recipe-name="{{ recipe.name }}"
                                                          data-cookbook-recipe-key="{{ cookbook.id }}|{{ recipe.url }}"
+                                                         data-cookbook-search-text="{{ recipe.menu_search_text }}"
                                                          draggable="true"
                                                          aria-grabbed="false">
                                                     <input type="checkbox"
@@ -340,6 +462,7 @@
                                             {% endfor %}
                                         </div>
                                         <div class="cookbook-empty cookbook-recipe-search-empty" data-cookbook-search-empty hidden>No matching recipes.</div>
+                                        </details>
                                     {% else %}
                                         <div class="cookbook-empty">Empty.</div>
                                     {% endif %}
@@ -387,6 +510,112 @@
                         Cancel
                     </button>
                     <button type="submit" class="cookbook-name-save-btn">Save Name</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="cookbookCategoryEditorModal"
+         class="cookbook-name-modal-backdrop cookbook-category-modal-backdrop"
+         aria-hidden="true"
+         onclick="if (event.target === this) closeCookbookCategoryEditor()">
+        <div class="cookbook-name-modal cookbook-category-modal" role="dialog" aria-modal="true" aria-labelledby="cookbookCategoryEditorTitle">
+            <div class="cookbook-name-modal-header">
+                <h2 id="cookbookCategoryEditorTitle">Edit Recipe Categories</h2>
+                <button type="button"
+                        class="cookbook-name-modal-close"
+                        onclick="closeCookbookCategoryEditor()"
+                        aria-label="Close recipe category editor">
+                    Close
+                </button>
+            </div>
+            <form id="cookbookCategoryEditorForm"
+                  action="/api/cookbooks"
+                  method="POST"
+                  onsubmit="return saveCookbookCategories(event)">
+                <input type="hidden" name="recipe_url" id="cookbookCategoryRecipeUrl">
+                <div class="cookbook-category-recipe-name" data-cookbook-category-recipe-name></div>
+                <div class="cookbook-category-grid">
+                    <label for="cookbookCategoryMealType">
+                        <span>Meal Type</span>
+                        <select id="cookbookCategoryMealType" name="meal_type">
+                            <option value="">Use inferred</option>
+                            {% for choice in cookbook_view.category_choices.meal_type %}
+                                <option value="{{ choice }}">{{ choice }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label for="cookbookCategoryCuisine">
+                        <span>Cuisine</span>
+                        <select id="cookbookCategoryCuisine" name="cuisine">
+                            <option value="">Use inferred</option>
+                            {% for choice in cookbook_view.category_choices.cuisine %}
+                                <option value="{{ choice }}">{{ choice }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label for="cookbookCategoryMainIngredient">
+                        <span>Main Ingredient</span>
+                        <select id="cookbookCategoryMainIngredient" name="main_ingredient">
+                            <option value="">Use inferred</option>
+                            {% for choice in cookbook_view.category_choices.main_ingredient %}
+                                <option value="{{ choice }}">{{ choice }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label for="cookbookCategoryCookingMethod">
+                        <span>Cooking Method</span>
+                        <select id="cookbookCategoryCookingMethod" name="cooking_method">
+                            <option value="">Use inferred</option>
+                            {% for choice in cookbook_view.category_choices.cooking_method %}
+                                <option value="{{ choice }}">{{ choice }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label for="cookbookCategoryOccasion">
+                        <span>Occasion</span>
+                        <select id="cookbookCategoryOccasion" name="occasion">
+                            <option value="">Use inferred</option>
+                            {% for choice in cookbook_view.category_choices.occasion %}
+                                <option value="{{ choice }}">{{ choice }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label for="cookbookCategoryDietaryPreference">
+                        <span>Dietary Preference</span>
+                        <select id="cookbookCategoryDietaryPreference" name="dietary_preference">
+                            <option value="">Use inferred</option>
+                            {% for choice in cookbook_view.category_choices.dietary_preference %}
+                                <option value="{{ choice }}">{{ choice }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label for="cookbookCategoryPrepTimeGroup">
+                        <span>Prep Time</span>
+                        <select id="cookbookCategoryPrepTimeGroup" name="prep_time_group">
+                            <option value="">Use inferred</option>
+                            {% for choice in cookbook_view.category_choices.prep_time_group %}
+                                <option value="{{ choice }}">{{ choice }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label class="cookbook-category-custom-field" for="cookbookCategoryCustomCategories">
+                        <span>Custom Categories</span>
+                        <input id="cookbookCategoryCustomCategories"
+                               type="text"
+                               name="custom_categories"
+                               placeholder="Sophia's Favorites, Weeknight Dinners"
+                               autocomplete="off">
+                    </label>
+                </div>
+                <div id="cookbookCategoryEditorStatus" class="cookbook-name-modal-status" aria-live="polite"></div>
+                <div class="cookbook-name-modal-actions">
+                    <button type="button"
+                            class="cookbook-name-cancel-btn"
+                            onclick="closeCookbookCategoryEditor()">
+                        Cancel
+                    </button>
+                    <button type="submit" class="cookbook-name-save-btn">Save Categories</button>
                 </div>
             </form>
         </div>
