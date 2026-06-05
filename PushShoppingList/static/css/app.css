@@ -5708,7 +5708,17 @@ body {
 
         .user-push-notifications-panel {
             margin-top: 12px;
+            padding: 0;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
             grid-template-columns: minmax(0, 1fr);
+        }
+
+        .user-push-notifications-divider {
+            width: 100%;
+            max-width: none;
+            margin: 4px 0 14px;
         }
 
         .user-feedback-support-panel {

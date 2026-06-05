@@ -232,15 +232,13 @@
                         <span class="sr-only">Account Menu</span>
                     </summary>
                     <div class="user-account-menu-panel" role="menu" aria-label="Account">
-                        <div class="user-account-menu-heading">Account</div>
-
                         <div class="user-account-menu-section">
-                            <div class="user-account-menu-section-title">Profile</div>
+                            <div class="user-account-menu-section-title">PROFILE</div>
                             <button type="button"
                                     class="user-account-menu-item"
                                     role="menuitem"
                                     onclick="return toggleUserProfileEditor()">
-                                Account Settings
+                                ⚙ Account Settings
                             </button>
                             {% if has_account_notices %}
                                 <button type="button"
@@ -248,34 +246,34 @@
                                         role="menuitem"
                                         aria-controls="accountNoticesPanel"
                                         onclick="return toggleAccountNoticesPanel()">
-                                    Account Notices
+                                    🔔 Account Notices
                                 </button>
                             {% endif %}
                         </div>
 
                         <div class="user-account-menu-section">
-                            <div class="user-account-menu-section-title">Security</div>
+                            <div class="user-account-menu-section-title">SECURITY</div>
                             {% if current_user.auth_provider == "firebase" %}
                                 <button type="button"
                                         class="user-account-menu-item"
                                         role="menuitem"
                                         data-firebase-change-password
                                         data-user-email="{{ current_user.email }}">
-                                    Change Password
+                                    🔒 Change Password
                                 </button>
                                 {% if current_user.email_verified %}
                                     <button type="button"
                                             class="user-account-menu-item user-account-menu-disabled"
                                             disabled
                                             aria-disabled="true">
-                                        Email Verified
+                                        ✅ Email Verified
                                     </button>
                                 {% else %}
                                     <button type="button"
                                             class="user-account-menu-item"
                                             role="menuitem"
                                             data-firebase-verify-email>
-                                        Verify Email
+                                        ✅ Verify Email
                                     </button>
                                 {% endif %}
                             {% else %}
@@ -283,7 +281,7 @@
                                         class="user-account-menu-item"
                                         role="menuitem"
                                         onclick="return toggleUserProfileEditor()">
-                                    Change Password
+                                    🔒 Change Password
                                 </button>
                             {% endif %}
                             <button type="button"
@@ -291,41 +289,30 @@
                                     role="menuitem"
                                     data-two-factor-open
                                     aria-controls="accountTwoFactorPanel">
-                                Two-Factor Authentication
+                                🛡 Two-Factor Authentication
                             </button>
                         </div>
 
                         <div class="user-account-menu-section">
-                            <div class="user-account-menu-section-title">Notifications</div>
+                            <div class="user-account-menu-section-title">COMMUNICATIONS</div>
                             <button type="button"
                                     class="user-account-menu-item"
                                     role="menuitem"
                                     data-push-notifications-open
                                     aria-controls="accountPushNotificationsPanel">
-                                Push Notifications
+                                📱 Push Notifications
                             </button>
-                        </div>
-
-                        <div class="user-account-menu-section">
-                            <div class="user-account-menu-section-title">Support</div>
                             <button type="button"
                                     class="user-account-menu-item"
                                     role="menuitem"
                                     aria-controls="feedbackSupportSection"
                                     onclick="return openFeedbackSupportSection()">
-                                Feedback &amp; Support
+                                💬 Feedback &amp; Support
                             </button>
                         </div>
 
                         <div class="user-account-menu-section">
-                            <div class="user-account-menu-section-title">Account</div>
-                            <button type="button"
-                                    class="user-account-menu-item user-account-menu-danger"
-                                    role="menuitem"
-                                    data-delete-account-open
-                                    aria-controls="accountDeletePanel">
-                                Delete Account
-                            </button>
+                            <div class="user-account-menu-section-title">SESSION</div>
                             <form id="firebaseSignOutForm"
                                   class="user-account-menu-form"
                                   data-firebase-sign-out-form
@@ -334,9 +321,20 @@
                                 <button type="submit"
                                         class="user-account-menu-item user-account-menu-danger"
                                         role="menuitem">
-                                    Sign Out
+                                    ↪ Sign Out
                                 </button>
                             </form>
+                        </div>
+
+                        <div class="user-account-menu-section">
+                            <div class="user-account-menu-section-title">DANGER ZONE</div>
+                            <button type="button"
+                                    class="user-account-menu-item user-account-menu-danger"
+                                    role="menuitem"
+                                    data-delete-account-open
+                                    aria-controls="accountDeletePanel">
+                                🗑 Delete Account
+                            </button>
                         </div>
                         <div class="user-account-menu-status"
                              data-account-menu-status
@@ -460,6 +458,7 @@
              data-push-notifications-panel
              data-notifications-enabled="{% if current_user.notifications_enabled %}1{% else %}0{% endif %}"
              hidden>
+            <div class="app-section-divider recipe-entry-section-divider user-push-notifications-divider" aria-hidden="true"></div>
             <div class="user-push-panel-header">
                 <h3>Push Notifications</h3>
                 <button type="button"

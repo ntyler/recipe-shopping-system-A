@@ -41,10 +41,24 @@ def test_account_menu_uses_compact_grouped_dropdown_style():
     assert 'role="menu"' in menu_markup
     assert 'role="menuitem"' in menu_markup
     assert 'class="sr-only">Account Menu</span>' in menu_markup
-    assert "user-account-menu-heading" in menu_markup
     assert "user-account-menu-trigger-icon" in menu_markup
-    for label in ("Profile", "Security", "Notifications", "Support", "Account"):
+    for label in ("PROFILE", "SECURITY", "COMMUNICATIONS", "SESSION", "DANGER ZONE"):
         assert f">{label}</div>" in menu_markup
+    for label in (
+        "⚙ Account Settings",
+        "🔔 Account Notices",
+        "🔒 Change Password",
+        "✅ Email Verified",
+        "🛡 Two-Factor Authentication",
+        "📱 Push Notifications",
+        "💬 Feedback &amp; Support",
+        "↪ Sign Out",
+        "🗑 Delete Account",
+    ):
+        assert label in menu_markup
+    assert menu_markup.index(">SESSION</div>") < menu_markup.index("↪ Sign Out")
+    assert menu_markup.index(">DANGER ZONE</div>") < menu_markup.index("🗑 Delete Account")
+    assert menu_markup.index("↪ Sign Out") < menu_markup.index("🗑 Delete Account")
     assert "user-account-menu-item" in menu_markup
     assert "user-account-menu-danger" in menu_markup
     assert 'class="secondary"' not in menu_markup
@@ -245,6 +259,22 @@ def test_feedback_support_tickets_are_compact_collapsible_portal_rows():
     assert "expandFeedbackTicketFromHash()" in script
     assert "bindFeedbackTickets();" in script
     assert "bindAccountMenuDropdowns();" in script
+
+
+def test_push_notifications_panel_uses_divider_without_outer_border():
+    template = (ROOT / "PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    assert "user-push-notifications-divider" in template
+    assert "app-section-divider recipe-entry-section-divider user-push-notifications-divider" in template
+    assert ".user-push-notifications-divider" in css
+
+    push_css_start = css.index(".user-push-notifications-panel {")
+    push_css_end = css.index(".user-push-notifications-divider", push_css_start)
+    push_css = css[push_css_start:push_css_end]
+    assert "padding: 0;" in push_css
+    assert "border: 0;" in push_css
+    assert "background: transparent;" in push_css
 
 
 def test_account_action_token_pages_stay_focused_and_visible():
