@@ -4613,11 +4613,17 @@ body {
             display: grid;
             gap: 10px;
             margin-bottom: 14px;
-            padding: 12px 14px;
-            border: 1px solid #7c5a16;
-            border-radius: 8px;
-            background: #211808;
+            padding: 0;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
             color: #f8eed2;
+        }
+
+        .user-account-notices-divider {
+            width: 100%;
+            max-width: none;
+            margin: 4px 0 14px;
         }
 
         .user-account-access-notices[hidden] {
@@ -5571,7 +5577,18 @@ body {
 
         .user-account-edit-form {
             margin-top: 12px;
+            padding: 0;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
             grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .user-account-settings-divider {
+            grid-column: 1 / -1;
+            width: 100%;
+            max-width: none;
+            margin: 4px 0 14px;
         }
 
         .user-account-edit-header {

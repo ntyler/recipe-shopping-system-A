@@ -69,9 +69,14 @@ def test_account_settings_editor_has_header_close_and_closes_menu():
     firebase_script = (ROOT / "PushShoppingList/static/js/firebase-auth.js").read_text(encoding="utf-8")
 
     assert '<h3>Account Settings</h3>' in template
+    assert "user-account-settings-divider" in template
+    assert "app-section-divider recipe-entry-section-divider user-account-settings-divider" in template
     assert "data-user-profile-close" in template
     assert "toggleUserProfileEditor(false)" in template
     assert ".user-account-edit-header" in css
+    assert ".user-account-settings-divider" in css
+    assert "border: 0;" in css
+    assert "background: transparent;" in css
     assert "function toggleUserProfileEditor(open = null)" in script
     assert "function scrollToUserAccountProfile(behavior = \"auto\")" in script
     assert "function scrollToUserAccountTop(behavior = \"auto\")" in script
@@ -126,6 +131,8 @@ def test_admin_support_view_is_admin_only_reasoned_and_audited():
     assert "Account Notices" in account_template
     assert 'id="accountNoticesPanel"' in account_template
     assert "data-account-notices-panel" in account_template
+    assert "user-account-notices-divider" in account_template
+    assert "app-section-divider recipe-entry-section-divider user-account-notices-divider" in account_template
     assert "onclick=\"return toggleAccountNoticesPanel()\"" in account_template
     assert "onclick=\"return toggleAccountNoticesPanel(false)\"" in account_template
     assert "Feedback &amp; Support" in account_template
@@ -138,6 +145,7 @@ def test_admin_support_view_is_admin_only_reasoned_and_audited():
     assert "notice.admin_email" not in account_template
     assert "entry.actorPrivateEmail" in support_template
     assert ".user-account-access-notices" in css
+    assert ".user-account-notices-divider" in css
     assert ".user-account-access-notices[hidden]" in css
     assert ".user-account-access-notices-actions" in css
     assert ".user-account-access-history-toggle" in css
@@ -156,6 +164,13 @@ def test_admin_support_view_is_admin_only_reasoned_and_audited():
     assert "password_hash" not in support_template
     assert "two_factor.secret" not in support_template
     assert ".admin-support-card" in css
+
+    notices_css_start = css.index(".user-account-access-notices {")
+    notices_css_end = css.index(".user-account-notices-divider", notices_css_start)
+    notices_css = css[notices_css_start:notices_css_end]
+    assert "padding: 0;" in notices_css
+    assert "border: 0;" in notices_css
+    assert "background: transparent;" in notices_css
 
 
 def test_feedback_support_follows_account_and_closes_to_profile():
