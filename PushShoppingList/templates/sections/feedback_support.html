@@ -17,6 +17,16 @@
          data-collapse-content="feedback-support"
          data-collapse-default="collapsed"
          data-collapse-mobile-default="collapsed">
+    <div class="user-push-panel-header feedback-support-panel-header">
+        <h3>Feedback &amp; Support</h3>
+        <button type="button"
+                class="secondary user-push-panel-close"
+                data-feedback-support-close
+                onclick="return closeFeedbackSupportSection()">
+            Close
+        </button>
+    </div>
+
     <div class="feedback-support-header">
         <p>
             Help us improve the shopping experience. Submit bugs, feature requests, product matching issues, recipe extraction problems, or general feedback.
@@ -120,5 +130,10 @@
             {% endif %}
         </section>
     {% endif %}
+    <footer class="feedback-support-footer">
+        <strong>Need additional help?</strong>
+        <a href="mailto:support@recipeshoppinglist.com">support@recipeshoppinglist.com</a>
+        <span>Average response time: &lt;24 hours</span>
+    </footer>
     </div>
 </section>

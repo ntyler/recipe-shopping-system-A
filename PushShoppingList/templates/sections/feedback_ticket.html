@@ -1,7 +1,7 @@
 <article id="feedback-{{ feedback.feedback_id }}" class="feedback-ticket{% if feedback.unread_notifications_count %} has-unread{% endif %}">
     <div class="feedback-ticket-top">
         <div>
-            <div class="feedback-ticket-id">#{{ feedback.feedback_id }}</div>
+            <div class="feedback-ticket-id">{{ feedback.display_feedback_id }}</div>
             <h4>{{ feedback.subject }}</h4>
             <div class="feedback-ticket-meta">
                 <span>{{ feedback.feedback_type }}</span>
@@ -14,6 +14,7 @@
                 <span class="feedback-unread-badge">Unread</span>
             {% endif %}
             <span class="feedback-status">{{ feedback.status }}</span>
+            <span class="feedback-priority feedback-priority-{{ feedback.priority_key }}">{{ feedback.priority }} Priority</span>
         </div>
     </div>
 
@@ -32,7 +33,8 @@
 
         {% if feedback.admin_notes %}
             <div class="feedback-admin-update">
-                <strong>Admin Update</strong>
+                <strong>Support Update</strong>
+                <small>From {{ feedback.support_public_email }}</small>
                 <span>{{ feedback.admin_notes }}</span>
             </div>
         {% endif %}
@@ -59,17 +61,53 @@
             </div>
         {% endif %}
 
+        {% if feedback.comments %}
+            <section class="feedback-comments" aria-label="Ticket comments">
+                <strong>Comments</strong>
+                <ol class="feedback-comment-list">
+                    {% for comment in feedback.comments %}
+                        <li class="feedback-comment feedback-comment-{{ comment.authorType }}">
+                            <div>
+                                <strong>{{ comment.author_type_label }}</strong>
+                                <small>{{ comment.display_created_at }} by {{ comment.display_author }}</small>
+                            </div>
+                            <p>{{ comment.commentText }}</p>
+                        </li>
+                    {% endfor %}
+                </ol>
+            </section>
+        {% endif %}
+
         <div class="feedback-timeline-wrap">
             <strong>Activity Timeline</strong>
             <ol class="feedback-timeline">
                 {% for event in feedback.timeline %}
                     <li>
-                        <span>{{ event.status }}</span>
-                        <small>{{ event.display_date }}</small>
+                        <span>{{ event.event }}</span>
+                        <small>
+                            {{ event.display_date }}
+                            {% if event.display_actor %} by {{ event.display_actor }}{% endif %}
+                        </small>
                     </li>
                 {% endfor %}
             </ol>
         </div>
+
+        <form class="feedback-comment-form"
+              method="POST"
+              action="{{ url_for('feedback_bp.add_feedback_comment_route', feedback_id=feedback.feedback_id) }}">
+            <label>
+                <span>Add Comment</span>
+                <textarea name="commentText" required></textarea>
+            </label>
+            <button type="submit" class="feedback-submit-btn">Reply to Support</button>
+        </form>
+
+        {% if feedback.can_reopen %}
+            <form method="POST" action="{{ url_for('feedback_bp.reopen_feedback_route', feedback_id=feedback.feedback_id) }}">
+                <button type="submit" class="feedback-secondary-btn">Reopen Ticket</button>
+            </form>
+        {% endif %}
 
         {% if feedback.unread_notifications_count %}
             <form method="POST" action="{{ url_for('feedback_bp.mark_feedback_read_route', feedback_id=feedback.feedback_id) }}">

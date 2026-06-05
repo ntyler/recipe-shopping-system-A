@@ -27,6 +27,7 @@
 
 <main id="appContent" class="app-content">
     {% include "sections/user_account.html" %}
+    {% include "sections/feedback_support.html" %}
     {% if admin_support_dashboard and admin_support_dashboard.is_admin %}
         <div class="app-section-divider" aria-hidden="true"></div>
         {% include "sections/admin_support.html" %}
@@ -46,7 +47,6 @@
     {% include "sections/store_options.html" %}
     {% include "sections/view_behavior.html" %}
     {% include "sections/items.html" %}
-    {% include "sections/feedback_support.html" %}
 </main>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

@@ -123,6 +123,28 @@ def test_admin_support_view_is_admin_only_reasoned_and_audited():
     assert ".admin-support-card" in css
 
 
+def test_feedback_support_follows_account_and_closes_to_profile():
+    index_template = (ROOT / "PushShoppingList/templates/index.html").read_text(encoding="utf-8")
+    feedback_template = (ROOT / "PushShoppingList/templates/sections/feedback_support.html").read_text(encoding="utf-8")
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    account_include = '{% include "sections/user_account.html" %}'
+    feedback_include = '{% include "sections/feedback_support.html" %}'
+    ai_pantry_include = '{% include "sections/ai_pantry.html" %}'
+
+    assert index_template.index(account_include) < index_template.index(feedback_include)
+    assert index_template.index(feedback_include) < index_template.index(ai_pantry_include)
+    assert index_template.count(feedback_include) == 1
+    assert "data-feedback-support-close" in feedback_template
+    assert "onclick=\"return closeFeedbackSupportSection()\"" in feedback_template
+    assert "user-push-panel-header feedback-support-panel-header" in feedback_template
+    assert "function closeFeedbackSupportSection()" in script
+    assert 'toggleCardCollapse("feedback-support")' in script
+    assert 'scrollToUserAccountProfile("auto")' in script
+    assert ".feedback-support-content" in css
+
+
 def test_account_action_token_pages_stay_focused_and_visible():
     index_template = (ROOT / "PushShoppingList/templates/index.html").read_text(encoding="utf-8")
     account_template = (ROOT / "PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")

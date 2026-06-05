@@ -1,4 +1,5 @@
 import re
+import json
 
 from flask import render_template
 from werkzeug.datastructures import MultiDict
@@ -132,3 +133,71 @@ def test_feedback_support_header_shows_zero_request_count_for_guest():
     assert "feedback-support-header-count" in html
     assert re.search(r"feedback-support-header-count\">\s*0\s*requests", html)
     assert "support@recipeshoppinglist.com" in html
+
+
+def test_feedback_ticket_portal_renders_public_support_identity(monkeypatch, tmp_path):
+    feedback_file = tmp_path / "feedback.json"
+    monkeypatch.setattr(feedback_service, "FEEDBACK_FILE", feedback_file)
+
+    user = {
+        "user_id": "user-1",
+        "username": "user@example.com",
+        "email": "user@example.com",
+    }
+    feedback_file.write_text(
+        json.dumps({
+            "feedback": [{
+                "feedback_id": "FB-1001",
+                "user": user,
+                "created_at": "2026-06-04T12:00:00Z",
+                "updated_at": "2026-06-04T13:00:00Z",
+                "feedback_type": "Bug Report",
+                "subject": "Button error",
+                "description": "Mark read fails.",
+                "attachments": [],
+                "status": "Resolved",
+                "admin_notes": "We found the issue.",
+                "resolution_notes": "A fix was shipped.",
+                "admin_attachments": [],
+                "timeline": [{
+                    "event": "Support Update Added",
+                    "status": "Investigating",
+                    "timestamp": "2026-06-04T13:00:00Z",
+                    "actor": "ntylerbert@gmail.com",
+                }],
+                "notifications": [{
+                    "notification_id": "notice-1",
+                    "user_id": "user-1",
+                    "message": "Your feedback FB-1001 was updated.",
+                    "created_at": "2026-06-04T13:00:00Z",
+                    "read_at": "",
+                }],
+                "comments": [{
+                    "commentText": "Can you try it again?",
+                    "authorUid": "admin-1",
+                    "authorEmail": "ntylerbert@gmail.com",
+                    "authorType": "support",
+                    "createdAt": "2026-06-04T13:01:00Z",
+                }],
+            }],
+        }),
+        encoding="utf-8",
+    )
+
+    app = create_app()
+    with app.test_request_context("/"):
+        feedback = feedback_service.feedback_dashboard_for_user(user)["my_feedback"][0]
+        html = render_template(
+            "sections/feedback_ticket.html",
+            current_user=user,
+            feedback=feedback,
+        )
+
+    assert "RSL-FB-1001" in html
+    assert "Support Update" in html
+    assert "Admin Update" not in html
+    assert "support@recipeshoppinglist.com" in html
+    assert "ntylerbert@gmail.com" not in html
+    assert "Normal Priority" in html
+    assert "Reply to Support" in html
+    assert "Reopen Ticket" in html

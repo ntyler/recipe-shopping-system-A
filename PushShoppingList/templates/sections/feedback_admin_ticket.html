@@ -1,7 +1,7 @@
 <article id="feedback-{{ feedback.feedback_id }}" class="feedback-ticket feedback-admin-ticket">
     <div class="feedback-ticket-top">
         <div>
-            <div class="feedback-ticket-id">#{{ feedback.feedback_id }}</div>
+            <div class="feedback-ticket-id">{{ feedback.display_feedback_id }}</div>
             <h4>{{ feedback.subject }}</h4>
             <div class="feedback-ticket-meta">
                 <span>{{ feedback.feedback_type }}</span>
@@ -10,11 +10,29 @@
                 <span>Submitted {{ feedback.display_created_at }}</span>
             </div>
         </div>
-        <span class="feedback-status">{{ feedback.status }}</span>
+        <div class="feedback-status-wrap">
+            <span class="feedback-status">{{ feedback.status }}</span>
+            <span class="feedback-priority feedback-priority-{{ feedback.priority_key }}">{{ feedback.priority }} Priority</span>
+        </div>
     </div>
 
     <div class="feedback-ticket-body">
         <div class="feedback-ticket-description">{{ feedback.description }}</div>
+
+        {% if feedback.admin_notes %}
+            <div class="feedback-admin-update">
+                <strong>Support Update</strong>
+                <small>Internal actor remains available in audit/admin views.</small>
+                <span>{{ feedback.admin_notes }}</span>
+            </div>
+        {% endif %}
+
+        {% if feedback.resolution_notes %}
+            <div class="feedback-resolution">
+                <strong>Resolution Notes</strong>
+                <span>{{ feedback.resolution_notes }}</span>
+            </div>
+        {% endif %}
 
         {% if feedback.attachments %}
             <div class="feedback-attachment-list">
@@ -26,13 +44,33 @@
             </div>
         {% endif %}
 
+        {% if feedback.comments %}
+            <section class="feedback-comments" aria-label="Ticket comments">
+                <strong>Comments</strong>
+                <ol class="feedback-comment-list">
+                    {% for comment in feedback.comments %}
+                        <li class="feedback-comment feedback-comment-{{ comment.authorType }}">
+                            <div>
+                                <strong>{{ comment.author_type_label }}</strong>
+                                <small>{{ comment.display_created_at }} by {{ comment.display_author }}</small>
+                            </div>
+                            <p>{{ comment.commentText }}</p>
+                        </li>
+                    {% endfor %}
+                </ol>
+            </section>
+        {% endif %}
+
         <div class="feedback-timeline-wrap">
             <strong>Activity Timeline</strong>
             <ol class="feedback-timeline">
                 {% for event in feedback.timeline %}
                     <li>
-                        <span>{{ event.status }}</span>
-                        <small>{{ event.display_date }}</small>
+                        <span>{{ event.event }}</span>
+                        <small>
+                            {{ event.display_date }}
+                            {% if event.display_actor %} by {{ event.display_actor }}{% endif %}
+                        </small>
                     </li>
                 {% endfor %}
             </ol>
@@ -51,7 +89,15 @@
                 </select>
             </label>
             <label>
-                <span>Admin Notes</span>
+                <span>Priority</span>
+                <select name="priority" required>
+                    {% for priority in feedback_dashboard.feedback_priorities %}
+                        <option value="{{ priority }}" {% if priority == feedback.priority %}selected{% endif %}>{{ priority }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>
+                <span>Support Update</span>
                 <textarea name="admin_notes">{{ feedback.admin_notes }}</textarea>
             </label>
             <label>
@@ -59,7 +105,11 @@
                 <textarea name="resolution_notes">{{ feedback.resolution_notes }}</textarea>
             </label>
             <label>
-                <span>Admin Attachment</span>
+                <span>Support Comment</span>
+                <textarea name="support_comment"></textarea>
+            </label>
+            <label>
+                <span>Support Attachment</span>
                 <input type="file"
                        name="admin_attachment"
                        accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,text/markdown,text/csv,.doc,.docx,.xls,.xlsx">

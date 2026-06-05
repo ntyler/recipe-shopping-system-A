@@ -4,8 +4,11 @@ from flask import request
 from flask import session
 from flask import url_for
 
+from PushShoppingList.services.feedback_service import add_feedback_comment
 from PushShoppingList.services.feedback_service import create_feedback
+from PushShoppingList.services.feedback_service import display_feedback_id
 from PushShoppingList.services.feedback_service import mark_feedback_notifications_read
+from PushShoppingList.services.feedback_service import reopen_feedback_ticket
 from PushShoppingList.services.feedback_service import update_feedback_as_admin
 from PushShoppingList.services.user_account_service import current_public_user
 
@@ -32,7 +35,7 @@ def submit_feedback_route():
         request.files,
     )
     message = (
-        f"Feedback {result.get('feedback_id')} submitted."
+        f"Feedback {display_feedback_id(result.get('feedback_id'))} submitted."
         if result.get("feedback_id")
         else "Feedback submitted."
     )
@@ -49,6 +52,27 @@ def update_feedback_admin_route(feedback_id):
         request.files,
     )
     flash_feedback_result(result, "Feedback updated.")
+    return redirect(url_for("main_bp.index", _anchor=f"feedback-{feedback_id}"))
+
+
+@feedback_bp.route("/feedback/<feedback_id>/comment", methods=["POST"])
+def add_feedback_comment_route(feedback_id):
+    result = add_feedback_comment(
+        current_public_user(),
+        feedback_id,
+        request.form.get("commentText"),
+    )
+    flash_feedback_result(result, "Reply sent to support.")
+    return redirect(url_for("main_bp.index", _anchor=f"feedback-{feedback_id}"))
+
+
+@feedback_bp.route("/feedback/<feedback_id>/reopen", methods=["POST"])
+def reopen_feedback_route(feedback_id):
+    result = reopen_feedback_ticket(
+        current_public_user(),
+        feedback_id,
+    )
+    flash_feedback_result(result, "Ticket reopened.")
     return redirect(url_for("main_bp.index", _anchor=f"feedback-{feedback_id}"))
 
 

@@ -15830,6 +15830,11 @@ body {
     max-width: 980px;
 }
 
+.feedback-support-content {
+    display: grid;
+    gap: 18px;
+}
+
 .feedback-support-header {
     display: grid;
     gap: 8px;
@@ -15908,7 +15913,8 @@ body {
 
 .feedback-form,
 .feedback-ticket,
-.feedback-admin-form {
+.feedback-admin-form,
+.feedback-comment-form {
     display: grid;
     gap: 14px;
 }
@@ -15929,14 +15935,16 @@ body {
 }
 
 .feedback-form label,
-.feedback-admin-form label {
+.feedback-admin-form label,
+.feedback-comment-form label {
     display: grid;
     gap: 6px;
     min-width: 0;
 }
 
 .feedback-form label span,
-.feedback-admin-form label span {
+.feedback-admin-form label span,
+.feedback-comment-form label span {
     color: #d4d0c8;
     font-size: 12px;
     font-weight: 900;
@@ -15949,7 +15957,8 @@ body {
 .feedback-form textarea,
 .feedback-admin-form input,
 .feedback-admin-form select,
-.feedback-admin-form textarea {
+.feedback-admin-form textarea,
+.feedback-comment-form textarea {
     width: 100%;
     min-width: 0;
     box-sizing: border-box;
@@ -15969,15 +15978,15 @@ body {
 }
 
 .feedback-form textarea,
-.feedback-admin-form textarea {
+.feedback-admin-form textarea,
+.feedback-comment-form textarea {
     min-height: 120px;
     height: 120px;
     resize: vertical;
 }
 
 .feedback-form-wide,
-.feedback-admin-form label:nth-child(2),
-.feedback-admin-form label:nth-child(3) {
+.feedback-admin-form label:nth-child(n + 3) {
     grid-column: 1 / -1;
 }
 
@@ -16033,7 +16042,8 @@ body {
 .feedback-unread-total,
 .feedback-admin-count,
 .feedback-unread-badge,
-.feedback-status {
+.feedback-status,
+.feedback-priority {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -16056,6 +16066,30 @@ body {
     border: 1px solid #245b8e;
     background: #0d253d;
     color: #dceeff;
+}
+
+.feedback-priority {
+    border: 1px solid #475569;
+    background: #1f2933;
+    color: #e2e8f0;
+}
+
+.feedback-priority-low {
+    border-color: #3f6212;
+    background: #17230b;
+    color: #bef264;
+}
+
+.feedback-priority-high {
+    border-color: #b45309;
+    background: #351f08;
+    color: #fed7aa;
+}
+
+.feedback-priority-critical {
+    border-color: #b91c1c;
+    background: #3b1111;
+    color: #fecaca;
 }
 
 .feedback-ticket-list {
@@ -16114,7 +16148,9 @@ body {
 .feedback-ticket-description,
 .feedback-notification-update,
 .feedback-admin-update,
-.feedback-resolution {
+.feedback-resolution,
+.feedback-comments,
+.feedback-comment-form {
     display: grid;
     gap: 5px;
     padding: 12px;
@@ -16136,9 +16172,18 @@ body {
     border-left: 3px solid #00d084;
 }
 
+.feedback-comments {
+    border-left: 3px solid #a78bfa;
+}
+
+.feedback-comment-form {
+    border: 1px solid #2d4157;
+}
+
 .feedback-notification-update strong,
 .feedback-admin-update strong,
 .feedback-resolution strong,
+.feedback-comments > strong,
 .feedback-timeline-wrap strong {
     color: #d4d0c8;
     font-size: 12px;
@@ -16148,8 +16193,51 @@ body {
 }
 
 .feedback-notification-update small,
-.feedback-admin-update small {
+.feedback-admin-update small,
+.feedback-comment small {
     color: #aeb7c2;
+}
+
+.feedback-comment-list {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.feedback-comment {
+    display: grid;
+    gap: 6px;
+    padding: 10px;
+    border: 1px solid #2d4157;
+    border-radius: 8px;
+    background: #0f161d;
+}
+
+.feedback-comment-support {
+    border-color: #1e80c9;
+    background: #0b1828;
+}
+
+.feedback-comment-user {
+    border-color: #6d5fa8;
+    background: #151425;
+}
+
+.feedback-comment div {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.feedback-comment p {
+    margin: 0;
+    color: #e6edf3;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
 }
 
 .feedback-attachment-list {
@@ -16207,6 +16295,29 @@ body {
 .feedback-timeline small {
     color: #b8c2cc;
     font-weight: 700;
+}
+
+.feedback-support-footer {
+    display: grid;
+    justify-items: center;
+    gap: 5px;
+    padding: 14px;
+    border: 1px solid #2d4157;
+    border-radius: 8px;
+    background: #101822;
+    color: #e5edf5;
+    text-align: center;
+    font-weight: 900;
+}
+
+.feedback-support-footer a {
+    color: #93c5fd;
+    overflow-wrap: anywhere;
+}
+
+.feedback-support-footer span {
+    color: #cbd5e1;
+    font-size: 12px;
 }
 
 .admin-feedback-section,

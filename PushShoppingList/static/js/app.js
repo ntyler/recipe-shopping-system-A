@@ -15233,6 +15233,20 @@ function openFeedbackSupportSection() {
     return false;
 }
 
+function closeFeedbackSupportSection() {
+    const content = document.querySelector('[data-collapse-content="feedback-support"]');
+
+    if (content && !content.classList.contains("collapsed")) {
+        toggleCardCollapse("feedback-support");
+    }
+
+    if (typeof scrollToUserAccountProfile === "function") {
+        scrollToUserAccountProfile("auto");
+    }
+
+    return false;
+}
+
 function openStoreRequestFeedback(button) {
     closeRecipeEditRowMenus();
 
