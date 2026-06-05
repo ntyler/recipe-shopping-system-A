@@ -13468,7 +13468,9 @@ body {
 }
 
 .recipe-edit-category-grid {
-    margin-top: 6px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px 24px;
+    margin-top: 16px;
 }
 
 .recipe-edit-category-custom-field {
@@ -14619,6 +14621,15 @@ body {
 
     .recipe-edit-grid {
         grid-template-columns: 1fr;
+    }
+
+    .recipe-edit-category-grid {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+
+    .recipe-edit-category-custom-field {
+        grid-column: auto;
     }
 
     .recipe-edit-pdf-actions {
@@ -16324,6 +16335,10 @@ body {
     }
 
     .recipe-edit-grid {
+        gap: 8px 10px;
+    }
+
+    .recipe-edit-category-grid {
         gap: 8px 10px;
     }
 
