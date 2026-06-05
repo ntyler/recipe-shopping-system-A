@@ -416,8 +416,9 @@ def openai_usage_dashboard_for_user(user=None):
     month_completion = sum_tokens(month_records, "completionTokens")
     month_total = sum_tokens(month_records, "totalTokens")
     lifetime_total = sum_tokens(records, "totalTokens")
-    estimated_month_cost = sum_cost(month_records, "estimatedCostUsd")
-    billable_month_cost = sum_cost(month_records, "billableCostUsd")
+    estimated_month_cost = sum_record_cost(month_records, "estimatedCostUsd")
+    billable_month_cost = sum_record_cost(month_records, "billableCostUsd")
+    unavailable_cost_label = "Pricing not configured" if month_records else "Not available yet"
     limit_remaining = monthly_limit - month_total if monthly_limit is not None else None
     budget_spend = billable_month_cost if billable_month_cost is not None else (estimated_month_cost or 0)
     budget_remaining = monthly_budget - budget_spend if monthly_budget is not None else None
@@ -442,9 +443,9 @@ def openai_usage_dashboard_for_user(user=None):
         "monthly_total_tokens": month_total,
         "monthly_request_count": len(month_records),
         "monthly_estimated_cost": estimated_month_cost,
-        "monthly_estimated_cost_label": money_label(estimated_month_cost) if estimated_month_cost is not None else "Not available yet",
+        "monthly_estimated_cost_label": money_label(estimated_month_cost) if estimated_month_cost is not None else unavailable_cost_label,
         "monthly_billable_cost": billable_month_cost,
-        "monthly_billable_cost_label": money_label(billable_month_cost) if billable_month_cost is not None else "Not available yet",
+        "monthly_billable_cost_label": money_label(billable_month_cost) if billable_month_cost is not None else unavailable_cost_label,
         "monthly_tokens_remaining": limit_remaining,
         "monthly_tokens_remaining_label": number_label(max(0, limit_remaining)) if limit_remaining is not None else "No limit set",
         "monthly_budget_remaining": budget_remaining,
@@ -466,6 +467,11 @@ def openai_usage_dashboard_for_user(user=None):
             "This dashboard tracks only OpenAI API usage returned from requests made by this shopping-list app. "
             "ChatGPT website/app subscription usage is separate and cannot be shown here. "
             "Billable AI Cost uses this app's configured pricing ledger and can differ from the raw OpenAI API estimate."
+        ),
+        "pricing_note": (
+            "Configure OpenAI API pricing rates to calculate Estimated API Cost and Billable AI Cost."
+            if month_records and estimated_month_cost is None
+            else ""
         ),
         "empty_state_message": (
             "No OpenAI API usage has been recorded for this app yet. "
@@ -502,10 +508,10 @@ def sum_tokens(records, key):
     return sum(int_or_zero(record.get(key)) for record in records)
 
 
-def sum_cost(records, key):
+def sum_record_cost(records, key):
     values = []
     for record in records:
-        value = record.get(key)
+        value = record_cost_value(record, key)
         if value is None:
             continue
         try:
@@ -515,6 +521,23 @@ def sum_cost(records, key):
     if not values:
         return None
     return round(sum(values), 6)
+
+
+def record_cost_value(record, key):
+    value = float_or_none(record.get(key))
+    if value is not None:
+        return value
+
+    derived_costs = estimate_openai_billing_costs(
+        {
+            "prompt_tokens": int_or_zero(record.get("promptTokens")),
+            "completion_tokens": int_or_zero(record.get("completionTokens")),
+            "total_tokens": int_or_zero(record.get("totalTokens")),
+        },
+        model=record.get("model"),
+        feature=record.get("feature"),
+    )
+    return derived_costs.get(key)
 
 
 def percent_used(value, limit):

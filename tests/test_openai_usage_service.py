@@ -159,6 +159,56 @@ def test_openai_usage_dashboard_counts_user_friendly_activity_groups(tmp_path, m
     assert dashboard["monthly_generated_image_count"] == 1
 
 
+def test_openai_usage_dashboard_prices_legacy_token_records_with_current_rates(tmp_path, monkeypatch):
+    monkeypatch.setattr(storage_service, "USER_DATA_DIR", tmp_path / "users")
+    monkeypatch.setenv("SHOPPING_APP_OPENAI_INPUT_COST_PER_1M_TOKENS", "5")
+    monkeypatch.setenv("SHOPPING_APP_OPENAI_OUTPUT_COST_PER_1M_TOKENS", "15")
+    usage_file = tmp_path / "users" / "user-123" / "openai_usage.json"
+    usage_file.parent.mkdir(parents=True)
+    usage_file.write_text(
+        json.dumps({
+            "records": [
+                {
+                    "createdAt": openai_usage_service.now_iso(),
+                    "month": openai_usage_service.current_month_key(),
+                    "userId": "user-123",
+                    "feature": "recipe-text-extraction",
+                    "model": "gpt-test",
+                    "promptTokens": 100,
+                    "completionTokens": 50,
+                    "totalTokens": 150,
+                }
+            ]
+        }),
+        encoding="utf-8",
+    )
+
+    dashboard = openai_usage_service.openai_usage_dashboard_for_user({"user_id": "user-123"})
+
+    assert dashboard["monthly_total_tokens"] == 150
+    assert dashboard["monthly_estimated_cost_label"] == "$0.0013"
+    assert dashboard["monthly_billable_cost_label"] == "$0.0013"
+    assert dashboard["pricing_note"] == ""
+
+
+def test_openai_usage_dashboard_explains_missing_pricing_for_recorded_tokens(tmp_path, monkeypatch):
+    monkeypatch.setattr(storage_service, "USER_DATA_DIR", tmp_path / "users")
+    monkeypatch.setattr(openai_usage_service, "active_user_id", lambda: "user-123")
+    monkeypatch.delenv("SHOPPING_APP_OPENAI_INPUT_COST_PER_1M_TOKENS", raising=False)
+    monkeypatch.delenv("SHOPPING_APP_OPENAI_OUTPUT_COST_PER_1M_TOKENS", raising=False)
+    monkeypatch.delenv("SHOPPING_APP_OPENAI_MODEL_RATES_JSON", raising=False)
+    monkeypatch.delenv("SHOPPING_APP_OPENAI_FEATURE_COSTS_JSON", raising=False)
+
+    openai_usage_service.record_openai_usage(FakeResponse(), "recipe-text-extraction")
+
+    dashboard = openai_usage_service.openai_usage_dashboard_for_user({"user_id": "user-123"})
+
+    assert dashboard["monthly_total_tokens"] == 150
+    assert dashboard["monthly_estimated_cost_label"] == "Pricing not configured"
+    assert dashboard["monthly_billable_cost_label"] == "Pricing not configured"
+    assert dashboard["pricing_note"] == "Configure OpenAI API pricing rates to calculate Estimated API Cost and Billable AI Cost."
+
+
 def test_openai_usage_records_billable_ledger_with_model_rates_fixed_cost_and_markup(tmp_path, monkeypatch):
     monkeypatch.setattr(storage_service, "USER_DATA_DIR", tmp_path / "users")
     monkeypatch.setattr(openai_usage_service, "active_user_id", lambda: "user-123")

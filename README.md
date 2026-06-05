@@ -67,6 +67,8 @@ The AI Usage & Billing dashboard records OpenAI API usage returned by this shopp
 
 For user pass-through billing, the app stores an app-owned billing ledger in each user's `openai_usage.json`. Each new record can include raw estimated API cost, configured billable cost, token rates, fixed feature charges, markup percentage, and pricing source. Use `SHOPPING_APP_OPENAI_MODEL_RATES_JSON` for model-specific token rates, `SHOPPING_APP_OPENAI_FEATURE_COSTS_JSON` for fixed charges such as generated images, and `SHOPPING_APP_OPENAI_BILLING_MARKUP_PERCENT` for a default markup. Keep those settings aligned with your current OpenAI API pricing before charging users.
 
+Set these pricing variables in the same PowerShell session that starts the Flask app, or set them permanently with Windows environment-variable tooling and restart the app. If the dashboard shows `Pricing not configured`, usage is being recorded but the running app has not loaded usable API pricing rates.
+
 Optional ntfy topic for phone/computer extraction notifications:
 
 ```powershell

@@ -166,6 +166,7 @@ def test_usage_dashboard_menu_opens_visible_account_panel():
     assert "Tokens are pieces of text processed by the AI." in template
     assert "Estimated API cost is calculated from OpenAI API usage returned by this app." in template
     assert "Billable AI Cost uses this app's configured pricing ledger for user pass-through costs." in template
+    assert "user-usage-pricing-note" in template
     assert "Recipe Imports" in template
     assert "Pantry Scans" in template
     assert "Product Searches" in template

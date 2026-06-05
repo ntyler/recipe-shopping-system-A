@@ -524,6 +524,11 @@
             <p class="user-usage-dashboard-note user-usage-token-note">
                 Tokens are pieces of text processed by the AI. Estimated API cost is calculated from OpenAI API usage returned by this app. Billable AI Cost uses this app's configured pricing ledger for user pass-through costs.
             </p>
+            {% if openai_usage.pricing_note %}
+                <p class="user-usage-dashboard-note user-usage-pricing-note">
+                    {{ openai_usage.pricing_note }}
+                </p>
+            {% endif %}
             <div class="user-usage-dashboard-section-title">App Activity This Month</div>
             <div class="user-usage-activity-grid" aria-label="App AI activity counters">
                 <article class="user-usage-dashboard-card user-usage-activity-card">
