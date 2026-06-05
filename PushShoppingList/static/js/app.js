@@ -1277,6 +1277,8 @@ async function copyAccountNtfyLink(button) {
 
 let hiddenExtractJobId = null;
 let lastRenderedExtractJobId = null;
+let extractProgressPollTimer = null;
+let extractProgressPollInFlight = false;
 let extractRefreshTimer = null;
 let extractAutoCloseTimer = null;
 let lastRenderedExtractProgress = null;
@@ -13871,6 +13873,9 @@ function publishRecipeImageProgressItem(item) {
     }
 
     rememberRecipeImageProgressItem(item);
+    if (item.state === "running") {
+        scheduleRecipeImageProgressPoll(500);
+    }
 
     if (recipeImageProgressChannel) {
         try {
@@ -13906,6 +13911,10 @@ function startRecipeImageProgressPolling() {
     scheduleRecipeImageProgressPoll(300);
 }
 
+function hasRunningRecipeImageProgressItem() {
+    return Array.from(recipeImageProgressItemsByKey.values()).some(item => item && item.state === "running");
+}
+
 function scheduleRecipeImageProgressPoll(delay = 5000) {
     window.clearTimeout(recipeImageProgressPollTimer);
     recipeImageProgressPollTimer = window.setTimeout(pollRecipeImageProgress, delay);
@@ -13920,7 +13929,7 @@ async function pollRecipeImageProgress() {
     }
 
     recipeImageProgressPollInFlight = true;
-    let nextDelay = 5000;
+    let nextDelay = null;
 
     try {
         const response = await fetch("/api/recipe_image_progress", { cache: "no-store" });
@@ -13934,10 +13943,14 @@ async function pollRecipeImageProgress() {
             }
         }
     } catch (err) {
-        nextDelay = 8000;
+        if (hasRunningRecipeImageProgressItem()) {
+            nextDelay = 8000;
+        }
     } finally {
         recipeImageProgressPollInFlight = false;
-        scheduleRecipeImageProgressPoll(nextDelay);
+        if (nextDelay !== null) {
+            scheduleRecipeImageProgressPoll(nextDelay);
+        }
     }
 }
 
@@ -17233,6 +17246,7 @@ async function startRecipeExtractionUrls(urls) {
             job_id: jobId,
         }),
     });
+    scheduleExtractionProgressPoll(250);
 
     currentExtractAbortControllers = [];
 
@@ -17286,6 +17300,7 @@ async function startRecipeExtractionUrls(urls) {
     } finally {
         currentExtractAbortController = null;
         currentExtractAbortControllers = [];
+        await pollExtractionProgress();
     }
 }
 
@@ -17350,11 +17365,39 @@ function waitForNextPaint() {
 }
 
 function startExtractionProgressPolling() {
-    pollExtractionProgress();
-    setInterval(pollExtractionProgress, 2000);
+    scheduleExtractionProgressPoll(300);
+}
+
+function scheduleExtractionProgressPoll(delay = 2000) {
+    window.clearTimeout(extractProgressPollTimer);
+    extractProgressPollTimer = window.setTimeout(pollExtractionProgress, delay);
+}
+
+function shouldContinueExtractionProgressPolling(progress) {
+    if (!progress) {
+        return false;
+    }
+
+    if (progress.active || progress.status === "running") {
+        return true;
+    }
+
+    return (progress.urls || []).some(item => item.state === "running" || item.state === "waiting");
 }
 
 async function pollExtractionProgress() {
+    extractProgressPollTimer = null;
+
+    if (extractProgressPollInFlight) {
+        if (shouldContinueExtractionProgressPolling(lastRenderedExtractProgress)) {
+            scheduleExtractionProgressPoll(1000);
+        }
+        return;
+    }
+
+    extractProgressPollInFlight = true;
+    let nextDelay = null;
+
     try {
         const response = await fetch("/api/extract_progress", {
             cache: "no-store",
@@ -17366,8 +17409,18 @@ async function pollExtractionProgress() {
 
         const progress = await response.json();
         renderExtractionProgress(progress);
+        if (shouldContinueExtractionProgressPolling(progress)) {
+            nextDelay = 2000;
+        }
     } catch (err) {
-        // Progress polling is best-effort; extraction still runs through the form request.
+        if (shouldContinueExtractionProgressPolling(lastRenderedExtractProgress)) {
+            nextDelay = 4000;
+        }
+    } finally {
+        extractProgressPollInFlight = false;
+        if (nextDelay !== null) {
+            scheduleExtractionProgressPoll(nextDelay);
+        }
     }
 }
 

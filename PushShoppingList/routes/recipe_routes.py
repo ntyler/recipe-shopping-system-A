@@ -161,34 +161,41 @@ def extract_recipe_route():
             break
 
         mark_url_running(job_id, urls, index)
-        result = extract_recipe_from_url(
-            url,
-            progress_callback=lambda message, summary=None, idx=index: mark_url_message(
-                job_id,
-                urls,
-                idx,
-                message,
-                summary,
-            ),
-        )
+        try:
+            result = extract_recipe_from_url(
+                url,
+                progress_callback=lambda message, summary=None, idx=index: mark_url_message(
+                    job_id,
+                    urls,
+                    idx,
+                    message,
+                    summary,
+                ),
+            )
+        except Exception as exc:
+            mark_url_failed(job_id, urls, index, str(exc))
+            continue
 
         if is_cancel_requested(job_id):
             break
 
-        ingredients = result.get("ingredients", [])
+        try:
+            ingredients = result.get("ingredients", [])
 
-        if result.get("ok") and ingredients:
-            add_items(ingredients)
-            save_ingredients_for_recipe(url, ingredients, result)
-            if result.get("display_name") or result.get("recipe_title"):
-                save_recipe_url_name(url, result.get("display_name") or result.get("recipe_title"))
-            add_recipe_urls([url])
-            ensure_recipe_has_default_cookbook(url, result)
-            record_recipe_import_activity(url, result, "form-url")
-            extracted_any = True
-            mark_url_done(job_id, urls, index, len(ingredients))
-        else:
-            mark_url_failed(job_id, urls, index, result.get("error") or NO_INGREDIENTS_ERROR)
+            if result.get("ok") and ingredients:
+                add_items(ingredients)
+                save_ingredients_for_recipe(url, ingredients, result)
+                if result.get("display_name") or result.get("recipe_title"):
+                    save_recipe_url_name(url, result.get("display_name") or result.get("recipe_title"))
+                add_recipe_urls([url])
+                ensure_recipe_has_default_cookbook(url, result)
+                record_recipe_import_activity(url, result, "form-url")
+                extracted_any = True
+                mark_url_done(job_id, urls, index, len(ingredients))
+            else:
+                mark_url_failed(job_id, urls, index, result.get("error") or NO_INGREDIENTS_ERROR)
+        except Exception as exc:
+            mark_url_failed(job_id, urls, index, str(exc))
 
     if extracted_any:
         sort_ingredients()
@@ -271,46 +278,56 @@ def api_extract_recipe_route():
     if not is_current_job(job_id):
         return jsonify({"ok": False, "cancelled": True, "error": "Extraction superseded."}), 409
 
-    result = extract_recipe_from_url(
-        url,
-        progress_callback=lambda message, summary=None: mark_url_message(
-            job_id,
-            urls,
-            index,
-            message,
-            summary,
-        ),
-    )
+    try:
+        result = extract_recipe_from_url(
+            url,
+            progress_callback=lambda message, summary=None: mark_url_message(
+                job_id,
+                urls,
+                index,
+                message,
+                summary,
+            ),
+        )
 
-    if is_cancel_requested(job_id) or not is_current_job(job_id):
-        return jsonify({"ok": False, "cancelled": True, "error": "Extraction cancelled."}), 409
+        if is_cancel_requested(job_id) or not is_current_job(job_id):
+            return jsonify({"ok": False, "cancelled": True, "error": "Extraction cancelled."}), 409
 
-    ingredients = result.get("ingredients", [])
+        ingredients = result.get("ingredients", [])
 
-    if not result.get("ok") or not ingredients:
-        if result.get("ok"):
-            result = {
-                **result,
-                "ok": False,
-                "error": NO_INGREDIENTS_ERROR,
-            }
+        if not result.get("ok") or not ingredients:
+            if result.get("ok"):
+                result = {
+                    **result,
+                    "ok": False,
+                    "error": NO_INGREDIENTS_ERROR,
+                }
 
-        progress = mark_url_failed(job_id, urls, index, result.get("error") or NO_INGREDIENTS_ERROR)
+            progress = mark_url_failed(job_id, urls, index, result.get("error") or NO_INGREDIENTS_ERROR)
+            finish_batch_if_ready(job_id, progress)
+
+            return jsonify(with_openai_usage_dashboard(result)), 400
+
+        add_items(ingredients)
+        save_ingredients_for_recipe(url, ingredients, result)
+        if result.get("display_name") or result.get("recipe_title"):
+            save_recipe_url_name(url, result.get("display_name") or result.get("recipe_title"))
+        add_recipe_urls([url])
+        ensure_recipe_has_default_cookbook(url, result)
+        record_recipe_import_activity(url, result, "api-url")
+        progress = mark_url_done(job_id, urls, index, len(ingredients))
         finish_batch_if_ready(job_id, progress)
 
-        return jsonify(with_openai_usage_dashboard(result)), 400
+        return jsonify(with_openai_usage_dashboard(result))
+    except Exception as exc:
+        if is_cancel_requested(job_id) or not is_current_job(job_id):
+            return jsonify({"ok": False, "cancelled": True, "error": "Extraction cancelled."}), 409
 
-    add_items(ingredients)
-    save_ingredients_for_recipe(url, ingredients, result)
-    if result.get("display_name") or result.get("recipe_title"):
-        save_recipe_url_name(url, result.get("display_name") or result.get("recipe_title"))
-    add_recipe_urls([url])
-    ensure_recipe_has_default_cookbook(url, result)
-    record_recipe_import_activity(url, result, "api-url")
-    progress = mark_url_done(job_id, urls, index, len(ingredients))
-    finish_batch_if_ready(job_id, progress)
+        result = {"ok": False, "error": str(exc) or "Recipe extraction failed."}
+        progress = mark_url_failed(job_id, urls, index, result["error"])
+        finish_batch_if_ready(job_id, progress)
 
-    return jsonify(with_openai_usage_dashboard(result))
+        return jsonify(with_openai_usage_dashboard(result)), 500
 
 
 @recipe_bp.route("/api/start_extract_progress", methods=["POST"])
