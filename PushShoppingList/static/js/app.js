@@ -9324,7 +9324,8 @@ function updateRecipeEditorPdfControls(recipe) {
         || generatedPdfPath
         || (recipe && (recipe.generated_pdf_available || recipe.generated_recipe_pdf_available || recipe.pdf_available))
     ));
-    const generatedArchiveUrl = hasGeneratedPdf
+    const canOpenRecipePdf = Boolean(sourceUrl);
+    const generatedArchiveUrl = canOpenRecipePdf
         ? (generatedCloudflareUrl || recipeArchivePdfUrl(sourceUrl, "generated_recipe"))
         : "#";
     const sourceArchiveUrl = sourceUrl ? recipeArchivePdfUrl(sourceUrl, "webpage_backup") : "#";
@@ -9334,7 +9335,15 @@ function updateRecipeEditorPdfControls(recipe) {
     setRecipePdfFieldOpenTarget(generatedPdfPathInput, generatedPdfPathLink, generatedPdfPath, generatedPdfPath ? recipeArchivePdfUrl(sourceUrl, "generated_recipe") : "", "Open Generated PDF");
     setRecipePdfFieldOpenTarget(generatedCloudflareInput, generatedCloudflareLink, generatedCloudflareUrl, generatedCloudflareUrl, "Open Generated Cloudflare PDF");
 
-    [pdfButton, pdfMobileButton, pdfPanelButton, pdfMenuButton].forEach((button) => {
+    [pdfButton, pdfMobileButton].forEach((button) => {
+        if (button) {
+            button.hidden = !canOpenRecipePdf;
+            button.href = generatedArchiveUrl;
+            button.dataset.recipePdfUrl = generatedArchiveUrl;
+        }
+    });
+
+    [pdfPanelButton, pdfMenuButton].forEach((button) => {
         if (button) {
             button.hidden = !hasGeneratedPdf;
             button.href = generatedArchiveUrl;
