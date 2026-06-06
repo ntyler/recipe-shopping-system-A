@@ -597,6 +597,31 @@
                         <input type="hidden" id="recipeEditCoverMimeType">
                         <input type="hidden" id="recipeEditCoverSource">
                     </div>
+                    <div class="recipe-edit-rating-field recipe-edit-wide">
+                        <span class="recipe-edit-rating-label">Rating</span>
+                        <input type="hidden" id="recipeEditRating" value="0">
+                        <div id="recipeEditRatingStars"
+                             class="recipe-edit-rating-stars"
+                             role="radiogroup"
+                             aria-label="Recipe rating">
+                            {% for rating_value in range(1, 6) %}
+                                <button type="button"
+                                        class="recipe-edit-rating-star"
+                                        data-rating-value="{{ rating_value }}"
+                                        role="radio"
+                                        aria-checked="false"
+                                        aria-label="{{ rating_value }} star{% if rating_value != 1 %}s{% endif %}"
+                                        onclick="return setRecipeRating({{ rating_value }});">
+                                    &#9733;
+                                </button>
+                            {% endfor %}
+                            <button type="button"
+                                    class="recipe-edit-rating-clear"
+                                    onclick="return setRecipeRating(0);">
+                                Clear
+                            </button>
+                        </div>
+                    </div>
                     <div class="recipe-edit-file-groups recipe-edit-wide">
                         <label class="recipe-edit-file-field">
                             <span>Source URL</span>
@@ -683,31 +708,6 @@
                             <span>Servings</span>
                             <input type="text" name="servings" id="recipeEditServings">
                         </label>
-                    </div>
-                    <div class="recipe-edit-rating-field recipe-edit-wide">
-                        <span class="recipe-edit-rating-label">Rating</span>
-                        <input type="hidden" id="recipeEditRating" value="0">
-                        <div id="recipeEditRatingStars"
-                             class="recipe-edit-rating-stars"
-                             role="radiogroup"
-                             aria-label="Recipe rating">
-                            {% for rating_value in range(1, 6) %}
-                                <button type="button"
-                                        class="recipe-edit-rating-star"
-                                        data-rating-value="{{ rating_value }}"
-                                        role="radio"
-                                        aria-checked="false"
-                                        aria-label="{{ rating_value }} star{% if rating_value != 1 %}s{% endif %}"
-                                        onclick="return setRecipeRating({{ rating_value }});">
-                                    &#9733;
-                                </button>
-                            {% endfor %}
-                            <button type="button"
-                                    class="recipe-edit-rating-clear"
-                                    onclick="return setRecipeRating(0);">
-                                Clear
-                            </button>
-                        </div>
                     </div>
                     <label>
                         <span class="recipe-edit-label-line">

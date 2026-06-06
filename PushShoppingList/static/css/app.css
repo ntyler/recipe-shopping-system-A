@@ -9020,19 +9020,21 @@ body {
         }
 
         .recipe-edit-rating-field {
-            display: grid;
-            gap: 8px;
-            padding: 10px 12px;
-            border: 1px solid #2f3638;
-            border-radius: 8px;
-            background: #151919;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 6px;
+            min-width: 0;
+            padding: 0;
+            border: 0;
+            background: transparent;
         }
 
         .recipe-edit-rating-label {
-            color: #cbd5d1;
+            color: #c4ccd8;
             font-size: 12px;
-            font-weight: 800;
-            letter-spacing: 0.04em;
+            font-weight: 750;
+            letter-spacing: 0.02em;
             line-height: 1.2;
             text-transform: uppercase;
         }
