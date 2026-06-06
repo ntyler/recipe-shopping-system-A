@@ -5954,6 +5954,23 @@ async function submitRecipeMediaUpload(input) {
         setRecipeFileLoadingSummary("Saving ingredients and refreshing the shopping list...");
         await waitForNextPaint();
 
+        const categoryStatusMessage = String((data && data.category_status_message) || "").trim();
+        const categoryStatus = data ? data.category_status : null;
+        const importCategorySuccess = !(categoryStatus && categoryStatus.ok === false);
+
+        if (importCategorySuccess) {
+            const saveMessage = categoryStatusMessage || "Saved to shopping list.";
+            updateRecipeFileLoadingStep("save", "done", saveMessage);
+            setRecipeFileLoadingSummary(categoryStatusMessage || "Recipe import completed.");
+        } else {
+            const saveMessage = categoryStatusMessage || "Saved to shopping list.";
+            updateRecipeFileLoadingStep("save", "failed", saveMessage);
+            setRecipeFileLoadingSummary(saveMessage);
+            if (status) {
+                status.textContent = saveMessage;
+            }
+        }
+
         window.location.reload();
     } catch (err) {
         clearTimeout(readingTimer);

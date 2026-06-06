@@ -35,10 +35,13 @@ from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_
 from PushShoppingList.services.recipe_extract_service import recipe_pdf_path
 from PushShoppingList.services.cookbook_service import ensure_unclassified_cookbook_for_recipes
 from PushShoppingList.services.cookbook_service import ingredient_sections_from_recipe_data
+from PushShoppingList.services.cookbook_service import COOKBOOK_CATEGORY_ALL_FIELDS
+from PushShoppingList.services.cookbook_service import CATEGORY_SOURCE_AI_INFERRED
 from PushShoppingList.services.cookbook_service import move_recipes_to_cookbook
 from PushShoppingList.services.cookbook_service import purge_recipe_from_all_cookbooks
 from PushShoppingList.services.cookbook_service import recipe_cookbook_assignments
 from PushShoppingList.services.cookbook_service import resolve_cookbook_destination
+from PushShoppingList.services.cookbook_service import update_cookbook_recipe_categories
 from PushShoppingList.services.food_review_alternative_service import suggest_food_review_alternatives
 from PushShoppingList.services.recipe_edit_service import create_new_recipe
 from PushShoppingList.services.recipe_edit_service import create_editable_recipe_pdf
@@ -82,6 +85,7 @@ recipe_bp = Blueprint("recipe_bp", __name__)
 NO_INGREDIENTS_ERROR = "No ingredients were found for this recipe URL."
 IMPORT_LOGIN_ERROR = "Sign in before importing recipes so imported data is saved to your account."
 FOOD_REVIEW_LOGIN_ERROR = "Sign in before using food reviews so results stay tied to your account."
+IMPORT_CATEGORY_STATUS_MESSAGE = "Import complete. Generating ChatGPT categories..."
 
 
 def run_generated_recipe_pdf_creation(recipe_url, context="import"):
@@ -355,6 +359,95 @@ def record_recipe_import_activity(url, result, source):
     )
 
 
+def apply_imported_recipe_category_routine(url, recipe_metadata, assignment):
+    url = str(url or "").strip()
+    recipe_metadata = recipe_metadata if isinstance(recipe_metadata, dict) else {}
+    assignment = assignment if isinstance(assignment, dict) else {}
+    title = import_recipe_title(recipe_metadata, url)
+
+    if not url:
+        print("[recipe_import_category] action=skipped reason=no_recipe_url")
+        return {"ok": False, "error": "Recipe URL is required."}
+
+    cookbook_id = str(assignment.get("cookbook_id", "")).strip()
+    if not cookbook_id:
+        print(
+            "[recipe_import_category] action=skipped "
+            f"title={title} url={url} reason=missing_cookbook_assignment"
+        )
+        return {"ok": False, "error": "Recipe cookbook assignment is required."}
+
+    category_input = {
+        **recipe_metadata,
+    }
+    category_input.setdefault("source_url", url)
+    category_input.setdefault("source_display_url", url)
+    category_input.setdefault("url", url)
+
+    print(
+        "[recipe_import_category] action=started "
+        f"title={title} url={url} cookbook_id={cookbook_id}"
+    )
+
+    decision = decide_recipe_categories_with_chatgpt(
+        category_input,
+        mode="all",
+        current_categories={},
+        trigger_source="recipe_import:all",
+    )
+
+    if not decision.get("ok"):
+        error = str(decision.get("error") or "Unable to infer categories.")
+        print(
+            "[recipe_import_category] action=failed "
+            f"title={title} url={url} error={error}"
+        )
+        return {"ok": False, "error": error, "title": title}
+
+    categories = decision.get("categories") or {}
+    if not isinstance(categories, dict):
+        print(
+            "[recipe_import_category] action=failed "
+            f"title={title} url={url} error=invalid_category_payload"
+        )
+        return {"ok": False, "error": "Invalid category payload.", "title": title}
+
+    category_sources = {}
+    for field in COOKBOOK_CATEGORY_ALL_FIELDS:
+        if (
+            field == "custom_categories"
+            and isinstance(categories.get(field), list)
+            and categories.get(field)
+        ) or str(categories.get(field) or "").strip():
+            category_sources[field] = CATEGORY_SOURCE_AI_INFERRED
+
+    try:
+        update_cookbook_recipe_categories(
+            cookbook_id,
+            url,
+            categories,
+            category_sources=category_sources,
+        )
+        print(
+            "[recipe_import_category] action=success "
+            f"title={title} url={url} "
+            f"categories={json.dumps(categories, ensure_ascii=False)}"
+        )
+        return {
+            "ok": True,
+            "title": title,
+            "categories": categories,
+            "status": "updated",
+        }
+    except Exception as exc:
+        error = str(exc)
+        print(
+            "[recipe_import_category] action=failed "
+            f"title={title} url={url} error={error}"
+        )
+        return {"ok": False, "error": error, "title": title}
+
+
 def with_openai_usage_dashboard(result):
     if not isinstance(result, dict):
         return result
@@ -418,7 +511,17 @@ def extract_recipe_route():
                 if result.get("display_name") or result.get("recipe_title"):
                     save_recipe_url_name(url, result.get("display_name") or result.get("recipe_title"))
                 add_recipe_urls([url])
-                save_import_cookbook_assignment(url, result, cookbook)
+                assignment = save_import_cookbook_assignment(url, result, cookbook)
+                print(f"[recipe_import] action=created title={import_recipe_title(result, url)} url={url}")
+                print(f"[recipe_import] action=categories_start title={import_recipe_title(result, url)}")
+                mark_url_message(
+                    job_id,
+                    urls,
+                    index,
+                    IMPORT_CATEGORY_STATUS_MESSAGE,
+                    summary="Generating categories with ChatGPT.",
+                )
+                apply_imported_recipe_category_routine(url, result, assignment)
                 create_source_url_pdf(url)
                 schedule_generated_recipe_pdf_creation(url, context="form-url")
                 record_recipe_import_activity(url, result, "form-url")
@@ -468,7 +571,16 @@ def upload_recipe_media_route():
         if result.get("display_name") or result.get("recipe_title"):
             save_recipe_url_name(recipe_url, result.get("display_name") or result.get("recipe_title"))
         add_recipe_urls([recipe_url])
-        save_import_cookbook_assignment(recipe_url, result, cookbook)
+        assignment = save_import_cookbook_assignment(recipe_url, result, cookbook)
+        print(f"[recipe_import] action=created title={import_recipe_title(result, recipe_url)} url={recipe_url}")
+        print(f"[recipe_import] action=categories_start title={import_recipe_title(result, recipe_url)}")
+        category_status = apply_imported_recipe_category_routine(recipe_url, result, assignment)
+        result = {
+            **result,
+            "import_category_status": category_status,
+            "category_status": category_status,
+            "category_status_message": IMPORT_CATEGORY_STATUS_MESSAGE if category_status.get("ok") else category_status.get("error", ""),
+        }
         create_source_url_pdf(recipe_url)
         pdf_job = schedule_generated_recipe_pdf_creation(recipe_url, context="media-upload")
         result = {
@@ -556,12 +668,23 @@ def api_extract_recipe_route():
         if result.get("display_name") or result.get("recipe_title"):
             save_recipe_url_name(url, result.get("display_name") or result.get("recipe_title"))
         add_recipe_urls([url])
-        save_import_cookbook_assignment(url, result, cookbook)
+        assignment = save_import_cookbook_assignment(url, result, cookbook)
+        mark_url_message(
+            job_id,
+            urls,
+            index,
+            IMPORT_CATEGORY_STATUS_MESSAGE,
+            summary="Generating categories with ChatGPT.",
+        )
+        category_status = apply_imported_recipe_category_routine(url, result, assignment)
         create_source_url_pdf(url)
         pdf_job = schedule_generated_recipe_pdf_creation(url, context="api-url")
         result = {
             **result,
             "generated_recipe_pdf_job": pdf_job,
+            "import_category_status": category_status,
+            "category_status": category_status,
+            "category_status_message": IMPORT_CATEGORY_STATUS_MESSAGE if category_status.get("ok") else category_status.get("error", ""),
         }
         record_recipe_import_activity(url, result, "api-url")
         progress = mark_url_done(job_id, urls, index, len(ingredients))
