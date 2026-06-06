@@ -54,6 +54,8 @@ MAX_SOCIAL_VIDEO_PROMPT_CHARS = 12000
 MAX_VIDEO_TRANSCRIPTION_SECONDS = int(os.getenv("MAX_VIDEO_TRANSCRIPTION_SECONDS", "180"))
 MAX_VIDEO_AUDIO_BYTES = int(os.getenv("MAX_VIDEO_AUDIO_BYTES", str(24 * 1024 * 1024)))
 MAX_SOCIAL_VIDEO_IMAGE_URLS = int(os.getenv("MAX_SOCIAL_VIDEO_IMAGE_URLS", "4"))
+MAX_OPENAI_UPLOAD_IMAGE_SIDE = int(os.getenv("MAX_OPENAI_UPLOAD_IMAGE_SIDE", "2000"))
+MAX_OPENAI_UPLOAD_IMAGE_BYTES = int(os.getenv("MAX_OPENAI_UPLOAD_IMAGE_BYTES", str(2 * 1024 * 1024)))
 FOOD_IMAGE_INFERENCE_CONFIDENCE_THRESHOLD = float(
     os.getenv("FOOD_IMAGE_INFERENCE_CONFIDENCE_THRESHOLD", "0.75")
 )
@@ -5389,11 +5391,50 @@ def send_prompt_to_openai(prompt_text):
     return response.choices[0].message.content
 
 
-def send_image_prompt_to_openai(prompt_text, image_path, mime_type):
+def prepare_image_bytes_for_openai(image_path, mime_type):
     image_bytes = image_path.read_bytes()
+
+    if len(image_bytes) <= MAX_OPENAI_UPLOAD_IMAGE_BYTES:
+        return image_bytes, mime_type
+
+    try:
+        from PIL import Image
+        from PIL import ImageOps
+    except Exception:
+        return image_bytes, mime_type
+
+    try:
+        with Image.open(io.BytesIO(image_bytes)) as image:
+            image = ImageOps.exif_transpose(image)
+            image.thumbnail(
+                (MAX_OPENAI_UPLOAD_IMAGE_SIDE, MAX_OPENAI_UPLOAD_IMAGE_SIDE),
+                Image.Resampling.LANCZOS,
+            )
+
+            if image.mode not in ("RGB", "L"):
+                image = image.convert("RGB")
+
+            output = io.BytesIO()
+            image.save(output, format="JPEG", quality=82, optimize=True)
+            compressed = output.getvalue()
+
+            if compressed:
+                print(
+                    "[recipe_import] action=compress_openai_image "
+                    f"original_bytes={len(image_bytes)} compressed_bytes={len(compressed)}"
+                )
+                return compressed, "image/jpeg"
+    except Exception as exc:
+        print(f"[recipe_import] action=compress_openai_image_failed error={exc}")
+
+    return image_bytes, mime_type
+
+
+def send_image_prompt_to_openai(prompt_text, image_path, mime_type):
+    image_bytes, mime_type = prepare_image_bytes_for_openai(image_path, mime_type)
     image_data = base64.b64encode(image_bytes).decode("ascii")
 
-    response = get_openai_client().chat.completions.create(
+    response = get_openai_client().with_options(timeout=90).chat.completions.create(
         model=MODEL,
         messages=[
             {

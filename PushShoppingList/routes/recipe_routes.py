@@ -566,6 +566,7 @@ def upload_recipe_media_route():
         result.get("extraction_method") or result.get("source_type") or "upload"
     ).strip()
     extraction_confidence = result.get("extraction_confidence")
+    extraction_error = str(result.get("error") or "").strip()
     path_label = {
         "document_text": "text recipe import",
         "photo_text": "text recipe import",
@@ -577,6 +578,7 @@ def upload_recipe_media_route():
         f"[recipe_import] action=media_upload_path path={path_label} "
         f"title={import_recipe_title(result, result.get('source_url') or '')} "
         f"confidence={extraction_confidence}"
+        f"{f' error={extraction_error}' if extraction_error else ''}"
     )
 
     if result.get("ok") and result.get("ingredients"):
