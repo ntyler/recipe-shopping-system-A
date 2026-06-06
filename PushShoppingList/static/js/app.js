@@ -8720,6 +8720,107 @@ async function saveRecipeEditorCategories(savedSourceUrl = "", fallbackUrl = "")
     };
 }
 
+function recipeEditCategorySuggestionValue(categories, field) {
+    const value = categories && categories[field];
+
+    if (Array.isArray(value)) {
+        return value
+            .map(item => String(item || "").trim())
+            .filter(Boolean)
+            .join(", ");
+    }
+
+    return String(value || "").trim();
+}
+
+function applyRecipeEditCategorySuggestions(categories = {}, mode = "missing") {
+    const form = document.getElementById("recipeEditForm");
+    const overwrite = mode === "all";
+
+    if (!form) {
+        return;
+    }
+
+    RECIPE_EDIT_CATEGORY_FIELD_NAMES.forEach(field => {
+        const input = form.elements[field];
+        const currentValue = input ? String(input.value || "").trim() : "";
+        const nextValue = recipeEditCategorySuggestionValue(categories, field);
+
+        if (input && nextValue && (overwrite || !currentValue)) {
+            setCookbookCategoryFieldValue(form, field, nextValue);
+        }
+    });
+
+    const customInput = form.elements.custom_categories;
+    const currentCustom = customInput ? String(customInput.value || "").trim() : "";
+    const nextCustom = recipeEditCategorySuggestionValue(categories, "custom_categories");
+
+    if (customInput && nextCustom && (overwrite || !currentCustom)) {
+        setCookbookCategoryFieldValue(form, "custom_categories", nextCustom);
+    }
+}
+
+async function decideRecipeEditCategoriesWithChatGPT(button, mode = "missing") {
+    const decisionMode = mode === "all" ? "all" : "missing";
+    const originalText = button ? button.textContent : "";
+
+    closeRecipeEditRowMenus();
+
+    if (
+        decisionMode === "all"
+        && recipeEditCategoryValuesHaveAny(collectRecipeEditorCategoryValues())
+        && !window.confirm("ChatGPT will replace the current category selections. Continue?")
+    ) {
+        return false;
+    }
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Asking...";
+    }
+
+    try {
+        setRecipeEditStatus("Asking ChatGPT to choose recipe categories...");
+        const payload = collectRecipeEditorPayload();
+        const response = await fetch("/api/recipe_category_decision", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                recipe: payload.recipe,
+            }),
+        });
+        const data = await response.json();
+        syncOpenAiUsageDashboardFromResponse(data);
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to choose recipe categories.");
+        }
+
+        applyRecipeEditCategorySuggestions(data.categories || {}, decisionMode);
+        setRecipeEditStatus(
+            decisionMode === "all"
+                ? "ChatGPT filled recipe categories. Save Recipe to keep them."
+                : "ChatGPT filled missing recipe categories. Save Recipe to keep them."
+        );
+    } catch (err) {
+        console.warn("Unable to choose recipe categories.", err);
+        setRecipeEditStatus(err.message || "Unable to choose recipe categories.", true);
+    } finally {
+        if (button && button.isConnected) {
+            button.disabled = false;
+            button.textContent = originalText || (
+                decisionMode === "all"
+                    ? "Have ChatGPT Decide All"
+                    : "Have ChatGPT Decide Missing"
+            );
+        }
+    }
+
+    return false;
+}
+
 async function openRecipeEditor(button, options = {}) {
     const url = button ? button.dataset.recipeUrl || "" : "";
     const modal = document.getElementById("recipeEditModal");

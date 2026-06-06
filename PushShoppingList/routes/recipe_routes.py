@@ -35,6 +35,7 @@ from PushShoppingList.services.food_review_alternative_service import suggest_fo
 from PushShoppingList.services.recipe_edit_service import create_new_recipe
 from PushShoppingList.services.recipe_edit_service import create_editable_recipe_pdf
 from PushShoppingList.services.recipe_edit_service import delete_editable_recipe_pdf
+from PushShoppingList.services.recipe_edit_service import decide_recipe_categories_with_chatgpt
 from PushShoppingList.services.recipe_edit_service import estimate_recipe_nutrition
 from PushShoppingList.services.recipe_edit_service import generate_recipe_equipment_image
 from PushShoppingList.services.recipe_edit_service import generate_recipe_step_image
@@ -494,6 +495,16 @@ def api_recipe_nutrition_estimate_route():
 def api_recipe_note_feedback_route():
     data = request.get_json(silent=True) or {}
     result = recipe_note_feedback(data)
+    status = 200 if result.get("ok") else 400
+
+    return jsonify(with_openai_usage_dashboard(result)), status
+
+
+@recipe_bp.route("/api/recipe_category_decision", methods=["POST"])
+def api_recipe_category_decision_route():
+    data = request.get_json(silent=True) or {}
+    recipe = data.get("recipe", data)
+    result = decide_recipe_categories_with_chatgpt(recipe)
     status = 200 if result.get("ok") else 400
 
     return jsonify(with_openai_usage_dashboard(result)), status

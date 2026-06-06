@@ -14,7 +14,11 @@ import requests
 
 from PushShoppingList.services import cloudflare_r2_storage
 from PushShoppingList.services.food_rules_service import load_food_rules
+from PushShoppingList.services.cookbook_service import COOKBOOK_CATEGORY_FIELDS
+from PushShoppingList.services.cookbook_service import clean_category_payload
+from PushShoppingList.services.cookbook_service import cookbook_category_choices
 from PushShoppingList.services.cookbook_service import ensure_unclassified_cookbook_for_recipes
+from PushShoppingList.services.cookbook_service import infer_recipe_categories
 from PushShoppingList.services.cookbook_service import recipe_category_metadata_for_editor
 from PushShoppingList.services.cookbook_service import recipe_cookbook_assignments
 from PushShoppingList.services.ingredient_text_review_service import annotate_ingredients_for_food_review
@@ -1296,6 +1300,189 @@ def sanitize_recipe_cover_image(value, source_url="", fallback_alt=""):
         return {}
 
     return cover_image
+
+
+def category_context_text(value):
+    return " ".join(str(value or "").strip().split())
+
+
+def category_context_ingredients(ingredients):
+    rows = []
+
+    for item in ingredients or []:
+        if isinstance(item, dict):
+            name = category_context_text(
+                item.get("ingredient")
+                or item.get("name")
+                or item.get("display_name")
+                or item.get("purchasable_item")
+                or item.get("buy_as")
+            )
+            original = category_context_text(item.get("original_text"))
+            preparation = category_context_text(item.get("preparation"))
+            section = category_context_text(item.get("section") or item.get("store_section"))
+            row = {
+                key: value
+                for key, value in {
+                    "name": name,
+                    "original_text": original,
+                    "preparation": preparation,
+                    "section": section,
+                }.items()
+                if value
+            }
+        else:
+            name = category_context_text(item)
+            row = {"name": name} if name else {}
+
+        if row:
+            rows.append(row)
+
+    return rows
+
+
+def category_context_text_rows(items, *fields):
+    rows = []
+
+    for item in items or []:
+        if isinstance(item, dict):
+            text = ""
+            for field in fields:
+                text = category_context_text(item.get(field))
+                if text:
+                    break
+        else:
+            text = category_context_text(item)
+
+        if text:
+            rows.append(text)
+
+    return rows
+
+
+def recipe_category_prompt_context(payload):
+    payload = payload if isinstance(payload, dict) else {}
+
+    return {
+        "title": category_context_text(payload.get("recipe_title") or payload.get("display_name")),
+        "display_name": category_context_text(payload.get("display_name")),
+        "servings": category_context_text(payload.get("servings")),
+        "level": category_context_text(payload.get("level")),
+        "total_time": category_context_text(payload.get("total_time")),
+        "prep_time": category_context_text(payload.get("prep_time")),
+        "inactive_time": category_context_text(payload.get("inactive_time")),
+        "cook_time": category_context_text(payload.get("cook_time")),
+        "ingredients": category_context_ingredients(payload.get("ingredients", [])),
+        "equipment": category_context_text_rows(payload.get("equipment", []), "equipment", "text", "name"),
+        "instructions": category_context_text_rows(payload.get("instructions", []), "instruction", "text"),
+    }
+
+
+def recipe_category_inference_record(payload):
+    context = recipe_category_prompt_context(payload)
+    section_items = [
+        {"name": item.get("name")}
+        for item in context.get("ingredients", [])
+        if item.get("name")
+    ]
+
+    return {
+        "name": context.get("title") or context.get("display_name"),
+        "description": "",
+        "prep_time": context.get("prep_time"),
+        "cook_time": context.get("cook_time"),
+        "total_time": context.get("total_time"),
+        "equipment_items": context.get("equipment", []),
+        "instruction_items": context.get("instructions", []),
+        "sections": {"INGREDIENTS": section_items} if section_items else {},
+    }
+
+
+def build_recipe_category_decision_prompt(payload):
+    choices = cookbook_category_choices()
+    context = recipe_category_prompt_context(payload)
+
+    return f"""
+Choose cookbook menu categories for this recipe.
+
+Return only a JSON object with these exact keys:
+meal_type, cuisine, main_ingredient, cooking_method, occasion, dietary_preference, prep_time_group, custom_categories.
+
+Rules:
+- For meal_type, cuisine, main_ingredient, cooking_method, occasion, dietary_preference, and prep_time_group, choose exactly one label from the allowed options.
+- If a field is uncertain, choose the closest useful option instead of leaving it blank.
+- custom_categories should be an array of 0 to 3 concise user-friendly cookbook groups.
+- Re-analyze the recipe title, ingredients, equipment, times, and instructions.
+- Do not include markdown or explanatory text.
+
+Allowed options:
+{json.dumps(choices, ensure_ascii=False, indent=2)}
+
+Recipe:
+{json.dumps(context, ensure_ascii=False, indent=2)}
+""".strip()
+
+
+def decide_recipe_categories_with_chatgpt(payload):
+    payload = payload if isinstance(payload, dict) else {}
+
+    if not os.getenv("OPENAI_API_KEY"):
+        return {
+            "ok": False,
+            "error": "Missing OPENAI_API_KEY environment variable.",
+        }
+
+    prompt = build_recipe_category_decision_prompt(payload)
+    model = os.getenv("OPENAI_RECIPE_CATEGORY_MODEL", MODEL)
+
+    try:
+        response = get_openai_client().chat.completions.create(
+            model=model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You classify recipes into cookbook menu categories and return only valid JSON.",
+                },
+                {
+                    "role": "user",
+                    "content": prompt,
+                },
+            ],
+            response_format={"type": "json_object"},
+            temperature=0,
+        )
+        record_openai_usage(
+            response,
+            "recipe-category-decision",
+            model=model,
+        )
+        content = response.choices[0].message.content
+        data = json.loads(clean_json_response(content))
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": f"Recipe category decision failed: {exc}",
+        }
+
+    categories = data.get("categories") if isinstance(data, dict) and isinstance(data.get("categories"), dict) else data
+
+    if not isinstance(categories, dict):
+        return {
+            "ok": False,
+            "error": "Recipe category decision returned an unexpected response.",
+        }
+
+    cleaned = clean_category_payload(categories)
+    fallback = infer_recipe_categories(recipe_category_inference_record(payload))
+
+    for field in COOKBOOK_CATEGORY_FIELDS:
+        if not cleaned.get(field):
+            cleaned[field] = fallback.get(field, "")
+
+    return {
+        "ok": True,
+        "categories": cleaned,
+    }
 
 
 def estimate_recipe_nutrition(payload):
