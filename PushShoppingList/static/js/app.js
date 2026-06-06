@@ -8630,8 +8630,34 @@ let activeFoodReviewRow = null;
 let activeFoodReviewAlternatives = [];
 let recipeEditDraggedRow = null;
 let recipeEditPointerDrag = null;
+let recipeEditPdfRefreshTimer = null;
+let recipeEditPdfRefreshToken = 0;
 const RECIPE_EDIT_CATEGORY_FIELD_NAMES = CATEGORY_FIELD_NAMES;
 const RECIPE_EDIT_CATEGORY_ALL_FIELD_NAMES = CATEGORY_ALL_FIELD_NAMES;
+const RECIPE_EDIT_PDF_FIELD_ALIASES = {
+    source_url: ["source_url", "url"],
+    source_pdf_path: ["source_pdf_path", "webpage_backup_pdf_path", "pdf_path"],
+    source_cloudflare_pdf_url: [
+        "source_cloudflare_pdf_url",
+        "source_cloudflare_pdf_path",
+        "webpage_backup_pdf_url",
+        "cloudflare_pdf_url",
+    ],
+    generated_pdf_path: ["generated_pdf_path", "generated_recipe_pdf_path"],
+    generated_cloudflare_pdf_url: [
+        "generated_cloudflare_pdf_url",
+        "generated_cloudflare_pdf_path",
+        "generated_recipe_pdf_url",
+        "pdf_public_url",
+    ],
+};
+const RECIPE_EDIT_PDF_INPUT_IDS = {
+    source_url: "recipeEditSourceUrl",
+    source_pdf_path: "recipeEditSourcePdfPath",
+    source_cloudflare_pdf_url: "recipeEditSourceCloudflarePdfUrl",
+    generated_pdf_path: "recipeEditGeneratedPdfPath",
+    generated_cloudflare_pdf_url: "recipeEditGeneratedCloudflarePdfUrl",
+};
 
 async function fetchRecipeEditorData(url) {
     const response = await fetch(`/api/recipe?url=${encodeURIComponent(url)}`, {
@@ -9141,7 +9167,7 @@ function populateRecipeEditor(recipe, originalUrl) {
     setValue("recipeEditOriginalUrl", originalUrl);
     setValue("recipeEditDisplayName", recipe.display_name || "");
     setValue("recipeEditTitleInput", recipe.recipe_title || "");
-    setValue("recipeEditSourceUrl", recipe.source_display_url || recipe.source_url || originalUrl);
+    setRecipeEditorSourceUrlField(recipe, originalUrl);
     setValue("recipeEditQuantity", recipe.quantity || "1");
     setValue("recipeEditServings", recipe.servings || "");
     setValue("recipeEditLevel", recipe.level || "");
@@ -9156,17 +9182,6 @@ function populateRecipeEditor(recipe, originalUrl) {
     updateRecipeEditorPdfControls(recipe);
     syncRecipeEditSourceFilesDetails();
     setRecipeEditorCoverImage(coverImage, recipe.recipe_title || recipe.display_name || "Recipe title image");
-
-    const sourceInput = document.getElementById("recipeEditSourceUrl");
-    if (sourceInput) {
-        sourceInput.dataset.canonicalSourceUrl = recipe.source_url || originalUrl;
-        sourceInput.dataset.displaySourceUrl = recipe.source_display_url || "";
-        if (sourceInput.dataset.sourceLinkBound !== "true") {
-            sourceInput.dataset.sourceLinkBound = "true";
-            sourceInput.addEventListener("input", updateRecipeEditSourceUrlLink);
-        }
-    }
-    updateRecipeEditSourceUrlLink();
 
     const ingredientWrap = document.getElementById("recipeEditIngredients");
     const equipmentWrap = document.getElementById("recipeEditEquipment");
@@ -9219,6 +9234,257 @@ function populateRecipeEditor(recipe, originalUrl) {
 function recipeEditorCurrentUrl() {
     const input = document.getElementById("recipeEditOriginalUrl");
     return input ? String(input.value || "").trim() : "";
+}
+
+function recipeEditorIsOpen() {
+    const modal = document.getElementById("recipeEditModal");
+    return Boolean(modal && modal.classList.contains("open"));
+}
+
+function recipeObjectHasAnyAlias(recipe, aliases = []) {
+    if (!recipe || typeof recipe !== "object") {
+        return false;
+    }
+
+    return aliases.some(alias => Object.prototype.hasOwnProperty.call(recipe, alias));
+}
+
+function recipeObjectValueFromAliases(recipe, aliases = []) {
+    if (!recipe || typeof recipe !== "object") {
+        return "";
+    }
+
+    for (const alias of aliases) {
+        const value = String(recipe[alias] || "").trim();
+        if (value) {
+            return value;
+        }
+    }
+
+    return "";
+}
+
+function currentRecipeEditorPdfFieldValues() {
+    return Object.fromEntries(Object.entries(RECIPE_EDIT_PDF_INPUT_IDS).map(([field, id]) => {
+        const input = document.getElementById(id);
+        return [field, input ? String(input.value || "").trim() : ""];
+    }));
+}
+
+function normalizeRecipeEditorPdfValues(recipe = {}, fallbackUrl = "", options = {}) {
+    const useCurrentForMissing = options.useCurrentForMissing === true;
+    const current = useCurrentForMissing ? currentRecipeEditorPdfFieldValues() : {};
+    const values = {};
+
+    Object.entries(RECIPE_EDIT_PDF_FIELD_ALIASES).forEach(([field, aliases]) => {
+        if (recipeObjectHasAnyAlias(recipe, aliases)) {
+            values[field] = recipeObjectValueFromAliases(recipe, aliases);
+        } else if (field === "source_url" && fallbackUrl) {
+            values[field] = String(fallbackUrl || "").trim();
+        } else {
+            values[field] = current[field] || "";
+        }
+    });
+
+    if (!values.source_url) {
+        values.source_url = String(fallbackUrl || "").trim();
+    }
+
+    return values;
+}
+
+function setRecipeEditInputValueFromServer(input, value, options = {}) {
+    if (!input) {
+        return "";
+    }
+
+    const nextValue = String(value || "").trim();
+    const currentValue = String(input.value || "").trim();
+    const previousServerValue = Object.prototype.hasOwnProperty.call(input.dataset, "lastServerValue")
+        ? String(input.dataset.lastServerValue || "").trim()
+        : currentValue;
+    const silent = options.silent === true;
+
+    if (silent && options.skipEmpty === true && !nextValue) {
+        return currentValue;
+    }
+
+    if (!silent || !currentValue || currentValue === previousServerValue) {
+        input.value = nextValue;
+        input.dataset.lastServerValue = nextValue;
+        return nextValue;
+    }
+
+    return currentValue;
+}
+
+function setRecipeEditorSourceUrlField(recipe = {}, originalUrl = "", options = {}) {
+    const sourceInput = document.getElementById("recipeEditSourceUrl");
+    const canonicalSourceUrl = String(recipe.source_url || recipe.url || originalUrl || "").trim();
+    const displaySourceUrl = String(recipe.source_display_url || "").trim();
+    const visibleValue = displaySourceUrl || canonicalSourceUrl;
+    const appliedValue = setRecipeEditInputValueFromServer(sourceInput, visibleValue, options);
+    const updatedFromServer = !options.silent || appliedValue === visibleValue;
+
+    if (sourceInput && updatedFromServer) {
+        sourceInput.dataset.canonicalSourceUrl = canonicalSourceUrl;
+        sourceInput.dataset.displaySourceUrl = displaySourceUrl;
+        sourceInput.dataset.lastServerCanonicalValue = canonicalSourceUrl;
+    }
+
+    if (sourceInput && sourceInput.dataset.sourceLinkBound !== "true") {
+        sourceInput.dataset.sourceLinkBound = "true";
+        sourceInput.addEventListener("input", updateRecipeEditSourceUrlLink);
+    }
+
+    updateRecipeEditSourceUrlLink();
+    return appliedValue;
+}
+
+function mergeRecipeEditorPdfFieldsIntoOpenEditor(recipe = {}, options = {}) {
+    if (!recipeEditorIsOpen()) {
+        return false;
+    }
+
+    const currentUrl = recipeEditorCurrentUrl();
+    const expectedUrl = String(options.recipeUrl || "").trim();
+
+    if (expectedUrl && currentUrl && expectedUrl !== currentUrl) {
+        return false;
+    }
+
+    const serverValues = normalizeRecipeEditorPdfValues(recipe, currentUrl, {
+        useCurrentForMissing: true,
+    });
+    const mergedValues = {};
+    let changed = false;
+
+    if (recipeObjectHasAnyAlias(recipe, RECIPE_EDIT_PDF_FIELD_ALIASES.source_url)) {
+        const sourceInput = document.getElementById(RECIPE_EDIT_PDF_INPUT_IDS.source_url);
+        const before = sourceInput ? String(sourceInput.value || "").trim() : "";
+        const after = setRecipeEditorSourceUrlField({
+            source_url: serverValues.source_url,
+            source_display_url: recipe.source_display_url || "",
+        }, currentUrl, {
+            silent: true,
+            skipEmpty: true,
+        });
+
+        mergedValues.source_url = recipeEditorSourceUrlForOpen() || serverValues.source_url || currentUrl;
+        if (after !== before && recipeEditOriginalSnapshot) {
+            recipeEditOriginalSnapshot.source_url = serverValues.source_url || "";
+        }
+        changed = changed || after !== before;
+    } else {
+        mergedValues.source_url = recipeEditorSourceUrlForOpen() || serverValues.source_url || currentUrl;
+    }
+
+    [
+        "source_pdf_path",
+        "source_cloudflare_pdf_url",
+        "generated_pdf_path",
+        "generated_cloudflare_pdf_url",
+    ].forEach(field => {
+        const input = document.getElementById(RECIPE_EDIT_PDF_INPUT_IDS[field]);
+        const before = input ? String(input.value || "").trim() : "";
+        const after = setRecipeEditInputValueFromServer(input, serverValues[field], {
+            silent: true,
+        });
+
+        mergedValues[field] = after || serverValues[field] || "";
+        changed = changed || after !== before;
+    });
+
+    updateRecipeEditorPdfControls({
+        ...recipe,
+        ...mergedValues,
+    }, {
+        updateInputValues: false,
+        useCurrentForMissing: false,
+    });
+
+    return changed;
+}
+
+async function refreshOpenRecipeEditorPdfFieldsFromServer(options = {}) {
+    if (!recipeEditorIsOpen()) {
+        return false;
+    }
+
+    const currentUrl = recipeEditorCurrentUrl();
+    const recipeUrl = String(options.recipeUrl || currentUrl || "").trim();
+
+    if (!recipeUrl || (currentUrl && recipeUrl !== currentUrl)) {
+        return false;
+    }
+
+    const recipe = await fetchRecipeEditorData(recipeUrl);
+    return mergeRecipeEditorPdfFieldsIntoOpenEditor(recipe, {
+        recipeUrl,
+    });
+}
+
+function scheduleOpenRecipeEditorPdfRefresh(options = {}) {
+    const recipeUrl = String(options.recipeUrl || recipeEditorCurrentUrl() || "").trim();
+
+    if (!recipeEditorIsOpen() || !recipeUrl) {
+        return;
+    }
+
+    if (recipeEditPdfRefreshTimer) {
+        window.clearTimeout(recipeEditPdfRefreshTimer);
+        recipeEditPdfRefreshTimer = null;
+    }
+
+    const token = ++recipeEditPdfRefreshToken;
+    const startedAt = Date.now();
+    const timeoutMs = Math.max(1000, Number(options.timeoutMs) || 15000);
+    const intervalMs = Math.max(500, Number(options.intervalMs) || 1200);
+    const waitForGeneratedCloudflare = options.waitForGeneratedCloudflare === true;
+    const waitForSourceCloudflare = options.waitForSourceCloudflare === true;
+
+    const poll = async () => {
+        if (token !== recipeEditPdfRefreshToken || !recipeEditorIsOpen()) {
+            return;
+        }
+
+        if (recipeEditorCurrentUrl() !== recipeUrl) {
+            return;
+        }
+
+        try {
+            await refreshOpenRecipeEditorPdfFieldsFromServer({ recipeUrl });
+        } catch (err) {
+            console.warn("Unable to silently refresh recipe PDF fields.", err);
+        }
+
+        const fields = currentRecipeEditorPdfFieldValues();
+        const elapsed = Date.now() - startedAt;
+        const generatedReady = Boolean(fields.generated_cloudflare_pdf_url || fields.generated_pdf_path);
+        const sourceReady = Boolean(fields.source_cloudflare_pdf_url || fields.source_pdf_path);
+        const anyPdfReady = generatedReady || sourceReady;
+        const ready = (waitForGeneratedCloudflare || waitForSourceCloudflare)
+            ? (
+                (
+                    waitForGeneratedCloudflare
+                        ? Boolean(fields.generated_cloudflare_pdf_url)
+                        : true
+                ) && (
+                    waitForSourceCloudflare
+                        ? Boolean(fields.source_cloudflare_pdf_url)
+                        : true
+                )
+            )
+            : anyPdfReady;
+
+        if (elapsed >= timeoutMs || ready) {
+            return;
+        }
+
+        recipeEditPdfRefreshTimer = window.setTimeout(poll, intervalMs);
+    };
+
+    recipeEditPdfRefreshTimer = window.setTimeout(poll, Math.max(0, Number(options.initialDelay) || 0));
 }
 
 function updateRecipeEditorCookbookAssignment(recipeUrl, cookbookId, cookbookName, cookbookIsUnclassified = false) {
@@ -9282,7 +9548,7 @@ function setRecipeEditorCookbook(recipe, fallbackUrl = "") {
     });
 }
 
-function updateRecipeEditorPdfControls(recipe) {
+function updateRecipeEditorPdfControls(recipe, options = {}) {
     const sourcePdfPathInput = document.getElementById("recipeEditSourcePdfPath");
     const sourcePdfPathLink = document.getElementById("recipeEditSourcePdfPathLink");
     const sourceCloudflareInput = document.getElementById("recipeEditSourceCloudflarePdfUrl");
@@ -9301,61 +9567,69 @@ function updateRecipeEditorPdfControls(recipe) {
     const deletePdfButton = document.getElementById("recipeEditDeletePdfButton");
     const copyPdfLinkButton = document.getElementById("recipeEditCopyPdfLinkButton");
     const uploadPdfButton = document.getElementById("recipeEditUploadPdfButton");
-    const sourceUrl = recipe && recipe.source_url ? recipe.source_url : "";
-    const sourcePdfPath = recipe && (recipe.source_pdf_path || recipe.webpage_backup_pdf_path || recipe.pdf_path)
-        ? (recipe.source_pdf_path || recipe.webpage_backup_pdf_path || recipe.pdf_path)
-        : "";
-    const sourceCloudflareUrl = recipe && (recipe.source_cloudflare_pdf_url || recipe.webpage_backup_pdf_url || recipe.cloudflare_pdf_url)
-        ? (recipe.source_cloudflare_pdf_url || recipe.webpage_backup_pdf_url || recipe.cloudflare_pdf_url)
-        : "";
-    const generatedPdfPath = recipe && (recipe.generated_pdf_path || recipe.generated_recipe_pdf_path)
-        ? (recipe.generated_pdf_path || recipe.generated_recipe_pdf_path)
-        : "";
-    const generatedCloudflareUrl = recipe && (recipe.generated_cloudflare_pdf_url || recipe.generated_recipe_pdf_url || recipe.pdf_public_url)
-        ? (recipe.generated_cloudflare_pdf_url || recipe.generated_recipe_pdf_url || recipe.pdf_public_url)
-        : "";
+    const pdfValues = normalizeRecipeEditorPdfValues(recipe || {}, recipeEditorCurrentUrl(), {
+        useCurrentForMissing: options.useCurrentForMissing !== false,
+    });
+    const updateInputValues = options.updateInputValues !== false;
+    const sourceUrl = pdfValues.source_url;
+    const sourcePdfPath = pdfValues.source_pdf_path;
+    const sourceCloudflareUrl = pdfValues.source_cloudflare_pdf_url;
+    const generatedPdfPath = pdfValues.generated_pdf_path;
+    const generatedCloudflareUrl = pdfValues.generated_cloudflare_pdf_url;
     const hasGeneratedLocalPdf = Boolean(recipe && sourceUrl && (
         recipe.generated_pdf_local_available
         || recipe.generated_recipe_pdf_local_available
-        || (generatedPdfPath && !generatedCloudflareUrl)
-    ));
-    const hasGeneratedPdf = Boolean(sourceUrl && (
-        generatedCloudflareUrl
         || generatedPdfPath
-        || (recipe && (recipe.generated_pdf_available || recipe.generated_recipe_pdf_available || recipe.pdf_available))
     ));
-    const canOpenRecipePdf = Boolean(sourceUrl);
-    const generatedArchiveUrl = canOpenRecipePdf
-        ? (generatedCloudflareUrl || recipeArchivePdfUrl(sourceUrl, "generated_recipe"))
-        : "#";
-    const sourceArchiveUrl = sourceUrl ? recipeArchivePdfUrl(sourceUrl, "webpage_backup") : "#";
+    const hasSourceLocalPdf = Boolean(recipe && sourceUrl && (
+        recipe.source_pdf_local_available
+        || recipe.webpage_backup_pdf_local_available
+        || sourcePdfPath
+    ));
+    const generatedArchiveUrl = hasGeneratedLocalPdf
+        ? recipeArchivePdfUrl(sourceUrl, "generated_recipe")
+        : "";
+    const generatedOpenUrl = generatedCloudflareUrl || generatedArchiveUrl;
+    const sourceArchiveUrl = hasSourceLocalPdf
+        ? recipeArchivePdfUrl(sourceUrl, "webpage_backup")
+        : "";
+    const sourceOpenUrl = sourceCloudflareUrl || sourceArchiveUrl;
+    const hasGeneratedPdf = Boolean(generatedOpenUrl);
 
-    setRecipePdfFieldOpenTarget(sourcePdfPathInput, sourcePdfPathLink, sourcePdfPath, sourcePdfPath ? sourceArchiveUrl : "", "Open Source PDF Path");
-    setRecipePdfFieldOpenTarget(sourceCloudflareInput, sourceCloudflareLink, sourceCloudflareUrl, sourceCloudflareUrl, "Open Source Cloudflare PDF");
-    setRecipePdfFieldOpenTarget(generatedPdfPathInput, generatedPdfPathLink, generatedPdfPath, generatedPdfPath ? recipeArchivePdfUrl(sourceUrl, "generated_recipe") : "", "Open Generated PDF");
-    setRecipePdfFieldOpenTarget(generatedCloudflareInput, generatedCloudflareLink, generatedCloudflareUrl, generatedCloudflareUrl, "Open Generated Cloudflare PDF");
+    setRecipePdfFieldOpenTarget(sourcePdfPathInput, sourcePdfPathLink, sourcePdfPath, sourceArchiveUrl, "Open Source PDF Path", {
+        updateInput: updateInputValues,
+    });
+    setRecipePdfFieldOpenTarget(sourceCloudflareInput, sourceCloudflareLink, sourceCloudflareUrl, sourceCloudflareUrl, "Open Source Cloudflare PDF", {
+        updateInput: updateInputValues,
+    });
+    setRecipePdfFieldOpenTarget(generatedPdfPathInput, generatedPdfPathLink, generatedPdfPath, generatedArchiveUrl, "Open Generated PDF", {
+        updateInput: updateInputValues,
+    });
+    setRecipePdfFieldOpenTarget(generatedCloudflareInput, generatedCloudflareLink, generatedCloudflareUrl, generatedCloudflareUrl, "Open Generated Cloudflare PDF", {
+        updateInput: updateInputValues,
+    });
 
     [pdfButton, pdfMobileButton].forEach((button) => {
         if (button) {
-            button.hidden = !canOpenRecipePdf;
-            button.href = generatedArchiveUrl;
-            button.dataset.recipePdfUrl = generatedArchiveUrl;
+            button.hidden = !generatedOpenUrl;
+            button.href = generatedOpenUrl || "#";
+            button.dataset.recipePdfUrl = generatedOpenUrl || "";
         }
     });
 
     [pdfPanelButton, pdfMenuButton].forEach((button) => {
         if (button) {
-            button.hidden = !hasGeneratedPdf;
-            button.href = generatedArchiveUrl;
-            button.dataset.recipePdfUrl = generatedArchiveUrl;
+            button.hidden = !generatedOpenUrl;
+            button.href = generatedOpenUrl || "#";
+            button.dataset.recipePdfUrl = generatedOpenUrl || "";
         }
     });
 
     [sourcePdfButton, sourcePdfMobileButton].forEach((button) => {
         if (button) {
-            button.hidden = !sourceCloudflareUrl;
-            button.href = sourceCloudflareUrl || "#";
-            button.dataset.recipePdfUrl = sourceCloudflareUrl || "";
+            button.hidden = !sourceOpenUrl;
+            button.href = sourceOpenUrl || "#";
+            button.dataset.recipePdfUrl = sourceOpenUrl || "";
         }
     });
 
@@ -9392,13 +9666,14 @@ function syncRecipeEditSourceFilesDetails() {
     details.open = !mobile;
 }
 
-function setRecipePdfFieldOpenTarget(input, link, value, openUrl, label) {
+function setRecipePdfFieldOpenTarget(input, link, value, openUrl, label, options = {}) {
     const textValue = String(value || "").trim();
     const targetUrl = String(openUrl || "").trim();
     const canOpen = Boolean(textValue && targetUrl && targetUrl !== "#");
 
-    if (input) {
+    if (input && options.updateInput !== false) {
         input.value = textValue;
+        input.dataset.lastServerValue = textValue;
     }
 
     if (!link) {
@@ -12953,6 +13228,12 @@ async function createRecipeEditorPdf(button) {
             pdf_object_key: finalPdfData.pdf_object_key || "",
             pdf_uploaded_at: finalPdfData.pdf_uploaded_at || "",
         });
+        scheduleOpenRecipeEditorPdfRefresh({
+            recipeUrl: sourceUrl,
+            waitForGeneratedCloudflare: true,
+            initialDelay: 600,
+            timeoutMs: 15000,
+        });
         setRecipeEditStatus(statusMessage);
         showRecipeQuantityUpdatedMessage("", "", "", statusMessage);
     } catch (err) {
@@ -13062,6 +13343,12 @@ async function uploadRecipeEditorPdfToCloudflareWithSource(sourceUrl) {
         pdf_public_url: data.pdf_public_url || data.generated_cloudflare_pdf_url || data.generated_recipe_pdf_url || "",
         pdf_object_key: data.pdf_object_key || "",
         pdf_uploaded_at: data.pdf_uploaded_at || "",
+    });
+    scheduleOpenRecipeEditorPdfRefresh({
+        recipeUrl: sourceUrlValue,
+        waitForGeneratedCloudflare: true,
+        initialDelay: 600,
+        timeoutMs: 15000,
     });
 
     return data;
@@ -18225,6 +18512,14 @@ async function startRecipeExtractionUrls(urls) {
                 data = {};
             }
             syncOpenAiUsageDashboardFromResponse(data);
+            if (response.ok && data && data.ok !== false) {
+                scheduleOpenRecipeEditorPdfRefresh({
+                    recipeUrl: url,
+                    waitForSourceCloudflare: true,
+                    initialDelay: 500,
+                    timeoutMs: 15000,
+                });
+            }
             return response;
         }).catch(err => {
             if (!cancelExtractRequested) {
@@ -18509,6 +18804,15 @@ function scheduleExtractionRefresh(jobId) {
     }
 
     extractRefreshTimer = setTimeout(() => {
+        if (recipeEditorIsOpen()) {
+            scheduleOpenRecipeEditorPdfRefresh({
+                initialDelay: 0,
+                waitForSourceCloudflare: true,
+                timeoutMs: 15000,
+            });
+            return;
+        }
+
         window.location.href = "/";
     }, 1200);
 }
