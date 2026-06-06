@@ -63,6 +63,13 @@ LOW_CONFIDENCE_FOOD_IMAGE_INFERENCE = float(
     os.getenv("LOW_CONFIDENCE_FOOD_IMAGE_INFERENCE", "0.55")
 )
 NON_RECIPE_FOOD_DISH_ERROR = "This upload does not appear to contain a recipe or recognizable food dish."
+NO_READABLE_UPLOAD_TEXT_ERROR = "No readable recipe text was found in this uploaded file."
+NO_WRITTEN_PHOTO_TEXT_ERROR = "No written recipe text was found in this photo."
+FOOD_PHOTO_NO_RECIPE_TEXT_ERROR = (
+    "This looks like a food photo, but no written recipe was found. "
+    "Add a description or recipe notes to generate a shopping list."
+)
+NO_UPLOAD_INGREDIENTS_ERROR = "No recipe ingredients were found in this uploaded file."
 DEFAULT_YOUTUBE_AUDIO_PLAYER_CLIENTS = ("android",)
 OPENAI_FILE_INPUT_MIME_TYPES = {
     "application/pdf",
@@ -5597,6 +5604,83 @@ def parse_json_text_response(recipe_url, response_text):
     return json_data, None
 
 
+def build_normalized_import_object(
+    source_type,
+    source_name="",
+    source_url="",
+    uploaded_file_path="",
+    extracted_text="",
+    detected_food_photo=False,
+    recipe_json=None,
+    error_message="",
+):
+    return {
+        "source_type": source_type,
+        "source_name": source_name,
+        "source_url": source_url,
+        "uploaded_file_path": uploaded_file_path,
+        "extracted_text": extracted_text,
+        "detected_food_photo": bool(detected_food_photo),
+        "recipe_json": recipe_json,
+        "error_message": error_message,
+    }
+
+
+def upload_import_source_type(mime_type, filename, upload_path):
+    suffix = upload_file_suffix(filename, upload_path)
+    normalized_mime_type = str(mime_type or "").split(";", 1)[0].strip().lower()
+
+    if normalized_mime_type.startswith("image/"):
+        return "image"
+
+    if normalized_mime_type == "application/pdf" or suffix == ".pdf":
+        return "pdf"
+
+    if normalized_mime_type.startswith("text/") or suffix in {".txt", ".md"}:
+        return "text"
+
+    return "document"
+
+
+def upload_source_type_label(source_type):
+    return {
+        "url": "URL",
+        "image": "Image",
+        "pdf": "PDF",
+        "document": "Document",
+        "text": "Text",
+    }.get(str(source_type or "").strip().lower(), "File")
+
+
+def build_upload_failure_result(import_object, error_message, failed_step="extract", **extra):
+    import_object = import_object if isinstance(import_object, dict) else {}
+    import_object["error_message"] = error_message
+
+    print(
+        "[recipe_import] action=upload_import_failed "
+        f"source_type={import_object.get('source_type')} "
+        f"source_name={str(import_object.get('source_name') or '')!r} "
+        f"failed_step={failed_step} error={error_message}"
+    )
+
+    result = {
+        "ok": False,
+        "error": error_message,
+        "failed_step": failed_step,
+        "ingredients": [],
+        "import_source": import_object,
+        "source_type": import_object.get("source_type"),
+        "source_type_label": upload_source_type_label(import_object.get("source_type")),
+        "source_name": import_object.get("source_name"),
+        "source_url": import_object.get("source_url"),
+        "uploaded_file_path": import_object.get("uploaded_file_path"),
+        "extracted_text": import_object.get("extracted_text") or "",
+        "detected_food_photo": bool(import_object.get("detected_food_photo")),
+    }
+    result.update(extra)
+    return result
+
+
 def parse_confidence(value):
     if isinstance(value, str):
         cleaned = value.strip().replace("%", "").strip()
@@ -5908,11 +5992,67 @@ def extract_recipe_from_upload(file_storage):
     )
     mime_type = normalize_upload_mime_type(mime_type, filename, upload_path)
     upload_suffix = upload_file_suffix(filename, upload_path)
+    import_source_type = upload_import_source_type(mime_type, filename, upload_path)
+    import_object = build_normalized_import_object(
+        import_source_type,
+        source_name=filename,
+        source_url=recipe_url,
+        uploaded_file_path=str(upload_path),
+    )
     page_text = ""
     extraction_method = "upload"
 
     try:
-        if upload_is_word_document(mime_type, filename, upload_path):
+        upload_path_for_review = upload_path
+        mime_type_for_review = mime_type
+        filename_for_review = filename
+
+        if import_source_type == "image":
+            page_text, detected_food_photo, read_error = read_upload_image_text(
+                recipe_url,
+                upload_path,
+                mime_type,
+                filename,
+            )
+            import_object["extracted_text"] = page_text
+            import_object["detected_food_photo"] = detected_food_photo
+            extraction_method = "photo_text"
+
+            if not page_text.strip():
+                error_message = (
+                    FOOD_PHOTO_NO_RECIPE_TEXT_ERROR
+                    if detected_food_photo
+                    else NO_WRITTEN_PHOTO_TEXT_ERROR
+                )
+                if read_error:
+                    print(
+                        "[recipe_import] action=upload_read_failed "
+                        f"source_type={import_source_type} file={filename!r} error={read_error}"
+                    )
+                return build_upload_failure_result(
+                    import_object,
+                    error_message,
+                    failed_step="read",
+                    extraction_method=extraction_method,
+                )
+
+            prompt_text = build_prompt(
+                recipe_url,
+                page_text[:MAX_PAGE_TEXT_CHARS],
+                "This text was read from an uploaded image. Extract only the written recipe content.",
+            )
+            response_text = send_prompt_to_openai(prompt_text)
+        elif upload_is_word_document(mime_type, filename, upload_path):
+            if upload_suffix == ".docx":
+                try:
+                    page_text = extract_text_from_generic_document(upload_path, filename)
+                except Exception as exc:
+                    page_text = ""
+                    print(
+                        "[recipe_import] action=upload_word_text_failed "
+                        f"file={filename!r} error={exc}"
+                    )
+
             converted_pdf_path, page_text = convert_word_upload_to_pdf(
                 recipe_url,
                 upload_path,
@@ -5920,140 +6060,124 @@ def extract_recipe_from_upload(file_storage):
                 page_text=page_text,
             )
             extraction_filename = f"{Path(filename).stem or 'uploaded-recipe'}.pdf"
-            prompt_text = build_upload_prompt(recipe_url, extraction_filename)
-            response_text = send_file_prompt_to_openai(
-                prompt_text,
-                converted_pdf_path,
-                "application/pdf",
-                extraction_filename,
-            )
             upload_path_for_review = converted_pdf_path
             mime_type_for_review = "application/pdf"
             filename_for_review = extraction_filename
             extraction_method = "document_text"
-        elif mime_type.startswith("image/"):
-            prompt_text = build_upload_prompt(recipe_url, filename)
-            response_text = send_image_prompt_to_openai(prompt_text, upload_path, mime_type)
-            upload_path_for_review = upload_path
-            mime_type_for_review = mime_type
-            filename_for_review = filename
-            extraction_method = "photo_text"
-        elif mime_type.startswith("text/") or upload_suffix in {".txt", ".md"}:
+
+            if page_text.strip():
+                prompt_text = build_prompt(recipe_url, page_text[:MAX_PAGE_TEXT_CHARS])
+                response_text = send_prompt_to_openai(prompt_text)
+            else:
+                prompt_text = build_upload_prompt(recipe_url, extraction_filename)
+                response_text = send_file_prompt_to_openai(
+                    prompt_text,
+                    converted_pdf_path,
+                    "application/pdf",
+                    extraction_filename,
+                )
+            import_object["extracted_text"] = page_text
+        elif import_source_type == "text":
             page_text = upload_path.read_text(encoding="utf-8", errors="ignore")
-            prompt_text = build_prompt(recipe_url, page_text[:MAX_PAGE_TEXT_CHARS])
-            response_text = send_prompt_to_openai(prompt_text)
-            upload_path_for_review = upload_path
-            mime_type_for_review = mime_type
-            filename_for_review = filename
-            extraction_method = "document_text"
-        elif upload_can_use_openai_file_input(mime_type, filename, upload_path):
-            prompt_text = build_upload_prompt(recipe_url, filename)
-            response_text = send_file_prompt_to_openai(prompt_text, upload_path, mime_type, filename)
-            upload_path_for_review = upload_path
-            mime_type_for_review = mime_type
-            filename_for_review = filename
-            extraction_method = "document_text"
-        else:
-            page_text = extract_text_from_generic_document(upload_path, filename)
+            import_object["extracted_text"] = page_text
 
             if not page_text.strip():
-                return {
-                    "ok": False,
-                    "error": "No readable recipe text was found in that file. Try a photo, PDF, Word document, or text-based recipe file.",
-                }
+                return build_upload_failure_result(
+                    import_object,
+                    NO_READABLE_UPLOAD_TEXT_ERROR,
+                    failed_step="read",
+                    extraction_method="document_text",
+                )
 
             prompt_text = build_prompt(recipe_url, page_text[:MAX_PAGE_TEXT_CHARS])
             response_text = send_prompt_to_openai(prompt_text)
-            upload_path_for_review = upload_path
-            mime_type_for_review = mime_type
-            filename_for_review = filename
+            extraction_method = "document_text"
+        elif import_source_type == "pdf":
+            try:
+                page_text = extract_text_from_pdf(upload_path)
+            except Exception as exc:
+                page_text = ""
+                print(
+                    "[recipe_import] action=upload_pdf_text_failed "
+                    f"file={filename!r} error={exc}"
+                )
+            import_object["extracted_text"] = page_text
+            extraction_method = "document_text"
+
+            if page_text.strip():
+                prompt_text = build_prompt(recipe_url, page_text[:MAX_PAGE_TEXT_CHARS])
+                response_text = send_prompt_to_openai(prompt_text)
+            elif upload_can_use_openai_file_input(mime_type, filename, upload_path):
+                prompt_text = build_upload_prompt(recipe_url, filename)
+                response_text = send_file_prompt_to_openai(prompt_text, upload_path, mime_type, filename)
+            else:
+                return build_upload_failure_result(
+                    import_object,
+                    NO_READABLE_UPLOAD_TEXT_ERROR,
+                    failed_step="read",
+                    extraction_method=extraction_method,
+                )
+        else:
+            page_text = extract_text_from_generic_document(upload_path, filename)
+            import_object["extracted_text"] = page_text
+
+            if not page_text.strip():
+                return build_upload_failure_result(
+                    import_object,
+                    NO_READABLE_UPLOAD_TEXT_ERROR,
+                    failed_step="read",
+                    extraction_method="document_text",
+                )
+
+            prompt_text = build_prompt(recipe_url, page_text[:MAX_PAGE_TEXT_CHARS])
+            response_text = send_prompt_to_openai(prompt_text)
             extraction_method = "document_text"
 
         json_data, parse_error = parse_json_text_response(recipe_url, response_text)
-        should_infer_food_image = False
         if parse_error:
-            if extraction_method != "photo_text":
-                return {
-                    "ok": False,
-                    "error": parse_error,
-                }
-
-            should_infer_food_image = True
-        elif extraction_method == "photo_text" and not structured_recipe_data_is_usable(json_data):
-            should_infer_food_image = True
-
-        if should_infer_food_image:
-            inferred_json, inference_error = infer_food_image_recipe(
-                recipe_url,
-                upload_path,
-                mime_type_for_review,
-                filename_for_review,
+            print(
+                "[recipe_import] action=upload_extract_parse_failed "
+                f"source_type={import_source_type} file={filename!r} error={parse_error}"
             )
-            if inference_error:
-                return {
-                    "ok": False,
-                    "error": NON_RECIPE_FOOD_DISH_ERROR,
-                    "extraction_method": "not_recipe_image",
-                }
-
-            extraction_method = "food_image_inferred"
-            json_data = inferred_json
-
-        if extraction_method == "food_image_inferred":
-            if not structured_recipe_data_is_usable(json_data):
-                return {
-                    "ok": False,
-                    "error": NON_RECIPE_FOOD_DISH_ERROR,
-                    "extraction_method": "not_recipe_image",
-                    "source_type": "food_image_inferred",
-                }
-
-            extraction_confidence = parse_confidence(json_data.get("extraction_confidence"))
-            if extraction_confidence is None:
-                extraction_confidence = 0.5
-            json_data["extraction_confidence"] = extraction_confidence
-
-            if extraction_confidence < LOW_CONFIDENCE_FOOD_IMAGE_INFERENCE:
-                return {
-                    "ok": False,
-                    "error": (
-                        "Could not confidently infer a full recipe from this image. "
-                        "Please provide a short dish description (for example, 'grilled salmon with broccoli') and retry."
-                    ),
-                    "needs_dish_description": True,
-                    "extraction_confidence": extraction_confidence,
-                    "source_type": "food_image_inferred",
-                    "extraction_method": "not_recipe_image",
-                }
-
-            parsed_title = clean_recipe_text(
-                json_data.get("recipe_title") or json_data.get("display_name") or ""
+            return build_upload_failure_result(
+                import_object,
+                NO_UPLOAD_INGREDIENTS_ERROR,
+                failed_step="extract",
+                extraction_method=extraction_method,
             )
-            if extraction_confidence >= FOOD_IMAGE_INFERENCE_CONFIDENCE_THRESHOLD and parsed_title:
-                json_data["recipe_title"] = f"AI-Inferred {parsed_title}"
-                json_data["display_name"] = f"AI-Inferred {parsed_title}"
-            else:
-                json_data["recipe_title"] = "AI-Inferred Recipe from Food Photo"
-                json_data["display_name"] = "AI-Inferred Recipe from Food Photo"
 
-            json_data["source_type"] = "food_image_inferred"
-            json_data["ai_inferred"] = True
-            normalize_extracted_recipe_identity(json_data)
-        else:
-            title = determine_upload_recipe_title(
-                recipe_url,
-                upload_path_for_review,
-                mime_type_for_review,
-                filename_for_review,
-                page_text,
+        import_object["recipe_json"] = json_data
+        if not structured_recipe_data_is_usable(json_data):
+            print(
+                "[recipe_import] action=upload_extract_no_recipe_data "
+                f"source_type={import_source_type} file={filename!r} "
+                f"has_ingredients={bool(json_data.get('ingredients'))} "
+                f"has_instructions={bool(json_data.get('instructions'))}"
             )
-            if title:
-                json_data["recipe_title"] = title
-            json_data.setdefault("ai_inferred", False)
-            json_data["source_type"] = (
-                "photo_text" if extraction_method == "photo_text" else "document_text"
+            return build_upload_failure_result(
+                import_object,
+                NO_UPLOAD_INGREDIENTS_ERROR,
+                failed_step="extract",
+                extraction_method=extraction_method,
             )
-            json_data.setdefault("extraction_confidence", 0.90)
+
+        title = determine_upload_recipe_title(
+            recipe_url,
+            upload_path_for_review,
+            mime_type_for_review,
+            filename_for_review,
+            page_text,
+        )
+        if title:
+            json_data["recipe_title"] = title
+        json_data.setdefault("ai_inferred", False)
+        json_data["source_type"] = (
+            "photo_text" if extraction_method == "photo_text" else "document_text"
+        )
+        json_data["import_source_type"] = import_source_type
+        json_data["import_source_name"] = filename
+        json_data["extracted_text"] = page_text
+        json_data.setdefault("extraction_confidence", 0.90)
 
         json_data["source_url"] = recipe_url
         if json_data.get("ai_inferred") is None:
@@ -6068,15 +6192,14 @@ def extract_recipe_from_upload(file_storage):
         )
         if cover_image:
             json_data["cover_image"] = cover_image
-        if extraction_method != "food_image_inferred":
-            merge_missing_upload_ingredients(
-                recipe_url,
-                json_data,
-                upload_path_for_review,
-                mime_type_for_review,
-                filename_for_review,
-                page_text,
-            )
+        merge_missing_upload_ingredients(
+            recipe_url,
+            json_data,
+            upload_path_for_review,
+            mime_type_for_review,
+            filename_for_review,
+            page_text,
+        )
 
         json_data["extraction_method"] = extraction_method
         archive_uploaded_recipe_pdf(
@@ -6089,15 +6212,30 @@ def extract_recipe_from_upload(file_storage):
         )
         save_extracted_recipe_json(recipe_url, json_data)
 
-        return build_extract_result(recipe_url, json_data, extraction_method)
+        result = build_extract_result(recipe_url, json_data, extraction_method)
+        import_object["recipe_json"] = json_data
+        result["import_source"] = import_object
+        result["source_type"] = import_source_type
+        result["source_type_label"] = upload_source_type_label(import_source_type)
+        result["source_name"] = filename
+        result["uploaded_file_path"] = str(upload_path)
+        result["extracted_text"] = page_text
+        result["detected_food_photo"] = bool(import_object.get("detected_food_photo"))
+        return result
     except Exception as exc:
         raw_error_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_UPLOAD_ERROR.txt"
         raw_error_path.write_text(str(exc), encoding="utf-8")
+        print(
+            "[recipe_import] action=upload_extract_exception "
+            f"source_type={import_source_type} file={filename!r} error={exc}"
+        )
 
-        return {
-            "ok": False,
-            "error": f"Upload extraction failed: {exc}",
-        }
+        return build_upload_failure_result(
+            import_object,
+            f"Upload extraction failed: {exc}",
+            failed_step="extract",
+            extraction_method=extraction_method,
+        )
 
 
 def upload_can_use_openai_file_input(mime_type, filename, upload_path):
@@ -6314,6 +6452,47 @@ If the upload is a grocery package, handwritten note, printed recipe card, cookb
 screenshot, or recipe photo, use only the visible text. Do not invent hidden ingredients.
 """,
     )
+
+
+def build_upload_image_text_prompt(filename):
+    return f"""
+Read this uploaded image named {filename}.
+
+Return ONLY valid JSON in this shape:
+{{
+  "extracted_text": "all readable recipe text from the image, preserving line breaks where useful",
+  "detected_food_photo": false,
+  "contains_written_recipe": false
+}}
+
+Rules:
+- Transcribe readable written text only.
+- If the image shows prepared food or a meal, set detected_food_photo to true.
+- If the image has ingredient lines, directions, recipe title text, cookbook text, or recipe-card text, set contains_written_recipe to true.
+- If there is no readable written recipe text, set extracted_text to an empty string.
+- Do not infer a recipe from the food image.
+"""
+
+
+def read_upload_image_text(recipe_url, upload_path, mime_type, filename):
+    try:
+        response_text = send_image_prompt_to_openai(
+            build_upload_image_text_prompt(filename),
+            upload_path,
+            mime_type,
+        )
+        data, parse_error = parse_json_text_response(recipe_url, response_text)
+    except Exception as exc:
+        raw_error_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_IMAGE_READ_ERROR.txt"
+        raw_error_path.write_text(str(exc), encoding="utf-8")
+        return "", False, str(exc)
+
+    if parse_error:
+        return "", False, parse_error
+
+    extracted_text = str(data.get("extracted_text") or "").strip()
+    detected_food_photo = bool(data.get("detected_food_photo"))
+    return extracted_text, detected_food_photo, ""
 
 
 def determine_upload_recipe_title(recipe_url, upload_path, mime_type, filename, page_text=""):

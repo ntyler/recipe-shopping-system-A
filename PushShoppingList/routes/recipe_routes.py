@@ -29,6 +29,7 @@ from PushShoppingList.services.extraction_progress_service import request_cancel
 from PushShoppingList.services.extraction_progress_service import start_progress
 from PushShoppingList.services.recipe_extract_service import extract_recipe_from_upload
 from PushShoppingList.services.recipe_extract_service import extract_recipe_from_url
+from PushShoppingList.services.recipe_extract_service import NO_UPLOAD_INGREDIENTS_ERROR
 from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
 from PushShoppingList.services.recipe_extract_service import recipe_cover_image_file_path
 from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_path
@@ -562,12 +563,14 @@ def upload_recipe_media_route():
     log_selected_import_cookbook("media-upload", cookbook)
 
     result = extract_recipe_from_upload(uploaded_file)
-    extraction_source = str(
-        result.get("extraction_method") or result.get("source_type") or "upload"
-    ).strip()
+    extraction_source = str(result.get("source_type") or result.get("extraction_method") or "upload").strip()
     extraction_confidence = result.get("extraction_confidence")
     extraction_error = str(result.get("error") or "").strip()
     path_label = {
+        "image": "uploaded image",
+        "pdf": "uploaded PDF/document",
+        "document": "uploaded PDF/document",
+        "text": "uploaded text",
         "document_text": "text recipe import",
         "photo_text": "text recipe import",
         "food_image_inferred": "food image inferred recipe",
@@ -609,7 +612,7 @@ def upload_recipe_media_route():
         sort_ingredients()
     elif result.get("ok"):
         if not result.get("error"):
-            result["error"] = NO_INGREDIENTS_ERROR
+            result["error"] = NO_UPLOAD_INGREDIENTS_ERROR
         result = {
             **result,
             "ok": False,

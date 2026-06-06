@@ -5905,12 +5905,14 @@ async function submitRecipeMediaUpload(input) {
     const destination = currentImportCookbookDestination();
     syncImportCookbookHiddenInputs(destination);
 
+    const sourceTypeLabel = recipeUploadSourceTypeLabel(file);
+
     if (status) {
-        status.textContent = `Loading ${file.name}...`;
+        status.textContent = `Importing ${file.name}...`;
     }
 
     console.log("[recipe_import] selected import cookbook", destination);
-    showRecipeFileLoadingOverlay(file.name);
+    showRecipeFileLoadingOverlay(file.name, sourceTypeLabel);
     await waitForNextPaint();
 
     const formData = new FormData(form);
@@ -5943,8 +5945,12 @@ async function submitRecipeMediaUpload(input) {
         clearTimeout(readingTimer);
         clearTimeout(extractTimer);
 
+        setRecipeFileSourceType((data && data.source_type_label) || sourceTypeLabel);
+
         if (!response.ok || !data.ok) {
-            throw new Error((data && data.error) || "Unable to load file.");
+            const error = new Error((data && data.error) || "Unable to load file.");
+            error.data = data;
+            throw error;
         }
 
         updateRecipeFileLoadingStep("upload", "done", "Uploaded");
@@ -5975,8 +5981,20 @@ async function submitRecipeMediaUpload(input) {
     } catch (err) {
         clearTimeout(readingTimer);
         clearTimeout(extractTimer);
-        updateRecipeFileLoadingStep("extract", "failed", "Failed");
-        updateRecipeFileLoadingStep("save", "failed", "Not saved");
+        const data = err && err.data ? err.data : {};
+        setRecipeFileSourceType(data.source_type_label || sourceTypeLabel);
+
+        if (data.failed_step === "read") {
+            updateRecipeFileLoadingStep("upload", "done", "Uploaded");
+            updateRecipeFileLoadingStep("read", "failed", "No readable recipe text");
+            updateRecipeFileLoadingStep("extract", "waiting", "Waiting");
+            updateRecipeFileLoadingStep("save", "waiting", "Disabled");
+        } else {
+            updateRecipeFileLoadingStep("upload", "done", "Uploaded");
+            updateRecipeFileLoadingStep("read", "done", "Read");
+            updateRecipeFileLoadingStep("extract", "failed", "No usable recipe data");
+            updateRecipeFileLoadingStep("save", "waiting", "Disabled");
+        }
         setRecipeFileLoadingSummary(err.message || "Unable to load file.");
 
         if (status) {
@@ -5987,7 +6005,34 @@ async function submitRecipeMediaUpload(input) {
     }
 }
 
-function showRecipeFileLoadingOverlay(fileName) {
+function recipeUploadSourceTypeLabel(file) {
+    const name = String((file && file.name) || "").toLowerCase();
+    const type = String((file && file.type) || "").toLowerCase();
+
+    if (type.startsWith("image/")) {
+        return "Image";
+    }
+
+    if (type === "application/pdf" || name.endsWith(".pdf")) {
+        return "PDF";
+    }
+
+    if (type.startsWith("text/") || name.endsWith(".txt") || name.endsWith(".md")) {
+        return "Text";
+    }
+
+    return "Document";
+}
+
+function setRecipeFileSourceType(sourceTypeLabel) {
+    const node = document.getElementById("recipeFileSourceType");
+
+    if (node) {
+        node.textContent = `Source type: ${sourceTypeLabel || "File"}`;
+    }
+}
+
+function showRecipeFileLoadingOverlay(fileName, sourceTypeLabel) {
     let overlay = document.getElementById("recipeFileLoadingOverlay");
 
     if (!overlay) {
@@ -5998,15 +6043,23 @@ function showRecipeFileLoadingOverlay(fileName) {
         overlay.innerHTML = `
             <div class="recipe-qty-progress-card" role="dialog" aria-modal="true" aria-labelledby="recipeFileLoadingTitle">
                 <div class="recipe-qty-progress-header">
-                    <h2 id="recipeFileLoadingTitle">Loading File</h2>
+                    <h2 id="recipeFileLoadingTitle">Importing File</h2>
                     <button type="button" class="recipe-qty-progress-close" onclick="hideRecipeFileLoadingOverlay()">Hide</button>
                 </div>
+                <div id="recipeFileSourceType" class="recipe-qty-progress-summary">Source type: File</div>
                 <div id="recipeFileLoadingSummary" class="recipe-qty-progress-summary">Preparing file...</div>
                 <div id="recipeFileLoadingList" class="recipe-qty-progress-list"></div>
             </div>
         `;
         document.body.appendChild(overlay);
     }
+
+    const title = overlay.querySelector("#recipeFileLoadingTitle");
+    if (title) {
+        title.textContent = "Importing File";
+    }
+
+    setRecipeFileSourceType(sourceTypeLabel);
 
     const list = overlay.querySelector("#recipeFileLoadingList");
     const steps = [
