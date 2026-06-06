@@ -9055,6 +9055,7 @@ async function openRecipeEditor(button, options = {}) {
         return;
     }
 
+    syncRecipeEditSourceFilesDetails();
     setRecipeEditStatus("Loading recipe...");
     modal.classList.add("open");
     modal.setAttribute("aria-hidden", "false");
@@ -9153,6 +9154,7 @@ function populateRecipeEditor(recipe, originalUrl) {
     populateRecipeEditCategories(recipe);
     populateRecipeScalingControls(recipe.scaling || {}, recipe.servings || "");
     updateRecipeEditorPdfControls(recipe);
+    syncRecipeEditSourceFilesDetails();
     setRecipeEditorCoverImage(coverImage, recipe.recipe_title || recipe.display_name || "Recipe title image");
 
     const sourceInput = document.getElementById("recipeEditSourceUrl");
@@ -9290,6 +9292,9 @@ function updateRecipeEditorPdfControls(recipe) {
     const generatedCloudflareInput = document.getElementById("recipeEditGeneratedCloudflarePdfUrl");
     const generatedCloudflareLink = document.getElementById("recipeEditGeneratedCloudflarePdfUrlLink");
     const pdfButton = document.getElementById("recipeEditPdfButton");
+    const pdfMobileButton = document.getElementById("recipeEditPdfButtonMobile");
+    const sourcePdfButton = document.getElementById("recipeEditSourcePdfButton");
+    const sourcePdfMobileButton = document.getElementById("recipeEditSourcePdfButtonMobile");
     const pdfPanelButton = document.getElementById("recipeEditPdfButtonPanel");
     const pdfMenuButton = document.getElementById("recipeEditPdfMenuButton");
     const localPdfDownloadButton = document.getElementById("recipeEditLocalPdfDownloadButton");
@@ -9329,11 +9334,19 @@ function updateRecipeEditorPdfControls(recipe) {
     setRecipePdfFieldOpenTarget(generatedPdfPathInput, generatedPdfPathLink, generatedPdfPath, generatedPdfPath ? recipeArchivePdfUrl(sourceUrl, "generated_recipe") : "", "Open Generated PDF");
     setRecipePdfFieldOpenTarget(generatedCloudflareInput, generatedCloudflareLink, generatedCloudflareUrl, generatedCloudflareUrl, "Open Generated Cloudflare PDF");
 
-    [pdfButton, pdfPanelButton, pdfMenuButton].forEach((button) => {
+    [pdfButton, pdfMobileButton, pdfPanelButton, pdfMenuButton].forEach((button) => {
         if (button) {
             button.hidden = !hasGeneratedPdf;
             button.href = generatedArchiveUrl;
             button.dataset.recipePdfUrl = generatedArchiveUrl;
+        }
+    });
+
+    [sourcePdfButton, sourcePdfMobileButton].forEach((button) => {
+        if (button) {
+            button.hidden = !sourceCloudflareUrl;
+            button.href = sourceCloudflareUrl || "#";
+            button.dataset.recipePdfUrl = sourceCloudflareUrl || "";
         }
     });
 
@@ -9354,6 +9367,20 @@ function updateRecipeEditorPdfControls(recipe) {
     if (uploadPdfButton) {
         uploadPdfButton.hidden = !sourceUrl || !hasGeneratedLocalPdf || Boolean(generatedCloudflareUrl);
     }
+}
+
+function syncRecipeEditSourceFilesDetails() {
+    const details = document.getElementById("recipeEditSourceFilesDetails");
+
+    if (!details) {
+        return;
+    }
+
+    const mobile = window.matchMedia
+        ? window.matchMedia("(max-width: 760px)").matches
+        : window.innerWidth <= 760;
+
+    details.open = !mobile;
 }
 
 function setRecipePdfFieldOpenTarget(input, link, value, openUrl, label) {
