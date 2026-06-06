@@ -29,6 +29,7 @@ from PushShoppingList.services.recipe_extract_service import extract_recipe_from
 from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
 from PushShoppingList.services.recipe_extract_service import recipe_cover_image_file_path
 from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_path
+from PushShoppingList.services.recipe_extract_service import recipe_pdf_path
 from PushShoppingList.services.cookbook_service import ensure_unclassified_cookbook_for_recipes
 from PushShoppingList.services.cookbook_service import purge_recipe_from_all_cookbooks
 from PushShoppingList.services.food_review_alternative_service import suggest_food_review_alternatives
@@ -47,7 +48,10 @@ from PushShoppingList.services.recipe_edit_service import save_recipe_cover_imag
 from PushShoppingList.services.recipe_edit_service import save_recipe_detail_image_upload
 from PushShoppingList.services.recipe_edit_service import create_source_url_pdf
 from PushShoppingList.services.recipe_edit_service import ensure_recipe_pdf_cloudflare_link
+from PushShoppingList.services.recipe_edit_service import ensure_recipe_pdf_pair
+from PushShoppingList.services.recipe_edit_service import normalize_pdf_kind
 from PushShoppingList.services.recipe_edit_service import upload_recipe_pdf_to_cloudflare
+from PushShoppingList.services.recipe_edit_service import upload_all_recipe_pdfs_to_cloudflare
 from PushShoppingList.services.recipe_image_progress_service import load_recipe_image_progress
 from PushShoppingList.services.recipe_ingredient_service import remove_recipe_and_unused_ingredients
 from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
@@ -190,6 +194,7 @@ def extract_recipe_route():
                     save_recipe_url_name(url, result.get("display_name") or result.get("recipe_title"))
                 add_recipe_urls([url])
                 ensure_recipe_has_default_cookbook(url, result)
+                ensure_recipe_pdf_pair(url, regenerate_generated=True)
                 record_recipe_import_activity(url, result, "form-url")
                 extracted_any = True
                 mark_url_done(job_id, urls, index, len(ingredients))
@@ -235,6 +240,7 @@ def upload_recipe_media_route():
             save_recipe_url_name(recipe_url, result.get("display_name") or result.get("recipe_title"))
         add_recipe_urls([recipe_url])
         ensure_recipe_has_default_cookbook(recipe_url, result)
+        ensure_recipe_pdf_pair(recipe_url, regenerate_generated=True)
         record_recipe_import_activity(recipe_url, result, "media-upload")
         sort_ingredients()
     elif result.get("ok"):
@@ -315,6 +321,7 @@ def api_extract_recipe_route():
             save_recipe_url_name(url, result.get("display_name") or result.get("recipe_title"))
         add_recipe_urls([url])
         ensure_recipe_has_default_cookbook(url, result)
+        ensure_recipe_pdf_pair(url, regenerate_generated=True)
         record_recipe_import_activity(url, result, "api-url")
         progress = mark_url_done(job_id, urls, index, len(ingredients))
         finish_batch_if_ready(job_id, progress)
@@ -603,7 +610,18 @@ def api_delete_recipe_pdf_route():
 def api_upload_recipe_pdf_to_cloudflare_route():
     data = request.get_json(silent=True) or {}
     url = str(data.get("url", "") or "").strip()
-    result = upload_recipe_pdf_to_cloudflare(url)
+    kind = normalize_pdf_kind(data.get("kind") or data.get("pdf_kind") or "")
+    result = upload_recipe_pdf_to_cloudflare(url, pdf_kind=kind)
+    status = 200 if result.get("ok") else 400
+
+    return jsonify(result), status
+
+
+@recipe_bp.route("/api/recipe_pdfs/cloudflare_upload", methods=["POST"])
+def api_upload_recipe_pdfs_to_cloudflare_route():
+    data = request.get_json(silent=True) or {}
+    url = str(data.get("url", "") or "").strip()
+    result = upload_all_recipe_pdfs_to_cloudflare(url)
     status = 200 if result.get("ok") else 400
 
     return jsonify(result), status
@@ -621,7 +639,8 @@ def recipe_pdf_link_route():
             "error": "Recipe URL is required.",
         }), 400
 
-    result = ensure_recipe_pdf_cloudflare_link(url, allow_local_fallback=False)
+    kind = normalize_pdf_kind(request.args.get("kind") or request.args.get("pdf_kind") or "")
+    result = ensure_recipe_pdf_cloudflare_link(url, allow_local_fallback=False, pdf_kind=kind)
     public_url = str(result.get("public_url") or result.get("pdf_public_url") or "").strip()
     success = bool(result.get("success") and public_url)
     status = 200 if success else 400
@@ -642,6 +661,7 @@ def recipe_pdf_link_route():
 def recipe_archive_pdf_route():
     url = str(request.args.get("url", "") or "").strip()
     wants_download = str(request.args.get("download", "") or "").strip().lower() in {"1", "true", "yes"}
+    kind = normalize_pdf_kind(request.args.get("kind") or request.args.get("pdf_kind") or "")
 
     if not url:
         abort(404)
@@ -651,7 +671,7 @@ def recipe_archive_pdf_route():
         if not is_admin_user(user):
             return Response("Admin access is required to download local recipe PDFs.", status=403)
 
-        pdf_path = recipe_archive_pdf_path(url)
+        pdf_path = recipe_pdf_path(url, kind)
 
         if not pdf_path.exists():
             abort(404)
@@ -663,7 +683,7 @@ def recipe_archive_pdf_route():
             download_name=pdf_path.name,
         )
 
-    result = ensure_recipe_pdf_cloudflare_link(url, allow_local_fallback=True)
+    result = ensure_recipe_pdf_cloudflare_link(url, allow_local_fallback=True, pdf_kind=kind)
     public_url = str(result.get("public_url") or result.get("pdf_public_url") or "").strip()
 
     if result.get("success") and public_url:
@@ -675,7 +695,7 @@ def recipe_archive_pdf_route():
 
         return response
 
-    pdf_path = recipe_archive_pdf_path(url)
+    pdf_path = recipe_pdf_path(url, kind)
 
     if pdf_path.exists():
         return send_file(

@@ -72,6 +72,8 @@ DEFAULT_RECIPE_SCALING_MULTIPLIERS = (
     {"label": "2x", "value": 2},
     {"label": "3x", "value": 3},
 )
+PDF_KIND_WEBPAGE_BACKUP = "webpage_backup"
+PDF_KIND_GENERATED_RECIPE = "generated_recipe"
 PDF_PAPER_WIDTH_IN = 8.5
 PDF_MARGIN_TOP_IN = 0.65
 PDF_MARGIN_BOTTOM_IN = 0.45
@@ -243,6 +245,18 @@ def recipe_archive_pdf_path(recipe_url):
     return PDF_FOLDER / f"{safe_filename(recipe_url)}.pdf"
 
 
+def generated_recipe_pdf_path(recipe_url):
+    return PDF_FOLDER / f"{safe_filename(recipe_url)}_generated_recipe.pdf"
+
+
+def recipe_pdf_path(recipe_url, pdf_kind=PDF_KIND_WEBPAGE_BACKUP):
+    return (
+        generated_recipe_pdf_path(recipe_url)
+        if pdf_kind == PDF_KIND_GENERATED_RECIPE
+        else recipe_archive_pdf_path(recipe_url)
+    )
+
+
 def recipe_archive_pdf_exists(recipe_url):
     return recipe_archive_pdf_path(recipe_url).exists()
 
@@ -255,7 +269,21 @@ def cloudflare_pdf_upload_is_usable(upload_result):
     return bool(upload_result and (upload_result.get("ok") or upload_result.get("code") == "duplicate_object"))
 
 
-def attach_cloudflare_pdf_metadata(recipe_url, json_data, upload_result, pdf_path=None):
+def pdf_metadata_field_prefix(pdf_kind):
+    return (
+        "generated_recipe_pdf"
+        if pdf_kind == PDF_KIND_GENERATED_RECIPE
+        else "webpage_backup_pdf"
+    )
+
+
+def attach_cloudflare_pdf_metadata(
+    recipe_url,
+    json_data,
+    upload_result,
+    pdf_path=None,
+    pdf_kind=PDF_KIND_WEBPAGE_BACKUP,
+):
     if not isinstance(json_data, dict) or not cloudflare_pdf_upload_is_usable(upload_result):
         return json_data
 
@@ -266,21 +294,41 @@ def attach_cloudflare_pdf_metadata(recipe_url, json_data, upload_result, pdf_pat
         return json_data
 
     uploaded_at = utc_iso_now()
-    pdf_metadata = json_data.get("pdf") if isinstance(json_data.get("pdf"), dict) else {}
-    pdf_metadata["local_path"] = str(pdf_path or recipe_archive_pdf_path(recipe_url))
-    pdf_metadata["r2_object_key"] = object_key
-    pdf_metadata["r2_public_url"] = public_url
-    pdf_metadata["uploaded_at"] = uploaded_at
-    pdf_metadata["cloud_status"] = "uploaded"
-    pdf_metadata["cloudflare_r2"] = {
-        "provider": "cloudflare_r2",
-        "bucket": str(upload_result.get("bucket") or os.getenv("R2_BUCKET_NAME", "")).strip(),
-        "object_key": object_key,
-        "public_url": public_url,
+    pdf_kind = PDF_KIND_GENERATED_RECIPE if pdf_kind == PDF_KIND_GENERATED_RECIPE else PDF_KIND_WEBPAGE_BACKUP
+    local_path = str(pdf_path or recipe_pdf_path(recipe_url, pdf_kind))
+    bucket = str(upload_result.get("bucket") or os.getenv("R2_BUCKET_NAME", "")).strip()
+    kind_metadata = {
+        "local_path": local_path,
+        "r2_object_key": object_key,
+        "r2_public_url": public_url,
         "uploaded_at": uploaded_at,
         "cloud_status": "uploaded",
+        "cloudflare_r2": {
+            "provider": "cloudflare_r2",
+            "bucket": bucket,
+            "object_key": object_key,
+            "public_url": public_url,
+            "uploaded_at": uploaded_at,
+            "cloud_status": "uploaded",
+        },
     }
+    pdf_metadata = json_data.get("pdf") if isinstance(json_data.get("pdf"), dict) else {}
+    pdf_metadata[pdf_kind] = kind_metadata
+
+    if pdf_kind == PDF_KIND_WEBPAGE_BACKUP:
+        pdf_metadata["local_path"] = local_path
+        pdf_metadata["r2_object_key"] = object_key
+        pdf_metadata["r2_public_url"] = public_url
+        pdf_metadata["uploaded_at"] = uploaded_at
+        pdf_metadata["cloud_status"] = "uploaded"
+        pdf_metadata["cloudflare_r2"] = kind_metadata["cloudflare_r2"]
+
     json_data["pdf"] = pdf_metadata
+    prefix = pdf_metadata_field_prefix(pdf_kind)
+    json_data[f"{prefix}_path"] = local_path
+    json_data[f"{prefix}_url"] = public_url
+    json_data[f"{prefix}_object_key"] = object_key
+    json_data[f"{prefix}_uploaded_at"] = uploaded_at
 
     return json_data
 
