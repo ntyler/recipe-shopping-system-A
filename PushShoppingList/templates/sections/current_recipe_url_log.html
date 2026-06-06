@@ -97,13 +97,6 @@
                                            title="{{ recipe.source_display_url }}"
                                            onclick="event.stopPropagation()"
                                            data-recipe-url="{{ recipe.url }}">{{ recipe.name }}</a>
-                                        {% if recipe.rating %}
-                                            <span class="recipe-rating-display"
-                                                  aria-label="{{ recipe.rating }} out of 5 stars"
-                                                  title="{{ recipe.rating }} out of 5 stars">
-                                                {{ recipe.rating_stars }}
-                                            </span>
-                                        {% endif %}
                                     </span>
                                 </div>
                                 {% if recipe.food_rule_status.needs_review %}
@@ -211,6 +204,18 @@
                                                     {% endif %}
                                                 </div>
                                         </div>
+                                    </div>
+                                {% endif %}
+                                {% if recipe.rating %}
+                                    <div class="recipe-url-summary-rating">
+                                        <span class="recipe-url-summary-rating-label recipe-url-summary-meta-label">Rating:</span>
+                                        <span class="recipe-url-summary-rating-value recipe-url-summary-meta-value">
+                                            <span class="recipe-rating-display"
+                                                  aria-label="{{ recipe.rating }} out of 5 stars"
+                                                  title="{{ recipe.rating }} out of 5 stars">
+                                                {{ recipe.rating_stars }}
+                                            </span>
+                                        </span>
                                     </div>
                                 {% endif %}
                                 </div>
