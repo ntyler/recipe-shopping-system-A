@@ -435,8 +435,9 @@ body {
         }
 
         .recipe-import-cookbook-field {
-            max-width: 520px;
-            margin: 12px auto 0;
+            width: 100%;
+            max-width: none;
+            margin: 12px 0 0;
             text-align: left;
         }
 
