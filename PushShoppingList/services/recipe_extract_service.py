@@ -284,7 +284,30 @@ def attach_cloudflare_pdf_metadata(
     pdf_path=None,
     pdf_kind=PDF_KIND_WEBPAGE_BACKUP,
 ):
-    if not isinstance(json_data, dict) or not cloudflare_pdf_upload_is_usable(upload_result):
+    if not isinstance(json_data, dict):
+        return json_data
+
+    pdf_kind = PDF_KIND_GENERATED_RECIPE if pdf_kind == PDF_KIND_GENERATED_RECIPE else PDF_KIND_WEBPAGE_BACKUP
+    local_path = str(pdf_path or recipe_pdf_path(recipe_url, pdf_kind))
+    prefix = pdf_metadata_field_prefix(pdf_kind)
+
+    json_data[f"{prefix}_path"] = local_path
+    if pdf_kind == PDF_KIND_GENERATED_RECIPE:
+        json_data["generated_pdf_path"] = local_path
+    else:
+        json_data["source_pdf_path"] = local_path
+        json_data["pdf_path"] = local_path
+
+    if not cloudflare_pdf_upload_is_usable(upload_result):
+        print(
+            "[recipe_pdf_fields] "
+            f"action=extract_attach_local:{pdf_kind} "
+            f"fields={{'source_url': {str(json_data.get('source_url') or recipe_url)!r}, "
+            f"'source_pdf_path': {str(json_data.get('source_pdf_path') or '')!r}, "
+            f"'source_cloudflare_pdf_url': {str(json_data.get('source_cloudflare_pdf_url') or '')!r}, "
+            f"'generated_pdf_path': {str(json_data.get('generated_pdf_path') or '')!r}, "
+            f"'generated_cloudflare_pdf_url': {str(json_data.get('generated_cloudflare_pdf_url') or '')!r}}}"
+        )
         return json_data
 
     object_key = str(upload_result.get("object_key") or "").strip()
@@ -294,8 +317,6 @@ def attach_cloudflare_pdf_metadata(
         return json_data
 
     uploaded_at = utc_iso_now()
-    pdf_kind = PDF_KIND_GENERATED_RECIPE if pdf_kind == PDF_KIND_GENERATED_RECIPE else PDF_KIND_WEBPAGE_BACKUP
-    local_path = str(pdf_path or recipe_pdf_path(recipe_url, pdf_kind))
     bucket = str(upload_result.get("bucket") or os.getenv("R2_BUCKET_NAME", "")).strip()
     kind_metadata = {
         "local_path": local_path,
@@ -324,11 +345,28 @@ def attach_cloudflare_pdf_metadata(
         pdf_metadata["cloudflare_r2"] = kind_metadata["cloudflare_r2"]
 
     json_data["pdf"] = pdf_metadata
-    prefix = pdf_metadata_field_prefix(pdf_kind)
     json_data[f"{prefix}_path"] = local_path
     json_data[f"{prefix}_url"] = public_url
     json_data[f"{prefix}_object_key"] = object_key
     json_data[f"{prefix}_uploaded_at"] = uploaded_at
+    if pdf_kind == PDF_KIND_GENERATED_RECIPE:
+        json_data["generated_pdf_path"] = local_path
+        json_data["generated_cloudflare_pdf_url"] = public_url
+    else:
+        json_data["source_pdf_path"] = local_path
+        json_data["source_cloudflare_pdf_url"] = public_url
+        json_data["pdf_path"] = local_path
+        json_data["cloudflare_pdf_url"] = public_url
+
+    print(
+        "[recipe_pdf_fields] "
+        f"action=extract_attach_cloudflare:{pdf_kind} "
+        f"fields={{'source_url': {str(json_data.get('source_url') or recipe_url)!r}, "
+        f"'source_pdf_path': {str(json_data.get('source_pdf_path') or '')!r}, "
+        f"'source_cloudflare_pdf_url': {str(json_data.get('source_cloudflare_pdf_url') or '')!r}, "
+        f"'generated_pdf_path': {str(json_data.get('generated_pdf_path') or '')!r}, "
+        f"'generated_cloudflare_pdf_url': {str(json_data.get('generated_cloudflare_pdf_url') or '')!r}}}"
+    )
 
     return json_data
 
@@ -5450,6 +5488,7 @@ def save_json_response(recipe_url, response_text, html_text=None):
 
     try:
         json_data = json.loads(cleaned)
+        json_data["source_url"] = json_data.get("source_url") or recipe_url
         normalize_extracted_recipe_identity(json_data)
         normalize_extracted_ingredient_fields(json_data)
         normalize_extracted_equipment_fields(json_data)
@@ -5585,6 +5624,7 @@ def structured_recipe_data_is_usable(json_data):
 
 
 def save_extracted_recipe_json(recipe_url, json_data):
+    json_data["source_url"] = json_data.get("source_url") or recipe_url
     normalize_extracted_recipe_identity(json_data)
     normalize_extracted_ingredient_fields(json_data)
     normalize_extracted_equipment_fields(json_data)

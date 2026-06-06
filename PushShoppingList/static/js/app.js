@@ -9281,11 +9281,14 @@ function setRecipeEditorCookbook(recipe, fallbackUrl = "") {
 }
 
 function updateRecipeEditorPdfControls(recipe) {
-    const pdfPathInput = document.getElementById("recipeEditPdfPath");
-    const pdfPathLink = document.getElementById("recipeEditPdfPathLink");
-    const pdfPublicUrlField = document.getElementById("recipeEditPdfPublicUrlField");
-    const pdfPublicUrlInput = document.getElementById("recipeEditPdfPublicUrl");
-    const pdfPublicUrlLink = document.getElementById("recipeEditPdfPublicUrlLink");
+    const sourcePdfPathInput = document.getElementById("recipeEditSourcePdfPath");
+    const sourcePdfPathLink = document.getElementById("recipeEditSourcePdfPathLink");
+    const sourceCloudflareInput = document.getElementById("recipeEditSourceCloudflarePdfUrl");
+    const sourceCloudflareLink = document.getElementById("recipeEditSourceCloudflarePdfUrlLink");
+    const generatedPdfPathInput = document.getElementById("recipeEditGeneratedPdfPath");
+    const generatedPdfPathLink = document.getElementById("recipeEditGeneratedPdfPathLink");
+    const generatedCloudflareInput = document.getElementById("recipeEditGeneratedCloudflarePdfUrl");
+    const generatedCloudflareLink = document.getElementById("recipeEditGeneratedCloudflarePdfUrlLink");
     const pdfButton = document.getElementById("recipeEditPdfButton");
     const pdfPanelButton = document.getElementById("recipeEditPdfButtonPanel");
     const pdfMenuButton = document.getElementById("recipeEditPdfMenuButton");
@@ -9294,74 +9297,96 @@ function updateRecipeEditorPdfControls(recipe) {
     const copyPdfLinkButton = document.getElementById("recipeEditCopyPdfLinkButton");
     const uploadPdfButton = document.getElementById("recipeEditUploadPdfButton");
     const sourceUrl = recipe && recipe.source_url ? recipe.source_url : "";
-    const pdfPath = recipe && recipe.pdf_path ? recipe.pdf_path : "";
-    const pdfPublicUrl = recipe && recipe.pdf_public_url ? recipe.pdf_public_url : "";
-    const hasLocalPdf = Boolean(recipe && (recipe.pdf_local_available || (recipe.pdf_available && !pdfPublicUrl)) && sourceUrl);
-    const hasPdf = Boolean(recipe && sourceUrl && (pdfPublicUrl || recipe.pdf_available || hasLocalPdf));
-    const archiveUrl = hasPdf ? (pdfPublicUrl || recipeArchivePdfUrl(sourceUrl)) : "#";
+    const sourcePdfPath = recipe && (recipe.source_pdf_path || recipe.webpage_backup_pdf_path || recipe.pdf_path)
+        ? (recipe.source_pdf_path || recipe.webpage_backup_pdf_path || recipe.pdf_path)
+        : "";
+    const sourceCloudflareUrl = recipe && (recipe.source_cloudflare_pdf_url || recipe.webpage_backup_pdf_url || recipe.cloudflare_pdf_url)
+        ? (recipe.source_cloudflare_pdf_url || recipe.webpage_backup_pdf_url || recipe.cloudflare_pdf_url)
+        : "";
+    const generatedPdfPath = recipe && (recipe.generated_pdf_path || recipe.generated_recipe_pdf_path)
+        ? (recipe.generated_pdf_path || recipe.generated_recipe_pdf_path)
+        : "";
+    const generatedCloudflareUrl = recipe && (recipe.generated_cloudflare_pdf_url || recipe.generated_recipe_pdf_url || recipe.pdf_public_url)
+        ? (recipe.generated_cloudflare_pdf_url || recipe.generated_recipe_pdf_url || recipe.pdf_public_url)
+        : "";
+    const hasGeneratedLocalPdf = Boolean(recipe && sourceUrl && (
+        recipe.generated_pdf_local_available
+        || recipe.generated_recipe_pdf_local_available
+        || (generatedPdfPath && !generatedCloudflareUrl)
+    ));
+    const hasGeneratedPdf = Boolean(sourceUrl && (
+        generatedCloudflareUrl
+        || generatedPdfPath
+        || (recipe && (recipe.generated_pdf_available || recipe.generated_recipe_pdf_available || recipe.pdf_available))
+    ));
+    const generatedArchiveUrl = hasGeneratedPdf
+        ? (generatedCloudflareUrl || recipeArchivePdfUrl(sourceUrl, "generated_recipe"))
+        : "#";
+    const sourceArchiveUrl = sourceUrl ? recipeArchivePdfUrl(sourceUrl, "webpage_backup") : "#";
 
-    if (pdfPathInput) {
-        pdfPathInput.value = pdfPath;
-    }
-
-    if (pdfPathLink) {
-        pdfPathLink.href = archiveUrl;
-        pdfPathLink.hidden = !hasPdf;
-        pdfPathLink.setAttribute("aria-disabled", hasPdf ? "false" : "true");
-        pdfPathLink.title = hasPdf ? "Open PDF" : "PDF not available";
-        pdfPathLink.setAttribute("aria-label", hasPdf ? "Open PDF" : "PDF not available");
-    }
-
-    if (pdfPublicUrlInput) {
-        pdfPublicUrlInput.value = pdfPublicUrl;
-    }
-
-    if (pdfPublicUrlField) {
-        pdfPublicUrlField.hidden = !pdfPublicUrl;
-        if (pdfPublicUrlLink) {
-            const hasPublicPdfUrl = Boolean(pdfPublicUrl);
-            const canOpenPublicPdfUrl = hasPublicPdfUrl && isShareablePublicPdfUrl(pdfPublicUrl);
-            pdfPublicUrlLink.href = canOpenPublicPdfUrl ? pdfPublicUrl : "#";
-            pdfPublicUrlLink.hidden = !canOpenPublicPdfUrl;
-            pdfPublicUrlLink.setAttribute("aria-disabled", canOpenPublicPdfUrl ? "false" : "true");
-            pdfPublicUrlLink.title = canOpenPublicPdfUrl ? "Open PDF public URL" : "No public PDF URL";
-            pdfPublicUrlLink.setAttribute("aria-label", canOpenPublicPdfUrl ? "Open PDF public URL" : "No public PDF URL");
-        }
-    }
+    setRecipePdfFieldOpenTarget(sourcePdfPathInput, sourcePdfPathLink, sourcePdfPath, sourcePdfPath ? sourceArchiveUrl : "", "Open Source PDF Path");
+    setRecipePdfFieldOpenTarget(sourceCloudflareInput, sourceCloudflareLink, sourceCloudflareUrl, sourceCloudflareUrl, "Open Source Cloudflare PDF");
+    setRecipePdfFieldOpenTarget(generatedPdfPathInput, generatedPdfPathLink, generatedPdfPath, generatedPdfPath ? recipeArchivePdfUrl(sourceUrl, "generated_recipe") : "", "Open Generated PDF");
+    setRecipePdfFieldOpenTarget(generatedCloudflareInput, generatedCloudflareLink, generatedCloudflareUrl, generatedCloudflareUrl, "Open Generated Cloudflare PDF");
 
     [pdfButton, pdfPanelButton, pdfMenuButton].forEach((button) => {
         if (button) {
-            button.hidden = !hasPdf;
-            button.href = archiveUrl;
-            button.dataset.recipePdfUrl = archiveUrl;
+            button.hidden = !hasGeneratedPdf;
+            button.href = generatedArchiveUrl;
+            button.dataset.recipePdfUrl = generatedArchiveUrl;
         }
     });
 
     if (deletePdfButton) {
-        deletePdfButton.hidden = !hasLocalPdf && !pdfPublicUrl;
+        deletePdfButton.hidden = !hasGeneratedPdf;
     }
 
     if (localPdfDownloadButton) {
-        localPdfDownloadButton.hidden = !hasLocalPdf;
-        localPdfDownloadButton.href = hasLocalPdf ? recipeArchivePdfDownloadUrl(sourceUrl) : "#";
+        localPdfDownloadButton.hidden = !hasGeneratedLocalPdf;
+        localPdfDownloadButton.href = hasGeneratedLocalPdf ? recipeArchivePdfDownloadUrl(sourceUrl, "generated_recipe") : "#";
     }
 
     if (copyPdfLinkButton) {
-        copyPdfLinkButton.hidden = !pdfPublicUrl;
-        copyPdfLinkButton.dataset.pdfPublicUrl = pdfPublicUrl;
+        copyPdfLinkButton.hidden = !generatedCloudflareUrl;
+        copyPdfLinkButton.dataset.pdfPublicUrl = generatedCloudflareUrl;
     }
 
     if (uploadPdfButton) {
-        uploadPdfButton.hidden = !sourceUrl || !hasLocalPdf || Boolean(pdfPublicUrl);
+        uploadPdfButton.hidden = !sourceUrl || !hasGeneratedLocalPdf || Boolean(generatedCloudflareUrl);
     }
 }
 
-function recipeArchivePdfUrl(sourceUrl) {
-    return `/recipe_archive_pdf?url=${encodeURIComponent(sourceUrl || "")}`;
+function setRecipePdfFieldOpenTarget(input, link, value, openUrl, label) {
+    const textValue = String(value || "").trim();
+    const targetUrl = String(openUrl || "").trim();
+    const canOpen = Boolean(textValue && targetUrl && targetUrl !== "#");
+
+    if (input) {
+        input.value = textValue;
+    }
+
+    if (!link) {
+        return;
+    }
+
+    link.href = canOpen ? targetUrl : "#";
+    link.dataset.recipePdfUrl = canOpen ? targetUrl : "";
+    link.hidden = !canOpen;
+    link.setAttribute("aria-disabled", canOpen ? "false" : "true");
+    link.title = canOpen ? label : "No PDF value";
+    link.setAttribute("aria-label", canOpen ? label : "No PDF value");
 }
 
-function recipeArchivePdfDownloadUrl(sourceUrl) {
-    return `/recipe_archive_pdf?url=${encodeURIComponent(sourceUrl || "")}&download=1`;
+function recipeArchivePdfUrl(sourceUrl, kind = "") {
+    const kindValue = String(kind || "").trim();
+    const kindQuery = kindValue ? `&kind=${encodeURIComponent(kindValue)}` : "";
+    return `/recipe_archive_pdf?url=${encodeURIComponent(sourceUrl || "")}${kindQuery}`;
+}
+
+function recipeArchivePdfDownloadUrl(sourceUrl, kind = "") {
+    const kindValue = String(kind || "").trim();
+    const kindQuery = kindValue ? `&kind=${encodeURIComponent(kindValue)}` : "";
+    return `/recipe_archive_pdf?url=${encodeURIComponent(sourceUrl || "")}&download=1${kindQuery}`;
 }
 
 function openRecipeEditorPdf(link, event) {
@@ -12674,8 +12699,8 @@ async function saveRecipeEditor(event) {
 
     try {
         const payload = collectRecipeEditorPayload();
-        const pdfCreationReason = recipePdfCreationReasonOnSave(payload.recipe);
-        const shouldCreatePdf = Boolean(pdfCreationReason);
+        const pdfCreationReason = "";
+        const shouldCreatePdf = false;
         const shouldSaveCategories = recipeEditCategoryValuesChanged();
         const progressItems = buildRecipeSaveProgressItems(payload.recipe);
         let refreshProgressIndex = progressItems.length - 1;
@@ -12745,10 +12770,11 @@ async function saveRecipeEditor(event) {
             recipeForEditor = {
                 ...(recipeForEditor || {}),
                 source_url: pdfData.url || sourceUrl,
-                pdf_path: pdfData.pdf_path || "",
+                generated_pdf_path: pdfData.generated_pdf_path || pdfData.generated_recipe_pdf_path || pdfData.pdf_path || "",
                 pdf_available: true,
                 pdf_local_available: Boolean(pdfData.pdf_local_available),
-                pdf_public_url: pdfData.pdf_public_url || "",
+                generated_cloudflare_pdf_url: pdfData.generated_cloudflare_pdf_url || pdfData.generated_recipe_pdf_url || pdfData.pdf_public_url || "",
+                pdf_public_url: pdfData.pdf_public_url || pdfData.generated_cloudflare_pdf_url || pdfData.generated_recipe_pdf_url || "",
                 pdf_object_key: pdfData.pdf_object_key || "",
                 pdf_uploaded_at: pdfData.pdf_uploaded_at || "",
             };
@@ -12883,10 +12909,11 @@ async function createRecipeEditorPdf(button) {
 
         updateRecipeEditorPdfControls({
             source_url: finalPdfData.url || sourceUrl,
-            pdf_path: finalPdfData.pdf_path || "",
+            generated_pdf_path: finalPdfData.generated_pdf_path || finalPdfData.generated_recipe_pdf_path || finalPdfData.pdf_path || "",
             pdf_available: true,
             pdf_local_available: Boolean(finalPdfData.pdf_local_available),
-            pdf_public_url: finalPdfData.pdf_public_url || "",
+            generated_cloudflare_pdf_url: finalPdfData.generated_cloudflare_pdf_url || finalPdfData.generated_recipe_pdf_url || finalPdfData.pdf_public_url || "",
+            pdf_public_url: finalPdfData.pdf_public_url || finalPdfData.generated_cloudflare_pdf_url || finalPdfData.generated_recipe_pdf_url || "",
             pdf_object_key: finalPdfData.pdf_object_key || "",
             pdf_uploaded_at: finalPdfData.pdf_uploaded_at || "",
         });
@@ -12906,10 +12933,6 @@ async function createRecipeEditorPdf(button) {
 }
 
 async function createRecipePdfForSource(sourceUrl) {
-    if (isLegitimateWebUrl(sourceUrl)) {
-        return createRecipePdfFromSourceUrl(sourceUrl);
-    }
-
     return createRecipePdfFromSavedRecipe(sourceUrl);
 }
 
@@ -12986,7 +13009,7 @@ async function uploadRecipeEditorPdfToCloudflareWithSource(sourceUrl) {
         headers: {
             "Content-Type": "application/json",
         },
-        body: JSON.stringify({ url: sourceUrlValue }),
+        body: JSON.stringify({ url: sourceUrlValue, kind: "generated_recipe" }),
     });
     const data = await response.json();
 
@@ -12996,10 +13019,11 @@ async function uploadRecipeEditorPdfToCloudflareWithSource(sourceUrl) {
 
     updateRecipeEditorPdfControls({
         source_url: data.url || sourceUrlValue,
-        pdf_path: data.pdf_path || "",
+        generated_pdf_path: data.generated_pdf_path || data.generated_recipe_pdf_path || data.pdf_path || "",
         pdf_available: data.pdf_available !== false,
         pdf_local_available: Boolean(data.pdf_local_available),
-        pdf_public_url: data.pdf_public_url || "",
+        generated_cloudflare_pdf_url: data.generated_cloudflare_pdf_url || data.generated_recipe_pdf_url || data.pdf_public_url || "",
+        pdf_public_url: data.pdf_public_url || data.generated_cloudflare_pdf_url || data.generated_recipe_pdf_url || "",
         pdf_object_key: data.pdf_object_key || "",
         pdf_uploaded_at: data.pdf_uploaded_at || "",
     });
@@ -13047,7 +13071,7 @@ async function uploadRecipeEditorPdfToCloudflare(button) {
 }
 
 async function copyRecipeEditorPdfLink(button) {
-    const publicUrlInput = document.getElementById("recipeEditPdfPublicUrl");
+    const publicUrlInput = document.getElementById("recipeEditGeneratedCloudflarePdfUrl");
     const publicUrl = (
         (button && button.dataset.pdfPublicUrl ? button.dataset.pdfPublicUrl : "")
         || (publicUrlInput ? publicUrlInput.value.trim() : "")
@@ -13125,7 +13149,8 @@ async function deleteRecipeEditorPdf(button) {
 
         updateRecipeEditorPdfControls({
             source_url: data.url || sourceUrl,
-            pdf_path: data.pdf_path || "",
+            generated_pdf_path: data.generated_pdf_path || "",
+            generated_cloudflare_pdf_url: data.generated_cloudflare_pdf_url || "",
             pdf_available: false,
         });
         setRecipeEditStatus("PDF deleted.");
@@ -13482,6 +13507,18 @@ function collectRecipeEditorPayload() {
             display_name: document.getElementById("recipeEditDisplayName").value.trim(),
             recipe_title: document.getElementById("recipeEditTitleInput").value.trim(),
             source_url: sourceUrl,
+            source_pdf_path: document.getElementById("recipeEditSourcePdfPath")
+                ? document.getElementById("recipeEditSourcePdfPath").value.trim()
+                : "",
+            source_cloudflare_pdf_url: document.getElementById("recipeEditSourceCloudflarePdfUrl")
+                ? document.getElementById("recipeEditSourceCloudflarePdfUrl").value.trim()
+                : "",
+            generated_pdf_path: document.getElementById("recipeEditGeneratedPdfPath")
+                ? document.getElementById("recipeEditGeneratedPdfPath").value.trim()
+                : "",
+            generated_cloudflare_pdf_url: document.getElementById("recipeEditGeneratedCloudflarePdfUrl")
+                ? document.getElementById("recipeEditGeneratedCloudflarePdfUrl").value.trim()
+                : "",
             quantity,
             servings: document.getElementById("recipeEditServings").value.trim(),
             cover_image: collectRecipeEditorCoverImage(),
@@ -13552,7 +13589,8 @@ function updateRecipeEditSourceUrlLink() {
     sourceLink.href = canOpen ? sourceUrl : "#";
     sourceLink.hidden = !canOpen;
     sourceLink.setAttribute("aria-disabled", canOpen ? "false" : "true");
-    sourceLink.title = canOpen ? "Open source URL" : "No web source URL";
+    sourceLink.title = canOpen ? "Open Source URL" : "No web source URL";
+    sourceLink.setAttribute("aria-label", canOpen ? "Open Source URL" : "No web source URL");
 }
 
 function collectRecipeIngredientRows() {

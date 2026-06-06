@@ -48,7 +48,6 @@ from PushShoppingList.services.recipe_edit_service import save_recipe_cover_imag
 from PushShoppingList.services.recipe_edit_service import save_recipe_detail_image_upload
 from PushShoppingList.services.recipe_edit_service import create_source_url_pdf
 from PushShoppingList.services.recipe_edit_service import ensure_recipe_pdf_cloudflare_link
-from PushShoppingList.services.recipe_edit_service import ensure_recipe_pdf_pair
 from PushShoppingList.services.recipe_edit_service import normalize_pdf_kind
 from PushShoppingList.services.recipe_edit_service import upload_recipe_pdf_to_cloudflare
 from PushShoppingList.services.recipe_edit_service import upload_all_recipe_pdfs_to_cloudflare
@@ -194,7 +193,7 @@ def extract_recipe_route():
                     save_recipe_url_name(url, result.get("display_name") or result.get("recipe_title"))
                 add_recipe_urls([url])
                 ensure_recipe_has_default_cookbook(url, result)
-                ensure_recipe_pdf_pair(url, regenerate_generated=True)
+                create_source_url_pdf(url)
                 record_recipe_import_activity(url, result, "form-url")
                 extracted_any = True
                 mark_url_done(job_id, urls, index, len(ingredients))
@@ -240,7 +239,7 @@ def upload_recipe_media_route():
             save_recipe_url_name(recipe_url, result.get("display_name") or result.get("recipe_title"))
         add_recipe_urls([recipe_url])
         ensure_recipe_has_default_cookbook(recipe_url, result)
-        ensure_recipe_pdf_pair(recipe_url, regenerate_generated=True)
+        create_source_url_pdf(recipe_url)
         record_recipe_import_activity(recipe_url, result, "media-upload")
         sort_ingredients()
     elif result.get("ok"):
@@ -321,7 +320,7 @@ def api_extract_recipe_route():
             save_recipe_url_name(url, result.get("display_name") or result.get("recipe_title"))
         add_recipe_urls([url])
         ensure_recipe_has_default_cookbook(url, result)
-        ensure_recipe_pdf_pair(url, regenerate_generated=True)
+        create_source_url_pdf(url)
         record_recipe_import_activity(url, result, "api-url")
         progress = mark_url_done(job_id, urls, index, len(ingredients))
         finish_batch_if_ready(job_id, progress)

@@ -56,3 +56,27 @@ def test_recipe_entry_divider_and_ai_pantry_centering_are_wired():
     assert "#aiPantrySection .ai-pantry-toggle" in css
     assert "justify-content: center;" in css
     assert "text-align: center;" in css
+
+
+def test_recipe_editor_uses_split_source_and_generated_pdf_fields():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    js = read_text("PushShoppingList/static/js/app.js")
+
+    assert "recipe-edit-file-groups recipe-edit-wide" in template
+    assert "Source URL" in template
+    assert "Source PDF Path" in template
+    assert "Source Cloudflare PDF Path" in template
+    assert "Generated PDF Path" in template
+    assert "Generated Cloudflare PDF Path" in template
+    assert "SOURCE FILES" not in template
+    assert "GENERATED FILES" not in template
+    assert "<span>PDF Path</span>" not in template
+    assert "Cloudflare PDF URL" not in template
+    assert "recipeEditSourcePdfPath" in template
+    assert "recipeEditGeneratedPdfPath" in template
+    assert '<textarea id="recipeEditSourcePdfPath"' not in template
+    assert '<textarea id="recipeEditGeneratedCloudflarePdfUrl"' not in template
+    assert template.index("recipeEditGeneratedCloudflarePdfUrl") < template.index("recipeEditServings")
+    assert "source_pdf_path" in js
+    assert "generated_pdf_path" in js
+    assert 'body: JSON.stringify({ url: sourceUrlValue, kind: "generated_recipe" })' in js

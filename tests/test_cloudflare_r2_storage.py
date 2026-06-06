@@ -141,6 +141,60 @@ def test_recipe_pdf_upload_saves_metadata_and_deletes_local(monkeypatch, tmp_pat
     assert not pdf_path.exists()
     assert saved["pdf"]["cloudflare_r2"]["object_key"] == "recipe-pdfs/manual_recipe_test.pdf"
     assert saved["pdf"]["cloudflare_r2"]["public_url"] == result["pdf_public_url"]
+    assert saved["source_pdf_path"] == str(pdf_path)
+    assert saved["source_cloudflare_pdf_url"] == result["pdf_public_url"]
+    assert saved["webpage_backup_pdf_path"] == str(pdf_path)
+    assert saved["webpage_backup_pdf_url"] == result["pdf_public_url"]
+
+
+def test_generated_pdf_upload_saves_generated_fields_without_overwriting_source(monkeypatch, tmp_path):
+    output_dir = tmp_path / "output"
+    pdf_dir = tmp_path / "pdf"
+    output_dir.mkdir()
+    pdf_dir.mkdir()
+    monkeypatch.setattr(recipe_edit_service, "OUTPUT_FOLDER", output_dir)
+    monkeypatch.setattr(recipe_extract_service, "PDF_FOLDER", pdf_dir)
+    monkeypatch.setattr(
+        recipe_edit_service.cloudflare_r2_storage,
+        "upload_pdf",
+        lambda path: {
+            "ok": True,
+            "object_key": f"recipe-pdfs/{Path(path).name}",
+            "public_url": f"https://public.example.com/recipe-pdfs/{Path(path).name}",
+            "bucket": "recipe-shopping-pdfs",
+        },
+    )
+    monkeypatch.setattr(
+        recipe_edit_service.cloudflare_r2_storage,
+        "delete_local_pdf_after_upload",
+        lambda: False,
+    )
+    url = "https://example.com/recipes/tacos"
+    source_path = "D:/recipes/source-backup.pdf"
+    source_url = "https://public.example.com/recipe-pdfs/source-backup.pdf"
+    recipe_edit_service.save_recipe_output(url, {
+        "source_url": url,
+        "recipe_title": "Tacos",
+        "ingredients": [],
+        "source_pdf_path": source_path,
+        "source_cloudflare_pdf_url": source_url,
+    })
+    generated_path = recipe_extract_service.generated_recipe_pdf_path(url)
+    generated_path.write_bytes(b"%PDF-1.4\n%%EOF\n")
+
+    result = recipe_edit_service.upload_recipe_pdf_to_cloudflare(
+        url,
+        pdf_kind=recipe_extract_service.PDF_KIND_GENERATED_RECIPE,
+    )
+    saved = recipe_edit_service.load_recipe_output(url)
+
+    assert result["ok"] is True
+    assert saved["source_pdf_path"] == source_path
+    assert saved["source_cloudflare_pdf_url"] == source_url
+    assert saved["generated_pdf_path"] == str(generated_path)
+    assert saved["generated_cloudflare_pdf_url"] == result["pdf_public_url"]
+    assert saved["generated_recipe_pdf_path"] == str(generated_path)
+    assert saved["generated_recipe_pdf_url"] == result["pdf_public_url"]
 
 
 def test_url_import_json_save_auto_uploads_archive_to_cloudflare(monkeypatch, tmp_path):
@@ -179,6 +233,13 @@ def test_url_import_json_save_auto_uploads_archive_to_cloudflare(monkeypatch, tm
     assert json_data["pdf"]["cloudflare_r2"]["public_url"] == (
         "https://public.example.com/recipe-pdfs/example_com_recipes_tacos.pdf"
     )
+    assert json_data["source_url"] == url
+    assert json_data["source_pdf_path"] == str(recipe_extract_service.recipe_archive_pdf_path(url))
+    assert json_data["source_cloudflare_pdf_url"] == (
+        "https://public.example.com/recipe-pdfs/example_com_recipes_tacos.pdf"
+    )
+    assert json_data.get("generated_pdf_path", "") == ""
+    assert json_data.get("generated_cloudflare_pdf_url", "") == ""
 
 
 def test_uploaded_doc_save_auto_uploads_archive_and_can_delete_local(monkeypatch, tmp_path):
@@ -223,4 +284,68 @@ def test_uploaded_doc_save_auto_uploads_archive_and_can_delete_local(monkeypatch
     assert saved["pdf"]["cloudflare_r2"]["public_url"] == (
         "https://public.example.com/recipe-pdfs/uploaded_sample_doc.pdf"
     )
+    assert saved["source_pdf_path"] == str(pdf_path)
+    assert saved["source_cloudflare_pdf_url"] == (
+        "https://public.example.com/recipe-pdfs/uploaded_sample_doc.pdf"
+    )
+    assert saved.get("generated_pdf_path", "") == ""
+    assert saved.get("generated_cloudflare_pdf_url", "") == ""
     assert not pdf_path.exists()
+
+
+def test_legacy_pdf_fields_load_as_source_pdf_fields(monkeypatch, tmp_path):
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+    monkeypatch.setattr(recipe_edit_service, "OUTPUT_FOLDER", output_dir)
+    monkeypatch.setattr(recipe_edit_service, "load_recipe_ingredients", lambda: {})
+    monkeypatch.setattr(recipe_edit_service, "recipe_cookbook_assignments", lambda: {})
+    monkeypatch.setattr(recipe_edit_service, "load_food_rules", lambda: {})
+    url = "https://example.com/recipes/legacy"
+    legacy_pdf_path = "D:/legacy/source.pdf"
+    legacy_cloudflare_url = "https://public.example.com/recipe-pdfs/legacy.pdf"
+    recipe_edit_service.save_recipe_output(url, {
+        "source_url": url,
+        "recipe_title": "Legacy Recipe",
+        "ingredients": [],
+        "instructions": [],
+        "pdf_path": legacy_pdf_path,
+        "cloudflare_pdf_url": legacy_cloudflare_url,
+    })
+
+    loaded = recipe_edit_service.load_editable_recipe(url)["recipe"]
+
+    assert loaded["source_pdf_path"] == legacy_pdf_path
+    assert loaded["source_cloudflare_pdf_url"] == legacy_cloudflare_url
+    assert loaded["generated_pdf_path"] == ""
+    assert loaded["generated_cloudflare_pdf_url"] == ""
+
+
+def test_split_pdf_payload_can_explicitly_clear_legacy_aliases():
+    recipe_data = {
+        "source_pdf_path": "D:/source.pdf",
+        "source_cloudflare_pdf_url": "https://public.example.com/source.pdf",
+        "webpage_backup_pdf_path": "D:/source.pdf",
+        "webpage_backup_pdf_url": "https://public.example.com/source.pdf",
+        "pdf_path": "D:/source.pdf",
+        "cloudflare_pdf_url": "https://public.example.com/source.pdf",
+        "generated_pdf_path": "D:/generated.pdf",
+        "generated_cloudflare_pdf_url": "https://public.example.com/generated.pdf",
+        "generated_recipe_pdf_path": "D:/generated.pdf",
+        "generated_recipe_pdf_url": "https://public.example.com/generated.pdf",
+    }
+
+    recipe_edit_service.apply_recipe_pdf_asset_payload(recipe_data, {
+        "source_pdf_path": "",
+        "source_cloudflare_pdf_url": "",
+        "generated_pdf_path": "",
+        "generated_cloudflare_pdf_url": "",
+    })
+
+    assert recipe_data["source_pdf_path"] == ""
+    assert recipe_data["source_cloudflare_pdf_url"] == ""
+    assert recipe_data["pdf_path"] == ""
+    assert recipe_data["cloudflare_pdf_url"] == ""
+    assert recipe_data["generated_pdf_path"] == ""
+    assert recipe_data["generated_cloudflare_pdf_url"] == ""
+    assert recipe_data["generated_recipe_pdf_path"] == ""
+    assert recipe_data["generated_recipe_pdf_url"] == ""

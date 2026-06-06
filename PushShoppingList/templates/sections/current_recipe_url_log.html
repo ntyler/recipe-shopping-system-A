@@ -597,57 +597,93 @@
                         <input type="hidden" id="recipeEditCoverMimeType">
                         <input type="hidden" id="recipeEditCoverSource">
                     </div>
-                    <label>
-                        <span>Source URL</span>
-                        <span class="recipe-edit-source-url-field">
-                            <input type="text" name="source_url" id="recipeEditSourceUrl">
-                            <a id="recipeEditSourceUrlLink"
-                               class="recipe-edit-source-url-link"
-                               href="#"
-                               target="_blank"
-                               rel="noopener noreferrer"
-                               aria-label="Open source URL"
-                               title="Open source URL">&#8599;</a>
-                        </span>
-                    </label>
-                    <label>
-                        <span>PDF Path</span>
-                        <span class="recipe-edit-source-url-field">
-                            <input type="text" id="recipeEditPdfPath" readonly>
-                            <a id="recipeEditPdfPathLink"
-                               class="recipe-edit-source-url-link"
-                               href="#"
-                               target="_blank"
-                               rel="noopener noreferrer"
-                               aria-label="Open PDF path"
-                               title="Open PDF path"
-                               onclick="return openRecipeEditorPdf(this, event)"
-                               hidden>
-                                &#8599;
-                            </a>
-                        </span>
-                    </label>
-                    <label id="recipeEditPdfPublicUrlField" hidden>
-                        <span>Cloudflare PDF URL</span>
-                        <span class="recipe-edit-source-url-field">
-                            <input type="text" id="recipeEditPdfPublicUrl" readonly>
-                            <a id="recipeEditPdfPublicUrlLink"
-                               class="recipe-edit-source-url-link"
-                               href="#"
-                               target="_blank"
-                               rel="noopener noreferrer"
-                               aria-label="Open PDF public URL"
-                               title="Open PDF public URL"
-                               onclick="return openRecipeEditorPdf(this, event)"
-                               hidden>
-                                &#8599;
-                            </a>
-                        </span>
-                    </label>
-                    <label>
-                        <span>Servings</span>
-                        <input type="text" name="servings" id="recipeEditServings">
-                    </label>
+                    <div class="recipe-edit-file-groups recipe-edit-wide">
+                        <label class="recipe-edit-file-field">
+                            <span>Source URL</span>
+                            <span class="recipe-edit-source-url-field">
+                                <input type="text" name="source_url" id="recipeEditSourceUrl">
+                                <a id="recipeEditSourceUrlLink"
+                                   class="recipe-edit-source-url-link"
+                                   href="#"
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   aria-label="Open Source URL"
+                                   title="Open Source URL">&#8599;</a>
+                            </span>
+                        </label>
+                        <label class="recipe-edit-file-field">
+                            <span>Source PDF Path</span>
+                            <span class="recipe-edit-source-url-field">
+                                <input type="text" id="recipeEditSourcePdfPath" readonly>
+                                <a id="recipeEditSourcePdfPathLink"
+                                   class="recipe-edit-source-url-link"
+                                   href="#"
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   aria-label="Open Source PDF Path"
+                                   title="Open Source PDF Path"
+                                   onclick="return openRecipeEditorPdf(this, event)"
+                                   hidden>
+                                    &#8599;
+                                </a>
+                            </span>
+                        </label>
+                        <label class="recipe-edit-file-field">
+                            <span>Source Cloudflare PDF Path</span>
+                            <span class="recipe-edit-source-url-field">
+                                <input type="text" id="recipeEditSourceCloudflarePdfUrl" readonly>
+                                <a id="recipeEditSourceCloudflarePdfUrlLink"
+                                   class="recipe-edit-source-url-link"
+                                   href="#"
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   aria-label="Open Source Cloudflare PDF"
+                                   title="Open Source Cloudflare PDF"
+                                   onclick="return openRecipeEditorPdf(this, event)"
+                                   hidden>
+                                    &#8599;
+                                </a>
+                            </span>
+                        </label>
+                        <label class="recipe-edit-file-field">
+                            <span>Generated PDF Path</span>
+                            <span class="recipe-edit-source-url-field">
+                                <input type="text" id="recipeEditGeneratedPdfPath" readonly>
+                                <a id="recipeEditGeneratedPdfPathLink"
+                                   class="recipe-edit-source-url-link"
+                                   href="#"
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   aria-label="Open Generated PDF"
+                                   title="Open Generated PDF"
+                                   onclick="return openRecipeEditorPdf(this, event)"
+                                   hidden>
+                                    &#8599;
+                                </a>
+                            </span>
+                        </label>
+                        <label class="recipe-edit-file-field">
+                            <span>Generated Cloudflare PDF Path</span>
+                            <span class="recipe-edit-source-url-field">
+                                <input type="text" id="recipeEditGeneratedCloudflarePdfUrl" readonly>
+                                <a id="recipeEditGeneratedCloudflarePdfUrlLink"
+                                   class="recipe-edit-source-url-link"
+                                   href="#"
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   aria-label="Open Generated Cloudflare PDF"
+                                   title="Open Generated Cloudflare PDF"
+                                   onclick="return openRecipeEditorPdf(this, event)"
+                                   hidden>
+                                    &#8599;
+                                </a>
+                            </span>
+                        </label>
+                        <label class="recipe-edit-file-field">
+                            <span>Servings</span>
+                            <input type="text" name="servings" id="recipeEditServings">
+                        </label>
+                    </div>
                     <div class="recipe-edit-rating-field recipe-edit-wide">
                         <span class="recipe-edit-rating-label">Rating</span>
                         <input type="hidden" id="recipeEditRating" value="0">

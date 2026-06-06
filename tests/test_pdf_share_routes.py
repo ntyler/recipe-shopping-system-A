@@ -99,7 +99,7 @@ def test_pdf_cloudflare_upload_route_returns_public_url(monkeypatch, tmp_path):
     monkeypatch.setattr(
         pdf_routes,
         "upload_local_pdf_path_to_cloudflare",
-        lambda pdf_path, url="": {
+        lambda pdf_path, url="", pdf_kind="": {
             "ok": True,
             "success": True,
             "url": url,

@@ -17,6 +17,7 @@ from PushShoppingList.services.pdf_share_service import record_share_access
 from PushShoppingList.services.pdf_share_service import resolve_share_token
 from PushShoppingList.services.pdf_share_service import revoke_share_token
 from PushShoppingList.services.pdf_share_service import safe_resolve_pdf_path
+from PushShoppingList.services.recipe_edit_service import recipe_pdf_kind_for_filename
 from PushShoppingList.services.recipe_edit_service import recipe_url_for_pdf_filename
 from PushShoppingList.services.recipe_edit_service import upload_local_pdf_path_to_cloudflare
 from PushShoppingList.services.user_account_service import current_public_user
@@ -186,7 +187,8 @@ def upload_pdf_to_cloudflare_route():
         }), 400
 
     recipe_url = recipe_url_for_pdf_filename(pdf_path.name)
-    result = upload_local_pdf_path_to_cloudflare(pdf_path, url=recipe_url)
+    pdf_kind = recipe_pdf_kind_for_filename(pdf_path.name)
+    result = upload_local_pdf_path_to_cloudflare(pdf_path, url=recipe_url, pdf_kind=pdf_kind)
     status = 200 if result.get("ok") else 400
 
     return jsonify(result), status
