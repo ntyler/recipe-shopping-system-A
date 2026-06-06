@@ -91,3 +91,20 @@ def test_recipe_rating_note_ui_and_endpoint_hooks_present():
     assert "recipe-rating-display" in current_recipes
     assert "recipe-rating-display" in recipe_view
     assert "recipe-rating-display" in cookbooks
+
+
+def test_recipe_view_rating_is_only_metadata_row_under_cookbook():
+    recipe_view = read_text("PushShoppingList/templates/sections/items.html")
+    css = read_text("PushShoppingList/static/css/app.css")
+
+    title_group = recipe_view[
+        recipe_view.index('<span class="recipe-view-name-group">'):
+        recipe_view.index('<div class="recipe-view-title-actions">')
+    ]
+
+    assert "recipe-rating-display" not in title_group
+    assert recipe_view.count("recipe-rating-display") == 1
+    assert recipe_view.index("recipe-view-cookbook") < recipe_view.index("recipe-view-rating")
+    assert ".recipe-view-rating .recipe-rating-display" in css
+    assert "background: transparent;" in css
+    assert "border: 0;" in css

@@ -3596,13 +3596,31 @@ body {
             font-weight: 400;
         }
 
-        .recipe-view-summary-line {
+        .recipe-view-summary-line,
+        .recipe-view-rating {
             display: grid;
             grid-template-columns: var(--recipe-meta-label-width) minmax(0, 1fr);
             align-items: baseline;
             column-gap: 8px;
             margin: 0;
             font-weight: 400;
+        }
+
+        .recipe-view-rating {
+            color: #aaa;
+            font-size: 14px;
+        }
+
+        .recipe-view-rating .recipe-rating-display {
+            min-height: 0;
+            margin-left: 0;
+            padding: 0;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            color: #fbbf24;
+            font-size: 14px;
+            line-height: 1.2;
         }
 
         .recipe-view-title-amount {
