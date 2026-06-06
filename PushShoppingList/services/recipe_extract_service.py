@@ -294,8 +294,10 @@ def attach_cloudflare_pdf_metadata(
     json_data[f"{prefix}_path"] = local_path
     if pdf_kind == PDF_KIND_GENERATED_RECIPE:
         json_data["generated_pdf_path"] = local_path
+        json_data["generated_cloudflare_pdf_path"] = str(json_data.get("generated_cloudflare_pdf_url") or "").strip()
     else:
         json_data["source_pdf_path"] = local_path
+        json_data["source_cloudflare_pdf_path"] = str(json_data.get("source_cloudflare_pdf_url") or "").strip()
         json_data["pdf_path"] = local_path
 
     if not cloudflare_pdf_upload_is_usable(upload_result):
@@ -352,9 +354,11 @@ def attach_cloudflare_pdf_metadata(
     if pdf_kind == PDF_KIND_GENERATED_RECIPE:
         json_data["generated_pdf_path"] = local_path
         json_data["generated_cloudflare_pdf_url"] = public_url
+        json_data["generated_cloudflare_pdf_path"] = public_url
     else:
         json_data["source_pdf_path"] = local_path
         json_data["source_cloudflare_pdf_url"] = public_url
+        json_data["source_cloudflare_pdf_path"] = public_url
         json_data["pdf_path"] = local_path
         json_data["cloudflare_pdf_url"] = public_url
 

@@ -9914,6 +9914,10 @@ body {
             z-index: 12000;
         }
 
+        .recipe-pdf-save-prompt-backdrop {
+            z-index: 13000;
+        }
+
         .recipe-qty-progress-card {
             width: min(720px, 100%);
             max-height: 88vh;
@@ -9958,6 +9962,27 @@ body {
             font-size: 15px;
             font-weight: 700;
             text-align: center;
+        }
+
+        .recipe-pdf-save-prompt-card {
+            width: min(620px, 100%);
+        }
+
+        .recipe-pdf-save-prompt-message {
+            margin: 0;
+            padding: 12px;
+            border: 1px solid #444;
+            border-radius: 8px;
+            background: #111;
+            color: #dbe8f5;
+            font-size: 16px;
+            font-weight: 700;
+            line-height: 1.45;
+            text-align: center;
+        }
+
+        .recipe-pdf-save-prompt-actions {
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.85fr);
         }
 
         .recipe-qty-progress-list {
@@ -12954,6 +12979,10 @@ body {
             }
 
             .recipe-save-progress-actions {
+                grid-template-columns: 1fr;
+            }
+
+            .recipe-pdf-save-prompt-actions {
                 grid-template-columns: 1fr;
             }
         }

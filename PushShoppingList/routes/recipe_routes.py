@@ -1,9 +1,12 @@
 import json
+import threading
 from time import perf_counter
 
 from flask import Blueprint
 from flask import abort
+from flask import copy_current_request_context
 from flask import flash
+from flask import has_request_context
 from flask import Response
 from flask import jsonify
 from flask import redirect
@@ -75,6 +78,93 @@ recipe_bp = Blueprint("recipe_bp", __name__)
 NO_INGREDIENTS_ERROR = "No ingredients were found for this recipe URL."
 IMPORT_LOGIN_ERROR = "Sign in before importing recipes so imported data is saved to your account."
 FOOD_REVIEW_LOGIN_ERROR = "Sign in before using food reviews so results stay tied to your account."
+
+
+def run_generated_recipe_pdf_creation(recipe_url, context="import"):
+    recipe_url = str(recipe_url or "").strip()
+    context = str(context or "import").strip() or "import"
+
+    if not recipe_url:
+        return {
+            "ok": False,
+            "error": "Recipe URL is required.",
+        }
+
+    print(f"[recipe_pdf] action=auto_generated_start context={context} url={recipe_url}")
+
+    try:
+        result = create_editable_recipe_pdf(recipe_url)
+    except Exception as exc:
+        print(
+            "[recipe_pdf] "
+            f"action=auto_generated_failed context={context} url={recipe_url} error={exc}"
+        )
+        return {
+            "ok": False,
+            "url": recipe_url,
+            "error": str(exc),
+        }
+
+    public_url = str(
+        result.get("generated_cloudflare_pdf_url")
+        or result.get("generated_recipe_pdf_url")
+        or result.get("pdf_public_url")
+        or result.get("public_url")
+        or ""
+    ).strip()
+    pdf_path = str(
+        result.get("generated_pdf_path")
+        or result.get("generated_recipe_pdf_path")
+        or result.get("pdf_path")
+        or ""
+    ).strip()
+
+    if result.get("ok") and public_url:
+        print(
+            "[recipe_pdf] "
+            f"action=auto_generated_done context={context} url={recipe_url} "
+            f"generated_pdf_path={pdf_path} generated_cloudflare_pdf_url={public_url}"
+        )
+    elif result.get("ok"):
+        print(
+            "[recipe_pdf] "
+            f"action=auto_generated_local_only context={context} url={recipe_url} "
+            f"generated_pdf_path={pdf_path} error={result.get('error') or ''}"
+        )
+    else:
+        print(
+            "[recipe_pdf] "
+            f"action=auto_generated_failed context={context} url={recipe_url} "
+            f"error={result.get('error') or 'Unable to create generated recipe PDF.'}"
+        )
+
+    return result
+
+
+def schedule_generated_recipe_pdf_creation(recipe_url, context="import"):
+    recipe_url = str(recipe_url or "").strip()
+
+    if not recipe_url:
+        return {
+            "queued": False,
+            "error": "Recipe URL is required.",
+        }
+
+    def worker():
+        run_generated_recipe_pdf_creation(recipe_url, context=context)
+
+    target = copy_current_request_context(worker) if has_request_context() else worker
+    thread = threading.Thread(
+        target=target,
+        name=f"recipe-generated-pdf-{len(recipe_url)}",
+        daemon=True,
+    )
+    thread.start()
+
+    return {
+        "queued": True,
+        "url": recipe_url,
+    }
 
 
 def require_account_for_import(wants_json=False):
@@ -194,6 +284,7 @@ def extract_recipe_route():
                 add_recipe_urls([url])
                 ensure_recipe_has_default_cookbook(url, result)
                 create_source_url_pdf(url)
+                schedule_generated_recipe_pdf_creation(url, context="form-url")
                 record_recipe_import_activity(url, result, "form-url")
                 extracted_any = True
                 mark_url_done(job_id, urls, index, len(ingredients))
@@ -240,6 +331,11 @@ def upload_recipe_media_route():
         add_recipe_urls([recipe_url])
         ensure_recipe_has_default_cookbook(recipe_url, result)
         create_source_url_pdf(recipe_url)
+        pdf_job = schedule_generated_recipe_pdf_creation(recipe_url, context="media-upload")
+        result = {
+            **result,
+            "generated_recipe_pdf_job": pdf_job,
+        }
         record_recipe_import_activity(recipe_url, result, "media-upload")
         sort_ingredients()
     elif result.get("ok"):
@@ -321,6 +417,11 @@ def api_extract_recipe_route():
         add_recipe_urls([url])
         ensure_recipe_has_default_cookbook(url, result)
         create_source_url_pdf(url)
+        pdf_job = schedule_generated_recipe_pdf_creation(url, context="api-url")
+        result = {
+            **result,
+            "generated_recipe_pdf_job": pdf_job,
+        }
         record_recipe_import_activity(url, result, "api-url")
         progress = mark_url_done(job_id, urls, index, len(ingredients))
         finish_batch_if_ready(job_id, progress)

@@ -9589,12 +9589,12 @@ function updateRecipeEditorPdfControls(recipe, options = {}) {
     const generatedArchiveUrl = hasGeneratedLocalPdf
         ? recipeArchivePdfUrl(sourceUrl, "generated_recipe")
         : "";
-    const generatedOpenUrl = generatedCloudflareUrl || generatedArchiveUrl;
+    const generatedOpenUrl = generatedCloudflareUrl;
     const sourceArchiveUrl = hasSourceLocalPdf
         ? recipeArchivePdfUrl(sourceUrl, "webpage_backup")
         : "";
-    const sourceOpenUrl = sourceCloudflareUrl || sourceArchiveUrl;
-    const hasGeneratedPdf = Boolean(generatedOpenUrl);
+    const sourceOpenUrl = sourceCloudflareUrl;
+    const hasGeneratedPdf = Boolean(generatedCloudflareUrl || generatedArchiveUrl);
 
     setRecipePdfFieldOpenTarget(sourcePdfPathInput, sourcePdfPathLink, sourcePdfPath, sourceArchiveUrl, "Open Source PDF Path", {
         updateInput: updateInputValues,
@@ -12989,6 +12989,77 @@ function removeRecipeEditRow(button) {
     }
 }
 
+function recipeHasGeneratedCloudflarePdf(recipe = {}) {
+    const values = normalizeRecipeEditorPdfValues(recipe, recipeEditorCurrentUrl(), {
+        useCurrentForMissing: true,
+    });
+
+    return Boolean(String(values.generated_cloudflare_pdf_url || "").trim());
+}
+
+async function recipePdfSaveChoiceForPayload(recipe = {}) {
+    if (recipeHasGeneratedCloudflarePdf(recipe)) {
+        return "save_without_pdf";
+    }
+
+    return promptRecipeMissingPdfOnSave();
+}
+
+function promptRecipeMissingPdfOnSave() {
+    return new Promise(resolve => {
+        let overlay = document.getElementById("recipePdfSavePromptOverlay");
+
+        if (overlay) {
+            overlay.remove();
+        }
+
+        overlay = document.createElement("div");
+        overlay.id = "recipePdfSavePromptOverlay";
+        overlay.className = "recipe-qty-progress-backdrop recipe-pdf-save-prompt-backdrop open";
+        overlay.setAttribute("aria-hidden", "false");
+        overlay.innerHTML = `
+            <div class="recipe-qty-progress-card recipe-pdf-save-prompt-card" role="dialog" aria-modal="true" aria-labelledby="recipePdfSavePromptTitle" aria-describedby="recipePdfSavePromptMessage">
+                <div class="recipe-qty-progress-header">
+                    <h2 id="recipePdfSavePromptTitle">Recipe PDF</h2>
+                </div>
+                <p id="recipePdfSavePromptMessage" class="recipe-pdf-save-prompt-message">
+                    This recipe does not have a generated Recipe PDF yet. Do you want to create one now?
+                </p>
+                <div class="recipe-save-progress-actions recipe-pdf-save-prompt-actions">
+                    <button type="button" class="recipe-save-progress-action primary" data-recipe-pdf-save-choice="create">Save and Create PDF</button>
+                    <button type="button" class="recipe-save-progress-action secondary" data-recipe-pdf-save-choice="save_without_pdf">Save Without PDF</button>
+                    <button type="button" class="recipe-save-progress-action secondary" data-recipe-pdf-save-choice="cancel">Cancel</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        const settle = choice => {
+            overlay.removeEventListener("keydown", handleKeydown);
+            overlay.remove();
+            resolve(choice);
+        };
+        const handleKeydown = event => {
+            if (event.key === "Escape") {
+                event.preventDefault();
+                settle("cancel");
+            }
+        };
+
+        overlay.addEventListener("keydown", handleKeydown);
+        overlay.querySelectorAll("[data-recipe-pdf-save-choice]").forEach(button => {
+            button.addEventListener("click", () => {
+                settle(button.dataset.recipePdfSaveChoice || "cancel");
+            });
+        });
+
+        const primaryButton = overlay.querySelector('[data-recipe-pdf-save-choice="create"]');
+        if (primaryButton) {
+            primaryButton.focus({ preventScroll: true });
+        }
+    });
+}
+
 async function saveRecipeEditor(event) {
     if (event) {
         event.preventDefault();
@@ -13001,6 +13072,17 @@ async function saveRecipeEditor(event) {
         return false;
     }
 
+    const payload = collectRecipeEditorPayload();
+    const pdfSaveChoice = await recipePdfSaveChoiceForPayload(payload.recipe);
+
+    if (pdfSaveChoice === "cancel") {
+        setRecipeEditStatus("Save canceled.");
+        return false;
+    }
+
+    const shouldCreatePdf = pdfSaveChoice === "create";
+    const pdfCreationReason = shouldCreatePdf ? "missing_pdf" : "";
+
     if (saveButton) {
         saveButton.disabled = true;
         saveButton.textContent = "Saving...";
@@ -13009,9 +13091,6 @@ async function saveRecipeEditor(event) {
     setRecipeEditStatus("Saving recipe...");
 
     try {
-        const payload = collectRecipeEditorPayload();
-        const pdfCreationReason = "";
-        const shouldCreatePdf = false;
         const shouldSaveCategories = recipeEditCategoryValuesChanged();
         const progressItems = buildRecipeSaveProgressItems(payload.recipe);
         let refreshProgressIndex = progressItems.length - 1;
@@ -13060,6 +13139,8 @@ async function saveRecipeEditor(event) {
                 ? recipeForEditor.source_url
                 : payload.recipe.source_url || payload.original_url
         );
+        let createdPdfPublicUrl = "";
+        let createdPdfUploadError = "";
 
         if (shouldSaveCategories) {
             updateRecipeSaveProgressItem(categoryProgressIndex, "running", "Saving...");
@@ -13077,19 +13158,21 @@ async function saveRecipeEditor(event) {
         if (shouldCreatePdf) {
             updateRecipeSaveProgressItem(pdfProgressIndex, "running", "Generating...");
             setRecipeEditStatus("Generating PDF...");
-            const pdfData = await createRecipePdfForSource(sourceUrl);
+            const pdfData = await createRecipePdfAndUploadForSource(sourceUrl);
+            createdPdfPublicUrl = recipePdfDataCloudflareUrl(pdfData);
+            createdPdfUploadError = pdfData.upload_error || "";
             recipeForEditor = {
                 ...(recipeForEditor || {}),
                 source_url: pdfData.url || sourceUrl,
                 generated_pdf_path: pdfData.generated_pdf_path || pdfData.generated_recipe_pdf_path || pdfData.pdf_path || "",
                 pdf_available: true,
                 pdf_local_available: Boolean(pdfData.pdf_local_available),
-                generated_cloudflare_pdf_url: pdfData.generated_cloudflare_pdf_url || pdfData.generated_recipe_pdf_url || pdfData.pdf_public_url || "",
-                pdf_public_url: pdfData.pdf_public_url || pdfData.generated_cloudflare_pdf_url || pdfData.generated_recipe_pdf_url || "",
+                generated_cloudflare_pdf_url: createdPdfPublicUrl,
+                pdf_public_url: createdPdfPublicUrl,
                 pdf_object_key: pdfData.pdf_object_key || "",
                 pdf_uploaded_at: pdfData.pdf_uploaded_at || "",
             };
-            updateRecipeSaveProgressItem(pdfProgressIndex, "done", pdfData.pdf_public_url ? "Cloud ready" : "Created");
+            updateRecipeSaveProgressItem(pdfProgressIndex, "done", createdPdfPublicUrl ? "Cloud ready" : "Created");
         }
 
         updateRecipeSaveProgressItem(refreshProgressIndex, "running", "Refreshing...");
@@ -13107,12 +13190,21 @@ async function saveRecipeEditor(event) {
         updateRecipeSaveProgressItem(refreshProgressIndex, "done", "Refreshed");
         setRecipeSaveProgressSummary(
             shouldCreatePdf
-                ? "Recipe saved, cloud PDF ready, and page values refreshed."
+                ? (
+                    createdPdfPublicUrl
+                        ? "Recipe saved and PDF created."
+                        : (createdPdfUploadError || "Recipe saved and PDF created, but Cloudflare upload is not ready.")
+                )
                 : "Recipe saved and page values refreshed."
         );
         setRecipeSaveProgressActionsState("done");
         setRecipeEditStatus("");
-        showRecipeQuantityUpdatedMessage("", "", "", "Recipe updated.");
+        showRecipeQuantityUpdatedMessage(
+            "",
+            "",
+            "",
+            shouldCreatePdf && createdPdfPublicUrl ? "Recipe saved and PDF created." : "Recipe updated."
+        );
     } catch (err) {
         console.warn("Unable to save recipe.", err);
         setRecipeEditStatus("Unable to save recipe.", true);
@@ -13251,6 +13343,44 @@ async function createRecipeEditorPdf(button) {
 
 async function createRecipePdfForSource(sourceUrl) {
     return createRecipePdfFromSavedRecipe(sourceUrl);
+}
+
+function recipePdfDataCloudflareUrl(data = {}) {
+    return String(
+        data.generated_cloudflare_pdf_url
+        || data.generated_cloudflare_pdf_path
+        || data.generated_recipe_pdf_url
+        || data.pdf_public_url
+        || data.public_url
+        || ""
+    ).trim();
+}
+
+async function createRecipePdfAndUploadForSource(sourceUrl) {
+    let pdfData = await createRecipePdfForSource(sourceUrl);
+
+    if (recipePdfDataCloudflareUrl(pdfData)) {
+        return pdfData;
+    }
+
+    try {
+        setRecipeEditStatus("Uploading PDF to Cloudflare...");
+        const uploadData = await uploadRecipeEditorPdfToCloudflareWithSource(sourceUrl);
+        if (uploadData && uploadData.ok) {
+            pdfData = {
+                ...pdfData,
+                ...uploadData,
+            };
+        }
+    } catch (uploadError) {
+        console.warn("Generated recipe PDF upload failed.", uploadError);
+        pdfData = {
+            ...pdfData,
+            upload_error: `Recipe saved and PDF created, but Cloudflare upload failed: ${uploadError.message || "Unknown error"}`,
+        };
+    }
+
+    return pdfData;
 }
 
 function isLegitimateWebUrl(value) {
@@ -18515,9 +18645,10 @@ async function startRecipeExtractionUrls(urls) {
             if (response.ok && data && data.ok !== false) {
                 scheduleOpenRecipeEditorPdfRefresh({
                     recipeUrl: url,
+                    waitForGeneratedCloudflare: true,
                     waitForSourceCloudflare: true,
                     initialDelay: 500,
-                    timeoutMs: 15000,
+                    timeoutMs: 60000,
                 });
             }
             return response;
@@ -18807,8 +18938,9 @@ function scheduleExtractionRefresh(jobId) {
         if (recipeEditorIsOpen()) {
             scheduleOpenRecipeEditorPdfRefresh({
                 initialDelay: 0,
+                waitForGeneratedCloudflare: true,
                 waitForSourceCloudflare: true,
-                timeoutMs: 15000,
+                timeoutMs: 60000,
             });
             return;
         }

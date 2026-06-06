@@ -22,7 +22,7 @@ def test_shared_recipe_pdf_section_is_wired_into_main_page():
     assert "Copy PDF Link" in section_template
     assert "Upload to Cloudflare" in section_template
     assert "Create Share Link" not in section_template
-    assert "Copy Link" in section_template
+    assert "Copy PDF Link" in section_template
     assert "Revoke Link" in section_template
     assert "data-pdf-share-row" in section_template
     assert "data-pdf-public-url" in section_template
@@ -62,7 +62,7 @@ def test_recipe_editor_uses_split_source_and_generated_pdf_fields():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     js = read_text("PushShoppingList/static/js/app.js")
 
-    assert "recipe-edit-file-groups recipe-edit-wide" in template
+    assert "recipe-edit-file-groups" in template
     assert "Source URL" in template
     assert "Source PDF Path" in template
     assert "Source Cloudflare PDF Path" in template
@@ -80,3 +80,21 @@ def test_recipe_editor_uses_split_source_and_generated_pdf_fields():
     assert "source_pdf_path" in js
     assert "generated_pdf_path" in js
     assert 'body: JSON.stringify({ url: sourceUrlValue, kind: "generated_recipe" })' in js
+    assert "This recipe does not have a generated Recipe PDF yet. Do you want to create one now?" in js
+    assert "Save and Create PDF" in js
+    assert "Save Without PDF" in js
+    assert "const generatedOpenUrl = generatedCloudflareUrl;" in js
+    assert "const sourceOpenUrl = sourceCloudflareUrl;" in js
+    assert "waitForGeneratedCloudflare: true" in js
+    assert "function recipePdfSaveChoiceForPayload" in js
+
+
+def test_recipe_imports_queue_generated_recipe_pdf_creation():
+    routes = read_text("PushShoppingList/routes/recipe_routes.py")
+
+    assert "def schedule_generated_recipe_pdf_creation" in routes
+    assert "run_generated_recipe_pdf_creation(recipe_url, context=context)" in routes
+    assert 'schedule_generated_recipe_pdf_creation(url, context="form-url")' in routes
+    assert 'schedule_generated_recipe_pdf_creation(recipe_url, context="media-upload")' in routes
+    assert 'schedule_generated_recipe_pdf_creation(url, context="api-url")' in routes
+    assert "action=auto_generated_failed" in routes

@@ -155,6 +155,7 @@ def apply_recipe_pdf_asset_aliases(recipe_data):
     )
     source_url = first_pdf_asset_value(
         recipe_data.get("source_cloudflare_pdf_url"),
+        recipe_data.get("source_cloudflare_pdf_path"),
         recipe_data.get("webpage_backup_pdf_url"),
         recipe_data.get("cloudflare_pdf_url"),
     )
@@ -164,13 +165,16 @@ def apply_recipe_pdf_asset_aliases(recipe_data):
     )
     generated_url = first_pdf_asset_value(
         recipe_data.get("generated_cloudflare_pdf_url"),
+        recipe_data.get("generated_cloudflare_pdf_path"),
         recipe_data.get("generated_recipe_pdf_url"),
     )
 
     recipe_data["source_pdf_path"] = source_path
     recipe_data["source_cloudflare_pdf_url"] = source_url
+    recipe_data["source_cloudflare_pdf_path"] = source_url
     recipe_data["generated_pdf_path"] = generated_path
     recipe_data["generated_cloudflare_pdf_url"] = generated_url
+    recipe_data["generated_cloudflare_pdf_path"] = generated_url
 
     if source_path:
         recipe_data["webpage_backup_pdf_path"] = source_path
@@ -187,6 +191,16 @@ def apply_recipe_pdf_asset_aliases(recipe_data):
 def apply_recipe_pdf_asset_payload(recipe_data, payload):
     recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
     payload = payload if isinstance(payload, dict) else {}
+    if "source_cloudflare_pdf_path" in payload and "source_cloudflare_pdf_url" not in payload:
+        payload = {
+            **payload,
+            "source_cloudflare_pdf_url": payload.get("source_cloudflare_pdf_path"),
+        }
+    if "generated_cloudflare_pdf_path" in payload and "generated_cloudflare_pdf_url" not in payload:
+        payload = {
+            **payload,
+            "generated_cloudflare_pdf_url": payload.get("generated_cloudflare_pdf_path"),
+        }
 
     for field in RECIPE_PDF_ASSET_FIELDS:
         if field in payload:
@@ -196,11 +210,13 @@ def apply_recipe_pdf_asset_payload(recipe_data, payload):
                 recipe_data["webpage_backup_pdf_path"] = ""
                 recipe_data["pdf_path"] = ""
             elif field == "source_cloudflare_pdf_url" and not value:
+                recipe_data["source_cloudflare_pdf_path"] = ""
                 recipe_data["webpage_backup_pdf_url"] = ""
                 recipe_data["cloudflare_pdf_url"] = ""
             elif field == "generated_pdf_path" and not value:
                 recipe_data["generated_recipe_pdf_path"] = ""
             elif field == "generated_cloudflare_pdf_url" and not value:
+                recipe_data["generated_cloudflare_pdf_path"] = ""
                 recipe_data["generated_recipe_pdf_url"] = ""
 
     return apply_recipe_pdf_asset_aliases(recipe_data)
@@ -320,8 +336,10 @@ def load_editable_recipe(url):
             "chatgpt_feedback_created_at": str(recipe_data.get("chatgpt_feedback_created_at") or "").strip(),
             "source_pdf_path": pdf["webpage_backup"]["path"],
             "source_cloudflare_pdf_url": pdf["webpage_backup"]["public_url"],
+            "source_cloudflare_pdf_path": pdf["webpage_backup"]["public_url"],
             "generated_pdf_path": pdf["generated_recipe"]["path"],
             "generated_cloudflare_pdf_url": pdf["generated_recipe"]["public_url"],
+            "generated_cloudflare_pdf_path": pdf["generated_recipe"]["public_url"],
             "source_pdf_available": pdf["webpage_backup"]["available"],
             "source_pdf_local_available": pdf["webpage_backup"]["local_available"],
             "generated_pdf_available": pdf["generated_recipe"]["available"],
@@ -506,9 +524,15 @@ def normalize_recipe_pdf_storage_metadata(recipe_data, pdf_kind=PDF_KIND_WEBPAGE
     )
     public_url = (
         (
-            str(recipe_data.get("generated_cloudflare_pdf_url") or "").strip()
+            (
+                str(recipe_data.get("generated_cloudflare_pdf_url") or "").strip()
+                or str(recipe_data.get("generated_cloudflare_pdf_path") or "").strip()
+            )
             if is_generated
-            else str(recipe_data.get("source_cloudflare_pdf_url") or "").strip()
+            else (
+                str(recipe_data.get("source_cloudflare_pdf_url") or "").strip()
+                or str(recipe_data.get("source_cloudflare_pdf_path") or "").strip()
+            )
         )
         or str(recipe_data.get(f"{prefix}_url") or "").strip()
         or (
@@ -622,9 +646,11 @@ def save_recipe_pdf_storage_metadata(
     if pdf_kind == PDF_KIND_GENERATED_RECIPE:
         recipe_data["generated_pdf_path"] = local_path
         recipe_data["generated_cloudflare_pdf_url"] = public_url
+        recipe_data["generated_cloudflare_pdf_path"] = public_url
     else:
         recipe_data["source_pdf_path"] = local_path
         recipe_data["source_cloudflare_pdf_url"] = public_url
+        recipe_data["source_cloudflare_pdf_path"] = public_url
         recipe_data["pdf_path"] = local_path
         recipe_data["cloudflare_pdf_url"] = public_url
     apply_recipe_pdf_asset_aliases(recipe_data)
@@ -860,9 +886,11 @@ def recipe_pdf_cloudflare_result(
     if pdf_kind == PDF_KIND_GENERATED_RECIPE:
         result["generated_pdf_path"] = str(path)
         result["generated_cloudflare_pdf_url"] = public_url
+        result["generated_cloudflare_pdf_path"] = public_url
     else:
         result["source_pdf_path"] = str(path)
         result["source_cloudflare_pdf_url"] = public_url
+        result["source_cloudflare_pdf_path"] = public_url
     return result
 
 
@@ -986,9 +1014,11 @@ def upload_local_pdf_path_to_cloudflare(local_pdf_path, url="", pdf_kind=PDF_KIN
     if pdf_kind == PDF_KIND_GENERATED_RECIPE:
         result["generated_pdf_path"] = str(path)
         result["generated_cloudflare_pdf_url"] = public_url
+        result["generated_cloudflare_pdf_path"] = public_url
     else:
         result["source_pdf_path"] = str(path)
         result["source_cloudflare_pdf_url"] = public_url
+        result["source_cloudflare_pdf_path"] = public_url
     return result
 
 
@@ -1096,9 +1126,11 @@ def attach_cloudflare_pdf_result(result, upload_result, pdf_kind=PDF_KIND_GENERA
     if pdf_kind == PDF_KIND_GENERATED_RECIPE:
         result["generated_pdf_path"] = result[f"{prefix}_path"]
         result["generated_cloudflare_pdf_url"] = public_url
+        result["generated_cloudflare_pdf_path"] = public_url
     else:
         result["source_pdf_path"] = result[f"{prefix}_path"]
         result["source_cloudflare_pdf_url"] = public_url
+        result["source_cloudflare_pdf_path"] = public_url
 
     if upload_result.get("delete_warning"):
         result["delete_warning"] = upload_result["delete_warning"]
@@ -1204,9 +1236,11 @@ def generate_editable_recipe_pdf_file(url, pdf_kind=PDF_KIND_GENERATED_RECIPE):
     if pdf_kind == PDF_KIND_GENERATED_RECIPE:
         result["generated_pdf_path"] = str(saved_path)
         result["generated_cloudflare_pdf_url"] = ""
+        result["generated_cloudflare_pdf_path"] = ""
     else:
         result["source_pdf_path"] = str(saved_path)
         result["source_cloudflare_pdf_url"] = ""
+        result["source_cloudflare_pdf_path"] = ""
 
     return result
 
@@ -1454,6 +1488,7 @@ def delete_editable_recipe_pdf(url):
     if recipe_data:
         recipe_data["generated_pdf_path"] = ""
         recipe_data["generated_cloudflare_pdf_url"] = ""
+        recipe_data["generated_cloudflare_pdf_path"] = ""
         recipe_data["generated_recipe_pdf_path"] = ""
         recipe_data["generated_recipe_pdf_url"] = ""
         pdf_metadata = recipe_data.get("pdf") if isinstance(recipe_data.get("pdf"), dict) else {}
@@ -1470,6 +1505,7 @@ def delete_editable_recipe_pdf(url):
         "pdf_available": False,
         "generated_pdf_path": "",
         "generated_cloudflare_pdf_url": "",
+        "generated_cloudflare_pdf_path": "",
     }
 
 
