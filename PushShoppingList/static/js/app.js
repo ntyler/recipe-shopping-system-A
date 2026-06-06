@@ -4,6 +4,19 @@ function saveScroll() {
 
 const SUPPORT_EMAIL = "support@recipeshoppinglist.com";
 const SUPPORT_ADMIN_EMAILS = ["ntylerbert@gmail.com"];
+const CATEGORY_FIELD_NAMES = [
+    "meal_type",
+    "cuisine",
+    "main_ingredient",
+    "cooking_method",
+    "occasion",
+    "dietary_preference",
+    "prep_time_group",
+];
+const CATEGORY_ALL_FIELD_NAMES = [...CATEGORY_FIELD_NAMES, "custom_categories"];
+const CATEGORY_SOURCE_USER_SELECTED = "user_selected";
+const CATEGORY_SOURCE_AI_INFERRED = "ai_inferred";
+const CATEGORY_SOURCE_BLANK = "blank";
 const USER_ACCOUNT_OPEN_PANEL_KEY = "user-account-open-panel";
 const USER_PROFILE_EDITOR_OPEN_KEY = "user-account-settings-open";
 const USER_ACCOUNT_REMEMBERED_PANEL_SELECTORS = {
@@ -5224,6 +5237,79 @@ function setCookbookCategoryEditorStatus(message, isError = false) {
     status.classList.toggle("error", Boolean(isError));
 }
 
+function categoryFieldHasValue(field, value) {
+    if (field === "custom_categories") {
+        if (Array.isArray(value)) {
+            return value.some(item => String(item || "").trim());
+        }
+        return Boolean(String(value || "").trim());
+    }
+
+    return Boolean(String(value || "").trim());
+}
+
+function normalizeCategorySource(source, field, value) {
+    if (!categoryFieldHasValue(field, value)) {
+        return CATEGORY_SOURCE_BLANK;
+    }
+
+    return [CATEGORY_SOURCE_USER_SELECTED, CATEGORY_SOURCE_AI_INFERRED].includes(source)
+        ? source
+        : CATEGORY_SOURCE_USER_SELECTED;
+}
+
+function categorySourceDatasetKey(field) {
+    return `categorySource${field
+        .split("_")
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+        .join("")}`;
+}
+
+function setFormCategorySource(form, field, source) {
+    if (!form) {
+        return;
+    }
+
+    const values = form.id === "recipeEditForm"
+        ? collectRecipeEditorCategoryValues()
+        : {};
+    const value = values[field] || (form.elements[field] ? form.elements[field].value : "");
+    form.dataset[categorySourceDatasetKey(field)] = normalizeCategorySource(source, field, value);
+}
+
+function collectFormCategorySources(form) {
+    const sources = {};
+
+    if (!form) {
+        return sources;
+    }
+
+    CATEGORY_ALL_FIELD_NAMES.forEach(field => {
+        const fieldValue = form.elements[field] ? form.elements[field].value : "";
+        sources[field] = normalizeCategorySource(
+            form.dataset[categorySourceDatasetKey(field)],
+            field,
+            fieldValue,
+        );
+    });
+
+    return sources;
+}
+
+function setFormCategorySources(form, sources = {}, values = {}) {
+    if (!form) {
+        return;
+    }
+
+    CATEGORY_ALL_FIELD_NAMES.forEach(field => {
+        form.dataset[categorySourceDatasetKey(field)] = normalizeCategorySource(
+            sources[field],
+            field,
+            values[field],
+        );
+    });
+}
+
 function setCookbookCategoryFieldValue(form, name, value) {
     const field = form ? form.elements[name] : null;
     const nextValue = String(value || "").trim();
@@ -5260,7 +5346,7 @@ function openCookbookCategoryEditor(button) {
 
     form.setAttribute("action", `/api/cookbooks/${encodeURIComponent(cookbookId)}/recipe_categories`);
     form.dataset.categoryUserSet = button.dataset.categoryUserSet || "0";
-    form.dataset.originalCategoryValues = JSON.stringify({
+    const values = {
         meal_type: button.dataset.categoryMealType || "",
         cuisine: button.dataset.categoryCuisine || "",
         main_ingredient: button.dataset.categoryMainIngredient || "",
@@ -5269,7 +5355,19 @@ function openCookbookCategoryEditor(button) {
         dietary_preference: button.dataset.categoryDietaryPreference || "",
         prep_time_group: button.dataset.categoryPrepTimeGroup || "",
         custom_categories: button.dataset.categoryCustomCategories || "",
-    });
+    };
+    const sources = {
+        meal_type: button.dataset.categorySourceMealType || "",
+        cuisine: button.dataset.categorySourceCuisine || "",
+        main_ingredient: button.dataset.categorySourceMainIngredient || "",
+        cooking_method: button.dataset.categorySourceCookingMethod || "",
+        occasion: button.dataset.categorySourceOccasion || "",
+        dietary_preference: button.dataset.categorySourceDietaryPreference || "",
+        prep_time_group: button.dataset.categorySourcePrepTimeGroup || "",
+        custom_categories: button.dataset.categorySourceCustomCategories || "",
+    };
+    form.dataset.originalCategoryValues = JSON.stringify(values);
+    setFormCategorySources(form, sources, values);
 
     setCookbookCategoryFieldValue(form, "recipe_url", recipeUrl);
     setCookbookCategoryFieldValue(form, "meal_type", button.dataset.categoryMealType);
@@ -5280,6 +5378,7 @@ function openCookbookCategoryEditor(button) {
     setCookbookCategoryFieldValue(form, "dietary_preference", button.dataset.categoryDietaryPreference);
     setCookbookCategoryFieldValue(form, "prep_time_group", button.dataset.categoryPrepTimeGroup);
     setCookbookCategoryFieldValue(form, "custom_categories", button.dataset.categoryCustomCategories);
+    bindCookbookCategorySourceTracking(form);
 
     if (title) {
         title.textContent = recipeName;
@@ -5315,8 +5414,33 @@ function closeCookbookCategoryEditor() {
     }
 }
 
+function bindCookbookCategorySourceTracking(form) {
+    if (!form || form.dataset.categorySourceTrackingBound === "1") {
+        return;
+    }
+
+    form.dataset.categorySourceTrackingBound = "1";
+    CATEGORY_ALL_FIELD_NAMES.forEach(field => {
+        const input = form.elements[field];
+
+        if (!input) {
+            return;
+        }
+
+        const markUserSelected = () => {
+            setFormCategorySource(form, field, CATEGORY_SOURCE_USER_SELECTED);
+        };
+
+        input.addEventListener("change", markUserSelected);
+        if (input.tagName !== "SELECT") {
+            input.addEventListener("input", markUserSelected);
+        }
+    });
+}
+
 async function submitCookbookCategoryForm(form, confirmOverwrite = false) {
     const formData = new FormData(form);
+    formData.set("category_sources", JSON.stringify(collectFormCategorySources(form)));
 
     if (confirmOverwrite) {
         formData.set("confirm_overwrite", "1");
@@ -8506,15 +8630,8 @@ let activeFoodReviewRow = null;
 let activeFoodReviewAlternatives = [];
 let recipeEditDraggedRow = null;
 let recipeEditPointerDrag = null;
-const RECIPE_EDIT_CATEGORY_FIELD_NAMES = [
-    "meal_type",
-    "cuisine",
-    "main_ingredient",
-    "cooking_method",
-    "occasion",
-    "dietary_preference",
-    "prep_time_group",
-];
+const RECIPE_EDIT_CATEGORY_FIELD_NAMES = CATEGORY_FIELD_NAMES;
+const RECIPE_EDIT_CATEGORY_ALL_FIELD_NAMES = CATEGORY_ALL_FIELD_NAMES;
 
 async function fetchRecipeEditorData(url) {
     const response = await fetch(`/api/recipe?url=${encodeURIComponent(url)}`, {
@@ -8545,6 +8662,18 @@ function recipeEditCategoryValuesFromRecipe(recipe = {}) {
     return values;
 }
 
+function recipeEditCategorySourcesFromRecipe(recipe = {}, values = null) {
+    const categoryValues = values || recipeEditCategoryValuesFromRecipe(recipe);
+    return Object.fromEntries(RECIPE_EDIT_CATEGORY_ALL_FIELD_NAMES.map(field => [
+        field,
+        normalizeCategorySource(
+            recipe.category_metadata_sources ? recipe.category_metadata_sources[field] : "",
+            field,
+            categoryValues[field],
+        ),
+    ]));
+}
+
 function collectRecipeEditorCategoryValues() {
     const form = document.getElementById("recipeEditForm");
     const values = {};
@@ -8559,6 +8688,10 @@ function collectRecipeEditorCategoryValues() {
     return values;
 }
 
+function collectRecipeEditorCategorySources() {
+    return collectFormCategorySources(document.getElementById("recipeEditForm"));
+}
+
 function recipeEditCategorySnapshotKey(values = {}) {
     const normalized = {};
 
@@ -8566,6 +8699,17 @@ function recipeEditCategorySnapshotKey(values = {}) {
         normalized[field] = String(values[field] || "").trim();
     });
     normalized.custom_categories = String(values.custom_categories || "").trim();
+    return JSON.stringify(normalized);
+}
+
+function recipeEditCategorySourcesSnapshotKey(sources = {}, values = null) {
+    const normalized = {};
+    const categoryValues = values || collectRecipeEditorCategoryValues();
+
+    RECIPE_EDIT_CATEGORY_ALL_FIELD_NAMES.forEach(field => {
+        normalized[field] = normalizeCategorySource(sources[field], field, categoryValues[field]);
+    });
+
     return JSON.stringify(normalized);
 }
 
@@ -8583,6 +8727,20 @@ function originalRecipeEditCategoryValues() {
     }
 }
 
+function originalRecipeEditCategorySources() {
+    const form = document.getElementById("recipeEditForm");
+
+    if (!form || !form.dataset.originalCategorySources) {
+        return {};
+    }
+
+    try {
+        return JSON.parse(form.dataset.originalCategorySources) || {};
+    } catch (err) {
+        return {};
+    }
+}
+
 function recipeEditCategoryValuesChanged() {
     const section = document.getElementById("recipeEditCategoriesSection");
 
@@ -8591,7 +8749,9 @@ function recipeEditCategoryValuesChanged() {
     }
 
     return recipeEditCategorySnapshotKey(collectRecipeEditorCategoryValues())
-        !== recipeEditCategorySnapshotKey(originalRecipeEditCategoryValues());
+        !== recipeEditCategorySnapshotKey(originalRecipeEditCategoryValues())
+        || recipeEditCategorySourcesSnapshotKey(collectRecipeEditorCategorySources(), collectRecipeEditorCategoryValues())
+        !== recipeEditCategorySourcesSnapshotKey(originalRecipeEditCategorySources(), originalRecipeEditCategoryValues());
 }
 
 function recipeEditCategoryValuesHaveAny(values = {}) {
@@ -8602,6 +8762,7 @@ function recipeEditCategoryValuesHaveAny(values = {}) {
 function populateRecipeEditCategories(recipe = {}) {
     const form = document.getElementById("recipeEditForm");
     const values = recipeEditCategoryValuesFromRecipe(recipe);
+    const sources = recipeEditCategorySourcesFromRecipe(recipe, values);
     const recipeName = document.getElementById("recipeEditCategoryRecipeName");
     const source = document.getElementById("recipeEditCategorySource");
 
@@ -8610,7 +8771,9 @@ function populateRecipeEditCategories(recipe = {}) {
     }
 
     form.dataset.originalCategoryValues = JSON.stringify(values);
+    form.dataset.originalCategorySources = JSON.stringify(sources);
     form.dataset.categoryUserSet = recipe.category_metadata_user_set ? "1" : "0";
+    setFormCategorySources(form, sources, values);
 
     RECIPE_EDIT_CATEGORY_FIELD_NAMES.forEach(field => {
         setCookbookCategoryFieldValue(form, field, values[field]);
@@ -8623,9 +8786,36 @@ function populateRecipeEditCategories(recipe = {}) {
 
     if (source) {
         const sourceLabel = recipe.category_metadata_source
-            || (recipe.category_metadata_user_set ? "Saved" : "Inferred");
+            || (recipe.category_metadata_user_set ? "Saved" : "Blank");
         source.textContent = `Categories: ${sourceLabel}`;
     }
+}
+
+function bindRecipeEditCategorySourceTracking() {
+    const form = document.getElementById("recipeEditForm");
+
+    if (!form || form.dataset.categorySourceTrackingBound === "1") {
+        return;
+    }
+
+    form.dataset.categorySourceTrackingBound = "1";
+    RECIPE_EDIT_CATEGORY_ALL_FIELD_NAMES.forEach(field => {
+        const input = form.elements[field];
+
+        if (!input) {
+            return;
+        }
+
+        const markUserSelected = () => {
+            setFormCategorySource(form, field, CATEGORY_SOURCE_USER_SELECTED);
+            setRecipeEditCategorySourceLabel("Saved");
+        };
+
+        input.addEventListener("change", markUserSelected);
+        if (input.tagName !== "SELECT") {
+            input.addEventListener("input", markUserSelected);
+        }
+    });
 }
 
 function currentRecipeEditorCookbookId() {
@@ -8641,6 +8831,7 @@ function recipeEditorCategoryFormData(recipeUrl, values, confirmOverwrite = fals
         formData.set(field, values[field] || "");
     });
     formData.set("custom_categories", values.custom_categories || "");
+    formData.set("category_sources", JSON.stringify(collectRecipeEditorCategorySources()));
 
     if (confirmOverwrite) {
         formData.set("confirm_overwrite", "1");
@@ -8733,9 +8924,18 @@ function recipeEditCategorySuggestionValue(categories, field) {
     return String(value || "").trim();
 }
 
+function setRecipeEditCategorySourceLabel(label) {
+    const source = document.getElementById("recipeEditCategorySource");
+
+    if (source) {
+        source.textContent = `Categories: ${label || "Blank"}`;
+    }
+}
+
 function applyRecipeEditCategorySuggestions(categories = {}, mode = "missing") {
     const form = document.getElementById("recipeEditForm");
     const overwrite = mode === "all";
+    let applied = false;
 
     if (!form) {
         return;
@@ -8746,8 +8946,14 @@ function applyRecipeEditCategorySuggestions(categories = {}, mode = "missing") {
         const currentValue = input ? String(input.value || "").trim() : "";
         const nextValue = recipeEditCategorySuggestionValue(categories, field);
 
-        if (input && nextValue && (overwrite || !currentValue)) {
+        if (input && overwrite) {
             setCookbookCategoryFieldValue(form, field, nextValue);
+            setFormCategorySource(form, field, CATEGORY_SOURCE_AI_INFERRED);
+            applied = true;
+        } else if (input && nextValue && !currentValue) {
+            setCookbookCategoryFieldValue(form, field, nextValue);
+            setFormCategorySource(form, field, CATEGORY_SOURCE_AI_INFERRED);
+            applied = true;
         }
     });
 
@@ -8755,8 +8961,18 @@ function applyRecipeEditCategorySuggestions(categories = {}, mode = "missing") {
     const currentCustom = customInput ? String(customInput.value || "").trim() : "";
     const nextCustom = recipeEditCategorySuggestionValue(categories, "custom_categories");
 
-    if (customInput && nextCustom && (overwrite || !currentCustom)) {
+    if (customInput && overwrite) {
         setCookbookCategoryFieldValue(form, "custom_categories", nextCustom);
+        setFormCategorySource(form, "custom_categories", CATEGORY_SOURCE_AI_INFERRED);
+        applied = true;
+    } else if (customInput && nextCustom && !currentCustom) {
+        setCookbookCategoryFieldValue(form, "custom_categories", nextCustom);
+        setFormCategorySource(form, "custom_categories", CATEGORY_SOURCE_AI_INFERRED);
+        applied = true;
+    }
+
+    if (applied) {
+        setRecipeEditCategorySourceLabel("AI inferred");
     }
 }
 
@@ -8789,6 +9005,9 @@ async function decideRecipeEditCategoriesWithChatGPT(button, mode = "missing") {
             },
             body: JSON.stringify({
                 recipe: payload.recipe,
+                mode: decisionMode,
+                trigger_source: `recipe_editor:${decisionMode}`,
+                current_categories: collectRecipeEditorCategoryValues(),
             }),
         });
         const data = await response.json();
@@ -17583,6 +17802,7 @@ async function refreshStoreMarkup(options = {}) {
     bindSectionHeaderToggles();
     bindRecipeDetailToggles();
     bindRecipeTaskChecks();
+    bindRecipeEditCategorySourceTracking();
     decorateRecipeCoverImages();
     applyKnownRecipeImageProgressItems();
     updateViewSwitcherStickyOffset();
@@ -17783,6 +18003,7 @@ document.addEventListener("DOMContentLoaded", function () {
     bindSectionHeaderToggles();
     bindRecipeDetailToggles();
     bindRecipeTaskChecks();
+    bindRecipeEditCategorySourceTracking();
     keepRecipeCoverImagesVisible();
     initRecipeImageProgressSync();
     updateRecipeEditStickyOffsets();

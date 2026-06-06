@@ -52,7 +52,7 @@ def test_cookbook_menu_mode_static_hooks_are_present():
     assert ".cookbook-category-grid" in css
 
 
-def test_cookbook_menu_metadata_is_inferred_without_saving_over_user_fields():
+def test_cookbook_menu_metadata_uses_saved_values_without_render_inference():
     with TemporaryDirectory() as temp_dir, patch.object(
         cookbook_service,
         "COOKBOOKS_FILE",
@@ -90,20 +90,22 @@ def test_cookbook_menu_metadata_is_inferred_without_saving_over_user_fields():
         dinner = view["cookbooks"][0]
         recipe = dinner["recipes"][0]
 
-        assert recipe["main_ingredient"] == "🐔 Chicken"
-        assert recipe["cuisine"] == "🇮🇹 Italian"
-        assert recipe["meal_type"] == "🍽️ Dinner"
-        assert recipe["restaurant_menu_category"] == "🍝 Pasta"
-        assert recipe["prep_time_group"] == "⏱️ 15–30 Minutes"
-        assert "🇮🇹 Italian" in recipe["menu_tags"]
+        assert recipe["main_ingredient"] == ""
+        assert recipe["cuisine"] == ""
+        assert recipe["meal_type"] == ""
+        assert recipe["restaurant_menu_category"] == ""
+        assert recipe["prep_time_group"] == ""
+        assert recipe["category_metadata_source"] == "Blank"
+        assert recipe["category_metadata_sources"]["main_ingredient"] == "blank"
+        assert "🇮🇹 Italian" not in recipe["menu_tags"]
         assert "fettuccine pasta" in recipe["menu_search_text"]
 
-        pasta_section = next(
+        restaurant_fallback_section = next(
             section
             for section in dinner["menu_sections"]["restaurant_menu"]
-            if section["label"] == "🍝 Pasta"
+            if section["label"] == "🍽️ Other Recipes"
         )
-        assert pasta_section["recipes"][0]["name"] == "Chicken Alfredo"
+        assert restaurant_fallback_section["recipes"][0]["name"] == "Chicken Alfredo"
 
 
 def test_cookbook_category_update_requires_confirmation_before_overwriting_manual_values():
@@ -155,3 +157,5 @@ def test_cookbook_category_update_requires_confirmation_before_overwriting_manua
         assert saved_recipe["category_metadata_user_set"] is True
         assert saved_recipe["cuisine"] == "🌍 Other / Fusion"
         assert saved_recipe["custom_categories"] == ["🧪 Things We Want To Try"]
+        assert saved_recipe["category_metadata_sources"]["cuisine"] == "user_selected"
+        assert saved_recipe["category_metadata_sources"]["custom_categories"] == "user_selected"

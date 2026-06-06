@@ -21,6 +21,15 @@ COOKBOOK_CATEGORY_FIELDS = (
     "dietary_preference",
     "prep_time_group",
 )
+COOKBOOK_CATEGORY_ALL_FIELDS = (*COOKBOOK_CATEGORY_FIELDS, "custom_categories")
+CATEGORY_SOURCE_USER_SELECTED = "user_selected"
+CATEGORY_SOURCE_AI_INFERRED = "ai_inferred"
+CATEGORY_SOURCE_BLANK = "blank"
+CATEGORY_SOURCE_VALUES = {
+    CATEGORY_SOURCE_USER_SELECTED,
+    CATEGORY_SOURCE_AI_INFERRED,
+    CATEGORY_SOURCE_BLANK,
+}
 
 COOKBOOK_MENU_MODES = (
     {
@@ -135,6 +144,7 @@ COOKBOOK_MENU_MODES = (
         "sections": (
             "🥩 High Protein",
             "🥗 Low Carb",
+            "🌱 Vegan",
             "🌱 Vegetarian",
             "🌾 Gluten Free",
             "🥛 Dairy Free",
@@ -362,11 +372,18 @@ def clean_recipe_record(value):
         "instruction_items": clean_text_list(value.get("instruction_items")),
         "sections": clean_recipe_sections(value.get("sections")),
         "custom_categories": clean_custom_categories(value.get("custom_categories")),
+        "restaurant_menu_category": clean_text(value.get("restaurant_menu_category")),
+        "alphabetical_group": clean_text(value.get("alphabetical_group")),
         "category_metadata_user_set": bool(value.get("category_metadata_user_set")),
     }
 
     for field in COOKBOOK_CATEGORY_FIELDS:
         record[field] = clean_text(value.get(field))
+
+    record["category_metadata_sources"] = stored_category_sources(
+        value,
+        stored_category_metadata(record),
+    )
 
     cover_image = clean_cover_image(value.get("cover_image"))
 
@@ -500,6 +517,73 @@ def clean_category_payload(payload):
     return cleaned
 
 
+def category_field_has_value(field, value):
+    if field == "custom_categories":
+        return bool(clean_custom_categories(value))
+
+    return bool(clean_text(value))
+
+
+def normalize_category_source(value):
+    source = clean_text(value)
+    return source if source in CATEGORY_SOURCE_VALUES else ""
+
+
+def clean_category_source_payload(sources, categories=None):
+    sources = sources if isinstance(sources, dict) else {}
+    categories = categories if isinstance(categories, dict) else {}
+    cleaned = {}
+
+    for field in COOKBOOK_CATEGORY_ALL_FIELDS:
+        value = categories.get(field)
+
+        if not category_field_has_value(field, value):
+            cleaned[field] = CATEGORY_SOURCE_BLANK
+            continue
+
+        source = normalize_category_source(sources.get(field))
+        if source and source != CATEGORY_SOURCE_BLANK:
+            cleaned[field] = source
+            continue
+
+        # Older saved records did not have per-field sources. Treat any
+        # existing nonblank value as user-selected so missing-only AI inference
+        # cannot rewrite legacy saved categories.
+        cleaned[field] = CATEGORY_SOURCE_USER_SELECTED
+
+    return cleaned
+
+
+def stored_category_sources(recipe, metadata=None):
+    recipe = recipe if isinstance(recipe, dict) else {}
+    metadata = metadata if isinstance(metadata, dict) else stored_category_metadata(recipe)
+    return clean_category_source_payload(
+        recipe.get("category_metadata_sources"),
+        metadata,
+    )
+
+
+def category_sources_have_user_selected(sources):
+    sources = sources if isinstance(sources, dict) else {}
+    return any(source == CATEGORY_SOURCE_USER_SELECTED for source in sources.values())
+
+
+def category_metadata_source_label(metadata, sources):
+    metadata = metadata if isinstance(metadata, dict) else {}
+    sources = sources if isinstance(sources, dict) else {}
+
+    if not category_metadata_has_values(metadata):
+        return "Blank"
+
+    if category_sources_have_user_selected(sources):
+        return "Saved"
+
+    if any(source == CATEGORY_SOURCE_AI_INFERRED for source in sources.values()):
+        return "AI inferred"
+
+    return "Saved"
+
+
 def stored_category_metadata(recipe):
     recipe = recipe if isinstance(recipe, dict) else {}
     metadata = {
@@ -573,7 +657,9 @@ def infer_prep_time_group(recipe, text):
     if text_has_any(text, "make ahead", "overnight", "freezer"):
         return "🧊 Make Ahead"
 
-    minutes = duration_minutes(recipe.get("prep_time")) or duration_minutes(recipe.get("total_time"))
+    minutes = duration_minutes(recipe.get("total_time"))
+    if minutes is None:
+        minutes = duration_minutes(recipe.get("prep_time"))
 
     if minutes is None:
         title_match = re.search(r"\b(\d{1,3})\s*(?:minute|min)\b", text)
@@ -640,9 +726,7 @@ def infer_recipe_categories(recipe):
     else:
         metadata["cuisine"] = "🌍 Other / Fusion"
 
-    if text_has_any(text, "vegan", "tofu", "tempeh"):
-        metadata["main_ingredient"] = "🌱 Vegan"
-    elif text_has_any(text, "chicken", "turkey"):
+    if text_has_any(text, "chicken", "turkey"):
         metadata["main_ingredient"] = "🐔 Chicken"
     elif text_has_any(text, "beef", "steak", "ground beef", "short rib", "brisket"):
         metadata["main_ingredient"] = "🥩 Beef"
@@ -662,7 +746,7 @@ def infer_recipe_categories(recipe):
         metadata["main_ingredient"] = "🥔 Potatoes"
     elif text_has_any(text, "cheese", "ricotta", "mozzarella", "cheddar", "parmesan"):
         metadata["main_ingredient"] = "🧀 Cheese"
-    elif text_has_any(text, "vegetarian", "vegetable", "spinach", "mushroom", "salad"):
+    elif text_has_any(text, "vegetarian", "vegan", "tofu", "tempeh", "jackfruit", "vegetable", "spinach", "mushroom", "salad"):
         metadata["main_ingredient"] = "🥬 Vegetarian"
 
     if text_has_any(text, "grill", "grilled", "bbq", "barbecue"):
@@ -703,8 +787,8 @@ def infer_recipe_categories(recipe):
         metadata["dietary_preference"] = "🥩 High Protein"
     if text_has_any(text, "low carb", "keto") or (metadata["meal_type"] == "🥗 Side Dish" and "salad" in text):
         metadata["dietary_preference"] = "🥗 Low Carb"
-    if metadata["main_ingredient"] == "🌱 Vegan" or "vegan" in text:
-        metadata["dietary_preference"] = "🌱 Vegetarian"
+    if "vegan" in text:
+        metadata["dietary_preference"] = "🌱 Vegan"
     elif metadata["main_ingredient"] == "🥬 Vegetarian" or "vegetarian" in text:
         metadata["dietary_preference"] = "🌱 Vegetarian"
     if text_has_any(text, "gluten free", "gluten-free"):
@@ -758,6 +842,11 @@ def infer_alphabetical_group(name):
     return match.group(0).upper() if match else "#"
 
 
+def restaurant_menu_category_from_stored_metadata(metadata):
+    metadata = metadata if isinstance(metadata, dict) else {}
+    return infer_restaurant_menu_category(metadata, "")
+
+
 def recipe_short_description(recipe):
     description = clean_text(recipe.get("description"))
 
@@ -780,17 +869,20 @@ def apply_recipe_menu_metadata(recipe):
         return recipe
 
     stored = stored_category_metadata(recipe)
-    manual = bool(recipe.get("category_metadata_user_set")) or category_metadata_has_values(stored)
-    inferred = infer_recipe_categories(recipe)
+    sources = stored_category_sources(recipe, stored)
 
     for field in COOKBOOK_CATEGORY_FIELDS:
-        recipe[field] = stored.get(field) or inferred.get(field, "")
+        recipe[field] = stored.get(field, "")
 
     recipe["custom_categories"] = stored.get("custom_categories") or []
-    recipe["restaurant_menu_category"] = inferred.get("restaurant_menu_category", "")
-    recipe["alphabetical_group"] = inferred.get("alphabetical_group", "#")
-    recipe["category_metadata_user_set"] = manual
-    recipe["category_metadata_source"] = "Saved" if manual else "Inferred"
+    recipe["restaurant_menu_category"] = (
+        clean_text(recipe.get("restaurant_menu_category"))
+        or restaurant_menu_category_from_stored_metadata(stored)
+    )
+    recipe["alphabetical_group"] = clean_text(recipe.get("alphabetical_group")) or infer_alphabetical_group(recipe.get("name"))
+    recipe["category_metadata_sources"] = sources
+    recipe["category_metadata_user_set"] = category_sources_have_user_selected(sources)
+    recipe["category_metadata_source"] = category_metadata_source_label(stored, sources)
     recipe["short_description"] = recipe_short_description(recipe)
     recipe["menu_tags"] = recipe_menu_tags(recipe)
     recipe["menu_search_text"] = recipe_menu_search_text(recipe)
@@ -854,6 +946,7 @@ def recipe_category_metadata_for_editor(recipe_url, recipe_data=None, recipe_met
         "custom_categories": record.get("custom_categories", []),
         "restaurant_menu_category": record.get("restaurant_menu_category", ""),
         "alphabetical_group": record.get("alphabetical_group", ""),
+        "category_metadata_sources": record.get("category_metadata_sources", {}),
         "category_metadata_user_set": bool(record.get("category_metadata_user_set")),
         "category_metadata_source": record.get("category_metadata_source", ""),
         "short_description": record.get("short_description", ""),
@@ -1440,13 +1533,20 @@ def remove_recipe_from_cookbook(cookbook_id, recipe_url):
         return save_cookbooks(payload)
 
 
-def update_cookbook_recipe_categories(cookbook_id, recipe_url, categories, confirm_overwrite=False):
+def update_cookbook_recipe_categories(
+    cookbook_id,
+    recipe_url,
+    categories,
+    confirm_overwrite=False,
+    category_sources=None,
+):
     target_key = recipe_key(recipe_url)
 
     if not target_key:
         raise ValueError("Recipe is required.")
 
     cleaned_categories = clean_category_payload(categories)
+    cleaned_sources = clean_category_source_payload(category_sources, cleaned_categories)
 
     with COOKBOOKS_LOCK:
         payload = load_cookbooks()
@@ -1478,8 +1578,10 @@ def update_cookbook_recipe_categories(cookbook_id, recipe_url, categories, confi
             recipe[field] = cleaned_categories.get(field, "")
 
         recipe["custom_categories"] = cleaned_categories.get("custom_categories", [])
-        recipe["category_metadata_user_set"] = category_metadata_has_values(cleaned_categories)
-        recipe["category_metadata_updated_at"] = now_iso() if recipe["category_metadata_user_set"] else ""
+        recipe["category_metadata_sources"] = cleaned_sources
+        recipe["category_metadata_user_set"] = category_sources_have_user_selected(cleaned_sources)
+        recipe["category_metadata_source"] = category_metadata_source_label(cleaned_categories, cleaned_sources)
+        recipe["category_metadata_updated_at"] = now_iso() if category_metadata_has_values(cleaned_categories) else ""
         return save_cookbooks(payload)
 
 

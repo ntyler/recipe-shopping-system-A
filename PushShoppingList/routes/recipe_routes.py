@@ -511,7 +511,13 @@ def api_recipe_note_feedback_route():
 def api_recipe_category_decision_route():
     data = request.get_json(silent=True) or {}
     recipe = data.get("recipe", data)
-    result = decide_recipe_categories_with_chatgpt(recipe)
+    mode = data.get("mode", "missing")
+    result = decide_recipe_categories_with_chatgpt(
+        recipe,
+        mode=mode,
+        current_categories=data.get("current_categories", {}),
+        trigger_source=data.get("trigger_source") or f"recipe_editor:{mode}",
+    )
     status = 200 if result.get("ok") else 400
 
     return jsonify(with_openai_usage_dashboard(result)), status

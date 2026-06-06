@@ -229,6 +229,14 @@
                                                                                             data-category-dietary-preference="{{ recipe.dietary_preference }}"
                                                                                             data-category-prep-time-group="{{ recipe.prep_time_group }}"
                                                                                             data-category-custom-categories="{{ recipe.custom_categories | join(', ') }}"
+                                                                                            data-category-source-meal-type="{{ recipe.category_metadata_sources.meal_type if recipe.category_metadata_sources else '' }}"
+                                                                                            data-category-source-cuisine="{{ recipe.category_metadata_sources.cuisine if recipe.category_metadata_sources else '' }}"
+                                                                                            data-category-source-main-ingredient="{{ recipe.category_metadata_sources.main_ingredient if recipe.category_metadata_sources else '' }}"
+                                                                                            data-category-source-cooking-method="{{ recipe.category_metadata_sources.cooking_method if recipe.category_metadata_sources else '' }}"
+                                                                                            data-category-source-occasion="{{ recipe.category_metadata_sources.occasion if recipe.category_metadata_sources else '' }}"
+                                                                                            data-category-source-dietary-preference="{{ recipe.category_metadata_sources.dietary_preference if recipe.category_metadata_sources else '' }}"
+                                                                                            data-category-source-prep-time-group="{{ recipe.category_metadata_sources.prep_time_group if recipe.category_metadata_sources else '' }}"
+                                                                                            data-category-source-custom-categories="{{ recipe.category_metadata_sources.custom_categories if recipe.category_metadata_sources else '' }}"
                                                                                             data-category-user-set="{% if recipe.category_metadata_user_set %}1{% else %}0{% endif %}"
                                                                                             onclick="return openCookbookCategoryEditor(this)">
                                                                                         Edit Categories

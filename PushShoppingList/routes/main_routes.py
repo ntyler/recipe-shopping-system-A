@@ -1593,6 +1593,15 @@ def update_cookbook_recipe_categories_route(cookbook_id):
         "prep_time_group": request.form.get("prep_time_group", ""),
         "custom_categories": request.form.get("custom_categories", ""),
     }
+    category_sources = {}
+    category_sources_json = request.form.get("category_sources", "")
+    if category_sources_json:
+        try:
+            parsed_sources = json.loads(category_sources_json)
+            if isinstance(parsed_sources, dict):
+                category_sources = parsed_sources
+        except (TypeError, ValueError):
+            category_sources = {}
 
     try:
         update_cookbook_recipe_categories(
@@ -1600,6 +1609,7 @@ def update_cookbook_recipe_categories_route(cookbook_id):
             request.form.get("recipe_url", ""),
             categories,
             confirm_overwrite=request.form.get("confirm_overwrite") == "1",
+            category_sources=category_sources,
         )
     except CookbookCategoryOverwriteConflict as err:
         return jsonify({

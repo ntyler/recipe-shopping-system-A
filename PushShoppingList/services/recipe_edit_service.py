@@ -14,8 +14,10 @@ import requests
 
 from PushShoppingList.services import cloudflare_r2_storage
 from PushShoppingList.services.food_rules_service import load_food_rules
+from PushShoppingList.services.cookbook_service import COOKBOOK_CATEGORY_ALL_FIELDS
 from PushShoppingList.services.cookbook_service import COOKBOOK_CATEGORY_FIELDS
 from PushShoppingList.services.cookbook_service import clean_category_payload
+from PushShoppingList.services.cookbook_service import clean_custom_categories
 from PushShoppingList.services.cookbook_service import cookbook_category_choices
 from PushShoppingList.services.cookbook_service import ensure_unclassified_cookbook_for_recipes
 from PushShoppingList.services.cookbook_service import infer_recipe_categories
@@ -1643,6 +1645,8 @@ Rules:
 - If a field is uncertain, choose the closest useful option instead of leaving it blank.
 - custom_categories should be an array of 0 to 3 concise user-friendly cookbook groups.
 - Re-analyze the recipe title, ingredients, equipment, times, and instructions.
+- Main ingredient must describe the dominant ingredient type. Do not choose Vegan as main_ingredient; put Vegan under dietary_preference when applicable.
+- For prep_time_group, use total_time when it is available. Use prep_time only when total_time is blank.
 - Do not include markdown or explanatory text.
 
 Allowed options:
@@ -1653,8 +1657,99 @@ Recipe:
 """.strip()
 
 
-def decide_recipe_categories_with_chatgpt(payload):
+def recipe_category_value_has_content(field, value):
+    if field == "custom_categories":
+        return bool(clean_custom_categories(value))
+
+    return bool(str(value or "").strip())
+
+
+def recipe_category_effective_decision_values(old_values, suggested_values, mode):
+    mode = "all" if mode == "all" else "missing"
+    old_values = clean_category_payload(old_values)
+    suggested_values = clean_category_payload(suggested_values)
+    effective = {
+        field: old_values.get(field, [])
+        for field in COOKBOOK_CATEGORY_ALL_FIELDS
+    }
+
+    for field in COOKBOOK_CATEGORY_ALL_FIELDS:
+        if mode == "all" or not recipe_category_value_has_content(field, old_values.get(field)):
+            effective[field] = suggested_values.get(field, [] if field == "custom_categories" else "")
+
+    return clean_category_payload(effective)
+
+
+def recipe_category_changed_fields(old_values, new_values):
+    old_values = clean_category_payload(old_values)
+    new_values = clean_category_payload(new_values)
+    changed = []
+
+    for field in COOKBOOK_CATEGORY_FIELDS:
+        if str(old_values.get(field) or "").strip() != str(new_values.get(field) or "").strip():
+            changed.append(field)
+
+    if clean_custom_categories(old_values.get("custom_categories")) != clean_custom_categories(new_values.get("custom_categories")):
+        changed.append("custom_categories")
+
+    return changed
+
+
+def recipe_category_payload_id(payload):
     payload = payload if isinstance(payload, dict) else {}
+    return (
+        category_context_text(payload.get("source_url"))
+        or category_context_text(payload.get("url"))
+        or category_context_text(payload.get("source_display_url"))
+        or category_context_text(payload.get("recipe_title"))
+        or category_context_text(payload.get("display_name"))
+        or "unknown"
+    )
+
+
+def normalize_chatgpt_category_decision(cleaned, fallback):
+    cleaned = clean_category_payload(cleaned)
+    fallback = clean_category_payload(fallback)
+
+    for field in COOKBOOK_CATEGORY_FIELDS:
+        if not cleaned.get(field):
+            cleaned[field] = fallback.get(field, "")
+
+    if "vegan" in str(cleaned.get("main_ingredient") or "").lower():
+        replacement = fallback.get("main_ingredient", "")
+        if not replacement or "vegan" in replacement.lower():
+            replacement = next(
+                (choice for choice in cookbook_category_choices().get("main_ingredient", []) if "Vegetarian" in choice),
+                "",
+            )
+        cleaned["main_ingredient"] = replacement
+
+    if fallback.get("prep_time_group"):
+        cleaned["prep_time_group"] = fallback["prep_time_group"]
+
+    return cleaned
+
+
+def log_recipe_category_inference(recipe_id, trigger_source, old_values, new_values, fields_changed):
+    payload = {
+        "recipe_id": recipe_id,
+        "trigger_source": trigger_source,
+        "old_values": old_values,
+        "new_values": new_values,
+        "fields_changed": fields_changed,
+    }
+    print(f"[recipe_category_inference] {json.dumps(payload, ensure_ascii=False)}")
+
+
+def decide_recipe_categories_with_chatgpt(
+    payload,
+    mode="missing",
+    current_categories=None,
+    trigger_source="recipe_editor",
+):
+    payload = payload if isinstance(payload, dict) else {}
+    mode = "all" if mode == "all" else "missing"
+    trigger_source = str(trigger_source or f"recipe_editor:{mode}").strip()
 
     if not os.getenv("OPENAI_API_KEY"):
         return {
@@ -1704,10 +1799,18 @@ def decide_recipe_categories_with_chatgpt(payload):
 
     cleaned = clean_category_payload(categories)
     fallback = infer_recipe_categories(recipe_category_inference_record(payload))
+    cleaned = normalize_chatgpt_category_decision(cleaned, fallback)
+    old_values = clean_category_payload(current_categories or {})
+    effective_values = recipe_category_effective_decision_values(old_values, cleaned, mode)
+    fields_changed = recipe_category_changed_fields(old_values, effective_values)
 
-    for field in COOKBOOK_CATEGORY_FIELDS:
-        if not cleaned.get(field):
-            cleaned[field] = fallback.get(field, "")
+    log_recipe_category_inference(
+        recipe_category_payload_id(payload),
+        trigger_source,
+        old_values,
+        effective_values,
+        fields_changed,
+    )
 
     return {
         "ok": True,
