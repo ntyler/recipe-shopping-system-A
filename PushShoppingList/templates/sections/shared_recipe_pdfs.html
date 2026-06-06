@@ -1,11 +1,27 @@
-<section id="sharedRecipePdfsSection" class="app-card pdf-share-card">
-    <button type="button"
-            class="card-collapse-toggle pdf-share-toggle"
-            data-collapse-toggle="shared-recipe-pdfs"
-            aria-expanded="true"
-            onclick="toggleCardCollapse('shared-recipe-pdfs')">
-        <span>Shared Recipe PDFs</span>
-    </button>
+{% set shared_recipe_pdfs_account_panel = shared_recipe_pdfs_account_panel|default(false) %}
+<section id="sharedRecipePdfsSection"
+         class="{% if not shared_recipe_pdfs_account_panel %}app-card {% endif %}pdf-share-card{% if shared_recipe_pdfs_account_panel %} user-shared-recipe-pdfs-panel{% endif %}"
+         {% if shared_recipe_pdfs_account_panel %}data-shared-recipe-pdfs-panel hidden{% endif %}>
+    {% if shared_recipe_pdfs_account_panel %}
+        <div class="app-section-divider recipe-entry-section-divider user-shared-recipe-pdfs-divider" aria-hidden="true"></div>
+        <div class="user-push-panel-header user-shared-recipe-pdfs-header">
+    {% endif %}
+        <button type="button"
+                class="card-collapse-toggle pdf-share-toggle"
+                data-collapse-toggle="shared-recipe-pdfs"
+                aria-expanded="true"
+                onclick="toggleCardCollapse('shared-recipe-pdfs')">
+            <span>Shared Recipe PDFs</span>
+        </button>
+    {% if shared_recipe_pdfs_account_panel %}
+            <button type="button"
+                    class="secondary user-push-panel-close user-shared-recipe-pdfs-close"
+                    data-shared-recipe-pdfs-close
+                    onclick="return closeSharedRecipePdfsPanel()">
+                Close
+            </button>
+        </div>
+    {% endif %}
 
     <div class="card-collapse-content pdf-share-content"
          data-collapse-content="shared-recipe-pdfs"

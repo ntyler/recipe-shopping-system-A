@@ -23,6 +23,7 @@ const USER_ACCOUNT_REMEMBERED_PANEL_SELECTORS = {
     accountSettings: "#userProfileEditForm",
     accountNotices: "[data-account-notices-panel]",
     usageDashboard: "[data-usage-dashboard-panel]",
+    sharedRecipePdfs: "[data-shared-recipe-pdfs-panel]",
     twoFactor: "[data-two-factor-panel]",
     pushNotifications: "[data-push-notifications-panel]",
     deleteAccount: "[data-delete-account-panel]",
@@ -36,6 +37,7 @@ const USER_ACCOUNT_PANEL_HASH_KEYS = {
     "#userProfileEditForm": "accountSettings",
     "#accountNoticesPanel": "accountNotices",
     "#accountUsageDashboardPanel": "usageDashboard",
+    "#sharedRecipePdfsSection": "sharedRecipePdfs",
     "#accountTwoFactorPanel": "twoFactor",
     "#accountPushNotificationsPanel": "pushNotifications",
     "#accountDeletePanel": "deleteAccount",
@@ -389,6 +391,10 @@ function restoreRememberedAccountPanelOpenWithOptions(options = {}) {
 
     panel.hidden = false;
     hideRememberedAccountPanels(panel);
+
+    if (panelKey === "sharedRecipePdfs") {
+        expandSharedRecipePdfsContent();
+    }
 
     const accountMenu = document.querySelector("[data-account-menu]");
     if (accountMenu) {
@@ -1069,6 +1075,62 @@ function toggleUsageDashboardPanel(open = null) {
             }
         });
     } else if (typeof scrollToUserAccountProfile === "function") {
+        scrollToUserAccountProfile("auto");
+    }
+
+    return false;
+}
+
+function expandSharedRecipePdfsContent() {
+    const content = document.querySelector('[data-collapse-content="shared-recipe-pdfs"]');
+
+    if (content && content.classList.contains("collapsed")) {
+        setCardCollapseContentCollapsed(content, false);
+    }
+}
+
+function openSharedRecipePdfsPanel() {
+    const panel = document.querySelector("[data-shared-recipe-pdfs-panel]");
+
+    if (!panel) {
+        return false;
+    }
+
+    const accountMenu = document.querySelector("[data-account-menu]");
+    if (accountMenu) {
+        closeAccountMenuDropdown(accountMenu);
+    }
+
+    panel.hidden = false;
+    rememberAccountPanelElement(panel, true);
+    hideRememberedAccountPanels(panel);
+    expandSharedRecipePdfsContent();
+
+    window.requestAnimationFrame(() => {
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+        const firstControl = panel.querySelector("[data-shared-recipe-pdfs-close]")
+            || panel.querySelector("[data-collapse-toggle='shared-recipe-pdfs']")
+            || panel.querySelector("button, a, input, select, textarea");
+
+        if (firstControl) {
+            firstControl.focus({ preventScroll: true });
+        }
+    });
+
+    return false;
+}
+
+function closeSharedRecipePdfsPanel() {
+    const panel = document.querySelector("[data-shared-recipe-pdfs-panel]");
+
+    if (!panel) {
+        return false;
+    }
+
+    panel.hidden = true;
+    rememberAccountPanelElement(panel, false);
+
+    if (typeof scrollToUserAccountProfile === "function") {
         scrollToUserAccountProfile("auto");
     }
 
