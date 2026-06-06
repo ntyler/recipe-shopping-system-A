@@ -252,15 +252,25 @@ def clean_text_list(value):
 
 
 def clean_custom_categories(value):
-    if isinstance(value, str):
+    def split_categories(text):
         return [
-            text
-            for part in re.split(r"[,\n]+", value)
-            for text in [clean_text(part)]
-            if text
+            cleaned
+            for part in re.split(r"[,\n]+", str(text or ""))
+            for cleaned in [clean_text(part)]
+            if cleaned
         ]
 
-    return clean_text_list(value)
+    if isinstance(value, str):
+        return split_categories(value)
+
+    if not isinstance(value, list):
+        return []
+
+    items = []
+    for item in value:
+        items.extend(split_categories(item))
+
+    return items
 
 
 def clean_cover_image(value):
@@ -372,6 +382,7 @@ def clean_recipe_record(value):
         "instruction_items": clean_text_list(value.get("instruction_items")),
         "sections": clean_recipe_sections(value.get("sections")),
         "custom_categories": clean_custom_categories(value.get("custom_categories")),
+        "categories": clean_custom_categories(value.get("categories")),
         "restaurant_menu_category": clean_text(value.get("restaurant_menu_category")),
         "alphabetical_group": clean_text(value.get("alphabetical_group")),
         "category_metadata_user_set": bool(value.get("category_metadata_user_set")),
@@ -586,10 +597,14 @@ def category_metadata_source_label(metadata, sources):
 
 def stored_category_metadata(recipe):
     recipe = recipe if isinstance(recipe, dict) else {}
-    metadata = {
-        field: category_choice_label(field, recipe.get(field))
-        for field in COOKBOOK_CATEGORY_FIELDS
-    }
+    metadata = {}
+
+    for field in COOKBOOK_CATEGORY_FIELDS:
+        value = recipe.get(field)
+        if field == "prep_time_group":
+            value = value or recipe.get("prep_time_category")
+        metadata[field] = category_choice_label(field, value)
+
     metadata["custom_categories"] = clean_custom_categories(recipe.get("custom_categories"))
     return metadata
 
@@ -885,6 +900,7 @@ def apply_recipe_menu_metadata(recipe):
     recipe["category_metadata_source"] = category_metadata_source_label(stored, sources)
     recipe["short_description"] = recipe_short_description(recipe)
     recipe["menu_tags"] = recipe_menu_tags(recipe)
+    recipe["category_display"] = build_recipe_category_display(recipe)
     recipe["menu_search_text"] = recipe_menu_search_text(recipe)
     return recipe
 
@@ -954,24 +970,55 @@ def recipe_category_metadata_for_editor(recipe_url, recipe_data=None, recipe_met
     }
 
 
-def recipe_menu_tags(recipe):
-    tags = []
-    seen = set()
+def add_recipe_category_display_value(tags, seen, value, field=None, split=False):
+    values = clean_custom_categories(value) if split else clean_text_list(value)
 
-    for field in ("meal_type", "cuisine", "main_ingredient", "cooking_method", "dietary_preference", "prep_time_group"):
-        value = clean_text(recipe.get(field))
-        key = normalize_text(value)
-        if value and key not in seen:
+    if field:
+        values = [
+            category_choice_label(field, value)
+            for value in values
+        ]
+
+    for value in values:
+        key = normalized_label_key(value)
+        if value and key and key not in seen:
             tags.append(value)
             seen.add(key)
 
-    for category in clean_text_list(recipe.get("custom_categories")):
-        key = normalize_text(category)
-        if key not in seen:
-            tags.append(category)
-            seen.add(key)
+
+def recipe_category_display_values(recipe):
+    tags = []
+    seen = set()
+
+    for field in (
+        "meal_type",
+        "cuisine",
+        "main_ingredient",
+        "cooking_method",
+        "occasion",
+        "dietary_preference",
+    ):
+        add_recipe_category_display_value(tags, seen, recipe.get(field), field=field)
+
+    add_recipe_category_display_value(
+        tags,
+        seen,
+        recipe.get("prep_time_group") or recipe.get("prep_time_category"),
+        field="prep_time_group",
+    )
+    add_recipe_category_display_value(tags, seen, recipe.get("custom_categories"), split=True)
+    add_recipe_category_display_value(tags, seen, recipe.get("categories"), split=True)
 
     return tags
+
+
+def recipe_menu_tags(recipe):
+    return recipe_category_display_values(recipe)
+
+
+def build_recipe_category_display(recipe):
+    tags = recipe_category_display_values(recipe if isinstance(recipe, dict) else {})
+    return ", ".join(tags) if tags else "Blank"
 
 
 def recipe_menu_search_text(recipe):
@@ -988,6 +1035,7 @@ def recipe_menu_search_text(recipe):
         recipe.get("restaurant_menu_category"),
     ]
     parts.extend(recipe.get("custom_categories") or [])
+    parts.extend(clean_custom_categories(recipe.get("categories")))
     parts.extend(recipe_ingredients_for_record(recipe))
     return normalize_text(" ".join(clean_text(part) for part in parts if clean_text(part)))
 
@@ -1661,6 +1709,34 @@ def hydrate_recipe(stored_recipe, current_recipes):
         **stored_recipe,
         **recipe,
     }
+
+    for field in COOKBOOK_CATEGORY_FIELDS:
+        if not clean_text(hydrated_recipe.get(field)) and clean_text(stored_recipe.get(field)):
+            hydrated_recipe[field] = stored_recipe[field]
+
+    if (
+        not clean_custom_categories(hydrated_recipe.get("custom_categories"))
+        and clean_custom_categories(stored_recipe.get("custom_categories"))
+    ):
+        hydrated_recipe["custom_categories"] = stored_recipe["custom_categories"]
+
+    if (
+        not clean_custom_categories(hydrated_recipe.get("categories"))
+        and clean_custom_categories(stored_recipe.get("categories"))
+    ):
+        hydrated_recipe["categories"] = stored_recipe["categories"]
+
+    if (
+        stored_recipe.get("category_metadata_sources")
+        and not recipe.get("category_metadata_sources")
+    ):
+        hydrated_recipe["category_metadata_sources"] = stored_recipe["category_metadata_sources"]
+
+    if (
+        stored_recipe.get("category_metadata_user_set")
+        and not recipe.get("category_metadata_user_set")
+    ):
+        hydrated_recipe["category_metadata_user_set"] = stored_recipe["category_metadata_user_set"]
 
     if not hydrated_recipe.get("cover_image") and stored_recipe.get("cover_image"):
         hydrated_recipe["cover_image"] = stored_recipe["cover_image"]
