@@ -1364,6 +1364,68 @@ def create_cookbook(name):
         return find_cookbook(saved, new_cookbook["id"]) or new_cookbook
 
 
+def find_or_create_cookbook(name):
+    name = clean_text(name)
+
+    if not name:
+        raise ValueError("Cookbook name is required.")
+
+    with COOKBOOKS_LOCK:
+        payload = load_cookbooks()
+        existing = find_cookbook_by_name(payload, name)
+
+        if existing is not None:
+            existing.setdefault("recipes", [])
+            return existing
+
+        new_cookbook = {
+            "id": unique_cookbook_id(payload, name),
+            "name": name,
+            "recipes": [],
+        }
+        payload["cookbooks"].append(new_cookbook)
+
+        saved = save_cookbooks(payload)
+        return find_cookbook(saved, new_cookbook["id"]) or new_cookbook
+
+
+def resolve_cookbook_destination(cookbook_id="", cookbook_name="", create_missing=False):
+    cookbook_id = clean_text(cookbook_id)
+    cookbook_name = clean_text(cookbook_name)
+
+    with COOKBOOKS_LOCK:
+        payload = load_cookbooks()
+
+        if cookbook_id:
+            cookbook = find_cookbook(payload, cookbook_id)
+            if cookbook is not None:
+                cookbook.setdefault("recipes", [])
+                return cookbook
+
+        if cookbook_name:
+            if normalize_text(cookbook_name) == normalize_text(UNCLASSIFIED_COOKBOOK_NAME):
+                cookbook = ensure_unclassified_cookbook(payload)
+                saved = save_cookbooks(payload)
+                return find_cookbook(saved, cookbook.get("id", "")) or cookbook
+
+            cookbook = find_cookbook_by_name(payload, cookbook_name)
+            if cookbook is not None:
+                cookbook.setdefault("recipes", [])
+                return cookbook
+
+            if create_missing:
+                new_cookbook = {
+                    "id": unique_cookbook_id(payload, cookbook_name),
+                    "name": cookbook_name,
+                    "recipes": [],
+                }
+                payload["cookbooks"].append(new_cookbook)
+                saved = save_cookbooks(payload)
+                return find_cookbook(saved, new_cookbook["id"]) or new_cookbook
+
+        return None
+
+
 def delete_cookbook(cookbook_id):
     with COOKBOOKS_LOCK:
         payload = load_cookbooks()

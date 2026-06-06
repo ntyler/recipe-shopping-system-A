@@ -1,16 +1,98 @@
 <div class="app-section-divider recipe-entry-section-divider" aria-hidden="true"></div>
 
+{% set import_unclassified_cookbook = namespace(id="", name="unclassified", present=false) %}
+{% if cookbook_view and cookbook_view.cookbooks %}
+    {% for cookbook in cookbook_view.cookbooks %}
+        {% if cookbook.is_unclassified %}
+            {% set import_unclassified_cookbook.id = cookbook.id %}
+            {% set import_unclassified_cookbook.name = cookbook.name %}
+            {% set import_unclassified_cookbook.present = true %}
+        {% endif %}
+    {% endfor %}
+{% endif %}
+
 <div class="recipe-card">
     <h2 class="recipe-entry-heading">Enter Recipe Links</h2>
     <p class="helper-text recipe-entry-helper">Paste one recipe URL per line</p>
 
     <form id="extractRecipeForm" onsubmit="startRecipeExtraction(event)">
+        <input type="hidden"
+               name="cookbook_id"
+               data-import-cookbook-id-field
+               value="{{ import_unclassified_cookbook.id }}">
+        <input type="hidden"
+               name="cookbook_name"
+               data-import-cookbook-name-field
+               value="{{ import_unclassified_cookbook.name }}">
         <textarea
             class="recipe-url-box"
             id="recipeUrlsTextarea"
             name="recipe_urls"
             placeholder="https://www.forkinthekitchen.com/homemade-cheese-ravioli/&#10;https://www.forkinthekitchen.com/homemade-crispy-falafel/"></textarea>
     </form>
+
+    <div class="recipe-import-cookbook-field recipe-edit-cookbook-field"
+         data-import-cookbook-selector
+         data-default-cookbook-id="{{ import_unclassified_cookbook.id }}"
+         data-default-cookbook-name="{{ import_unclassified_cookbook.name }}"
+         data-selected-cookbook-id="{{ import_unclassified_cookbook.id }}"
+         data-selected-cookbook-name="{{ import_unclassified_cookbook.name }}">
+        <span class="recipe-edit-cookbook-label">Save extracted recipes to cookbook:</span>
+        <div class="recipe-url-summary-cookbook-value recipe-edit-cookbook-value recipe-import-cookbook-value recipe-url-summary-cookbook-menu-wrap recipe-edit-row-menu-wrap">
+            <button type="button"
+                    class="recipe-url-summary-cookbook-select recipe-edit-cookbook-select recipe-import-cookbook-select"
+                    aria-label="Save extracted recipes to cookbook"
+                    aria-haspopup="true"
+                    aria-expanded="false"
+                    onclick="return toggleRecipeEditRowMenu(this, event)">
+                <span class="recipe-url-summary-cookbook-name recipe-edit-cookbook-name recipe-import-cookbook-name"
+                      data-import-cookbook-name>{{ import_unclassified_cookbook.name }}</span>
+                <span class="recipe-url-summary-cookbook-chevron" aria-hidden="true"></span>
+            </button>
+            <div class="recipe-edit-row-menu recipe-url-summary-cookbook-menu recipe-import-cookbook-menu" hidden>
+                <button type="button"
+                        data-import-cookbook-create
+                        onclick="return createImportCookbookDestination(this)">
+                    Create New Cookbook
+                </button>
+                <div class="recipe-url-summary-cookbook-menu-label">Save to cookbook</div>
+                {% if cookbook_view and cookbook_view.cookbooks %}
+                    {% for cookbook in cookbook_view.cookbooks %}
+                        <button type="button"
+                                data-import-cookbook-option
+                                data-cookbook-id="{{ cookbook.id }}"
+                                data-cookbook-name="{{ cookbook.name }}"
+                                data-cookbook-unclassified="{% if cookbook.is_unclassified %}1{% else %}0{% endif %}"
+                                onclick="return selectImportCookbookDestination(this)">
+                            {{ cookbook.name }}
+                        </button>
+                    {% endfor %}
+                {% endif %}
+                {% if not import_unclassified_cookbook.present %}
+                    <button type="button"
+                            data-import-cookbook-option
+                            data-cookbook-id=""
+                            data-cookbook-name="unclassified"
+                            data-cookbook-unclassified="1"
+                            onclick="return selectImportCookbookDestination(this)">
+                        unclassified
+                    </button>
+                {% endif %}
+                {% if import_unclassified_cookbook.id %}
+                    <button type="button"
+                            class="delete"
+                            data-import-cookbook-option
+                            data-import-cookbook-remove
+                            data-cookbook-id="{{ import_unclassified_cookbook.id }}"
+                            data-cookbook-name="{{ import_unclassified_cookbook.name }}"
+                            data-cookbook-unclassified="1"
+                            onclick="return selectImportCookbookDestination(this)">
+                        Remove cookbook assignment
+                    </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
 
     <div class="recipe-import-actions">
         <button class="extract-btn" type="submit" form="extractRecipeForm">Import Recipe URLs</button>
@@ -21,6 +103,14 @@
               action="/upload_recipe_media"
               enctype="multipart/form-data"
               onsubmit="saveScroll()">
+            <input type="hidden"
+                   name="cookbook_id"
+                   data-import-cookbook-id-field
+                   value="{{ import_unclassified_cookbook.id }}">
+            <input type="hidden"
+                   name="cookbook_name"
+                   data-import-cookbook-name-field
+                   value="{{ import_unclassified_cookbook.name }}">
             <input id="recipeMediaUploadInput"
                    name="recipe_media"
                    type="file"

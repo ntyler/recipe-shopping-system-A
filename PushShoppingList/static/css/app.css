@@ -434,6 +434,40 @@ body {
             background: #107C10;
         }
 
+        .recipe-import-cookbook-field {
+            max-width: 520px;
+            margin: 12px auto 0;
+            text-align: left;
+        }
+
+        .recipe-import-cookbook-field .recipe-edit-cookbook-label {
+            color: #c4ccd8;
+            font-size: 12px;
+            font-weight: 850;
+            letter-spacing: 0.02em;
+            text-transform: none;
+            white-space: normal;
+        }
+
+        .recipe-import-cookbook-value {
+            width: 100%;
+            max-width: none;
+        }
+
+        .recipe-import-cookbook-select {
+            min-height: 38px;
+            padding: 9px 12px;
+        }
+
+        .recipe-import-cookbook-menu {
+            min-width: min(320px, calc(100vw - 24px));
+        }
+
+        .recipe-import-cookbook-menu button.selected {
+            color: #8ff5a1;
+            background: rgba(16, 124, 16, 0.24);
+        }
+
         .recipe-import-actions .extract-btn,
         .recipe-import-actions .recipe-media-upload-btn {
             margin-top: 0;

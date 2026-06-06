@@ -21,6 +21,7 @@ from PushShoppingList.services.food_rules_service import shopping_item_food_rule
 from PushShoppingList.services.feedback_service import feedback_dashboard_for_user
 from PushShoppingList.services.cookbook_service import cookbook_view
 from PushShoppingList.services.cookbook_service import create_cookbook
+from PushShoppingList.services.cookbook_service import find_or_create_cookbook
 from PushShoppingList.services.cookbook_service import cookbook_recipes_for_urls
 from PushShoppingList.services.cookbook_service import CookbookCategoryOverwriteConflict
 from PushShoppingList.services.cookbook_service import CookbookRecipeConflict
@@ -1484,7 +1485,10 @@ def save_list():
 @main_bp.route("/api/cookbooks", methods=["POST"])
 def create_cookbook_route():
     try:
-        cookbook = create_cookbook(request.form.get("name", ""))
+        if request.form.get("reuse_existing") == "1":
+            cookbook = find_or_create_cookbook(request.form.get("name", ""))
+        else:
+            cookbook = create_cookbook(request.form.get("name", ""))
     except ValueError as err:
         return jsonify({"ok": False, "error": str(err)}), 400
 

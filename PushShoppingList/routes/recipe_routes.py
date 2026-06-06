@@ -34,7 +34,11 @@ from PushShoppingList.services.recipe_extract_service import recipe_cover_image_
 from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_path
 from PushShoppingList.services.recipe_extract_service import recipe_pdf_path
 from PushShoppingList.services.cookbook_service import ensure_unclassified_cookbook_for_recipes
+from PushShoppingList.services.cookbook_service import ingredient_sections_from_recipe_data
+from PushShoppingList.services.cookbook_service import move_recipes_to_cookbook
 from PushShoppingList.services.cookbook_service import purge_recipe_from_all_cookbooks
+from PushShoppingList.services.cookbook_service import recipe_cookbook_assignments
+from PushShoppingList.services.cookbook_service import resolve_cookbook_destination
 from PushShoppingList.services.food_review_alternative_service import suggest_food_review_alternatives
 from PushShoppingList.services.recipe_edit_service import create_new_recipe
 from PushShoppingList.services.recipe_edit_service import create_editable_recipe_pdf
@@ -208,6 +212,136 @@ def ensure_recipe_has_default_cookbook(url, recipe_metadata=None):
     }])
 
 
+def import_recipe_title(recipe_metadata, fallback_url=""):
+    recipe_metadata = recipe_metadata if isinstance(recipe_metadata, dict) else {}
+    return str(
+        recipe_metadata.get("display_name")
+        or recipe_metadata.get("recipe_title")
+        or recipe_metadata.get("name")
+        or fallback_url
+        or ""
+    ).strip()
+
+
+def import_text_items(values, field_names):
+    if not isinstance(values, list):
+        return []
+
+    items = []
+
+    for value in values:
+        if isinstance(value, dict):
+            text = ""
+            for field_name in field_names:
+                text = str(value.get(field_name) or "").strip()
+                if text:
+                    break
+        else:
+            text = str(value or "").strip()
+
+        if text:
+            items.append(text)
+
+    return items
+
+
+def import_recipe_record(url, recipe_metadata=None):
+    recipe_metadata = recipe_metadata if isinstance(recipe_metadata, dict) else {}
+    title = import_recipe_title(recipe_metadata, url)
+
+    return {
+        "url": url,
+        "name": title or url,
+        "source_href": url,
+        "source_display_url": url,
+        "quantity": 1,
+        "description": recipe_metadata.get("description") or recipe_metadata.get("summary") or "",
+        "prep_time": recipe_metadata.get("prep_time", ""),
+        "cook_time": recipe_metadata.get("cook_time", ""),
+        "total_time": recipe_metadata.get("total_time", ""),
+        "rating": recipe_metadata.get("rating", 0),
+        "archive_pdf_available": bool(recipe_metadata.get("archive_pdf_available")),
+        "base_servings": recipe_metadata.get("servings", ""),
+        "equipment_items": import_text_items(
+            recipe_metadata.get("equipment", []),
+            ("name", "display_name", "equipment", "item"),
+        ),
+        "instruction_items": import_text_items(
+            recipe_metadata.get("instructions", []),
+            ("text", "instruction", "step", "description"),
+        ),
+        "sections": ingredient_sections_from_recipe_data(recipe_metadata.get("ingredients", [])),
+        "cover_image": recipe_metadata.get("cover_image") or {},
+    }
+
+
+def selected_import_cookbook(cookbook_id="", cookbook_name=""):
+    cookbook_id = str(cookbook_id or "").strip()
+    cookbook_name = str(cookbook_name or "").strip()
+
+    if not cookbook_id and not cookbook_name:
+        return None
+
+    cookbook = resolve_cookbook_destination(
+        cookbook_id,
+        cookbook_name,
+        create_missing=bool(cookbook_name),
+    )
+
+    if cookbook is None:
+        print(
+            "[recipe_import] "
+            f"action=selected_cookbook_not_found cookbook_id={cookbook_id} cookbook_name={cookbook_name}"
+        )
+
+    return cookbook
+
+
+def selected_import_cookbook_from_form(form):
+    return selected_import_cookbook(
+        form.get("cookbook_id", ""),
+        form.get("cookbook_name", ""),
+    )
+
+
+def selected_import_cookbook_from_json(data):
+    data = data if isinstance(data, dict) else {}
+    return selected_import_cookbook(
+        data.get("cookbook_id", ""),
+        data.get("cookbook_name", ""),
+    )
+
+
+def log_selected_import_cookbook(source, cookbook):
+    cookbook = cookbook if isinstance(cookbook, dict) else {}
+    print(
+        "[recipe_import] "
+        f"action=selected_cookbook source={source} "
+        f"cookbook_id={cookbook.get('id', '')} cookbook_name={cookbook.get('name', '') or 'default'}"
+    )
+
+
+def save_import_cookbook_assignment(url, recipe_metadata=None, cookbook=None):
+    if cookbook and cookbook.get("id"):
+        move_recipes_to_cookbook(
+            cookbook.get("id", ""),
+            [url],
+            [import_recipe_record(url, recipe_metadata)],
+            overwrite_existing=True,
+        )
+    else:
+        ensure_recipe_has_default_cookbook(url, recipe_metadata)
+
+    assignment = recipe_cookbook_assignments().get(normalize_recipe_url_key(url), {})
+    assigned_name = assignment.get("cookbook_name") or (cookbook or {}).get("name", "") or "unclassified"
+    print(
+        "[recipe_import] "
+        f"action=recipe_created title={import_recipe_title(recipe_metadata, url)} "
+        f"assigned_cookbook={assigned_name} url={url}"
+    )
+    return assignment
+
+
 def record_recipe_import_activity(url, result, source):
     result = result if isinstance(result, dict) else {}
     record_app_activity(
@@ -247,6 +381,8 @@ def extract_recipe_route():
 
     job_id = new_job_id()
     start_progress(urls, job_id=job_id)
+    cookbook = selected_import_cookbook_from_form(request.form)
+    log_selected_import_cookbook("form-url", cookbook)
 
     extracted_any = False
 
@@ -282,7 +418,7 @@ def extract_recipe_route():
                 if result.get("display_name") or result.get("recipe_title"):
                     save_recipe_url_name(url, result.get("display_name") or result.get("recipe_title"))
                 add_recipe_urls([url])
-                ensure_recipe_has_default_cookbook(url, result)
+                save_import_cookbook_assignment(url, result, cookbook)
                 create_source_url_pdf(url)
                 schedule_generated_recipe_pdf_creation(url, context="form-url")
                 record_recipe_import_activity(url, result, "form-url")
@@ -319,6 +455,9 @@ def upload_recipe_media_route():
 
         return redirect("/")
 
+    cookbook = selected_import_cookbook_from_form(request.form)
+    log_selected_import_cookbook("media-upload", cookbook)
+
     result = extract_recipe_from_upload(uploaded_file)
 
     if result.get("ok") and result.get("ingredients"):
@@ -329,7 +468,7 @@ def upload_recipe_media_route():
         if result.get("display_name") or result.get("recipe_title"):
             save_recipe_url_name(recipe_url, result.get("display_name") or result.get("recipe_title"))
         add_recipe_urls([recipe_url])
-        ensure_recipe_has_default_cookbook(recipe_url, result)
+        save_import_cookbook_assignment(recipe_url, result, cookbook)
         create_source_url_pdf(recipe_url)
         pdf_job = schedule_generated_recipe_pdf_creation(recipe_url, context="media-upload")
         result = {
@@ -368,6 +507,8 @@ def api_extract_recipe_route():
     ]
     job_id = str(data.get("job_id") or new_job_id())
     index = int(data.get("index", 0))
+    cookbook = selected_import_cookbook_from_json(data)
+    log_selected_import_cookbook("api-url", cookbook)
 
     if not urls:
         urls = [url]
@@ -415,7 +556,7 @@ def api_extract_recipe_route():
         if result.get("display_name") or result.get("recipe_title"):
             save_recipe_url_name(url, result.get("display_name") or result.get("recipe_title"))
         add_recipe_urls([url])
-        ensure_recipe_has_default_cookbook(url, result)
+        save_import_cookbook_assignment(url, result, cookbook)
         create_source_url_pdf(url)
         pdf_job = schedule_generated_recipe_pdf_creation(url, context="api-url")
         result = {
@@ -451,6 +592,8 @@ def api_start_extract_progress_route():
         if str(item).strip()
     ]
     job_id = str(data.get("job_id") or new_job_id())
+    cookbook = selected_import_cookbook_from_json(data)
+    log_selected_import_cookbook("api-url-batch", cookbook)
 
     return jsonify(start_progress(urls, job_id=job_id))
 

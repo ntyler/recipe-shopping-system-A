@@ -31,6 +31,7 @@ const USER_ACCOUNT_PANEL_HIDE_SELECTOR = [
     ...Object.values(USER_ACCOUNT_REMEMBERED_PANEL_SELECTORS),
     "[data-feedback-support-panel]",
 ].join(", ");
+const IMPORT_COOKBOOK_STORAGE_KEY = "import-recipe-cookbook-destination";
 const USER_ACCOUNT_PANEL_HASH_KEYS = {
     "#userProfileEditForm": "accountSettings",
     "#accountNoticesPanel": "accountNotices",
@@ -4967,6 +4968,241 @@ async function createRecipeLogCookbook(button) {
     return false;
 }
 
+function normalizeImportCookbookName(name) {
+    return String(name || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function importCookbookSelector() {
+    return document.querySelector("[data-import-cookbook-selector]");
+}
+
+function importCookbookDefaultDestination() {
+    const selector = importCookbookSelector();
+
+    return {
+        cookbookId: selector ? selector.dataset.defaultCookbookId || "" : "",
+        cookbookName: selector ? selector.dataset.defaultCookbookName || "unclassified" : "unclassified",
+    };
+}
+
+function normalizeImportCookbookDestination(destination = {}) {
+    const cookbookId = String(destination.cookbookId || destination.cookbook_id || "").trim();
+    const cookbookName = String(destination.cookbookName || destination.cookbook_name || "").trim();
+
+    if (cookbookId || cookbookName) {
+        return {
+            cookbookId,
+            cookbookName: cookbookName || "unclassified",
+        };
+    }
+
+    return importCookbookDefaultDestination();
+}
+
+function importCookbookStoredDestination() {
+    try {
+        const stored = JSON.parse(localStorage.getItem(IMPORT_COOKBOOK_STORAGE_KEY) || "{}");
+        return normalizeImportCookbookDestination(stored);
+    } catch (err) {
+        return importCookbookDefaultDestination();
+    }
+}
+
+function importCookbookOptionMatches(button, destination) {
+    if (!button) {
+        return false;
+    }
+
+    const optionId = String(button.dataset.cookbookId || "").trim();
+    const optionName = normalizeImportCookbookName(button.dataset.cookbookName || "");
+    const destinationId = String(destination.cookbookId || "").trim();
+    const destinationName = normalizeImportCookbookName(destination.cookbookName || "");
+
+    if (destinationId && optionId) {
+        return optionId === destinationId;
+    }
+
+    return Boolean(destinationName && optionName === destinationName);
+}
+
+function syncImportCookbookHiddenInputs(destination) {
+    const normalized = normalizeImportCookbookDestination(destination);
+
+    document.querySelectorAll("[data-import-cookbook-id-field]").forEach(field => {
+        field.value = normalized.cookbookId || "";
+    });
+
+    document.querySelectorAll("[data-import-cookbook-name-field]").forEach(field => {
+        field.value = normalized.cookbookName || "";
+    });
+}
+
+function setImportCookbookDestination(destination, options = {}) {
+    const selector = importCookbookSelector();
+    const normalized = normalizeImportCookbookDestination(destination);
+    const label = normalized.cookbookName || "unclassified";
+
+    if (selector) {
+        selector.dataset.selectedCookbookId = normalized.cookbookId || "";
+        selector.dataset.selectedCookbookName = label;
+
+        const name = selector.querySelector("[data-import-cookbook-name]");
+        if (name) {
+            name.textContent = label;
+            name.title = label;
+            name.classList.toggle("muted", !label);
+        }
+
+        selector.querySelectorAll("[data-import-cookbook-option]").forEach(button => {
+            const selected = importCookbookOptionMatches(button, normalized);
+            button.classList.toggle("selected", selected);
+            button.setAttribute("aria-pressed", selected ? "true" : "false");
+        });
+    }
+
+    syncImportCookbookHiddenInputs(normalized);
+
+    if (options.persist !== false) {
+        try {
+            localStorage.setItem(IMPORT_COOKBOOK_STORAGE_KEY, JSON.stringify(normalized));
+        } catch (err) {
+            // localStorage can be unavailable in private or restricted contexts.
+        }
+    }
+
+    return normalized;
+}
+
+function currentImportCookbookDestination() {
+    const selector = importCookbookSelector();
+
+    if (!selector) {
+        return importCookbookDefaultDestination();
+    }
+
+    return normalizeImportCookbookDestination({
+        cookbookId: selector.dataset.selectedCookbookId || "",
+        cookbookName: selector.dataset.selectedCookbookName || "",
+    });
+}
+
+function selectImportCookbookDestination(button) {
+    const destination = normalizeImportCookbookDestination({
+        cookbookId: button ? button.dataset.cookbookId || "" : "",
+        cookbookName: button ? button.dataset.cookbookName || "" : "",
+    });
+
+    closeRecipeEditRowMenus();
+    setImportCookbookDestination(destination);
+    return false;
+}
+
+function ensureImportCookbookMenuOption(cookbook) {
+    const selector = importCookbookSelector();
+    const menu = selector ? selector.querySelector(".recipe-import-cookbook-menu") : null;
+    const cookbookId = String(cookbook && cookbook.id || "").trim();
+    const cookbookName = String(cookbook && cookbook.name || "").trim();
+
+    if (!menu || !cookbookName) {
+        return;
+    }
+
+    const existing = [...menu.querySelectorAll("[data-import-cookbook-option]")].find(button => {
+        return importCookbookOptionMatches(button, {
+            cookbookId,
+            cookbookName,
+        });
+    });
+
+    if (existing) {
+        existing.dataset.cookbookId = cookbookId;
+        existing.dataset.cookbookName = cookbookName;
+        existing.textContent = cookbookName;
+        return;
+    }
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.importCookbookOption = "";
+    button.dataset.cookbookId = cookbookId;
+    button.dataset.cookbookName = cookbookName;
+    button.textContent = cookbookName;
+    button.addEventListener("click", () => selectImportCookbookDestination(button));
+
+    const removeButton = menu.querySelector("[data-import-cookbook-remove]");
+    menu.insertBefore(button, removeButton || null);
+}
+
+async function createImportCookbookDestination(button) {
+    const name = window.prompt("New cookbook name");
+
+    if (!name || !name.trim()) {
+        return false;
+    }
+
+    const originalText = button ? button.textContent : "";
+
+    try {
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Creating...";
+        }
+
+        const formData = new FormData();
+        formData.set("name", name.trim());
+        formData.set("reuse_existing", "1");
+        const data = await submitCookbookApi("/api/cookbooks", formData);
+        const cookbook = data.cookbook || {};
+
+        if (!cookbook.id && !cookbook.name) {
+            throw new Error("Cookbook was created, but its details were not returned.");
+        }
+
+        ensureImportCookbookMenuOption({
+            id: cookbook.id || "",
+            name: cookbook.name || name.trim(),
+        });
+        closeRecipeEditRowMenus();
+        setImportCookbookDestination({
+            cookbookId: cookbook.id || "",
+            cookbookName: cookbook.name || name.trim(),
+        });
+        showRecipeQuantityUpdatedMessage("", "", "", `Import cookbook set to ${cookbook.name || name.trim()}.`);
+    } catch (err) {
+        console.warn("Unable to create import cookbook.", err);
+        window.alert(err.message || "Unable to create cookbook.");
+    } finally {
+        if (button && button.isConnected) {
+            button.disabled = false;
+            button.textContent = originalText || "Create New Cookbook";
+        }
+    }
+
+    return false;
+}
+
+function bindImportCookbookSelector() {
+    const selector = importCookbookSelector();
+
+    if (!selector) {
+        return;
+    }
+
+    const stored = importCookbookStoredDestination();
+    const matchingOption = [...selector.querySelectorAll("[data-import-cookbook-option]")].find(button => {
+        return importCookbookOptionMatches(button, stored);
+    });
+
+    if (matchingOption) {
+        setImportCookbookDestination({
+            cookbookId: matchingOption.dataset.cookbookId || stored.cookbookId || "",
+            cookbookName: matchingOption.dataset.cookbookName || stored.cookbookName || "",
+        }, { persist: false });
+    } else {
+        setImportCookbookDestination(importCookbookDefaultDestination(), { persist: false });
+    }
+}
+
 async function moveRecipesToCookbook(event) {
     event.preventDefault();
 
@@ -5604,16 +5840,21 @@ async function submitRecipeMediaUpload(input) {
     }
 
     const file = input.files[0];
+    const destination = currentImportCookbookDestination();
+    syncImportCookbookHiddenInputs(destination);
 
     if (status) {
         status.textContent = `Loading ${file.name}...`;
     }
 
+    console.log("[recipe_import] selected import cookbook", destination);
     showRecipeFileLoadingOverlay(file.name);
     await waitForNextPaint();
 
     const formData = new FormData(form);
     formData.set("ajax", "1");
+    formData.set("cookbook_id", destination.cookbookId || "");
+    formData.set("cookbook_name", destination.cookbookName || "");
 
     updateRecipeFileLoadingStep("upload", "running", "Uploading file");
     const readingTimer = setTimeout(() => {
@@ -11030,7 +11271,7 @@ function toggleRecipeIngredientRowMenu(button, event = null) {
 }
 
 function recipeEditMovableRowSelector() {
-    return ".recipe-edit-ingredient-row, .recipe-edit-equipment-row, .recipe-edit-instruction-row, .recipe-edit-nutrition-row, .recipe-edit-reflection-note-row, .recipe-edit-cookbook-field, .recipe-url-summary-row, .store-manager-row, .recipe-view-card, .cookbook-card, .cookbook-recipe-card, .rules-group, .rules-editor-food-row";
+    return ".recipe-edit-ingredient-row, .recipe-edit-equipment-row, .recipe-edit-instruction-row, .recipe-edit-nutrition-row, .recipe-edit-reflection-note-row, .recipe-edit-cookbook-field, .recipe-import-cookbook-field, .recipe-url-summary-row, .store-manager-row, .recipe-view-card, .cookbook-card, .cookbook-recipe-card, .rules-group, .rules-editor-food-row";
 }
 
 function recipeEditMoveSelectorForRow(row) {
@@ -18289,6 +18530,7 @@ async function refreshStoreMarkup(options = {}) {
     bindRecipeQuantityInputs();
     bindRecipeNameInputs();
     bindCookbooks();
+    bindImportCookbookSelector();
     bindStoreButtons();
     bindSectionHeaderToggles();
     bindRecipeDetailToggles();
@@ -18490,6 +18732,7 @@ document.addEventListener("DOMContentLoaded", function () {
     bindRecipeQuantityInputs();
     bindRecipeNameInputs();
     bindCookbooks();
+    bindImportCookbookSelector();
     bindStoreButtons();
     bindSectionHeaderToggles();
     bindRecipeDetailToggles();
@@ -18540,6 +18783,10 @@ async function startRecipeExtraction(event) {
 }
 
 async function startRecipeExtractionUrls(urls) {
+    const destination = currentImportCookbookDestination();
+    syncImportCookbookHiddenInputs(destination);
+    console.log("[recipe_import] selected import cookbook", destination);
+
     showExtractionOverlay();
     const jobId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     hiddenExtractJobId = null;
@@ -18599,6 +18846,8 @@ async function startRecipeExtractionUrls(urls) {
         body: JSON.stringify({
             urls: urls,
             job_id: jobId,
+            cookbook_id: destination.cookbookId || "",
+            cookbook_name: destination.cookbookName || "",
         }),
     });
     scheduleExtractionProgressPoll(250);
@@ -18633,6 +18882,8 @@ async function startRecipeExtractionUrls(urls) {
                 urls: urls,
                 index: index,
                 job_id: jobId,
+                cookbook_id: destination.cookbookId || "",
+                cookbook_name: destination.cookbookName || "",
             }),
         }).then(async response => {
             let data = {};
