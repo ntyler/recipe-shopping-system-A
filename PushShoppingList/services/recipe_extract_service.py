@@ -54,6 +54,13 @@ MAX_SOCIAL_VIDEO_PROMPT_CHARS = 12000
 MAX_VIDEO_TRANSCRIPTION_SECONDS = int(os.getenv("MAX_VIDEO_TRANSCRIPTION_SECONDS", "180"))
 MAX_VIDEO_AUDIO_BYTES = int(os.getenv("MAX_VIDEO_AUDIO_BYTES", str(24 * 1024 * 1024)))
 MAX_SOCIAL_VIDEO_IMAGE_URLS = int(os.getenv("MAX_SOCIAL_VIDEO_IMAGE_URLS", "4"))
+FOOD_IMAGE_INFERENCE_CONFIDENCE_THRESHOLD = float(
+    os.getenv("FOOD_IMAGE_INFERENCE_CONFIDENCE_THRESHOLD", "0.75")
+)
+LOW_CONFIDENCE_FOOD_IMAGE_INFERENCE = float(
+    os.getenv("LOW_CONFIDENCE_FOOD_IMAGE_INFERENCE", "0.55")
+)
+NON_RECIPE_FOOD_DISH_ERROR = "This upload does not appear to contain a recipe or recognizable food dish."
 DEFAULT_YOUTUBE_AUDIO_PLAYER_CLIENTS = ("android",)
 OPENAI_FILE_INPUT_MIME_TYPES = {
     "application/pdf",
@@ -5526,6 +5533,200 @@ def save_json_response(recipe_url, response_text, html_text=None):
         return False, None
 
 
+def parse_json_text_response(recipe_url, response_text):
+    cleaned = clean_json_response(response_text)
+
+    if not cleaned:
+        raw_error_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_PARSE_ERROR.txt"
+        raw_error_path.write_text(response_text, encoding="utf-8")
+        return None, "The AI response was empty."
+
+    try:
+        json_data = json.loads(cleaned)
+    except json.JSONDecodeError as exc:
+        raw_error_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_PARSE_ERROR.txt"
+        raw_error_path.write_text(response_text, encoding="utf-8")
+        return None, f"Unable to parse AI response JSON: {exc}"
+
+    if not isinstance(json_data, dict):
+        raw_error_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_PARSE_ERROR.txt"
+        raw_error_path.write_text(response_text, encoding="utf-8")
+        return None, "The AI response was not a JSON object."
+
+    return json_data, None
+
+
+def parse_confidence(value):
+    if isinstance(value, str):
+        cleaned = value.strip().replace("%", "").strip()
+        if not cleaned:
+            return None
+        value = cleaned
+
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return None
+
+    if 0 <= value <= 1:
+        return round(max(0.0, min(1.0, value)), 2)
+
+    if 0 < value <= 100:
+        return round(max(0.0, min(1.0, value / 100)), 2)
+
+    return None
+
+
+def normalize_ingredient_candidates(raw_ingredients):
+    rows = []
+    seen = set()
+
+    for item in raw_ingredients or []:
+        if isinstance(item, str):
+            row = {"original_text": clean_recipe_text(item)}
+            parsed = parse_structured_ingredient_line(row["original_text"])
+            row["quantity"] = row.get("quantity") or parsed["quantity"]
+            row["unit"] = row.get("unit") or parsed["unit"]
+            row["ingredient"] = row.get("ingredient") or parsed["ingredient"]
+            row["preparation"] = ""
+            row["optional"] = False
+            rows.append(row)
+            continue
+
+        if not isinstance(item, dict):
+            continue
+
+        ingredient = clean_recipe_text(
+            item.get("ingredient")
+            or item.get("name")
+            or item.get("original_text")
+        )
+        original_text = clean_recipe_text(item.get("original_text"))
+
+        if not original_text and ingredient:
+            pieces = [
+                clean_recipe_text(item.get("quantity")),
+                clean_recipe_text(item.get("unit")),
+                ingredient,
+                clean_recipe_text(item.get("preparation")),
+            ]
+            original_text = " ".join(part for part in pieces if part)
+
+        if not ingredient and original_text:
+            ingredient = parse_structured_ingredient_line(original_text)["ingredient"]
+
+        if not ingredient:
+            continue
+
+        key = normalize_ingredient_key(ingredient)
+        if not key or key in seen:
+            continue
+
+        row = {
+            "original_text": original_text or ingredient,
+            "quantity": item.get("quantity"),
+            "unit": item.get("unit"),
+            "ingredient": ingredient,
+            "preparation": item.get("preparation"),
+            "optional": bool(item.get("optional")),
+            "section": item.get("section"),
+            "store_section": item.get("store_section"),
+        }
+
+        rows.append(row)
+        seen.add(key)
+
+    if rows:
+        normalize_extracted_ingredient_fields({"ingredients": rows})
+
+    return rows
+
+
+def build_food_image_inference_prompt(recipe_url, filename):
+    return build_prompt(
+        recipe_url,
+        f"""
+Analyze this uploaded food photo and infer a practical home-cook recipe.
+
+Return JSON with exactly this shape:
+{{
+  "recipe_title": "AI-Inferred recipe title",
+  "display_name": "Short card-friendly title",
+  "servings": 2,
+  "prep_time": "PT0H15M",
+  "cook_time": "PT0H25M",
+  "total_time": "PT0H40M",
+  "level": "Easy",
+  "ingredients": [
+    {{
+      "quantity": "1",
+      "unit": "cup",
+      "ingredient": "rice",
+      "preparation": "",
+      "optional": false,
+      "section": "PASTA, RICE & GRAINS"
+    }}
+  ],
+  "visible_ingredients": ["rice", "onions", "olive oil"],
+  "inferred_ingredients": ["rice", "onion", "salt", "pepper", "olive oil"],
+  "equipment": ["large pan", "spatula"],
+  "instructions": ["Cook ingredients.", "Adjust seasoning and serve."],
+  "nutrition": {{}},
+  "extraction_confidence": 0.0,
+  "image_analysis_notes": "notes..."
+}}
+
+Rules:
+- Use only clearly visible ingredients in visible_ingredients.
+- inference should be practical and suitable for a home cook.
+- Use grocery-store ingredients with quantities and sections.
+- Do not claim the result is exact if inferred.
+- Include a confidence score between 0 and 1 in extraction_confidence.
+- Return valid JSON only.
+""",
+    )
+
+
+def infer_food_image_recipe(recipe_url, upload_path, mime_type, filename):
+    response_text = send_image_prompt_to_openai(
+        build_food_image_inference_prompt(recipe_url, filename),
+        upload_path,
+        mime_type,
+    )
+
+    parsed, parse_error = parse_json_text_response(recipe_url, response_text)
+    if parse_error:
+        return None, parse_error
+
+    ingredients = normalize_ingredient_candidates(parsed.get("ingredients", []))
+    visible = normalize_ingredient_candidates(parsed.get("visible_ingredients", []))
+    inferred = normalize_ingredient_candidates(parsed.get("inferred_ingredients", []))
+    parsed["ingredients"] = ingredients
+    parsed["visible_ingredients"] = [row.get("ingredient") for row in visible if row.get("ingredient")]
+    parsed["inferred_ingredients"] = [row.get("ingredient") for row in inferred if row.get("ingredient")]
+
+    if not isinstance(parsed.get("equipment"), list):
+        parsed["equipment"] = []
+
+    if not isinstance(parsed.get("instructions"), list):
+        parsed["instructions"] = []
+
+    if not isinstance(parsed.get("nutrition"), dict):
+        parsed["nutrition"] = {}
+
+    extraction_confidence = parse_confidence(parsed.get("extraction_confidence"))
+    parsed["extraction_confidence"] = extraction_confidence if extraction_confidence is not None else 0.55
+
+    parsed["source_type"] = "food_image_inferred"
+    parsed["ai_inferred"] = True
+    parsed["image_analysis_notes"] = (
+        f"{clean_recipe_text(parsed.get('image_analysis_notes'))} "
+        "This recipe was inferred from a food image and may not match the original dish exactly."
+    ).strip()
+
+    return parsed, None
+
+
 def normalize_extracted_ingredient_fields(json_data):
     for item in json_data.get("ingredients", []):
         if not isinstance(item, dict):
@@ -5667,6 +5868,7 @@ def extract_recipe_from_upload(file_storage):
     mime_type = normalize_upload_mime_type(mime_type, filename, upload_path)
     upload_suffix = upload_file_suffix(filename, upload_path)
     page_text = ""
+    extraction_method = "upload"
 
     try:
         if upload_is_word_document(mime_type, filename, upload_path):
@@ -5687,12 +5889,14 @@ def extract_recipe_from_upload(file_storage):
             upload_path_for_review = converted_pdf_path
             mime_type_for_review = "application/pdf"
             filename_for_review = extraction_filename
+            extraction_method = "document_text"
         elif mime_type.startswith("image/"):
             prompt_text = build_upload_prompt(recipe_url, filename)
             response_text = send_image_prompt_to_openai(prompt_text, upload_path, mime_type)
             upload_path_for_review = upload_path
             mime_type_for_review = mime_type
             filename_for_review = filename
+            extraction_method = "photo_text"
         elif mime_type.startswith("text/") or upload_suffix in {".txt", ".md"}:
             page_text = upload_path.read_text(encoding="utf-8", errors="ignore")
             prompt_text = build_prompt(recipe_url, page_text[:MAX_PAGE_TEXT_CHARS])
@@ -5700,12 +5904,14 @@ def extract_recipe_from_upload(file_storage):
             upload_path_for_review = upload_path
             mime_type_for_review = mime_type
             filename_for_review = filename
+            extraction_method = "document_text"
         elif upload_can_use_openai_file_input(mime_type, filename, upload_path):
             prompt_text = build_upload_prompt(recipe_url, filename)
             response_text = send_file_prompt_to_openai(prompt_text, upload_path, mime_type, filename)
             upload_path_for_review = upload_path
             mime_type_for_review = mime_type
             filename_for_review = filename
+            extraction_method = "document_text"
         else:
             page_text = extract_text_from_generic_document(upload_path, filename)
 
@@ -5720,25 +5926,98 @@ def extract_recipe_from_upload(file_storage):
             upload_path_for_review = upload_path
             mime_type_for_review = mime_type
             filename_for_review = filename
+            extraction_method = "document_text"
 
-        ok, json_data = save_json_response(recipe_url, response_text)
+        json_data, parse_error = parse_json_text_response(recipe_url, response_text)
+        should_infer_food_image = False
+        if parse_error:
+            if extraction_method != "photo_text":
+                return {
+                    "ok": False,
+                    "error": parse_error,
+                }
 
-        if not ok or not json_data:
-            return {
-                "ok": False,
-                "error": "The uploaded recipe could not be parsed into recipe JSON.",
-            }
+            should_infer_food_image = True
+        elif extraction_method == "photo_text" and not structured_recipe_data_is_usable(json_data):
+            should_infer_food_image = True
+
+        if should_infer_food_image:
+            inferred_json, inference_error = infer_food_image_recipe(
+                recipe_url,
+                upload_path,
+                mime_type_for_review,
+                filename_for_review,
+            )
+            if inference_error:
+                return {
+                    "ok": False,
+                    "error": NON_RECIPE_FOOD_DISH_ERROR,
+                    "extraction_method": "not_recipe_image",
+                }
+
+            extraction_method = "food_image_inferred"
+            json_data = inferred_json
+
+        if extraction_method == "food_image_inferred":
+            if not structured_recipe_data_is_usable(json_data):
+                return {
+                    "ok": False,
+                    "error": NON_RECIPE_FOOD_DISH_ERROR,
+                    "extraction_method": "not_recipe_image",
+                    "source_type": "food_image_inferred",
+                }
+
+            extraction_confidence = parse_confidence(json_data.get("extraction_confidence"))
+            if extraction_confidence is None:
+                extraction_confidence = 0.5
+            json_data["extraction_confidence"] = extraction_confidence
+
+            if extraction_confidence < LOW_CONFIDENCE_FOOD_IMAGE_INFERENCE:
+                return {
+                    "ok": False,
+                    "error": (
+                        "Could not confidently infer a full recipe from this image. "
+                        "Please provide a short dish description (for example, 'grilled salmon with broccoli') and retry."
+                    ),
+                    "needs_dish_description": True,
+                    "extraction_confidence": extraction_confidence,
+                    "source_type": "food_image_inferred",
+                    "extraction_method": "not_recipe_image",
+                }
+
+            parsed_title = clean_recipe_text(
+                json_data.get("recipe_title") or json_data.get("display_name") or ""
+            )
+            if extraction_confidence >= FOOD_IMAGE_INFERENCE_CONFIDENCE_THRESHOLD and parsed_title:
+                json_data["recipe_title"] = f"AI-Inferred {parsed_title}"
+                json_data["display_name"] = f"AI-Inferred {parsed_title}"
+            else:
+                json_data["recipe_title"] = "AI-Inferred Recipe from Food Photo"
+                json_data["display_name"] = "AI-Inferred Recipe from Food Photo"
+
+            json_data["source_type"] = "food_image_inferred"
+            json_data["ai_inferred"] = True
+            normalize_extracted_recipe_identity(json_data)
+        else:
+            title = determine_upload_recipe_title(
+                recipe_url,
+                upload_path_for_review,
+                mime_type_for_review,
+                filename_for_review,
+                page_text,
+            )
+            if title:
+                json_data["recipe_title"] = title
+            json_data.setdefault("ai_inferred", False)
+            json_data["source_type"] = (
+                "photo_text" if extraction_method == "photo_text" else "document_text"
+            )
+            json_data.setdefault("extraction_confidence", 0.90)
 
         json_data["source_url"] = recipe_url
-        title = determine_upload_recipe_title(
-            recipe_url,
-            upload_path_for_review,
-            mime_type_for_review,
-            filename_for_review,
-            page_text,
-        )
-        if title:
-            json_data["recipe_title"] = title
+        if json_data.get("ai_inferred") is None:
+            json_data["ai_inferred"] = False
+
         cover_image = extract_recipe_cover_image_from_upload(
             upload_path,
             mime_type,
@@ -5748,14 +6027,17 @@ def extract_recipe_from_upload(file_storage):
         )
         if cover_image:
             json_data["cover_image"] = cover_image
-        merge_missing_upload_ingredients(
-            recipe_url,
-            json_data,
-            upload_path_for_review,
-            mime_type_for_review,
-            filename_for_review,
-            page_text,
-        )
+        if extraction_method != "food_image_inferred":
+            merge_missing_upload_ingredients(
+                recipe_url,
+                json_data,
+                upload_path_for_review,
+                mime_type_for_review,
+                filename_for_review,
+                page_text,
+            )
+
+        json_data["extraction_method"] = extraction_method
         archive_uploaded_recipe_pdf(
             recipe_url,
             upload_path_for_review,
@@ -5766,7 +6048,7 @@ def extract_recipe_from_upload(file_storage):
         )
         save_extracted_recipe_json(recipe_url, json_data)
 
-        return build_extract_result(recipe_url, json_data, "upload")
+        return build_extract_result(recipe_url, json_data, extraction_method)
     except Exception as exc:
         raw_error_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_UPLOAD_ERROR.txt"
         raw_error_path.write_text(str(exc), encoding="utf-8")
@@ -6247,6 +6529,12 @@ def build_extract_result(recipe_url, json_data, extraction_method):
         "instructions": json_data.get("instructions", []),
         "nutrition": json_data.get("nutrition", {}),
         "raw": json_data,
+        "source_type": json_data.get("source_type") or extraction_method,
+        "ai_inferred": bool(json_data.get("ai_inferred")),
+        "extraction_confidence": json_data.get("extraction_confidence"),
+        "image_analysis_notes": json_data.get("image_analysis_notes"),
+        "visible_ingredients": json_data.get("visible_ingredients") or [],
+        "inferred_ingredients": json_data.get("inferred_ingredients") or [],
         "extraction_method": extraction_method,
     }
 

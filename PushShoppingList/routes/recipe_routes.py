@@ -562,6 +562,22 @@ def upload_recipe_media_route():
     log_selected_import_cookbook("media-upload", cookbook)
 
     result = extract_recipe_from_upload(uploaded_file)
+    extraction_source = str(
+        result.get("extraction_method") or result.get("source_type") or "upload"
+    ).strip()
+    extraction_confidence = result.get("extraction_confidence")
+    path_label = {
+        "document_text": "text recipe import",
+        "photo_text": "text recipe import",
+        "food_image_inferred": "food image inferred recipe",
+        "not_recipe_image": "not recipe/food",
+    }.get(extraction_source, "not recipe/food")
+
+    print(
+        f"[recipe_import] action=media_upload_path path={path_label} "
+        f"title={import_recipe_title(result, result.get('source_url') or '')} "
+        f"confidence={extraction_confidence}"
+    )
 
     if result.get("ok") and result.get("ingredients"):
         recipe_url = result.get("source_url")
@@ -590,10 +606,11 @@ def upload_recipe_media_route():
         record_recipe_import_activity(recipe_url, result, "media-upload")
         sort_ingredients()
     elif result.get("ok"):
+        if not result.get("error"):
+            result["error"] = NO_INGREDIENTS_ERROR
         result = {
             **result,
             "ok": False,
-            "error": NO_INGREDIENTS_ERROR,
         }
 
     if wants_json:
