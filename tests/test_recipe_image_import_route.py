@@ -191,7 +191,7 @@ def test_generate_recipe_from_image_reports_json_parse_failure(monkeypatch, tmp_
     assert payload["debug"]["json_parse_success"] is False
 
 
-def test_generate_recipe_from_image_success_refreshes_after_save():
+def test_generate_recipe_from_image_success_opens_editor_after_save():
     script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     start = script.index("async function submitRecipeMediaVision()")
     end = script.index("async function submitRecipeMediaRetry()")
@@ -199,9 +199,24 @@ def test_generate_recipe_from_image_success_refreshes_after_save():
 
     assert 'updateRecipeFileLoadingStep("save", "running", "Saving");' in block
     assert "Saving ingredients and refreshing the shopping list..." in block
-    assert "window.location.reload();" in block
+    assert "Refreshing recipe and opening the editor..." in block
+    assert "await openImportedRecipeEditorAfterMediaImport(data" in block
+    assert "window.location.reload();" not in block
     assert "setRecipeFileVisionDebug(data && data.debug" in block
     assert "Reason:" in block
+
+
+def test_media_import_editor_helper_refreshes_markup_then_opens_recipe():
+    script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    start = script.index("async function openImportedRecipeEditorAfterMediaImport")
+    end = script.index("async function submitRecipeMediaVision()")
+    block = script[start:end]
+
+    assert "data.source_url || data.url" in block
+    assert "recipeJson.source_url" in block
+    assert "await refreshStoreMarkup({ requireRecipeLog: true, cacheBust: true });" in block
+    assert "hideRecipeFileLoadingOverlay();" in block
+    assert "await openRecipeEditor({ dataset: { recipeUrl } });" in block
 
 
 def test_generate_recipe_from_image_debug_panel_has_requested_sections():

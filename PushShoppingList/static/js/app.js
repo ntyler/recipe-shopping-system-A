@@ -6247,6 +6247,45 @@ async function submitRecipeMediaReadText() {
     await submitRecipeMediaUpload(getRecipeMediaUploadInput(), "", "read_text");
 }
 
+async function openImportedRecipeEditorAfterMediaImport(data = {}, options = {}) {
+    const recipeJson = data && data.recipe_json && typeof data.recipe_json === "object"
+        ? data.recipe_json
+        : {};
+    const recipeUrl = String(
+        (data && (data.source_url || data.url))
+        || recipeJson.source_url
+        || recipeJson.url
+        || ""
+    ).trim();
+    const statusMessage = String(options.statusMessage || "Recipe import completed.").trim();
+
+    if (!recipeUrl) {
+        window.location.reload();
+        return;
+    }
+
+    setRecipeFileLoadingSummary(options.refreshMessage || "Refreshing recipe and opening the editor...");
+    await waitForNextPaint();
+
+    try {
+        await refreshStoreMarkup({ requireRecipeLog: true, cacheBust: true });
+    } catch (err) {
+        console.warn("Unable to refresh recipe after media import.", err);
+        setRecipeFileLoadingSummary("Recipe saved. Reloading to show it...");
+        window.location.reload();
+        return;
+    }
+
+    hideRecipeFileLoadingOverlay();
+    await waitForNextPaint();
+    await openRecipeEditor({ dataset: { recipeUrl } });
+
+    const status = document.getElementById("recipeMediaUploadStatus");
+    if (status && statusMessage) {
+        status.textContent = statusMessage;
+    }
+}
+
 async function submitRecipeMediaVision() {
     if (recipeMediaVisionInProgress) {
         return;
@@ -6403,7 +6442,10 @@ async function submitRecipeMediaVision() {
         if (status) {
             status.textContent = categoryStatusMessage || "Recipe estimated from uploaded image.";
         }
-        window.location.reload();
+        await openImportedRecipeEditorAfterMediaImport(data, {
+            statusMessage: categoryStatusMessage || "Recipe estimated from uploaded image.",
+            refreshMessage: "Refreshing recipe and opening the editor...",
+        });
     } catch (err) {
         const data = err && err.data ? err.data : {};
         const responseErrorMessage = String((data && (data.error_message || data.error)) || "").trim();
