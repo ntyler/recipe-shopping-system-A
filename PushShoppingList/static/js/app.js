@@ -5899,6 +5899,7 @@ function getRecipeMediaUploadInput() {
 
 let recipeMediaUploadPath = "";
 let recipeMediaVisionInProgress = false;
+let recipeMediaUploadPreview = null;
 
 function setRecipeMediaUploadPath(path) {
     recipeMediaUploadPath = String(path || "").trim();
@@ -6075,6 +6076,10 @@ async function submitRecipeMediaUpload(input, manualDescription = "", uploadMode
 
         const extractionMode = String((data && data.extraction_mode) || "").trim();
         const isImageEstimate = extractionMode === "image_estimate" || extractionMode === "manual_description";
+        const extractedRecipeJson = data && data.recipe_json ? data.recipe_json : null;
+        if (extractedRecipeJson && extractedRecipeJson.ingredients) {
+            recipeMediaUploadPreview = extractedRecipeJson;
+        }
 
         if (isImageEstimate) {
             setRecipeFileLoadingSummary("Generating recipe estimate from uploaded image...");
@@ -6249,6 +6254,7 @@ async function submitRecipeMediaVision() {
     syncImportCookbookHiddenInputs(destination);
 
     recipeMediaVisionInProgress = true;
+    recipeMediaUploadPreview = null;
 
     try {
         showRecipeFileLoadingOverlay(fileLabel, sourceTypeLabel, isImageUpload);
@@ -6295,26 +6301,34 @@ async function submitRecipeMediaVision() {
             throw error;
         }
 
-        const recipeJson = data && data.recipe_json && data.recipe_json.ingredients
-            ? data.recipe_json
-            : data;
+        const recipeJson = data && data.recipe_json ? data.recipe_json : null;
         const ingredients = Array.isArray(recipeJson && recipeJson.ingredients)
             ? recipeJson.ingredients
             : [];
-        updateRecipeFileLoadingStep("estimate", "done", "Success");
-        updateRecipeFileLoadingStep("extract", "done", "Completed");
-        setRecipeFileEstimatedBanner(true, (data && data.estimation_banner) || "Recipe estimated from uploaded image. Review ingredients before saving.");
+        const estimationBanner = String((data && data.estimation_banner) || "").trim()
+            || "Recipe estimated from uploaded image. Review ingredients before saving.";
+        const recipeEstimateSuccessful = ingredients.length > 0;
 
-        if (ingredients.length > 0) {
-            updateRecipeFileLoadingStep("save", "running", "Enabled");
-            setRecipeFileLoadingSummary("Saving ingredients and refreshing the shopping list...");
-            await waitForNextPaint();
-            window.location.reload();
-            return;
+        if (!recipeEstimateSuccessful) {
+            const message = "Could not estimate a recipe from this image. Try describing the meal manually.";
+            const error = new Error(message);
+            error.data = {
+                ...data,
+                error: message,
+            };
+            throw error;
         }
 
-        updateRecipeFileLoadingStep("save", "waiting", "No ingredients found");
-        setRecipeFileLoadingSummary("Could not estimate a recipe from this image. Try describing the meal manually.");
+        recipeMediaUploadPreview = recipeJson;
+        updateRecipeFileLoadingStep("estimate", "done", "Success");
+        updateRecipeFileLoadingStep("extract", "done", "Completed");
+        setRecipeFileEstimatedBanner(true, estimationBanner);
+        updateRecipeFileLoadingStep("save", "waiting", "Enabled");
+        setRecipeFileLoadingSummary("Recipe estimated from uploaded image. Review ingredients before saving.");
+        setRecipeFileActionButtonsEnabled(false);
+        if (status) {
+            status.textContent = "Recipe estimated from uploaded image.";
+        }
     } catch (err) {
         const data = err && err.data ? err.data : {};
         const responseErrorMessage = String((data && data.error) || "").trim();

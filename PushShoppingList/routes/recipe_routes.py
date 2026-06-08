@@ -718,9 +718,6 @@ def api_generate_recipe_from_image_route():
             "error": "uploaded_file_path is required.",
         }), 400
 
-    cookbook = selected_import_cookbook_from_json(data)
-    log_selected_import_cookbook("vision-api", cookbook)
-
     try:
         upload_root = UPLOAD_FOLDER.resolve()
         upload_path = Path(uploaded_file_path).resolve()
@@ -749,6 +746,9 @@ def api_generate_recipe_from_image_route():
         }), 400
 
     recipe_url = f"uploaded://{upload_path.name}"
+    vision_unavailable_message = (
+        "Could not estimate a recipe from this image. Try describing the meal manually."
+    )
     parsed_recipe, inference_error = generateRecipeFromImage(
         upload_path,
         user_description="",
@@ -758,12 +758,30 @@ def api_generate_recipe_from_image_route():
     )
 
     if inference_error:
-        return jsonify({
-            "ok": False,
-            "error": inference_error or "Could not estimate a recipe from this image. Try describing the meal manually.",
-            "failed_step": "extract",
-            "uploaded_file_path": str(upload_path),
-        }), 400
+        return jsonify(
+            {
+                **build_upload_failure_result(
+                    {
+                        "source_type": "image",
+                        "source_name": upload_path.name,
+                        "source_url": recipe_url,
+                        "uploaded_file_path": str(upload_path),
+                        "detected_food_photo": True,
+                        "recipe_json": parsed_recipe,
+                    },
+                    inference_error or vision_unavailable_message,
+                    failed_step="extract",
+                ),
+                "source_type": source_type,
+                "source_type_label": "Image",
+                "source_name": upload_path.name,
+                "uploaded_file_path": str(upload_path),
+                "extraction_mode": extraction_mode,
+                "extraction_mode_label": "Vision",
+                "raw": parsed_recipe,
+                "recipe_json": parsed_recipe,
+            }
+        ), 400
 
     result = build_extract_result(recipe_url, parsed_recipe, extraction_mode)
     result["source_type"] = source_type
@@ -779,26 +797,37 @@ def api_generate_recipe_from_image_route():
     )
     result["raw"] = parsed_recipe
     result["recipe_json"] = parsed_recipe
-    result["ok"] = bool(result.get("ok") and parsed_recipe)
+    result["ok"] = bool(result.get("ok") and result.get("ingredients"))
 
-    result = commit_media_import_result(
-        result,
-        cookbook,
-        recipe_url=recipe_url,
-        context="vision-api",
-    )
-    if result.get("ok") and result.get("ingredients"):
-        status = 200
-    else:
-        if not result.get("error"):
-            result["error"] = NO_UPLOAD_INGREDIENTS_ERROR
-        result = {
-            **build_upload_failure_result({}, result.get("error"), failed_step="extract"),
-            **result,
-        }
-        status = 400
+    if not result.get("ingredients"):
+        return jsonify(
+            {
+                **build_upload_failure_result(
+                    {
+                        "source_type": "image",
+                        "source_name": upload_path.name,
+                        "source_url": recipe_url,
+                        "uploaded_file_path": str(upload_path),
+                        "detected_food_photo": True,
+                        "recipe_json": parsed_recipe,
+                    },
+                    vision_unavailable_message,
+                    failed_step="extract",
+                ),
+                **result,
+                "source_type": source_type,
+                "source_type_label": "Image",
+                "source_name": upload_path.name,
+                "uploaded_file_path": str(upload_path),
+                "extraction_mode": extraction_mode,
+                "extraction_mode_label": "Vision",
+                "raw": parsed_recipe,
+                "recipe_json": parsed_recipe,
+                "ok": False,
+            }
+        ), 400
 
-    return jsonify(result), status
+    return jsonify(result), 200
 
 
 @recipe_bp.route("/api/extract_recipe", methods=["POST"])
