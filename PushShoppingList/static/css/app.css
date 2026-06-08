@@ -10086,6 +10086,18 @@ body {
             gap: 8px;
         }
 
+        .recipe-file-image-estimate-banner {
+            margin-top: 12px;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #d0a300;
+            background: #332b00;
+            color: #ffe99e;
+            font-size: 13px;
+            font-weight: 700;
+            line-height: 1.4;
+        }
+
         .recipe-file-manual-description-message {
             color: #fef9c3;
             font-size: 13px;

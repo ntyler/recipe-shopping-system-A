@@ -5780,7 +5780,7 @@ def build_food_image_inference_prompt(recipe_url, filename, user_description="")
     return build_prompt(
         recipe_url,
         f"""
-Analyze this uploaded food photo and infer a practical home-cook recipe.
+Analyze this food photo and create a likely recipe. Identify visible ingredients, estimate reasonable quantities, equipment, and instructions. Return strict JSON only. Mark every ingredient as estimated_from_image=true and include confidence notes. Do not claim certainty.
 {user_description_hint}
 
 Return JSON with exactly this shape:
@@ -5797,6 +5797,7 @@ Return JSON with exactly this shape:
       "quantity": "1",
       "unit": "cup",
       "ingredient": "rice",
+      "estimated_from_image": true,
       "preparation": "",
       "optional": false,
       "section": "PASTA, RICE & GRAINS"
@@ -5808,15 +5809,15 @@ Return JSON with exactly this shape:
   "instructions": ["Cook ingredients.", "Adjust seasoning and serve."],
   "nutrition": {{}},
   "extraction_confidence": 0.0,
+  "extraction_mode": "image_estimate",
   "image_analysis_notes": "notes..."
 }}
 
 Rules:
 - Use only clearly visible ingredients in visible_ingredients.
-- inference should be practical and suitable for a home cook.
 - Use grocery-store ingredients with quantities and sections.
 - If a user description is provided, treat it as a high-priority hint for ingredient selection and method flow.
-- Do not claim the result is exact if inferred.
+- Do not claim the result is exact; treat all inferred items as estimated.
 - Do not claim ingredient amounts are exact; they should be treated as estimates.
 - Include a confidence score between 0 and 1 in extraction_confidence.
 - Return valid JSON only.
@@ -5855,23 +5856,46 @@ def infer_food_image_recipe(recipe_url, upload_path, mime_type, filename, user_d
     parsed["extraction_confidence"] = extraction_confidence if extraction_confidence is not None else 0.55
 
     has_user_description = bool(clean_recipe_text(user_description))
+    extraction_mode = "manual_description" if has_user_description else "image_estimate"
     parsed["source_type"] = (
-        "food_image_from_description"
-        if has_user_description
-        else "food_image_inferred"
+        "image"
     )
+    parsed["extraction_mode"] = extraction_mode
     parsed["ai_inferred"] = True
     estimated_note = (
         FOOD_PHOTO_DESCRIPTION_ESTIMATED_NOTE
         if has_user_description
-        else "This recipe was inferred from a food image and may not match the original dish exactly."
+        else "Estimated from food photo and should be reviewed before shopping."
     )
     parsed["image_analysis_notes"] = (
         f"{clean_recipe_text(parsed.get('image_analysis_notes'))} "
         f"{estimated_note}"
     ).strip()
 
+    for ingredient in parsed.get("ingredients", []):
+        if isinstance(ingredient, dict):
+            ingredient["estimated_from_image"] = True
+
     return parsed, None
+
+
+def generateRecipeFromImage(uploaded_file_path, user_description="", recipe_url="", filename="", mime_type=""):
+    upload_path = Path(uploaded_file_path)
+    resolved_url = (
+        str(recipe_url).strip()
+        if str(recipe_url).strip()
+        else f"uploaded://{upload_path.name}"
+    )
+    resolved_filename = str(filename or upload_path.name)
+    resolved_mime_type = normalize_upload_mime_type(mime_type, resolved_filename, upload_path)
+
+    return infer_food_image_recipe(
+        resolved_url,
+        upload_path,
+        resolved_mime_type,
+        resolved_filename,
+        user_description=user_description,
+    )
 
 
 def normalize_extracted_ingredient_fields(json_data):
@@ -6042,7 +6066,7 @@ def extract_recipe_from_upload(file_storage, manual_description=""):
             import_object["extracted_text"] = page_text
             import_object["detected_food_photo"] = detected_food_photo
             import_object["contains_written_recipe"] = bool(contains_written_recipe)
-            extraction_method = "photo_text"
+            extraction_method = "ocr_text"
 
             if not page_text.strip() or not contains_written_recipe:
                 if read_error:
@@ -6052,50 +6076,55 @@ def extract_recipe_from_upload(file_storage, manual_description=""):
                     )
 
                 if detected_food_photo:
-                    if manual_description:
-                        print(
-                            "[recipe_import] action=upload_food_photo_description_inference_start "
-                            f"source_type={import_source_type} file={filename!r}"
-                        )
-                        inferred_json, inference_error = infer_food_image_recipe(
-                            recipe_url,
-                            upload_path,
-                            mime_type,
-                            filename,
-                            user_description=manual_description,
-                        )
-                        if inference_error:
-                            print(
-                                "[recipe_import] action=upload_food_photo_description_inference_failed "
-                                f"source_type={import_source_type} file={filename!r} error={inference_error}"
-                            )
-                            return build_upload_failure_result(
-                                import_object,
-                                FOOD_PHOTO_NO_RECIPE_TEXT_ERROR,
-                                failed_step="extract",
-                                extraction_method="food_image_from_description",
-                            )
+                    fallback_mode = (
+                        "manual_description"
+                        if manual_description
+                        else "image_estimate"
+                    )
+                    print(
+                        "[recipe_import] action=upload_food_photo_image_estimate_start "
+                        f"source_type={import_source_type} file={filename!r} mode={fallback_mode}"
+                    )
+                    inferred_json, inference_error = generateRecipeFromImage(
+                        upload_path,
+                        user_description=manual_description,
+                        recipe_url=recipe_url,
+                        filename=filename,
+                        mime_type=mime_type,
+                    )
 
-                        extraction_method = "food_image_from_description"
-                        json_data = inferred_json
-                        import_object["manual_description"] = manual_description
-                        import_object["recipe_json"] = json_data
-                    else:
+                    if inference_error:
+                        error_message = (
+                            FOOD_PHOTO_NO_RECIPE_TEXT_ERROR
+                            if not manual_description
+                            else "Unable to estimate this food photo from the description. Try a more detailed description."
+                        )
+                        print(
+                            "[recipe_import] action=upload_food_photo_image_estimate_failed "
+                            f"source_type={import_source_type} file={filename!r} mode={fallback_mode} "
+                            f"error={inference_error}"
+                        )
                         return build_upload_failure_result(
                             import_object,
-                            FOOD_PHOTO_NO_RECIPE_TEXT_ERROR,
+                            error_message,
                             failed_step="manual_description",
-                            extraction_method="not_recipe_image",
+                            extraction_method=fallback_mode,
                         )
+
+                    extraction_method = fallback_mode
+                    json_data = inferred_json
+                    if manual_description:
+                        import_object["manual_description"] = manual_description
+                    import_object["recipe_json"] = json_data
                 else:
                     return build_upload_failure_result(
                         import_object,
-                        NO_WRITTEN_PHOTO_TEXT_ERROR,
+                        NO_READABLE_UPLOAD_TEXT_ERROR,
                         failed_step="read",
                         extraction_method=extraction_method,
                     )
 
-            if extraction_method == "photo_text":
+            if extraction_method == "ocr_text":
                 prompt_text = build_prompt(
                     recipe_url,
                     page_text[:MAX_PAGE_TEXT_CHARS],
@@ -6196,6 +6225,13 @@ def extract_recipe_from_upload(file_storage, manual_description=""):
         if json_data is None:
             json_data, parse_error = parse_json_text_response(recipe_url, response_text)
             if parse_error:
+                if extraction_method in {"image_estimate", "manual_description"}:
+                    return build_upload_failure_result(
+                        import_object,
+                        NO_UPLOAD_INGREDIENTS_ERROR,
+                        failed_step="manual_description",
+                        extraction_method=extraction_method,
+                    )
                 print(
                     "[recipe_import] action=upload_extract_parse_failed "
                     f"source_type={import_source_type} file={filename!r} error={parse_error}"
@@ -6209,6 +6245,13 @@ def extract_recipe_from_upload(file_storage, manual_description=""):
 
         import_object["recipe_json"] = json_data
         if not structured_recipe_data_is_usable(json_data):
+            if extraction_method in {"image_estimate", "manual_description"}:
+                return build_upload_failure_result(
+                    import_object,
+                    NO_UPLOAD_INGREDIENTS_ERROR,
+                    failed_step="manual_description",
+                    extraction_method=extraction_method,
+                )
             print(
                 "[recipe_import] action=upload_extract_no_recipe_data "
                 f"source_type={import_source_type} file={filename!r} "
@@ -6222,7 +6265,7 @@ def extract_recipe_from_upload(file_storage, manual_description=""):
                 extraction_method=extraction_method,
             )
 
-        if extraction_method in {"food_image_inferred", "food_image_from_description"}:
+        if extraction_method in {"image_estimate", "manual_description"}:
             extraction_confidence = parse_confidence(json_data.get("extraction_confidence"))
             if extraction_confidence is None:
                 extraction_confidence = 0.5
@@ -6231,22 +6274,28 @@ def extract_recipe_from_upload(file_storage, manual_description=""):
             parsed_title = clean_recipe_text(
                 json_data.get("recipe_title") or json_data.get("display_name") or ""
             )
-            if extraction_method == "food_image_from_description":
+            if extraction_method == "manual_description":
                 json_data["recipe_title"] = (
                     f"Estimated from photo/description: {parsed_title}"
                     if parsed_title
                     else "Estimated from photo/description"
                 )
                 json_data["display_name"] = json_data["recipe_title"]
-            elif extraction_confidence >= FOOD_IMAGE_INFERENCE_CONFIDENCE_THRESHOLD and parsed_title:
-                json_data["recipe_title"] = f"AI-Inferred {parsed_title}"
-                json_data["display_name"] = f"AI-Inferred {parsed_title}"
+            elif extraction_method == "image_estimate":
+                json_data["recipe_title"] = (
+                    f"Estimated from food photo: {parsed_title}"
+                    if parsed_title
+                    else "Estimated from food photo"
+                )
+                json_data["display_name"] = json_data["recipe_title"]
             else:
-                json_data["recipe_title"] = "AI-Inferred Recipe from Food Photo"
-                json_data["display_name"] = "AI-Inferred Recipe from Food Photo"
+                json_data["recipe_title"] = "Estimated recipe from food photo"
+                json_data["display_name"] = "Estimated recipe from food photo"
 
-            json_data["source_type"] = extraction_method
+            json_data["source_type"] = "image"
+            json_data["extraction_mode"] = extraction_method
             json_data["ai_inferred"] = True
+            json_data.setdefault("extracted_text", page_text)
             normalize_extracted_recipe_identity(json_data)
         else:
             title = determine_upload_recipe_title(
@@ -6260,8 +6309,11 @@ def extract_recipe_from_upload(file_storage, manual_description=""):
                 json_data["recipe_title"] = title
             json_data.setdefault("ai_inferred", False)
             json_data["source_type"] = (
-                "photo_text" if extraction_method == "photo_text" else "document_text"
+                "photo_text" if extraction_method == "ocr_text" else "document_text"
             )
+            if extraction_method == "ocr_text":
+                json_data["extraction_mode"] = "ocr_text"
+
         json_data["import_source_type"] = import_source_type
         json_data["import_source_name"] = filename
         json_data["extracted_text"] = page_text
@@ -6280,7 +6332,7 @@ def extract_recipe_from_upload(file_storage, manual_description=""):
         )
         if cover_image:
             json_data["cover_image"] = cover_image
-        if extraction_method not in {"food_image_inferred", "food_image_from_description"}:
+        if extraction_method not in {"image_estimate", "manual_description"}:
             merge_missing_upload_ingredients(
                 recipe_url,
                 json_data,
@@ -6846,6 +6898,7 @@ def build_extract_result(recipe_url, json_data, extraction_method):
         "visible_ingredients": json_data.get("visible_ingredients") or [],
         "inferred_ingredients": json_data.get("inferred_ingredients") or [],
         "extraction_method": extraction_method,
+        "extraction_mode": json_data.get("extraction_mode") or extraction_method,
     }
 
 

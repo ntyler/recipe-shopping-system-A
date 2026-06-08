@@ -5898,6 +5898,7 @@ async function submitRecipeMediaUpload(input, manualDescription = "") {
     const status = document.getElementById("recipeMediaUploadStatus");
     const fileInput = input && input.files ? input : document.getElementById("recipeMediaUploadInput");
     const photoDescription = String(manualDescription || "").trim();
+    const isImageUpload = fileInput ? String(fileInput.files?.[0]?.type || "").startsWith("image/") : false;
 
     if (!form || !fileInput || !fileInput.files || !fileInput.files.length) {
         return;
@@ -5919,6 +5920,7 @@ async function submitRecipeMediaUpload(input, manualDescription = "") {
     console.log("[recipe_import] selected import cookbook", destination);
     showRecipeFileLoadingOverlay(file.name, sourceTypeLabel);
     setRecipeFileManualDescriptionPanelVisible(false);
+    setRecipeFileEstimatedBanner(false);
     await waitForNextPaint();
 
     const formData = new FormData(form);
@@ -5940,7 +5942,11 @@ async function submitRecipeMediaUpload(input, manualDescription = "") {
     }, 600);
     const extractTimer = setTimeout(() => {
         updateRecipeFileLoadingStep("read", "done", "Readable text found");
-        updateRecipeFileLoadingStep("extract", "running", "Extracting recipe data");
+        updateRecipeFileLoadingStep(
+            "extract",
+            "running",
+            isImageUpload ? "Estimating from photo" : "Extracting recipe data"
+        );
         setRecipeFileLoadingSummary("Extracting ingredients, quantities, instructions, and sections...");
     }, 1600);
 
@@ -5959,6 +5965,7 @@ async function submitRecipeMediaUpload(input, manualDescription = "") {
 
         setRecipeFileSourceType((data && data.source_type_label) || sourceTypeLabel);
         setRecipeFileManualDescriptionPanelVisible(false);
+        setRecipeFileEstimatedBanner(false);
 
         if (!response.ok || !data.ok) {
             const error = new Error((data && data.error) || "Unable to load file.");
@@ -5966,9 +5973,22 @@ async function submitRecipeMediaUpload(input, manualDescription = "") {
             throw error;
         }
 
+        const extractionMode = String((data && data.extraction_mode) || "").trim();
+        const isImageEstimate = extractionMode === "image_estimate" || extractionMode === "manual_description";
+
         updateRecipeFileLoadingStep("upload", "done", "Uploaded");
         updateRecipeFileLoadingStep("read", "done", "Read");
-        updateRecipeFileLoadingStep("extract", "done", `${(data.ingredients || []).length} ingredients found`);
+
+        if (isImageEstimate) {
+            updateRecipeFileLoadingStep("extract", "running", "Estimating from photo");
+            await waitForNextPaint();
+            updateRecipeFileLoadingStep("extract", "done", "Estimated recipe created");
+            setRecipeFileEstimatedBanner(true, "Recipe estimated from food photo. Review before saving.");
+            setRecipeFileLoadingSummary("Review and adjust the estimated recipe before saving.");
+        } else {
+            updateRecipeFileLoadingStep("extract", "done", `${(data.ingredients || []).length} ingredients found`);
+        }
+
         updateRecipeFileLoadingStep("save", "running", "Saving to shopping list");
         setRecipeFileLoadingSummary("Saving ingredients and refreshing the shopping list...");
         await waitForNextPaint();
@@ -6003,6 +6023,7 @@ async function submitRecipeMediaUpload(input, manualDescription = "") {
             updateRecipeFileLoadingStep("read", "done", "No readable recipe text");
             updateRecipeFileLoadingStep("extract", "waiting", "Waiting");
             updateRecipeFileLoadingStep("save", "waiting", "Disabled");
+            setRecipeFileEstimatedBanner(false);
             setRecipeFileLoadingSummary(message);
             setRecipeFileManualDescriptionPanelVisible(true, message, photoDescription);
             keepFileInput = true;
@@ -6012,12 +6033,14 @@ async function submitRecipeMediaUpload(input, manualDescription = "") {
             updateRecipeFileLoadingStep("extract", "waiting", "Waiting");
             updateRecipeFileLoadingStep("save", "waiting", "Disabled");
             setRecipeFileManualDescriptionPanelVisible(false);
+            setRecipeFileEstimatedBanner(false);
         } else {
             updateRecipeFileLoadingStep("upload", "done", "Uploaded");
             updateRecipeFileLoadingStep("read", "done", "Read");
             updateRecipeFileLoadingStep("extract", "failed", "No usable recipe data");
             updateRecipeFileLoadingStep("save", "waiting", "Disabled");
             setRecipeFileManualDescriptionPanelVisible(false);
+            setRecipeFileEstimatedBanner(false);
         }
         setRecipeFileLoadingSummary(err.message || "Unable to load file.");
 
@@ -6134,6 +6157,9 @@ function showRecipeFileLoadingOverlay(fileName, sourceTypeLabel) {
                 </div>
                 <div id="recipeFileSourceType" class="recipe-qty-progress-summary">Source type: File</div>
                 <div id="recipeFileLoadingSummary" class="recipe-qty-progress-summary">Preparing file...</div>
+                <div id="recipeFileImageEstimateBanner" class="recipe-file-image-estimate-banner" hidden>
+                    Recipe estimated from food photo. Review before saving.
+                </div>
                 <div id="recipeFileLoadingList" class="recipe-qty-progress-list"></div>
                 <div id="recipeFileManualDescriptionPanel" class="recipe-file-manual-description-panel" hidden>
                     <div class="recipe-file-manual-description-message">
@@ -6144,7 +6170,7 @@ function showRecipeFileLoadingOverlay(fileName, sourceTypeLabel) {
                         id="recipeFileManualDescriptionInput"
                         class="recipe-file-manual-description-textarea"
                         rows="3"
-                        placeholder="Example: shrimp and rice in creamy orange sauce with peas…"></textarea>
+                        placeholder="Example: shrimp and rice in creamy orange sauce with peas&hellip;"></textarea>
                     <button
                         id="recipeFileManualDescriptionSubmit"
                         type="button"
@@ -6220,6 +6246,17 @@ function setRecipeFileLoadingSummary(message) {
     if (summary) {
         summary.textContent = message;
     }
+}
+
+function setRecipeFileEstimatedBanner(visible, message = "") {
+    const banner = document.getElementById("recipeFileImageEstimateBanner");
+
+    if (!banner) {
+        return;
+    }
+
+    banner.textContent = message || "Recipe estimated from food photo. Review before saving.";
+    banner.hidden = !visible;
 }
 
 function cardCollapseStorageKey(key, content) {

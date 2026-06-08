@@ -572,7 +572,12 @@ def upload_recipe_media_route():
         uploaded_file,
         manual_description=manual_description,
     )
-    extraction_source = str(result.get("extraction_method") or result.get("source_type") or "upload").strip()
+    extraction_source = str(
+        result.get("extraction_mode")
+        or result.get("extraction_method")
+        or result.get("source_type")
+        or "upload"
+    ).strip()
     extraction_confidence = result.get("extraction_confidence")
     extraction_error = str(result.get("error") or "").strip()
     path_label = {
@@ -581,9 +586,9 @@ def upload_recipe_media_route():
         "document": "uploaded PDF/document",
         "text": "uploaded text",
         "document_text": "text recipe import",
-        "photo_text": "text recipe import",
-        "food_image_inferred": "food image inferred recipe",
-        "food_image_from_description": "estimated from photo/description",
+        "ocr_text": "text recipe import",
+        "image_estimate": "estimated from food photo",
+        "manual_description": "estimated from photo/description",
         "not_recipe_image": "not recipe/food",
     }.get(extraction_source, "not recipe/food")
 
@@ -629,8 +634,18 @@ def upload_recipe_media_route():
         }
 
     if wants_json:
-        if extraction_source == "food_image_from_description":
+        if extraction_source == "manual_description":
             result["source_type_label"] = "Estimated from photo/description"
+        elif extraction_source == "image_estimate":
+            result["source_type_label"] = "Estimated from food photo"
+        elif extraction_source == "ocr_text":
+            result["source_type_label"] = "Text recipe import"
+        if extraction_source in {"manual_description", "image_estimate"}:
+            result["estimation_banner"] = (
+                "Recipe estimated from food photo. Review before saving."
+            )
+        if extraction_source:
+            result["extraction_mode"] = extraction_source
 
         status = 200 if result.get("ok") else 400
         return jsonify(result), status
