@@ -6241,7 +6241,18 @@ async function submitRecipeMediaVision() {
     }
 
     if (!uploadedFilePath) {
-        const message = "Could not estimate a recipe from this image. Try describing the meal manually.";
+        const reason = "Uploaded file path is missing.";
+        const message = `Could not estimate a recipe from this image.\nReason: ${reason}`;
+        setRecipeFileVisionDebug({
+            error_code: "UPLOADED_FILE_PATH_REQUIRED",
+            error_message: reason,
+            failed_status: "image_uploaded",
+            image_uploaded: false,
+            vision_request_sent: false,
+            vision_response_received: false,
+            json_parse_success: false,
+            recipe_creation_success: false,
+        }, { visible: true });
         if (status) {
             status.textContent = message;
         }
@@ -6269,6 +6280,22 @@ async function submitRecipeMediaVision() {
         updateRecipeFileLoadingStep("extract", "waiting", "Waiting");
         updateRecipeFileLoadingStep("save", "waiting", "Disabled");
         setRecipeFileLoadingSummary("Generating recipe estimate from uploaded image...");
+        const requestDebug = {
+            image_uploaded: true,
+            vision_request_sent: true,
+            vision_response_received: false,
+            json_parse_success: false,
+            recipe_creation_success: false,
+            vision_request: {
+                endpoint: "/api/generate-recipe-from-image",
+                uploaded_file_path: uploadedFilePath,
+                source_type: "image",
+                extraction_mode: "vision",
+                cookbook_id: destination.cookbookId || "",
+                cookbook_name: destination.cookbookName || "",
+            },
+        };
+        setRecipeFileVisionDebug(requestDebug, { visible: true });
         await waitForNextPaint();
 
         const response = await fetch("/api/generate-recipe-from-image", {
@@ -6286,6 +6313,11 @@ async function submitRecipeMediaVision() {
             }),
         });
         const data = await response.json();
+        setRecipeFileVisionDebug(data && data.debug, {
+            visible: true,
+            recipeJson: data && data.recipe_json,
+            errorData: data,
+        });
         const responsePath = String((data && data.uploaded_file_path) || "").trim();
         if (responsePath) {
             setRecipeMediaUploadPath(responsePath);
@@ -6310,11 +6342,13 @@ async function submitRecipeMediaVision() {
         const recipeEstimateSuccessful = ingredients.length > 0;
 
         if (!recipeEstimateSuccessful) {
-            const message = "Could not estimate a recipe from this image. Try describing the meal manually.";
+            const reason = String((data && (data.error_message || data.error)) || "No ingredients found.").trim();
+            const message = `Could not estimate a recipe from this image.\nReason: ${reason}`;
             const error = new Error(message);
             error.data = {
                 ...data,
                 error: message,
+                error_message: reason,
             };
             throw error;
         }
@@ -6347,26 +6381,50 @@ async function submitRecipeMediaVision() {
         window.location.reload();
     } catch (err) {
         const data = err && err.data ? err.data : {};
-        const responseErrorMessage = String((data && data.error) || "").trim();
-        const message = (
-            responseErrorMessage
-            || "Could not estimate a recipe from this image. Try describing the meal manually."
-        );
+        const responseErrorMessage = String((data && (data.error_message || data.error)) || "").trim();
+        const reason = responseErrorMessage || "No failure reason was returned by the backend.";
+        const message = `Could not estimate a recipe from this image.\nReason: ${reason}`;
 
         const responsePath = String((data && data.uploaded_file_path) || "").trim();
         if (responsePath) {
             setRecipeMediaUploadPath(responsePath);
         }
+        setRecipeFileVisionDebug(data && data.debug, {
+            visible: true,
+            recipeJson: data && data.recipe_json,
+            errorData: data,
+        });
 
         setRecipeFileSourceType(sourceTypeLabel);
         setRecipeFileExtractionMode("Vision");
-        setRecipeFileManualDescriptionPanelVisible(true, "Could not estimate a recipe from this image. Try describing the meal manually.", "");
+        setRecipeFileManualDescriptionPanelVisible(true, message, "");
         setRecipeFileEstimatedBanner(false);
-        updateRecipeFileLoadingStep("upload", "done", "Uploaded");
+        const debug = data && data.debug ? data.debug : {};
+        updateRecipeFileLoadingStep(
+            "upload",
+            debug.failed_status === "image_uploaded" ? "failed" : "done",
+            debug.failed_status === "image_uploaded" ? "Upload issue" : "Uploaded"
+        );
         updateRecipeFileLoadingStep("read", "done", "No readable recipe text");
-        updateRecipeFileLoadingStep("estimate", "failed", "No estimate");
-        updateRecipeFileLoadingStep("extract", "failed", "No usable recipe data");
-        updateRecipeFileLoadingStep("save", "waiting", "Disabled");
+        if (debug.vision_response_received) {
+            updateRecipeFileLoadingStep("estimate", "done", "Response received");
+        } else if (debug.vision_request_sent) {
+            updateRecipeFileLoadingStep("estimate", "failed", "No response");
+        } else {
+            updateRecipeFileLoadingStep("estimate", "failed", "No estimate");
+        }
+        if (debug.json_parse_success) {
+            updateRecipeFileLoadingStep("extract", "failed", "No ingredients found");
+        } else if (debug.failed_status === "json_parse_success") {
+            updateRecipeFileLoadingStep("extract", "failed", "JSON parse failed");
+        } else {
+            updateRecipeFileLoadingStep("extract", "failed", "No usable recipe data");
+        }
+        updateRecipeFileLoadingStep(
+            "save",
+            debug.failed_status === "recipe_creation_success" ? "failed" : "waiting",
+            debug.failed_status === "recipe_creation_success" ? "Not saved" : "Disabled"
+        );
         setRecipeFileLoadingSummary(message || "Could not estimate a recipe from this image. Try describing the meal manually.");
         setRecipeFileActionButtonsEnabled(true);
 
@@ -6506,6 +6564,26 @@ function showRecipeFileLoadingOverlay(fileName, sourceTypeLabel, showImageAction
                     Recipe estimated from uploaded image. Review ingredients before saving.
                 </div>
                 <div id="recipeFileLoadingList" class="recipe-qty-progress-list"></div>
+                <details id="recipeFileVisionDebugPanel" class="recipe-file-debug-panel" hidden>
+                    <summary class="recipe-file-debug-toggle">View Debug Details</summary>
+                    <div id="recipeFileVisionDebugStatuses" class="recipe-file-debug-statuses"></div>
+                    <div class="recipe-file-debug-section">
+                        <div class="recipe-file-debug-title">Vision Request</div>
+                        <pre id="recipeFileVisionDebugRequest" class="recipe-file-debug-pre">No request data yet.</pre>
+                    </div>
+                    <div class="recipe-file-debug-section">
+                        <div class="recipe-file-debug-title">Vision Response</div>
+                        <pre id="recipeFileVisionDebugResponse" class="recipe-file-debug-pre">No response data yet.</pre>
+                    </div>
+                    <div class="recipe-file-debug-section">
+                        <div class="recipe-file-debug-title">Recipe JSON</div>
+                        <pre id="recipeFileVisionDebugRecipeJson" class="recipe-file-debug-pre">No recipe JSON yet.</pre>
+                    </div>
+                    <div class="recipe-file-debug-section">
+                        <div class="recipe-file-debug-title">Error Details</div>
+                        <pre id="recipeFileVisionDebugError" class="recipe-file-debug-pre">No errors yet.</pre>
+                    </div>
+                </details>
                 <div id="recipeFileManualDescriptionPanel" class="recipe-file-manual-description-panel" hidden>
                     <div class="recipe-file-manual-description-message">
                         This looks like a food photo, but no written recipe text was found.
@@ -6556,6 +6634,7 @@ function showRecipeFileLoadingOverlay(fileName, sourceTypeLabel, showImageAction
     `).join("");
 
     setRecipeFileLoadingSummary("Preparing to load the selected file...");
+    setRecipeFileVisionDebug(null, { visible: false });
     overlay.classList.add("open");
     overlay.setAttribute("aria-hidden", "false");
     document.body.classList.add("modal-open");
@@ -6605,6 +6684,107 @@ function setRecipeFileEstimatedBanner(visible, message = "") {
 
     banner.textContent = message || "Recipe estimated from uploaded image. Review ingredients before saving.";
     banner.hidden = !visible;
+}
+
+function recipeFileDebugText(value, fallback = "Not available") {
+    if (value === null || value === undefined || value === "") {
+        return fallback;
+    }
+
+    if (typeof value === "string") {
+        return value;
+    }
+
+    try {
+        return JSON.stringify(value, null, 2);
+    } catch (err) {
+        return String(value);
+    }
+}
+
+function recipeFileDebugStatus(debug, key) {
+    if (debug && debug[key] === true) {
+        return { state: "done", text: "Done" };
+    }
+
+    if (debug && debug.failed_status === key) {
+        return { state: "failed", text: "Failed" };
+    }
+
+    return { state: "waiting", text: "Pending" };
+}
+
+function setRecipeFileVisionDebug(debug = null, options = {}) {
+    const panel = document.getElementById("recipeFileVisionDebugPanel");
+    if (!panel) {
+        return;
+    }
+
+    const visible = Boolean(options.visible || debug);
+    panel.hidden = !visible;
+
+    if (!visible) {
+        panel.open = false;
+        return;
+    }
+
+    const normalizedDebug = debug && typeof debug === "object" ? debug : {};
+    const statuses = [
+        ["image_uploaded", "Image Uploaded"],
+        ["vision_request_sent", "Vision Request Sent"],
+        ["vision_response_received", "Vision Response Received"],
+        ["json_parse_success", "Recipe JSON Parsed"],
+        ["recipe_creation_success", "Recipe Created"],
+    ];
+    const statusNode = document.getElementById("recipeFileVisionDebugStatuses");
+    if (statusNode) {
+        statusNode.innerHTML = statuses.map(([key, label]) => {
+            const status = recipeFileDebugStatus(normalizedDebug, key);
+            return `
+                <div class="recipe-file-debug-status-row">
+                    <span>${escapeHtml(label)}</span>
+                    <strong class="${escapeHtml(status.state)}">${escapeHtml(status.text)}</strong>
+                </div>
+            `;
+        }).join("");
+    }
+
+    const requestNode = document.getElementById("recipeFileVisionDebugRequest");
+    if (requestNode) {
+        requestNode.textContent = recipeFileDebugText(normalizedDebug.vision_request, "No request data yet.");
+    }
+
+    const responseNode = document.getElementById("recipeFileVisionDebugResponse");
+    if (responseNode) {
+        responseNode.textContent = recipeFileDebugText(normalizedDebug.vision_response, "No response data yet.");
+    }
+
+    const recipeNode = document.getElementById("recipeFileVisionDebugRecipeJson");
+    if (recipeNode) {
+        recipeNode.textContent = recipeFileDebugText(
+            options.recipeJson || normalizedDebug.recipe_json,
+            "No recipe JSON yet."
+        );
+    }
+
+    const errorNode = document.getElementById("recipeFileVisionDebugError");
+    if (errorNode) {
+        const errorDetails = {
+            error_code: normalizedDebug.error_code || (options.errorData && options.errorData.error_code) || "",
+            error_message: normalizedDebug.error_message || (options.errorData && (options.errorData.error_message || options.errorData.error)) || "",
+            file_exists: normalizedDebug.file_exists,
+            file_size: normalizedDebug.file_size,
+            image_type_supported: normalizedDebug.image_type_supported,
+            image_readable: normalizedDebug.image_readable,
+            vision_request_sent: normalizedDebug.vision_request_sent,
+            vision_response_received: normalizedDebug.vision_response_received,
+            json_parse_success: normalizedDebug.json_parse_success,
+            ingredient_count: normalizedDebug.ingredient_count,
+            recipe_creation_success: normalizedDebug.recipe_creation_success,
+            steps: normalizedDebug.steps || [],
+        };
+        errorNode.textContent = recipeFileDebugText(errorDetails, "No errors yet.");
+    }
 }
 
 function cardCollapseStorageKey(key, content) {

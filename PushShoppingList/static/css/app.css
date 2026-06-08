@@ -10118,6 +10118,97 @@ body {
             gap: 8px;
         }
 
+        .recipe-file-debug-panel {
+            margin-top: 12px;
+            padding: 0;
+            border-radius: 10px;
+            border: 1px solid #475569;
+            background: #12181c;
+            color: #dbe8f5;
+        }
+
+        .recipe-file-debug-toggle {
+            cursor: pointer;
+            padding: 10px 12px;
+            color: #f8fafc;
+            font-size: 13px;
+            font-weight: 800;
+            list-style-position: inside;
+        }
+
+        .recipe-file-debug-statuses {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+            padding: 0 12px 12px;
+        }
+
+        .recipe-file-debug-status-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            min-width: 0;
+            padding: 8px 10px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            background: #0f1720;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .recipe-file-debug-status-row span {
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+
+        .recipe-file-debug-status-row strong {
+            flex: 0 0 auto;
+            padding: 4px 7px;
+            border-radius: 999px;
+            color: #ddd;
+            background: #343a40;
+            font-size: 11px;
+        }
+
+        .recipe-file-debug-status-row strong.done {
+            color: #00ff9d;
+            background: #063d24;
+        }
+
+        .recipe-file-debug-status-row strong.failed {
+            color: #ffd4d4;
+            background: #7f1d1d;
+        }
+
+        .recipe-file-debug-section {
+            padding: 0 12px 12px;
+        }
+
+        .recipe-file-debug-title {
+            margin-bottom: 6px;
+            color: #cbd5e1;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+        }
+
+        .recipe-file-debug-pre {
+            max-height: 180px;
+            margin: 0;
+            padding: 10px;
+            overflow: auto;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            background: #090d10;
+            color: #e5eef8;
+            font-size: 12px;
+            line-height: 1.45;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
         .recipe-file-image-estimate-banner {
             margin-top: 12px;
             padding: 10px;
@@ -10134,6 +10225,7 @@ body {
             color: #fef9c3;
             font-size: 13px;
             line-height: 1.4;
+            white-space: pre-line;
         }
 
         .recipe-file-manual-description-label {
@@ -13195,6 +13287,10 @@ body {
 
             .recipe-qty-progress-status {
                 justify-self: start;
+            }
+
+            .recipe-file-debug-statuses {
+                grid-template-columns: 1fr;
             }
 
             .recipe-save-progress-actions {

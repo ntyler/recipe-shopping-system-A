@@ -62,6 +62,19 @@ FOOD_IMAGE_INFERENCE_CONFIDENCE_THRESHOLD = float(
 LOW_CONFIDENCE_FOOD_IMAGE_INFERENCE = float(
     os.getenv("LOW_CONFIDENCE_FOOD_IMAGE_INFERENCE", "0.55")
 )
+VISION_SUPPORTED_IMAGE_MIME_TYPES = {
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/gif",
+}
+VISION_SUPPORTED_IMAGE_SUFFIXES = {
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".webp",
+    ".gif",
+}
 NON_RECIPE_FOOD_DISH_ERROR = "This upload does not appear to contain a recipe or recognizable food dish."
 NO_READABLE_UPLOAD_TEXT_ERROR = "No readable recipe text was found in this uploaded file."
 NO_WRITTEN_PHOTO_TEXT_ERROR = "No written recipe text was found in this photo."
@@ -249,6 +262,91 @@ def get_openai_client():
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), timeout=45)
 
     return client
+
+
+def build_vision_debug(uploaded_file_path="", filename="", mime_type=""):
+    return {
+        "file_path": str(uploaded_file_path or ""),
+        "filename": str(filename or ""),
+        "mime_type": str(mime_type or ""),
+        "file_exists": False,
+        "file_size": 0,
+        "image_type_supported": False,
+        "image_readable": False,
+        "image_uploaded": False,
+        "vision_request_sent": False,
+        "vision_response_received": False,
+        "json_parse_success": False,
+        "recipe_json_parsed": False,
+        "ingredient_count": 0,
+        "recipe_creation_success": False,
+        "error_code": "",
+        "error_message": "",
+        "failed_status": "",
+        "vision_request": {},
+        "vision_response": "",
+        "recipe_json": None,
+        "steps": [],
+    }
+
+
+def log_vision_debug_step(debug, message, **details):
+    if isinstance(debug, dict):
+        step = {
+            "message": message,
+        }
+        step.update({
+            key: value
+            for key, value in details.items()
+            if value not in (None, "")
+        })
+        debug.setdefault("steps", []).append(step)
+
+    suffix = ""
+    if details:
+        suffix = " " + " ".join(
+            f"{key}={value!r}" for key, value in details.items() if value not in (None, "")
+        )
+    print(f"[Vision] {message}{suffix}")
+
+
+def set_vision_debug_error(debug, error_code, error_message, failed_status=""):
+    error_code = str(error_code or "VISION_FAILED").strip() or "VISION_FAILED"
+    error_message = str(error_message or "Vision recipe generation failed.").strip()
+
+    if isinstance(debug, dict):
+        debug["error_code"] = error_code
+        debug["error_message"] = error_message
+        if failed_status:
+            debug["failed_status"] = failed_status
+
+    log_vision_debug_step(
+        debug,
+        "Failure",
+        error_code=error_code,
+        error_message=error_message,
+        failed_status=failed_status,
+    )
+    return error_message
+
+
+def classify_vision_ai_exception(exc):
+    text = str(exc or "").strip()
+    lowered = text.lower()
+
+    if "quota" in lowered or "insufficient_quota" in lowered:
+        return "API_QUOTA_EXCEEDED", "API quota exceeded."
+
+    if "rate limit" in lowered or "429" in lowered:
+        return "API_RATE_LIMITED", "Vision API rate limit exceeded."
+
+    if "authentication" in lowered or "api key" in lowered or "401" in lowered:
+        return "VISION_MODEL_NOT_CONFIGURED", "Vision model not configured."
+
+    if "unsupported" in lowered and "image" in lowered:
+        return "UNSUPPORTED_IMAGE_FORMAT", "Unsupported image format."
+
+    return "AI_REQUEST_FAILED", f"Vision AI request failed: {text or type(exc).__name__}"
 
 
 def safe_filename(text):
@@ -5935,18 +6033,88 @@ Rules:
 """
 
 
-def infer_food_image_recipe(recipe_url, upload_path, mime_type, filename, user_description=""):
-    response_text = send_image_prompt_to_openai(
-        build_food_image_inference_prompt(recipe_url, filename, user_description),
-        upload_path,
-        mime_type,
-    )
+def infer_food_image_recipe(recipe_url, upload_path, mime_type, filename, user_description="", debug=None):
+    prompt_text = build_food_image_inference_prompt(recipe_url, filename, user_description)
+    if isinstance(debug, dict):
+        debug["vision_request"] = {
+            "model": MODEL,
+            "filename": str(filename or ""),
+            "mime_type": str(mime_type or ""),
+            "prompt_length": len(prompt_text),
+            "prompt": prompt_text,
+        }
+
+    if not str(MODEL or "").strip():
+        return None, set_vision_debug_error(
+            debug,
+            "VISION_MODEL_NOT_CONFIGURED",
+            "Vision model not configured.",
+            failed_status="vision_request_sent",
+        )
+
+    if not os.getenv("OPENAI_API_KEY"):
+        return None, set_vision_debug_error(
+            debug,
+            "VISION_MODEL_NOT_CONFIGURED",
+            "Vision model not configured: OPENAI_API_KEY is missing.",
+            failed_status="vision_request_sent",
+        )
+
+    if isinstance(debug, dict):
+        debug["vision_request_sent"] = True
+    log_vision_debug_step(debug, "Sending image to AI", model=MODEL, filename=filename, mime_type=mime_type)
+
+    try:
+        response_text = send_image_prompt_to_openai(
+            prompt_text,
+            upload_path,
+            mime_type,
+        )
+    except Exception as exc:
+        error_code, error_message = classify_vision_ai_exception(exc)
+        return None, set_vision_debug_error(
+            debug,
+            error_code,
+            error_message,
+            failed_status="vision_response_received",
+        )
+
+    response_text = str(response_text or "")
+    response_length = len(response_text)
+    if isinstance(debug, dict):
+        debug["vision_response_received"] = bool(response_text.strip())
+        debug["response_length"] = response_length
+        debug["vision_response"] = response_text[:12000]
+    log_vision_debug_step(debug, "AI response received", received=bool(response_text.strip()))
+    log_vision_debug_step(debug, "Response length", response_length=response_length)
+
+    if not response_text.strip():
+        return None, set_vision_debug_error(
+            debug,
+            "AI_EMPTY_RESPONSE",
+            "AI returned empty response.",
+            failed_status="vision_response_received",
+        )
 
     parsed, parse_error = parse_json_text_response(recipe_url, response_text)
     if parse_error:
-        return None, parse_error
+        if isinstance(debug, dict):
+            debug["json_parse_success"] = False
+            debug["recipe_json_parsed"] = False
+        return None, set_vision_debug_error(
+            debug,
+            "JSON_PARSE_FAILED",
+            f"JSON parsing failed: {parse_error}",
+            failed_status="json_parse_success",
+        )
 
     parsed = parsed if isinstance(parsed, dict) else {}
+    if isinstance(debug, dict):
+        debug["json_parse_success"] = True
+        debug["recipe_json_parsed"] = True
+        debug["recipe_json"] = parsed
+    log_vision_debug_step(debug, "JSON parse success")
+
     ingredient_candidates = (
         parsed.get("ingredients")
         or parsed.get("estimated_ingredients")
@@ -5960,6 +6128,9 @@ def infer_food_image_recipe(recipe_url, upload_path, mime_type, filename, user_d
     parsed["visible_ingredients"] = [row.get("ingredient") for row in visible if row.get("ingredient")]
     parsed["inferred_ingredients"] = [row.get("ingredient") for row in inferred if row.get("ingredient")]
     parsed["shopping_list_items"] = extract_ingredients_from_result({"ingredients": ingredients})
+    if isinstance(debug, dict):
+        debug["ingredient_count"] = len(ingredients)
+    log_vision_debug_step(debug, "Ingredient count", ingredient_count=len(ingredients))
 
     parsed["equipment"] = normalize_recipe_text_list(parsed.get("equipment"))
 
@@ -6052,7 +6223,7 @@ def infer_food_image_recipe(recipe_url, upload_path, mime_type, filename, user_d
     return parsed, None
 
 
-def generateRecipeFromImage(uploaded_file_path, user_description="", recipe_url="", filename="", mime_type=""):
+def generateRecipeFromImage(uploaded_file_path, user_description="", recipe_url="", filename="", mime_type="", debug=None):
     upload_path = Path(uploaded_file_path)
     resolved_url = (
         str(recipe_url).strip()
@@ -6068,6 +6239,7 @@ def generateRecipeFromImage(uploaded_file_path, user_description="", recipe_url=
         resolved_mime_type,
         resolved_filename,
         user_description=user_description,
+        debug=debug,
     )
 
 

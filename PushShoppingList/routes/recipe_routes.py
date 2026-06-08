@@ -31,10 +31,16 @@ from PushShoppingList.services.extraction_progress_service import start_progress
 from PushShoppingList.services.recipe_extract_service import extract_recipe_from_upload
 from PushShoppingList.services.recipe_extract_service import extract_recipe_from_url
 from PushShoppingList.services.recipe_extract_service import generateRecipeFromImage
+from PushShoppingList.services.recipe_extract_service import build_vision_debug
 from PushShoppingList.services.recipe_extract_service import build_extract_result
+from PushShoppingList.services.recipe_extract_service import log_vision_debug_step
+from PushShoppingList.services.recipe_extract_service import normalize_upload_mime_type
 from PushShoppingList.services.recipe_extract_service import NO_UPLOAD_INGREDIENTS_ERROR
 from PushShoppingList.services.recipe_extract_service import UPLOAD_FOLDER
 from PushShoppingList.services.recipe_extract_service import build_upload_failure_result
+from PushShoppingList.services.recipe_extract_service import set_vision_debug_error
+from PushShoppingList.services.recipe_extract_service import VISION_SUPPORTED_IMAGE_MIME_TYPES
+from PushShoppingList.services.recipe_extract_service import VISION_SUPPORTED_IMAGE_SUFFIXES
 from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
 from PushShoppingList.services.recipe_extract_service import recipe_cover_image_file_path
 from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_path
@@ -689,6 +695,152 @@ def commit_media_import_result(result, cookbook, recipe_url="", context="media-u
     return result
 
 
+def vision_failure_response(
+    debug,
+    error_code,
+    error_message,
+    status=400,
+    upload_path=None,
+    source_name="",
+    source_url="",
+    failed_step="extract",
+    extra=None,
+):
+    debug = debug if isinstance(debug, dict) else build_vision_debug()
+    if not debug.get("error_code"):
+        set_vision_debug_error(
+            debug,
+            error_code,
+            error_message,
+            failed_status=debug.get("failed_status") or "",
+        )
+
+    upload_path_text = str(upload_path or debug.get("file_path") or "").strip()
+    source_name = source_name or (Path(upload_path_text).name if upload_path_text else "")
+    error_code = debug.get("error_code") or error_code
+    error_message = debug.get("error_message") or error_message
+
+    payload = build_upload_failure_result(
+        {
+            "source_type": "image",
+            "source_name": source_name,
+            "source_url": source_url,
+            "uploaded_file_path": upload_path_text,
+            "detected_food_photo": True,
+            "recipe_json": debug.get("recipe_json"),
+        },
+        error_message,
+        failed_step=failed_step,
+    )
+    payload.update({
+        "success": False,
+        "error_code": error_code,
+        "error_message": error_message,
+        "debug": debug,
+        "source_type": "image",
+        "source_type_label": "Image",
+        "source_name": source_name,
+        "uploaded_file_path": upload_path_text,
+        "extraction_mode": "vision",
+        "extraction_mode_label": "Vision",
+        "raw": debug.get("recipe_json"),
+        "recipe_json": debug.get("recipe_json"),
+    })
+    if source_url:
+        payload["source_url"] = source_url
+    if extra:
+        payload.update(extra)
+    return jsonify(payload), status
+
+
+def validate_vision_image_upload(upload_path, filename, mime_type, debug):
+    file_exists = upload_path.is_file()
+    debug["file_exists"] = file_exists
+    log_vision_debug_step(debug, "File exists", file_exists=file_exists)
+
+    if not file_exists:
+        return set_vision_debug_error(
+            debug,
+            "UPLOADED_FILE_MISSING",
+            "Uploaded file missing.",
+            failed_status="image_uploaded",
+        )
+
+    try:
+        file_size = upload_path.stat().st_size
+    except OSError as exc:
+        return set_vision_debug_error(
+            debug,
+            "UPLOADED_FILE_UNREADABLE",
+            f"Uploaded file could not be read: {exc}",
+            failed_status="image_uploaded",
+        )
+
+    debug["file_size"] = file_size
+    log_vision_debug_step(debug, "File size", file_size=file_size)
+
+    if file_size <= 0:
+        return set_vision_debug_error(
+            debug,
+            "EMPTY_IMAGE_FILE",
+            "Uploaded image file is empty.",
+            failed_status="image_uploaded",
+        )
+
+    normalized_mime_type = normalize_upload_mime_type(mime_type, filename, upload_path)
+    normalized_mime_type = str(normalized_mime_type or "").split(";", 1)[0].strip().lower()
+    suffix = upload_path.suffix.lower()
+    image_type_supported = (
+        normalized_mime_type in VISION_SUPPORTED_IMAGE_MIME_TYPES
+        or suffix in VISION_SUPPORTED_IMAGE_SUFFIXES
+    )
+    debug["mime_type"] = normalized_mime_type
+    debug["image_type_supported"] = image_type_supported
+    log_vision_debug_step(
+        debug,
+        "Image type supported",
+        mime_type=normalized_mime_type,
+        suffix=suffix,
+        image_type_supported=image_type_supported,
+    )
+
+    if not image_type_supported:
+        return set_vision_debug_error(
+            debug,
+            "UNSUPPORTED_IMAGE_FORMAT",
+            "Unsupported image format.",
+            failed_status="image_uploaded",
+        )
+
+    try:
+        from PIL import Image
+
+        with Image.open(upload_path) as image:
+            debug["image_format"] = str(image.format or "")
+            debug["image_width"] = image.size[0]
+            debug["image_height"] = image.size[1]
+            image.verify()
+    except ImportError:
+        return set_vision_debug_error(
+            debug,
+            "IMAGE_VALIDATION_UNAVAILABLE",
+            "Image validation unavailable because Pillow is not installed.",
+            failed_status="image_uploaded",
+        )
+    except Exception as exc:
+        return set_vision_debug_error(
+            debug,
+            "IMAGE_UNREADABLE",
+            f"Uploaded image is not readable: {exc}",
+            failed_status="image_uploaded",
+        )
+
+    debug["image_readable"] = True
+    debug["image_uploaded"] = True
+    log_vision_debug_step(debug, "Image readable", image_format=debug.get("image_format"))
+    return ""
+
+
 @recipe_bp.route("/api/generate-recipe-from-image", methods=["POST"])
 def api_generate_recipe_from_image_route():
     account_response = require_account_for_import(wants_json=True)
@@ -699,51 +851,97 @@ def api_generate_recipe_from_image_route():
     uploaded_file_path = str(data.get("uploaded_file_path") or "").strip()
     source_type = str(data.get("source_type") or "").strip().lower() or "image"
     extraction_mode = str(data.get("extraction_mode") or "").strip().lower() or "vision"
+    debug = build_vision_debug(uploaded_file_path=uploaded_file_path)
+    log_vision_debug_step(debug, "Image path received", image_path=uploaded_file_path)
 
     if source_type != "image":
-        return jsonify({
-            "ok": False,
-            "error": "image source_type is required.",
-        }), 400
+        set_vision_debug_error(
+            debug,
+            "INVALID_SOURCE_TYPE",
+            "image source_type is required.",
+            failed_status="image_uploaded",
+        )
+        return vision_failure_response(debug, "INVALID_SOURCE_TYPE", "image source_type is required.")
 
     if extraction_mode != "vision":
-        return jsonify({
-            "ok": False,
-            "error": "extraction_mode must be vision.",
-        }), 400
+        set_vision_debug_error(
+            debug,
+            "INVALID_EXTRACTION_MODE",
+            "extraction_mode must be vision.",
+            failed_status="vision_request_sent",
+        )
+        return vision_failure_response(debug, "INVALID_EXTRACTION_MODE", "extraction_mode must be vision.")
 
     if not uploaded_file_path:
-        return jsonify({
-            "ok": False,
-            "error": "uploaded_file_path is required.",
-        }), 400
+        set_vision_debug_error(
+            debug,
+            "UPLOADED_FILE_PATH_REQUIRED",
+            "uploaded_file_path is required.",
+            failed_status="image_uploaded",
+        )
+        return vision_failure_response(debug, "UPLOADED_FILE_PATH_REQUIRED", "uploaded_file_path is required.")
 
     try:
         upload_root = UPLOAD_FOLDER.resolve()
         upload_path = Path(uploaded_file_path).resolve()
     except Exception:
-        return jsonify({
-            "ok": False,
-            "error": "Invalid uploaded_file_path value.",
-        }), 400
-
-    if not upload_path.is_file():
-        return jsonify({
-            "ok": False,
-            "error": "Uploaded image could not be found.",
-        }), 400
+        set_vision_debug_error(
+            debug,
+            "INVALID_UPLOADED_FILE_PATH",
+            "Invalid uploaded_file_path value.",
+            failed_status="image_uploaded",
+        )
+        return vision_failure_response(debug, "INVALID_UPLOADED_FILE_PATH", "Invalid uploaded_file_path value.")
 
     if upload_root not in upload_path.parents and upload_root != upload_path:
-        return jsonify({
-            "ok": False,
-            "error": "Invalid uploaded_file_path value.",
-        }), 400
+        set_vision_debug_error(
+            debug,
+            "INVALID_UPLOADED_FILE_PATH",
+            "Invalid uploaded_file_path value.",
+            failed_status="image_uploaded",
+        )
+        return vision_failure_response(
+            debug,
+            "INVALID_UPLOADED_FILE_PATH",
+            "Invalid uploaded_file_path value.",
+            upload_path=upload_path,
+            source_name=upload_path.name,
+        )
 
     if not upload_path.name:
-        return jsonify({
-            "ok": False,
-            "error": "Uploaded image name is missing.",
-        }), 400
+        set_vision_debug_error(
+            debug,
+            "UPLOADED_FILE_NAME_MISSING",
+            "Uploaded image name is missing.",
+            failed_status="image_uploaded",
+        )
+        return vision_failure_response(
+            debug,
+            "UPLOADED_FILE_NAME_MISSING",
+            "Uploaded image name is missing.",
+            upload_path=upload_path,
+        )
+
+    resolved_mime_type = normalize_upload_mime_type("", upload_path.name, upload_path)
+    debug.update({
+        "file_path": str(upload_path),
+        "filename": upload_path.name,
+        "mime_type": str(resolved_mime_type or ""),
+    })
+    validation_error = validate_vision_image_upload(
+        upload_path,
+        upload_path.name,
+        resolved_mime_type,
+        debug,
+    )
+    if validation_error:
+        return vision_failure_response(
+            debug,
+            debug.get("error_code") or "IMAGE_VALIDATION_FAILED",
+            validation_error,
+            upload_path=upload_path,
+            source_name=upload_path.name,
+        )
 
     cookbook = selected_import_cookbook_from_json(data)
     log_selected_import_cookbook("media-upload-vision", cookbook)
@@ -757,34 +955,32 @@ def api_generate_recipe_from_image_route():
         user_description="",
         recipe_url=recipe_url,
         filename=upload_path.name,
-        mime_type="",
+        mime_type=resolved_mime_type,
+        debug=debug,
     )
 
     if inference_error:
-        return jsonify(
-            {
-                **build_upload_failure_result(
-                    {
-                        "source_type": "image",
-                        "source_name": upload_path.name,
-                        "source_url": recipe_url,
-                        "uploaded_file_path": str(upload_path),
-                        "detected_food_photo": True,
-                        "recipe_json": parsed_recipe,
-                    },
-                    inference_error or vision_unavailable_message,
-                    failed_step="extract",
-                ),
-                "source_type": source_type,
-                "source_type_label": "Image",
-                "source_name": upload_path.name,
-                "uploaded_file_path": str(upload_path),
-                "extraction_mode": extraction_mode,
-                "extraction_mode_label": "Vision",
+        if parsed_recipe is not None:
+            debug["recipe_json"] = parsed_recipe
+        return vision_failure_response(
+            debug,
+            debug.get("error_code") or "VISION_RECIPE_GENERATION_FAILED",
+            inference_error or vision_unavailable_message,
+            upload_path=upload_path,
+            source_name=upload_path.name,
+            source_url=recipe_url,
+            extra={
                 "raw": parsed_recipe,
                 "recipe_json": parsed_recipe,
-            }
-        ), 400
+            },
+        )
+
+    if parsed_recipe is not None:
+        debug["vision_request_sent"] = True
+        debug["vision_response_received"] = True
+        debug["json_parse_success"] = True
+        debug["recipe_json_parsed"] = True
+        debug["recipe_json"] = parsed_recipe
 
     result = build_extract_result(recipe_url, parsed_recipe, "image_estimate")
     result["source_type"] = source_type
@@ -801,34 +997,28 @@ def api_generate_recipe_from_image_route():
     result["raw"] = parsed_recipe
     result["recipe_json"] = parsed_recipe
     result["ok"] = bool(result.get("ok") and result.get("ingredients"))
+    debug["recipe_json"] = parsed_recipe
+    debug["ingredient_count"] = len(result.get("ingredients") or [])
 
     if not result.get("ingredients"):
-        return jsonify(
-            {
-                **build_upload_failure_result(
-                    {
-                        "source_type": "image",
-                        "source_name": upload_path.name,
-                        "source_url": recipe_url,
-                        "uploaded_file_path": str(upload_path),
-                        "detected_food_photo": True,
-                        "recipe_json": parsed_recipe,
-                    },
-                    vision_unavailable_message,
-                    failed_step="extract",
-                ),
+        set_vision_debug_error(
+            debug,
+            "NO_INGREDIENTS_FOUND",
+            "No ingredients found.",
+            failed_status="recipe_creation_success",
+        )
+        return vision_failure_response(
+            debug,
+            "NO_INGREDIENTS_FOUND",
+            "No ingredients found.",
+            upload_path=upload_path,
+            source_name=upload_path.name,
+            source_url=recipe_url,
+            extra={
                 **result,
-                "source_type": source_type,
-                "source_type_label": "Image",
-                "source_name": upload_path.name,
-                "uploaded_file_path": str(upload_path),
-                "extraction_mode": "image_estimate",
-                "extraction_mode_label": "Vision",
-                "raw": parsed_recipe,
-                "recipe_json": parsed_recipe,
                 "ok": False,
-            }
-        ), 400
+            },
+        )
 
     result = commit_media_import_result(
         result,
@@ -849,6 +1039,10 @@ def api_generate_recipe_from_image_route():
     )
     result["raw"] = parsed_recipe
     result["recipe_json"] = parsed_recipe
+    result["success"] = bool(result.get("ok"))
+    result["debug"] = debug
+    debug["recipe_creation_success"] = bool(result.get("ok"))
+    log_vision_debug_step(debug, "Recipe creation success", recipe_creation_success=debug["recipe_creation_success"])
 
     return jsonify(result), 200
 
