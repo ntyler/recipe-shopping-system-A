@@ -6,6 +6,7 @@ from PIL import Image
 
 from PushShoppingList.app import create_app
 from PushShoppingList.routes import recipe_routes
+from PushShoppingList.services import recipe_edit_service
 from PushShoppingList.services import recipe_extract_service
 from PushShoppingList.services import recipe_url_service
 from PushShoppingList.services import shopping_list_service
@@ -56,7 +57,6 @@ def test_generate_recipe_from_image_commits_estimate(monkeypatch, tmp_path):
     upload_path = write_uploaded_image(user_data_dir, user_id)
 
     parsed_recipe = {
-        "recipe_title": "Photo Rice Bowl",
         "display_name": "Photo Rice Bowl",
         "source_type": "image",
         "extraction_mode": "image_estimate",
@@ -112,7 +112,9 @@ def test_generate_recipe_from_image_commits_estimate(monkeypatch, tmp_path):
     assert payload["source_type_label"] == "Image"
     assert payload["extraction_mode"] == "image_estimate"
     assert payload["extraction_mode_label"] == "Vision"
-    assert payload["recipe_json"] == parsed_recipe
+    assert payload["recipe_json"]["display_name"] == "Photo Rice Bowl"
+    assert payload["recipe_json"]["recipe_title"] == "Photo Rice Bowl"
+    assert payload["recipe_json"]["source_url"] == "uploaded://meal.png"
     assert payload["category_status"]["ok"] is True
     assert payload["success"] is True
     assert payload["debug"]["file_exists"] is True
@@ -128,6 +130,15 @@ def test_generate_recipe_from_image_commits_estimate(monkeypatch, tmp_path):
         session["user_id"] = user_id
         assert shopping_list_service.load_items() == ["rice", "onion"]
         assert recipe_url_service.load_recipe_urls() == ["uploaded://meal.png"]
+        editor_recipe = recipe_edit_service.load_editable_recipe("uploaded://meal.png")["recipe"]
+        assert editor_recipe["source_url"] == "uploaded://meal.png"
+        assert editor_recipe["display_name"] == "Photo Rice Bowl"
+        assert editor_recipe["recipe_title"] == "Photo Rice Bowl"
+        assert [item["ingredient"] for item in editor_recipe["ingredients"]] == ["rice", "onion"]
+        assert [item["instruction"] for item in editor_recipe["instructions"]] == [
+            "Cook the rice.",
+            "Top with onion.",
+        ]
 
 
 def test_generate_recipe_from_image_reports_unreadable_image(monkeypatch, tmp_path):

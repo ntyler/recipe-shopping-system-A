@@ -35,10 +35,14 @@ from PushShoppingList.services.recipe_extract_service import build_vision_debug
 from PushShoppingList.services.recipe_extract_service import build_extract_result
 from PushShoppingList.services.recipe_extract_service import log_vision_debug_step
 from PushShoppingList.services.recipe_extract_service import normalize_upload_mime_type
+from PushShoppingList.services.recipe_extract_service import normalize_extracted_equipment_fields
+from PushShoppingList.services.recipe_extract_service import normalize_extracted_ingredient_fields
+from PushShoppingList.services.recipe_extract_service import normalize_extracted_recipe_identity
 from PushShoppingList.services.recipe_extract_service import NO_UPLOAD_INGREDIENTS_ERROR
 from PushShoppingList.services.recipe_extract_service import UPLOAD_FOLDER
 from PushShoppingList.services.recipe_extract_service import build_upload_failure_result
 from PushShoppingList.services.recipe_extract_service import set_vision_debug_error
+from PushShoppingList.services.recipe_extract_service import save_extracted_recipe_json
 from PushShoppingList.services.recipe_extract_service import VISION_SUPPORTED_IMAGE_MIME_TYPES
 from PushShoppingList.services.recipe_extract_service import VISION_SUPPORTED_IMAGE_SUFFIXES
 from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
@@ -976,6 +980,11 @@ def api_generate_recipe_from_image_route():
         )
 
     if parsed_recipe is not None:
+        parsed_recipe = dict(parsed_recipe)
+        parsed_recipe["source_url"] = recipe_url
+        normalize_extracted_recipe_identity(parsed_recipe)
+        normalize_extracted_ingredient_fields(parsed_recipe)
+        normalize_extracted_equipment_fields(parsed_recipe)
         debug["vision_request_sent"] = True
         debug["vision_response_received"] = True
         debug["json_parse_success"] = True
@@ -1020,6 +1029,7 @@ def api_generate_recipe_from_image_route():
             },
         )
 
+    save_extracted_recipe_json(recipe_url, parsed_recipe)
     result = commit_media_import_result(
         result,
         cookbook,
