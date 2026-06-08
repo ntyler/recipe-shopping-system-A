@@ -5819,6 +5819,90 @@ def normalize_confidence_level(value, default="medium"):
     return "low"
 
 
+FOOD_IMAGE_RECIPE_METADATA_DEFAULTS = {
+    "servings": "4 servings",
+    "level": "Easy",
+    "total_time": "45 min",
+    "prep_time": "15 min",
+    "inactive_time": "0 min",
+    "cook_time": "30 min",
+}
+
+FOOD_IMAGE_RECIPE_METADATA_ALIASES = {
+    "servings": (
+        "servings",
+        "recipe_amount",
+        "recipe_yield",
+        "yield",
+        "portions",
+        "serves",
+    ),
+    "level": ("level", "difficulty", "recipe_difficulty"),
+    "total_time": ("total_time", "total", "recipe_total_time", "estimated_total_time"),
+    "prep_time": ("prep_time", "prep", "recipe_prep_time", "hands_on_time"),
+    "inactive_time": (
+        "inactive_time",
+        "inactive",
+        "recipe_inactive_time",
+        "rest_time",
+        "waiting_time",
+        "chill_time",
+        "rise_time",
+    ),
+    "cook_time": ("cook_time", "cook", "recipe_cook_time", "cooking_time"),
+}
+
+FOOD_IMAGE_EMPTY_RECIPE_INFO_VALUES = {
+    "",
+    "none",
+    "null",
+    "n/a",
+    "na",
+    "not specified",
+    "unknown",
+}
+
+
+def normalize_food_image_recipe_metadata(json_data):
+    if not isinstance(json_data, dict):
+        return
+
+    for key in FOOD_IMAGE_RECIPE_METADATA_DEFAULTS:
+        value = food_image_recipe_metadata_value(json_data, key)
+        json_data[key] = value or FOOD_IMAGE_RECIPE_METADATA_DEFAULTS[key]
+
+    apply_recipe_scaling_metadata(json_data)
+
+
+def food_image_recipe_metadata_value(json_data, key):
+    for alias in FOOD_IMAGE_RECIPE_METADATA_ALIASES.get(key, (key,)):
+        if alias not in json_data:
+            continue
+
+        value = json_data.get(alias)
+        if isinstance(value, bool) or value in (None, "", [], {}):
+            continue
+
+        if isinstance(value, (int, float)):
+            if key == "servings":
+                return f"{value:g} servings"
+            if key.endswith("_time"):
+                return f"{value:g} min"
+
+        if isinstance(value, (list, dict)):
+            continue
+
+        cleaned = (
+            clean_recipe_text(value)
+            if key == "servings"
+            else clean_recipe_info_value(value)
+        )
+        if cleaned.lower() not in FOOD_IMAGE_EMPTY_RECIPE_INFO_VALUES:
+            return cleaned
+
+    return ""
+
+
 def normalize_ingredient_candidates(raw_ingredients):
     rows = []
     seen = set()
