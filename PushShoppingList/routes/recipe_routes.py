@@ -745,6 +745,9 @@ def api_generate_recipe_from_image_route():
             "error": "Uploaded image name is missing.",
         }), 400
 
+    cookbook = selected_import_cookbook_from_json(data)
+    log_selected_import_cookbook("media-upload-vision", cookbook)
+
     recipe_url = f"uploaded://{upload_path.name}"
     vision_unavailable_message = (
         "Could not estimate a recipe from this image. Try describing the meal manually."
@@ -783,14 +786,14 @@ def api_generate_recipe_from_image_route():
             }
         ), 400
 
-    result = build_extract_result(recipe_url, parsed_recipe, extraction_mode)
+    result = build_extract_result(recipe_url, parsed_recipe, "image_estimate")
     result["source_type"] = source_type
     result["source_type_label"] = "Image"
     result["source_url"] = recipe_url
     result["source_name"] = upload_path.name
     result["uploaded_file_path"] = str(upload_path)
     result["detected_food_photo"] = True
-    result["extraction_mode"] = extraction_mode
+    result["extraction_mode"] = "image_estimate"
     result["extraction_mode_label"] = "Vision"
     result["estimation_banner"] = (
         "Recipe estimated from uploaded image. Review ingredients before saving."
@@ -819,13 +822,33 @@ def api_generate_recipe_from_image_route():
                 "source_type_label": "Image",
                 "source_name": upload_path.name,
                 "uploaded_file_path": str(upload_path),
-                "extraction_mode": extraction_mode,
+                "extraction_mode": "image_estimate",
                 "extraction_mode_label": "Vision",
                 "raw": parsed_recipe,
                 "recipe_json": parsed_recipe,
                 "ok": False,
             }
         ), 400
+
+    result = commit_media_import_result(
+        result,
+        cookbook,
+        recipe_url=recipe_url,
+        context="media-upload",
+    )
+    result["source_type"] = source_type
+    result["source_type_label"] = "Image"
+    result["source_url"] = recipe_url
+    result["source_name"] = upload_path.name
+    result["uploaded_file_path"] = str(upload_path)
+    result["detected_food_photo"] = True
+    result["extraction_mode"] = "image_estimate"
+    result["extraction_mode_label"] = "Vision"
+    result["estimation_banner"] = (
+        "Recipe estimated from uploaded image. Review ingredients before saving."
+    )
+    result["raw"] = parsed_recipe
+    result["recipe_json"] = parsed_recipe
 
     return jsonify(result), 200
 

@@ -6323,12 +6323,28 @@ async function submitRecipeMediaVision() {
         updateRecipeFileLoadingStep("estimate", "done", "Success");
         updateRecipeFileLoadingStep("extract", "done", "Completed");
         setRecipeFileEstimatedBanner(true, estimationBanner);
-        updateRecipeFileLoadingStep("save", "waiting", "Enabled");
-        setRecipeFileLoadingSummary("Recipe estimated from uploaded image. Review ingredients before saving.");
+        updateRecipeFileLoadingStep("save", "running", "Saving");
+        setRecipeFileLoadingSummary("Saving ingredients and refreshing the shopping list...");
+        await waitForNextPaint();
+
+        const categoryStatusMessage = String((data && data.category_status_message) || "").trim();
+        const categoryStatus = data ? data.category_status : null;
+        const importCategorySuccess = !(categoryStatus && categoryStatus.ok === false);
+
+        if (importCategorySuccess) {
+            updateRecipeFileLoadingStep("save", "done", categoryStatusMessage || "Saved to shopping list.");
+            setRecipeFileLoadingSummary(categoryStatusMessage || "Recipe import completed.");
+        } else {
+            const saveMessage = categoryStatusMessage || "Saved to shopping list.";
+            updateRecipeFileLoadingStep("save", "failed", saveMessage);
+            setRecipeFileLoadingSummary(saveMessage);
+        }
+
         setRecipeFileActionButtonsEnabled(false);
         if (status) {
-            status.textContent = "Recipe estimated from uploaded image.";
+            status.textContent = categoryStatusMessage || "Recipe estimated from uploaded image.";
         }
+        window.location.reload();
     } catch (err) {
         const data = err && err.data ? err.data : {};
         const responseErrorMessage = String((data && data.error) || "").trim();
