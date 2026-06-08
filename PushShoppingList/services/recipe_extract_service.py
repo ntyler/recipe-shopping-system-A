@@ -5703,6 +5703,24 @@ def parse_confidence(value):
     return None
 
 
+def normalize_confidence_level(value, default="medium"):
+    if isinstance(value, str):
+        candidate = value.strip().lower()
+        if candidate in {"high", "medium", "low"}:
+            return candidate
+
+    parsed = parse_confidence(value)
+    if parsed is None:
+        return default
+
+    if parsed >= 0.8:
+        return "high"
+    if parsed >= 0.55:
+        return "medium"
+
+    return "low"
+
+
 def normalize_ingredient_candidates(raw_ingredients):
     rows = []
     seen = set()
@@ -5768,6 +5786,50 @@ def normalize_ingredient_candidates(raw_ingredients):
     return rows
 
 
+def normalize_vision_ingredient_candidates(raw_ingredients):
+    rows = []
+
+    for row in normalize_ingredient_candidates(raw_ingredients):
+        if not isinstance(row, dict):
+            continue
+
+        original_text = clean_recipe_text(row.get("original_text") or "")
+        parsed_line = parse_structured_ingredient_line(original_text)
+        ingredient = clean_recipe_text(
+            row.get("ingredient")
+            or parsed_line.get("ingredient")
+            or original_text
+        )
+
+        if not original_text:
+            original_text = clean_recipe_text(
+                " ".join(
+                    part
+                    for part in [
+                        clean_recipe_text(row.get("quantity")),
+                        clean_recipe_text(row.get("unit")),
+                        ingredient,
+                        clean_recipe_text(row.get("preparation")),
+                    ]
+                    if part
+                )
+            )
+
+        rows.append({
+            "section": clean_recipe_text(row.get("section") or ""),
+            "original_text": original_text or ingredient,
+            "quantity": clean_recipe_text(row.get("quantity") or ""),
+            "unit": clean_recipe_text(row.get("unit") or ""),
+            "ingredient": ingredient,
+            "preparation": clean_recipe_text(row.get("preparation") or ""),
+            "optional": bool(row.get("optional")),
+            "estimated_from_image": bool(row.get("estimated_from_image", True)),
+            "confidence": normalize_confidence_level(row.get("confidence"), default="medium"),
+        })
+
+    return rows
+
+
 def normalize_recipe_text_list(value):
     if isinstance(value, list):
         rows = []
@@ -5812,17 +5874,21 @@ def build_food_image_inference_prompt(recipe_url, filename, user_description="")
         else ""
     )
     return f"""
-Analyze this food photo and create a likely recipe. Identify visible ingredients, estimate reasonable quantities, equipment, and instructions. Return strict JSON only. Mark every ingredient as estimated_from_image=true and include confidence notes. Do not claim certainty.
+Analyze this food photo and create a likely recipe.
+Identify visible ingredients, estimate reasonable quantities, equipment, and instructions.
+Return strict JSON only.
+Mark every ingredient as estimated_from_image=true and include confidence notes.
+Do not claim certainty.
 {user_description_hint}
 
 Return JSON with exactly this shape:
 {{
+  "recipe_name": "AI-Inferred recipe title",
   "recipe_title": "AI-Inferred recipe title",
   "display_name": "Short card-friendly title",
-  "servings": 2,
-  "prep_time": "PT0H15M",
-  "cook_time": "PT0H25M",
-  "total_time": "PT0H40M",
+  "servings": null,
+  "estimated_from_image": true,
+  "confidence_notes": ["Visible ingredients are estimated from the image."],
   "level": "Easy",
   "ingredients": [
     {{
@@ -5830,21 +5896,29 @@ Return JSON with exactly this shape:
       "unit": "cup",
       "ingredient": "rice",
       "estimated_from_image": true,
+      "confidence": "medium",
       "preparation": "",
       "optional": false,
-      "section": "PASTA, RICE & GRAINS"
+      "section": "",
+      "original_text": "1 cup rice"
     }}
   ],
   "visible_ingredients": ["rice", "onions", "olive oil"],
   "inferred_ingredients": ["rice", "onion", "salt", "pepper", "olive oil"],
   "equipment": ["large pan", "spatula"],
   "instructions": ["Cook ingredients.", "Adjust seasoning and serve."],
-  "shopping_list_items": ["rice", "onion", "olive oil"],
-  "nutrition": {{}},
+  "nutrition": {{
+    "calories": "",
+    "protein": "",
+    "carbs": "",
+    "fat": "",
+    "fiber": "",
+    "sodium": ""
+  }},
   "extraction_confidence": 0.0,
   "extraction_mode": "image_estimate",
   "image_analysis_notes": "notes...",
-  "confidence_notes": ["Visible ingredients are estimated from the image."]
+  "shopping_list_items": ["rice", "onion", "olive oil"]
 }}
 
 Rules:
@@ -5856,6 +5930,7 @@ Rules:
 - Do not claim the result is exact; treat all inferred items as estimated.
 - Do not claim ingredient amounts are exact; they should be treated as estimates.
 - Include a confidence score between 0 and 1 in extraction_confidence.
+- Return `confidence` per ingredient as one of: "high", "medium", or "low".
 - Return valid JSON only.
 """
 
@@ -5871,13 +5946,14 @@ def infer_food_image_recipe(recipe_url, upload_path, mime_type, filename, user_d
     if parse_error:
         return None, parse_error
 
+    parsed = parsed if isinstance(parsed, dict) else {}
     ingredient_candidates = (
         parsed.get("ingredients")
         or parsed.get("estimated_ingredients")
         or parsed.get("shopping_list_items")
         or []
     )
-    ingredients = normalize_ingredient_candidates(ingredient_candidates)
+    ingredients = normalize_vision_ingredient_candidates(ingredient_candidates)
     visible = normalize_ingredient_candidates(parsed.get("visible_ingredients", []))
     inferred = normalize_ingredient_candidates(parsed.get("inferred_ingredients", []))
     parsed["ingredients"] = ingredients
@@ -5901,12 +5977,37 @@ def infer_food_image_recipe(recipe_url, upload_path, mime_type, filename, user_d
 
     if not isinstance(parsed.get("nutrition"), dict):
         parsed["nutrition"] = {}
+    parsed["nutrition"] = {
+        "calories": clean_recipe_text(parsed["nutrition"].get("calories") or ""),
+        "protein": clean_recipe_text(parsed["nutrition"].get("protein") or ""),
+        "carbs": clean_recipe_text(parsed["nutrition"].get("carbs") or ""),
+        "fat": clean_recipe_text(parsed["nutrition"].get("fat") or ""),
+        "fiber": clean_recipe_text(parsed["nutrition"].get("fiber") or ""),
+        "sodium": clean_recipe_text(parsed["nutrition"].get("sodium") or ""),
+    }
 
     extraction_confidence = parse_confidence(parsed.get("extraction_confidence"))
     parsed["extraction_confidence"] = extraction_confidence if extraction_confidence is not None else 0.55
 
     has_user_description = bool(clean_recipe_text(user_description))
     extraction_mode = "manual_description" if has_user_description else "image_estimate"
+    recipe_name = clean_recipe_text(
+        parsed.get("recipe_name")
+        or parsed.get("recipe_title")
+        or parsed.get("display_name")
+    )
+    parsed["recipe_name"] = recipe_name or "Estimated recipe from photo"
+    parsed["recipe_title"] = parsed["recipe_name"]
+    parsed["display_name"] = parsed.get("display_name") or parsed["recipe_name"]
+    servings_value = parsed.get("servings")
+    if isinstance(servings_value, str):
+        servings_value = servings_value.strip()
+        if servings_value.lower() in {"", "none", "null", "n/a", "na"}:
+            servings_value = None
+    elif servings_value == "":
+        servings_value = None
+    parsed["servings"] = servings_value
+    parsed["estimated_from_image"] = True
     parsed["source_type"] = (
         "image"
     )
@@ -5943,6 +6044,10 @@ def infer_food_image_recipe(recipe_url, upload_path, mime_type, filename, user_d
     for ingredient in parsed.get("ingredients", []):
         if isinstance(ingredient, dict):
             ingredient["estimated_from_image"] = True
+            ingredient["confidence"] = normalize_confidence_level(
+                ingredient.get("confidence"),
+                default="medium",
+            )
 
     return parsed, None
 

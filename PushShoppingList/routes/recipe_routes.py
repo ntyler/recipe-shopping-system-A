@@ -1,5 +1,6 @@
 import json
 import threading
+from pathlib import Path
 from time import perf_counter
 
 from flask import Blueprint
@@ -29,7 +30,11 @@ from PushShoppingList.services.extraction_progress_service import request_cancel
 from PushShoppingList.services.extraction_progress_service import start_progress
 from PushShoppingList.services.recipe_extract_service import extract_recipe_from_upload
 from PushShoppingList.services.recipe_extract_service import extract_recipe_from_url
+from PushShoppingList.services.recipe_extract_service import generateRecipeFromImage
+from PushShoppingList.services.recipe_extract_service import build_extract_result
 from PushShoppingList.services.recipe_extract_service import NO_UPLOAD_INGREDIENTS_ERROR
+from PushShoppingList.services.recipe_extract_service import UPLOAD_FOLDER
+from PushShoppingList.services.recipe_extract_service import build_upload_failure_result
 from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
 from PushShoppingList.services.recipe_extract_service import recipe_cover_image_file_path
 from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_path
@@ -601,45 +606,19 @@ def upload_recipe_media_route():
         f"{f' error={extraction_error}' if extraction_error else ''}"
     )
 
-    if result.get("ok") and result.get("ingredients"):
-        recipe_url = result.get("source_url")
-        ingredients = result.get("ingredients", [])
-        add_items(ingredients)
-        save_ingredients_for_recipe(recipe_url, ingredients, result)
-        if result.get("display_name") or result.get("recipe_title"):
-            save_recipe_url_name(recipe_url, result.get("display_name") or result.get("recipe_title"))
-        add_recipe_urls([recipe_url])
-        assignment = save_import_cookbook_assignment(recipe_url, result, cookbook)
-        print(f"[recipe_import] action=created title={import_recipe_title(result, recipe_url)} url={recipe_url}")
-        print(f"[recipe_import] action=categories_start title={import_recipe_title(result, recipe_url)}")
-        category_status = apply_imported_recipe_category_routine(recipe_url, result, assignment)
-        result = {
-            **result,
-            "import_category_status": category_status,
-            "category_status": category_status,
-            "category_status_message": IMPORT_CATEGORY_STATUS_MESSAGE if category_status.get("ok") else category_status.get("error", ""),
-        }
-        create_source_url_pdf(recipe_url)
-        pdf_job = schedule_generated_recipe_pdf_creation(recipe_url, context="media-upload")
-        result = {
-            **result,
-            "generated_recipe_pdf_job": pdf_job,
-        }
-        record_recipe_import_activity(recipe_url, result, "media-upload")
-        sort_ingredients()
-    elif result.get("ok"):
-        if not result.get("error"):
-            result["error"] = NO_UPLOAD_INGREDIENTS_ERROR
-        result = {
-            **result,
-            "ok": False,
-        }
+    result = commit_media_import_result(
+        result,
+        cookbook,
+        recipe_url=str(result.get("source_url") or ""),
+        context="media-upload",
+    )
 
     if wants_json:
         extraction_mode_label = (
             {
                 "ocr_text": "OCR",
                 "image_estimate": "Vision",
+                "vision": "Vision",
                 "manual_description": "Manual",
             }.get(extraction_source, "Unknown")
             if extraction_source
@@ -648,7 +627,7 @@ def upload_recipe_media_route():
         if extraction_mode_label and extraction_mode_label != "Unknown":
             result["extraction_mode_label"] = extraction_mode_label
 
-        if extraction_source in {"manual_description", "image_estimate"}:
+        if extraction_source in {"manual_description", "image_estimate", "vision"}:
             result["estimation_banner"] = (
                 "Recipe estimated from uploaded image. Review ingredients before saving."
                 if extraction_source == "image_estimate"
@@ -657,10 +636,169 @@ def upload_recipe_media_route():
         if extraction_source:
             result["extraction_mode"] = extraction_source
 
+        result["recipe_json"] = result.get("raw")
+
         status = 200 if result.get("ok") else 400
         return jsonify(result), status
 
     return redirect("/")
+
+
+def commit_media_import_result(result, cookbook, recipe_url="", context="media-upload"):
+    result = result if isinstance(result, dict) else {}
+    ingredients = result.get("ingredients") if isinstance(result.get("ingredients"), list) else []
+    recipe_url = str(recipe_url or result.get("source_url") or "").strip()
+    if recipe_url:
+        result["source_url"] = recipe_url
+
+    if result.get("ok") and ingredients:
+        add_items(ingredients)
+        save_ingredients_for_recipe(recipe_url, ingredients, result)
+        if result.get("display_name") or result.get("recipe_title"):
+            save_recipe_url_name(recipe_url, result.get("display_name") or result.get("recipe_title"))
+
+        add_recipe_urls([recipe_url])
+        assignment = save_import_cookbook_assignment(recipe_url, result, cookbook)
+        print(
+            f"[recipe_import] action=created title={import_recipe_title(result, recipe_url)} url={recipe_url}"
+        )
+        print(
+            f"[recipe_import] action=categories_start title={import_recipe_title(result, recipe_url)}"
+        )
+        category_status = apply_imported_recipe_category_routine(recipe_url, result, assignment)
+        result = {
+            **result,
+            "import_category_status": category_status,
+            "category_status": category_status,
+            "category_status_message": IMPORT_CATEGORY_STATUS_MESSAGE if category_status.get("ok") else category_status.get("error", ""),
+        }
+        create_source_url_pdf(recipe_url)
+        pdf_job = schedule_generated_recipe_pdf_creation(recipe_url, context=context)
+        result = {
+            **result,
+            "generated_recipe_pdf_job": pdf_job,
+        }
+        record_recipe_import_activity(recipe_url, result, context)
+        sort_ingredients()
+        return result
+
+    if result.get("ok"):
+        result["error"] = result.get("error") or NO_UPLOAD_INGREDIENTS_ERROR
+        result["ok"] = False
+
+    return result
+
+
+@recipe_bp.route("/api/generate-recipe-from-image", methods=["POST"])
+def api_generate_recipe_from_image_route():
+    account_response = require_account_for_import(wants_json=True)
+    if account_response:
+        return account_response
+
+    data = request.get_json(force=True) or {}
+    uploaded_file_path = str(data.get("uploaded_file_path") or "").strip()
+    source_type = str(data.get("source_type") or "").strip().lower() or "image"
+    extraction_mode = str(data.get("extraction_mode") or "").strip().lower() or "vision"
+
+    if source_type != "image":
+        return jsonify({
+            "ok": False,
+            "error": "image source_type is required.",
+        }), 400
+
+    if extraction_mode != "vision":
+        return jsonify({
+            "ok": False,
+            "error": "extraction_mode must be vision.",
+        }), 400
+
+    if not uploaded_file_path:
+        return jsonify({
+            "ok": False,
+            "error": "uploaded_file_path is required.",
+        }), 400
+
+    cookbook = selected_import_cookbook_from_json(data)
+    log_selected_import_cookbook("vision-api", cookbook)
+
+    try:
+        upload_root = UPLOAD_FOLDER.resolve()
+        upload_path = Path(uploaded_file_path).resolve()
+    except Exception:
+        return jsonify({
+            "ok": False,
+            "error": "Invalid uploaded_file_path value.",
+        }), 400
+
+    if not upload_path.is_file():
+        return jsonify({
+            "ok": False,
+            "error": "Uploaded image could not be found.",
+        }), 400
+
+    if upload_root not in upload_path.parents and upload_root != upload_path:
+        return jsonify({
+            "ok": False,
+            "error": "Invalid uploaded_file_path value.",
+        }), 400
+
+    if not upload_path.name:
+        return jsonify({
+            "ok": False,
+            "error": "Uploaded image name is missing.",
+        }), 400
+
+    recipe_url = f"uploaded://{upload_path.name}"
+    parsed_recipe, inference_error = generateRecipeFromImage(
+        upload_path,
+        user_description="",
+        recipe_url=recipe_url,
+        filename=upload_path.name,
+        mime_type="",
+    )
+
+    if inference_error:
+        return jsonify({
+            "ok": False,
+            "error": inference_error or "Could not estimate a recipe from this image. Try describing the meal manually.",
+            "failed_step": "extract",
+            "uploaded_file_path": str(upload_path),
+        }), 400
+
+    result = build_extract_result(recipe_url, parsed_recipe, extraction_mode)
+    result["source_type"] = source_type
+    result["source_type_label"] = "Image"
+    result["source_url"] = recipe_url
+    result["source_name"] = upload_path.name
+    result["uploaded_file_path"] = str(upload_path)
+    result["detected_food_photo"] = True
+    result["extraction_mode"] = extraction_mode
+    result["extraction_mode_label"] = "Vision"
+    result["estimation_banner"] = (
+        "Recipe estimated from uploaded image. Review ingredients before saving."
+    )
+    result["raw"] = parsed_recipe
+    result["recipe_json"] = parsed_recipe
+    result["ok"] = bool(result.get("ok") and parsed_recipe)
+
+    result = commit_media_import_result(
+        result,
+        cookbook,
+        recipe_url=recipe_url,
+        context="vision-api",
+    )
+    if result.get("ok") and result.get("ingredients"):
+        status = 200
+    else:
+        if not result.get("error"):
+            result["error"] = NO_UPLOAD_INGREDIENTS_ERROR
+        result = {
+            **build_upload_failure_result({}, result.get("error"), failed_step="extract"),
+            **result,
+        }
+        status = 400
+
+    return jsonify(result), status
 
 
 @recipe_bp.route("/api/extract_recipe", methods=["POST"])
