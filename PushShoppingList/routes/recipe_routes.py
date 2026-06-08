@@ -563,7 +563,7 @@ def upload_recipe_media_route():
     log_selected_import_cookbook("media-upload", cookbook)
 
     result = extract_recipe_from_upload(uploaded_file)
-    extraction_source = str(result.get("source_type") or result.get("extraction_method") or "upload").strip()
+    extraction_source = str(result.get("extraction_method") or result.get("source_type") or "upload").strip()
     extraction_confidence = result.get("extraction_confidence")
     extraction_error = str(result.get("error") or "").strip()
     path_label = {
