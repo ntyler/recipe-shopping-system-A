@@ -6075,54 +6075,53 @@ def extract_recipe_from_upload(file_storage, manual_description=""):
                         f"source_type={import_source_type} file={filename!r} error={read_error}"
                     )
 
-                if detected_food_photo:
-                    fallback_mode = (
-                        "manual_description"
-                        if manual_description
-                        else "image_estimate"
+                fallback_mode = (
+                    "manual_description"
+                    if manual_description
+                    else "image_estimate"
+                )
+                print(
+                    "[recipe_import] action=upload_food_photo_image_estimate_start "
+                    f"source_type={import_source_type} file={filename!r} mode={fallback_mode}"
+                )
+                inferred_json, inference_error = generateRecipeFromImage(
+                    upload_path,
+                    user_description=manual_description,
+                    recipe_url=recipe_url,
+                    filename=filename,
+                    mime_type=mime_type,
+                )
+
+                if inference_error:
+                    error_message = (
+                        FOOD_PHOTO_NO_RECIPE_TEXT_ERROR
+                        if not manual_description
+                        else "Unable to estimate this food photo from the description. Try a more detailed description."
                     )
                     print(
-                        "[recipe_import] action=upload_food_photo_image_estimate_start "
-                        f"source_type={import_source_type} file={filename!r} mode={fallback_mode}"
+                        "[recipe_import] action=upload_food_photo_image_estimate_failed "
+                        f"source_type={import_source_type} file={filename!r} mode={fallback_mode} "
+                        f"error={inference_error}"
                     )
-                    inferred_json, inference_error = generateRecipeFromImage(
-                        upload_path,
-                        user_description=manual_description,
-                        recipe_url=recipe_url,
-                        filename=filename,
-                        mime_type=mime_type,
-                    )
-
-                    if inference_error:
-                        error_message = (
-                            FOOD_PHOTO_NO_RECIPE_TEXT_ERROR
-                            if not manual_description
-                            else "Unable to estimate this food photo from the description. Try a more detailed description."
-                        )
-                        print(
-                            "[recipe_import] action=upload_food_photo_image_estimate_failed "
-                            f"source_type={import_source_type} file={filename!r} mode={fallback_mode} "
-                            f"error={inference_error}"
-                        )
+                    if detected_food_photo or manual_description:
                         return build_upload_failure_result(
                             import_object,
                             error_message,
                             failed_step="manual_description",
                             extraction_method=fallback_mode,
                         )
-
-                    extraction_method = fallback_mode
-                    json_data = inferred_json
-                    if manual_description:
-                        import_object["manual_description"] = manual_description
-                    import_object["recipe_json"] = json_data
-                else:
                     return build_upload_failure_result(
                         import_object,
                         NO_READABLE_UPLOAD_TEXT_ERROR,
                         failed_step="read",
                         extraction_method=extraction_method,
                     )
+
+                extraction_method = fallback_mode
+                json_data = inferred_json
+                if manual_description:
+                    import_object["manual_description"] = manual_description
+                import_object["recipe_json"] = json_data
 
             if extraction_method == "ocr_text":
                 prompt_text = build_prompt(
