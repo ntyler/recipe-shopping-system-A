@@ -6952,12 +6952,34 @@ def prepare_word_conversion_source(upload_path, filename):
     return source_path, True
 
 
+def infer_safe_upload_suffix(value):
+    name = Path(str(value or "")).name.lower()
+    match = re.search(r"_(jpe?g|png|webp|gif|pdf|txt|md|docx?|html?)$", name)
+
+    if not match:
+        return ""
+
+    suffix = match.group(1)
+    if suffix == "jpeg":
+        suffix = "jpg"
+    return f".{suffix}"
+
+
 def upload_file_suffix(filename, upload_path):
-    return Path(filename or "").suffix.lower() or upload_path.suffix.lower()
+    return (
+        Path(filename or "").suffix.lower()
+        or upload_path.suffix.lower()
+        or infer_safe_upload_suffix(filename)
+        or infer_safe_upload_suffix(upload_path)
+    )
 
 
 def normalize_upload_mime_type(mime_type, filename, upload_path):
     guessed_type = mimetypes.guess_type(filename or str(upload_path))[0]
+    if not guessed_type:
+        suffix = upload_file_suffix(filename, upload_path)
+        if suffix:
+            guessed_type = mimetypes.guess_type(f"uploaded{suffix}")[0]
 
     if not mime_type or mime_type == "application/octet-stream":
         return guessed_type or "application/octet-stream"

@@ -5898,6 +5898,8 @@ function getRecipeMediaUploadInput() {
 }
 
 let recipeMediaUploadPath = "";
+let recipeMediaUploadSourceName = "";
+let recipeMediaUploadMimeType = "";
 let recipeMediaVisionInProgress = false;
 let recipeMediaUploadPreview = null;
 
@@ -5907,6 +5909,29 @@ function setRecipeMediaUploadPath(path) {
 
 function getRecipeMediaUploadPath() {
     return recipeMediaUploadPath;
+}
+
+function setRecipeMediaUploadMetadata(data = {}, file = null) {
+    recipeMediaUploadSourceName = String(
+        (data && data.source_name)
+        || (file && file.name)
+        || recipeMediaUploadSourceName
+        || ""
+    ).trim();
+    recipeMediaUploadMimeType = String(
+        (data && data.mime_type)
+        || (file && file.type)
+        || recipeMediaUploadMimeType
+        || ""
+    ).trim();
+}
+
+function getRecipeMediaUploadSourceName() {
+    return recipeMediaUploadSourceName;
+}
+
+function getRecipeMediaUploadMimeType() {
+    return recipeMediaUploadMimeType;
 }
 
 function normalizeRecipeUploadMode(uploadMode) {
