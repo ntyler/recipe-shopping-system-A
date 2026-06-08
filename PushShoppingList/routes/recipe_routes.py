@@ -562,7 +562,16 @@ def upload_recipe_media_route():
     cookbook = selected_import_cookbook_from_form(request.form)
     log_selected_import_cookbook("media-upload", cookbook)
 
-    result = extract_recipe_from_upload(uploaded_file)
+    manual_description = str(
+        request.form.get("photo_description")
+        or request.form.get("recipe_description")
+        or ""
+    ).strip()
+
+    result = extract_recipe_from_upload(
+        uploaded_file,
+        manual_description=manual_description,
+    )
     extraction_source = str(result.get("extraction_method") or result.get("source_type") or "upload").strip()
     extraction_confidence = result.get("extraction_confidence")
     extraction_error = str(result.get("error") or "").strip()
@@ -574,6 +583,7 @@ def upload_recipe_media_route():
         "document_text": "text recipe import",
         "photo_text": "text recipe import",
         "food_image_inferred": "food image inferred recipe",
+        "food_image_from_description": "estimated from photo/description",
         "not_recipe_image": "not recipe/food",
     }.get(extraction_source, "not recipe/food")
 
@@ -619,6 +629,9 @@ def upload_recipe_media_route():
         }
 
     if wants_json:
+        if extraction_source == "food_image_from_description":
+            result["source_type_label"] = "Estimated from photo/description"
+
         status = 200 if result.get("ok") else 400
         return jsonify(result), status
 

@@ -10075,6 +10075,62 @@ body {
             gap: 10px;
         }
 
+        .recipe-file-manual-description-panel {
+            margin-top: 12px;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid #444;
+            background: #101313;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .recipe-file-manual-description-message {
+            color: #fef9c3;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .recipe-file-manual-description-label {
+            color: #cbd5e1;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+        }
+
+        .recipe-file-manual-description-textarea {
+            width: 100%;
+            box-sizing: border-box;
+            min-height: 78px;
+            margin: 0;
+            padding: 8px 10px;
+            border: 1px solid #4b5563;
+            border-radius: 8px;
+            background: #1b2021;
+            color: #fff;
+            font-size: 13px;
+            resize: vertical;
+            line-height: 1.4;
+        }
+
+        .recipe-file-manual-description-submit {
+            margin: 0;
+            width: 100%;
+            min-height: 38px;
+            border-radius: 8px;
+            background: #155da8;
+            color: #dbe8f5;
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .recipe-file-manual-description-submit:disabled {
+            cursor: wait;
+            opacity: 0.75;
+        }
+
         .recipe-qty-progress-row {
             display: grid;
             grid-template-columns: minmax(0, 1fr) 140px;

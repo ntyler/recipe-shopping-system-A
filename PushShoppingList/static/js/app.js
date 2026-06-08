@@ -5893,33 +5893,45 @@ function openRecipeMediaUpload() {
     }
 }
 
-async function submitRecipeMediaUpload(input) {
+async function submitRecipeMediaUpload(input, manualDescription = "") {
     const form = document.getElementById("recipeMediaUploadForm");
     const status = document.getElementById("recipeMediaUploadStatus");
+    const fileInput = input && input.files ? input : document.getElementById("recipeMediaUploadInput");
+    const photoDescription = String(manualDescription || "").trim();
 
-    if (!form || !input || !input.files || !input.files.length) {
+    if (!form || !fileInput || !fileInput.files || !fileInput.files.length) {
         return;
     }
 
-    const file = input.files[0];
+    const file = fileInput.files[0];
     const destination = currentImportCookbookDestination();
     syncImportCookbookHiddenInputs(destination);
 
     const sourceTypeLabel = recipeUploadSourceTypeLabel(file);
+    const fileLabel = file.name || "uploaded file";
 
     if (status) {
-        status.textContent = `Importing ${file.name}...`;
+        status.textContent = photoDescription
+            ? "Generating recipe from description..."
+            : `Importing ${fileLabel}...`;
     }
 
     console.log("[recipe_import] selected import cookbook", destination);
     showRecipeFileLoadingOverlay(file.name, sourceTypeLabel);
+    setRecipeFileManualDescriptionPanelVisible(false);
     await waitForNextPaint();
 
     const formData = new FormData(form);
     formData.set("ajax", "1");
     formData.set("cookbook_id", destination.cookbookId || "");
     formData.set("cookbook_name", destination.cookbookName || "");
+    if (photoDescription) {
+        formData.set("photo_description", photoDescription);
+    } else {
+        formData.delete("photo_description");
+    }
 
+    let keepFileInput = false;
     updateRecipeFileLoadingStep("upload", "running", "Uploading file");
     const readingTimer = setTimeout(() => {
         updateRecipeFileLoadingStep("upload", "done", "Uploaded");
@@ -5946,6 +5958,7 @@ async function submitRecipeMediaUpload(input) {
         clearTimeout(extractTimer);
 
         setRecipeFileSourceType((data && data.source_type_label) || sourceTypeLabel);
+        setRecipeFileManualDescriptionPanelVisible(false);
 
         if (!response.ok || !data.ok) {
             const error = new Error((data && data.error) || "Unable to load file.");
@@ -5984,16 +5997,27 @@ async function submitRecipeMediaUpload(input) {
         const data = err && err.data ? err.data : {};
         setRecipeFileSourceType(data.source_type_label || sourceTypeLabel);
 
-        if (data.failed_step === "read") {
+        if (data.failed_step === "manual_description") {
+            const message = String(err.message || "No readable recipe text found.").trim();
+            updateRecipeFileLoadingStep("upload", "done", "Uploaded");
+            updateRecipeFileLoadingStep("read", "done", "No readable recipe text");
+            updateRecipeFileLoadingStep("extract", "waiting", "Waiting");
+            updateRecipeFileLoadingStep("save", "waiting", "Disabled");
+            setRecipeFileLoadingSummary(message);
+            setRecipeFileManualDescriptionPanelVisible(true, message, photoDescription);
+            keepFileInput = true;
+        } else if (data.failed_step === "read") {
             updateRecipeFileLoadingStep("upload", "done", "Uploaded");
             updateRecipeFileLoadingStep("read", "failed", "No readable recipe text");
             updateRecipeFileLoadingStep("extract", "waiting", "Waiting");
             updateRecipeFileLoadingStep("save", "waiting", "Disabled");
+            setRecipeFileManualDescriptionPanelVisible(false);
         } else {
             updateRecipeFileLoadingStep("upload", "done", "Uploaded");
             updateRecipeFileLoadingStep("read", "done", "Read");
             updateRecipeFileLoadingStep("extract", "failed", "No usable recipe data");
             updateRecipeFileLoadingStep("save", "waiting", "Disabled");
+            setRecipeFileManualDescriptionPanelVisible(false);
         }
         setRecipeFileLoadingSummary(err.message || "Unable to load file.");
 
@@ -6001,7 +6025,69 @@ async function submitRecipeMediaUpload(input) {
             status.textContent = err.message || "Unable to load file.";
         }
     } finally {
-        input.value = "";
+        if (!keepFileInput) {
+            fileInput.value = "";
+        }
+    }
+}
+
+async function submitRecipeMediaDescription() {
+    const textarea = document.getElementById("recipeFileManualDescriptionInput");
+    const submitButton = document.getElementById("recipeFileManualDescriptionSubmit");
+    const rawDescription = String(textarea ? textarea.value : "").trim();
+
+    if (!rawDescription) {
+        if (textarea) {
+            textarea.focus();
+        }
+
+        return;
+    }
+
+    if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = "Generating...";
+    }
+
+    try {
+        await submitRecipeMediaUpload(document.getElementById("recipeMediaUploadInput"), rawDescription);
+    } finally {
+        if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.textContent = "Generate Recipe From Description";
+        }
+    }
+}
+
+function setRecipeFileManualDescriptionPanelVisible(visible, message = "", description = "") {
+    const overlay = document.getElementById("recipeFileLoadingOverlay");
+    if (!overlay) {
+        return;
+    }
+
+    const panel = overlay.querySelector("#recipeFileManualDescriptionPanel");
+    if (!panel) {
+        return;
+    }
+
+    const status = panel.querySelector(".recipe-file-manual-description-message");
+    const textarea = panel.querySelector("#recipeFileManualDescriptionInput");
+
+    panel.hidden = !visible;
+
+    if (status) {
+        status.textContent = message || "This looks like a food photo, but no recipe text was found.";
+    }
+
+    if (visible && textarea) {
+        if (!textarea.value.trim() && description) {
+            textarea.value = description;
+        }
+        textarea.disabled = false;
+    }
+
+    if (!visible && textarea) {
+        textarea.value = "";
     }
 }
 
@@ -6049,6 +6135,24 @@ function showRecipeFileLoadingOverlay(fileName, sourceTypeLabel) {
                 <div id="recipeFileSourceType" class="recipe-qty-progress-summary">Source type: File</div>
                 <div id="recipeFileLoadingSummary" class="recipe-qty-progress-summary">Preparing file...</div>
                 <div id="recipeFileLoadingList" class="recipe-qty-progress-list"></div>
+                <div id="recipeFileManualDescriptionPanel" class="recipe-file-manual-description-panel" hidden>
+                    <div class="recipe-file-manual-description-message">
+                        This looks like a food photo, but no written recipe text was found.
+                    </div>
+                    <label class="recipe-file-manual-description-label" for="recipeFileManualDescriptionInput">Describe this meal or recipe</label>
+                    <textarea
+                        id="recipeFileManualDescriptionInput"
+                        class="recipe-file-manual-description-textarea"
+                        rows="3"
+                        placeholder="Example: shrimp and rice in creamy orange sauce with peas…"></textarea>
+                    <button
+                        id="recipeFileManualDescriptionSubmit"
+                        type="button"
+                        class="recipe-file-manual-description-submit"
+                        onclick="submitRecipeMediaDescription()">
+                        Generate Recipe From Description
+                    </button>
+                </div>
             </div>
         `;
         document.body.appendChild(overlay);
