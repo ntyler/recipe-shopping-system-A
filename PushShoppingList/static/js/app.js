@@ -6140,7 +6140,14 @@ async function submitRecipeMediaUpload(input, manualDescription = "", uploadMode
             }
         }
 
-        window.location.reload();
+        if (isImageEstimate) {
+            await openImportedRecipeEditorAfterMediaImport(data, {
+                statusMessage: categoryStatusMessage || "Recipe estimated from uploaded image.",
+                refreshMessage: "Refreshing recipe and opening the editor...",
+            });
+        } else {
+            window.location.reload();
+        }
     } catch (err) {
         const data = err && err.data ? err.data : {};
         const uploadedFilePath = String((data && data.uploaded_file_path) || "").trim();
@@ -6202,11 +6209,16 @@ async function submitRecipeMediaUpload(input, manualDescription = "", uploadMode
     }
 }
 
+function recipeFileManualDescriptionValue() {
+    const textarea = document.getElementById("recipeFileManualDescriptionInput");
+    return String(textarea ? textarea.value : "").trim();
+}
+
 async function submitRecipeMediaDescription() {
     const textarea = document.getElementById("recipeFileManualDescriptionInput");
     const panel = document.getElementById("recipeFileManualDescriptionPanel");
     const submitButton = document.getElementById("recipeFileManualDescriptionSubmit");
-    const rawDescription = String(textarea ? textarea.value : "").trim();
+    const rawDescription = recipeFileManualDescriptionValue();
 
     if (panel && panel.hidden) {
         setRecipeFileManualDescriptionPanelVisible(true, "Describe the photo to estimate a recipe with your notes.");
@@ -6298,6 +6310,8 @@ async function submitRecipeMediaVision() {
     const uploadedFilePath = getRecipeMediaUploadPath();
     const sourceTypeLabel = recipeUploadSourceTypeLabel(file || {});
     const fileLabel = file && file.name ? file.name : "uploaded file";
+    const photoDescription = recipeFileManualDescriptionValue();
+    const visionModeLabel = photoDescription ? "Vision + Description" : "Vision";
 
     if (!isImageUpload) {
         await submitRecipeMediaUpload(fileInput, "", "vision");
@@ -6336,7 +6350,7 @@ async function submitRecipeMediaVision() {
         setRecipeFileManualDescriptionPanelVisible(false);
         setRecipeFileEstimatedBanner(false);
         setRecipeFileSourceType(sourceTypeLabel);
-        setRecipeFileExtractionMode("Vision");
+        setRecipeFileExtractionMode(visionModeLabel);
         setRecipeFileActionButtonsEnabled(false);
         updateRecipeFileLoadingStep("upload", "running", "Uploading file");
         updateRecipeFileLoadingStep("read", "done", "No readable recipe text");
@@ -6355,6 +6369,7 @@ async function submitRecipeMediaVision() {
                 uploaded_file_path: uploadedFilePath,
                 source_type: "image",
                 extraction_mode: "vision",
+                photo_description_present: Boolean(photoDescription),
                 cookbook_id: destination.cookbookId || "",
                 cookbook_name: destination.cookbookName || "",
             },
@@ -6372,6 +6387,7 @@ async function submitRecipeMediaVision() {
                 uploaded_file_path: uploadedFilePath,
                 source_type: "image",
                 extraction_mode: "vision",
+                photo_description: photoDescription,
                 cookbook_id: destination.cookbookId || "",
                 cookbook_name: destination.cookbookName || "",
             }),
@@ -6389,7 +6405,7 @@ async function submitRecipeMediaVision() {
 
         updateRecipeFileLoadingStep("upload", "done", "Uploaded");
         setRecipeFileSourceType((data && data.source_type_label) || sourceTypeLabel);
-        setRecipeFileExtractionMode("Vision");
+        setRecipeFileExtractionMode((data && data.extraction_mode_label) || visionModeLabel);
 
         if (!response.ok || !data.ok) {
             const error = new Error((data && data.error) || "Could not estimate a recipe from this image. Try describing the meal manually.");
@@ -6463,8 +6479,8 @@ async function submitRecipeMediaVision() {
         });
 
         setRecipeFileSourceType(sourceTypeLabel);
-        setRecipeFileExtractionMode("Vision");
-        setRecipeFileManualDescriptionPanelVisible(true, message, "");
+        setRecipeFileExtractionMode(visionModeLabel);
+        setRecipeFileManualDescriptionPanelVisible(true, message, photoDescription);
         setRecipeFileEstimatedBanner(false);
         const debug = data && data.debug ? data.debug : {};
         updateRecipeFileLoadingStep(

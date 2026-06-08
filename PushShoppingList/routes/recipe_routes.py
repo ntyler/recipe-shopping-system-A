@@ -29,6 +29,7 @@ from PushShoppingList.services.extraction_progress_service import new_job_id
 from PushShoppingList.services.extraction_progress_service import request_cancel
 from PushShoppingList.services.extraction_progress_service import start_progress
 from PushShoppingList.services.recipe_extract_service import extract_recipe_from_upload
+from PushShoppingList.services.recipe_extract_service import extract_recipe_cover_image_from_upload
 from PushShoppingList.services.recipe_extract_service import extract_recipe_from_url
 from PushShoppingList.services.recipe_extract_service import generateRecipeFromImage
 from PushShoppingList.services.recipe_extract_service import build_vision_debug
@@ -855,6 +856,12 @@ def api_generate_recipe_from_image_route():
     uploaded_file_path = str(data.get("uploaded_file_path") or "").strip()
     source_type = str(data.get("source_type") or "").strip().lower() or "image"
     extraction_mode = str(data.get("extraction_mode") or "").strip().lower() or "vision"
+    user_description = str(
+        data.get("photo_description")
+        or data.get("recipe_description")
+        or data.get("description")
+        or ""
+    ).strip()
     debug = build_vision_debug(uploaded_file_path=uploaded_file_path)
     log_vision_debug_step(debug, "Image path received", image_path=uploaded_file_path)
 
@@ -951,12 +958,19 @@ def api_generate_recipe_from_image_route():
     log_selected_import_cookbook("media-upload-vision", cookbook)
 
     recipe_url = f"uploaded://{upload_path.name}"
+    extraction_method = "manual_description" if user_description else "image_estimate"
+    extraction_mode_label = "Vision + Description" if user_description else "Vision"
+    estimation_banner = (
+        "Recipe estimated from uploaded image and your description. Review before saving."
+        if user_description
+        else "Recipe estimated from uploaded image. Review ingredients before saving."
+    )
     vision_unavailable_message = (
         "Could not estimate a recipe from this image. Try describing the meal manually."
     )
     parsed_recipe, inference_error = generateRecipeFromImage(
         upload_path,
-        user_description="",
+        user_description=user_description,
         recipe_url=recipe_url,
         filename=upload_path.name,
         mime_type=resolved_mime_type,
@@ -982,27 +996,37 @@ def api_generate_recipe_from_image_route():
     if parsed_recipe is not None:
         parsed_recipe = dict(parsed_recipe)
         parsed_recipe["source_url"] = recipe_url
+        parsed_recipe["extraction_mode"] = extraction_method
+        if user_description:
+            parsed_recipe["manual_description"] = user_description
         normalize_extracted_recipe_identity(parsed_recipe)
         normalize_extracted_ingredient_fields(parsed_recipe)
         normalize_extracted_equipment_fields(parsed_recipe)
+        cover_image = extract_recipe_cover_image_from_upload(
+            upload_path,
+            resolved_mime_type,
+            upload_path.name,
+            recipe_url,
+            fallback_alt=parsed_recipe.get("recipe_title") or upload_path.name,
+        )
+        if cover_image:
+            parsed_recipe["cover_image"] = cover_image
         debug["vision_request_sent"] = True
         debug["vision_response_received"] = True
         debug["json_parse_success"] = True
         debug["recipe_json_parsed"] = True
         debug["recipe_json"] = parsed_recipe
 
-    result = build_extract_result(recipe_url, parsed_recipe, "image_estimate")
+    result = build_extract_result(recipe_url, parsed_recipe, extraction_method)
     result["source_type"] = source_type
     result["source_type_label"] = "Image"
     result["source_url"] = recipe_url
     result["source_name"] = upload_path.name
     result["uploaded_file_path"] = str(upload_path)
     result["detected_food_photo"] = True
-    result["extraction_mode"] = "image_estimate"
-    result["extraction_mode_label"] = "Vision"
-    result["estimation_banner"] = (
-        "Recipe estimated from uploaded image. Review ingredients before saving."
-    )
+    result["extraction_mode"] = extraction_method
+    result["extraction_mode_label"] = extraction_mode_label
+    result["estimation_banner"] = estimation_banner
     result["raw"] = parsed_recipe
     result["recipe_json"] = parsed_recipe
     result["ok"] = bool(result.get("ok") and result.get("ingredients"))
@@ -1042,11 +1066,9 @@ def api_generate_recipe_from_image_route():
     result["source_name"] = upload_path.name
     result["uploaded_file_path"] = str(upload_path)
     result["detected_food_photo"] = True
-    result["extraction_mode"] = "image_estimate"
-    result["extraction_mode_label"] = "Vision"
-    result["estimation_banner"] = (
-        "Recipe estimated from uploaded image. Review ingredients before saving."
-    )
+    result["extraction_mode"] = extraction_method
+    result["extraction_mode_label"] = extraction_mode_label
+    result["estimation_banner"] = estimation_banner
     result["raw"] = parsed_recipe
     result["recipe_json"] = parsed_recipe
     result["success"] = bool(result.get("ok"))

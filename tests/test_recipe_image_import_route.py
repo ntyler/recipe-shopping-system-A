@@ -115,6 +115,9 @@ def test_generate_recipe_from_image_commits_estimate(monkeypatch, tmp_path):
     assert payload["recipe_json"]["display_name"] == "Photo Rice Bowl"
     assert payload["recipe_json"]["recipe_title"] == "Photo Rice Bowl"
     assert payload["recipe_json"]["source_url"] == "uploaded://meal.png"
+    assert payload["recipe_json"]["cover_image"]["path"] == "data/uploads/meal.png"
+    assert payload["recipe_json"]["cover_image"]["source"] == "uploaded_image"
+    assert payload["cover_image"]["path"] == "data/uploads/meal.png"
     assert payload["category_status"]["ok"] is True
     assert payload["success"] is True
     assert payload["debug"]["file_exists"] is True
@@ -134,11 +137,80 @@ def test_generate_recipe_from_image_commits_estimate(monkeypatch, tmp_path):
         assert editor_recipe["source_url"] == "uploaded://meal.png"
         assert editor_recipe["display_name"] == "Photo Rice Bowl"
         assert editor_recipe["recipe_title"] == "Photo Rice Bowl"
+        assert editor_recipe["cover_image"]["path"] == "data/uploads/meal.png"
+        assert editor_recipe["cover_image"]["source"] == "uploaded_image"
+        assert editor_recipe["cover_image"]["src"].startswith("/recipe_cover_image?url=")
         assert [item["ingredient"] for item in editor_recipe["ingredients"]] == ["rice", "onion"]
         assert [item["instruction"] for item in editor_recipe["instructions"]] == [
             "Cook the rice.",
             "Top with onion.",
         ]
+
+
+def test_generate_recipe_from_image_passes_description_hint(monkeypatch, tmp_path):
+    user_id, user_data_dir = configure_image_user(monkeypatch, tmp_path)
+    upload_path = write_uploaded_image(user_data_dir, user_id, filename="hinted-meal.png")
+    captured = {}
+
+    parsed_recipe = {
+        "display_name": "Creamy Orange Rice",
+        "source_type": "image",
+        "extraction_mode": "image_estimate",
+        "ai_inferred": True,
+        "ingredients": [
+            {"ingredient": "rice", "original_text": "1 cup rice"},
+            {"ingredient": "peas", "original_text": "1/2 cup peas"},
+        ],
+        "instructions": ["Simmer the sauce.", "Fold in rice and peas."],
+    }
+
+    def fake_generate_from_image(*args, **kwargs):
+        captured.update(kwargs)
+        return parsed_recipe, None
+
+    monkeypatch.setattr(recipe_routes, "generateRecipeFromImage", fake_generate_from_image)
+    monkeypatch.setattr(
+        recipe_routes,
+        "save_import_cookbook_assignment",
+        lambda url, result, cookbook: {"cookbook_id": "test-book"},
+    )
+    monkeypatch.setattr(
+        recipe_routes,
+        "apply_imported_recipe_category_routine",
+        lambda url, result, assignment: {"ok": True, "categories": {}, "status": "updated"},
+    )
+    monkeypatch.setattr(recipe_routes, "create_source_url_pdf", lambda url: None)
+    monkeypatch.setattr(
+        recipe_routes,
+        "schedule_generated_recipe_pdf_creation",
+        lambda url, context="media-upload": {"queued": False, "url": url},
+    )
+    monkeypatch.setattr(recipe_routes, "record_recipe_import_activity", lambda *args, **kwargs: None)
+    monkeypatch.setattr(recipe_routes, "sort_ingredients", lambda: None)
+
+    app = create_app()
+    description = "creamy orange sauce with peas over rice"
+
+    with app.test_client() as client:
+        seed_signed_in_user(client, user_id)
+        response = client.post(
+            "/api/generate-recipe-from-image",
+            json={
+                "uploaded_file_path": str(upload_path),
+                "source_type": "image",
+                "extraction_mode": "vision",
+                "photo_description": description,
+            },
+        )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert captured["user_description"] == description
+    assert payload["extraction_mode"] == "manual_description"
+    assert payload["extraction_mode_label"] == "Vision + Description"
+    assert "description" in payload["estimation_banner"]
+    assert payload["recipe_json"]["manual_description"] == description
+    assert payload["recipe_json"]["cover_image"]["path"] == "data/uploads/hinted-meal.png"
 
 
 def test_generate_recipe_from_image_reports_unreadable_image(monkeypatch, tmp_path):
@@ -212,9 +284,24 @@ def test_generate_recipe_from_image_success_opens_editor_after_save():
     assert "Saving ingredients and refreshing the shopping list..." in block
     assert "Refreshing recipe and opening the editor..." in block
     assert "await openImportedRecipeEditorAfterMediaImport(data" in block
+    assert "photo_description: photoDescription" in block
+    assert "Vision + Description" in block
     assert "window.location.reload();" not in block
     assert "setRecipeFileVisionDebug(data && data.debug" in block
     assert "Reason:" in block
+
+
+def test_image_estimate_upload_success_opens_editor_after_save():
+    script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    start = script.index("async function submitRecipeMediaUpload(")
+    end = script.index("function recipeFileManualDescriptionValue()")
+    block = script[start:end]
+
+    assert "const isImageEstimate" in block
+    assert "if (isImageEstimate)" in block
+    assert "await openImportedRecipeEditorAfterMediaImport(data" in block
+    assert "Refreshing recipe and opening the editor..." in block
+    assert "window.location.reload();" in block
 
 
 def test_media_import_editor_helper_refreshes_markup_then_opens_recipe():
