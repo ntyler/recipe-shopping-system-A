@@ -5768,6 +5768,40 @@ def normalize_ingredient_candidates(raw_ingredients):
     return rows
 
 
+def normalize_recipe_text_list(value):
+    if isinstance(value, list):
+        rows = []
+
+        for item in value:
+            if isinstance(item, dict):
+                text = clean_recipe_text(
+                    item.get("text")
+                    or item.get("instruction")
+                    or item.get("step")
+                    or item.get("name")
+                    or item.get("note")
+                )
+            else:
+                text = clean_recipe_text(item)
+
+            if text:
+                rows.append(text)
+
+        return rows
+
+    raw_text = str(value or "").replace("\r\n", "\n").replace("\r", "\n")
+    rows = [
+        clean_recipe_text(part)
+        for part in re.split(r"\n+", raw_text)
+        if clean_recipe_text(part)
+    ]
+    if rows:
+        return rows
+
+    text = clean_recipe_text(value)
+    return [text] if text else []
+
+
 def build_food_image_inference_prompt(recipe_url, filename, user_description=""):
     user_description = clean_recipe_text(user_description)
     user_description_hint = (
@@ -5777,9 +5811,7 @@ def build_food_image_inference_prompt(recipe_url, filename, user_description="")
         if user_description
         else ""
     )
-    return build_prompt(
-        recipe_url,
-        f"""
+    return f"""
 Analyze this food photo and create a likely recipe. Identify visible ingredients, estimate reasonable quantities, equipment, and instructions. Return strict JSON only. Mark every ingredient as estimated_from_image=true and include confidence notes. Do not claim certainty.
 {user_description_hint}
 
@@ -5807,22 +5839,25 @@ Return JSON with exactly this shape:
   "inferred_ingredients": ["rice", "onion", "salt", "pepper", "olive oil"],
   "equipment": ["large pan", "spatula"],
   "instructions": ["Cook ingredients.", "Adjust seasoning and serve."],
+  "shopping_list_items": ["rice", "onion", "olive oil"],
   "nutrition": {{}},
   "extraction_confidence": 0.0,
   "extraction_mode": "image_estimate",
-  "image_analysis_notes": "notes..."
+  "image_analysis_notes": "notes...",
+  "confidence_notes": ["Visible ingredients are estimated from the image."]
 }}
 
 Rules:
+- If the image does not show food or a meal, return an empty ingredients array and explain that in image_analysis_notes.
 - Use only clearly visible ingredients in visible_ingredients.
 - Use grocery-store ingredients with quantities and sections.
+- Include reasonable likely pantry staples in inferred_ingredients and ingredients only when needed for a plausible recipe.
 - If a user description is provided, treat it as a high-priority hint for ingredient selection and method flow.
 - Do not claim the result is exact; treat all inferred items as estimated.
 - Do not claim ingredient amounts are exact; they should be treated as estimates.
 - Include a confidence score between 0 and 1 in extraction_confidence.
 - Return valid JSON only.
-""",
-    )
+"""
 
 
 def infer_food_image_recipe(recipe_url, upload_path, mime_type, filename, user_description=""):
@@ -5836,18 +5871,33 @@ def infer_food_image_recipe(recipe_url, upload_path, mime_type, filename, user_d
     if parse_error:
         return None, parse_error
 
-    ingredients = normalize_ingredient_candidates(parsed.get("ingredients", []))
+    ingredient_candidates = (
+        parsed.get("ingredients")
+        or parsed.get("estimated_ingredients")
+        or parsed.get("shopping_list_items")
+        or []
+    )
+    ingredients = normalize_ingredient_candidates(ingredient_candidates)
     visible = normalize_ingredient_candidates(parsed.get("visible_ingredients", []))
     inferred = normalize_ingredient_candidates(parsed.get("inferred_ingredients", []))
     parsed["ingredients"] = ingredients
     parsed["visible_ingredients"] = [row.get("ingredient") for row in visible if row.get("ingredient")]
     parsed["inferred_ingredients"] = [row.get("ingredient") for row in inferred if row.get("ingredient")]
+    parsed["shopping_list_items"] = extract_ingredients_from_result({"ingredients": ingredients})
 
-    if not isinstance(parsed.get("equipment"), list):
-        parsed["equipment"] = []
+    parsed["equipment"] = normalize_recipe_text_list(parsed.get("equipment"))
 
-    if not isinstance(parsed.get("instructions"), list):
-        parsed["instructions"] = []
+    instructions = normalize_recipe_text_list(
+        parsed.get("instructions")
+        or parsed.get("steps")
+        or parsed.get("method")
+    )
+    if ingredients and not instructions:
+        instructions = [
+            "Review the estimated ingredients from the food photo before cooking.",
+            "Prepare the dish using the likely method for the visible meal, adjusting quantities and seasoning as needed.",
+        ]
+    parsed["instructions"] = instructions
 
     if not isinstance(parsed.get("nutrition"), dict):
         parsed["nutrition"] = {}
@@ -5867,9 +5917,27 @@ def infer_food_image_recipe(recipe_url, upload_path, mime_type, filename, user_d
         if has_user_description
         else "Estimated from food photo and should be reviewed before shopping."
     )
+    confidence_notes = normalize_recipe_text_list(
+        parsed.get("confidence_notes")
+        or parsed.get("confidence")
+        or parsed.get("notes")
+    )
+    parsed["confidence_notes"] = confidence_notes
+    analysis_notes = clean_recipe_text(
+        parsed.get("image_analysis_notes")
+        or parsed.get("analysis_notes")
+        or parsed.get("photo_analysis_notes")
+    )
     parsed["image_analysis_notes"] = (
-        f"{clean_recipe_text(parsed.get('image_analysis_notes'))} "
-        f"{estimated_note}"
+        " ".join(
+            part
+            for part in [
+                analysis_notes,
+                " ".join(confidence_notes),
+                estimated_note,
+            ]
+            if part
+        )
     ).strip()
 
     for ingredient in parsed.get("ingredients", []):
@@ -6893,6 +6961,7 @@ def build_extract_result(recipe_url, json_data, extraction_method):
         "source_type": json_data.get("source_type") or extraction_method,
         "ai_inferred": bool(json_data.get("ai_inferred")),
         "extraction_confidence": json_data.get("extraction_confidence"),
+        "confidence_notes": json_data.get("confidence_notes") or [],
         "image_analysis_notes": json_data.get("image_analysis_notes"),
         "visible_ingredients": json_data.get("visible_ingredients") or [],
         "inferred_ingredients": json_data.get("inferred_ingredients") or [],
