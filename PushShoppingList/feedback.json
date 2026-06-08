@@ -123,6 +123,40 @@
           "createdAt": "2026-06-05T04:25:30Z"
         }
       ]
+    },
+    {
+      "feedback_id": "FB-1002",
+      "user": {
+        "user_id": "aeb8ff0c7e45491cb2538bbb8b2919ed",
+        "username": "imadeoneforthisplace@gmail.com",
+        "email": "imadeoneforthisplace@gmail.com"
+      },
+      "created_at": "2026-06-06T19:57:12Z",
+      "updated_at": "2026-06-06T19:57:12Z",
+      "feedback_type": "Store Request",
+      "subject": "Request store: Sam's Club",
+      "description": "Store name:Sam's Club\r\nStore website:\r\nStore selector/location URL:\r\nWhy this store should be added:\r\nNotes:",
+      "attachments": [],
+      "status": "Submitted",
+      "priority": "Normal",
+      "admin_notes": "",
+      "resolution_notes": "",
+      "admin_attachments": [],
+      "timeline": [
+        {
+          "event": "Submitted",
+          "status": "Submitted",
+          "timestamp": "2026-06-06T19:57:12Z",
+          "actor": "imadeoneforthisplace@gmail.com",
+          "actorUid": "aeb8ff0c7e45491cb2538bbb8b2919ed",
+          "actorEmail": "imadeoneforthisplace@gmail.com",
+          "actorPrivateEmail": "imadeoneforthisplace@gmail.com",
+          "actorPublicEmail": "imadeoneforthisplace@gmail.com",
+          "actorType": "user"
+        }
+      ],
+      "notifications": [],
+      "comments": []
     }
   ]
 }
