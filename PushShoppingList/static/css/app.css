@@ -10069,6 +10069,38 @@ body {
             grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.85fr);
         }
 
+        .recipe-file-action-title {
+            margin: 0 0 8px;
+            color: #f8fafc;
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+        }
+
+        .recipe-file-action-buttons {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .recipe-file-action-btn {
+            width: 100%;
+            margin: 0;
+            min-height: 38px;
+            border-radius: 8px;
+            background: #27364a;
+            color: #f8fafc;
+            border: 1px solid #3f597d;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .recipe-file-action-btn:disabled {
+            opacity: 0.6;
+            cursor: wait;
+        }
+
         .recipe-qty-progress-list {
             display: flex;
             flex-direction: column;

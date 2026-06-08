@@ -567,10 +567,12 @@ def upload_recipe_media_route():
         or request.form.get("recipe_description")
         or ""
     ).strip()
+    upload_mode = str(request.form.get("upload_mode") or "").strip().lower()
 
     result = extract_recipe_from_upload(
         uploaded_file,
         manual_description=manual_description,
+        upload_mode=upload_mode,
     )
     extraction_source = str(
         result.get("extraction_mode")
@@ -634,15 +636,23 @@ def upload_recipe_media_route():
         }
 
     if wants_json:
-        if extraction_source == "manual_description":
-            result["source_type_label"] = "Estimated from photo/description"
-        elif extraction_source == "image_estimate":
-            result["source_type_label"] = "Estimated from food photo"
-        elif extraction_source == "ocr_text":
-            result["source_type_label"] = "Text recipe import"
+        extraction_mode_label = (
+            {
+                "ocr_text": "OCR",
+                "image_estimate": "Vision",
+                "manual_description": "Manual",
+            }.get(extraction_source, "Unknown")
+            if extraction_source
+            else "Unknown"
+        )
+        if extraction_mode_label and extraction_mode_label != "Unknown":
+            result["extraction_mode_label"] = extraction_mode_label
+
         if extraction_source in {"manual_description", "image_estimate"}:
             result["estimation_banner"] = (
-                "Recipe estimated from food photo. Review before saving."
+                "Recipe estimated from uploaded image. Review ingredients before saving."
+                if extraction_source == "image_estimate"
+                else "Recipe estimated from photo/description. Review before saving."
             )
         if extraction_source:
             result["extraction_mode"] = extraction_source
