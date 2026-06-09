@@ -5,6 +5,7 @@ cd /d D:\GitHub\recipe-shopping-system-A
 echo Starting Flask app...
 
 set SHOPPING_APP_PORT=5083
+set SHOPPING_APP_PYTHON_EXE=C:\Python39\python.exe
 call :load_user_env SHOPPING_APP_SMTP_HOST
 call :load_user_env SHOPPING_APP_SMTP_PORT
 call :load_user_env SHOPPING_APP_SMTP_USERNAME
@@ -22,7 +23,12 @@ set PRODUCT_FINAL_SELECTION_CANDIDATES=96
 set PRODUCT_AI_BROWSER_WAIT_SECONDS=4
 start http://127.0.0.1:%SHOPPING_APP_PORT%
 
-py -3.11 app.py
+if not exist "%SHOPPING_APP_PYTHON_EXE%" (
+    echo Required Python executable not found: %SHOPPING_APP_PYTHON_EXE%
+    exit /b 1
+)
+
+"%SHOPPING_APP_PYTHON_EXE%" app.py
 goto :eof
 
 :load_user_env

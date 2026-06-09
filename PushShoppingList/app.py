@@ -23,6 +23,7 @@ from PushShoppingList.services.user_account_service import current_public_user
 from PushShoppingList.services.user_account_service import current_user
 from PushShoppingList.services.user_account_service import is_admin_user
 from PushShoppingList.services.user_account_service import pending_two_factor_setup
+from PushShoppingList.services.recipe_extract_service import log_openai_startup_diagnostics
 
 
 PUBLIC_ENDPOINTS = {
@@ -109,6 +110,10 @@ def create_app():
     app.secret_key = os.getenv("SHOPPING_APP_SECRET_KEY", "dev-shopping-list-session-key")
     app.permanent_session_lifetime = timedelta(days=30)
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    log_openai_startup_diagnostics(
+        debug_mode=app.debug,
+        reloader_mode=os.environ.get("WERKZEUG_RUN_MAIN") == "true",
+    )
 
     app.register_blueprint(account_bp)
     app.register_blueprint(feedback_bp)

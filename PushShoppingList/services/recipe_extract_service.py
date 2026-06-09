@@ -8,17 +8,22 @@ import mimetypes
 import imghdr
 import shutil
 import subprocess
+import sys
 import time
 import uuid
 import zipfile
 import xml.etree.ElementTree as ET
+from dataclasses import asdict
+from dataclasses import dataclass
 from datetime import datetime
 from datetime import timezone
 from pathlib import Path
+from typing import Optional
 from urllib.parse import unquote
 from urllib.parse import urljoin
 from urllib.parse import urlparse
 
+import openai
 import requests
 from bs4 import BeautifulSoup
 from openai import OpenAI
@@ -81,8 +86,10 @@ UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 VIDEO_FOLDER.mkdir(parents=True, exist_ok=True)
 PDF_FOLDER.mkdir(parents=True, exist_ok=True)
 
-MODEL = os.getenv("OPENAI_RECIPE_MODEL", "gpt-4o-mini")
+MODEL = os.getenv("OPENAI_RECIPE_MODEL", "gpt-5.5")
 VISION_MODEL_DEFAULT = "gpt-5.5"
+VISION_MODEL_FALLBACK = "gpt-4o-mini"
+OPENAI_RECIPE_MODEL_DEFAULT = "gpt-5.5"
 OPENAI_PING_TEXT_MODEL = os.getenv("OPENAI_PING_TEXT_MODEL", "gpt-4o-mini")
 VISION_REQUEST_TIMEOUT_SECONDS = _safe_int(
     os.getenv("OPENAI_VISION_REQUEST_TIMEOUT_SECONDS", "120"),
@@ -97,7 +104,7 @@ VISION_MAX_RETRIES = _safe_int(
     2,
 )
 print(f"[Recipe AI] OPENAI_API_KEY present: {'yes' if bool(os.getenv('OPENAI_API_KEY')) else 'no'}")
-print(f"[Recipe AI] Vision model: {os.getenv('OPENAI_VISION_MODEL') or os.getenv('OPENAI_RECIPE_MODEL') or VISION_MODEL_DEFAULT}")
+print(f"[Recipe AI] Vision model: {os.getenv('OPENAI_VISION_MODEL') or VISION_MODEL_DEFAULT}")
 MAX_PAGE_TEXT_CHARS = 35000
 MAX_SOCIAL_VIDEO_PROMPT_CHARS = 12000
 MAX_VIDEO_TRANSCRIPTION_SECONDS = int(os.getenv("MAX_VIDEO_TRANSCRIPTION_SECONDS", "180"))
@@ -144,12 +151,104 @@ VISION_CONVERTIBLE_IMAGE_SUFFIXES = {
     ".avif",
 }
 
-def resolve_vision_model():
-    return str(
-        os.getenv("OPENAI_VISION_MODEL", "").strip()
-        or os.getenv("OPENAI_RECIPE_MODEL", "").strip()
-        or VISION_MODEL_DEFAULT
+@dataclass
+class OpenAIModelResolution:
+    model: str
+    source: str
+    purpose: str
+
+
+@dataclass
+class VisionResult:
+    ok: bool
+    text: str = ""
+    model_used: str = ""
+    model_source: str = ""
+    action_name: str = ""
+    error_code: str = ""
+    error_message: str = ""
+    technical_message: str = ""
+    exception_type: str = ""
+    openai_error_code: str = ""
+    openai_error_param: str = ""
+    fallback_used: bool = False
+    fallback_from_model: str = ""
+    fallback_to_model: str = ""
+    image_bytes: int = 0
+    base64_length: int = 0
+    temperature_included: bool = False
+    debug: Optional[dict] = None
+
+    def to_dict(self):
+        payload = asdict(self)
+        payload["model"] = self.model_used
+        payload["action"] = self.action_name
+        return payload
+
+
+class VisionRequestError(RuntimeError):
+    def __init__(self, result):
+        self.result = result
+        super().__init__(result.technical_message or result.error_message or result.error_code)
+
+
+def resolve_openai_model(purpose="recipe", preferred_model=None, fallback=False):
+    purpose = str(purpose or "recipe").strip().lower()
+    preferred_model = str(preferred_model or "").strip()
+
+    if fallback:
+        return OpenAIModelResolution(
+            model=VISION_MODEL_FALLBACK,
+            source="fallback:gpt-4o-mini",
+            purpose=purpose,
+        )
+
+    if preferred_model:
+        return OpenAIModelResolution(
+            model=preferred_model,
+            source="preferred_model",
+            purpose=purpose,
+        )
+
+    if purpose == "vision":
+        env_model = os.getenv("OPENAI_VISION_MODEL", "").strip()
+        if env_model:
+            return OpenAIModelResolution(
+                model=env_model,
+                source="env:OPENAI_VISION_MODEL",
+                purpose=purpose,
+            )
+        return OpenAIModelResolution(
+            model=VISION_MODEL_DEFAULT,
+            source="default:gpt-5.5",
+            purpose=purpose,
+        )
+
+    env_model = os.getenv("OPENAI_RECIPE_MODEL", "").strip()
+    if env_model:
+        return OpenAIModelResolution(
+            model=env_model,
+            source="env:OPENAI_RECIPE_MODEL",
+            purpose=purpose,
+        )
+
+    return OpenAIModelResolution(
+        model=OPENAI_RECIPE_MODEL_DEFAULT,
+        source="default:gpt-5.5",
+        purpose=purpose,
     )
+
+
+def resolve_vision_model():
+    return resolve_openai_model("vision").model
+
+
+def resolve_vision_model_source():
+    return resolve_openai_model("vision").source
+
+
+def resolve_recipe_model():
+    return resolve_openai_model("recipe").model
 
 
 OPENAI_UNSUPPORTED_PARAMETER_MESSAGE = (
@@ -190,6 +289,10 @@ def _coerce_openai_error_payload(value):
 def get_openai_error_code_and_param(exc):
     if exc is None:
         return "", ""
+
+    if isinstance(exc, VisionRequestError):
+        result = exc.result
+        return result.openai_error_code or result.error_code or "", result.openai_error_param or ""
 
     error_code = ""
     error_param = ""
@@ -520,6 +623,7 @@ def get_openai_client():
 
 
 def build_vision_debug(uploaded_file_path="", filename="", mime_type=""):
+    model_resolution = resolve_openai_model("vision")
     return {
         "file_path": str(uploaded_file_path or ""),
         "filename": str(filename or ""),
@@ -528,8 +632,12 @@ def build_vision_debug(uploaded_file_path="", filename="", mime_type=""):
         "file_size": 0,
         "uploaded_file_size": 0,
         "openai_image_bytes": 0,
-        "model": resolve_vision_model(),
+        "model": model_resolution.model,
+        "model_source": model_resolution.source,
         "temperature_included": False,
+        "fallback_used": False,
+        "fallback_from_model": "",
+        "fallback_to_model": "",
         "image_type_supported": False,
         "image_readable": False,
         "image_uploaded": False,
@@ -554,6 +662,37 @@ def build_vision_debug(uploaded_file_path="", filename="", mime_type=""):
         "recipe_json": None,
         "steps": [],
     }
+
+
+def openai_runtime_diagnostics(debug_mode=None, reloader_mode=None):
+    recipe_resolution = resolve_openai_model("recipe")
+    vision_resolution = resolve_openai_model("vision")
+    return {
+        "sys.executable": sys.executable,
+        "sys.version": sys.version.replace("\n", " "),
+        "os.getcwd": os.getcwd(),
+        "openai.__version__": getattr(openai, "__version__", ""),
+        "openai.__file__": getattr(openai, "__file__", ""),
+        "OPENAI_API_KEY_present": "yes" if bool(os.getenv("OPENAI_API_KEY")) else "no",
+        "OPENAI_RECIPE_MODEL": os.getenv("OPENAI_RECIPE_MODEL", ""),
+        "OPENAI_VISION_MODEL": os.getenv("OPENAI_VISION_MODEL", ""),
+        "resolved_recipe_model": recipe_resolution.model,
+        "resolved_recipe_model_source": recipe_resolution.source,
+        "resolved_vision_model": vision_resolution.model,
+        "resolved_vision_model_source": vision_resolution.source,
+        "flask_debug": bool(debug_mode) if debug_mode is not None else "",
+        "flask_reloader": bool(reloader_mode) if reloader_mode is not None else "",
+        "pid": os.getpid(),
+    }
+
+
+def log_openai_startup_diagnostics(debug_mode=None, reloader_mode=None):
+    diagnostics = openai_runtime_diagnostics(debug_mode=debug_mode, reloader_mode=reloader_mode)
+    print("[OpenAI Startup] diagnostics_begin")
+    for key, value in diagnostics.items():
+        print(f"[OpenAI Startup] {key} = {value}")
+    print("[OpenAI Startup] diagnostics_end")
+    return diagnostics
 
 
 def log_vision_debug_step(debug, message, **details):
@@ -597,6 +736,10 @@ def set_vision_debug_error(debug, error_code, error_message, failed_status=""):
 
 
 def classify_vision_ai_exception(exc):
+    if isinstance(exc, VisionRequestError):
+        result = exc.result
+        return result.error_code or "AI_REQUEST_FAILED", result.error_message or "Vision AI request failed."
+
     if not os.getenv("OPENAI_API_KEY"):
         return (
             "OPENAI_API_KEY_MISSING",
@@ -751,6 +894,9 @@ def set_vision_debug_exception(debug, exc):
     exception_type = type(exc).__name__
     exception_message = str(exc or "").strip() or exception_type
     error_code, error_param = get_openai_error_code_and_param(exc)
+    if isinstance(exc, VisionRequestError):
+        exception_type = exc.result.exception_type or exception_type
+        exception_message = exc.result.technical_message or exc.result.error_message or exception_message
     if isinstance(debug, dict):
         debug["exception_type"] = exception_type
         debug["exception_message"] = exception_message
@@ -6100,62 +6246,380 @@ def unsupported_phone_image_message(mime_type=""):
     return "Unsupported image format."
 
 
-def prepare_image_bytes_for_openai(image_path, mime_type):
-    image_bytes = image_path.read_bytes()
-    resolved_mime = str(mime_type or "").split(";", 1)[0].strip().lower()
-    needs_conversion = image_mime_needs_openai_conversion(resolved_mime, image_path)
-    needs_size_normalization = len(image_bytes) >= NORMALIZE_OPENAI_UPLOAD_IMAGE_BYTES
-    should_normalize = needs_conversion or needs_size_normalization
-
-    if len(image_bytes) <= MAX_OPENAI_UPLOAD_IMAGE_BYTES and not should_normalize:
-        return image_bytes, resolved_mime or mime_type
+def normalize_image_bytes_for_openai(image_path, mime_type="", debug=None):
+    upload_path = Path(image_path)
+    original_bytes = upload_path.read_bytes()
+    original_mime = str(mime_type or detect_image_mime_type(upload_path, "") or "").split(";", 1)[0].strip().lower()
 
     try:
-        if needs_conversion:
-            ensure_heif_image_support()
+        ensure_heif_image_support()
         from PIL import Image
         from PIL import ImageOps
-    except Exception:
-        if needs_conversion:
-            raise ValueError(unsupported_phone_image_message(resolved_mime))
-        return image_bytes, resolved_mime or mime_type
+    except Exception as exc:
+        raise RuntimeError(f"Pillow image support is unavailable: {exc}") from exc
 
     try:
-        with Image.open(io.BytesIO(image_bytes)) as image:
-            image = ImageOps.exif_transpose(image)
-            image.thumbnail(
-                (MAX_OPENAI_UPLOAD_IMAGE_SIDE, MAX_OPENAI_UPLOAD_IMAGE_SIDE),
-                Image.Resampling.LANCZOS,
-            )
+        with Image.open(io.BytesIO(original_bytes)) as image:
+            original_format = str(image.format or "")
+            mode_before = str(image.mode or "")
+            size_before = tuple(image.size or (0, 0))
+            max_dimension_before = max(size_before) if size_before else 0
+            transposed = ImageOps.exif_transpose(image)
+            exif_transpose_applied = tuple(transposed.size or ()) != tuple(image.size or ())
+            if transposed is not image:
+                image = transposed
 
-            if image.mode not in ("RGB", "L"):
+            if max(image.size or (0, 0)) > 1600:
+                image.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
+
+            if image.mode != "RGB":
                 image = image.convert("RGB")
 
+            mode_after = str(image.mode or "")
+            size_after = tuple(image.size or (0, 0))
+            max_dimension_after = max(size_after) if size_after else 0
             output = io.BytesIO()
-            image.save(output, format="JPEG", quality=82, optimize=True)
-            compressed = output.getvalue()
-
-            if compressed:
-                print(
-                    "[recipe_import] action=normalize_openai_image "
-                    f"original_mime={resolved_mime or 'unknown'} "
-                    "output_mime=image/jpeg "
-                    f"original_bytes={len(image_bytes)} converted_bytes={len(compressed)} "
-                    f"conversion_required={needs_conversion} "
-                    f"size_normalization_required={needs_size_normalization}"
-                )
-                return compressed, "image/jpeg"
+            save_kwargs = {"format": "JPEG", "quality": 85}
+            try:
+                image.save(output, optimize=True, **save_kwargs)
+            except Exception:
+                output = io.BytesIO()
+                image.save(output, **save_kwargs)
+            normalized_bytes = output.getvalue()
     except Exception as exc:
         print(
-            "[recipe_import] action=normalize_openai_image_failed "
-            f"mime_type={resolved_mime or 'unknown'} "
-            f"conversion_required={needs_conversion} "
-            f"size_normalization_required={needs_size_normalization} error={exc}"
+            "[Vision] action=image_normalization_failed "
+            f"file={str(upload_path)!r} original_mime={original_mime or 'unknown'} "
+            f"original_bytes={len(original_bytes)} exception_type={type(exc).__name__} error={exc}"
         )
-        if needs_conversion:
-            raise ValueError(unsupported_phone_image_message(resolved_mime)) from exc
+        raise RuntimeError(f"Image decode/conversion failed: {exc}") from exc
 
-    return image_bytes, resolved_mime or mime_type
+    details = {
+        "original_format": original_format,
+        "original_mime": original_mime or "application/octet-stream",
+        "original_bytes": len(original_bytes),
+        "output_format": "JPEG",
+        "output_mime": "image/jpeg",
+        "output_bytes": len(normalized_bytes),
+        "image_mode_before": mode_before,
+        "image_mode_after": mode_after,
+        "exif_transpose_applied": bool(exif_transpose_applied),
+        "max_dimension_before": max_dimension_before,
+        "max_dimension_after": max_dimension_after,
+    }
+    if isinstance(debug, dict):
+        debug.update(details)
+        debug["mime_type"] = "image/jpeg"
+        debug["openai_image_bytes"] = len(normalized_bytes)
+    print(
+        "[Vision] action=normalize_image_for_openai "
+        f"original_format={original_format or 'unknown'} "
+        f"original_mime={details['original_mime']} original_bytes={len(original_bytes)} "
+        "output_format=JPEG output_mime=image/jpeg "
+        f"output_bytes={len(normalized_bytes)} "
+        f"image_mode_before={mode_before} image_mode_after={mode_after} "
+        f"exif_transpose_applied={'yes' if exif_transpose_applied else 'no'} "
+        f"max_dimension_before={max_dimension_before} max_dimension_after={max_dimension_after}"
+    )
+    return normalized_bytes, "image/jpeg", details
+
+
+def prepare_image_bytes_for_openai(image_path, mime_type):
+    image_bytes, output_mime, _details = normalize_image_bytes_for_openai(image_path, mime_type)
+    return image_bytes, output_mime
+
+
+def _openai_vision_result_from_exception(exc, action_name, model, model_source, image_bytes=0, base64_length=0, temperature_included=False, debug=None):
+    openai_error_code, openai_error_param = get_openai_error_code_and_param(exc)
+    error_code, error_message = classify_vision_ai_exception(exc)
+    technical_message = str(exc or "").strip() or type(exc).__name__
+    if isinstance(debug, dict):
+        debug["error_code"] = error_code
+        debug["error_message"] = error_message
+        debug["technical_message"] = technical_message
+        debug["exception_type"] = type(exc).__name__
+        debug["exception_message"] = technical_message
+        debug["openai_error_code"] = openai_error_code
+        debug["openai_error_param"] = openai_error_param
+        debug["request_completed"] = False
+        debug["temperature_included"] = bool(temperature_included)
+
+    print(
+        "[Vision] action=openai_exception "
+        f"action_name={action_name} model={model} model_source={model_source} "
+        f"exception_type={type(exc).__name__} str={str(exc)!r} repr={repr(exc)} "
+        f"cause={repr(getattr(exc, '__cause__', None))} "
+        f"context={repr(getattr(exc, '__context__', None))} "
+        f"openai_error_code={openai_error_code or 'n/a'} "
+        f"openai_error_param={openai_error_param or 'n/a'} "
+        f"image_bytes={image_bytes} base64_length={base64_length} "
+        f"temperature_included={temperature_included} final_error_code={error_code}"
+    )
+    return VisionResult(
+        ok=False,
+        text="",
+        model_used=model,
+        model_source=model_source,
+        action_name=action_name,
+        error_code=error_code,
+        error_message=error_message,
+        technical_message=technical_message,
+        exception_type=type(exc).__name__,
+        openai_error_code=openai_error_code,
+        openai_error_param=openai_error_param,
+        image_bytes=image_bytes,
+        base64_length=base64_length,
+        temperature_included=bool(temperature_included),
+        debug=debug if isinstance(debug, dict) else None,
+    )
+
+
+def _vision_failure_should_fallback(result):
+    return result.error_code in {
+        "OPENAI_CONNECTION_ERROR",
+        "OPENAI_UNSUPPORTED_MODEL",
+        "OPENAI_UNSUPPORTED_PARAMETER",
+        "OPENAI_BAD_REQUEST",
+        "OPENAI_INVALID_IMAGE_PAYLOAD",
+    }
+
+
+def call_openai_vision_image(
+    image_path,
+    prompt,
+    action_name,
+    preferred_model=None,
+    debug=None,
+):
+    action_name = str(action_name or "vision").strip() or "vision"
+    upload_path = Path(image_path)
+    if isinstance(debug, dict):
+        debug["action"] = action_name
+        debug["file_path"] = str(upload_path)
+        debug["filename"] = str(debug.get("filename") or upload_path.name)
+
+    if not os.getenv("OPENAI_API_KEY"):
+        result = VisionResult(
+            ok=False,
+            model_used=resolve_openai_model("vision", preferred_model).model,
+            model_source=resolve_openai_model("vision", preferred_model).source,
+            action_name=action_name,
+            error_code="OPENAI_API_KEY_MISSING",
+            error_message="OPENAI_API_KEY is missing or invalid.",
+            technical_message="OPENAI_API_KEY is missing.",
+            debug=debug if isinstance(debug, dict) else None,
+        )
+        if isinstance(debug, dict):
+            debug["model"] = result.model_used
+            debug["model_source"] = result.model_source
+            debug["error_code"] = result.error_code
+            debug["error_message"] = result.error_message
+            debug["technical_message"] = result.technical_message
+            debug["failed_status"] = "vision_request_sent"
+        return result
+
+    if not upload_path.is_file():
+        result = VisionResult(
+            ok=False,
+            model_used=resolve_openai_model("vision", preferred_model).model,
+            model_source=resolve_openai_model("vision", preferred_model).source,
+            action_name=action_name,
+            error_code="UPLOADED_FILE_MISSING",
+            error_message="Uploaded image file does not exist.",
+            technical_message=f"Missing file: {upload_path}",
+            debug=debug if isinstance(debug, dict) else None,
+        )
+        if isinstance(debug, dict):
+            debug["model"] = result.model_used
+            debug["model_source"] = result.model_source
+            debug["error_code"] = result.error_code
+            debug["error_message"] = result.error_message
+            debug["technical_message"] = result.technical_message
+            debug["file_exists"] = False
+            debug["failed_status"] = "image_uploaded"
+        return result
+
+    uploaded_file_size = upload_path.stat().st_size
+    if isinstance(debug, dict):
+        debug["file_exists"] = True
+        debug["file_size"] = uploaded_file_size
+        debug["uploaded_file_size"] = uploaded_file_size
+        debug["image_uploaded"] = True
+
+    try:
+        image_bytes, output_mime, normalize_details = normalize_image_bytes_for_openai(
+            upload_path,
+            detect_image_mime_type(upload_path, ""),
+            debug=debug,
+        )
+    except Exception as exc:
+        result = _openai_vision_result_from_exception(
+            exc,
+            action_name,
+            resolve_openai_model("vision", preferred_model).model,
+            resolve_openai_model("vision", preferred_model).source,
+            debug=debug,
+        )
+        result.error_code = "IMAGE_NORMALIZATION_FAILED"
+        result.error_message = "Image decode/conversion failure."
+        if isinstance(debug, dict):
+            debug["error_code"] = result.error_code
+            debug["error_message"] = result.error_message
+            debug["failed_status"] = "image_uploaded"
+        return result
+
+    encoded_image = base64.b64encode(image_bytes).decode("ascii")
+    base64_length = len(encoded_image)
+    if isinstance(debug, dict):
+        debug["mime_type"] = output_mime
+        debug["openai_image_bytes"] = len(image_bytes)
+        debug["encoded_base64_length"] = base64_length
+        debug["vision_request"] = {
+            "model": "",
+            "model_source": "",
+            "action": action_name,
+            "filename": upload_path.name,
+            "mime_type": output_mime,
+            "prompt_length": len(str(prompt or "")),
+            "data_url_prefix": "data:image/jpeg;base64,",
+            **normalize_details,
+        }
+
+    attempts = [resolve_openai_model("vision", preferred_model)]
+    if attempts[0].model != VISION_MODEL_FALLBACK:
+        attempts.append(resolve_openai_model("vision", fallback=True))
+
+    first_failure = None
+    for attempt_index, model_resolution in enumerate(attempts):
+        model = model_resolution.model
+        model_source = model_resolution.source
+        temperature_included = supports_custom_temperature(model)
+        request_kwargs = {}
+        if temperature_included:
+            request_kwargs["temperature"] = 0
+        if isinstance(debug, dict):
+            debug["model"] = model
+            debug["model_source"] = model_source
+            debug["temperature_included"] = bool(temperature_included)
+            debug["request_started"] = True
+            debug["request_completed"] = False
+            debug["vision_request_sent"] = True
+            debug["failed_status"] = "vision_request_sent"
+            debug["vision_request"]["model"] = model
+            debug["vision_request"]["model_source"] = model_source
+            debug["vision_request"]["temperature_included"] = bool(temperature_included)
+
+        print(
+            "[Vision] action=request_start "
+            f"action_name={action_name} model={model} model_source={model_source} "
+            f"temperature_included={temperature_included} "
+            f"image_bytes={len(image_bytes)} base64_length={base64_length}"
+        )
+        try:
+            client = OpenAI()
+            response = client.chat.completions.create(
+                model=model,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": str(prompt or "")},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": "data:image/jpeg;base64," + encoded_image,
+                            },
+                        },
+                    ],
+                }],
+                **request_kwargs,
+            )
+            text = str(response.choices[0].message.content or "")
+            if not text.strip():
+                empty_exc = RuntimeError("OpenAI returned an empty response.")
+                result = _openai_vision_result_from_exception(
+                    empty_exc,
+                    action_name,
+                    model,
+                    model_source,
+                    image_bytes=len(image_bytes),
+                    base64_length=base64_length,
+                    temperature_included=temperature_included,
+                    debug=debug,
+                )
+                result.error_code = "OPENAI_EMPTY_RESPONSE"
+                result.error_message = "OpenAI returned an empty response."
+                if isinstance(debug, dict):
+                    debug["error_code"] = result.error_code
+                    debug["error_message"] = result.error_message
+                return result
+
+            record_openai_usage(response, action_name, model=model)
+            if isinstance(debug, dict):
+                debug["request_completed"] = True
+                debug["vision_response_received"] = True
+                debug["failed_status"] = ""
+                debug["vision_response"] = text[:12000]
+
+            result = VisionResult(
+                ok=True,
+                text=text,
+                model_used=model,
+                model_source=model_source,
+                action_name=action_name,
+                image_bytes=len(image_bytes),
+                base64_length=base64_length,
+                temperature_included=bool(temperature_included),
+                debug=debug if isinstance(debug, dict) else None,
+            )
+            if attempt_index > 0 and first_failure is not None:
+                result.fallback_used = True
+                result.fallback_from_model = first_failure.model_used
+                result.fallback_to_model = model
+                if isinstance(debug, dict):
+                    debug["fallback_used"] = True
+                    debug["fallback_from_model"] = first_failure.model_used
+                    debug["fallback_to_model"] = model
+                print(
+                    "[Vision] VISION_MODEL_FALLBACK_USED "
+                    f"from_model={first_failure.model_used} to_model={model}"
+                )
+            print(
+                "[Vision] action=request_success "
+                f"action_name={action_name} model={model} model_source={model_source} "
+                f"temperature_included={temperature_included}"
+            )
+            return result
+        except Exception as exc:
+            result = _openai_vision_result_from_exception(
+                exc,
+                action_name,
+                model,
+                model_source,
+                image_bytes=len(image_bytes),
+                base64_length=base64_length,
+                temperature_included=temperature_included,
+                debug=debug,
+            )
+            if attempt_index == 0 and len(attempts) > 1 and _vision_failure_should_fallback(result):
+                first_failure = result
+                print(
+                    "[Vision] VISION_MODEL_FALLBACK_USED "
+                    f"from_model={model} to_model={VISION_MODEL_FALLBACK}"
+                )
+                if isinstance(debug, dict):
+                    debug["fallback_used"] = True
+                    debug["fallback_from_model"] = model
+                    debug["fallback_to_model"] = VISION_MODEL_FALLBACK
+                continue
+            if first_failure is not None:
+                result.fallback_used = True
+                result.fallback_from_model = first_failure.model_used
+                result.fallback_to_model = model
+                if isinstance(debug, dict):
+                    debug["fallback_used"] = True
+                    debug["fallback_from_model"] = first_failure.model_used
+                    debug["fallback_to_model"] = model
+            return result
 
 
 def send_image_prompt_to_openai(
@@ -6168,152 +6632,21 @@ def send_image_prompt_to_openai(
     debug=None,
     action=None,
 ):
-    resolved_model = str(model or resolve_vision_model()).strip() or VISION_MODEL_DEFAULT
-    resolved_timeout = (
-        _safe_int(request_timeout, VISION_REQUEST_TIMEOUT_SECONDS)
-        if request_timeout is not None
-        else VISION_REQUEST_TIMEOUT_SECONDS
-    )
-    max_retry_attempts = (
-        _safe_int(max_retries, VISION_MAX_RETRIES)
-        if max_retries is not None
-        else VISION_MAX_RETRIES
-    )
-    upload_path = Path(image_path)
-
-    resolved_mime = detect_image_mime_type(upload_path, mime_type)
-    uploaded_file_size = upload_path.stat().st_size if upload_path.is_file() else 0
-    image_bytes, resolved_mime = prepare_image_bytes_for_openai(upload_path, resolved_mime)
-    encoded_image = base64.b64encode(image_bytes).decode("ascii")
-    if isinstance(debug, dict):
-        debug["file_path"] = str(upload_path)
-        debug["filename"] = str(debug.get("filename") or upload_path.name)
-        debug["mime_type"] = str(resolved_mime)
-        debug["file_exists"] = upload_path.is_file()
-        debug["file_size"] = uploaded_file_size
-        debug["uploaded_file_size"] = uploaded_file_size
-        debug["openai_image_bytes"] = len(image_bytes)
-        debug["model"] = resolved_model
-        debug["encoded_base64_length"] = len(encoded_image)
-        debug["request_started"] = False
-        debug["request_completed"] = False
-        debug["exception_type"] = ""
-        debug["exception_message"] = ""
-
-    openai_env_model = os.getenv("OPENAI_RECIPE_MODEL", "")
-    openai_env_vision_model = os.getenv("OPENAI_VISION_MODEL", "")
-    print(f"[Recipe AI] OPENAI_RECIPE_MODEL env = {openai_env_model}")
-    print(f"[Recipe AI] OPENAI_VISION_MODEL env = {openai_env_vision_model}")
-    print(f"[Recipe AI] MODEL used = {resolved_model}")
-    print(f"[Vision] Model used = {resolved_model}")
-    print(f"[Vision] Model: {resolved_model}")
-    print(f"[Vision] Image path: {upload_path}")
-    print(f"[Vision] File exists: {upload_path.is_file()}")
-    print(f"[Vision] Uploaded file size: {uploaded_file_size}")
-    print(f"[Vision] OpenAI image bytes: {len(image_bytes)}")
-    print(f"[Vision] MIME type: {resolved_mime}")
-    print(f"[Vision] Encoded base64 length: {len(encoded_image)}")
     debug_action = (
         str(debug.get("action") or action or "generate_recipe_from_image")
         if isinstance(debug, dict)
         else str(action or "generate_recipe_from_image")
     )
-    if isinstance(debug, dict):
-        debug["action"] = debug_action
-    log_vision_debug_step(debug, "Model", model=resolved_model)
-    log_vision_debug_step(debug, "Image path", image_path=str(upload_path))
-    log_vision_debug_step(debug, "File exists", file_exists=upload_path.is_file())
-    log_vision_debug_step(debug, "Uploaded file size", uploaded_file_size=uploaded_file_size)
-    log_vision_debug_step(debug, "OpenAI image bytes", openai_image_bytes=len(image_bytes))
-    log_vision_debug_step(debug, "MIME type", mime_type=resolved_mime)
-    log_vision_debug_step(debug, "Encoded base64 length", encoded_base64_length=len(encoded_image))
-
-    for attempt in range(max_retry_attempts + 1):
-        temperature_included = False
-        if attempt > 0:
-            print(f"[Vision] Retrying request after delay: {VISION_RETRY_DELAY_SECONDS}s attempt={attempt}")
-            if isinstance(debug, dict):
-                debug["request_started"] = False
-                debug["request_completed"] = False
-            time.sleep(VISION_RETRY_DELAY_SECONDS)
-
-        if isinstance(debug, dict):
-            debug["request_started"] = True
-            debug["request_completed"] = False
-            debug["failed_status"] = "vision_request_sent"
-
-        print("[Vision] Request starting")
-        try:
-            payload, temperature_included, resolved_model = build_openai_chat_payload(
-                resolved_model,
-                "recipe-image-extraction",
-                [
-                    {
-                        "role": "system",
-                        "content": "You extract recipe ingredients from recipe photos and documents and return only valid JSON.",
-                    },
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt_text},
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:{resolved_mime};base64,{encoded_image}",
-                                },
-                            },
-                        ],
-                    },
-                ],
-                response_format={"type": "json_object"},
-                temperature=0,
-            )
-            if isinstance(debug, dict):
-                debug["temperature_included"] = temperature_included
-                debug["action"] = debug_action
-
-            response = get_openai_client().with_options(timeout=resolved_timeout).chat.completions.create(**payload)
-            if isinstance(debug, dict):
-                debug["request_completed"] = True
-                debug["temperature_included"] = temperature_included
-                debug["action"] = debug_action
-
-            print(f"[Vision] action={debug_action} model={resolved_model} temperature_included={temperature_included}")
-            print("[Vision] Request completed")
-            record_openai_usage(response, "recipe-image-extraction", model=resolved_model)
-            return response.choices[0].message.content
-        except Exception as exc:
-            print("[Vision] Request failed")
-            error_code, error_param = get_openai_error_code_and_param(exc)
-            final_error_code, final_error_message = classify_vision_ai_exception(exc)
-            set_vision_debug_exception(debug, exc)
-            print(
-                "[Vision] exception="
-                f"type={type(exc).__name__} "
-                f"error_code={error_code} "
-                f"error_param={error_param} "
-                f"model={resolved_model} "
-                f"action={debug_action} "
-                f"temperature_included={temperature_included}"
-            )
-            print(
-                "[Vision] final_error_code="
-                f"{final_error_code} final_error_message={final_error_message}"
-            )
-            if isinstance(debug, dict):
-                debug["openai_error_code"] = error_code
-                debug["openai_error_param"] = error_param
-                debug["technical_message"] = str(exc or "")
-                debug["action"] = debug_action
-                debug["error_code"] = final_error_code
-                debug["error_message"] = final_error_message
-                debug["request_completed"] = False
-            if attempt < max_retry_attempts and isinstance(
-                exc,
-                (APIConnectionError, APITimeoutError),
-            ):
-                continue
-            raise
+    result = call_openai_vision_image(
+        image_path=str(image_path),
+        prompt=prompt_text,
+        action_name=debug_action,
+        preferred_model=model,
+        debug=debug,
+    )
+    if not result.ok:
+        raise VisionRequestError(result)
+    return result.text
 
 
 def send_social_video_audio_image_prompt_to_openai(prompt_text, image_urls):
@@ -6913,18 +7246,21 @@ Rules:
 
 
 def infer_food_image_recipe(recipe_url, upload_path, mime_type, filename, user_description="", debug=None):
-    vision_model = resolve_vision_model()
+    model_resolution = resolve_openai_model("vision")
+    vision_model = model_resolution.model
     prompt_text = build_food_image_inference_prompt(recipe_url, filename, user_description)
     if isinstance(debug, dict):
         debug.setdefault("action", "generate_recipe_from_image")
         debug["vision_request"] = {
             "model": str(vision_model),
+            "model_source": model_resolution.source,
             "filename": str(filename or ""),
             "mime_type": str(mime_type or ""),
             "prompt_length": len(prompt_text),
             "prompt": prompt_text,
         }
         debug["model"] = str(vision_model)
+        debug["model_source"] = model_resolution.source
 
     if not str(vision_model or "").strip():
         return None, set_vision_debug_error(
@@ -6994,7 +7330,7 @@ def infer_food_image_recipe(recipe_url, upload_path, mime_type, filename, user_d
             debug["recipe_json_parsed"] = False
         return None, set_vision_debug_error(
             debug,
-            "JSON_PARSE_FAILED",
+            "VISION_RESPONSE_PARSE_FAILED",
             f"JSON parsing failed: {parse_error}",
             failed_status="json_parse_success",
         )
@@ -7025,8 +7361,9 @@ def infer_food_image_recipe(recipe_url, upload_path, mime_type, filename, user_d
 
     parsed["equipment"] = normalize_recipe_text_list(parsed.get("equipment"))
 
-    parsed["model_used"] = str(vision_model)
-    parsed["model"] = str(vision_model)
+    parsed["model_used"] = str(debug.get("model") if isinstance(debug, dict) else vision_model)
+    parsed["model"] = str(debug.get("model") if isinstance(debug, dict) else vision_model)
+    parsed["model_source"] = str(debug.get("model_source") if isinstance(debug, dict) else model_resolution.source)
 
     instructions = normalize_recipe_text_list(
         parsed.get("instructions")
@@ -7460,15 +7797,55 @@ def extract_recipe_from_upload(file_storage, manual_description="", upload_mode=
             extraction_method = "ocr_text"
 
             if not page_text.strip() or not contains_written_recipe:
-                return build_upload_failure_result(
-                    import_object,
-                    NO_READABLE_UPLOAD_TEXT_ERROR,
-                    failed_step="read",
-                    extraction_method=extraction_method,
-                    action=requested_upload_action,
-                    error_code="OPENAI_REQUEST_FAILED",
-                    technical_message=NO_READABLE_UPLOAD_TEXT_ERROR,
-                )
+                no_text_message = "No visible recipe text found."
+                debug_payload = build_vision_debug(uploaded_file_path=str(upload_path), filename=filename, mime_type=mime_type)
+                debug_payload.update({
+                    "action": requested_upload_action,
+                    "image_uploaded": True,
+                    "vision_request_sent": True,
+                    "vision_response_received": True,
+                    "json_parse_success": True,
+                    "recipe_creation_success": False,
+                    "error_code": "NO_VISIBLE_RECIPE_TEXT",
+                    "error_message": no_text_message,
+                    "technical_message": NO_READABLE_UPLOAD_TEXT_ERROR,
+                    "model": resolve_vision_model(),
+                    "model_source": resolve_vision_model_source(),
+                })
+                return {
+                    "success": True,
+                    "ok": True,
+                    "read_text_only": True,
+                    "no_visible_recipe_text": True,
+                    "error": "",
+                    "error_code": "NO_VISIBLE_RECIPE_TEXT",
+                    "error_message": no_text_message,
+                    "technical_message": NO_READABLE_UPLOAD_TEXT_ERROR,
+                    "failed_step": "",
+                    "ingredients": [],
+                    "import_source": import_object,
+                    "source_type": import_source_type,
+                    "source_type_label": upload_source_type_label(import_source_type),
+                    "source_name": filename,
+                    "source_url": recipe_url,
+                    "uploaded_file_path": str(upload_path),
+                    "extracted_text": page_text,
+                    "detected_food_photo": bool(detected_food_photo),
+                    "contains_written_recipe": bool(contains_written_recipe),
+                    "extraction_method": extraction_method,
+                    "extraction_mode": extraction_method,
+                    "extraction_mode_label": "OCR",
+                    "model_used": resolve_vision_model(),
+                    "model": resolve_vision_model(),
+                    "model_source": resolve_vision_model_source(),
+                    "action": requested_upload_action,
+                    "debug": debug_payload,
+                    "available_actions": [
+                        "read_text",
+                        "describe_recipe",
+                        "generate_recipe_from_image",
+                    ],
+                }
 
             prompt_text = build_prompt(
                 recipe_url,

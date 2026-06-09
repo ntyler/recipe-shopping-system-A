@@ -6154,6 +6154,10 @@ async function submitRecipeMediaUpload(input, manualDescription = "", uploadMode
                     || recipeUploadModeLabel(normalizedUploadMode))
                 : "N/A"
         );
+        if (data && (data.model_used || data.model)) {
+            const modelSource = String(data.model_source || (data.debug && data.debug.model_source) || "").trim();
+            setRecipeFileModelUsed(`${data.model_used || data.model}${modelSource ? ` (${modelSource})` : ""}`);
+        }
         setRecipeFileManualDescriptionPanelVisible(false);
         setRecipeFileEstimatedBanner(false);
 
@@ -6161,6 +6165,29 @@ async function submitRecipeMediaUpload(input, manualDescription = "", uploadMode
             const error = new Error((data && data.error) || "Unable to load file.");
             error.data = data;
             throw error;
+        }
+
+        if (isImageUpload && data && data.read_text_only) {
+            keepFileInput = true;
+            updateRecipeFileLoadingStep("read", "done", data.no_visible_recipe_text ? "No visible recipe text" : "Read complete");
+            updateRecipeFileLoadingStep("estimate", "waiting", "Available");
+            updateRecipeFileLoadingStep("extract", "waiting", "Available");
+            updateRecipeFileLoadingStep("save", "waiting", "Disabled");
+            setRecipeFileLoadingSummary(
+                data.no_visible_recipe_text
+                    ? "No visible recipe text found. You can still describe or generate from the image."
+                    : "Image text read complete. Choose the next action."
+            );
+            setRecipeFileManualDescriptionPanelVisible(true, "No visible recipe text found. Generate from the image or add your own description.");
+            setRecipeFileActionButtonsEnabled(true);
+            setRecipeFileVisionDebug(data && data.debug, {
+                visible: true,
+                errorData: data,
+            });
+            if (status) {
+                status.textContent = data.error_message || "No visible recipe text found.";
+            }
+            return;
         }
 
         const extractionMode = String((data && data.extraction_mode) || "").trim();
@@ -6361,6 +6388,96 @@ async function submitRecipeMediaDescription() {
         if (submitButton) {
             submitButton.disabled = false;
             submitButton.textContent = "Generate Recipe From Description";
+        }
+    }
+}
+
+async function submitRecipeMediaDescribeImage() {
+    const uploadedFilePath = getRecipeMediaUploadPath();
+    const status = document.getElementById("recipeMediaUploadStatus");
+    const fileInput = getRecipeMediaUploadInput();
+    const file = fileInput && fileInput.files ? fileInput.files[0] : null;
+    const fileLabel = file && file.name
+        ? file.name
+        : (String(uploadedFilePath || "").split(/[\\/]/).pop() || "uploaded file");
+
+    if (!uploadedFilePath) {
+        await submitRecipeMediaUpload(fileInput, "", "read_text");
+        return;
+    }
+
+    showRecipeFileLoadingOverlay(fileLabel, "Image", true);
+    setRecipeFileExtractionMode("Describe Recipe");
+    setRecipeFileActionButtonsEnabled(false);
+    updateRecipeFileLoadingStep("upload", "done", "Uploaded");
+    updateRecipeFileLoadingStep("read", "waiting", "Skipped");
+    updateRecipeFileLoadingStep("estimate", "running", "Describing");
+    updateRecipeFileLoadingStep("extract", "waiting", "Available");
+    updateRecipeFileLoadingStep("save", "waiting", "Disabled");
+    setRecipeFileLoadingSummary("Describing uploaded image...");
+
+    try {
+        const response = await fetch("/api/describe-recipe-image", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "fetch",
+            },
+            body: JSON.stringify({
+                uploaded_file_path: uploadedFilePath,
+                client_context: recipeFileClientContext(),
+            }),
+        });
+        const data = await response.json();
+        const modelUsed = String((data && (data.model_used || data.model)) || "").trim();
+        const modelSource = String((data && data.model_source) || (data && data.debug && data.debug.model_source) || "").trim();
+        setRecipeFileModelUsed(`${modelUsed || "Unknown"}${modelSource ? ` (${modelSource})` : ""}`);
+        setRecipeFileVisionDebug(data && data.debug, {
+            visible: true,
+            errorData: data,
+        });
+        if (data && data.uploaded_file_path) {
+            setRecipeMediaUploadPath(data.uploaded_file_path);
+        }
+
+        if (!response.ok || !data.ok) {
+            const error = new Error((data && (data.error_message || data.error)) || "Unable to describe this image.");
+            error.data = data;
+            throw error;
+        }
+
+        updateRecipeFileLoadingStep("estimate", "done", "Description ready");
+        setRecipeFileLoadingSummary(data.description || data.text || "Image described.");
+        setRecipeFileManualDescriptionPanelVisible(true, data.description || data.text || "", data.description || data.text || "");
+        setRecipeFileActionButtonsEnabled(true);
+        if (status) {
+            status.textContent = "Image description ready.";
+        }
+    } catch (err) {
+        const data = err && err.data ? err.data : {};
+        const debug = data && data.debug ? data.debug : {};
+        const responseErrorMessage = String(
+            (data && (data.error_message || data.error || data.technical_message)) || err.message || ""
+        ).trim();
+        const connectionErrorMessage = buildVisionConnectionErrorMessage(responseErrorMessage, {
+            ...debug,
+            error_code: String((data && data.error_code) || debug.error_code || ""),
+        });
+        const message = recipeFileErrorMessageWithReason(
+            connectionErrorMessage,
+            responseErrorMessage || "No failure reason was returned by the backend.",
+            "Unable to describe this image."
+        );
+        updateRecipeFileLoadingStep("estimate", "failed", "Description failed");
+        setRecipeFileLoadingSummary(message);
+        setRecipeFileManualDescriptionPanelVisible(true, message);
+        setRecipeFileVisionDebug(debug, {
+            visible: true,
+            errorData: data,
+        });
+        setRecipeFileActionButtonsEnabled(true);
+        if (status) {
+            status.textContent = message;
         }
     }
 }
@@ -6800,7 +6917,8 @@ async function submitRecipeMediaVision() {
         });
         const data = await response.json();
         const responseModelUsed = String((data && data.model_used) || "").trim();
-        setRecipeFileModelUsed(responseModelUsed || "Unknown");
+        const responseModelSource = String((data && data.model_source) || (data && data.debug && data.debug.model_source) || "").trim();
+        setRecipeFileModelUsed(`${responseModelUsed || "Unknown"}${responseModelSource ? ` (${responseModelSource})` : ""}`);
         const workflowSourceUrl = String(
             (data && (data.source_url || data.url)) || ""
         ).trim();
@@ -7086,7 +7204,7 @@ function showRecipeFileLoadingOverlay(fileName, sourceTypeLabel, showImageAction
                             id="recipeFileDescribeAction"
                             type="button"
                             class="recipe-file-action-btn"
-                            onclick="submitRecipeMediaDescription()"
+                            onclick="submitRecipeMediaDescribeImage()"
                         >
                             Describe Recipe
                         </button>
@@ -7340,6 +7458,11 @@ function setRecipeFileVisionDebug(debug = null, options = {}) {
             || normalizedDebug.model
             || "Unknown"
         ).trim();
+        const responseModelSource = String(
+            (options.errorData && options.errorData.model_source)
+            || normalizedDebug.model_source
+            || ""
+        ).trim();
         const responseExtractionMode = String(
             (options.errorData && options.errorData.extraction_mode_label)
             || (options.errorData && options.errorData.extraction_mode)
@@ -7352,6 +7475,7 @@ function setRecipeFileVisionDebug(debug = null, options = {}) {
         ).trim() || "Image";
         const errorDetails = {
             model_used: responseModelUsed,
+            model_source: responseModelSource,
             extraction_mode: responseExtractionMode,
             source_type: responseSourceType,
             action: normalizedDebug.action || (options.errorData && options.errorData.action) || "",
@@ -7383,6 +7507,7 @@ function setRecipeFileVisionDebug(debug = null, options = {}) {
         const errorText = recipeFileDebugText(errorDetails, "No errors yet.");
         const headerLines = [
             `Model Used: ${responseModelUsed || "Unknown"}`,
+            `Model Source: ${responseModelSource || "N/A"}`,
             `Error Code: ${errorDetails.error_code || "N/A"}`,
             `Error Message: ${errorDetails.error_message || "No message provided."}`,
             `Extraction Mode: ${responseExtractionMode || "Vision"}`,

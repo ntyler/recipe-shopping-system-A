@@ -4,10 +4,10 @@ Self-hosted recipe-to-shopping-list automation platform with recipe extraction, 
 
 ## Requirements
 
-Use **Python 3.11** for this project. The included `start_app.bat` runs the app with:
+Use the same Windows Python/OpenAI environment as the backend OpenAI Vision debug path:
 
 ```bat
-py -3.11 app.py
+C:\Python39\python.exe app.py
 ```
 
 You also need:
@@ -22,7 +22,7 @@ You also need:
 Install the Python dependencies from `requirements.txt`:
 
 ```powershell
-py -3.11 -m pip install -r requirements.txt
+C:\Python39\python.exe -m pip install -r requirements.txt
 ```
 
 Core libraries used by the project:
@@ -168,7 +168,7 @@ Notes:
 - Leave `DISABLE_RECIPE_HTML_CACHE_FALLBACK` unset if you want the app to reuse cached recipe HTML when a live page fails.
 - Leave `DISABLE_RECIPE_PDF_ARCHIVE` unset if you want each extracted recipe page saved as a PDF for later review.
 - Set `FORCE_OPENAI_RECIPE_EXTRACTION=1` only when you want the OpenAI extractor used even if recipe-card HTML already has enough structured data.
-- Leave `SHOPPING_APP_PORT` unset when running `py -3.11 app.py` directly and you want the default Flask port `5000`. The included `start_app.bat` currently sets `SHOPPING_APP_PORT=5083`.
+- Leave `SHOPPING_APP_PORT` unset when running `C:\Python39\python.exe app.py` directly and you want the default Flask port `5000`. The included `start_app.bat` currently sets `SHOPPING_APP_PORT=5083`.
 - Set `SHOPPING_APP_PASSWORD_RESET_BASE_URL` to the address users should open from password reset emails and signed-in two-factor disable verification emails, such as your LAN, Tailscale, or public HTTPS URL. If unset, reset emails use the current request host.
 - Set `SHOPPING_APP_ACCOUNT_LINK_BASE_URL` to the address users should open from account verification and account deletion emails. If unset, account links fall back to `SHOPPING_APP_PASSWORD_RESET_BASE_URL` or the current request host.
 - Product lookup uses `OPENAI_API_KEY` for fully loaded product-page analysis and final best-product selection. If no key is set, the app still parses product candidates but skips ChatGPT product analysis.
@@ -190,7 +190,7 @@ Open a new terminal after using `setx`.
 From the repo root:
 
 ```powershell
-py -3.11 app.py
+C:\Python39\python.exe app.py
 ```
 
 Then open:
@@ -501,7 +501,7 @@ Quick test with Flask's temporary self-signed certificate:
 ```powershell
 $env:SHOPPING_APP_SSL_ADHOC="1"
 $env:SHOPPING_APP_PORT="5083"
-py -3.11 app.py
+C:\Python39\python.exe app.py
 ```
 
 Then open:
@@ -517,7 +517,7 @@ Your browser will warn because the certificate is self-signed. For the most reli
 ```powershell
 $env:SHOPPING_APP_SSL_CERT="C:\path\to\cert.pem"
 $env:SHOPPING_APP_SSL_KEY="C:\path\to\key.pem"
-py -3.11 app.py
+C:\Python39\python.exe app.py
 ```
 
 - A trusted HTTPS tunnel such as Tailscale Funnel, Cloudflare Tunnel, or ngrok pointed at `http://127.0.0.1:5000`.

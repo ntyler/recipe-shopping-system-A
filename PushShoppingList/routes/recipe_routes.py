@@ -34,9 +34,12 @@ from PushShoppingList.services.recipe_extract_service import extract_recipe_cove
 from PushShoppingList.services.recipe_extract_service import extract_recipe_from_url
 from PushShoppingList.services.recipe_extract_service import generateRecipeFromImage
 from PushShoppingList.services.recipe_extract_service import build_vision_debug
+from PushShoppingList.services.recipe_extract_service import call_openai_vision_image
 from PushShoppingList.services.recipe_extract_service import MODEL
 from PushShoppingList.services.recipe_extract_service import OPENAI_PING_TEXT_MODEL
+from PushShoppingList.services.recipe_extract_service import openai_runtime_diagnostics
 from PushShoppingList.services.recipe_extract_service import resolve_vision_model
+from PushShoppingList.services.recipe_extract_service import resolve_vision_model_source
 from PushShoppingList.services.recipe_extract_service import classify_vision_ai_exception
 from PushShoppingList.services.recipe_extract_service import get_openai_error_code_and_param
 from PushShoppingList.services.recipe_extract_service import get_openai_client
@@ -779,21 +782,27 @@ def upload_recipe_media_route():
         f"{f' error={extraction_error}' if extraction_error else ''}"
     )
 
-    result = commit_media_import_result(
-        result,
-        cookbook,
-        recipe_url=str(result.get("source_url") or ""),
-        context="media-upload",
-    )
+    if not result.get("read_text_only"):
+        result = commit_media_import_result(
+            result,
+            cookbook,
+            recipe_url=str(result.get("source_url") or ""),
+            context="media-upload",
+        )
     if isinstance(result, dict):
         result.setdefault("success", bool(result.get("ok")))
         result.setdefault(
             "model_used",
             resolve_vision_model() if str(result.get("source_type") or "").lower() == "image" else MODEL,
         )
+        result.setdefault(
+            "model_source",
+            resolve_vision_model_source() if str(result.get("source_type") or "").lower() == "image" else "recipe",
+        )
         if "debug" not in result:
             result["debug"] = {
                 "model": resolve_vision_model() if str(result.get("source_type") or "").lower() == "image" else MODEL,
+                "model_source": resolve_vision_model_source() if str(result.get("source_type") or "").lower() == "image" else "recipe",
             }
 
     if wants_json:
@@ -821,7 +830,7 @@ def upload_recipe_media_route():
 
         result["recipe_json"] = result.get("raw")
 
-        status = 200 if result.get("ok") else 400
+        status = 200 if result.get("ok") or result.get("read_text_only") else 400
         return jsonify(result), status
 
     return redirect("/")
@@ -940,10 +949,14 @@ def vision_failure_response(
         "success": False,
         "model_used": model_used,
         "model": model_used,
+        "model_source": str(debug.get("model_source") or resolve_vision_model_source()),
         "error_code": error_code,
         "error_message": error_message,
         "technical_message": technical_message,
         "action": action,
+        "exception_type": str(debug.get("exception_type") or ""),
+        "openai_error_code": openai_error_code,
+        "openai_error_param": openai_error_param,
         "debug": debug,
         "source_type": "image",
         "source_type_label": "Image",
@@ -960,6 +973,62 @@ def vision_failure_response(
         payload.update(extra)
     payload.setdefault("model_used", model_used)
     return jsonify(payload), status
+
+
+def resolve_uploaded_image_path_for_api(uploaded_file_path, debug):
+    uploaded_file_path = str(uploaded_file_path or "").strip()
+    if not uploaded_file_path:
+        return None, vision_failure_response(
+            debug,
+            "UPLOADED_FILE_PATH_REQUIRED",
+            "uploaded_file_path is required.",
+            failed_step="image_uploaded",
+        )
+
+    try:
+        upload_root = UPLOAD_FOLDER.resolve()
+        upload_path = Path(uploaded_file_path).resolve()
+    except Exception:
+        return None, vision_failure_response(
+            debug,
+            "INVALID_UPLOADED_FILE_PATH",
+            "Invalid uploaded_file_path value.",
+            failed_step="image_uploaded",
+        )
+
+    if upload_root not in upload_path.parents and upload_root != upload_path:
+        return None, vision_failure_response(
+            debug,
+            "INVALID_UPLOADED_FILE_PATH",
+            "Invalid uploaded_file_path value.",
+            upload_path=upload_path,
+            source_name=upload_path.name,
+            failed_step="image_uploaded",
+        )
+
+    resolved_mime_type = normalize_upload_mime_type("", upload_path.name, upload_path)
+    debug.update({
+        "file_path": str(upload_path),
+        "filename": upload_path.name,
+        "mime_type": str(resolved_mime_type or ""),
+    })
+    validation_error = validate_vision_image_upload(
+        upload_path,
+        upload_path.name,
+        resolved_mime_type,
+        debug,
+    )
+    if validation_error:
+        return None, vision_failure_response(
+            debug,
+            debug.get("error_code") or "IMAGE_VALIDATION_FAILED",
+            validation_error,
+            upload_path=upload_path,
+            source_name=upload_path.name,
+            failed_step="image_uploaded",
+        )
+
+    return upload_path, None
 
 
 def validate_vision_image_upload(upload_path, filename, mime_type, debug):
@@ -1208,6 +1277,130 @@ def api_debug_vision_ping():
     ), 200
 
 
+@recipe_bp.route("/api/describe-recipe-image", methods=["POST"])
+def api_describe_recipe_image_route():
+    account_response = require_account_for_import(wants_json=True)
+    if account_response:
+        return account_response
+
+    data = request.get_json(force=True) or {}
+    uploaded_file_path = str(data.get("uploaded_file_path") or "").strip()
+    debug = build_vision_debug(uploaded_file_path=uploaded_file_path)
+    debug["action"] = "describe_recipe"
+    debug["request_user_agent"] = str(request.headers.get("User-Agent") or "")
+
+    upload_path, error_response = resolve_uploaded_image_path_for_api(uploaded_file_path, debug)
+    if error_response:
+        return error_response
+
+    prompt = (
+        "Visually describe this food image for a recipe workflow. "
+        "Mention the visible dish, likely major ingredients, preparation style, and any uncertainty. "
+        "If no food is visible, say so plainly. Return concise plain text."
+    )
+    result = call_openai_vision_image(
+        str(upload_path),
+        prompt,
+        "describe_recipe",
+        debug=debug,
+    )
+    if not result.ok:
+        return vision_failure_response(
+            debug,
+            result.error_code,
+            result.error_message,
+            action="describe_recipe",
+            status=502,
+            upload_path=upload_path,
+            source_name=upload_path.name,
+            failed_step="describe_recipe",
+        )
+
+    return jsonify({
+        "ok": True,
+        "success": True,
+        "action": "describe_recipe",
+        "description": result.text,
+        "text": result.text,
+        "model": result.model_used,
+        "model_used": result.model_used,
+        "model_source": result.model_source,
+        "source_type": "image",
+        "source_type_label": "Image",
+        "source_name": upload_path.name,
+        "uploaded_file_path": str(upload_path),
+        "debug": debug,
+    }), 200
+
+
+@recipe_bp.route("/api/debug-openai-vision", methods=["GET", "POST"])
+def api_debug_openai_vision_route():
+    account_response = require_account_for_import(wants_json=True)
+    if account_response:
+        return account_response
+
+    if not is_admin_user(current_user()):
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "Admin access is required.",
+            "error_code": "ADMIN_REQUIRED",
+        }), 403
+
+    data = request.get_json(silent=True) if request.method == "POST" else {}
+    data = data if isinstance(data, dict) else {}
+    uploaded_file_path = str(
+        data.get("uploaded_file_path")
+        or request.args.get("uploaded_file_path")
+        or ""
+    ).strip()
+    debug = build_vision_debug(uploaded_file_path=uploaded_file_path)
+    debug["action"] = "debug_openai_vision"
+
+    upload_path, error_response = resolve_uploaded_image_path_for_api(uploaded_file_path, debug)
+    diagnostics = openai_runtime_diagnostics()
+    if error_response:
+        response, status_code = error_response
+        payload = response.get_json(silent=True) or {}
+        payload.update({
+            "runtime": diagnostics,
+            "sys_executable": diagnostics.get("sys.executable"),
+            "openai_version": diagnostics.get("openai.__version__"),
+            "openai_file": diagnostics.get("openai.__file__"),
+        })
+        return jsonify(payload), status_code
+
+    prompt = str(data.get("prompt") or request.args.get("prompt") or "").strip()
+    if not prompt:
+        prompt = "Briefly describe this food image in one sentence."
+
+    result = call_openai_vision_image(
+        str(upload_path),
+        prompt,
+        "debug_openai_vision",
+        preferred_model=str(data.get("model") or request.args.get("model") or "").strip() or None,
+        debug=debug,
+    )
+    payload = {
+        "ok": bool(result.ok),
+        "success": bool(result.ok),
+        "sys_executable": diagnostics.get("sys.executable"),
+        "openai_version": diagnostics.get("openai.__version__"),
+        "openai_file": diagnostics.get("openai.__file__"),
+        "model": result.model_used,
+        "model_used": result.model_used,
+        "model_source": result.model_source,
+        "response_preview": result.text[:1000],
+        "debug": debug,
+        "runtime": diagnostics,
+    }
+    if not result.ok:
+        payload.update(result.to_dict())
+        return jsonify(payload), 502
+
+    return jsonify(payload), 200
+
+
 @recipe_bp.route("/api/generate-recipe-from-image", methods=["POST"])
 def api_generate_recipe_from_image_route():
     account_response = require_account_for_import(wants_json=True)
@@ -1448,6 +1641,10 @@ def api_generate_recipe_from_image_route():
     result["success"] = bool(result.get("ok"))
     result["model_used"] = str(debug.get("model") or resolve_vision_model())
     result["model"] = str(debug.get("model") or resolve_vision_model())
+    result["model_source"] = str(debug.get("model_source") or resolve_vision_model_source())
+    result["fallback_used"] = bool(debug.get("fallback_used"))
+    result["fallback_from_model"] = str(debug.get("fallback_from_model") or "")
+    result["fallback_to_model"] = str(debug.get("fallback_to_model") or "")
     result["action"] = "generate_recipe_from_image"
     result["debug"] = debug
     _mark_uploaded_recipe_nutrition_estimated(recipe_url, False)
