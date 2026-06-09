@@ -308,6 +308,69 @@ def _extract_recipe_payload_for_nutrition(data):
     return {}
 
 
+def ensure_uploaded_recipe_nutrition_estimate(recipe_url):
+    recipe_url = str(recipe_url or "").strip()
+
+    if not _is_uploaded_recipe_url(recipe_url):
+        return {
+            "ok": True,
+            "estimated": False,
+            "recipe_url": recipe_url,
+        }
+
+    if _is_uploaded_recipe_nutrition_complete(recipe_url):
+        return {
+            "ok": True,
+            "estimated": False,
+            "already_complete": True,
+            "recipe_url": recipe_url,
+        }
+
+    loaded_recipe = load_editable_recipe(recipe_url) or {}
+    recipe_payload = loaded_recipe.get("recipe") if isinstance(loaded_recipe, dict) else {}
+    recipe_payload = recipe_payload if isinstance(recipe_payload, dict) else {}
+
+    if not recipe_payload:
+        _mark_uploaded_recipe_nutrition_estimated(recipe_url, False)
+        return {
+            "ok": False,
+            "error": "Recipe payload is required before estimating nutrition.",
+            "recipe_url": recipe_url,
+        }
+
+    estimate_result = estimate_recipe_nutrition(recipe_payload)
+    if not estimate_result.get("ok"):
+        _mark_uploaded_recipe_nutrition_estimated(recipe_url, False)
+        return {
+            **estimate_result,
+            "ok": False,
+            "recipe_url": recipe_url,
+        }
+
+    updated_recipe = {
+        **recipe_payload,
+        "nutrition": estimate_result.get("nutrition", []),
+    }
+    save_result = save_editable_recipe(recipe_url, updated_recipe)
+    if not save_result.get("ok"):
+        _mark_uploaded_recipe_nutrition_estimated(recipe_url, False)
+        return {
+            "ok": False,
+            "error": save_result.get("error") or "Unable to save estimated nutrition.",
+            "recipe_url": recipe_url,
+            "recipe_json": updated_recipe,
+        }
+
+    _mark_uploaded_recipe_nutrition_estimated(recipe_url, _has_per_serving_estimate(updated_recipe.get("nutrition")))
+    return {
+        **estimate_result,
+        "ok": True,
+        "estimated": True,
+        "recipe_url": recipe_url,
+        "recipe_json": updated_recipe,
+    }
+
+
 def create_recipe_pdf_from_url(recipe_url):
     recipe_url = str(recipe_url or "").strip()
 
@@ -316,6 +379,19 @@ def create_recipe_pdf_from_url(recipe_url):
             "ok": False,
             "error": "Recipe URL is required.",
         }
+
+    if not _is_uploaded_recipe_nutrition_complete(recipe_url):
+        estimate_result = ensure_uploaded_recipe_nutrition_estimate(recipe_url)
+        if not estimate_result.get("ok"):
+            return {
+                **estimate_result,
+                "ok": False,
+                "error": (
+                    estimate_result.get("error")
+                    or "Estimate per serving basis is required before creating the recipe PDF."
+                ),
+                "success": False,
+            }
 
     if not _is_uploaded_recipe_nutrition_complete(recipe_url):
         return {

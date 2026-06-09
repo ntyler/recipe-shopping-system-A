@@ -337,6 +337,62 @@ def test_generate_recipe_from_image_success_opens_editor_after_save():
     assert "Reason:" in block
 
 
+def test_image_import_preflight_estimates_before_creating_pdf():
+    script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    start = script.index("async function runImageBasedRecipeImportPreflightForEdit()")
+    end = script.index("function buildVisionConnectionErrorMessage")
+    block = script[start:end]
+
+    assert "await submitRecipeMediaEstimatePerServing()" in block
+    assert block.index("await submitRecipeMediaEstimatePerServing()") < block.index("await createRecipePdfFromMediaImport()")
+
+
+def test_create_recipe_pdf_auto_estimates_uploaded_recipe(monkeypatch, tmp_path):
+    user_id, _user_data_dir = configure_image_user(monkeypatch, tmp_path)
+    app = create_app()
+    recipe_url = "uploaded://meal.png"
+    recipe_payload = {
+        "source_url": recipe_url,
+        "display_name": "Photo Rice Bowl",
+        "recipe_title": "Photo Rice Bowl",
+        "ingredients": [
+            {"ingredient": "rice", "original_text": "1 cup rice"},
+        ],
+        "instructions": [
+            {"instruction": "Cook the rice."},
+        ],
+    }
+
+    monkeypatch.setattr(
+        recipe_routes,
+        "estimate_recipe_nutrition",
+        lambda recipe: {
+            "ok": True,
+            "nutrition": [
+                {"key": "serving_basis", "value": "per serving"},
+                {"key": "calories", "value": "250 kcal"},
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        recipe_routes,
+        "create_editable_recipe_pdf",
+        lambda url: {"ok": True, "generated_cloudflare_pdf_url": "https://example.test/recipe.pdf"},
+    )
+
+    with app.test_request_context("/"):
+        session["user_id"] = user_id
+        save_result = recipe_edit_service.save_editable_recipe(recipe_url, recipe_payload)
+        assert save_result["ok"] is True
+
+        result = recipe_routes.create_recipe_pdf_from_url(recipe_url)
+        saved_recipe = recipe_edit_service.load_editable_recipe(recipe_url)["recipe"]
+
+    assert result["ok"] is True
+    assert saved_recipe["nutrition"][0] == {"key": "serving_basis", "value": "per serving"}
+    assert saved_recipe["nutrition"][1] == {"key": "calories", "value": "250 kcal"}
+
+
 def test_image_estimate_upload_success_opens_editor_after_save():
     script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     start = script.index("async function submitRecipeMediaUpload(")

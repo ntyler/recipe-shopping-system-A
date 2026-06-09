@@ -6755,6 +6755,13 @@ async function runImageBasedRecipeImportPreflightForEdit() {
         markRecipeMediaServingEstimateCompleteFromRecipe(recipeMediaUploadPreview);
     }
 
+    if (!isRecipeMediaEstimatePerServingDone()) {
+        const estimateOk = await submitRecipeMediaEstimatePerServing();
+        if (!estimateOk) {
+            return false;
+        }
+    }
+
     return await createRecipePdfFromMediaImport();
 }
 
