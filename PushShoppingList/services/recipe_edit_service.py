@@ -2243,7 +2243,6 @@ def recipe_note_feedback(payload):
                     "content": prompt,
                 },
             ],
-            "temperature": 0.2,
         }
         if include_temperature:
             request_payload["temperature"] = 0.2

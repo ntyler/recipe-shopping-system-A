@@ -175,6 +175,30 @@ def get_openai_error_code_and_param(exc):
     return str(error_code or "").strip(), str(error_param or "").strip()
 
 
+def is_openai_unsupported_temperature_error(exc, error_code="", error_param=""):
+    exception_text = str(exc or "").strip().lower()
+    lowered_error_param = str(error_param or "").strip().lower()
+    lowered_error_code = str(error_code or "").strip().lower()
+
+    if lowered_error_param == "temperature":
+        return True
+    if lowered_error_param.startswith("temperature."):
+        return True
+    if lowered_error_param.startswith("temperature:"):
+        return True
+
+    return (
+        lowered_error_code in {"unsupported_parameter", "invalid_request_error"}
+        and "temperature" in exception_text
+        and (
+            "unsupported" in exception_text
+            or "does not support" in exception_text
+            or "unsupported value" in exception_text
+            or "does not accept" in exception_text
+        )
+    )
+
+
 def build_openai_chat_payload(
     model,
     endpoint_name,
@@ -183,6 +207,9 @@ def build_openai_chat_payload(
     temperature=None,
     **extra_kwargs,
 ):
+    if not os.getenv("OPENAI_API_KEY"):
+        raise RuntimeError("OPENAI_API_KEY is missing.")
+
     resolved_model = str(model or MODEL).strip() or MODEL
     supports_temperature = supports_custom_temperature(resolved_model)
 
@@ -468,55 +495,147 @@ def set_vision_debug_error(debug, error_code, error_message, failed_status=""):
 
 
 def classify_vision_ai_exception(exc):
+    if not os.getenv("OPENAI_API_KEY"):
+        return (
+            "OPENAI_API_KEY_MISSING",
+            "OPENAI_API_KEY is missing or invalid.",
+        )
+
+    error_code, error_param = get_openai_error_code_and_param(exc)
+    lowered_error_code = str(error_code or "").lower()
+    lowered_error_param = str(error_param or "").lower()
+    lowered_exception = str(exc or "").strip().lower()
+    lowered_exception_type = str(type(exc).__name__).lower()
+    lowered_status_code = str(getattr(exc, "status_code", "")).lower()
+    is_temperature_param = (
+        lowered_error_param == "temperature"
+        or lowered_error_param.startswith("temperature.")
+        or lowered_error_param.startswith("temperature:")
+    )
+    if is_openai_unsupported_temperature_error(
+        exc,
+        error_code=lowered_error_code,
+        error_param=lowered_error_param,
+    ):
+        return (
+            "OPENAI_UNSUPPORTED_PARAMETER",
+            "The selected OpenAI model does not support one of the request settings. "
+            "The app should remove temperature for this model.",
+        )
+
+    if is_temperature_param and lowered_status_code in {"400", "422"}:
+        return (
+            "OPENAI_UNSUPPORTED_PARAMETER",
+            "The selected OpenAI model does not support one of the request settings. "
+            "The app should remove temperature for this model.",
+        )
+
+    if (
+        "unsupported value" in lowered_exception
+        and "temperature" in lowered_exception
+        and lowered_status_code == "400"
+    ):
+        return (
+            "OPENAI_UNSUPPORTED_PARAMETER",
+            "The selected OpenAI model does not support one of the request settings. "
+            "The app should remove temperature for this model.",
+        )
+
     if isinstance(exc, APIConnectionError):
         return "OPENAI_CONNECTION_ERROR", "Vision AI connection failed."
 
     if isinstance(exc, APITimeoutError):
-        return "OPENAI_TIMEOUT_ERROR", "Vision AI request timed out."
+        return "OPENAI_TIMEOUT", "Vision AI request timed out."
 
     if isinstance(exc, RateLimitError):
         return "OPENAI_RATE_LIMIT_ERROR", "Vision API rate limit exceeded."
 
     if isinstance(exc, AuthenticationError):
-        return "OPENAI_AUTH_ERROR", "Vision model not configured: invalid API key."
+        return "OPENAI_API_KEY_MISSING", "OPENAI_API_KEY is missing or invalid."
 
     if isinstance(exc, BadRequestError):
-        lowered = str(exc or "").lower()
-        error_code, error_param = get_openai_error_code_and_param(exc)
-        if "temperature" in lowered or "temperature" in (error_param or "").lower():
+        if lowered_error_code in {"invalid_request_error", "unsupported_parameter"} and (
+            lowered_error_param == "temperature" or lowered_error_param.startswith("temperature")
+        ):
             return (
                 "OPENAI_UNSUPPORTED_PARAMETER",
                 "The selected OpenAI model does not support one of the request settings. "
                 "The app should remove temperature for this model.",
             )
-        if str(error_code or "").lower() == "unsupported_parameter":
-            return (
-                "OPENAI_UNSUPPORTED_PARAMETER",
-                "The selected OpenAI model does not support one of the request settings. "
-                "The app should remove temperature for this model.",
-            )
-        if "model" in lowered and "unsupported" in lowered:
+
+        if lowered_error_code in {
+            "model_not_found",
+            "model_not_supported",
+            "unsupported_model",
+            "invalid_model",
+        } or "model" in lowered_exception and (
+            "not found" in lowered_exception
+            or "does not exist" in lowered_exception
+        ):
             return "OPENAI_UNSUPPORTED_MODEL", "OpenAI request failed: unsupported model."
-        if "image" in lowered and "unsupported" in lowered:
-            return "OPENAI_INVALID_IMAGE_PAYLOAD", "OpenAI request failed: unsupported image payload."
-        return "OPENAI_BAD_REQUEST", f"Vision AI request failed: {str(exc or '').strip() or type(exc).__name__}"
+        if (
+            lowered_status_code == "400"
+            and "model" in lowered_exception
+            and ("does not exist" in lowered_exception or "unsupported" in lowered_exception)
+        ):
+            return "OPENAI_UNSUPPORTED_MODEL", "OpenAI request failed: unsupported model."
+        if (
+            "unsupported" in lowered_exception
+            and "image" in lowered_exception
+            and "payload" in lowered_exception
+        ):
+            return "OPENAI_INVALID_IMAGE_PAYLOAD", "OpenAI request failed: invalid image payload."
+        return (
+            "OPENAI_BAD_REQUEST",
+            (
+                "Vision AI request failed: "
+                f"{str(exc or '').strip() or type(exc).__name__}"
+            ),
+        )
 
-    text = str(exc or "").strip()
-    lowered = text.lower()
-
-    if "quota" in lowered or "insufficient_quota" in lowered:
+    if (
+        "quota" in lowered_exception
+        or "insufficient_quota" in lowered_exception
+    ):
         return "API_QUOTA_EXCEEDED", "API quota exceeded."
 
-    if "rate limit" in lowered or "429" in lowered:
+    if "rate limit" in lowered_exception or "429" in lowered_exception:
         return "API_RATE_LIMITED", "Vision API rate limit exceeded."
 
-    if "authentication" in lowered or "api key" in lowered or "401" in lowered:
-        return "VISION_MODEL_NOT_CONFIGURED", "Vision model not configured."
+    if lowered_error_code in {"invalid_api_key", "authentication_error"}:
+        return "OPENAI_API_KEY_MISSING", "OPENAI_API_KEY is missing or invalid."
 
-    if "unsupported" in lowered and "image" in lowered:
+    if (
+        "authentication" in lowered_exception
+        or "api key" in lowered_exception
+        or "401" in lowered_exception
+    ):
+        return "OPENAI_API_KEY_MISSING", "OPENAI_API_KEY is missing or invalid."
+
+    if (
+        "unsupported" in lowered_exception
+        and "image" in lowered_exception
+        and "format" in lowered_exception
+    ):
         return "UNSUPPORTED_IMAGE_FORMAT", "Unsupported image format."
 
-    return "AI_REQUEST_FAILED", f"Vision AI request failed: {text or type(exc).__name__}"
+    if (
+        "unsupported" in lowered_exception
+        and "model" in lowered_exception
+        or lowered_error_code in {"model_not_found", "model_not_supported"}
+    ):
+        return "OPENAI_UNSUPPORTED_MODEL", "OpenAI request failed: unsupported model."
+
+    if lowered_error_code == "invalid_request_error" and lowered_error_param:
+        return "OPENAI_BAD_REQUEST", "Vision AI request failed: invalid request parameter."
+
+    if "invalid_request_error" in lowered_exception_type:
+        return "OPENAI_BAD_REQUEST", "Vision AI request failed: invalid request."
+
+    if "api key" in lowered_exception or "permission" in lowered_exception:
+        return "OPENAI_API_KEY_MISSING", "OPENAI_API_KEY is missing or invalid."
+
+    return "AI_REQUEST_FAILED", f"Vision AI request failed: {lowered_exception or type(exc).__name__}"
 
 
 def set_vision_debug_exception(debug, exc):
@@ -4643,7 +4762,7 @@ def extract_video_recipe_pdf_data_with_openai(recipe_url, page_text, progress_ca
 
 
 def send_video_recipe_pdf_prompt_to_openai(prompt_text):
-    payload, _, _ = build_openai_chat_payload(
+    payload, temperature_included, resolved_model = build_openai_chat_payload(
         MODEL,
         "video-recipe-pdf-extraction",
         [
@@ -4660,7 +4779,10 @@ def send_video_recipe_pdf_prompt_to_openai(prompt_text):
             },
         ],
         response_format={"type": "json_object"},
-        temperature=0,
+    )
+    print(
+        f"[OpenAI] action=video-recipe-pdf-extraction "
+        f"model={resolved_model} temperature_included={temperature_included}"
     )
     response = get_openai_client().chat.completions.create(**payload)
     record_openai_usage(response, "video-recipe-pdf-extraction", model=MODEL)
@@ -5760,7 +5882,7 @@ FINAL OUTPUT FORMAT
 
 
 def send_prompt_to_openai(prompt_text):
-    payload, _, _ = build_openai_chat_payload(
+    payload, temperature_included, resolved_model = build_openai_chat_payload(
         MODEL,
         "recipe-text-extraction",
         [
@@ -5774,7 +5896,10 @@ def send_prompt_to_openai(prompt_text):
             },
         ],
         response_format={"type": "json_object"},
-        temperature=0,
+    )
+    print(
+        f"[OpenAI] action=recipe-text-extraction "
+        f"model={resolved_model} temperature_included={temperature_included}"
     )
     response = get_openai_client().chat.completions.create(**payload)
     record_openai_usage(response, "recipe-text-extraction", model=MODEL)
@@ -5893,6 +6018,13 @@ def send_image_prompt_to_openai(prompt_text, image_path, mime_type, model=None, 
     print(f"[Vision] File size: {len(image_bytes)}")
     print(f"[Vision] MIME type: {resolved_mime}")
     print(f"[Vision] Encoded base64 length: {len(encoded_image)}")
+    debug_action = (
+        str(debug.get("action") or "generate_recipe_from_image")
+        if isinstance(debug, dict)
+        else "generate_recipe_from_image"
+    )
+    if isinstance(debug, dict):
+        debug["action"] = debug_action
     log_vision_debug_step(debug, "Model", model=resolved_model)
     log_vision_debug_step(debug, "Image path", image_path=str(upload_path))
     log_vision_debug_step(debug, "File exists", file_exists=upload_path.is_file())
@@ -5901,6 +6033,7 @@ def send_image_prompt_to_openai(prompt_text, image_path, mime_type, model=None, 
     log_vision_debug_step(debug, "Encoded base64 length", encoded_base64_length=len(encoded_image))
 
     for attempt in range(max_retry_attempts + 1):
+        temperature_included = False
         if attempt > 0:
             print(f"[Vision] Retrying request after delay: {VISION_RETRY_DELAY_SECONDS}s attempt={attempt}")
             if isinstance(debug, dict):
@@ -5937,24 +6070,46 @@ def send_image_prompt_to_openai(prompt_text, image_path, mime_type, model=None, 
                     },
                 ],
                 response_format={"type": "json_object"},
-                temperature=0,
             )
             if isinstance(debug, dict):
                 debug["temperature_included"] = temperature_included
+                debug["action"] = debug_action
 
             response = get_openai_client().with_options(timeout=resolved_timeout).chat.completions.create(**payload)
             if isinstance(debug, dict):
                 debug["request_completed"] = True
                 debug["temperature_included"] = temperature_included
+                debug["action"] = debug_action
 
-            print(f"[Vision] action=recipe-image-extraction model={resolved_model} temperature_included={temperature_included}")
+            print(f"[Vision] action={debug_action} model={resolved_model} temperature_included={temperature_included}")
             print("[Vision] Request completed")
             record_openai_usage(response, "recipe-image-extraction", model=resolved_model)
             return response.choices[0].message.content
         except Exception as exc:
             print("[Vision] Request failed")
+            error_code, error_param = get_openai_error_code_and_param(exc)
+            final_error_code, final_error_message = classify_vision_ai_exception(exc)
             set_vision_debug_exception(debug, exc)
+            print(
+                "[Vision] exception="
+                f"type={type(exc).__name__} "
+                f"error_code={error_code} "
+                f"error_param={error_param} "
+                f"model={resolved_model} "
+                f"action={debug_action} "
+                f"temperature_included={temperature_included}"
+            )
+            print(
+                "[Vision] final_error_code="
+                f"{final_error_code} final_error_message={final_error_message}"
+            )
             if isinstance(debug, dict):
+                debug["openai_error_code"] = error_code
+                debug["openai_error_param"] = error_param
+                debug["technical_message"] = str(exc or "")
+                debug["action"] = debug_action
+                debug["error_code"] = final_error_code
+                debug["error_message"] = final_error_message
                 debug["request_completed"] = False
             if attempt < max_retry_attempts and isinstance(
                 exc,
@@ -5977,7 +6132,7 @@ def send_social_video_audio_image_prompt_to_openai(prompt_text, image_urls):
             },
         })
 
-    payload, _, _ = build_openai_chat_payload(
+    payload, temperature_included, resolved_model = build_openai_chat_payload(
         MODEL,
         "social-video-audio-image-extraction",
         [
@@ -5994,7 +6149,10 @@ def send_social_video_audio_image_prompt_to_openai(prompt_text, image_urls):
             },
         ],
         response_format={"type": "json_object"},
-        temperature=0,
+    )
+    print(
+        f"[OpenAI] action=social-video-audio-image-extraction "
+        f"model={resolved_model} temperature_included={temperature_included}"
     )
     response = get_openai_client().chat.completions.create(**payload)
     record_openai_usage(response, "social-video-audio-image-extraction", model=MODEL)
@@ -6006,7 +6164,7 @@ def send_file_prompt_to_openai(prompt_text, file_path, mime_type, filename):
     file_bytes = file_path.read_bytes()
     file_data = base64.b64encode(file_bytes).decode("ascii")
 
-    payload, _, _ = build_openai_chat_payload(
+    payload, temperature_included, resolved_model = build_openai_chat_payload(
         MODEL,
         "recipe-file-extraction",
         [
@@ -6029,7 +6187,10 @@ def send_file_prompt_to_openai(prompt_text, file_path, mime_type, filename):
             },
         ],
         response_format={"type": "json_object"},
-        temperature=0,
+    )
+    print(
+        f"[OpenAI] action=recipe-file-extraction "
+        f"model={resolved_model} temperature_included={temperature_included}"
     )
     response = get_openai_client().chat.completions.create(**payload)
     record_openai_usage(response, "recipe-file-extraction", model=MODEL)
@@ -6157,6 +6318,22 @@ def build_upload_failure_result(import_object, error_message, failed_step="extra
     source_type = str(import_object.get("source_type") or "").strip().lower()
     default_model = resolve_vision_model() if source_type == "image" else MODEL
     model_used = str(extra.pop("model_used", "")).strip() or str(default_model).strip() or str(MODEL)
+    action = str(extra.pop("action", "read_text")).strip() or "read_text"
+    error_code = str(extra.pop("error_code", "")).strip() or "OPENAI_REQUEST_FAILED"
+    technical_message = str(extra.pop("technical_message", error_message) or error_message).strip()
+    normalized_error_message = str(error_message or "").strip() or "Upload extraction failed."
+    if normalized_error_message == error_code:
+        normalized_error_message = f"{error_code}: {normalized_error_message}"
+    debug_payload = extra.pop("debug", None)
+    if not isinstance(debug_payload, dict):
+        debug_payload = {}
+    else:
+        debug_payload = dict(debug_payload)
+    debug_payload.setdefault("model", model_used)
+    debug_payload["action"] = action
+    debug_payload["error_code"] = error_code
+    debug_payload["error_message"] = normalized_error_message
+    debug_payload["technical_message"] = technical_message
 
     print(
         "[recipe_import] action=upload_import_failed "
@@ -6168,7 +6345,10 @@ def build_upload_failure_result(import_object, error_message, failed_step="extra
     result = {
         "success": False,
         "ok": False,
-        "error": error_message,
+        "error": normalized_error_message,
+        "error_code": error_code,
+        "error_message": normalized_error_message,
+        "technical_message": technical_message,
         "failed_step": failed_step,
         "ingredients": [],
         "import_source": import_object,
@@ -6180,9 +6360,9 @@ def build_upload_failure_result(import_object, error_message, failed_step="extra
         "extracted_text": import_object.get("extracted_text") or "",
         "detected_food_photo": bool(import_object.get("detected_food_photo")),
         "model_used": model_used,
-        "debug": {
-            "model": model_used,
-        },
+        "model": model_used,
+        "action": action,
+        "debug": debug_payload,
     }
     result.update(extra)
     return result
@@ -6529,6 +6709,7 @@ def infer_food_image_recipe(recipe_url, upload_path, mime_type, filename, user_d
     vision_model = resolve_vision_model()
     prompt_text = build_food_image_inference_prompt(recipe_url, filename, user_description)
     if isinstance(debug, dict):
+        debug.setdefault("action", "generate_recipe_from_image")
         debug["vision_request"] = {
             "model": str(vision_model),
             "filename": str(filename or ""),
@@ -6541,16 +6722,16 @@ def infer_food_image_recipe(recipe_url, upload_path, mime_type, filename, user_d
     if not str(vision_model or "").strip():
         return None, set_vision_debug_error(
             debug,
-            "VISION_MODEL_NOT_CONFIGURED",
-            "Vision model not configured.",
+            "OPENAI_API_KEY_MISSING",
+            "OPENAI_API_KEY is missing or invalid.",
             failed_status="vision_request_sent",
         )
 
     if not os.getenv("OPENAI_API_KEY"):
         return None, set_vision_debug_error(
             debug,
-            "VISION_MODEL_NOT_CONFIGURED",
-            "Vision model not configured: OPENAI_API_KEY is missing.",
+            "OPENAI_API_KEY_MISSING",
+            "OPENAI_API_KEY is missing or invalid.",
             failed_status="vision_request_sent",
         )
 
@@ -6566,50 +6747,15 @@ def infer_food_image_recipe(recipe_url, upload_path, mime_type, filename, user_d
             model=vision_model,
             debug=debug,
         )
-    except APIConnectionError as exc:
-        set_vision_debug_exception(debug, exc)
-        return None, set_vision_debug_error(
-            debug,
-            "OPENAI_CONNECTION_ERROR",
-            "Vision AI connection failed.",
-            failed_status="vision_response_received",
-        )
-    except APITimeoutError as exc:
-        set_vision_debug_exception(debug, exc)
-        return None, set_vision_debug_error(
-            debug,
-            "OPENAI_TIMEOUT_ERROR",
-            "Vision AI request timed out.",
-            failed_status="vision_response_received",
-        )
-    except AuthenticationError as exc:
-        set_vision_debug_exception(debug, exc)
-        return None, set_vision_debug_error(
-            debug,
-            "OPENAI_AUTH_ERROR",
-            "Vision model not configured: invalid API key.",
-            failed_status="vision_response_received",
-        )
-    except RateLimitError as exc:
-        set_vision_debug_exception(debug, exc)
-        return None, set_vision_debug_error(
-            debug,
-            "OPENAI_RATE_LIMIT_ERROR",
-            "Vision API rate limit exceeded.",
-            failed_status="vision_response_received",
-        )
-    except BadRequestError as exc:
-        set_vision_debug_exception(debug, exc)
-        error_code, error_message = classify_vision_ai_exception(exc)
-        return None, set_vision_debug_error(
-            debug,
-            error_code,
-            error_message,
-            failed_status="vision_response_received",
-        )
     except Exception as exc:
         error_code, error_message = classify_vision_ai_exception(exc)
         set_vision_debug_exception(debug, exc)
+        print(
+            "[Vision] action=recipe_image_inference_failed "
+            f"model={vision_model} "
+            f"error_code={error_code} "
+            f"exception_type={type(exc).__name__}"
+        )
         return None, set_vision_debug_error(
             debug,
             error_code,
@@ -6933,6 +7079,10 @@ def extract_recipe_from_upload(file_storage, manual_description="", upload_mode=
         requested_upload_mode = "read_text"
     if requested_upload_mode == "manual":
         requested_upload_mode = "manual_description"
+    requested_upload_action = {
+        "vision": "generate_recipe_from_image",
+        "manual_description": "describe_recipe",
+    }.get(requested_upload_mode, "read_text")
 
     recipe_url = f"uploaded://{safe_name}"
     mime_type = (
@@ -6964,12 +7114,15 @@ def extract_recipe_from_upload(file_storage, manual_description="", upload_mode=
                 "[recipe_import] action=upload_food_photo_image_estimate_start "
                 f"source_type={import_source_type} file={filename!r} mode=image_estimate"
             )
+            vision_debug = build_vision_debug(uploaded_file_path=str(upload_path), filename=filename)
+            vision_debug["action"] = requested_upload_action
             inferred_json, inference_error = generateRecipeFromImage(
                 upload_path,
                 user_description="",
                 recipe_url=recipe_url,
                 filename=filename,
                 mime_type=mime_type,
+                debug=vision_debug,
             )
 
             if inference_error:
@@ -6978,11 +7131,23 @@ def extract_recipe_from_upload(file_storage, manual_description="", upload_mode=
                     f"source_type={import_source_type} file={filename!r} mode=image_estimate "
                     f"error={inference_error}"
                 )
+                failure_message = (
+                    str(inference_error or "").strip()
+                    or "Unable to estimate this food photo."
+                )
+                technical_message = (
+                    str(vision_debug.get("technical_message") or vision_debug.get("exception_message") or vision_debug.get("error_message") or "")
+                    or failure_message
+                )
                 return build_upload_failure_result(
                     import_object,
-                    "Unable to estimate this food photo.",
+                    failure_message,
                     failed_step="extract",
                     extraction_method="image_estimate",
+                    action=requested_upload_action,
+                    error_code=str(vision_debug.get("error_code") or "OPENAI_REQUEST_FAILED"),
+                    technical_message=technical_message,
+                    debug=vision_debug,
                 )
 
             extraction_method = "image_estimate"
@@ -6995,18 +7160,22 @@ def extract_recipe_from_upload(file_storage, manual_description="", upload_mode=
                     "Please add a description before generating from photo content.",
                     failed_step="manual_description",
                     extraction_method="manual_description",
+                    action=requested_upload_action,
                 )
 
             print(
                 "[recipe_import] action=upload_food_photo_image_estimate_start "
                 f"source_type={import_source_type} file={filename!r} mode=manual_description"
             )
+            vision_debug = build_vision_debug(uploaded_file_path=str(upload_path), filename=filename)
+            vision_debug["action"] = requested_upload_action
             inferred_json, inference_error = generateRecipeFromImage(
                 upload_path,
                 user_description=manual_description,
                 recipe_url=recipe_url,
                 filename=filename,
                 mime_type=mime_type,
+                debug=vision_debug,
             )
 
             if inference_error:
@@ -7015,11 +7184,23 @@ def extract_recipe_from_upload(file_storage, manual_description="", upload_mode=
                     f"source_type={import_source_type} file={filename!r} mode=manual_description "
                     f"error={inference_error}"
                 )
+                failure_message = (
+                    str(inference_error or "").strip()
+                    or "Unable to estimate this food photo from the description."
+                )
+                technical_message = (
+                    str(vision_debug.get("technical_message") or vision_debug.get("exception_message") or vision_debug.get("error_message") or "")
+                    or failure_message
+                )
                 return build_upload_failure_result(
                     import_object,
-                    "Unable to estimate this food photo from the description.",
+                    failure_message,
                     failed_step="manual_description",
                     extraction_method="manual_description",
+                    action=requested_upload_action,
+                    error_code=str(vision_debug.get("error_code") or "OPENAI_REQUEST_FAILED"),
+                    technical_message=technical_message,
+                    debug=vision_debug,
                 )
 
             extraction_method = "manual_description"
@@ -7027,23 +7208,37 @@ def extract_recipe_from_upload(file_storage, manual_description="", upload_mode=
             import_object["manual_description"] = manual_description
             import_object["recipe_json"] = json_data
         elif import_source_type == "image":
-            page_text, detected_food_photo, contains_written_recipe, read_error = read_upload_image_text(
-                recipe_url,
-                upload_path,
-                mime_type,
-                filename,
-            )
+            try:
+                page_text, detected_food_photo, contains_written_recipe, read_error = read_upload_image_text(
+                    recipe_url,
+                    upload_path,
+                    mime_type,
+                    filename,
+                )
+            except Exception as exc:
+                error_code, error_message = classify_vision_ai_exception(exc)
+                raw_error_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_IMAGE_READ_ERROR.txt"
+                raw_error_path.write_text(str(exc), encoding="utf-8")
+                return build_upload_failure_result(
+                    import_object,
+                    error_message,
+                    failed_step="read",
+                    extraction_method="ocr_text",
+                    action=requested_upload_action,
+                    error_code=error_code,
+                    technical_message=str(exc),
+                    debug={
+                        "error_code": error_code,
+                        "model": resolve_vision_model(),
+                        "exception_type": type(exc).__name__,
+                        "exception_message": str(exc),
+                    },
+                )
             import_object["extracted_text"] = page_text
             import_object["detected_food_photo"] = detected_food_photo
             import_object["contains_written_recipe"] = bool(contains_written_recipe)
 
             extraction_method = "ocr_text"
-
-            if read_error:
-                print(
-                    "[recipe_import] action=upload_read_failed "
-                    f"source_type={import_source_type} file={filename!r} error={read_error}"
-                )
 
             if not page_text.strip() or not contains_written_recipe:
                 return build_upload_failure_result(
@@ -7051,6 +7246,9 @@ def extract_recipe_from_upload(file_storage, manual_description="", upload_mode=
                     NO_READABLE_UPLOAD_TEXT_ERROR,
                     failed_step="read",
                     extraction_method=extraction_method,
+                    action=requested_upload_action,
+                    error_code="OPENAI_REQUEST_FAILED",
+                    technical_message=NO_READABLE_UPLOAD_TEXT_ERROR,
                 )
 
             prompt_text = build_prompt(
@@ -7104,6 +7302,9 @@ def extract_recipe_from_upload(file_storage, manual_description="", upload_mode=
                     NO_READABLE_UPLOAD_TEXT_ERROR,
                     failed_step="read",
                     extraction_method="document_text",
+                    action=requested_upload_action,
+                    error_code="OPENAI_REQUEST_FAILED",
+                    technical_message=NO_READABLE_UPLOAD_TEXT_ERROR,
                 )
 
             prompt_text = build_prompt(recipe_url, page_text[:MAX_PAGE_TEXT_CHARS])
@@ -7133,6 +7334,9 @@ def extract_recipe_from_upload(file_storage, manual_description="", upload_mode=
                     NO_READABLE_UPLOAD_TEXT_ERROR,
                     failed_step="read",
                     extraction_method=extraction_method,
+                    action=requested_upload_action,
+                    error_code="OPENAI_REQUEST_FAILED",
+                    technical_message=NO_READABLE_UPLOAD_TEXT_ERROR,
                 )
         else:
             page_text = extract_text_from_generic_document(upload_path, filename)
@@ -7144,6 +7348,7 @@ def extract_recipe_from_upload(file_storage, manual_description="", upload_mode=
                     NO_READABLE_UPLOAD_TEXT_ERROR,
                     failed_step="read",
                     extraction_method="document_text",
+                    action=requested_upload_action,
                 )
 
             prompt_text = build_prompt(recipe_url, page_text[:MAX_PAGE_TEXT_CHARS])
@@ -7159,6 +7364,9 @@ def extract_recipe_from_upload(file_storage, manual_description="", upload_mode=
                         NO_UPLOAD_INGREDIENTS_ERROR,
                         failed_step="manual_description",
                         extraction_method=extraction_method,
+                        action=requested_upload_action,
+                        error_code="OPENAI_REQUEST_FAILED",
+                        technical_message=parse_error,
                     )
                 print(
                     "[recipe_import] action=upload_extract_parse_failed "
@@ -7169,6 +7377,9 @@ def extract_recipe_from_upload(file_storage, manual_description="", upload_mode=
                     NO_UPLOAD_INGREDIENTS_ERROR,
                     failed_step="extract",
                     extraction_method=extraction_method,
+                    action=requested_upload_action,
+                    error_code="OPENAI_REQUEST_FAILED",
+                    technical_message=parse_error,
                 )
 
         import_object["recipe_json"] = json_data
@@ -7179,6 +7390,9 @@ def extract_recipe_from_upload(file_storage, manual_description="", upload_mode=
                     NO_UPLOAD_INGREDIENTS_ERROR,
                     failed_step="manual_description",
                     extraction_method=extraction_method,
+                    action=requested_upload_action,
+                    error_code="OPENAI_REQUEST_FAILED",
+                    technical_message=NO_UPLOAD_INGREDIENTS_ERROR,
                 )
             print(
                 "[recipe_import] action=upload_extract_no_recipe_data "
@@ -7191,6 +7405,7 @@ def extract_recipe_from_upload(file_storage, manual_description="", upload_mode=
                 NO_UPLOAD_INGREDIENTS_ERROR,
                 failed_step="extract",
                 extraction_method=extraction_method,
+                action=requested_upload_action,
             )
 
         if extraction_method in {"image_estimate", "manual_description"}:
@@ -7294,16 +7509,35 @@ def extract_recipe_from_upload(file_storage, manual_description="", upload_mode=
     except Exception as exc:
         raw_error_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_UPLOAD_ERROR.txt"
         raw_error_path.write_text(str(exc), encoding="utf-8")
+        error_code, error_message = classify_vision_ai_exception(exc)
+        error_param = get_openai_error_code_and_param(exc)[1]
+        request_model = resolve_vision_model() if import_source_type == "image" else MODEL
         print(
             "[recipe_import] action=upload_extract_exception "
-            f"source_type={import_source_type} file={filename!r} error={exc}"
+            f"source_type={import_source_type} action={requested_upload_action} "
+            f"model={request_model} file={filename!r} error={exc}"
+        )
+        print(
+            f"[recipe_import] final_error_code={error_code} "
+            f"final_error_message={error_message} "
+            f"exception_type={type(exc).__name__} "
+            f"error_param={error_param}"
         )
 
         return build_upload_failure_result(
             import_object,
-            f"Upload extraction failed: {exc}",
+            error_message or f"Upload extraction failed: {exc}",
             failed_step="extract",
             extraction_method=extraction_method,
+            action=requested_upload_action,
+            error_code=error_code,
+            technical_message=str(exc),
+            debug={
+                "model": resolve_vision_model() if import_source_type == "image" else MODEL,
+                "action": requested_upload_action,
+                "exception_type": type(exc).__name__,
+                "exception_message": str(exc),
+            },
         )
 
 
@@ -7566,20 +7800,21 @@ Rules:
 
 
 def read_upload_image_text(recipe_url, upload_path, mime_type, filename):
-    try:
-        response_text = send_image_prompt_to_openai(
-            build_upload_image_text_prompt(filename),
-            upload_path,
-            mime_type,
-        )
-        data, parse_error = parse_json_text_response(recipe_url, response_text)
-    except Exception as exc:
-        raw_error_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_IMAGE_READ_ERROR.txt"
-        raw_error_path.write_text(str(exc), encoding="utf-8")
-        return "", False, False, str(exc)
-
+    response_text = send_image_prompt_to_openai(
+        build_upload_image_text_prompt(filename),
+        upload_path,
+        mime_type,
+    )
+    data, parse_error = parse_json_text_response(recipe_url, response_text)
     if parse_error:
-        return "", False, False, parse_error
+        raw_error_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_IMAGE_READ_PARSE_ERROR.txt"
+        raw_error_path.write_text(parse_error, encoding="utf-8")
+        raw_response_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_IMAGE_READ_RESPONSE.txt"
+        raw_response_path.write_text(response_text, encoding="utf-8")
+        raise RuntimeError(f"Unable to parse image text response: {parse_error}")
+
+    if not isinstance(data, dict):
+        raise RuntimeError("Image text response was not a JSON object.")
 
     extracted_text = str(data.get("extracted_text") or "").strip()
     detected_food_photo = bool(data.get("detected_food_photo"))

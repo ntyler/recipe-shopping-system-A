@@ -6,7 +6,10 @@ from fractions import Fraction
 from openai import OpenAI
 
 from PushShoppingList.services.openai_usage_service import record_openai_usage
-from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
+from PushShoppingList.services.recipe_extract_service import (
+    OUTPUT_FOLDER,
+    supports_custom_temperature,
+)
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
 from PushShoppingList.services.recipe_url_service import normalize_recipe_quantity
 from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
@@ -200,9 +203,9 @@ Output shape:
 }}
 """
 
-    response = get_openai_client().chat.completions.create(
-        model=MODEL,
-        messages=[
+    request_payload = {
+        "model": MODEL,
+        "messages": [
             {
                 "role": "system",
                 "content": "You scale recipe ingredient quantities and return only valid JSON.",
@@ -213,8 +216,10 @@ Output shape:
             },
         ],
         response_format={"type": "json_object"},
-        temperature=0,
-    )
+    }
+    if supports_custom_temperature(MODEL):
+        request_payload["temperature"] = 0
+    response = get_openai_client().chat.completions.create(**request_payload)
 
     record_openai_usage(response, "recipe-quantity-scaling", model=MODEL)
     data = json.loads(clean_json_response(response.choices[0].message.content))

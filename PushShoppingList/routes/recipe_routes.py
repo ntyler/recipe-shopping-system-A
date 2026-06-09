@@ -852,6 +852,7 @@ def vision_failure_response(
     debug,
     error_code,
     error_message,
+    action=None,
     status=400,
     upload_path=None,
     source_name="",
@@ -872,7 +873,16 @@ def vision_failure_response(
     source_name = source_name or (Path(upload_path_text).name if upload_path_text else "")
     error_code = debug.get("error_code") or error_code
     error_message = debug.get("error_message") or error_message
+    action = str(action or debug.get("action") or "generate_recipe_from_image").strip() or "generate_recipe_from_image"
     model_used = str(debug.get("model") or resolve_vision_model())
+    technical_message = str(
+        debug.get("technical_message") or error_message
+    ).strip() or error_message
+    print(
+        "[recipe_routes] action=vision_failure "
+        f"action_name={action} error_code={error_code} "
+        f"model={model_used} status={status} failed_step={failed_step}"
+    )
 
     payload = build_upload_failure_result(
         {
@@ -885,12 +895,19 @@ def vision_failure_response(
         },
         error_message,
         failed_step=failed_step,
+        action=action,
+        error_code=error_code,
+        technical_message=technical_message,
+        debug=debug,
     )
     payload.update({
         "success": False,
         "model_used": model_used,
+        "model": model_used,
         "error_code": error_code,
         "error_message": error_message,
+        "technical_message": technical_message,
+        "action": action,
         "debug": debug,
         "source_type": "image",
         "source_type_label": "Image",
@@ -1157,6 +1174,7 @@ def api_generate_recipe_from_image_route():
         or ""
     ).strip()
     debug = build_vision_debug(uploaded_file_path=uploaded_file_path)
+    debug["action"] = "generate_recipe_from_image"
     log_vision_debug_step(debug, "Image path received", image_path=uploaded_file_path)
 
     if source_type != "image":
@@ -1367,6 +1385,8 @@ def api_generate_recipe_from_image_route():
     result["recipe_json"] = parsed_recipe
     result["success"] = bool(result.get("ok"))
     result["model_used"] = str(debug.get("model") or resolve_vision_model())
+    result["model"] = str(debug.get("model") or resolve_vision_model())
+    result["action"] = "generate_recipe_from_image"
     result["debug"] = debug
     _mark_uploaded_recipe_nutrition_estimated(recipe_url, False)
     debug["recipe_creation_success"] = bool(result.get("ok"))

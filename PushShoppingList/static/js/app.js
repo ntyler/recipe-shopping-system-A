@@ -6230,10 +6230,41 @@ async function submitRecipeMediaUpload(input, manualDescription = "", uploadMode
         if (uploadedFilePath) {
             setRecipeMediaUploadPath(uploadedFilePath);
         }
+        const responseErrorMessage = String(
+            (data && (data.error_message || data.error || data.technical_message)) || ""
+        ).trim();
+        const debug = data && data.debug ? data.debug : {};
+        const responseModelUsed = String(
+            (data && data.model_used)
+            || (data && data.model)
+            || ""
+        ).trim();
+        const connectionErrorMessage = isImageUpload
+            ? buildVisionConnectionErrorMessage(responseErrorMessage, {
+                ...debug,
+                error_code: String((data && data.error_code) || debug.error_code || ""),
+                exception_type: String((data && data.exception_type) || debug.exception_type || ""),
+                exception_message: String(
+                    (data && data.exception_message) || debug.exception_message || ""
+                ).trim(),
+            })
+            : "";
+        const reason = responseErrorMessage || "No failure reason was returned by the backend.";
+        const message = connectionErrorMessage
+            ? `${connectionErrorMessage}\n\nReason: ${reason}`
+            : `${isImageUpload ? "Could not estimate a recipe from this file." : "Unable to load file."}\nReason: ${reason}`;
+
         setRecipeFileSourceType(data.source_type_label || sourceTypeLabel);
         setRecipeFileActionButtonsEnabled(true);
         setRecipeFileManualDescriptionPanelVisible(isImageUpload, "", photoDescription);
-
+        setRecipeFileModelUsed(responseModelUsed || "Unknown");
+        if (isImageUpload) {
+            setRecipeFileVisionDebug(data && data.debug, {
+                visible: true,
+                recipeJson: data && data.recipe_json,
+                errorData: data,
+            });
+        }
         if (data.failed_step === "manual_description") {
             const message = String(err.message || "No readable recipe text found.").trim();
             updateRecipeFileLoadingStep("upload", "done", "Uploaded");
@@ -6273,10 +6304,10 @@ async function submitRecipeMediaUpload(input, manualDescription = "", uploadMode
             setRecipeFileEstimatedBanner(false);
             keepFileInput = true;
         }
-        setRecipeFileLoadingSummary(err.message || "Unable to load file.");
+        setRecipeFileLoadingSummary(message);
 
         if (status) {
-            status.textContent = err.message || "Unable to load file.";
+            status.textContent = message;
         }
     } finally {
         if (!keepFileInput) {
@@ -6587,10 +6618,11 @@ async function runImageBasedRecipeImportPreflightForEdit() {
 }
 
 function buildVisionConnectionErrorMessage(reason, debug = {}) {
-    const errorCode = String((debug && debug.error_code) || "").toLowerCase();
+    const errorCode = String(
+        (debug && debug.error_code)
+        || ""
+    ).toLowerCase();
     const reasonText = String(reason || "").toLowerCase();
-    const exceptionType = String((debug && debug.exception_type) || "").toLowerCase();
-    const exceptionMessage = String((debug && debug.exception_message) || "").toLowerCase();
     const temperatureError = errorCode === "openai_unsupported_parameter"
         || reasonText.includes("remove temperature");
 
@@ -6598,21 +6630,14 @@ function buildVisionConnectionErrorMessage(reason, debug = {}) {
         return "The selected OpenAI model does not support one of the request settings. The app should remove temperature for this model.";
     }
 
-    const likelyConnectionError = Boolean(
-        exceptionType.includes("connection")
-        || exceptionType.includes("timeout")
-        || exceptionType.includes("urlopen")
-        || reasonText.includes("connection")
-        || reasonText.includes("timed out")
-        || reasonText.includes("timeout")
-        || exceptionMessage.includes("connection")
-        || exceptionMessage.includes("timed out")
-        || exceptionMessage.includes("temporarily")
-        || errorCode.includes("connection")
-        || errorCode.includes("timeout")
-    );
+    if (
+        reasonText.includes("unsupported value")
+        && reasonText.includes("temperature")
+    ) {
+        return "The selected OpenAI model does not support one of the request settings. The app should remove temperature for this model.";
+    }
 
-    if (!likelyConnectionError) {
+    if (errorCode !== "openai_connection_error") {
         return "";
     }
 
@@ -6808,10 +6833,19 @@ async function submitRecipeMediaVision() {
         });
     } catch (err) {
         const data = err && err.data ? err.data : {};
-        const responseErrorMessage = String((data && (data.error_message || data.error)) || "").trim();
+        const responseErrorMessage = String(
+            (data && (data.error_message || data.error || data.technical_message)) || ""
+        ).trim();
         const debug = data && data.debug ? data.debug : {};
         const responseModelUsed = String((data && data.model_used) || "").trim();
-        const connectionErrorMessage = buildVisionConnectionErrorMessage(responseErrorMessage, debug);
+        const connectionErrorMessage = buildVisionConnectionErrorMessage(responseErrorMessage, {
+            ...debug,
+            error_code: String((data && data.error_code) || debug.error_code || ""),
+            exception_type: String((data && data.exception_type) || debug.exception_type || ""),
+            exception_message: String(
+                (data && data.exception_message) || debug.exception_message || ""
+            ).trim(),
+        });
         const reason = responseErrorMessage || "No failure reason was returned by the backend.";
         const message = connectionErrorMessage
             ? `${connectionErrorMessage}\n\nReason: ${reason}`
@@ -6869,6 +6903,25 @@ async function submitRecipeMediaVision() {
 }
 
 async function submitRecipeMediaRetry() {
+    const uploadedFilePath = getRecipeMediaUploadPath();
+    const pathExtension = String(uploadedFilePath || "").toLowerCase().trim().split(".").pop();
+    const isImageUploadPath = new Set([
+        "jpg",
+        "jpeg",
+        "png",
+        "webp",
+        "gif",
+        "heic",
+        "bmp",
+        "tif",
+        "tiff",
+    ]).has(pathExtension || "");
+
+    if (isImageUploadPath && uploadedFilePath) {
+        await submitRecipeMediaVision();
+        return;
+    }
+
     await submitRecipeMediaUpload(getRecipeMediaUploadInput(), "", "retry");
 }
 
@@ -7254,6 +7307,7 @@ function setRecipeFileVisionDebug(debug = null, options = {}) {
             model_used: responseModelUsed,
             extraction_mode: responseExtractionMode,
             source_type: responseSourceType,
+            action: normalizedDebug.action || (options.errorData && options.errorData.action) || "",
             error_code: normalizedDebug.error_code || (options.errorData && options.errorData.error_code) || "",
             error_message: normalizedDebug.error_message || (options.errorData && (options.errorData.error_message || options.errorData.error)) || "",
             model: normalizedDebug.model || "",
@@ -7264,6 +7318,7 @@ function setRecipeFileVisionDebug(debug = null, options = {}) {
             request_completed: normalizedDebug.request_completed,
             exception_type: normalizedDebug.exception_type,
             exception_message: normalizedDebug.exception_message,
+            technical_message: normalizedDebug.technical_message || (options.errorData && options.errorData.technical_message) || "",
             encoded_base64_length: normalizedDebug.encoded_base64_length,
             image_type_supported: normalizedDebug.image_type_supported,
             image_readable: normalizedDebug.image_readable,
@@ -7277,6 +7332,8 @@ function setRecipeFileVisionDebug(debug = null, options = {}) {
         const errorText = recipeFileDebugText(errorDetails, "No errors yet.");
         const headerLines = [
             `Model Used: ${responseModelUsed || "Unknown"}`,
+            `Error Code: ${errorDetails.error_code || "N/A"}`,
+            `Error Message: ${errorDetails.error_message || "No message provided."}`,
             `Extraction Mode: ${responseExtractionMode || "Vision"}`,
             `Source Type: ${responseSourceType || "Image"}`,
             "",
