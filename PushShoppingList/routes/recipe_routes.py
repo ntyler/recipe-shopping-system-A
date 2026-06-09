@@ -256,6 +256,13 @@ def _is_uploaded_recipe_nutrition_complete(url):
 
     recipe_payload = recipe_data.get("recipe") if isinstance(recipe_data, dict) else {}
     if _has_per_serving_estimate(recipe_payload.get("nutrition")):
+        normalized_recipe = _recipe_with_default_serving_basis(recipe_payload)
+        if normalized_recipe != recipe_payload:
+            try:
+                save_editable_recipe(url, normalized_recipe)
+                print(f"[recipe_pdf] action=default_serving_basis_saved url={url}")
+            except Exception as exc:
+                print(f"[recipe_pdf] action=default_serving_basis_save_failed url={url} error={exc}")
         IMAGE_RECIPE_WORKFLOW_STATES[key] = {
             **state,
             "estimate_per_serving_completed": True,
@@ -2107,7 +2114,11 @@ def api_recipe_route():
     if not original_url:
         return jsonify({"ok": False, "error": "Recipe URL is required."}), 400
 
-    result = save_editable_recipe(original_url, data.get("recipe", {}))
+    recipe_payload = data.get("recipe", {})
+    if _is_uploaded_recipe_url(original_url) and isinstance(recipe_payload, dict):
+        recipe_payload = _recipe_with_default_serving_basis(recipe_payload)
+
+    result = save_editable_recipe(original_url, recipe_payload)
     status = 200 if result.get("ok") else 400
 
     return jsonify(result), status

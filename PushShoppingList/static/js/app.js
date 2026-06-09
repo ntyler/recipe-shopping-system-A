@@ -6631,11 +6631,6 @@ async function createRecipePdfFromMediaImport() {
         return false;
     }
 
-    if (!isRecipeMediaEstimatePerServingDone()) {
-        setRecipeFileLoadingSummary("Estimate per serving basis is required before creating the recipe PDF.");
-        return false;
-    }
-
     try {
         const recipeLookupResponse = await fetch(`/api/recipe?url=${encodeURIComponent(recipeUrl)}`, {
             method: "GET",
@@ -6651,17 +6646,11 @@ async function createRecipePdfFromMediaImport() {
                 ? recipeLookupData.recipe
                 : null;
 
-        if (!recipeLookupResponse.ok || !recipeForEstimateCheck || !recipeHasPerServingEstimate(recipeForEstimateCheck)) {
-            throw new Error("Estimate per serving basis is required before creating the recipe PDF.");
+        if (recipeLookupResponse.ok && recipeForEstimateCheck && recipeHasPerServingEstimate(recipeForEstimateCheck)) {
+            markRecipeMediaServingEstimateCompleteFromRecipe(recipeForEstimateCheck);
         }
     } catch (lookupError) {
-        setRecipeFileLoadingSummary(lookupError.message || "Unable to validate serving estimate.");
-        markRecipeMediaEstimatePerServingDone(false);
-        setRecipeFileImageNextStepButtons({
-            estimateDisabled: false,
-            createPdfDisabled: true,
-        });
-        return false;
+        console.warn("Unable to pre-check uploaded recipe nutrition before PDF creation.", lookupError);
     }
 
     if (button) {
@@ -6671,6 +6660,7 @@ async function createRecipePdfFromMediaImport() {
 
     try {
         setRecipeFileLoadingSummary("Creating recipe PDF...");
+        updateRecipeFileLoadingStep("save", "running", "Creating PDF");
         const response = await fetch("/api/create-recipe-pdf", {
             method: "POST",
             headers: {
@@ -6685,12 +6675,14 @@ async function createRecipePdfFromMediaImport() {
         }
 
         setRecipeFileLoadingSummary("Recipe PDF created. You can open it from the recipe editor.");
+        updateRecipeFileLoadingStep("save", "done", "PDF created");
         setRecipeFileImageNextStepButtons({
             estimateDisabled: true,
             createPdfDisabled: true,
         });
     } catch (err) {
         setRecipeFileLoadingSummary(err.message || "Unable to create recipe PDF.");
+        updateRecipeFileLoadingStep("save", "error", "PDF failed");
         return false;
     } finally {
         if (button) {
@@ -6760,10 +6752,7 @@ async function openImportedRecipeEditorAfterMediaImport(data = {}, options = {})
 
 async function runImageBasedRecipeImportPreflightForEdit() {
     if (!isRecipeMediaEstimatePerServingDone()) {
-        const estimateOk = await submitRecipeMediaEstimatePerServing();
-        if (!estimateOk) {
-            return false;
-        }
+        markRecipeMediaServingEstimateCompleteFromRecipe(recipeMediaUploadPreview);
     }
 
     return await createRecipePdfFromMediaImport();
