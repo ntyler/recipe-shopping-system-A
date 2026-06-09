@@ -9807,6 +9807,73 @@ async function generateCurrentRecipeImagesFromMenu(button, options = {}) {
     return false;
 }
 
+async function estimateCurrentRecipeNutritionFromMenu(button) {
+    const row = recipeEditActionRowFromButton(button);
+    const recipeUrl = button ? button.dataset.recipeUrl || (row && row.dataset.recipeUrl) || "" : "";
+    const recipeNumber = button ? button.dataset.recipeNumber || "" : "";
+    const originalText = button ? button.textContent : "";
+
+    closeRecipeEditRowMenus();
+
+    if (!recipeUrl) {
+        showRecipeQuantityUpdatedMessage("", "", "", "Unable to estimate nutrition: recipe URL is missing.");
+        return false;
+    }
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Estimating...";
+    }
+
+    try {
+        showRecipeQuantityUpdatedMessage(recipeUrl, "", recipeNumber, "Estimating per-serving nutrition...");
+        const response = await fetch("/api/estimate-per-serving", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                recipe_url: recipeUrl,
+            }),
+        });
+        const data = await response.json();
+        syncOpenAiUsageDashboardFromResponse(data);
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to estimate nutrition.");
+        }
+
+        await refreshStoreMarkup({
+            requireRecipeLog: true,
+            cacheBust: true,
+        });
+        jumpToCurrentRecipeLogUrl(recipeUrl);
+        showRecipeQuantityUpdatedMessage(
+            recipeUrl,
+            "",
+            recipeNumber,
+            data.debug && data.debug.already_complete
+                ? "Per-serving nutrition is already available."
+                : "Per-serving nutrition estimate added."
+        );
+    } catch (err) {
+        console.warn("Unable to estimate nutrition from current recipe menu.", err);
+        showRecipeQuantityUpdatedMessage(
+            recipeUrl,
+            "",
+            recipeNumber,
+            err.message || "Unable to estimate nutrition."
+        );
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = originalText || "⌁ Estimate per serving basis";
+        }
+    }
+
+    return false;
+}
+
 function setAllCurrentRecipeUrlSummariesCollapsed(collapsed) {
     document.querySelectorAll("[data-current-recipe-row]").forEach(row => {
         const storageKey = recipeUrlSummaryCollapseStorageKey(row);

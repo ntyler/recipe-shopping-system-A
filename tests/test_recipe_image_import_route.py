@@ -76,6 +76,19 @@ def test_gpt5_models_do_not_support_custom_temperature():
     assert recipe_extract_service.supports_custom_temperature("gpt-4o-mini") is True
 
 
+def test_default_models_use_gpt55_for_vision_only(monkeypatch):
+    monkeypatch.delenv("OPENAI_RECIPE_MODEL", raising=False)
+    monkeypatch.delenv("OPENAI_VISION_MODEL", raising=False)
+
+    recipe_model = recipe_extract_service.resolve_openai_model("recipe")
+    vision_model = recipe_extract_service.resolve_openai_model("vision")
+
+    assert recipe_model.model == "gpt-4o-mini"
+    assert recipe_model.source == "default:gpt-4o-mini"
+    assert vision_model.model == "gpt-5.5"
+    assert vision_model.source == "default:gpt-5.5"
+
+
 def write_uploaded_image(user_data_dir, user_id, filename="meal.png", data=None):
     upload_dir = user_data_dir / user_id / "recipe-extractor" / "data" / "uploads"
     upload_dir.mkdir(parents=True)
@@ -299,7 +312,7 @@ def test_generate_recipe_from_image_reports_json_parse_failure(monkeypatch, tmp_
     assert response.status_code == 400
     payload = response.get_json()
     assert payload["success"] is False
-    assert payload["error_code"] == "JSON_PARSE_FAILED"
+    assert payload["error_code"] == "VISION_RESPONSE_PARSE_FAILED"
     assert "JSON parsing failed" in payload["error_message"]
     assert payload["debug"]["vision_request_sent"] is True
     assert payload["debug"]["vision_response_received"] is True

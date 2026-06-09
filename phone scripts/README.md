@@ -118,7 +118,7 @@ Next step:
 - If you get `000` or a connection error, start the app:
 
 ```powershell
-py -3.11 app.py
+C:\Python39\python.exe app.py
 ```
 
 or:

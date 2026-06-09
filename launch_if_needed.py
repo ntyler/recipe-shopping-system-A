@@ -40,6 +40,8 @@ def main():
     env = os.environ.copy()
     env.setdefault("SHOPPING_APP_PORT", str(PORT))
     env.setdefault("SHOPPING_APP_PYTHON_EXE", str(REQUIRED_PYTHON))
+    env.setdefault("OPENAI_RECIPE_MODEL", "gpt-4o-mini")
+    env.setdefault("OPENAI_VISION_MODEL", "gpt-5.5")
     subprocess.Popen(
         [str(REQUIRED_PYTHON), "app.py"],
         cwd=str(REPO_DIR),

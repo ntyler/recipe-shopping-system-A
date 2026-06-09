@@ -86,10 +86,10 @@ UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 VIDEO_FOLDER.mkdir(parents=True, exist_ok=True)
 PDF_FOLDER.mkdir(parents=True, exist_ok=True)
 
-MODEL = os.getenv("OPENAI_RECIPE_MODEL", "gpt-5.5")
+MODEL = os.getenv("OPENAI_RECIPE_MODEL", "gpt-4o-mini")
 VISION_MODEL_DEFAULT = "gpt-5.5"
 VISION_MODEL_FALLBACK = "gpt-4o-mini"
-OPENAI_RECIPE_MODEL_DEFAULT = "gpt-5.5"
+OPENAI_RECIPE_MODEL_DEFAULT = "gpt-4o-mini"
 OPENAI_PING_TEXT_MODEL = os.getenv("OPENAI_PING_TEXT_MODEL", "gpt-4o-mini")
 VISION_REQUEST_TIMEOUT_SECONDS = _safe_int(
     os.getenv("OPENAI_VISION_REQUEST_TIMEOUT_SECONDS", "120"),
@@ -234,7 +234,7 @@ def resolve_openai_model(purpose="recipe", preferred_model=None, fallback=False)
 
     return OpenAIModelResolution(
         model=OPENAI_RECIPE_MODEL_DEFAULT,
-        source="default:gpt-5.5",
+        source="default:gpt-4o-mini",
         purpose=purpose,
     )
 
