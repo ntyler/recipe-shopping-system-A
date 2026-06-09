@@ -9583,12 +9583,112 @@ function parseFormError(response, defaultMessage) {
     return fallbackMessage;
 }
 
+async function handleRecipeRemovalFormSubmit(form, submitter = null) {
+    if (!form || form.dataset.recipeRemoving === "1") {
+        return;
+    }
+
+    const confirmMessage = String(form.dataset.confirmMessage || "").trim();
+    if (confirmMessage && !window.confirm(confirmMessage)) {
+        return;
+    }
+
+    const submitButton = submitter
+        && submitter.matches
+        && (submitter.matches("button[type='submit']") || submitter.matches("input[type='submit']"))
+        ? submitter
+        : form.querySelector("button[type='submit'], input[type='submit']");
+
+    const originalText = submitButton ? (submitButton.textContent || "") : "";
+    const originalDisabled = submitButton ? submitButton.disabled : false;
+
+    form.dataset.recipeRemoving = "1";
+
+    if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = "Deleting...";
+    }
+
+    try {
+        const response = await fetch(formActionUrl(form), {
+            method: (form.getAttribute("method") || "POST").toUpperCase(),
+            headers: {
+                "X-Requested-With": "fetch",
+            },
+            body: new FormData(form),
+            redirect: "follow",
+        });
+
+        if (!response.ok) {
+            let message = parseFormError(response, "Unable to delete recipe.");
+
+            try {
+                const payload = await response.json();
+                message = String((payload && (payload.error || payload.message)) || message).trim() || message;
+            } catch (err) {
+                // Keep fallback message if JSON cannot be read.
+            }
+
+            throw new Error(message);
+        }
+
+        window.location.href = "/";
+    } catch (err) {
+        console.warn("Unable to delete recipe.", err);
+        alert(err.message || "Unable to delete recipe.");
+        if (submitButton) {
+            submitButton.disabled = originalDisabled;
+            submitButton.textContent = originalText || "Delete";
+        }
+    } finally {
+        form.dataset.recipeRemoving = "0";
+    }
+}
+
 function bindRecipeRemovalForms() {
     if (document.body.dataset.recipeRemovalFormsBound === "1") {
         return;
     }
 
     document.body.dataset.recipeRemovalFormsBound = "1";
+
+    document.body.addEventListener("click", async event => {
+        const button = event.target && typeof event.target.closest === "function"
+            ? event.target.closest("form.remove-recipe-form button[type='submit'], form.remove-recipe-form input[type='submit']")
+            : null;
+
+        if (!button) {
+            return;
+        }
+
+        const form = button.closest("form.remove-recipe-form");
+        if (!form) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        await handleRecipeRemovalFormSubmit(form, button);
+    }, true);
+
+    document.body.addEventListener("touchend", async event => {
+        const button = event.target && typeof event.target.closest === "function"
+            ? event.target.closest("form.remove-recipe-form button[type='submit'], form.remove-recipe-form input[type='submit']")
+            : null;
+
+        if (!button) {
+            return;
+        }
+
+        const form = button.closest("form.remove-recipe-form");
+        if (!form || form.dataset.recipeRemoving === "1") {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        await handleRecipeRemovalFormSubmit(form, button);
+    }, true);
 
     document.body.addEventListener("submit", async event => {
         const form = event.target && typeof event.target.closest === "function"
@@ -9601,58 +9701,7 @@ function bindRecipeRemovalForms() {
 
         event.preventDefault();
         event.stopPropagation();
-
-        const confirmMessage = String(form.dataset.confirmMessage || "").trim();
-        if (confirmMessage && !window.confirm(confirmMessage)) {
-            return;
-        }
-
-        const submitButton = event.submitter && event.submitter.type === "submit"
-            ? event.submitter
-            : form.querySelector('button[type="submit"], input[type="submit"]');
-        const originalText = submitButton ? submitButton.textContent : "";
-        saveScroll();
-
-        if (submitButton) {
-            submitButton.disabled = true;
-            submitButton.textContent = "Deleting...";
-        }
-
-        try {
-            const response = await fetch(formActionUrl(form), {
-                method: "POST",
-                headers: {
-                    "X-Requested-With": "fetch",
-                },
-                body: new FormData(form),
-            });
-
-            if (!response.ok) {
-                let message = parseFormError(response, "Unable to delete recipe.");
-
-                try {
-                    const payload = await response.json();
-                    message = String((payload && (payload.error || payload.message)) || message).trim() || message;
-                } catch (err) {
-                    // Keep fallback message if JSON cannot be read.
-                }
-
-                throw new Error(message);
-            }
-
-            const redirectUrl = response.url && response.url !== "about:blank"
-                ? response.url
-                : "/";
-
-            window.location.href = redirectUrl;
-        } catch (err) {
-            console.warn("Unable to delete recipe.", err);
-            alert(err.message || "Unable to delete recipe.");
-            if (submitButton) {
-                submitButton.disabled = false;
-                submitButton.textContent = originalText || "Delete";
-            }
-        }
+        await handleRecipeRemovalFormSubmit(form, event && event.submitter ? event.submitter : null);
     }, true);
 }
 
