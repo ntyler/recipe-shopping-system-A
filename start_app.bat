@@ -6,7 +6,7 @@ echo Starting Flask app...
 
 set SHOPPING_APP_PORT=5083
 set SHOPPING_APP_PYTHON_EXE=C:\Python39\python.exe
-set OPENAI_RECIPE_MODEL=gpt-4o-mini
+set OPENAI_RECIPE_MODEL=gpt-5.5
 set OPENAI_VISION_MODEL=gpt-5.5
 call :load_user_env SHOPPING_APP_SMTP_HOST
 call :load_user_env SHOPPING_APP_SMTP_PORT

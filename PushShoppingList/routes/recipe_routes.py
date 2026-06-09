@@ -1234,6 +1234,7 @@ def validate_vision_image_upload(upload_path, filename, mime_type, debug):
     image_type_convertible = (
         normalized_mime_type in VISION_CONVERTIBLE_IMAGE_MIME_TYPES
         or suffix in VISION_CONVERTIBLE_IMAGE_SUFFIXES
+        or normalized_mime_type.startswith("image/")
     )
     image_type_supported = image_type_supported_by_openai or image_type_convertible
     debug["mime_type"] = normalized_mime_type
@@ -1277,12 +1278,12 @@ def validate_vision_image_upload(upload_path, filename, mime_type, debug):
     except Exception as exc:
         error_message = (
             unsupported_phone_image_message(normalized_mime_type)
-            if image_type_convertible
+            if debug["image_requires_conversion"]
             else f"Uploaded image is not readable: {exc}"
         )
         return set_vision_debug_error(
             debug,
-            "UNSUPPORTED_IMAGE_FORMAT" if image_type_convertible else "IMAGE_UNREADABLE",
+            "UNSUPPORTED_IMAGE_FORMAT" if debug["image_requires_conversion"] else "IMAGE_UNREADABLE",
             error_message,
             failed_status="image_uploaded",
         )

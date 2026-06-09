@@ -76,15 +76,15 @@ def test_gpt5_models_do_not_support_custom_temperature():
     assert recipe_extract_service.supports_custom_temperature("gpt-4o-mini") is True
 
 
-def test_default_models_use_gpt55_for_vision_only(monkeypatch):
+def test_default_models_use_gpt55_with_gpt4o_mini_fallback(monkeypatch):
     monkeypatch.delenv("OPENAI_RECIPE_MODEL", raising=False)
     monkeypatch.delenv("OPENAI_VISION_MODEL", raising=False)
 
     recipe_model = recipe_extract_service.resolve_openai_model("recipe")
     vision_model = recipe_extract_service.resolve_openai_model("vision")
 
-    assert recipe_model.model == "gpt-4o-mini"
-    assert recipe_model.source == "default:gpt-4o-mini"
+    assert recipe_model.model == "gpt-5.5"
+    assert recipe_model.source == "default:gpt-5.5"
     assert vision_model.model == "gpt-5.5"
     assert vision_model.source == "default:gpt-5.5"
 

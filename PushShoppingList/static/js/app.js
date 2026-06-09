@@ -6079,7 +6079,12 @@ async function submitRecipeMediaUpload(input, manualDescription = "", uploadMode
     const fileInput = input && input.files ? input : getRecipeMediaUploadInput();
     const photoDescription = String(manualDescription || "").trim();
     const normalizedUploadMode = normalizeRecipeUploadMode(uploadMode);
-    const isImageUpload = fileInput ? String(fileInput.files?.[0]?.type || "").startsWith("image/") : false;
+    const selectedFile = fileInput && fileInput.files && fileInput.files.length
+        ? fileInput.files[0]
+        : null;
+    const isImageUpload = selectedFile
+        ? String(selectedFile.type || "").startsWith("image/")
+        : false;
 
     if (!form || !fileInput || !fileInput.files || !fileInput.files.length) {
         return;
@@ -6263,6 +6268,11 @@ async function submitRecipeMediaUpload(input, manualDescription = "", uploadMode
             || (debug && debug.model)
             || ""
         ).trim();
+        const responseModelSource = String(
+            (data && data.model_source)
+            || (debug && debug.model_source)
+            || ""
+        ).trim();
         const connectionErrorMessage = isImageUpload
             ? buildVisionConnectionErrorMessage(responseErrorMessage, {
                 ...debug,
@@ -6277,13 +6287,14 @@ async function submitRecipeMediaUpload(input, manualDescription = "", uploadMode
         const message = recipeFileErrorMessageWithReason(
             connectionErrorMessage,
             reason,
-            isImageUpload ? "Could not estimate a recipe from this file." : "Unable to load file."
+            isImageUpload ? "Could not estimate a recipe from this file." : "Unable to load file.",
+            recipeFileErrorCode(data, debug)
         );
 
         setRecipeFileSourceType(data.source_type_label || sourceTypeLabel);
         setRecipeFileActionButtonsEnabled(true);
         setRecipeFileManualDescriptionPanelVisible(isImageUpload, "", photoDescription);
-        setRecipeFileModelUsed(responseModelUsed || "Unknown");
+        setRecipeFileModelUsed(`${responseModelUsed || "Unknown"}${responseModelSource ? ` (${responseModelSource})` : ""}`);
         if (isImageUpload) {
             setRecipeFileVisionDebug(data && data.debug, {
                 visible: true,
@@ -6452,6 +6463,16 @@ async function submitRecipeMediaDescribeImage() {
     } catch (err) {
         const data = err && err.data ? err.data : {};
         const debug = data && data.debug ? data.debug : {};
+        const responseModelUsed = String(
+            (data && (data.model_used || data.model))
+            || (debug && debug.model)
+            || ""
+        ).trim();
+        const responseModelSource = String(
+            (data && data.model_source)
+            || (debug && debug.model_source)
+            || ""
+        ).trim();
         const responseErrorMessage = String(
             (data && (data.error_message || data.error || data.technical_message)) || err.message || ""
         ).trim();
@@ -6462,7 +6483,8 @@ async function submitRecipeMediaDescribeImage() {
         const message = recipeFileErrorMessageWithReason(
             connectionErrorMessage,
             responseErrorMessage || "No failure reason was returned by the backend.",
-            "Unable to describe this image."
+            "Unable to describe this image.",
+            recipeFileErrorCode(data, debug)
         );
         updateRecipeFileLoadingStep("estimate", "failed", "Description failed");
         setRecipeFileLoadingSummary(message);
@@ -6471,6 +6493,7 @@ async function submitRecipeMediaDescribeImage() {
             visible: true,
             errorData: data,
         });
+        setRecipeFileModelUsed(`${responseModelUsed || "Unknown"}${responseModelSource ? ` (${responseModelSource})` : ""}`);
         setRecipeFileActionButtonsEnabled(true);
         if (status) {
             status.textContent = message;
@@ -6789,20 +6812,31 @@ function buildVisionConnectionErrorMessage(reason, debug = {}) {
         return "";
     }
 
-    return "Connection error while contacting OpenAI.";
+    return "Connection error contacting OpenAI.";
 }
 
-function recipeFileErrorMessageWithReason(summary, reason, fallbackPrefix) {
+function recipeFileErrorCode(data = {}, debug = {}) {
+    return String(
+        (data && data.error_code)
+        || (debug && debug.error_code)
+        || ""
+    ).trim();
+}
+
+function recipeFileErrorMessageWithReason(summary, reason, fallbackPrefix, errorCode = "") {
     const summaryText = String(summary || "").trim();
     const reasonText = String(reason || "No failure reason was returned by the backend.").trim();
+    const codeText = String(errorCode || "").trim();
+    const codePrefix = codeText ? `Error Code: ${codeText}\n` : "";
 
     if (summaryText) {
-        return summaryText.toLowerCase() === reasonText.toLowerCase()
+        const body = summaryText.toLowerCase() === reasonText.toLowerCase()
             ? summaryText
             : `${summaryText}\n\nReason: ${reasonText}`;
+        return `${codePrefix}${body}`;
     }
 
-    return `${fallbackPrefix}\nReason: ${reasonText}`;
+    return `${codePrefix}${fallbackPrefix}\nReason: ${reasonText}`;
 }
 
 function recipeUploadedPathLooksLikeImage(uploadedFilePath = "") {
@@ -6813,6 +6847,7 @@ function recipeUploadedPathLooksLikeImage(uploadedFilePath = "") {
         "png",
         "webp",
         "gif",
+        "mpo",
         "heic",
         "heif",
         "bmp",
@@ -7031,6 +7066,11 @@ async function submitRecipeMediaVision() {
             || (debug && debug.model)
             || ""
         ).trim();
+        const responseModelSource = String(
+            (data && data.model_source)
+            || (debug && debug.model_source)
+            || ""
+        ).trim();
         const connectionErrorMessage = buildVisionConnectionErrorMessage(responseErrorMessage, {
             ...debug,
             error_code: String((data && data.error_code) || debug.error_code || ""),
@@ -7043,14 +7083,15 @@ async function submitRecipeMediaVision() {
         const message = recipeFileErrorMessageWithReason(
             connectionErrorMessage,
             reason,
-            "Could not estimate a recipe from this image."
+            "Could not estimate a recipe from this image.",
+            recipeFileErrorCode(data, debug)
         );
 
         const responsePath = String((data && data.uploaded_file_path) || "").trim();
         if (responsePath) {
             setRecipeMediaUploadPath(responsePath);
         }
-        setRecipeFileModelUsed(responseModelUsed || "Unknown");
+        setRecipeFileModelUsed(`${responseModelUsed || "Unknown"}${responseModelSource ? ` (${responseModelSource})` : ""}`);
         const workflowSourceUrl = String(
             (data && (data.source_url || data.url)) || ""
         ).trim();

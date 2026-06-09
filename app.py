@@ -26,8 +26,7 @@ def enforce_required_python_runtime():
     os.execv(str(required_python), [str(required_python), str(Path(__file__).resolve())])
 
 
-if __name__ == "__main__":
-    enforce_required_python_runtime()
+enforce_required_python_runtime()
 
 from PushShoppingList.app import create_app
 

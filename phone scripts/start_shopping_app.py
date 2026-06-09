@@ -19,8 +19,8 @@ USERNAME = "Tyler"
 PASSWORD = keychain.get_password("windows_ssh", "Tyler")
 
 REPO_DIR = r"D:\GitHub\recipe-shopping-system-A"
-BAT_FILE = rf"{REPO_DIR}\start_app.bat"
 WINDOWS_PYTHON_EXE = r"C:\Python39\python.exe"
+LAUNCH_IF_NEEDED = rf"{REPO_DIR}\launch_if_needed.py"
 
 APP_URL = "https://desktop-in7s09s.tail906b20.ts.net/"
 LOCAL_APP_PORT = 5083
@@ -152,9 +152,12 @@ try:
 
     print("Connecting to Windows PC over Tailscale...")
     ssh = connect_ssh()
-    print(f"Launching Flask app through start_app.bat ({WINDOWS_PYTHON_EXE})...")
+    print(f"Launching Flask app with {WINDOWS_PYTHON_EXE}...")
 
-    launch_command = f'cmd /c start "" /D "{REPO_DIR}" "{BAT_FILE}"'
+    launch_command = (
+        f'cmd /c start "" /D "{REPO_DIR}" '
+        f'"{WINDOWS_PYTHON_EXE}" "{LAUNCH_IF_NEEDED}"'
+    )
     run_ssh_command(ssh, launch_command)
 
     if ENSURE_FUNNEL:

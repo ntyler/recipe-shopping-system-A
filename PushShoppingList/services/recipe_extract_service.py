@@ -86,10 +86,10 @@ UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 VIDEO_FOLDER.mkdir(parents=True, exist_ok=True)
 PDF_FOLDER.mkdir(parents=True, exist_ok=True)
 
-MODEL = os.getenv("OPENAI_RECIPE_MODEL", "gpt-4o-mini")
+MODEL = os.getenv("OPENAI_RECIPE_MODEL", "gpt-5.5")
 VISION_MODEL_DEFAULT = "gpt-5.5"
 VISION_MODEL_FALLBACK = "gpt-4o-mini"
-OPENAI_RECIPE_MODEL_DEFAULT = "gpt-4o-mini"
+OPENAI_RECIPE_MODEL_DEFAULT = "gpt-5.5"
 OPENAI_PING_TEXT_MODEL = os.getenv("OPENAI_PING_TEXT_MODEL", "gpt-4o-mini")
 VISION_REQUEST_TIMEOUT_SECONDS = _safe_int(
     os.getenv("OPENAI_VISION_REQUEST_TIMEOUT_SECONDS", "120"),
@@ -104,6 +104,7 @@ VISION_MAX_RETRIES = _safe_int(
     2,
 )
 print(f"[Recipe AI] OPENAI_API_KEY present: {'yes' if bool(os.getenv('OPENAI_API_KEY')) else 'no'}")
+print(f"[Recipe AI] Recipe model: {os.getenv('OPENAI_RECIPE_MODEL') or OPENAI_RECIPE_MODEL_DEFAULT}")
 print(f"[Recipe AI] Vision model: {os.getenv('OPENAI_VISION_MODEL') or VISION_MODEL_DEFAULT}")
 MAX_PAGE_TEXT_CHARS = 35000
 MAX_SOCIAL_VIDEO_PROMPT_CHARS = 12000
@@ -126,6 +127,7 @@ VISION_SUPPORTED_IMAGE_MIME_TYPES = {
     "image/gif",
 }
 VISION_CONVERTIBLE_IMAGE_MIME_TYPES = {
+    "image/mpo",
     "image/heic",
     "image/heif",
     "image/heic-sequence",
@@ -143,6 +145,7 @@ VISION_SUPPORTED_IMAGE_SUFFIXES = {
     ".gif",
 }
 VISION_CONVERTIBLE_IMAGE_SUFFIXES = {
+    ".mpo",
     ".heic",
     ".heif",
     ".bmp",
@@ -234,7 +237,7 @@ def resolve_openai_model(purpose="recipe", preferred_model=None, fallback=False)
 
     return OpenAIModelResolution(
         model=OPENAI_RECIPE_MODEL_DEFAULT,
-        source="default:gpt-4o-mini",
+        source="default:gpt-5.5",
         purpose=purpose,
     )
 
@@ -6148,30 +6151,80 @@ FINAL OUTPUT FORMAT
 
 
 def send_prompt_to_openai(prompt_text):
-    payload, temperature_included, resolved_model = build_openai_chat_payload(
-        MODEL,
-        "recipe-text-extraction",
-        [
-            {
-                "role": "system",
-                "content": "You extract recipe ingredients and return only valid JSON.",
-            },
-            {
-                "role": "user",
-                "content": prompt_text,
-            },
-        ],
-        response_format={"type": "json_object"},
-        temperature=0,
-    )
-    print(
-        f"[OpenAI] action=recipe-text-extraction "
-        f"model={resolved_model} temperature_included={temperature_included}"
-    )
-    response = get_openai_client().chat.completions.create(**payload)
-    record_openai_usage(response, "recipe-text-extraction", model=MODEL)
+    messages = [
+        {
+            "role": "system",
+            "content": "You extract recipe ingredients and return only valid JSON.",
+        },
+        {
+            "role": "user",
+            "content": prompt_text,
+        },
+    ]
+    model_resolution = resolve_openai_model("recipe")
+    attempts = [model_resolution]
+    if model_resolution.model != VISION_MODEL_FALLBACK:
+        attempts.append(OpenAIModelResolution(
+            model=VISION_MODEL_FALLBACK,
+            source="fallback:gpt-4o-mini",
+            purpose="recipe",
+        ))
 
-    return response.choices[0].message.content
+    first_failure = None
+    for attempt_index, attempt in enumerate(attempts):
+        payload, temperature_included, resolved_model = build_openai_chat_payload(
+            attempt.model,
+            "recipe-text-extraction",
+            messages,
+            response_format={"type": "json_object"},
+            temperature=0,
+        )
+        print(
+            f"[OpenAI] action=recipe-text-extraction "
+            f"model={resolved_model} model_source={attempt.source} "
+            f"temperature_included={temperature_included}"
+        )
+        try:
+            response = get_openai_client().chat.completions.create(**payload)
+            record_openai_usage(response, "recipe-text-extraction", model=resolved_model)
+            return response.choices[0].message.content
+        except Exception as exc:
+            error_code, error_message = classify_vision_ai_exception(exc)
+            openai_error_code, openai_error_param = get_openai_error_code_and_param(exc)
+            print(
+                "[OpenAI] action=recipe-text-extraction_exception "
+                f"model={resolved_model} model_source={attempt.source} "
+                f"exception_type={type(exc).__name__} str={str(exc)!r} repr={repr(exc)} "
+                f"cause={repr(getattr(exc, '__cause__', None))} "
+                f"context={repr(getattr(exc, '__context__', None))} "
+                f"openai_error_code={openai_error_code or 'n/a'} "
+                f"openai_error_param={openai_error_param or 'n/a'} "
+                f"temperature_included={temperature_included} final_error_code={error_code}"
+            )
+            if (
+                attempt_index == 0
+                and len(attempts) > 1
+                and error_code in {
+                    "OPENAI_CONNECTION_ERROR",
+                    "OPENAI_TIMEOUT",
+                    "OPENAI_UNSUPPORTED_MODEL",
+                    "OPENAI_UNSUPPORTED_PARAMETER",
+                    "OPENAI_BAD_REQUEST",
+                }
+            ):
+                first_failure = exc
+                print(
+                    "[OpenAI] RECIPE_MODEL_FALLBACK_USED "
+                    f"from_model={resolved_model} to_model={VISION_MODEL_FALLBACK} "
+                    f"reason={error_code}"
+                )
+                continue
+            raise
+
+    if first_failure is not None:
+        raise first_failure
+
+    raise RuntimeError("Recipe text extraction failed without an OpenAI response.")
 
 
 def detect_image_mime_type(image_path, mime_type=""):
@@ -6264,8 +6317,16 @@ def normalize_image_bytes_for_openai(image_path, mime_type="", debug=None):
             mode_before = str(image.mode or "")
             size_before = tuple(image.size or (0, 0))
             max_dimension_before = max(size_before) if size_before else 0
+            orientation = None
+            try:
+                orientation = image.getexif().get(274)
+            except Exception:
+                orientation = None
             transposed = ImageOps.exif_transpose(image)
-            exif_transpose_applied = tuple(transposed.size or ()) != tuple(image.size or ())
+            exif_transpose_applied = bool(
+                orientation
+                and int(orientation) not in {0, 1}
+            )
             if transposed is not image:
                 image = transposed
 
@@ -6866,6 +6927,10 @@ def build_upload_failure_result(import_object, error_message, failed_step="extra
     else:
         debug_payload = dict(debug_payload)
     debug_payload.setdefault("model", model_used)
+    debug_payload.setdefault(
+        "model_source",
+        resolve_vision_model_source() if source_type == "image" else resolve_openai_model("recipe").source,
+    )
     debug_payload["action"] = action
     debug_payload["error_code"] = error_code
     debug_payload["error_message"] = normalized_error_message
@@ -6901,6 +6966,7 @@ def build_upload_failure_result(import_object, error_message, failed_step="extra
         "detected_food_photo": bool(import_object.get("detected_food_photo")),
         "model_used": model_used,
         "model": model_used,
+        "model_source": debug_payload.get("model_source") or "",
         "action": action,
         "debug": debug_payload,
     }
@@ -7318,7 +7384,7 @@ def infer_food_image_recipe(recipe_url, upload_path, mime_type, filename, user_d
     if not response_text.strip():
         return None, set_vision_debug_error(
             debug,
-            "AI_EMPTY_RESPONSE",
+            "OPENAI_EMPTY_RESPONSE",
             "AI returned empty response.",
             failed_status="vision_response_received",
         )
