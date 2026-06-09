@@ -141,7 +141,7 @@ def _has_per_serving_estimate(nutrition):
     if isinstance(nutrition, dict):
         serving_basis = _extract_nutrition_text_value(nutrition.get("serving_basis"))
         calories = _extract_nutrition_text_value(nutrition.get("calories"))
-        return bool(serving_basis and calories)
+        return bool(calories and (serving_basis or "per serving"))
 
     if isinstance(nutrition, list):
         serving_basis = ""
@@ -159,9 +159,43 @@ def _has_per_serving_estimate(nutrition):
             elif key == "calories":
                 calories = value
 
-        return bool(serving_basis and calories)
+        return bool(calories and (serving_basis or "per serving"))
 
     return False
+
+
+def _recipe_with_default_serving_basis(recipe):
+    recipe = dict(recipe) if isinstance(recipe, dict) else {}
+    nutrition = recipe.get("nutrition")
+
+    if isinstance(nutrition, dict):
+        nutrition = dict(nutrition)
+        if _extract_nutrition_text_value(nutrition.get("calories")) and not _extract_nutrition_text_value(nutrition.get("serving_basis")):
+            nutrition["serving_basis"] = "per serving"
+        recipe["nutrition"] = nutrition
+        return recipe
+
+    if isinstance(nutrition, list):
+        rows = [
+            dict(item)
+            for item in nutrition
+            if isinstance(item, dict)
+        ]
+        has_calories = False
+        has_serving_basis = False
+        for row in rows:
+            key = str(row.get("key") or "").strip().lower()
+            value = _extract_nutrition_text_value(row.get("value"))
+            if key == "calories" and value:
+                has_calories = True
+            elif key == "serving_basis" and value:
+                has_serving_basis = True
+        if has_calories and not has_serving_basis:
+            rows.insert(0, {"key": "serving_basis", "value": "per serving"})
+        recipe["nutrition"] = rows
+        return recipe
+
+    return recipe
 
 
 def _nutrition_rows_from_value(nutrition):
@@ -192,7 +226,7 @@ def _nutrition_rows_from_value(nutrition):
 
 
 def _existing_nutrition_success(recipe, recipe_url=""):
-    recipe = recipe if isinstance(recipe, dict) else {}
+    recipe = _recipe_with_default_serving_basis(recipe)
     nutrition = recipe.get("nutrition")
     rows = _nutrition_rows_from_value(nutrition)
     return {
@@ -1714,8 +1748,27 @@ def api_estimate_per_serving_route():
     ).strip()
     recipe = _extract_recipe_payload_for_nutrition(data)
 
-    if not recipe and recipe_url:
-        recipe = load_editable_recipe(recipe_url) or {}
+    saved_recipe = {}
+    if recipe_url:
+        loaded_recipe = load_editable_recipe(recipe_url) or {}
+        saved_recipe = loaded_recipe.get("recipe") if isinstance(loaded_recipe, dict) else {}
+        saved_recipe = saved_recipe if isinstance(saved_recipe, dict) else {}
+
+    if saved_recipe and _has_per_serving_estimate(saved_recipe.get("nutrition")):
+        saved_recipe = _recipe_with_default_serving_basis(saved_recipe)
+        _mark_uploaded_recipe_nutrition_estimated(recipe_url, True)
+        result = _existing_nutrition_success(saved_recipe, recipe_url)
+        result["model_used"] = str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL))
+        result["debug"] = {
+            "model": result["model_used"],
+            "recipe_url": recipe_url,
+            "already_complete": True,
+            "source": "saved_recipe",
+        }
+        return jsonify(with_openai_usage_dashboard(result)), 200
+
+    if not recipe and saved_recipe:
+        recipe = saved_recipe
 
     if not recipe:
         return jsonify(with_openai_usage_dashboard({
@@ -1730,6 +1783,7 @@ def api_estimate_per_serving_route():
         })), 400
 
     if _has_per_serving_estimate(recipe.get("nutrition") if isinstance(recipe, dict) else None):
+        recipe = _recipe_with_default_serving_basis(recipe)
         if recipe_url:
             save_result = save_editable_recipe(recipe_url, recipe)
             if not save_result.get("ok"):
@@ -2069,6 +2123,7 @@ def api_recipe_nutrition_estimate_route():
     data = request.get_json(silent=True) or {}
     recipe = data.get("recipe", data)
     if _has_per_serving_estimate(recipe.get("nutrition") if isinstance(recipe, dict) else None):
+        recipe = _recipe_with_default_serving_basis(recipe)
         return jsonify(with_openai_usage_dashboard(_existing_nutrition_success(recipe))), 200
 
     result = estimate_recipe_nutrition(recipe)

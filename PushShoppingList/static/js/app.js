@@ -6492,19 +6492,17 @@ function recipeHasPerServingEstimate(recipe = {}) {
     if (Array.isArray(nutrition)) {
         const servingBasis = nutrition.find(item => String(item && item.key || "").trim().toLowerCase() === "serving_basis");
         const calories = nutrition.find(item => String(item && item.key || "").trim().toLowerCase() === "calories");
+        const caloriesValue = String(calories && calories.value || "").trim();
+        const servingBasisValue = String(servingBasis && servingBasis.value || "").trim();
 
-        return Boolean(
-            servingBasis && calories
-            && String(servingBasis.value || "").trim()
-            && String(calories.value || "").trim()
-        );
+        return Boolean(caloriesValue && (servingBasisValue || "per serving"));
     }
 
     if (typeof nutrition === "object") {
         const servingBasis = String(nutrition.serving_basis || "").trim();
         const calories = String(nutrition.calories || "").trim();
 
-        return Boolean(servingBasis && calories);
+        return Boolean(calories && (servingBasis || "per serving"));
     }
 
     return false;
@@ -6515,6 +6513,23 @@ function recipeMediaEstimatePerServingAllowed(recipe = recipeMediaUploadPreview)
 }
 
 function markRecipeMediaServingEstimateCompleteFromRecipe(recipe = recipeMediaUploadPreview) {
+    if (recipe && recipe.nutrition && typeof recipe.nutrition === "object") {
+        if (Array.isArray(recipe.nutrition)) {
+            const hasCalories = recipe.nutrition.some(item => (
+                String(item && item.key || "").trim().toLowerCase() === "calories"
+                && String(item && item.value || "").trim()
+            ));
+            const hasServingBasis = recipe.nutrition.some(item => (
+                String(item && item.key || "").trim().toLowerCase() === "serving_basis"
+                && String(item && item.value || "").trim()
+            ));
+            if (hasCalories && !hasServingBasis) {
+                recipe.nutrition.unshift({ key: "serving_basis", value: "per serving" });
+            }
+        } else if (String(recipe.nutrition.calories || "").trim() && !String(recipe.nutrition.serving_basis || "").trim()) {
+            recipe.nutrition.serving_basis = "per serving";
+        }
+    }
     const complete = recipeMediaEstimatePerServingAllowed(recipe);
     markRecipeMediaEstimatePerServingDone(complete);
     setRecipeFileImageNextStepButtons({
