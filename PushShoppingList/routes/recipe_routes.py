@@ -638,6 +638,13 @@ def upload_recipe_media_route():
         recipe_url=str(result.get("source_url") or ""),
         context="media-upload",
     )
+    if isinstance(result, dict):
+        result.setdefault("success", bool(result.get("ok")))
+        result.setdefault("model_used", MODEL)
+        if "debug" not in result:
+            result["debug"] = {
+                "model": MODEL,
+            }
 
     if wants_json:
         extraction_mode_label = (

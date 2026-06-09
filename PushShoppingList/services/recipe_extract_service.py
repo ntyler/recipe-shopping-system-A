@@ -6033,6 +6033,7 @@ def upload_source_type_label(source_type):
 def build_upload_failure_result(import_object, error_message, failed_step="extract", **extra):
     import_object = import_object if isinstance(import_object, dict) else {}
     import_object["error_message"] = error_message
+    model_used = str(extra.pop("model_used", MODEL)).strip() or str(MODEL)
 
     print(
         "[recipe_import] action=upload_import_failed "
@@ -6042,6 +6043,7 @@ def build_upload_failure_result(import_object, error_message, failed_step="extra
     )
 
     result = {
+        "success": False,
         "ok": False,
         "error": error_message,
         "failed_step": failed_step,
@@ -6054,6 +6056,10 @@ def build_upload_failure_result(import_object, error_message, failed_step="extra
         "uploaded_file_path": import_object.get("uploaded_file_path"),
         "extracted_text": import_object.get("extracted_text") or "",
         "detected_food_photo": bool(import_object.get("detected_food_photo")),
+        "model_used": model_used,
+        "debug": {
+            "model": model_used,
+        },
     }
     result.update(extra)
     return result
@@ -7688,9 +7694,12 @@ def extract_text_from_docx(upload_path):
 
 
 def build_extract_result(recipe_url, json_data, extraction_method):
+    json_data = json_data if isinstance(json_data, dict) else {}
     ingredients = extract_ingredients_from_result(json_data)
+    model_used = str(MODEL)
 
     return {
+        "success": True,
         "ok": True,
         "source_url": recipe_url,
         "display_name": json_data.get("display_name") or json_data.get("recipe_title"),
@@ -7717,6 +7726,10 @@ def build_extract_result(recipe_url, json_data, extraction_method):
         "inferred_ingredients": json_data.get("inferred_ingredients") or [],
         "extraction_method": extraction_method,
         "extraction_mode": json_data.get("extraction_mode") or extraction_method,
+        "model_used": model_used,
+        "debug": {
+            "model": model_used,
+        },
     }
 
 
