@@ -6237,6 +6237,7 @@ async function submitRecipeMediaUpload(input, manualDescription = "", uploadMode
         const responseModelUsed = String(
             (data && data.model_used)
             || (data && data.model)
+            || (debug && debug.model)
             || ""
         ).trim();
         const connectionErrorMessage = isImageUpload
@@ -6250,9 +6251,11 @@ async function submitRecipeMediaUpload(input, manualDescription = "", uploadMode
             })
             : "";
         const reason = responseErrorMessage || "No failure reason was returned by the backend.";
-        const message = connectionErrorMessage
-            ? `${connectionErrorMessage}\n\nReason: ${reason}`
-            : `${isImageUpload ? "Could not estimate a recipe from this file." : "Unable to load file."}\nReason: ${reason}`;
+        const message = recipeFileErrorMessageWithReason(
+            connectionErrorMessage,
+            reason,
+            isImageUpload ? "Could not estimate a recipe from this file." : "Unable to load file."
+        );
 
         setRecipeFileSourceType(data.source_type_label || sourceTypeLabel);
         setRecipeFileActionButtonsEnabled(true);
@@ -6631,14 +6634,14 @@ function buildVisionConnectionErrorMessage(reason, debug = {}) {
         || reasonText.includes("remove temperature");
 
     if (temperatureError) {
-        return "The selected OpenAI model does not support one of the request settings. The app should remove temperature for this model.";
+        return "The selected OpenAI model does not support one of the request settings. The app should remove that setting and retry.";
     }
 
     if (
         reasonText.includes("unsupported value")
         && reasonText.includes("temperature")
     ) {
-        return "The selected OpenAI model does not support one of the request settings. The app should remove temperature for this model.";
+        return "The selected OpenAI model does not support one of the request settings. The app should remove that setting and retry.";
     }
 
     if (errorCode !== "openai_connection_error") {
@@ -6668,6 +6671,34 @@ function buildVisionConnectionErrorMessage(reason, debug = {}) {
     ].join("\n");
 }
 
+function recipeFileErrorMessageWithReason(summary, reason, fallbackPrefix) {
+    const summaryText = String(summary || "").trim();
+    const reasonText = String(reason || "No failure reason was returned by the backend.").trim();
+
+    if (summaryText) {
+        return summaryText.toLowerCase() === reasonText.toLowerCase()
+            ? summaryText
+            : `${summaryText}\n\nReason: ${reasonText}`;
+    }
+
+    return `${fallbackPrefix}\nReason: ${reasonText}`;
+}
+
+function recipeUploadedPathLooksLikeImage(uploadedFilePath = "") {
+    const pathExtension = String(uploadedFilePath || "").toLowerCase().trim().split(".").pop();
+    return new Set([
+        "jpg",
+        "jpeg",
+        "png",
+        "webp",
+        "gif",
+        "heic",
+        "bmp",
+        "tif",
+        "tiff",
+    ]).has(pathExtension || "");
+}
+
 async function submitRecipeMediaVision() {
     if (recipeMediaVisionInProgress) {
         return;
@@ -6676,10 +6707,18 @@ async function submitRecipeMediaVision() {
     const fileInput = getRecipeMediaUploadInput();
     const status = document.getElementById("recipeMediaUploadStatus");
     const file = fileInput && fileInput.files ? fileInput.files[0] : null;
-    const isImageUpload = Boolean(file && String(file.type || "").startsWith("image/"));
     const uploadedFilePath = getRecipeMediaUploadPath();
-    const sourceTypeLabel = recipeUploadSourceTypeLabel(file || {});
-    const fileLabel = file && file.name ? file.name : "uploaded file";
+    const isImageUploadPath = recipeUploadedPathLooksLikeImage(uploadedFilePath);
+    const isImageUpload = Boolean(
+        (file && String(file.type || "").startsWith("image/"))
+        || (uploadedFilePath && isImageUploadPath)
+    );
+    const sourceTypeLabel = file
+        ? recipeUploadSourceTypeLabel(file)
+        : (isImageUploadPath ? "Image" : "File");
+    const fileLabel = file && file.name
+        ? file.name
+        : (String(uploadedFilePath || "").split(/[\\/]/).pop() || "uploaded file");
     const photoDescription = recipeFileManualDescriptionValue();
     const visionModeLabel = photoDescription ? "Vision + Description" : "Vision";
 
@@ -6847,7 +6886,11 @@ async function submitRecipeMediaVision() {
             (data && (data.error_message || data.error || data.technical_message)) || ""
         ).trim();
         const debug = data && data.debug ? data.debug : {};
-        const responseModelUsed = String((data && data.model_used) || "").trim();
+        const responseModelUsed = String(
+            (data && (data.model_used || data.model))
+            || (debug && debug.model)
+            || ""
+        ).trim();
         const connectionErrorMessage = buildVisionConnectionErrorMessage(responseErrorMessage, {
             ...debug,
             error_code: String((data && data.error_code) || debug.error_code || ""),
@@ -6857,9 +6900,11 @@ async function submitRecipeMediaVision() {
             ).trim(),
         });
         const reason = responseErrorMessage || "No failure reason was returned by the backend.";
-        const message = connectionErrorMessage
-            ? `${connectionErrorMessage}\n\nReason: ${reason}`
-            : `Could not estimate a recipe from this image.\nReason: ${reason}`;
+        const message = recipeFileErrorMessageWithReason(
+            connectionErrorMessage,
+            reason,
+            "Could not estimate a recipe from this image."
+        );
 
         const responsePath = String((data && data.uploaded_file_path) || "").trim();
         if (responsePath) {
@@ -6920,18 +6965,7 @@ async function submitRecipeMediaVision() {
 
 async function submitRecipeMediaRetry() {
     const uploadedFilePath = getRecipeMediaUploadPath();
-    const pathExtension = String(uploadedFilePath || "").toLowerCase().trim().split(".").pop();
-    const isImageUploadPath = new Set([
-        "jpg",
-        "jpeg",
-        "png",
-        "webp",
-        "gif",
-        "heic",
-        "bmp",
-        "tif",
-        "tiff",
-    ]).has(pathExtension || "");
+    const isImageUploadPath = recipeUploadedPathLooksLikeImage(uploadedFilePath);
 
     if (isImageUploadPath && uploadedFilePath) {
         await submitRecipeMediaVision();

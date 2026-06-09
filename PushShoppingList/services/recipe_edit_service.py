@@ -39,6 +39,7 @@ from PushShoppingList.services.recipe_extract_service import extract_ingredients
 from PushShoppingList.services.recipe_extract_service import fetch_recipe_page
 from PushShoppingList.services.recipe_extract_service import generated_recipe_pdf_path
 from PushShoppingList.services.recipe_extract_service import get_openai_client
+from PushShoppingList.services.recipe_extract_service import get_openai_error_code_and_param
 from PushShoppingList.services.recipe_extract_service import normalize_recipe_cover_image
 from PushShoppingList.services.recipe_extract_service import normalize_extracted_equipment_fields
 from PushShoppingList.services.recipe_extract_service import normalize_extracted_ingredient_fields
@@ -89,6 +90,19 @@ NUTRITION_FIELDS = [
     "calcium",
     "iron",
 ]
+
+
+def log_recipe_edit_openai_exception(action, model, exc, final_error_code):
+    openai_error_code, openai_error_param = get_openai_error_code_and_param(exc)
+    print(
+        f"[OpenAI] action={action} model={model} "
+        f"exception_type={type(exc).__name__} "
+        f"openai_error_code={openai_error_code or 'n/a'} "
+        f"openai_error_param={openai_error_param or 'n/a'} "
+        f"final_error_code={final_error_code}"
+    )
+
+
 DEFAULT_MANUAL_NUTRITION_FIELDS = [
     "serving_basis",
     "calories",
@@ -2098,6 +2112,12 @@ def decide_recipe_categories_with_chatgpt(
         content = response.choices[0].message.content
         data = json.loads(clean_json_response(content))
     except Exception as exc:
+        log_recipe_edit_openai_exception(
+            "recipe-category-decision",
+            model,
+            exc,
+            "RECIPE_CATEGORY_DECISION_FAILED",
+        )
         return {
             "ok": False,
             "error": f"Recipe category decision failed: {exc}",
@@ -2182,6 +2202,12 @@ def estimate_recipe_nutrition(payload):
         content = response.choices[0].message.content
         data = json.loads(clean_json_response(content))
     except Exception as exc:
+        log_recipe_edit_openai_exception(
+            "nutrition-estimate",
+            model,
+            exc,
+            "NUTRITION_ESTIMATE_FAILED",
+        )
         return {
             "ok": False,
             "error": f"Nutrition estimate failed: {exc}",
@@ -2254,6 +2280,12 @@ def recipe_note_feedback(payload):
         )
         feedback = str(response.choices[0].message.content or "").strip()
     except Exception as exc:
+        log_recipe_edit_openai_exception(
+            "recipe-note-feedback",
+            model,
+            exc,
+            "RECIPE_NOTE_FEEDBACK_FAILED",
+        )
         return {
             "ok": False,
             "error": f"Recipe note feedback failed: {exc}",
@@ -2655,6 +2687,10 @@ def request_recipe_step_image_bytes(prompt):
         client = client.with_options(timeout=timeout_seconds)
 
     try:
+        print(
+            f"[OpenAI] action=recipe-step-image model={model} "
+            "temperature_included=False"
+        )
         response = client.images.generate(
             model=model,
             prompt=prompt,
@@ -2669,7 +2705,14 @@ def request_recipe_step_image_bytes(prompt):
             metadata={"size": size, "quality": quality},
         )
     except Exception as exc:
-        if "timeout" in str(exc).lower() or "timed out" in str(exc).lower():
+        is_timeout = "timeout" in str(exc).lower() or "timed out" in str(exc).lower()
+        log_recipe_edit_openai_exception(
+            "recipe-step-image",
+            model,
+            exc,
+            "OPENAI_TIMEOUT" if is_timeout else "RECIPE_STEP_IMAGE_FAILED",
+        )
+        if is_timeout:
             raise TimeoutError() from exc
         raise
 

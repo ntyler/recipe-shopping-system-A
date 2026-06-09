@@ -697,23 +697,51 @@ def upload_recipe_media_route():
     if account_response:
         return account_response
 
-    uploaded_file = request.files.get("recipe_media")
-
-    if not uploaded_file or not uploaded_file.filename:
-        if wants_json:
-            return jsonify({"ok": False, "error": "No file was selected."}), 400
-
-        return redirect("/")
-
-    cookbook = selected_import_cookbook_from_form(request.form)
-    log_selected_import_cookbook("media-upload", cookbook)
-
     manual_description = str(
         request.form.get("photo_description")
         or request.form.get("recipe_description")
         or ""
     ).strip()
     upload_mode = str(request.form.get("upload_mode") or "").strip().lower()
+    normalized_upload_mode = upload_mode if upload_mode in {
+        "auto",
+        "read",
+        "read_text",
+        "vision",
+        "manual",
+        "manual_description",
+        "retry",
+    } else "auto"
+    if normalized_upload_mode in {"read", "retry"}:
+        normalized_upload_mode = "read_text"
+    if normalized_upload_mode == "manual":
+        normalized_upload_mode = "manual_description"
+    upload_action = {
+        "vision": "generate_recipe_from_image",
+        "manual_description": "describe_recipe",
+    }.get(normalized_upload_mode, "read_text")
+
+    uploaded_file = request.files.get("recipe_media")
+
+    if not uploaded_file or not uploaded_file.filename:
+        if wants_json:
+            message = "No file was selected."
+            return jsonify({
+                "ok": False,
+                "success": False,
+                "error": message,
+                "error_code": "NO_FILE_SELECTED",
+                "error_message": message,
+                "technical_message": message,
+                "model": resolve_vision_model() if upload_action != "read_text" else MODEL,
+                "model_used": resolve_vision_model() if upload_action != "read_text" else MODEL,
+                "action": upload_action,
+            }), 400
+
+        return redirect("/")
+
+    cookbook = selected_import_cookbook_from_form(request.form)
+    log_selected_import_cookbook("media-upload", cookbook)
 
     result = extract_recipe_from_upload(
         uploaded_file,

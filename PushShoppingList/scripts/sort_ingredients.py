@@ -13,6 +13,7 @@ from PushShoppingList.services.recipe_extract_service import (
     ingredient_key_matches_existing,
     normalize_ingredient_for_shopping_list,
     normalize_ingredient_key,
+    supports_custom_temperature,
 )
 from PushShoppingList.services.shopping_list_service import SHOPPING_LIST_FILE
 
@@ -383,9 +384,9 @@ def validate_sorted_list(original_items, sorted_items):
 
 
 def send_prompt_to_openai(prompt_text):
-    response = get_openai_client().chat.completions.create(
-        model=MODEL,
-        messages=[
+    request_payload = {
+        "model": MODEL,
+        "messages": [
             {
                 "role": "system",
                 "content": "You sort grocery ingredients and return only valid JSON.",
@@ -395,9 +396,17 @@ def send_prompt_to_openai(prompt_text):
                 "content": prompt_text,
             },
         ],
-        response_format={"type": "json_object"},
-        temperature=0,
+        "response_format": {"type": "json_object"},
+    }
+    include_temperature = supports_custom_temperature(MODEL)
+    if include_temperature:
+        request_payload["temperature"] = 0
+
+    print(
+        f"[OpenAI] action=sort-ingredients model={MODEL} "
+        f"temperature_included={include_temperature}"
     )
+    response = get_openai_client().chat.completions.create(**request_payload)
 
     return response.choices[0].message.content
 
