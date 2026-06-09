@@ -6208,13 +6208,9 @@ async function submitRecipeMediaUpload(input, manualDescription = "", uploadMode
             if (sourceUrl) {
                 setRecipeMediaWorkflowSourceUrl(sourceUrl);
             }
-            markRecipeMediaEstimatePerServingDone(false);
             updateRecipeFileLoadingStep("save", "done", "Saved");
             setRecipeFileImageNextStepsPanelVisible(true);
-            setRecipeFileImageNextStepButtons({
-                estimateDisabled: false,
-                createPdfDisabled: true,
-            });
+            markRecipeMediaServingEstimateCompleteFromRecipe(recipeMediaUploadPreview);
         } else {
             updateRecipeFileLoadingStep("estimate", "done", "Skipped");
             updateRecipeFileLoadingStep("read", "done", "Readable text found");
@@ -6518,6 +6514,16 @@ function recipeMediaEstimatePerServingAllowed(recipe = recipeMediaUploadPreview)
     return recipeHasPerServingEstimate(recipe);
 }
 
+function markRecipeMediaServingEstimateCompleteFromRecipe(recipe = recipeMediaUploadPreview) {
+    const complete = recipeMediaEstimatePerServingAllowed(recipe);
+    markRecipeMediaEstimatePerServingDone(complete);
+    setRecipeFileImageNextStepButtons({
+        estimateDisabled: complete,
+        createPdfDisabled: !complete,
+    });
+    return complete;
+}
+
 async function submitRecipeMediaEstimatePerServing() {
     const recipeUrl = getRecipeMediaWorkflowSourceUrl();
     const recipeJson = recipeMediaUploadPreview;
@@ -6529,6 +6535,13 @@ async function submitRecipeMediaEstimatePerServing() {
             recipeFileSummary.textContent = "No recipe available to estimate. Try re-running image extraction.";
         }
         return false;
+    }
+
+    if (recipeMediaEstimatePerServingAllowed(recipeJson)) {
+        markRecipeMediaServingEstimateCompleteFromRecipe(recipeJson);
+        setRecipeFileLoadingSummary("Per-serving nutrition is already available.");
+        updateRecipeFileLoadingStep("save", "done", "Serving estimate complete");
+        return true;
     }
 
     if (button) {
@@ -6966,6 +6979,7 @@ async function submitRecipeMediaVision() {
         }
 
         recipeMediaUploadPreview = recipeJson;
+        markRecipeMediaServingEstimateCompleteFromRecipe(recipeJson);
         updateRecipeFileLoadingStep("estimate", "done", "Success");
         updateRecipeFileLoadingStep("extract", "done", "Completed");
         setRecipeFileEstimatedBanner(true, estimationBanner);
@@ -14626,6 +14640,16 @@ function recipeNutritionHeaderHtml() {
 
 async function estimateRecipeNutrition(button) {
     const originalText = button ? button.textContent : "";
+    const payload = collectRecipeEditorPayload();
+
+    if (payload && payload.recipe && recipeHasPerServingEstimate(payload.recipe)) {
+        updateRecipeEditorPdfControls(payload.recipe, {
+            updateInputValues: false,
+            useCurrentForMissing: true,
+        });
+        setRecipeEditStatus("Per-serving nutrition is already available.");
+        return false;
+    }
 
     if (button) {
         button.disabled = true;
@@ -14634,7 +14658,6 @@ async function estimateRecipeNutrition(button) {
 
     try {
         setRecipeEditStatus("Estimating nutrition with ChatGPT...");
-        const payload = collectRecipeEditorPayload();
         const response = await fetch("/api/recipe_nutrition_estimate", {
             method: "POST",
             headers: {

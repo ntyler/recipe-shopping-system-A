@@ -164,6 +164,48 @@ def _has_per_serving_estimate(nutrition):
     return False
 
 
+def _nutrition_rows_from_value(nutrition):
+    if isinstance(nutrition, list):
+        return [
+            {"key": str(item.get("key") or ""), "value": str(item.get("value") or "")}
+            for item in nutrition
+            if isinstance(item, dict) and str(item.get("key") or "").strip()
+        ]
+
+    if isinstance(nutrition, dict):
+        rows = []
+        for key, value in nutrition.items():
+            if key == "other" and isinstance(value, list):
+                for item in value:
+                    if not isinstance(item, dict):
+                        continue
+                    name = str(item.get("name") or item.get("key") or "").strip()
+                    item_value = str(item.get("value") or "").strip()
+                    if name or item_value:
+                        rows.append({"key": name or "other", "value": item_value})
+                continue
+            if str(value or "").strip():
+                rows.append({"key": str(key), "value": str(value)})
+        return rows
+
+    return []
+
+
+def _existing_nutrition_success(recipe, recipe_url=""):
+    recipe = recipe if isinstance(recipe, dict) else {}
+    nutrition = recipe.get("nutrition")
+    rows = _nutrition_rows_from_value(nutrition)
+    return {
+        "ok": True,
+        "success": True,
+        "already_complete": True,
+        "nutrition": rows,
+        "recipe_json": recipe,
+        "recipe_url": recipe_url,
+        "error": "",
+    }
+
+
 def _is_uploaded_recipe_nutrition_complete(url):
     if not _is_uploaded_recipe_url(url):
         return True
@@ -1647,7 +1689,10 @@ def api_generate_recipe_from_image_route():
     result["fallback_to_model"] = str(debug.get("fallback_to_model") or "")
     result["action"] = "generate_recipe_from_image"
     result["debug"] = debug
-    _mark_uploaded_recipe_nutrition_estimated(recipe_url, False)
+    _mark_uploaded_recipe_nutrition_estimated(
+        recipe_url,
+        _has_per_serving_estimate(parsed_recipe.get("nutrition") if isinstance(parsed_recipe, dict) else None),
+    )
     debug["recipe_creation_success"] = bool(result.get("ok"))
     log_vision_debug_step(debug, "Recipe creation success", recipe_creation_success=debug["recipe_creation_success"])
 
@@ -1683,6 +1728,27 @@ def api_estimate_per_serving_route():
                 "recipe_url": recipe_url,
             },
         })), 400
+
+    if _has_per_serving_estimate(recipe.get("nutrition") if isinstance(recipe, dict) else None):
+        if recipe_url:
+            save_result = save_editable_recipe(recipe_url, recipe)
+            if not save_result.get("ok"):
+                return jsonify(with_openai_usage_dashboard({
+                    "ok": False,
+                    "success": False,
+                    "error": save_result.get("error") or "Unable to save existing nutrition.",
+                    "recipe_json": recipe,
+                    "recipe_url": recipe_url,
+                })), 400
+            _mark_uploaded_recipe_nutrition_estimated(recipe_url, True)
+        result = _existing_nutrition_success(recipe, recipe_url)
+        result["model_used"] = str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL))
+        result["debug"] = {
+            "model": result["model_used"],
+            "recipe_url": recipe_url,
+            "already_complete": True,
+        }
+        return jsonify(with_openai_usage_dashboard(result)), 200
 
     model_used = str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL))
     result = estimate_recipe_nutrition(recipe)
@@ -2002,6 +2068,9 @@ def api_create_recipe_route():
 def api_recipe_nutrition_estimate_route():
     data = request.get_json(silent=True) or {}
     recipe = data.get("recipe", data)
+    if _has_per_serving_estimate(recipe.get("nutrition") if isinstance(recipe, dict) else None):
+        return jsonify(with_openai_usage_dashboard(_existing_nutrition_success(recipe))), 200
+
     result = estimate_recipe_nutrition(recipe)
     status = 200 if result.get("ok") else 400
 

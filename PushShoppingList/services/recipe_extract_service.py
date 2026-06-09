@@ -7379,14 +7379,24 @@ def infer_food_image_recipe(recipe_url, upload_path, mime_type, filename, user_d
 
     if not isinstance(parsed.get("nutrition"), dict):
         parsed["nutrition"] = {}
+    nutrition_source = parsed["nutrition"]
+    nutrition_serving_basis = clean_recipe_text(
+        nutrition_source.get("serving_basis")
+        or nutrition_source.get("basis")
+        or nutrition_source.get("per")
+        or ""
+    )
     parsed["nutrition"] = {
-        "calories": clean_recipe_text(parsed["nutrition"].get("calories") or ""),
-        "protein": clean_recipe_text(parsed["nutrition"].get("protein") or ""),
-        "carbs": clean_recipe_text(parsed["nutrition"].get("carbs") or ""),
-        "fat": clean_recipe_text(parsed["nutrition"].get("fat") or ""),
-        "fiber": clean_recipe_text(parsed["nutrition"].get("fiber") or ""),
-        "sodium": clean_recipe_text(parsed["nutrition"].get("sodium") or ""),
+        "serving_basis": nutrition_serving_basis,
+        "calories": clean_recipe_text(nutrition_source.get("calories") or ""),
+        "protein": clean_recipe_text(nutrition_source.get("protein") or ""),
+        "carbs": clean_recipe_text(nutrition_source.get("carbs") or nutrition_source.get("carbohydrates") or ""),
+        "fat": clean_recipe_text(nutrition_source.get("fat") or ""),
+        "fiber": clean_recipe_text(nutrition_source.get("fiber") or ""),
+        "sodium": clean_recipe_text(nutrition_source.get("sodium") or ""),
     }
+    if parsed["nutrition"].get("calories") and not parsed["nutrition"].get("serving_basis"):
+        parsed["nutrition"]["serving_basis"] = "per serving"
 
     extraction_confidence = parse_confidence(parsed.get("extraction_confidence"))
     parsed["extraction_confidence"] = extraction_confidence if extraction_confidence is not None else 0.55
