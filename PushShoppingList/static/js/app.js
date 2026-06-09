@@ -6219,6 +6219,7 @@ async function submitRecipeMediaUpload(input, manualDescription = "", uploadMode
             await openImportedRecipeEditorAfterMediaImport(data, {
                 statusMessage: categoryStatusMessage || "Recipe estimated from uploaded image.",
                 refreshMessage: "Refreshing recipe and opening the editor...",
+                runImagePreflight: true,
             });
         } else {
             window.location.reload();
@@ -6376,7 +6377,7 @@ async function submitRecipeMediaEstimatePerServing() {
         if (recipeFileSummary) {
             recipeFileSummary.textContent = "No recipe available to estimate. Try re-running image extraction.";
         }
-        return;
+        return false;
     }
 
     if (button) {
@@ -6431,12 +6432,15 @@ async function submitRecipeMediaEstimatePerServing() {
             createPdfDisabled: true,
         });
         setRecipeFileLoadingSummary(`Could not estimate serving basis. ${err.message || "Unable to estimate nutrition."}`);
+        return false;
     } finally {
         if (button) {
             button.disabled = false;
             button.textContent = "Estimate per serving basis";
         }
     }
+
+    return true;
 }
 
 async function createRecipePdfFromMediaImport() {
@@ -6445,12 +6449,12 @@ async function createRecipePdfFromMediaImport() {
 
     if (!recipeUrl) {
         setRecipeFileLoadingSummary("Recipe URL missing. Regenerate from image first.");
-        return;
+        return false;
     }
 
     if (!isRecipeMediaEstimatePerServingDone()) {
         setRecipeFileLoadingSummary("Estimate per serving basis is required before creating the recipe PDF.");
-        return;
+        return false;
     }
 
     try {
@@ -6478,7 +6482,7 @@ async function createRecipePdfFromMediaImport() {
             estimateDisabled: false,
             createPdfDisabled: true,
         });
-        return;
+        return false;
     }
 
     if (button) {
@@ -6508,12 +6512,15 @@ async function createRecipePdfFromMediaImport() {
         });
     } catch (err) {
         setRecipeFileLoadingSummary(err.message || "Unable to create recipe PDF.");
+        return false;
     } finally {
         if (button) {
             button.disabled = false;
             button.textContent = "Create recipe PDF";
         }
     }
+
+    return true;
 }
 
 async function submitRecipeMediaReadText() {
@@ -6531,10 +6538,19 @@ async function openImportedRecipeEditorAfterMediaImport(data = {}, options = {})
         || ""
     ).trim();
     const statusMessage = String(options.statusMessage || "Recipe import completed.").trim();
+    const runImagePreflight = Boolean(options.runImagePreflight);
 
     if (!recipeUrl) {
         window.location.reload();
         return;
+    }
+
+    if (runImagePreflight) {
+        setRecipeFileLoadingSummary("Preparing recipe for edit...");
+        const preflightOk = await runImageBasedRecipeImportPreflightForEdit();
+        if (!preflightOk) {
+            return;
+        }
     }
 
     setRecipeFileLoadingSummary(options.refreshMessage || "Refreshing recipe and opening the editor...");
@@ -6557,6 +6573,17 @@ async function openImportedRecipeEditorAfterMediaImport(data = {}, options = {})
     if (status && statusMessage) {
         status.textContent = statusMessage;
     }
+}
+
+async function runImageBasedRecipeImportPreflightForEdit() {
+    if (!isRecipeMediaEstimatePerServingDone()) {
+        const estimateOk = await submitRecipeMediaEstimatePerServing();
+        if (!estimateOk) {
+            return false;
+        }
+    }
+
+    return await createRecipePdfFromMediaImport();
 }
 
 function buildVisionConnectionErrorMessage(reason, debug = {}) {
@@ -6777,6 +6804,7 @@ async function submitRecipeMediaVision() {
         await openImportedRecipeEditorAfterMediaImport(data, {
             statusMessage: categoryStatusMessage || "Recipe estimated from uploaded image.",
             refreshMessage: "Refreshing recipe and opening the editor...",
+            runImagePreflight: true,
         });
     } catch (err) {
         const data = err && err.data ? err.data : {};
