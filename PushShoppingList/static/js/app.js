@@ -6298,6 +6298,53 @@ async function openImportedRecipeEditorAfterMediaImport(data = {}, options = {})
     }
 }
 
+function buildVisionConnectionErrorMessage(reason, debug = {}) {
+    const errorCode = String((debug && debug.error_code) || "").toLowerCase();
+    const reasonText = String(reason || "").toLowerCase();
+    const exceptionType = String((debug && debug.exception_type) || "").toLowerCase();
+    const exceptionMessage = String((debug && debug.exception_message) || "").toLowerCase();
+
+    const likelyConnectionError = Boolean(
+        exceptionType.includes("connection")
+        || exceptionType.includes("timeout")
+        || exceptionType.includes("urlopen")
+        || reasonText.includes("connection")
+        || reasonText.includes("timed out")
+        || reasonText.includes("timeout")
+        || exceptionMessage.includes("connection")
+        || exceptionMessage.includes("timed out")
+        || exceptionMessage.includes("temporarily")
+        || errorCode.includes("connection")
+        || errorCode.includes("timeout")
+    );
+
+    if (!likelyConnectionError) {
+        return "";
+    }
+
+    const model = String((debug && debug.model) || "unknown");
+    const fileExists = Boolean(debug && debug.file_exists);
+    const fileSize = Number(debug && debug.file_size ? debug.file_size : 0);
+    const exceptionTypeText = String(debug && debug.exception_type) || "Unknown";
+    const exceptionMessageText = String(debug && debug.exception_message || "");
+
+    return [
+        "Connection error while contacting OpenAI.",
+        "Possible causes:",
+        "- backend has no internet access",
+        "- OPENAI_API_KEY missing or invalid",
+        "- request timed out",
+        "- local image path was sent instead of image bytes/base64",
+        "- firewall/proxy blocked request",
+        "- OpenAI SDK/network issue",
+        `Model used: ${model}`,
+        `File exists: ${fileExists ? "yes" : "no"}`,
+        `File size: ${fileSize}`,
+        `Exception type: ${exceptionTypeText}`,
+        `Exception message: ${exceptionMessageText}`,
+    ].join("\n");
+}
+
 async function submitRecipeMediaVision() {
     if (recipeMediaVisionInProgress) {
         return;
@@ -6465,8 +6512,12 @@ async function submitRecipeMediaVision() {
     } catch (err) {
         const data = err && err.data ? err.data : {};
         const responseErrorMessage = String((data && (data.error_message || data.error)) || "").trim();
+        const debug = data && data.debug ? data.debug : {};
+        const connectionErrorMessage = buildVisionConnectionErrorMessage(responseErrorMessage, debug);
         const reason = responseErrorMessage || "No failure reason was returned by the backend.";
-        const message = `Could not estimate a recipe from this image.\nReason: ${reason}`;
+        const message = connectionErrorMessage
+            ? `${connectionErrorMessage}\n\nReason: ${reason}`
+            : `Could not estimate a recipe from this image.\nReason: ${reason}`;
 
         const responsePath = String((data && data.uploaded_file_path) || "").trim();
         if (responsePath) {
@@ -6482,7 +6533,6 @@ async function submitRecipeMediaVision() {
         setRecipeFileExtractionMode(visionModeLabel);
         setRecipeFileManualDescriptionPanelVisible(true, message, photoDescription);
         setRecipeFileEstimatedBanner(false);
-        const debug = data && data.debug ? data.debug : {};
         updateRecipeFileLoadingStep(
             "upload",
             debug.failed_status === "image_uploaded" ? "failed" : "done",
@@ -6855,8 +6905,15 @@ function setRecipeFileVisionDebug(debug = null, options = {}) {
         const errorDetails = {
             error_code: normalizedDebug.error_code || (options.errorData && options.errorData.error_code) || "",
             error_message: normalizedDebug.error_message || (options.errorData && (options.errorData.error_message || options.errorData.error)) || "",
+            model: normalizedDebug.model || "",
+            file_path: normalizedDebug.file_path || "",
             file_exists: normalizedDebug.file_exists,
             file_size: normalizedDebug.file_size,
+            request_started: normalizedDebug.request_started,
+            request_completed: normalizedDebug.request_completed,
+            exception_type: normalizedDebug.exception_type,
+            exception_message: normalizedDebug.exception_message,
+            encoded_base64_length: normalizedDebug.encoded_base64_length,
             image_type_supported: normalizedDebug.image_type_supported,
             image_readable: normalizedDebug.image_readable,
             vision_request_sent: normalizedDebug.vision_request_sent,

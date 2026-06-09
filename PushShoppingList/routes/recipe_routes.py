@@ -1,4 +1,5 @@
 import json
+import os
 import threading
 from pathlib import Path
 from time import perf_counter
@@ -33,8 +34,13 @@ from PushShoppingList.services.recipe_extract_service import extract_recipe_cove
 from PushShoppingList.services.recipe_extract_service import extract_recipe_from_url
 from PushShoppingList.services.recipe_extract_service import generateRecipeFromImage
 from PushShoppingList.services.recipe_extract_service import build_vision_debug
+from PushShoppingList.services.recipe_extract_service import MODEL
+from PushShoppingList.services.recipe_extract_service import OPENAI_PING_TEXT_MODEL
+from PushShoppingList.services.recipe_extract_service import classify_vision_ai_exception
+from PushShoppingList.services.recipe_extract_service import get_openai_client
 from PushShoppingList.services.recipe_extract_service import build_extract_result
 from PushShoppingList.services.recipe_extract_service import log_vision_debug_step
+from PushShoppingList.services.recipe_extract_service import send_image_prompt_to_openai
 from PushShoppingList.services.recipe_extract_service import normalize_upload_mime_type
 from PushShoppingList.services.recipe_extract_service import normalize_extracted_equipment_fields
 from PushShoppingList.services.recipe_extract_service import normalize_extracted_ingredient_fields
@@ -853,6 +859,134 @@ def validate_vision_image_upload(upload_path, filename, mime_type, debug):
     debug["image_uploaded"] = True
     log_vision_debug_step(debug, "Image readable", image_format=debug.get("image_format"))
     return ""
+
+
+@recipe_bp.route("/api/debug/openai-ping", methods=["GET"])
+def api_debug_openai_ping():
+    model = str(
+        request.args.get("model")
+        or OPENAI_PING_TEXT_MODEL
+    ).strip()
+    if not model:
+        model = "gpt-4o-mini"
+
+    if not os.getenv("OPENAI_API_KEY"):
+        return jsonify(
+            {
+                "success": False,
+                "model": model,
+                "error_type": "MISSING_OPENAI_API_KEY",
+                "error_message": "OPENAI_API_KEY is missing.",
+            }
+        ), 401
+
+    try:
+        response = get_openai_client().chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": "Return the word OK."}],
+            temperature=0,
+            max_tokens=8,
+            response_format={"type": "text"},
+        )
+        message = str((response.choices[0].message.content or "").strip())
+        message = message.strip('"').strip("'") or "OK"
+        return jsonify({"success": True, "model": model, "message": message}), 200
+    except Exception as exc:
+        return jsonify(
+            {
+                "success": False,
+                "model": model,
+                "error_type": type(exc).__name__,
+                "error_message": str(exc),
+            }
+        ), 502
+
+
+@recipe_bp.route("/api/debug/vision-ping", methods=["POST"])
+def api_debug_vision_ping():
+    data = request.get_json(silent=True) or {}
+    uploaded_file_path = str(data.get("uploaded_file_path") or "").strip()
+    if not uploaded_file_path:
+        return jsonify(
+            {
+                "success": False,
+                "error_type": "INVALID_REQUEST",
+                "error_message": "uploaded_file_path is required.",
+            }
+        ), 400
+
+    upload_path = Path(uploaded_file_path)
+    if not upload_path.exists() or not upload_path.is_file():
+        return jsonify(
+            {
+                "success": False,
+                "error_type": "UPLOADED_FILE_MISSING",
+                "error_message": "Uploaded image file does not exist.",
+            }
+        ), 400
+
+    debug = build_vision_debug(uploaded_file_path=uploaded_file_path, filename=upload_path.name)
+    resolved_mime = normalize_upload_mime_type(
+        str(data.get("mime_type") or "").strip(),
+        upload_path.name,
+        upload_path,
+    )
+
+    prompt = (
+        "Briefly describe this image in one sentence. "
+        'Return JSON only: {"description":""}'
+    )
+
+    try:
+        response_text = send_image_prompt_to_openai(
+            prompt,
+            upload_path,
+            resolved_mime,
+            model=MODEL,
+            debug=debug,
+        )
+    except Exception as exc:
+        error_code, error_message = classify_vision_ai_exception(exc)
+        set_vision_debug_error(
+            debug,
+            error_code,
+            error_message,
+            failed_status="vision_response_received",
+        )
+        return jsonify(
+            {
+                "success": False,
+                "model": debug.get("model") or MODEL,
+                "error_code": error_code,
+                "error_type": type(exc).__name__,
+                "error_message": error_message,
+                "debug": debug,
+            }
+        ), 502
+
+    try:
+        parsed_response = json.loads(response_text)
+    except Exception as exc:
+        return jsonify(
+            {
+                "success": False,
+                "model": debug.get("model") or MODEL,
+                "error_code": "VISION_PING_PARSE_ERROR",
+                "error_message": str(exc),
+                "raw_response": response_text,
+                "debug": debug,
+            }
+        ), 502
+
+    return jsonify(
+        {
+            "success": True,
+            "model": debug.get("model") or MODEL,
+            "raw_response": response_text,
+            "parsed_response": parsed_response,
+            "debug": debug,
+        }
+    ), 200
 
 
 @recipe_bp.route("/api/generate-recipe-from-image", methods=["POST"])

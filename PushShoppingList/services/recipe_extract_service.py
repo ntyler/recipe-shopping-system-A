@@ -5,6 +5,7 @@ import html
 import base64
 import io
 import mimetypes
+import imghdr
 import shutil
 import subprocess
 import time
@@ -22,6 +23,24 @@ import requests
 from bs4 import BeautifulSoup
 from openai import OpenAI
 
+try:
+    from openai import APIConnectionError, APITimeoutError, RateLimitError, AuthenticationError, BadRequestError
+except Exception:  # pragma: no cover
+    class APIConnectionError(Exception):
+        pass
+
+    class APITimeoutError(Exception):
+        pass
+
+    class RateLimitError(Exception):
+        pass
+
+    class AuthenticationError(Exception):
+        pass
+
+    class BadRequestError(Exception):
+        pass
+
 from PushShoppingList.services import cloudflare_r2_storage
 from PushShoppingList.services.openai_usage_service import record_openai_usage
 from PushShoppingList.services.purchase_mapping_service import apply_purchase_mapping_to_ingredient
@@ -32,6 +51,19 @@ from PushShoppingList.services.user_account_service import current_public_user
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 PROJECT_DIR = BASE_DIR.parent
+
+def _safe_int(value, default):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return int(default)
+
+
+def _safe_float(value, default):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float(default)
 
 EXTRACTOR_FOLDER = scoped_extractor_path()
 OUTPUT_FOLDER = scoped_extractor_data_path("output")
@@ -49,6 +81,21 @@ VIDEO_FOLDER.mkdir(parents=True, exist_ok=True)
 PDF_FOLDER.mkdir(parents=True, exist_ok=True)
 
 MODEL = os.getenv("OPENAI_RECIPE_MODEL", "gpt-4o-mini")
+OPENAI_PING_TEXT_MODEL = os.getenv("OPENAI_PING_TEXT_MODEL", "gpt-4o-mini")
+VISION_REQUEST_TIMEOUT_SECONDS = _safe_int(
+    os.getenv("OPENAI_VISION_REQUEST_TIMEOUT_SECONDS", "120"),
+    120,
+)
+VISION_RETRY_DELAY_SECONDS = _safe_float(
+    os.getenv("OPENAI_VISION_RETRY_DELAY_SECONDS", "0.75"),
+    0.75,
+)
+VISION_MAX_RETRIES = _safe_int(
+    os.getenv("OPENAI_VISION_MAX_RETRIES", "2"),
+    2,
+)
+print(f"[Recipe AI] OPENAI_API_KEY present: {'yes' if bool(os.getenv('OPENAI_API_KEY')) else 'no'}")
+print(f"[Recipe AI] Vision model: {MODEL}")
 MAX_PAGE_TEXT_CHARS = 35000
 MAX_SOCIAL_VIDEO_PROMPT_CHARS = 12000
 MAX_VIDEO_TRANSCRIPTION_SECONDS = int(os.getenv("MAX_VIDEO_TRANSCRIPTION_SECONDS", "180"))
@@ -271,18 +318,24 @@ def build_vision_debug(uploaded_file_path="", filename="", mime_type=""):
         "mime_type": str(mime_type or ""),
         "file_exists": False,
         "file_size": 0,
+        "model": MODEL,
         "image_type_supported": False,
         "image_readable": False,
         "image_uploaded": False,
+        "request_started": False,
+        "request_completed": False,
         "vision_request_sent": False,
         "vision_response_received": False,
         "json_parse_success": False,
         "recipe_json_parsed": False,
         "ingredient_count": 0,
         "recipe_creation_success": False,
+        "encoded_base64_length": 0,
         "error_code": "",
         "error_message": "",
         "failed_status": "",
+        "exception_type": "",
+        "exception_message": "",
         "vision_request": {},
         "vision_response": "",
         "recipe_json": None,
@@ -331,6 +384,26 @@ def set_vision_debug_error(debug, error_code, error_message, failed_status=""):
 
 
 def classify_vision_ai_exception(exc):
+    if isinstance(exc, APIConnectionError):
+        return "OPENAI_CONNECTION_ERROR", "Vision AI connection failed."
+
+    if isinstance(exc, APITimeoutError):
+        return "OPENAI_TIMEOUT_ERROR", "Vision AI request timed out."
+
+    if isinstance(exc, RateLimitError):
+        return "OPENAI_RATE_LIMIT_ERROR", "Vision API rate limit exceeded."
+
+    if isinstance(exc, AuthenticationError):
+        return "OPENAI_AUTH_ERROR", "Vision model not configured: invalid API key."
+
+    if isinstance(exc, BadRequestError):
+        lowered = str(exc or "").lower()
+        if "model" in lowered and "unsupported" in lowered:
+            return "OPENAI_UNSUPPORTED_MODEL", "OpenAI request failed: unsupported model."
+        if "image" in lowered and "unsupported" in lowered:
+            return "OPENAI_INVALID_IMAGE_PAYLOAD", "OpenAI request failed: unsupported image payload."
+        return "OPENAI_BAD_REQUEST", f"Vision AI request failed: {str(exc or '').strip() or type(exc).__name__}"
+
     text = str(exc or "").strip()
     lowered = text.lower()
 
@@ -347,6 +420,24 @@ def classify_vision_ai_exception(exc):
         return "UNSUPPORTED_IMAGE_FORMAT", "Unsupported image format."
 
     return "AI_REQUEST_FAILED", f"Vision AI request failed: {text or type(exc).__name__}"
+
+
+def set_vision_debug_exception(debug, exc):
+    exception_type = type(exc).__name__
+    exception_message = str(exc or "").strip() or exception_type
+    if isinstance(debug, dict):
+        debug["exception_type"] = exception_type
+        debug["exception_message"] = exception_message
+
+    log_vision_debug_step(
+        debug,
+        "Vision exception",
+        exception_type=exception_type,
+        exception_message=exception_message,
+    )
+    print(f"[Vision] Exception type: {exception_type}")
+    print(f"[Vision] Exception message: {exception_message}")
+    return exception_type, exception_message
 
 
 def safe_filename(text):
@@ -5583,6 +5674,36 @@ def send_prompt_to_openai(prompt_text):
     return response.choices[0].message.content
 
 
+def detect_image_mime_type(image_path, mime_type=""):
+    resolved_mime = str(mime_type or "").split(";", 1)[0].strip().lower()
+    if resolved_mime:
+        return resolved_mime
+
+    path = Path(image_path)
+    extension_mime = mimetypes.guess_type(path.name or str(path))[0]
+    if extension_mime:
+        return extension_mime.lower()
+
+    try:
+        detected = imghdr.what(str(path))
+        if detected:
+            if detected == "jpeg":
+                return "image/jpeg"
+            return f"image/{detected.lower()}"
+    except Exception:
+        pass
+
+    try:
+        from PIL import Image
+        with Image.open(path) as image:
+            if image.format:
+                return f"image/{image.format.lower()}"
+    except Exception:
+        pass
+
+    return "image/jpeg"
+
+
 def prepare_image_bytes_for_openai(image_path, mime_type):
     image_bytes = image_path.read_bytes()
 
@@ -5622,36 +5743,104 @@ def prepare_image_bytes_for_openai(image_path, mime_type):
     return image_bytes, mime_type
 
 
-def send_image_prompt_to_openai(prompt_text, image_path, mime_type):
-    image_bytes, mime_type = prepare_image_bytes_for_openai(image_path, mime_type)
-    image_data = base64.b64encode(image_bytes).decode("ascii")
+def send_image_prompt_to_openai(prompt_text, image_path, mime_type, model=None, request_timeout=None, max_retries=None, debug=None):
+    resolved_model = str(model or MODEL).strip() or MODEL
+    resolved_timeout = (
+        _safe_int(request_timeout, VISION_REQUEST_TIMEOUT_SECONDS)
+        if request_timeout is not None
+        else VISION_REQUEST_TIMEOUT_SECONDS
+    )
+    max_retry_attempts = (
+        _safe_int(max_retries, VISION_MAX_RETRIES)
+        if max_retries is not None
+        else VISION_MAX_RETRIES
+    )
+    upload_path = Path(image_path)
 
-    response = get_openai_client().with_options(timeout=90).chat.completions.create(
-        model=MODEL,
-        messages=[
-            {
-                "role": "system",
-                "content": "You extract recipe ingredients from recipe photos and documents and return only valid JSON.",
-            },
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt_text},
+    resolved_mime = detect_image_mime_type(upload_path, mime_type)
+    image_bytes, resolved_mime = prepare_image_bytes_for_openai(upload_path, resolved_mime)
+    encoded_image = base64.b64encode(image_bytes).decode("ascii")
+    if isinstance(debug, dict):
+        debug["file_path"] = str(upload_path)
+        debug["filename"] = str(debug.get("filename") or upload_path.name)
+        debug["mime_type"] = str(resolved_mime)
+        debug["file_exists"] = upload_path.is_file()
+        debug["file_size"] = len(image_bytes)
+        debug["model"] = resolved_model
+        debug["encoded_base64_length"] = len(encoded_image)
+        debug["request_started"] = False
+        debug["request_completed"] = False
+        debug["exception_type"] = ""
+        debug["exception_message"] = ""
+
+    print(f"[Vision] Model: {resolved_model}")
+    print(f"[Vision] Image path: {upload_path}")
+    print(f"[Vision] File exists: {upload_path.is_file()}")
+    print(f"[Vision] File size: {len(image_bytes)}")
+    print(f"[Vision] MIME type: {resolved_mime}")
+    print(f"[Vision] Encoded base64 length: {len(encoded_image)}")
+    log_vision_debug_step(debug, "Model", model=resolved_model)
+    log_vision_debug_step(debug, "Image path", image_path=str(upload_path))
+    log_vision_debug_step(debug, "File exists", file_exists=upload_path.is_file())
+    log_vision_debug_step(debug, "File size", file_size=len(image_bytes))
+    log_vision_debug_step(debug, "MIME type", mime_type=resolved_mime)
+    log_vision_debug_step(debug, "Encoded base64 length", encoded_base64_length=len(encoded_image))
+
+    for attempt in range(max_retry_attempts + 1):
+        if attempt > 0:
+            print(f"[Vision] Retrying request after delay: {VISION_RETRY_DELAY_SECONDS}s attempt={attempt}")
+            if isinstance(debug, dict):
+                debug["request_started"] = False
+                debug["request_completed"] = False
+            time.sleep(VISION_RETRY_DELAY_SECONDS)
+
+        if isinstance(debug, dict):
+            debug["request_started"] = True
+            debug["request_completed"] = False
+            debug["failed_status"] = "vision_request_sent"
+
+        print("[Vision] Request starting")
+        try:
+            response = get_openai_client().with_options(timeout=resolved_timeout).chat.completions.create(
+                model=resolved_model,
+                messages=[
                     {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:{mime_type};base64,{image_data}",
-                        },
+                        "role": "system",
+                        "content": "You extract recipe ingredients from recipe photos and documents and return only valid JSON.",
+                    },
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt_text},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:{resolved_mime};base64,{encoded_image}",
+                                },
+                            },
+                        ],
                     },
                 ],
-            },
-        ],
-        response_format={"type": "json_object"},
-        temperature=0,
-    )
-    record_openai_usage(response, "recipe-image-extraction", model=MODEL)
+                response_format={"type": "json_object"},
+                temperature=0,
+            )
 
-    return response.choices[0].message.content
+            if isinstance(debug, dict):
+                debug["request_completed"] = True
+            print("[Vision] Request completed")
+            record_openai_usage(response, "recipe-image-extraction", model=resolved_model)
+            return response.choices[0].message.content
+        except Exception as exc:
+            print("[Vision] Request failed")
+            set_vision_debug_exception(debug, exc)
+            if isinstance(debug, dict):
+                debug["request_completed"] = False
+            if attempt < max_retry_attempts and isinstance(
+                exc,
+                (APIConnectionError, APITimeoutError),
+            ):
+                continue
+            raise
 
 
 def send_social_video_audio_image_prompt_to_openai(prompt_text, image_urls):
@@ -6207,12 +6396,13 @@ def infer_food_image_recipe(recipe_url, upload_path, mime_type, filename, user_d
     prompt_text = build_food_image_inference_prompt(recipe_url, filename, user_description)
     if isinstance(debug, dict):
         debug["vision_request"] = {
-            "model": MODEL,
+            "model": str(MODEL),
             "filename": str(filename or ""),
             "mime_type": str(mime_type or ""),
             "prompt_length": len(prompt_text),
             "prompt": prompt_text,
         }
+        debug["model"] = str(MODEL)
 
     if not str(MODEL or "").strip():
         return None, set_vision_debug_error(
@@ -6239,9 +6429,53 @@ def infer_food_image_recipe(recipe_url, upload_path, mime_type, filename, user_d
             prompt_text,
             upload_path,
             mime_type,
+            model=MODEL,
+            debug=debug,
+        )
+    except APIConnectionError as exc:
+        set_vision_debug_exception(debug, exc)
+        return None, set_vision_debug_error(
+            debug,
+            "OPENAI_CONNECTION_ERROR",
+            "Vision AI connection failed.",
+            failed_status="vision_response_received",
+        )
+    except APITimeoutError as exc:
+        set_vision_debug_exception(debug, exc)
+        return None, set_vision_debug_error(
+            debug,
+            "OPENAI_TIMEOUT_ERROR",
+            "Vision AI request timed out.",
+            failed_status="vision_response_received",
+        )
+    except AuthenticationError as exc:
+        set_vision_debug_exception(debug, exc)
+        return None, set_vision_debug_error(
+            debug,
+            "OPENAI_AUTH_ERROR",
+            "Vision model not configured: invalid API key.",
+            failed_status="vision_response_received",
+        )
+    except RateLimitError as exc:
+        set_vision_debug_exception(debug, exc)
+        return None, set_vision_debug_error(
+            debug,
+            "OPENAI_RATE_LIMIT_ERROR",
+            "Vision API rate limit exceeded.",
+            failed_status="vision_response_received",
+        )
+    except BadRequestError as exc:
+        set_vision_debug_exception(debug, exc)
+        error_code, error_message = classify_vision_ai_exception(exc)
+        return None, set_vision_debug_error(
+            debug,
+            error_code,
+            error_message,
+            failed_status="vision_response_received",
         )
     except Exception as exc:
         error_code, error_message = classify_vision_ai_exception(exc)
+        set_vision_debug_exception(debug, exc)
         return None, set_vision_debug_error(
             debug,
             error_code,
