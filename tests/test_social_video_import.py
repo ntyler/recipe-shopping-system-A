@@ -604,6 +604,32 @@ def test_build_extract_result_includes_recipe_info_fields():
     assert result["cook_time"] == "20 min"
 
 
+def test_recipe_info_defaults_fill_editor_metadata_fields():
+    recipe_data = {
+        "recipe_title": "Pan Dinner",
+        "ingredients": [
+            {
+                "original_text": "1 cup rice",
+                "ingredient": "rice",
+                "quantity": "1",
+                "unit": "cup",
+            }
+        ],
+        "instructions": [{"step_number": 1, "instruction": "Cook the rice and serve."}],
+    }
+
+    recipe_extract_service.apply_recipe_info_metadata(recipe_data)
+    recipe_extract_service.apply_recipe_scaling_metadata(recipe_data)
+
+    assert recipe_data["servings"] == "4 servings"
+    assert recipe_data["level"] == "Easy"
+    assert recipe_data["total_time"] == "45 min"
+    assert recipe_data["prep_time"] == "15 min"
+    assert recipe_data["inactive_time"] == "0 min"
+    assert recipe_data["cook_time"] == "30 min"
+    assert recipe_data["scaling"]["base_servings"] == "4 servings"
+
+
 def test_youtube_audio_download_uses_android_player_client_by_default(monkeypatch):
     monkeypatch.delenv("YTDLP_YOUTUBE_PLAYER_CLIENTS", raising=False)
 

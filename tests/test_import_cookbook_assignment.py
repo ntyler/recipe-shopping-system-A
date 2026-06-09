@@ -43,6 +43,11 @@ def test_import_assignment_saves_recipe_to_selected_cookbook():
                 "display_name": "Black Bean Tacos",
                 "ingredients": ["black beans", "tortillas"],
                 "servings": "4 servings",
+                "level": "Easy",
+                "total_time": "30 min",
+                "prep_time": "10 min",
+                "inactive_time": "0 min",
+                "cook_time": "20 min",
             },
             cookbook,
         )
@@ -52,6 +57,13 @@ def test_import_assignment_saves_recipe_to_selected_cookbook():
 
         assert len(target["recipes"]) == 1
         assert target["recipes"][0]["name"] == "Black Bean Tacos"
+        assert target["recipes"][0]["servings"] == "4 servings"
+        assert target["recipes"][0]["base_servings"] == "4 servings"
+        assert target["recipes"][0]["level"] == "Easy"
+        assert target["recipes"][0]["total_time"] == "30 min"
+        assert target["recipes"][0]["prep_time"] == "10 min"
+        assert target["recipes"][0]["inactive_time"] == "0 min"
+        assert target["recipes"][0]["cook_time"] == "20 min"
         assert target["recipes"][0]["sections"]["INGREDIENTS"][0]["name"] == "black beans"
 
 

@@ -291,7 +291,10 @@ def recipe_view_rows(recipe_urls):
             "pdf_public_url": recipe_pdf_public_url(recipe["url"]),
             "cover_image": cover_image,
             "description": recipe_description_for_view(recipe_data),
+            "servings": recipe_data.get("servings", ""),
+            "level": recipe_data.get("level", ""),
             "prep_time": recipe_data.get("prep_time", ""),
+            "inactive_time": recipe_data.get("inactive_time", ""),
             "cook_time": recipe_data.get("cook_time", ""),
             "total_time": recipe_data.get("total_time", ""),
             "quantity": recipe_quantity,
@@ -386,7 +389,10 @@ def recipe_url_log_rows(recipe_urls, cookbook_assignments=None):
             "pdf_public_url": recipe_pdf_public_url(recipe["url"]),
             "cover_image": recipe_cover_image_for_view(recipe["url"], recipe_data, recipe_meta),
             "description": recipe_description_for_view(recipe_data),
+            "servings": recipe_data.get("servings", ""),
+            "level": recipe_data.get("level", ""),
             "prep_time": recipe_data.get("prep_time", ""),
+            "inactive_time": recipe_data.get("inactive_time", ""),
             "cook_time": recipe_data.get("cook_time", ""),
             "total_time": recipe_data.get("total_time", ""),
             "food_rule_status": recipe_food_rule_status(recipe_data),
@@ -493,7 +499,10 @@ def cookbook_view_for_render(recipe_rows):
             recipe["source_display_url"] = recipe.get("source_display_url") or recipe_source_display_url(recipe_url)
             recipe["quantity"] = recipe_quantity
             recipe["description"] = recipe.get("description") or recipe_description_for_view(recipe_data)
+            recipe["servings"] = recipe.get("servings") or recipe_data.get("servings", "")
+            recipe["level"] = recipe.get("level") or recipe_data.get("level", "")
             recipe["prep_time"] = recipe.get("prep_time") or recipe_data.get("prep_time", "")
+            recipe["inactive_time"] = recipe.get("inactive_time") or recipe_data.get("inactive_time", "")
             recipe["cook_time"] = recipe.get("cook_time") or recipe_data.get("cook_time", "")
             recipe["total_time"] = recipe.get("total_time") or recipe_data.get("total_time", "")
             recipe["scaling_options"] = recipe_log_scaling_options(recipe_data, recipe_quantity)

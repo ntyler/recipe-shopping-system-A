@@ -302,6 +302,15 @@ def load_editable_recipe(url):
     if recipe_data.get("servings") and not scaling.get("base_servings"):
         scaling["base_servings"] = str(recipe_data.get("servings") or "").strip()
     recipe_info = recipe_information_fields(recipe_data, url)
+    for key in recipe_information_keys():
+        recipe_info[key] = recipe_info.get(key) or str(meta.get(key) or "").strip()
+    servings = (
+        str(recipe_data.get("servings") or "").strip()
+        or str(meta.get("servings") or "").strip()
+        or str(meta.get("base_servings") or "").strip()
+    )
+    if servings and not scaling.get("base_servings"):
+        scaling["base_servings"] = servings
     cover_image = editable_recipe_cover_image(url, recipe_data, meta)
     category_metadata = recipe_category_metadata_for_editor(url, recipe_data, meta)
 
@@ -317,7 +326,7 @@ def load_editable_recipe(url):
             "cookbook_name": cookbook_assignment.get("cookbook_name", ""),
             "cookbook_is_unclassified": cookbook_assignment.get("cookbook_is_unclassified", False),
             "recipe_title": recipe_data.get("recipe_title") or "",
-            "servings": recipe_data.get("servings") or "",
+            "servings": servings,
             "cover_image": cover_image,
             **recipe_info,
             "scaling": scaling,
@@ -2915,6 +2924,13 @@ def update_recipe_ingredient_record(url, quantity, recipe_data):
         "url": url,
         "quantity": quantity,
         "name": existing.get("name") or recipe_data.get("display_name") or recipe_data.get("recipe_title"),
+        "servings": recipe_data.get("servings") or existing.get("servings"),
+        "level": recipe_data.get("level") or existing.get("level"),
+        "total_time": recipe_data.get("total_time") or existing.get("total_time"),
+        "prep_time": recipe_data.get("prep_time") or existing.get("prep_time"),
+        "inactive_time": recipe_data.get("inactive_time") or existing.get("inactive_time"),
+        "cook_time": recipe_data.get("cook_time") or existing.get("cook_time"),
+        "base_servings": recipe_data.get("servings") or existing.get("base_servings"),
         "scaled_servings": existing.get("scaled_servings"),
         "scaled_ingredients": existing.get("scaled_ingredients", {}),
         "ingredients": extract_ingredients_from_result(recipe_data),

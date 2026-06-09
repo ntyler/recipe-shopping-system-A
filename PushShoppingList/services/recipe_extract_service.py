@@ -952,6 +952,91 @@ def apply_recipe_info_metadata(json_data, html_text=None):
         if not str(json_data.get(key) or "").strip() and text_values.get(key):
             json_data[key] = text_values[key]
 
+    apply_recipe_info_estimates(json_data)
+
+
+RECIPE_INFO_ESTIMATE_DEFAULTS = {
+    "servings": "4 servings",
+    "level": "Easy",
+    "total_time": "45 min",
+    "prep_time": "15 min",
+    "inactive_time": "0 min",
+    "cook_time": "30 min",
+}
+
+RECIPE_INFO_ESTIMATE_ALIASES = {
+    "servings": (
+        "servings",
+        "recipe_amount",
+        "recipe_yield",
+        "yield",
+        "portions",
+        "serves",
+        "recipeYield",
+    ),
+    "level": ("level", "difficulty", "recipe_difficulty"),
+    "total_time": ("total_time", "total", "recipe_total_time", "estimated_total_time"),
+    "prep_time": ("prep_time", "prep", "recipe_prep_time", "hands_on_time"),
+    "inactive_time": (
+        "inactive_time",
+        "inactive",
+        "recipe_inactive_time",
+        "rest_time",
+        "waiting_time",
+        "chill_time",
+        "rise_time",
+    ),
+    "cook_time": ("cook_time", "cook", "recipe_cook_time", "cooking_time"),
+}
+
+RECIPE_INFO_EMPTY_VALUES = {
+    "",
+    "none",
+    "null",
+    "n/a",
+    "na",
+    "not specified",
+    "unknown",
+}
+
+
+def apply_recipe_info_estimates(json_data):
+    if not isinstance(json_data, dict) or not structured_recipe_data_is_usable(json_data):
+        return
+
+    for key, default in RECIPE_INFO_ESTIMATE_DEFAULTS.items():
+        value = recipe_info_estimate_value(json_data, key)
+        json_data[key] = value or default
+
+
+def recipe_info_estimate_value(json_data, key):
+    for alias in RECIPE_INFO_ESTIMATE_ALIASES.get(key, (key,)):
+        if alias not in json_data:
+            continue
+
+        value = json_data.get(alias)
+        if isinstance(value, bool) or value in (None, "", [], {}):
+            continue
+
+        if isinstance(value, (int, float)):
+            if key == "servings":
+                return f"{value:g} servings"
+            if key.endswith("_time"):
+                return f"{value:g} min"
+
+        if isinstance(value, (list, dict)):
+            continue
+
+        cleaned = (
+            clean_recipe_text(value)
+            if key == "servings"
+            else clean_recipe_info_value(value)
+        )
+        if cleaned.lower() not in RECIPE_INFO_EMPTY_VALUES:
+            return cleaned
+
+    return ""
+
 
 def extract_recipe_info_from_text(text):
     text = re.sub(r"\s+", " ", str(text or "")).strip()
@@ -5368,10 +5453,11 @@ RECIPE SCALING RULES
 ========================
 RECIPE INFO RULES
 ========================
-- Extract recipe difficulty/level and timing only if shown on the page.
-- Use the visible labels when available: Level, Total, Prep, Inactive, Cook.
-- Preserve the displayed wording, such as "Intermediate", "1 hr 55 min", or "30 min".
-- If a value is missing, use null.
+- Fill servings with the recipe amount, yield, portions, or best practical estimate, such as "4 servings", "6 portions", or "1 9-inch pan".
+- Fill level with the displayed or estimated recipe difficulty, such as "Easy", "Intermediate", or "Advanced".
+- Fill total_time, prep_time, inactive_time, and cook_time with displayed values when present, otherwise use practical estimates with units, such as "45 min", "1 hr 15 min", or "0 min".
+- Use inactive_time for waiting, resting, chilling, cooling, or rising time when the recipe implies it. Use "0 min" when none is implied.
+- Preserve displayed wording when available, such as "Intermediate", "1 hr 55 min", or "30 min".
 
 {additional_rules_block}
 ========================
@@ -6303,6 +6389,8 @@ def infer_food_image_recipe(recipe_url, upload_path, mime_type, filename, user_d
                 ingredient.get("confidence"),
                 default="medium",
             )
+
+    apply_recipe_info_metadata(parsed)
 
     return parsed, None
 
