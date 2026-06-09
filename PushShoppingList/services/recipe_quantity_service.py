@@ -215,7 +215,7 @@ Output shape:
                 "content": prompt,
             },
         ],
-        response_format={"type": "json_object"},
+        "response_format": {"type": "json_object"},
     }
     if supports_custom_temperature(MODEL):
         request_payload["temperature"] = 0

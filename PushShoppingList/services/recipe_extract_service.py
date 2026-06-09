@@ -137,26 +137,104 @@ def supports_custom_temperature(model):
     return not normalized_model.startswith("gpt-5")
 
 
+def _coerce_openai_error_payload(value):
+    if value is None:
+        return None
+
+    if isinstance(value, dict):
+        return value
+
+    if isinstance(value, str):
+        candidate = value.strip()
+        if not candidate:
+            return None
+        try:
+            parsed = json.loads(candidate)
+            if isinstance(parsed, dict):
+                return parsed
+        except Exception:
+            return {"message": candidate}
+
+    try:
+        if hasattr(value, "dict"):
+            parsed = value.dict()
+            if isinstance(parsed, dict):
+                return parsed
+    except Exception:
+        pass
+
+    return None
+
+
 def get_openai_error_code_and_param(exc):
     if exc is None:
         return "", ""
 
     error_code = ""
     error_param = ""
-    error_obj = getattr(exc, "error", None)
+    error_obj = _coerce_openai_error_payload(getattr(exc, "error", None))
+    body_obj = _coerce_openai_error_payload(getattr(exc, "body", None))
+    response_obj = getattr(exc, "response", None)
 
-    if isinstance(error_obj, dict):
-        error_code = error_obj.get("code")
-        error_param = error_obj.get("param")
+    if response_obj is not None:
+        body_from_response = None
+        if hasattr(response_obj, "json"):
+            try:
+                body_from_response = _coerce_openai_error_payload(response_obj.json())
+            except Exception:
+                body_from_response = None
+        if body_from_response is None and hasattr(response_obj, "text"):
+            body_from_response = _coerce_openai_error_payload(response_obj.text)
+        if body_from_response:
+            body_obj = body_from_response
 
-        if error_code is None:
-            error_code = error_obj.get("type")
-        if error_param is None:
-            error_param = error_obj.get("param_name")
+    payloads = []
+    if error_obj is not None:
+        payloads.append(error_obj)
+        nested_error = error_obj.get("error") if isinstance(error_obj, dict) else None
+        if nested_error not in (None, error_obj) and isinstance(nested_error, dict):
+            payloads.append(nested_error)
+    if body_obj is not None and body_obj is not error_obj:
+        payloads.append(body_obj)
+        nested_error = body_obj.get("error") if isinstance(body_obj, dict) else None
+        if nested_error not in (None, body_obj) and isinstance(nested_error, dict):
+            payloads.append(nested_error)
+    if body_obj is None and error_obj is not None:
+        payloads.append(error_obj)
+    if hasattr(exc, "response"):
+        response_payload = _coerce_openai_error_payload(getattr(exc, "response", None))
+        if response_payload:
+            payloads.append(response_payload)
 
-    elif error_obj is not None:
-        error_code = getattr(error_obj, "code", "")
-        error_param = getattr(error_obj, "param", "")
+    checked_payloads = set()
+    for payload in payloads:
+        if not isinstance(payload, dict):
+            continue
+
+        payload_id = id(payload)
+        if payload_id in checked_payloads:
+            continue
+        checked_payloads.add(payload_id)
+
+        if not error_code:
+            error_code = payload.get("code")
+        if not error_param:
+            error_param = payload.get("param")
+        if not error_code:
+            error_code = payload.get("error_code")
+        if not error_param:
+            error_param = payload.get("param_name")
+        if not error_code:
+            error_code = payload.get("type")
+
+        if isinstance(payload.get("error"), dict):
+            nested_payload = payload.get("error")
+            if not error_code:
+                error_code = nested_payload.get("code")
+            if not error_param:
+                error_param = nested_payload.get("param")
+            if not error_code:
+                error_code = nested_payload.get("type")
 
     if not error_code:
         error_code = (
@@ -169,6 +247,7 @@ def get_openai_error_code_and_param(exc):
         error_param = (
             getattr(exc, "param", "")
             or getattr(exc, "error_param", "")
+            or getattr(exc, "field", "")
             or ""
         )
 
@@ -502,44 +581,74 @@ def classify_vision_ai_exception(exc):
         )
 
     error_code, error_param = get_openai_error_code_and_param(exc)
-    lowered_error_code = str(error_code or "").lower()
-    lowered_error_param = str(error_param or "").lower()
+    lowered_error_code = str(error_code or "").lower().strip()
+    lowered_error_param = str(error_param or "").lower().strip()
     lowered_exception = str(exc or "").strip().lower()
     lowered_exception_type = str(type(exc).__name__).lower()
     lowered_status_code = str(getattr(exc, "status_code", "")).lower()
-    is_temperature_param = (
+
+    is_auth_error = (
+        isinstance(exc, AuthenticationError)
+        or lowered_error_code in {"invalid_api_key", "authentication_error"}
+        or "authentication" in lowered_exception
+        or "api key" in lowered_exception
+        or lowered_status_code == "401"
+    )
+    if is_auth_error:
+        return "OPENAI_API_KEY_MISSING", "OPENAI_API_KEY is missing or invalid."
+
+    is_temperature_error = (
         lowered_error_param == "temperature"
         or lowered_error_param.startswith("temperature.")
         or lowered_error_param.startswith("temperature:")
+        or (
+            "unsupported value" in lowered_exception
+            and "temperature" in lowered_exception
+            and lowered_status_code in {"400", "422"}
+        )
+        or lowered_exception.startswith("unsupported value: 0")
+        or lowered_exception.startswith("unsupported value: \"temperature\"")
+        or (
+            is_openai_unsupported_temperature_error(
+                exc,
+                error_code=lowered_error_code,
+                error_param=lowered_error_param,
+            )
+        )
     )
-    if is_openai_unsupported_temperature_error(
-        exc,
-        error_code=lowered_error_code,
-        error_param=lowered_error_param,
-    ):
+    if is_temperature_error:
         return (
             "OPENAI_UNSUPPORTED_PARAMETER",
             "The selected OpenAI model does not support one of the request settings. "
             "The app should remove temperature for this model.",
         )
 
-    if is_temperature_param and lowered_status_code in {"400", "422"}:
-        return (
-            "OPENAI_UNSUPPORTED_PARAMETER",
-            "The selected OpenAI model does not support one of the request settings. "
-            "The app should remove temperature for this model.",
+    is_model_error = (
+        lowered_error_code in {
+            "model_not_found",
+            "model_not_supported",
+            "unsupported_model",
+            "invalid_model",
+            "model_not_available",
+            "unsupported_value",
+        }
+        or (
+            "model" in lowered_exception
+            and (
+                "not found" in lowered_exception
+                or "does not exist" in lowered_exception
+                or "does not support" in lowered_exception
+            )
         )
-
-    if (
-        "unsupported value" in lowered_exception
-        and "temperature" in lowered_exception
-        and lowered_status_code == "400"
-    ):
-        return (
-            "OPENAI_UNSUPPORTED_PARAMETER",
-            "The selected OpenAI model does not support one of the request settings. "
-            "The app should remove temperature for this model.",
+        or (
+            lowered_status_code in {"404", "400"}
+            and "model" in lowered_exception
+            and (
+                "does not exist" in lowered_exception
+                or "not found" in lowered_exception
+            )
         )
+    )
 
     if isinstance(exc, APIConnectionError):
         return "OPENAI_CONNECTION_ERROR", "Vision AI connection failed."
@@ -547,44 +656,19 @@ def classify_vision_ai_exception(exc):
     if isinstance(exc, APITimeoutError):
         return "OPENAI_TIMEOUT", "Vision AI request timed out."
 
-    if isinstance(exc, RateLimitError):
+    if is_model_error:
+        return "OPENAI_UNSUPPORTED_MODEL", "OpenAI request failed: unsupported model."
+
+    if isinstance(exc, RateLimitError) or "rate limit" in lowered_exception:
         return "OPENAI_RATE_LIMIT_ERROR", "Vision API rate limit exceeded."
 
-    if isinstance(exc, AuthenticationError):
-        return "OPENAI_API_KEY_MISSING", "OPENAI_API_KEY is missing or invalid."
-
-    if isinstance(exc, BadRequestError):
-        if lowered_error_code in {"invalid_request_error", "unsupported_parameter"} and (
-            lowered_error_param == "temperature" or lowered_error_param.startswith("temperature")
-        ):
+    if lowered_error_code in {"unsupported_parameter", "invalid_request_error"} and lowered_status_code in {"400", "422"}:
+        if is_temperature_error:
             return (
                 "OPENAI_UNSUPPORTED_PARAMETER",
                 "The selected OpenAI model does not support one of the request settings. "
                 "The app should remove temperature for this model.",
             )
-
-        if lowered_error_code in {
-            "model_not_found",
-            "model_not_supported",
-            "unsupported_model",
-            "invalid_model",
-        } or "model" in lowered_exception and (
-            "not found" in lowered_exception
-            or "does not exist" in lowered_exception
-        ):
-            return "OPENAI_UNSUPPORTED_MODEL", "OpenAI request failed: unsupported model."
-        if (
-            lowered_status_code == "400"
-            and "model" in lowered_exception
-            and ("does not exist" in lowered_exception or "unsupported" in lowered_exception)
-        ):
-            return "OPENAI_UNSUPPORTED_MODEL", "OpenAI request failed: unsupported model."
-        if (
-            "unsupported" in lowered_exception
-            and "image" in lowered_exception
-            and "payload" in lowered_exception
-        ):
-            return "OPENAI_INVALID_IMAGE_PAYLOAD", "OpenAI request failed: invalid image payload."
         return (
             "OPENAI_BAD_REQUEST",
             (
@@ -594,46 +678,29 @@ def classify_vision_ai_exception(exc):
         )
 
     if (
+        "unsupported" in lowered_exception
+        and "image" in lowered_exception
+        and "payload" in lowered_exception
+    ):
+        return "OPENAI_INVALID_IMAGE_PAYLOAD", "OpenAI request failed: invalid image payload."
+
+    if (
         "quota" in lowered_exception
         or "insufficient_quota" in lowered_exception
     ):
         return "API_QUOTA_EXCEEDED", "API quota exceeded."
 
-    if "rate limit" in lowered_exception or "429" in lowered_exception:
-        return "API_RATE_LIMITED", "Vision API rate limit exceeded."
+    if lowered_status_code == "400" and lowered_error_param:
+        return (
+            "OPENAI_BAD_REQUEST",
+            f"Vision AI request failed: invalid request parameter ({lowered_error_param}).",
+        )
 
-    if lowered_error_code in {"invalid_api_key", "authentication_error"}:
-        return "OPENAI_API_KEY_MISSING", "OPENAI_API_KEY is missing or invalid."
-
-    if (
-        "authentication" in lowered_exception
-        or "api key" in lowered_exception
-        or "401" in lowered_exception
-    ):
-        return "OPENAI_API_KEY_MISSING", "OPENAI_API_KEY is missing or invalid."
-
-    if (
-        "unsupported" in lowered_exception
-        and "image" in lowered_exception
-        and "format" in lowered_exception
-    ):
+    if "unsupported" in lowered_exception and "image" in lowered_exception and "format" in lowered_exception:
         return "UNSUPPORTED_IMAGE_FORMAT", "Unsupported image format."
-
-    if (
-        "unsupported" in lowered_exception
-        and "model" in lowered_exception
-        or lowered_error_code in {"model_not_found", "model_not_supported"}
-    ):
-        return "OPENAI_UNSUPPORTED_MODEL", "OpenAI request failed: unsupported model."
-
-    if lowered_error_code == "invalid_request_error" and lowered_error_param:
-        return "OPENAI_BAD_REQUEST", "Vision AI request failed: invalid request parameter."
 
     if "invalid_request_error" in lowered_exception_type:
         return "OPENAI_BAD_REQUEST", "Vision AI request failed: invalid request."
-
-    if "api key" in lowered_exception or "permission" in lowered_exception:
-        return "OPENAI_API_KEY_MISSING", "OPENAI_API_KEY is missing or invalid."
 
     return "AI_REQUEST_FAILED", f"Vision AI request failed: {lowered_exception or type(exc).__name__}"
 
@@ -6339,7 +6406,8 @@ def build_upload_failure_result(import_object, error_message, failed_step="extra
         "[recipe_import] action=upload_import_failed "
         f"source_type={import_object.get('source_type')} "
         f"source_name={str(import_object.get('source_name') or '')!r} "
-        f"failed_step={failed_step} error={error_message}"
+        f"failed_step={failed_step} action={action} model={model_used} "
+        f"error_code={error_code} error={error_message}"
     )
 
     result = {

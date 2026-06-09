@@ -878,10 +878,14 @@ def vision_failure_response(
     technical_message = str(
         debug.get("technical_message") or error_message
     ).strip() or error_message
+    openai_error_code = str(debug.get("openai_error_code") or "").strip()
+    openai_error_param = str(debug.get("openai_error_param") or "").strip()
     print(
         "[recipe_routes] action=vision_failure "
-        f"action_name={action} error_code={error_code} "
-        f"model={model_used} status={status} failed_step={failed_step}"
+        f"action_name={action} error_code={error_code} final_error_code={error_code} "
+        f"model={model_used} status={status} failed_step={failed_step} "
+        f"openai_error_code={openai_error_code or 'n/a'} "
+        f"openai_error_param={openai_error_param or 'n/a'}"
     )
 
     payload = build_upload_failure_result(

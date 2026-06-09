@@ -6576,6 +6576,10 @@ async function openImportedRecipeEditorAfterMediaImport(data = {}, options = {})
         return;
     }
 
+    if (!getRecipeMediaWorkflowSourceUrl()) {
+        setRecipeMediaWorkflowSourceUrl(recipeUrl);
+    }
+
     if (runImagePreflight) {
         setRecipeFileLoadingSummary("Preparing recipe for edit...");
         const preflightOk = await runImageBasedRecipeImportPreflightForEdit();
@@ -6761,6 +6765,12 @@ async function submitRecipeMediaVision() {
         const data = await response.json();
         const responseModelUsed = String((data && data.model_used) || "").trim();
         setRecipeFileModelUsed(responseModelUsed || "Unknown");
+        const workflowSourceUrl = String(
+            (data && (data.source_url || data.url)) || ""
+        ).trim();
+        if (workflowSourceUrl) {
+            setRecipeMediaWorkflowSourceUrl(workflowSourceUrl);
+        }
         setRecipeFileVisionDebug(data && data.debug, {
             visible: true,
             recipeJson: data && data.recipe_json,
@@ -6856,6 +6866,12 @@ async function submitRecipeMediaVision() {
             setRecipeMediaUploadPath(responsePath);
         }
         setRecipeFileModelUsed(responseModelUsed || "Unknown");
+        const workflowSourceUrl = String(
+            (data && (data.source_url || data.url)) || ""
+        ).trim();
+        if (workflowSourceUrl) {
+            setRecipeMediaWorkflowSourceUrl(workflowSourceUrl);
+        }
         setRecipeFileVisionDebug(data && data.debug, {
             visible: true,
             recipeJson: data && data.recipe_json,
