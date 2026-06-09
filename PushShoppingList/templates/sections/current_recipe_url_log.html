@@ -333,7 +333,7 @@
                                         <form method="POST"
                                               action="{{ url_for('recipe_bp.remove_recipe_route') }}"
                                               class="remove-recipe-form recipe-url-summary-remove-form recipe-url-summary-menu-form"
-                                              onsubmit="saveScroll(); return confirm('Remove this recipe URL?');">
+                                              data-confirm-message="Remove this recipe URL?">
                                             <input type="hidden" name="url" value="{{ recipe.url }}">
                                             <button type="submit"
                                                     class="delete recipe-url-summary-remove"
@@ -344,7 +344,7 @@
                                         <form method="POST"
                                               action="{{ url_for('recipe_bp.purge_recipe_route') }}"
                                               class="remove-recipe-form recipe-url-summary-remove-form recipe-url-summary-menu-form"
-                                              onsubmit="saveScroll(); return confirm('Purge this recipe from current recipes and every cookbook?');">
+                                              data-confirm-message="Purge this recipe from current recipes and every cookbook?">
                                             <input type="hidden" name="url" value="{{ recipe.url }}">
                                             <button type="submit"
                                                     class="delete recipe-url-summary-remove"

@@ -9570,6 +9570,92 @@ function bindCurrentRecipeUrlSummaryToggles() {
     });
 }
 
+function parseFormError(response, defaultMessage) {
+    const fallbackMessage = defaultMessage || "Unable to complete request.";
+    if (!response) {
+        return fallbackMessage;
+    }
+
+    if (!response.ok) {
+        return response.statusText || fallbackMessage;
+    }
+
+    return fallbackMessage;
+}
+
+function bindRecipeRemovalForms() {
+    if (document.body.dataset.recipeRemovalFormsBound === "1") {
+        return;
+    }
+
+    document.body.dataset.recipeRemovalFormsBound = "1";
+
+    document.body.addEventListener("submit", async event => {
+        const form = event.target && typeof event.target.closest === "function"
+            ? event.target.closest("form.remove-recipe-form")
+            : null;
+
+        if (!form) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        const confirmMessage = String(form.dataset.confirmMessage || "").trim();
+        if (confirmMessage && !window.confirm(confirmMessage)) {
+            return;
+        }
+
+        const submitButton = event.submitter && event.submitter.type === "submit"
+            ? event.submitter
+            : form.querySelector('button[type="submit"], input[type="submit"]');
+        const originalText = submitButton ? submitButton.textContent : "";
+        saveScroll();
+
+        if (submitButton) {
+            submitButton.disabled = true;
+            submitButton.textContent = "Deleting...";
+        }
+
+        try {
+            const response = await fetch(formActionUrl(form), {
+                method: "POST",
+                headers: {
+                    "X-Requested-With": "fetch",
+                },
+                body: new FormData(form),
+            });
+
+            if (!response.ok) {
+                let message = parseFormError(response, "Unable to delete recipe.");
+
+                try {
+                    const payload = await response.json();
+                    message = String((payload && (payload.error || payload.message)) || message).trim() || message;
+                } catch (err) {
+                    // Keep fallback message if JSON cannot be read.
+                }
+
+                throw new Error(message);
+            }
+
+            const redirectUrl = response.url && response.url !== "about:blank"
+                ? response.url
+                : "/";
+
+            window.location.href = redirectUrl;
+        } catch (err) {
+            console.warn("Unable to delete recipe.", err);
+            alert(err.message || "Unable to delete recipe.");
+            if (submitButton) {
+                submitButton.disabled = false;
+                submitButton.textContent = originalText || "Delete";
+            }
+        }
+    }, true);
+}
+
 function recipeUrlOrder(list) {
     return [...list.querySelectorAll("[data-current-recipe-row]")]
         .map(row => row.dataset.recipeUrl || "")
@@ -19837,6 +19923,7 @@ async function refreshStoreMarkup(options = {}) {
     bindRecipeUrlLogDragAndDrop();
     bindRecipeViewDragAndDrop();
     bindCurrentRecipeUrlSummaryToggles();
+    bindRecipeRemovalForms();
     bindRecipeQuantityInputs();
     bindRecipeNameInputs();
     bindCookbooks();
@@ -20039,6 +20126,7 @@ document.addEventListener("DOMContentLoaded", function () {
     bindRecipeUrlLogDragAndDrop();
     bindRecipeViewDragAndDrop();
     bindCurrentRecipeUrlSummaryToggles();
+    bindRecipeRemovalForms();
     bindRecipeQuantityInputs();
     bindRecipeNameInputs();
     bindCookbooks();
