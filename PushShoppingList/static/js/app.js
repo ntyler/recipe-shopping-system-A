@@ -6564,6 +6564,12 @@ function buildVisionConnectionErrorMessage(reason, debug = {}) {
     const reasonText = String(reason || "").toLowerCase();
     const exceptionType = String((debug && debug.exception_type) || "").toLowerCase();
     const exceptionMessage = String((debug && debug.exception_message) || "").toLowerCase();
+    const temperatureError = errorCode === "openai_unsupported_parameter"
+        || reasonText.includes("remove temperature");
+
+    if (temperatureError) {
+        return "The selected OpenAI model does not support one of the request settings. The app should remove temperature for this model.";
+    }
 
     const likelyConnectionError = Boolean(
         exceptionType.includes("connection")

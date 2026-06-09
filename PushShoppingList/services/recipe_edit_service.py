@@ -27,6 +27,7 @@ from PushShoppingList.services.ingredient_text_review_service import annotate_in
 from PushShoppingList.services.recipe_extract_service import MODEL
 from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
 from PushShoppingList.services.recipe_extract_service import RAW_FOLDER
+from PushShoppingList.services.recipe_extract_service import supports_custom_temperature
 from PushShoppingList.services.recipe_extract_service import STORE_SECTION_ORDER
 from PushShoppingList.services.recipe_extract_service import UPLOAD_FOLDER
 from PushShoppingList.services.recipe_extract_service import build_video_text_pdf_html
@@ -2065,11 +2066,16 @@ def decide_recipe_categories_with_chatgpt(
 
     prompt = build_recipe_category_decision_prompt(payload)
     model = os.getenv("OPENAI_RECIPE_CATEGORY_MODEL", MODEL)
+    include_temperature = supports_custom_temperature(model)
 
     try:
-        response = get_openai_client().chat.completions.create(
-            model=model,
-            messages=[
+        print(
+            f"[OpenAI] action=recipe-category-decision model={model} "
+            f"temperature_included={include_temperature}"
+        )
+        request_payload = {
+            "model": model,
+            "messages": [
                 {
                     "role": "system",
                     "content": "You classify recipes into cookbook menu categories and return only valid JSON.",
@@ -2079,9 +2085,11 @@ def decide_recipe_categories_with_chatgpt(
                     "content": prompt,
                 },
             ],
-            response_format={"type": "json_object"},
-            temperature=0,
-        )
+            "response_format": {"type": "json_object"},
+        }
+        if include_temperature:
+            request_payload["temperature"] = 0
+        response = get_openai_client().chat.completions.create(**request_payload)
         record_openai_usage(
             response,
             "recipe-category-decision",
@@ -2141,11 +2149,17 @@ def estimate_recipe_nutrition(payload):
 
     serving_basis = recipe_nutrition_serving_basis(payload.get("nutrition"))
     prompt = build_nutrition_estimate_prompt(payload, serving_basis)
+    model = os.getenv("OPENAI_NUTRITION_MODEL", MODEL)
+    include_temperature = supports_custom_temperature(model)
 
     try:
-        response = get_openai_client().chat.completions.create(
-            model=os.getenv("OPENAI_NUTRITION_MODEL", MODEL),
-            messages=[
+        print(
+            f"[OpenAI] action=nutrition-estimate model={model} "
+            f"temperature_included={include_temperature}"
+        )
+        request_payload = {
+            "model": model,
+            "messages": [
                 {
                     "role": "system",
                     "content": "You estimate recipe nutrition and return only valid JSON.",
@@ -2155,9 +2169,11 @@ def estimate_recipe_nutrition(payload):
                     "content": prompt,
                 },
             ],
-            response_format={"type": "json_object"},
-            temperature=0,
-        )
+            "response_format": {"type": "json_object"},
+        }
+        if include_temperature:
+            request_payload["temperature"] = 0
+        response = get_openai_client().chat.completions.create(**request_payload)
         record_openai_usage(
             response,
             "nutrition-estimate",
@@ -2207,11 +2223,17 @@ def recipe_note_feedback(payload):
         }
 
     prompt = build_recipe_note_feedback_prompt(payload, note_text)
+    model = os.getenv("OPENAI_RECIPE_NOTE_MODEL", MODEL)
+    include_temperature = supports_custom_temperature(model)
 
     try:
-        response = get_openai_client().chat.completions.create(
-            model=os.getenv("OPENAI_RECIPE_NOTE_MODEL", MODEL),
-            messages=[
+        print(
+            f"[OpenAI] action=recipe-note-feedback model={model} "
+            f"temperature_included={include_temperature}"
+        )
+        request_payload = {
+            "model": model,
+            "messages": [
                 {
                     "role": "system",
                     "content": "You are a practical cooking coach. Give concise, useful feedback on recipe reflection notes.",
@@ -2221,12 +2243,15 @@ def recipe_note_feedback(payload):
                     "content": prompt,
                 },
             ],
-            temperature=0.2,
-        )
+            "temperature": 0.2,
+        }
+        if include_temperature:
+            request_payload["temperature"] = 0.2
+        response = get_openai_client().chat.completions.create(**request_payload)
         record_openai_usage(
             response,
             "recipe-note-feedback",
-            model=os.getenv("OPENAI_RECIPE_NOTE_MODEL", MODEL),
+            model=model,
         )
         feedback = str(response.choices[0].message.content or "").strip()
     except Exception as exc:

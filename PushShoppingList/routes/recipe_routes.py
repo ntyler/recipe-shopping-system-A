@@ -38,10 +38,12 @@ from PushShoppingList.services.recipe_extract_service import MODEL
 from PushShoppingList.services.recipe_extract_service import OPENAI_PING_TEXT_MODEL
 from PushShoppingList.services.recipe_extract_service import resolve_vision_model
 from PushShoppingList.services.recipe_extract_service import classify_vision_ai_exception
+from PushShoppingList.services.recipe_extract_service import get_openai_error_code_and_param
 from PushShoppingList.services.recipe_extract_service import get_openai_client
 from PushShoppingList.services.recipe_extract_service import build_extract_result
 from PushShoppingList.services.recipe_extract_service import log_vision_debug_step
 from PushShoppingList.services.recipe_extract_service import send_image_prompt_to_openai
+from PushShoppingList.services.recipe_extract_service import supports_custom_temperature
 from PushShoppingList.services.recipe_extract_service import normalize_upload_mime_type
 from PushShoppingList.services.recipe_extract_service import normalize_extracted_equipment_fields
 from PushShoppingList.services.recipe_extract_service import normalize_extracted_ingredient_fields
@@ -1015,23 +1017,36 @@ def api_debug_openai_ping():
         ), 401
 
     try:
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": "Return the word OK."}],
+            "max_tokens": 8,
+            "response_format": {"type": "text"},
+        }
+        if supports_custom_temperature(model):
+            payload["temperature"] = 0
+
+        print(
+            f"[OpenAI] action=openai-ping model={model} "
+            f"temperature_included={supports_custom_temperature(model)}"
+        )
         response = get_openai_client().chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": "Return the word OK."}],
-            temperature=0,
-            max_tokens=8,
-            response_format={"type": "text"},
+            **payload
         )
         message = str((response.choices[0].message.content or "").strip())
         message = message.strip('"').strip("'") or "OK"
         return jsonify({"success": True, "model": model, "message": message}), 200
     except Exception as exc:
+        error_code, error_param = get_openai_error_code_and_param(exc)
+        print(f"[OpenAI] action=openai-ping error_code={error_code} error_param={error_param}")
         return jsonify(
             {
                 "success": False,
                 "model": model,
                 "error_type": type(exc).__name__,
                 "error_message": str(exc),
+                "error_code": error_code,
+                "error_param": error_param,
             }
         ), 502
 

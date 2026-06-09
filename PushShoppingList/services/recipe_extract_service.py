@@ -130,6 +130,79 @@ def resolve_vision_model():
         or os.getenv("OPENAI_RECIPE_MODEL", "").strip()
         or VISION_MODEL_DEFAULT
     )
+
+
+def supports_custom_temperature(model):
+    normalized_model = str(model or "").strip().lower()
+    return not normalized_model.startswith("gpt-5")
+
+
+def get_openai_error_code_and_param(exc):
+    if exc is None:
+        return "", ""
+
+    error_code = ""
+    error_param = ""
+    error_obj = getattr(exc, "error", None)
+
+    if isinstance(error_obj, dict):
+        error_code = error_obj.get("code")
+        error_param = error_obj.get("param")
+
+        if error_code is None:
+            error_code = error_obj.get("type")
+        if error_param is None:
+            error_param = error_obj.get("param_name")
+
+    elif error_obj is not None:
+        error_code = getattr(error_obj, "code", "")
+        error_param = getattr(error_obj, "param", "")
+
+    if not error_code:
+        error_code = (
+            getattr(exc, "code", "")
+            or getattr(exc, "status_code", "")
+            or getattr(exc, "type", "")
+            or ""
+        )
+    if not error_param:
+        error_param = (
+            getattr(exc, "param", "")
+            or getattr(exc, "error_param", "")
+            or ""
+        )
+
+    return str(error_code or "").strip(), str(error_param or "").strip()
+
+
+def build_openai_chat_payload(
+    model,
+    endpoint_name,
+    messages,
+    response_format=None,
+    temperature=None,
+    **extra_kwargs,
+):
+    resolved_model = str(model or MODEL).strip() or MODEL
+    supports_temperature = supports_custom_temperature(resolved_model)
+
+    payload = {
+        "model": resolved_model,
+        "messages": messages,
+    }
+    if response_format is not None:
+        payload["response_format"] = response_format
+    payload.update(extra_kwargs)
+
+    if temperature is not None and supports_temperature:
+        payload["temperature"] = temperature
+
+    print(
+        f"[OpenAI] action={endpoint_name} "
+        f"model={resolved_model} "
+        f"temperature_included={supports_temperature and temperature is not None}"
+    )
+    return payload, bool(supports_temperature and temperature is not None), resolved_model
 NON_RECIPE_FOOD_DISH_ERROR = "This upload does not appear to contain a recipe or recognizable food dish."
 NO_READABLE_UPLOAD_TEXT_ERROR = "No readable recipe text was found in this uploaded file."
 NO_WRITTEN_PHOTO_TEXT_ERROR = "No written recipe text was found in this photo."
@@ -327,6 +400,7 @@ def build_vision_debug(uploaded_file_path="", filename="", mime_type=""):
         "file_exists": False,
         "file_size": 0,
         "model": MODEL,
+        "temperature_included": False,
         "image_type_supported": False,
         "image_readable": False,
         "image_uploaded": False,
@@ -342,6 +416,8 @@ def build_vision_debug(uploaded_file_path="", filename="", mime_type=""):
         "error_code": "",
         "error_message": "",
         "failed_status": "",
+        "openai_error_code": "",
+        "openai_error_param": "",
         "exception_type": "",
         "exception_message": "",
         "vision_request": {},
@@ -406,6 +482,19 @@ def classify_vision_ai_exception(exc):
 
     if isinstance(exc, BadRequestError):
         lowered = str(exc or "").lower()
+        error_code, error_param = get_openai_error_code_and_param(exc)
+        if "temperature" in lowered or "temperature" in (error_param or "").lower():
+            return (
+                "OPENAI_UNSUPPORTED_PARAMETER",
+                "The selected OpenAI model does not support one of the request settings. "
+                "The app should remove temperature for this model.",
+            )
+        if str(error_code or "").lower() == "unsupported_parameter":
+            return (
+                "OPENAI_UNSUPPORTED_PARAMETER",
+                "The selected OpenAI model does not support one of the request settings. "
+                "The app should remove temperature for this model.",
+            )
         if "model" in lowered and "unsupported" in lowered:
             return "OPENAI_UNSUPPORTED_MODEL", "OpenAI request failed: unsupported model."
         if "image" in lowered and "unsupported" in lowered:
@@ -433,18 +522,25 @@ def classify_vision_ai_exception(exc):
 def set_vision_debug_exception(debug, exc):
     exception_type = type(exc).__name__
     exception_message = str(exc or "").strip() or exception_type
+    error_code, error_param = get_openai_error_code_and_param(exc)
     if isinstance(debug, dict):
         debug["exception_type"] = exception_type
         debug["exception_message"] = exception_message
+        debug["openai_error_code"] = error_code
+        debug["openai_error_param"] = error_param
 
     log_vision_debug_step(
         debug,
         "Vision exception",
         exception_type=exception_type,
         exception_message=exception_message,
+        openai_error_code=error_code,
+        openai_error_param=error_param,
     )
     print(f"[Vision] Exception type: {exception_type}")
     print(f"[Vision] Exception message: {exception_message}")
+    print(f"[Vision] OpenAI error code: {error_code}")
+    print(f"[Vision] OpenAI error param: {error_param}")
     return exception_type, exception_message
 
 
@@ -4547,9 +4643,10 @@ def extract_video_recipe_pdf_data_with_openai(recipe_url, page_text, progress_ca
 
 
 def send_video_recipe_pdf_prompt_to_openai(prompt_text):
-    response = get_openai_client().chat.completions.create(
-        model=MODEL,
-        messages=[
+    payload, _, _ = build_openai_chat_payload(
+        MODEL,
+        "video-recipe-pdf-extraction",
+        [
             {
                 "role": "system",
                 "content": (
@@ -4565,6 +4662,7 @@ def send_video_recipe_pdf_prompt_to_openai(prompt_text):
         response_format={"type": "json_object"},
         temperature=0,
     )
+    response = get_openai_client().chat.completions.create(**payload)
     record_openai_usage(response, "video-recipe-pdf-extraction", model=MODEL)
 
     return response.choices[0].message.content
@@ -5662,9 +5760,10 @@ FINAL OUTPUT FORMAT
 
 
 def send_prompt_to_openai(prompt_text):
-    response = get_openai_client().chat.completions.create(
-        model=MODEL,
-        messages=[
+    payload, _, _ = build_openai_chat_payload(
+        MODEL,
+        "recipe-text-extraction",
+        [
             {
                 "role": "system",
                 "content": "You extract recipe ingredients and return only valid JSON.",
@@ -5677,6 +5776,7 @@ def send_prompt_to_openai(prompt_text):
         response_format={"type": "json_object"},
         temperature=0,
     )
+    response = get_openai_client().chat.completions.create(**payload)
     record_openai_usage(response, "recipe-text-extraction", model=MODEL)
 
     return response.choices[0].message.content
@@ -5815,9 +5915,10 @@ def send_image_prompt_to_openai(prompt_text, image_path, mime_type, model=None, 
 
         print("[Vision] Request starting")
         try:
-            response = get_openai_client().with_options(timeout=resolved_timeout).chat.completions.create(
-                model=resolved_model,
-                messages=[
+            payload, temperature_included, resolved_model = build_openai_chat_payload(
+                resolved_model,
+                "recipe-image-extraction",
+                [
                     {
                         "role": "system",
                         "content": "You extract recipe ingredients from recipe photos and documents and return only valid JSON.",
@@ -5838,9 +5939,15 @@ def send_image_prompt_to_openai(prompt_text, image_path, mime_type, model=None, 
                 response_format={"type": "json_object"},
                 temperature=0,
             )
+            if isinstance(debug, dict):
+                debug["temperature_included"] = temperature_included
 
+            response = get_openai_client().with_options(timeout=resolved_timeout).chat.completions.create(**payload)
             if isinstance(debug, dict):
                 debug["request_completed"] = True
+                debug["temperature_included"] = temperature_included
+
+            print(f"[Vision] action=recipe-image-extraction model={resolved_model} temperature_included={temperature_included}")
             print("[Vision] Request completed")
             record_openai_usage(response, "recipe-image-extraction", model=resolved_model)
             return response.choices[0].message.content
@@ -5870,9 +5977,10 @@ def send_social_video_audio_image_prompt_to_openai(prompt_text, image_urls):
             },
         })
 
-    response = get_openai_client().chat.completions.create(
-        model=MODEL,
-        messages=[
+    payload, _, _ = build_openai_chat_payload(
+        MODEL,
+        "social-video-audio-image-extraction",
+        [
             {
                 "role": "system",
                 "content": (
@@ -5888,6 +5996,7 @@ def send_social_video_audio_image_prompt_to_openai(prompt_text, image_urls):
         response_format={"type": "json_object"},
         temperature=0,
     )
+    response = get_openai_client().chat.completions.create(**payload)
     record_openai_usage(response, "social-video-audio-image-extraction", model=MODEL)
 
     return response.choices[0].message.content
@@ -5897,9 +6006,10 @@ def send_file_prompt_to_openai(prompt_text, file_path, mime_type, filename):
     file_bytes = file_path.read_bytes()
     file_data = base64.b64encode(file_bytes).decode("ascii")
 
-    response = get_openai_client().chat.completions.create(
-        model=MODEL,
-        messages=[
+    payload, _, _ = build_openai_chat_payload(
+        MODEL,
+        "recipe-file-extraction",
+        [
             {
                 "role": "system",
                 "content": "You extract recipe ingredients from recipe photos and documents and return only valid JSON.",
@@ -5921,6 +6031,7 @@ def send_file_prompt_to_openai(prompt_text, file_path, mime_type, filename):
         response_format={"type": "json_object"},
         temperature=0,
     )
+    response = get_openai_client().chat.completions.create(**payload)
     record_openai_usage(response, "recipe-file-extraction", model=MODEL)
 
     return response.choices[0].message.content
