@@ -55,10 +55,14 @@ from PushShoppingList.services.recipe_extract_service import set_vision_debug_er
 from PushShoppingList.services.recipe_extract_service import save_extracted_recipe_json
 from PushShoppingList.services.recipe_extract_service import VISION_SUPPORTED_IMAGE_MIME_TYPES
 from PushShoppingList.services.recipe_extract_service import VISION_SUPPORTED_IMAGE_SUFFIXES
+from PushShoppingList.services.recipe_extract_service import VISION_CONVERTIBLE_IMAGE_MIME_TYPES
+from PushShoppingList.services.recipe_extract_service import VISION_CONVERTIBLE_IMAGE_SUFFIXES
 from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
 from PushShoppingList.services.recipe_extract_service import recipe_cover_image_file_path
 from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_path
 from PushShoppingList.services.recipe_extract_service import recipe_pdf_path
+from PushShoppingList.services.recipe_extract_service import ensure_heif_image_support
+from PushShoppingList.services.recipe_extract_service import unsupported_phone_image_message
 from PushShoppingList.services.cookbook_service import ensure_unclassified_cookbook_for_recipes
 from PushShoppingList.services.cookbook_service import ingredient_sections_from_recipe_data
 from PushShoppingList.services.cookbook_service import COOKBOOK_CATEGORY_ALL_FIELDS
@@ -995,18 +999,25 @@ def validate_vision_image_upload(upload_path, filename, mime_type, debug):
     normalized_mime_type = normalize_upload_mime_type(mime_type, filename, upload_path)
     normalized_mime_type = str(normalized_mime_type or "").split(";", 1)[0].strip().lower()
     suffix = upload_path.suffix.lower()
-    image_type_supported = (
+    image_type_supported_by_openai = (
         normalized_mime_type in VISION_SUPPORTED_IMAGE_MIME_TYPES
         or suffix in VISION_SUPPORTED_IMAGE_SUFFIXES
     )
+    image_type_convertible = (
+        normalized_mime_type in VISION_CONVERTIBLE_IMAGE_MIME_TYPES
+        or suffix in VISION_CONVERTIBLE_IMAGE_SUFFIXES
+    )
+    image_type_supported = image_type_supported_by_openai or image_type_convertible
     debug["mime_type"] = normalized_mime_type
     debug["image_type_supported"] = image_type_supported
+    debug["image_requires_conversion"] = bool(image_type_convertible and not image_type_supported_by_openai)
     log_vision_debug_step(
         debug,
         "Image type supported",
         mime_type=normalized_mime_type,
         suffix=suffix,
         image_type_supported=image_type_supported,
+        image_requires_conversion=debug["image_requires_conversion"],
     )
 
     if not image_type_supported:
@@ -1019,6 +1030,9 @@ def validate_vision_image_upload(upload_path, filename, mime_type, debug):
 
     try:
         from PIL import Image
+
+        if image_type_convertible:
+            ensure_heif_image_support()
 
         with Image.open(upload_path) as image:
             debug["image_format"] = str(image.format or "")
@@ -1033,10 +1047,15 @@ def validate_vision_image_upload(upload_path, filename, mime_type, debug):
             failed_status="image_uploaded",
         )
     except Exception as exc:
+        error_message = (
+            unsupported_phone_image_message(normalized_mime_type)
+            if image_type_convertible
+            else f"Uploaded image is not readable: {exc}"
+        )
         return set_vision_debug_error(
             debug,
-            "IMAGE_UNREADABLE",
-            f"Uploaded image is not readable: {exc}",
+            "UNSUPPORTED_IMAGE_FORMAT" if image_type_convertible else "IMAGE_UNREADABLE",
+            error_message,
             failed_status="image_uploaded",
         )
 

@@ -42,6 +42,7 @@ except Exception:  # pragma: no cover
         pass
 
 from PushShoppingList.services import cloudflare_r2_storage
+from PushShoppingList.services.openai_model_service import supports_custom_temperature
 from PushShoppingList.services.openai_usage_service import record_openai_usage
 from PushShoppingList.services.purchase_mapping_service import apply_purchase_mapping_to_ingredient
 from PushShoppingList.services.storage_service import scoped_extractor_data_path
@@ -116,12 +117,30 @@ VISION_SUPPORTED_IMAGE_MIME_TYPES = {
     "image/webp",
     "image/gif",
 }
+VISION_CONVERTIBLE_IMAGE_MIME_TYPES = {
+    "image/heic",
+    "image/heif",
+    "image/heic-sequence",
+    "image/heif-sequence",
+    "image/bmp",
+    "image/x-ms-bmp",
+    "image/tiff",
+    "image/avif",
+}
 VISION_SUPPORTED_IMAGE_SUFFIXES = {
     ".jpg",
     ".jpeg",
     ".png",
     ".webp",
     ".gif",
+}
+VISION_CONVERTIBLE_IMAGE_SUFFIXES = {
+    ".heic",
+    ".heif",
+    ".bmp",
+    ".tif",
+    ".tiff",
+    ".avif",
 }
 
 def resolve_vision_model():
@@ -130,11 +149,6 @@ def resolve_vision_model():
         or os.getenv("OPENAI_RECIPE_MODEL", "").strip()
         or VISION_MODEL_DEFAULT
     )
-
-
-def supports_custom_temperature(model):
-    normalized_model = str(model or "").strip().lower()
-    return not normalized_model.startswith("gpt-5")
 
 
 OPENAI_UNSUPPORTED_PARAMETER_MESSAGE = (
@@ -707,7 +721,21 @@ def classify_vision_ai_exception(exc):
             f"Vision AI request failed: invalid request parameter ({lowered_error_param}).",
         )
 
-    if "unsupported" in lowered_exception and "image" in lowered_exception and "format" in lowered_exception:
+    if (
+        "phone photo format" in lowered_exception
+        or "most compatible" in lowered_exception
+    ):
+        return (
+            "UNSUPPORTED_IMAGE_FORMAT",
+            "This phone photo format could not be read. Upload JPEG or PNG, "
+            "or change the phone camera format to Most Compatible.",
+        )
+
+    if (
+        "unsupported" in lowered_exception
+        and "image" in lowered_exception
+        and "format" in lowered_exception
+    ):
         return "UNSUPPORTED_IMAGE_FORMAT", "Unsupported image format."
 
     if "invalid_request_error" in lowered_exception_type:
@@ -6018,6 +6046,7 @@ def detect_image_mime_type(image_path, mime_type=""):
 
     try:
         from PIL import Image
+        ensure_heif_image_support()
         with Image.open(path) as image:
             if image.format:
                 return f"image/{image.format.lower()}"
@@ -6027,17 +6056,64 @@ def detect_image_mime_type(image_path, mime_type=""):
     return "image/jpeg"
 
 
-def prepare_image_bytes_for_openai(image_path, mime_type):
-    image_bytes = image_path.read_bytes()
-
-    if len(image_bytes) <= MAX_OPENAI_UPLOAD_IMAGE_BYTES:
-        return image_bytes, mime_type
+def ensure_heif_image_support():
+    try:
+        import pillow_heif
+    except Exception:
+        return False
 
     try:
+        pillow_heif.register_heif_opener()
+        return True
+    except Exception:
+        return False
+
+
+def image_mime_needs_openai_conversion(mime_type, image_path=None):
+    normalized_mime = str(mime_type or "").split(";", 1)[0].strip().lower()
+    if normalized_mime in VISION_SUPPORTED_IMAGE_MIME_TYPES:
+        return False
+
+    if normalized_mime in VISION_CONVERTIBLE_IMAGE_MIME_TYPES:
+        return True
+
+    suffix = Path(image_path).suffix.lower() if image_path else ""
+    return suffix in VISION_CONVERTIBLE_IMAGE_SUFFIXES
+
+
+def unsupported_phone_image_message(mime_type=""):
+    normalized_mime = str(mime_type or "").split(";", 1)[0].strip().lower()
+    if normalized_mime in {
+        "image/heic",
+        "image/heif",
+        "image/heic-sequence",
+        "image/heif-sequence",
+    }:
+        return (
+            "This phone photo format could not be read. Upload JPEG or PNG, "
+            "or change the phone camera format to Most Compatible."
+        )
+
+    return "Unsupported image format."
+
+
+def prepare_image_bytes_for_openai(image_path, mime_type):
+    image_bytes = image_path.read_bytes()
+    resolved_mime = str(mime_type or "").split(";", 1)[0].strip().lower()
+    needs_conversion = image_mime_needs_openai_conversion(resolved_mime, image_path)
+
+    if len(image_bytes) <= MAX_OPENAI_UPLOAD_IMAGE_BYTES and not needs_conversion:
+        return image_bytes, resolved_mime or mime_type
+
+    try:
+        if needs_conversion:
+            ensure_heif_image_support()
         from PIL import Image
         from PIL import ImageOps
     except Exception:
-        return image_bytes, mime_type
+        if needs_conversion:
+            raise ValueError(unsupported_phone_image_message(resolved_mime))
+        return image_bytes, resolved_mime or mime_type
 
     try:
         with Image.open(io.BytesIO(image_bytes)) as image:
@@ -6056,14 +6132,23 @@ def prepare_image_bytes_for_openai(image_path, mime_type):
 
             if compressed:
                 print(
-                    "[recipe_import] action=compress_openai_image "
-                    f"original_bytes={len(image_bytes)} compressed_bytes={len(compressed)}"
+                    "[recipe_import] action=normalize_openai_image "
+                    f"original_mime={resolved_mime or 'unknown'} "
+                    "output_mime=image/jpeg "
+                    f"original_bytes={len(image_bytes)} converted_bytes={len(compressed)} "
+                    f"conversion_required={needs_conversion}"
                 )
                 return compressed, "image/jpeg"
     except Exception as exc:
-        print(f"[recipe_import] action=compress_openai_image_failed error={exc}")
+        print(
+            "[recipe_import] action=normalize_openai_image_failed "
+            f"mime_type={resolved_mime or 'unknown'} "
+            f"conversion_required={needs_conversion} error={exc}"
+        )
+        if needs_conversion:
+            raise ValueError(unsupported_phone_image_message(resolved_mime)) from exc
 
-    return image_bytes, mime_type
+    return image_bytes, resolved_mime or mime_type
 
 
 def send_image_prompt_to_openai(
@@ -6392,7 +6477,11 @@ def upload_import_source_type(mime_type, filename, upload_path):
     suffix = upload_file_suffix(filename, upload_path)
     normalized_mime_type = str(mime_type or "").split(";", 1)[0].strip().lower()
 
-    if normalized_mime_type.startswith("image/"):
+    if (
+        normalized_mime_type.startswith("image/")
+        or suffix in VISION_SUPPORTED_IMAGE_SUFFIXES
+        or suffix in VISION_CONVERTIBLE_IMAGE_SUFFIXES
+    ):
         return "image"
 
     if normalized_mime_type == "application/pdf" or suffix == ".pdf":
@@ -7852,7 +7941,7 @@ def prepare_word_conversion_source(upload_path, filename):
 
 def infer_safe_upload_suffix(value):
     name = Path(str(value or "")).name.lower()
-    match = re.search(r"_(jpe?g|png|webp|gif|pdf|txt|md|docx?|html?)$", name)
+    match = re.search(r"_(jpe?g|png|webp|gif|heic|heif|bmp|tiff?|avif|pdf|txt|md|docx?|html?)$", name)
 
     if not match:
         return ""
@@ -7861,6 +7950,23 @@ def infer_safe_upload_suffix(value):
     if suffix == "jpeg":
         suffix = "jpg"
     return f".{suffix}"
+
+
+def upload_image_mime_type_from_suffix(suffix):
+    normalized_suffix = str(suffix or "").strip().lower()
+    return {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp",
+        ".gif": "image/gif",
+        ".heic": "image/heic",
+        ".heif": "image/heif",
+        ".bmp": "image/bmp",
+        ".tif": "image/tiff",
+        ".tiff": "image/tiff",
+        ".avif": "image/avif",
+    }.get(normalized_suffix, "")
 
 
 def upload_file_suffix(filename, upload_path):
@@ -7877,7 +7983,10 @@ def normalize_upload_mime_type(mime_type, filename, upload_path):
     if not guessed_type:
         suffix = upload_file_suffix(filename, upload_path)
         if suffix:
-            guessed_type = mimetypes.guess_type(f"uploaded{suffix}")[0]
+            guessed_type = (
+                mimetypes.guess_type(f"uploaded{suffix}")[0]
+                or upload_image_mime_type_from_suffix(suffix)
+            )
 
     if not mime_type or mime_type == "application/octet-stream":
         return guessed_type or "application/octet-stream"

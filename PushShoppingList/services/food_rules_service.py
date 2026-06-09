@@ -5,6 +5,7 @@ from pathlib import Path
 
 from openai import OpenAI
 
+from PushShoppingList.services.openai_model_service import supports_custom_temperature
 from PushShoppingList.services.openai_usage_service import record_openai_usage
 from PushShoppingList.services.storage_service import scoped_extractor_data_path
 
@@ -162,23 +163,29 @@ def suggest_food_rules_from_prompt(prompt, current_rules=None, section=None):
     current_rules = normalize_food_rules(current_rules) if current_rules is not None else load_food_rules()
 
     try:
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You convert food preference text into grocery product restriction rules. "
+                    "Return only valid JSON."
+                ),
+            },
+            {
+                "role": "user",
+                "content": build_food_rule_prompt(prompt, current_rules, section),
+            },
+        ]
+        request_payload = {
+            "model": MODEL,
+            "messages": messages,
+            "response_format": {"type": "json_object"},
+        }
+        if supports_custom_temperature(MODEL):
+            request_payload["temperature"] = 0.1
+
         response = get_openai_client().chat.completions.create(
-            model=MODEL,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You convert food preference text into grocery product restriction rules. "
-                        "Return only valid JSON."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": build_food_rule_prompt(prompt, current_rules, section),
-                },
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.1,
+            **request_payload
         )
         record_openai_usage(response, "food-rules", model=MODEL)
         data = json.loads(clean_json_response(response.choices[0].message.content))

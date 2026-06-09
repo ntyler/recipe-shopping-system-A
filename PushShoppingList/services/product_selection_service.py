@@ -37,6 +37,7 @@ from PushShoppingList.services.purchase_mapping_service import purchase_group_re
 from PushShoppingList.services.purchase_mapping_service import purchase_mapping_for_item
 from PushShoppingList.services.purchase_mapping_service import purchase_mapping_for_recipe_ingredient
 from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
+from PushShoppingList.services.openai_model_service import supports_custom_temperature
 from PushShoppingList.services.recipe_quantity_service import format_quantity_display
 from PushShoppingList.services.recipe_quantity_service import load_saved_recipe_output
 from PushShoppingList.services.recipe_quantity_service import scale_quantity
@@ -3618,10 +3619,11 @@ def analyze_product_page_with_chatgpt(candidate, html_text, ingredient, usage_us
     try:
         with PRODUCT_AI_ANALYSIS_LOCK:
             response = client.chat.completions.create(
-                model=PRODUCT_ANALYSIS_MODEL,
-                messages=prompt_payload["messages"],
-                response_format={"type": "json_object"},
-                temperature=0.1,
+                **chatgpt_completion_payload(
+                    PRODUCT_ANALYSIS_MODEL,
+                    prompt_payload["messages"],
+                    temperature=0.1,
+                )
             )
         record_openai_usage(
             response,
@@ -3649,10 +3651,12 @@ def analyze_product_page_with_chatgpt(candidate, html_text, ingredient, usage_us
 
 
 def chatgpt_prompt_payload(kind, model, messages, temperature=0):
+    temperature_included = supports_custom_temperature(model)
     return {
         "kind": kind,
         "model": model,
         "temperature": temperature,
+        "temperature_included": temperature_included,
         "response_format": {"type": "json_object"},
         "messages": [
             {
@@ -3662,6 +3666,17 @@ def chatgpt_prompt_payload(kind, model, messages, temperature=0):
             for message in messages
         ],
     }
+
+
+def chatgpt_completion_payload(model, messages, temperature=0):
+    payload = {
+        "model": model,
+        "messages": messages,
+        "response_format": {"type": "json_object"},
+    }
+    if supports_custom_temperature(model):
+        payload["temperature"] = temperature
+    return payload
 
 
 def product_page_ai_payload(html_text):
@@ -5367,10 +5382,11 @@ def identify_rendered_html_products_with_chatgpt(
     try:
         with PRODUCT_AI_ANALYSIS_LOCK:
             response = client.chat.completions.create(
-                model=PRODUCT_ANALYSIS_MODEL,
-                messages=prompt_payload["messages"],
-                response_format={"type": "json_object"},
-                temperature=0,
+                **chatgpt_completion_payload(
+                    PRODUCT_ANALYSIS_MODEL,
+                    prompt_payload["messages"],
+                    temperature=0,
+                )
             )
         record_openai_usage(
             response,
@@ -7736,10 +7752,11 @@ def choose_store_products_with_chatgpt(
     try:
         with PRODUCT_AI_ANALYSIS_LOCK:
             response = client.chat.completions.create(
-                model=PRODUCT_ANALYSIS_MODEL,
-                messages=prompt_payload["messages"],
-                response_format={"type": "json_object"},
-                temperature=0,
+                **chatgpt_completion_payload(
+                    PRODUCT_ANALYSIS_MODEL,
+                    prompt_payload["messages"],
+                    temperature=0,
+                )
             )
         record_openai_usage(
             response,
@@ -8160,10 +8177,11 @@ def choose_best_product_with_chatgpt(
     try:
         with PRODUCT_AI_ANALYSIS_LOCK:
             response = client.chat.completions.create(
-                model=PRODUCT_ANALYSIS_MODEL,
-                messages=prompt_payload["messages"],
-                response_format={"type": "json_object"},
-                temperature=0,
+                **chatgpt_completion_payload(
+                    PRODUCT_ANALYSIS_MODEL,
+                    prompt_payload["messages"],
+                    temperature=0,
+                )
             )
         record_openai_usage(
             response,

@@ -75,6 +75,7 @@ from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_
 from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_path
 from PushShoppingList.services.recipe_extract_service import recipe_scaling_from_data
 from PushShoppingList.services.recipe_extract_service import scaling_multiplier_label
+from PushShoppingList.services.recipe_extract_service import supports_custom_temperature
 from PushShoppingList.services.recipe_edit_service import is_shareable_pdf_public_url
 from PushShoppingList.services.recipe_edit_service import PDF_KIND_GENERATED_RECIPE
 from PushShoppingList.services.recipe_edit_service import normalize_recipe_pdf_storage_metadata
@@ -2150,26 +2151,34 @@ Output shape:
 }}
 """
 
+    address_model = os.getenv("OPENAI_ADDRESS_MODEL", "gpt-4o-mini")
+
     try:
+        messages = [
+            {
+                "role": "system",
+                "content": "You extract structured US mailing address fields and return only JSON.",
+            },
+            {
+                "role": "user",
+                "content": prompt,
+            },
+        ]
+        request_payload = {
+            "model": address_model,
+            "messages": messages,
+            "response_format": {"type": "json_object"},
+        }
+        if supports_custom_temperature(address_model):
+            request_payload["temperature"] = 0
+
         response = address_openai_client.chat.completions.create(
-            model=os.getenv("OPENAI_ADDRESS_MODEL", "gpt-4o-mini"),
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You extract structured US mailing address fields and return only JSON.",
-                },
-                {
-                    "role": "user",
-                    "content": prompt,
-                },
-            ],
-            response_format={"type": "json_object"},
-            temperature=0,
+            **request_payload
         )
         record_openai_usage(
             response,
             "address-completion",
-            model=os.getenv("OPENAI_ADDRESS_MODEL", "gpt-4o-mini"),
+            model=address_model,
         )
         data = json.loads(clean_json_response(response.choices[0].message.content))
     except Exception as exc:

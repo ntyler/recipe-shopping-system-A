@@ -43,6 +43,25 @@ def valid_png_bytes():
     return output.getvalue()
 
 
+def test_prepare_image_bytes_converts_small_non_openai_image(tmp_path):
+    image_path = tmp_path / "phone-upload.bmp"
+    Image.new("RGB", (2, 2), color=(255, 255, 255)).save(image_path, format="BMP")
+
+    image_bytes, mime_type = recipe_extract_service.prepare_image_bytes_for_openai(
+        image_path,
+        "image/bmp",
+    )
+
+    assert mime_type == "image/jpeg"
+    assert image_bytes.startswith(b"\xff\xd8")
+
+
+def test_gpt5_models_do_not_support_custom_temperature():
+    assert recipe_extract_service.supports_custom_temperature("gpt-5.5") is False
+    assert recipe_extract_service.supports_custom_temperature("gpt-5") is False
+    assert recipe_extract_service.supports_custom_temperature("gpt-4o-mini") is True
+
+
 def write_uploaded_image(user_data_dir, user_id, filename="meal.png", data=None):
     upload_dir = user_data_dir / user_id / "recipe-extractor" / "data" / "uploads"
     upload_dir.mkdir(parents=True)

@@ -6,6 +6,7 @@ from openai import OpenAI
 
 from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.food_rules_service import term_matches
+from PushShoppingList.services.openai_model_service import supports_custom_temperature
 from PushShoppingList.services.openai_usage_service import record_openai_usage
 
 
@@ -42,23 +43,29 @@ def suggest_food_review_alternatives(payload):
     prompt = build_alternative_prompt(review)
 
     try:
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You suggest practical recipe ingredient alternatives that satisfy food rules. "
+                    "Return only valid JSON."
+                ),
+            },
+            {
+                "role": "user",
+                "content": prompt,
+            },
+        ]
+        request_payload = {
+            "model": MODEL,
+            "messages": messages,
+            "response_format": {"type": "json_object"},
+        }
+        if supports_custom_temperature(MODEL):
+            request_payload["temperature"] = 0.2
+
         response = get_openai_client().chat.completions.create(
-            model=MODEL,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You suggest practical recipe ingredient alternatives that satisfy food rules. "
-                        "Return only valid JSON."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": prompt,
-                },
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.2,
+            **request_payload
         )
         record_openai_usage(response, "food-review-alternatives", model=MODEL)
         data = json.loads(clean_json_response(response.choices[0].message.content))

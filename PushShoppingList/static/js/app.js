@@ -6693,9 +6693,11 @@ function recipeUploadedPathLooksLikeImage(uploadedFilePath = "") {
         "webp",
         "gif",
         "heic",
+        "heif",
         "bmp",
         "tif",
         "tiff",
+        "avif",
     ]).has(pathExtension || "");
 }
 
