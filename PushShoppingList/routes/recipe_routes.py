@@ -109,6 +109,129 @@ NO_INGREDIENTS_ERROR = "No ingredients were found for this recipe URL."
 IMPORT_LOGIN_ERROR = "Sign in before importing recipes so imported data is saved to your account."
 FOOD_REVIEW_LOGIN_ERROR = "Sign in before using food reviews so results stay tied to your account."
 IMPORT_CATEGORY_STATUS_MESSAGE = "Import complete. Generating ChatGPT categories..."
+IMAGE_RECIPE_WORKFLOW_STATES = {}
+
+
+def _uploaded_recipe_workflow_key(url):
+    return str(url or "").strip()
+
+
+def _is_uploaded_recipe_url(url):
+    return str(url or "").startswith("uploaded://")
+
+
+def _extract_nutrition_text_value(value):
+    if value is None:
+        return ""
+
+    return str(value).strip()
+
+
+def _has_per_serving_estimate(nutrition):
+    if isinstance(nutrition, dict):
+        serving_basis = _extract_nutrition_text_value(nutrition.get("serving_basis"))
+        calories = _extract_nutrition_text_value(nutrition.get("calories"))
+        return bool(serving_basis and calories)
+
+    if isinstance(nutrition, list):
+        serving_basis = ""
+        calories = ""
+
+        for item in nutrition:
+            if not isinstance(item, dict):
+                continue
+
+            key = str(item.get("key") or "").strip().lower()
+            value = _extract_nutrition_text_value(item.get("value"))
+
+            if key == "serving_basis":
+                serving_basis = value
+            elif key == "calories":
+                calories = value
+
+        return bool(serving_basis and calories)
+
+    return False
+
+
+def _is_uploaded_recipe_nutrition_complete(url):
+    if not _is_uploaded_recipe_url(url):
+        return True
+
+    key = _uploaded_recipe_workflow_key(url)
+    state = IMAGE_RECIPE_WORKFLOW_STATES.get(key, {})
+    if state.get("estimate_per_serving_completed"):
+        return True
+
+    try:
+        recipe_data = load_editable_recipe(url) if key else {}
+    except Exception:
+        recipe_data = {}
+
+    recipe_payload = recipe_data.get("recipe") if isinstance(recipe_data, dict) else {}
+    if _has_per_serving_estimate(recipe_payload.get("nutrition")):
+        IMAGE_RECIPE_WORKFLOW_STATES[key] = {
+            **state,
+            "estimate_per_serving_completed": True,
+            "last_checked_at": perf_counter(),
+        }
+        return True
+
+    return False
+
+
+def _should_auto_generate_recipe_pdf(url, extraction_source=""):
+    extraction_source = str(extraction_source or "").strip().lower()
+
+    if not _is_uploaded_recipe_url(url):
+        return True
+
+    return extraction_source not in {"image_estimate", "manual_description", "vision"}
+
+
+def _mark_uploaded_recipe_nutrition_estimated(url, estimated):
+    key = _uploaded_recipe_workflow_key(url)
+    if not key:
+        return
+
+    state = IMAGE_RECIPE_WORKFLOW_STATES.get(key, {})
+    state["estimate_per_serving_completed"] = bool(estimated)
+    state["updated_at"] = perf_counter()
+    IMAGE_RECIPE_WORKFLOW_STATES[key] = state
+
+
+def _extract_recipe_payload_for_nutrition(data):
+    if not isinstance(data, dict):
+        return {}
+
+    recipe = data.get("recipe")
+    if isinstance(recipe, dict):
+        return recipe
+
+    recipe_json = data.get("recipe_json")
+    if isinstance(recipe_json, dict):
+        return recipe_json
+
+    return {}
+
+
+def create_recipe_pdf_from_url(recipe_url):
+    recipe_url = str(recipe_url or "").strip()
+
+    if not recipe_url:
+        return {
+            "ok": False,
+            "error": "Recipe URL is required.",
+        }
+
+    if not _is_uploaded_recipe_nutrition_complete(recipe_url):
+        return {
+            "ok": False,
+            "error": "Estimate per serving basis is required before creating the recipe PDF.",
+            "success": False,
+        }
+
+    return create_editable_recipe_pdf(recipe_url)
 
 
 def run_generated_recipe_pdf_creation(recipe_url, context="import"):
@@ -123,18 +246,7 @@ def run_generated_recipe_pdf_creation(recipe_url, context="import"):
 
     print(f"[recipe_pdf] action=auto_generated_start context={context} url={recipe_url}")
 
-    try:
-        result = create_editable_recipe_pdf(recipe_url)
-    except Exception as exc:
-        print(
-            "[recipe_pdf] "
-            f"action=auto_generated_failed context={context} url={recipe_url} error={exc}"
-        )
-        return {
-            "ok": False,
-            "url": recipe_url,
-            "error": str(exc),
-        }
+    result = create_recipe_pdf_from_url(recipe_url)
 
     public_url = str(
         result.get("generated_cloudflare_pdf_url")
@@ -706,11 +818,19 @@ def commit_media_import_result(result, cookbook, recipe_url="", context="media-u
             "category_status_message": IMPORT_CATEGORY_STATUS_MESSAGE if category_status.get("ok") else category_status.get("error", ""),
         }
         create_source_url_pdf(recipe_url)
-        pdf_job = schedule_generated_recipe_pdf_creation(recipe_url, context=context)
-        result = {
-            **result,
-            "generated_recipe_pdf_job": pdf_job,
-        }
+
+        extraction_source = str(
+            result.get("extraction_mode")
+            or result.get("extraction_method")
+            or ""
+        ).strip()
+        if _should_auto_generate_recipe_pdf(recipe_url, extraction_source):
+            pdf_job = schedule_generated_recipe_pdf_creation(recipe_url, context=context)
+            result = {
+                **result,
+                "generated_recipe_pdf_job": pdf_job,
+            }
+
         record_recipe_import_activity(recipe_url, result, context)
         sort_ingredients()
         return result
@@ -1227,10 +1347,104 @@ def api_generate_recipe_from_image_route():
     result["success"] = bool(result.get("ok"))
     result["model_used"] = str(debug.get("model") or MODEL)
     result["debug"] = debug
+    _mark_uploaded_recipe_nutrition_estimated(recipe_url, False)
     debug["recipe_creation_success"] = bool(result.get("ok"))
     log_vision_debug_step(debug, "Recipe creation success", recipe_creation_success=debug["recipe_creation_success"])
 
     return jsonify(result), 200
+
+
+@recipe_bp.route("/api/estimate-per-serving", methods=["POST"])
+def api_estimate_per_serving_route():
+    account_response = require_account_for_import(wants_json=True)
+    if account_response:
+        return account_response
+
+    data = request.get_json(silent=True) or {}
+    recipe_url = str(
+        data.get("recipe_url")
+        or data.get("url")
+        or data.get("source_url")
+        or ""
+    ).strip()
+    recipe = _extract_recipe_payload_for_nutrition(data)
+
+    if not recipe and recipe_url:
+        recipe = load_editable_recipe(recipe_url) or {}
+
+    if not recipe:
+        return jsonify(with_openai_usage_dashboard({
+            "ok": False,
+            "success": False,
+            "error": "Recipe payload is required.",
+            "model_used": str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL)),
+            "debug": {
+                "model": str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL)),
+                "recipe_url": recipe_url,
+            },
+        })), 400
+
+    model_used = str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL))
+    result = estimate_recipe_nutrition(recipe)
+
+    if result.get("ok") and recipe_url:
+        updated_recipe = {
+            **recipe,
+            "nutrition": result.get("nutrition", []),
+        }
+        save_result = save_editable_recipe(recipe_url, updated_recipe)
+        if not save_result.get("ok"):
+            result = {
+                **result,
+                "ok": False,
+                "success": False,
+                "error": save_result.get("error") or "Unable to save estimated nutrition.",
+            }
+            _mark_uploaded_recipe_nutrition_estimated(recipe_url, False)
+        else:
+            result["recipe_json"] = updated_recipe
+            result["recipe_url"] = recipe_url
+            _mark_uploaded_recipe_nutrition_estimated(recipe_url, True)
+
+    if result.get("ok"):
+        result["success"] = True
+        result["recipe_json"] = result.get("recipe_json", recipe)
+    else:
+        result["success"] = False
+
+    result["model_used"] = model_used
+    result["debug"] = {
+        "model": model_used,
+        "recipe_url": recipe_url,
+    }
+    status = 200 if result.get("ok") else 400
+
+    return jsonify(with_openai_usage_dashboard(result)), status
+
+
+@recipe_bp.route("/api/create-recipe-pdf", methods=["POST"])
+def api_create_recipe_pdf_route():
+    account_response = require_account_for_import(wants_json=True)
+    if account_response:
+        return account_response
+
+    data = request.get_json(silent=True) or {}
+    url = str(data.get("url") or data.get("recipe_url") or data.get("source_url") or "").strip()
+
+    if not url:
+        return jsonify(with_openai_usage_dashboard({
+            "ok": False,
+            "success": False,
+            "error": "Recipe URL is required.",
+        })), 400
+
+    result = create_recipe_pdf_from_url(url)
+    status = 200 if result.get("ok") else 400
+    result["success"] = bool(result.get("ok"))
+    if "model_used" not in result:
+        result["model_used"] = str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL))
+
+    return jsonify(with_openai_usage_dashboard(result)), status
 
 
 @recipe_bp.route("/api/extract_recipe", methods=["POST"])
@@ -1582,7 +1796,7 @@ def api_recipe_image_progress_route():
 def api_recipe_pdf_route():
     data = request.get_json(silent=True) or {}
     url = str(data.get("url", "") or "").strip()
-    result = create_editable_recipe_pdf(url)
+    result = create_recipe_pdf_from_url(url)
     status = 200 if result.get("ok") else 400
 
     return jsonify(result), status

@@ -5902,9 +5902,27 @@ let recipeMediaUploadSourceName = "";
 let recipeMediaUploadMimeType = "";
 let recipeMediaVisionInProgress = false;
 let recipeMediaUploadPreview = null;
+let recipeMediaWorkflowSourceUrl = "";
+let recipeMediaEstimatePerServingDone = false;
 
 function setRecipeMediaUploadPath(path) {
     recipeMediaUploadPath = String(path || "").trim();
+}
+
+function setRecipeMediaWorkflowSourceUrl(url) {
+    recipeMediaWorkflowSourceUrl = String(url || "").trim();
+}
+
+function getRecipeMediaWorkflowSourceUrl() {
+    return recipeMediaWorkflowSourceUrl;
+}
+
+function markRecipeMediaEstimatePerServingDone(done) {
+    recipeMediaEstimatePerServingDone = Boolean(done);
+}
+
+function isRecipeMediaEstimatePerServingDone() {
+    return Boolean(recipeMediaEstimatePerServingDone);
 }
 
 function getRecipeMediaUploadPath() {
@@ -6007,6 +6025,52 @@ function setRecipeFileImageActionPanelVisible(visible) {
     } else {
         panel.hidden = true;
     }
+}
+
+function setRecipeFileImageNextStepsPanelVisible(visible) {
+    const overlay = document.getElementById("recipeFileLoadingOverlay");
+
+    if (!overlay) {
+        return;
+    }
+
+    const panel = overlay.querySelector("#recipeFileImageNextStepsPanel");
+    if (!panel) {
+        return;
+    }
+
+    panel.hidden = !Boolean(visible);
+}
+
+function setRecipeFileImageNextStepButtons({ estimateDisabled = true, createPdfDisabled = true }) {
+    const overlay = document.getElementById("recipeFileLoadingOverlay");
+
+    if (!overlay) {
+        return;
+    }
+
+    const estimateBtn = overlay.querySelector("#recipeFileEstimatePerServingBtn");
+    const createPdfBtn = overlay.querySelector("#recipeFileCreateRecipePdfBtn");
+
+    if (estimateBtn) {
+        estimateBtn.disabled = Boolean(estimateDisabled);
+        estimateBtn.hidden = false;
+    }
+
+    if (createPdfBtn) {
+        createPdfBtn.disabled = Boolean(createPdfDisabled);
+        createPdfBtn.hidden = false;
+    }
+}
+
+function resetRecipeFileImageNextSteps() {
+    markRecipeMediaEstimatePerServingDone(false);
+    setRecipeMediaWorkflowSourceUrl("");
+    setRecipeFileImageNextStepButtons({
+        estimateDisabled: true,
+        createPdfDisabled: true,
+    });
+    setRecipeFileImageNextStepsPanelVisible(false);
 }
 
 async function submitRecipeMediaUpload(input, manualDescription = "", uploadMode = "read_text") {
@@ -6113,6 +6177,17 @@ async function submitRecipeMediaUpload(input, manualDescription = "", uploadMode
             setRecipeFileEstimatedBanner(true, (data && data.estimation_banner) || "Recipe estimated from uploaded image. Review ingredients before saving.");
             const readStatus = isReadMode ? "Readable text found" : "No readable recipe text";
             updateRecipeFileLoadingStep("read", "done", readStatus);
+            const sourceUrl = String((data && data.source_url) || "").trim();
+            if (sourceUrl) {
+                setRecipeMediaWorkflowSourceUrl(sourceUrl);
+            }
+            markRecipeMediaEstimatePerServingDone(false);
+            updateRecipeFileLoadingStep("save", "done", "Saved");
+            setRecipeFileImageNextStepsPanelVisible(true);
+            setRecipeFileImageNextStepButtons({
+                estimateDisabled: false,
+                createPdfDisabled: true,
+            });
         } else {
             updateRecipeFileLoadingStep("estimate", "done", "Skipped");
             updateRecipeFileLoadingStep("read", "done", "Readable text found");
@@ -6251,6 +6326,192 @@ async function submitRecipeMediaDescription() {
         if (submitButton) {
             submitButton.disabled = false;
             submitButton.textContent = "Generate Recipe From Description";
+        }
+    }
+}
+
+function isUploadedRecipeSourceUrl(value = "") {
+    return String(value || "").startsWith("uploaded://");
+}
+
+function recipeHasPerServingEstimate(recipe = {}) {
+    const nutrition = recipe ? recipe.nutrition : null;
+
+    if (!nutrition) {
+        return false;
+    }
+
+    if (Array.isArray(nutrition)) {
+        const servingBasis = nutrition.find(item => String(item && item.key || "").trim().toLowerCase() === "serving_basis");
+        const calories = nutrition.find(item => String(item && item.key || "").trim().toLowerCase() === "calories");
+
+        return Boolean(
+            servingBasis && calories
+            && String(servingBasis.value || "").trim()
+            && String(calories.value || "").trim()
+        );
+    }
+
+    if (typeof nutrition === "object") {
+        const servingBasis = String(nutrition.serving_basis || "").trim();
+        const calories = String(nutrition.calories || "").trim();
+
+        return Boolean(servingBasis && calories);
+    }
+
+    return false;
+}
+
+function recipeMediaEstimatePerServingAllowed(recipe = recipeMediaUploadPreview) {
+    return recipeHasPerServingEstimate(recipe);
+}
+
+async function submitRecipeMediaEstimatePerServing() {
+    const recipeUrl = getRecipeMediaWorkflowSourceUrl();
+    const recipeJson = recipeMediaUploadPreview;
+    const recipeFileSummary = document.getElementById("recipeFileLoadingSummary");
+    const button = document.getElementById("recipeFileEstimatePerServingBtn");
+
+    if (!recipeUrl || !recipeJson || typeof recipeJson !== "object") {
+        if (recipeFileSummary) {
+            recipeFileSummary.textContent = "No recipe available to estimate. Try re-running image extraction.";
+        }
+        return;
+    }
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Estimating...";
+    }
+
+    try {
+        setRecipeFileLoadingSummary("Estimating nutrition per serving basis...");
+        updateRecipeFileLoadingStep("save", "running", "Estimating nutrition");
+        const response = await fetch("/api/estimate-per-serving", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                recipe_url: recipeUrl,
+                recipe: recipeJson,
+                recipe_json: recipeJson,
+            }),
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to estimate nutrition.");
+        }
+
+        const updatedRecipe = data && data.recipe_json && typeof data.recipe_json === "object"
+            ? data.recipe_json
+            : recipeJson;
+        recipeMediaUploadPreview = updatedRecipe;
+        markRecipeMediaEstimatePerServingDone(Boolean(recipeMediaEstimatePerServingAllowed(updatedRecipe)));
+
+        const responseModelUsed = String((data && data.model_used) || "").trim();
+        setRecipeFileModelUsed(responseModelUsed || "Unknown");
+        setRecipeFileVisionDebug(data && data.debug, {
+            visible: true,
+            recipeJson: data && data.recipe_json,
+            errorData: data,
+        });
+        setRecipeFileLoadingSummary("Per-serving nutrition estimate completed.");
+        updateRecipeFileLoadingStep("save", "done", "Serving estimate complete");
+
+        setRecipeFileImageNextStepButtons({
+            estimateDisabled: true,
+            createPdfDisabled: !recipeMediaEstimatePerServingAllowed(updatedRecipe),
+        });
+    } catch (err) {
+        markRecipeMediaEstimatePerServingDone(false);
+        setRecipeFileImageNextStepButtons({
+            estimateDisabled: false,
+            createPdfDisabled: true,
+        });
+        setRecipeFileLoadingSummary(`Could not estimate serving basis. ${err.message || "Unable to estimate nutrition."}`);
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = "Estimate per serving basis";
+        }
+    }
+}
+
+async function createRecipePdfFromMediaImport() {
+    const button = document.getElementById("recipeFileCreateRecipePdfBtn");
+    const recipeUrl = getRecipeMediaWorkflowSourceUrl();
+
+    if (!recipeUrl) {
+        setRecipeFileLoadingSummary("Recipe URL missing. Regenerate from image first.");
+        return;
+    }
+
+    if (!isRecipeMediaEstimatePerServingDone()) {
+        setRecipeFileLoadingSummary("Estimate per serving basis is required before creating the recipe PDF.");
+        return;
+    }
+
+    try {
+        const recipeLookupResponse = await fetch(`/api/recipe?url=${encodeURIComponent(recipeUrl)}`, {
+            method: "GET",
+            headers: {
+                "Accept": "application/json",
+            },
+        });
+        const recipeLookupData = await recipeLookupResponse.json();
+
+        const recipeForEstimateCheck = recipeLookupData && recipeLookupData.recipe && recipeLookupData.recipe.recipe
+            ? recipeLookupData.recipe.recipe
+            : recipeLookupData && recipeLookupData.recipe
+                ? recipeLookupData.recipe
+                : null;
+
+        if (!recipeLookupResponse.ok || !recipeForEstimateCheck || !recipeHasPerServingEstimate(recipeForEstimateCheck)) {
+            throw new Error("Estimate per serving basis is required before creating the recipe PDF.");
+        }
+    } catch (lookupError) {
+        setRecipeFileLoadingSummary(lookupError.message || "Unable to validate serving estimate.");
+        markRecipeMediaEstimatePerServingDone(false);
+        setRecipeFileImageNextStepButtons({
+            estimateDisabled: false,
+            createPdfDisabled: true,
+        });
+        return;
+    }
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Creating PDF...";
+    }
+
+    try {
+        setRecipeFileLoadingSummary("Creating recipe PDF...");
+        const response = await fetch("/api/create-recipe-pdf", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ url: recipeUrl }),
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to create recipe PDF.");
+        }
+
+        setRecipeFileLoadingSummary("Recipe PDF created. You can open it from the recipe editor.");
+        setRecipeFileImageNextStepButtons({
+            estimateDisabled: true,
+            createPdfDisabled: true,
+        });
+    } catch (err) {
+        setRecipeFileLoadingSummary(err.message || "Unable to create recipe PDF.");
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = "Create recipe PDF";
         }
     }
 }
@@ -6706,6 +6967,27 @@ function showRecipeFileLoadingOverlay(fileName, sourceTypeLabel, showImageAction
                     </div>
                 </div>
                 <div id="recipeFileLoadingSummary" class="recipe-qty-progress-summary">Preparing file...</div>
+                <div id="recipeFileImageNextStepsPanel" hidden>
+                    <div class="recipe-file-action-title">Next Steps</div>
+                    <div class="recipe-file-action-buttons">
+                        <button
+                            id="recipeFileEstimatePerServingBtn"
+                            type="button"
+                            class="recipe-file-action-btn"
+                            onclick="submitRecipeMediaEstimatePerServing()"
+                        >
+                            Estimate per serving basis
+                        </button>
+                        <button
+                            id="recipeFileCreateRecipePdfBtn"
+                            type="button"
+                            class="recipe-file-action-btn"
+                            onclick="createRecipePdfFromMediaImport()"
+                        >
+                            Create recipe PDF
+                        </button>
+                    </div>
+                </div>
                 <div id="recipeFileImageEstimateBanner" class="recipe-file-image-estimate-banner" hidden>
                     Recipe estimated from uploaded image. Review ingredients before saving.
                 </div>
@@ -6787,6 +7069,7 @@ function showRecipeFileLoadingOverlay(fileName, sourceTypeLabel, showImageAction
     document.body.classList.add("modal-open");
     setRecipeFileImageActionPanelVisible(Boolean(showImageActions));
     setRecipeFileActionButtonsEnabled(true);
+    resetRecipeFileImageNextSteps();
 }
 
 function hideRecipeFileLoadingOverlay() {
@@ -6797,6 +7080,7 @@ function hideRecipeFileLoadingOverlay() {
         overlay.setAttribute("aria-hidden", "true");
         document.body.classList.remove("modal-open");
     }
+    resetRecipeFileImageNextSteps();
 }
 
 function updateRecipeFileLoadingStep(stepKey, state, message) {
@@ -14364,6 +14648,10 @@ async function saveRecipeEditor(event) {
         let createdPdfPublicUrl = "";
         let createdPdfUploadError = "";
 
+        if (shouldCreatePdf && isUploadedRecipeSourceUrl(sourceUrl || "") && !recipeHasPerServingEstimate(payload.recipe || {})) {
+            throw new Error("Estimate per serving basis is required before creating the recipe PDF.");
+        }
+
         if (shouldSaveCategories) {
             updateRecipeSaveProgressItem(categoryProgressIndex, "running", "Saving...");
             setRecipeEditStatus("Saving recipe categories...");
@@ -14501,6 +14789,14 @@ async function createRecipeEditorPdf(button) {
                 ? saveData.recipe.source_url
                 : payload.recipe.source_url || payload.original_url
         );
+
+        const recipeForPdfCheck = saveData.recipe && typeof saveData.recipe === "object"
+            ? saveData.recipe
+            : payload.recipe;
+
+        if (isUploadedRecipeSourceUrl(sourceUrl || "") && !recipeHasPerServingEstimate(recipeForPdfCheck || {})) {
+            throw new Error("Estimate per serving basis is required before creating the recipe PDF.");
+        }
 
         if (saveData.recipe) {
             populateRecipeEditor(saveData.recipe, sourceUrl);
@@ -14650,12 +14946,16 @@ async function createRecipePdfFromSourceUrl(sourceUrl) {
 }
 
 async function createRecipePdfFromSavedRecipe(sourceUrl) {
-    const pdfResponse = await fetch("/api/recipe_pdf", {
+    const requestBody = JSON.stringify({ url: sourceUrl });
+    const isUploadedSource = isUploadedRecipeSourceUrl(String(sourceUrl || ""));
+    const endpoint = isUploadedSource ? "/api/create-recipe-pdf" : "/api/recipe_pdf";
+
+    const pdfResponse = await fetch(endpoint, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
         },
-        body: JSON.stringify({ url: sourceUrl }),
+        body: requestBody,
     });
     const pdfData = await pdfResponse.json();
 
