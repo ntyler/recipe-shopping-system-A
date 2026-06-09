@@ -6648,27 +6648,7 @@ function buildVisionConnectionErrorMessage(reason, debug = {}) {
         return "";
     }
 
-    const model = String((debug && debug.model) || "unknown");
-    const fileExists = Boolean(debug && debug.file_exists);
-    const fileSize = Number(debug && debug.file_size ? debug.file_size : 0);
-    const exceptionTypeText = String(debug && debug.exception_type) || "Unknown";
-    const exceptionMessageText = String(debug && debug.exception_message || "");
-
-    return [
-        "Connection error while contacting OpenAI.",
-        "Possible causes:",
-        "- backend has no internet access",
-        "- OPENAI_API_KEY missing or invalid",
-        "- request timed out",
-        "- local image path was sent instead of image bytes/base64",
-        "- firewall/proxy blocked request",
-        "- OpenAI SDK/network issue",
-        `Model used: ${model}`,
-        `File exists: ${fileExists ? "yes" : "no"}`,
-        `File size: ${fileSize}`,
-        `Exception type: ${exceptionTypeText}`,
-        `Exception message: ${exceptionMessageText}`,
-    ].join("\n");
+    return "Connection error while contacting OpenAI.";
 }
 
 function recipeFileErrorMessageWithReason(summary, reason, fallbackPrefix) {
@@ -6699,6 +6679,19 @@ function recipeUploadedPathLooksLikeImage(uploadedFilePath = "") {
         "tiff",
         "avif",
     ]).has(pathExtension || "");
+}
+
+function recipeFileClientContext() {
+    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection || {};
+    return {
+        user_agent: String(navigator.userAgent || ""),
+        platform: String(navigator.platform || ""),
+        max_touch_points: Number(navigator.maxTouchPoints || 0),
+        viewport: `${window.innerWidth || 0}x${window.innerHeight || 0}`,
+        device_pixel_ratio: Number(window.devicePixelRatio || 1),
+        connection_type: String(connection.effectiveType || connection.type || ""),
+        save_data: Boolean(connection.saveData),
+    };
 }
 
 async function submitRecipeMediaVision() {
@@ -6775,6 +6768,7 @@ async function submitRecipeMediaVision() {
             vision_response_received: false,
             json_parse_success: false,
             recipe_creation_success: false,
+            client_context: recipeFileClientContext(),
             vision_request: {
                 endpoint: "/api/generate-recipe-from-image",
                 uploaded_file_path: uploadedFilePath,
@@ -6801,6 +6795,7 @@ async function submitRecipeMediaVision() {
                 photo_description: photoDescription,
                 cookbook_id: destination.cookbookId || "",
                 cookbook_name: destination.cookbookName || "",
+                client_context: recipeFileClientContext(),
             }),
         });
         const data = await response.json();
@@ -7372,6 +7367,8 @@ function setRecipeFileVisionDebug(debug = null, options = {}) {
             exception_message: normalizedDebug.exception_message,
             technical_message: normalizedDebug.technical_message || (options.errorData && options.errorData.technical_message) || "",
             encoded_base64_length: normalizedDebug.encoded_base64_length,
+            uploaded_file_size: normalizedDebug.uploaded_file_size,
+            openai_image_bytes: normalizedDebug.openai_image_bytes,
             image_type_supported: normalizedDebug.image_type_supported,
             image_readable: normalizedDebug.image_readable,
             vision_request_sent: normalizedDebug.vision_request_sent,
@@ -7379,6 +7376,8 @@ function setRecipeFileVisionDebug(debug = null, options = {}) {
             json_parse_success: normalizedDebug.json_parse_success,
             ingredient_count: normalizedDebug.ingredient_count,
             recipe_creation_success: normalizedDebug.recipe_creation_success,
+            client_context: normalizedDebug.client_context,
+            request_user_agent: normalizedDebug.request_user_agent,
             steps: normalizedDebug.steps || [],
         };
         const errorText = recipeFileDebugText(errorDetails, "No errors yet.");

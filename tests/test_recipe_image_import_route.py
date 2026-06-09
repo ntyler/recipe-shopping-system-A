@@ -56,6 +56,20 @@ def test_prepare_image_bytes_converts_small_non_openai_image(tmp_path):
     assert image_bytes.startswith(b"\xff\xd8")
 
 
+def test_prepare_image_bytes_normalizes_supported_image_over_threshold(monkeypatch, tmp_path):
+    image_path = tmp_path / "phone-upload.png"
+    Image.new("RGB", (3, 3), color=(255, 255, 255)).save(image_path, format="PNG")
+    monkeypatch.setattr(recipe_extract_service, "NORMALIZE_OPENAI_UPLOAD_IMAGE_BYTES", 1)
+
+    image_bytes, mime_type = recipe_extract_service.prepare_image_bytes_for_openai(
+        image_path,
+        "image/png",
+    )
+
+    assert mime_type == "image/jpeg"
+    assert image_bytes.startswith(b"\xff\xd8")
+
+
 def test_gpt5_models_do_not_support_custom_temperature():
     assert recipe_extract_service.supports_custom_temperature("gpt-5.5") is False
     assert recipe_extract_service.supports_custom_temperature("gpt-5") is False

@@ -1224,9 +1224,20 @@ def api_generate_recipe_from_image_route():
         or data.get("description")
         or ""
     ).strip()
+    client_context = data.get("client_context") if isinstance(data.get("client_context"), dict) else {}
     debug = build_vision_debug(uploaded_file_path=uploaded_file_path)
     debug["action"] = "generate_recipe_from_image"
+    debug["client_context"] = client_context
+    debug["request_user_agent"] = str(request.headers.get("User-Agent") or "")
     log_vision_debug_step(debug, "Image path received", image_path=uploaded_file_path)
+    log_vision_debug_step(
+        debug,
+        "Client context",
+        user_agent=debug["request_user_agent"],
+        platform=client_context.get("platform"),
+        viewport=client_context.get("viewport"),
+        max_touch_points=client_context.get("max_touch_points"),
+    )
 
     if source_type != "image":
         set_vision_debug_error(

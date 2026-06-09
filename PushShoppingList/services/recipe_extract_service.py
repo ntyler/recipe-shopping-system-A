@@ -105,6 +105,7 @@ MAX_VIDEO_AUDIO_BYTES = int(os.getenv("MAX_VIDEO_AUDIO_BYTES", str(24 * 1024 * 1
 MAX_SOCIAL_VIDEO_IMAGE_URLS = int(os.getenv("MAX_SOCIAL_VIDEO_IMAGE_URLS", "4"))
 MAX_OPENAI_UPLOAD_IMAGE_SIDE = int(os.getenv("MAX_OPENAI_UPLOAD_IMAGE_SIDE", "2000"))
 MAX_OPENAI_UPLOAD_IMAGE_BYTES = int(os.getenv("MAX_OPENAI_UPLOAD_IMAGE_BYTES", str(2 * 1024 * 1024)))
+NORMALIZE_OPENAI_UPLOAD_IMAGE_BYTES = int(os.getenv("NORMALIZE_OPENAI_UPLOAD_IMAGE_BYTES", str(1024 * 1024)))
 FOOD_IMAGE_INFERENCE_CONFIDENCE_THRESHOLD = float(
     os.getenv("FOOD_IMAGE_INFERENCE_CONFIDENCE_THRESHOLD", "0.75")
 )
@@ -525,6 +526,8 @@ def build_vision_debug(uploaded_file_path="", filename="", mime_type=""):
         "mime_type": str(mime_type or ""),
         "file_exists": False,
         "file_size": 0,
+        "uploaded_file_size": 0,
+        "openai_image_bytes": 0,
         "model": resolve_vision_model(),
         "temperature_included": False,
         "image_type_supported": False,
@@ -6101,8 +6104,10 @@ def prepare_image_bytes_for_openai(image_path, mime_type):
     image_bytes = image_path.read_bytes()
     resolved_mime = str(mime_type or "").split(";", 1)[0].strip().lower()
     needs_conversion = image_mime_needs_openai_conversion(resolved_mime, image_path)
+    needs_size_normalization = len(image_bytes) >= NORMALIZE_OPENAI_UPLOAD_IMAGE_BYTES
+    should_normalize = needs_conversion or needs_size_normalization
 
-    if len(image_bytes) <= MAX_OPENAI_UPLOAD_IMAGE_BYTES and not needs_conversion:
+    if len(image_bytes) <= MAX_OPENAI_UPLOAD_IMAGE_BYTES and not should_normalize:
         return image_bytes, resolved_mime or mime_type
 
     try:
@@ -6136,14 +6141,16 @@ def prepare_image_bytes_for_openai(image_path, mime_type):
                     f"original_mime={resolved_mime or 'unknown'} "
                     "output_mime=image/jpeg "
                     f"original_bytes={len(image_bytes)} converted_bytes={len(compressed)} "
-                    f"conversion_required={needs_conversion}"
+                    f"conversion_required={needs_conversion} "
+                    f"size_normalization_required={needs_size_normalization}"
                 )
                 return compressed, "image/jpeg"
     except Exception as exc:
         print(
             "[recipe_import] action=normalize_openai_image_failed "
             f"mime_type={resolved_mime or 'unknown'} "
-            f"conversion_required={needs_conversion} error={exc}"
+            f"conversion_required={needs_conversion} "
+            f"size_normalization_required={needs_size_normalization} error={exc}"
         )
         if needs_conversion:
             raise ValueError(unsupported_phone_image_message(resolved_mime)) from exc
@@ -6175,6 +6182,7 @@ def send_image_prompt_to_openai(
     upload_path = Path(image_path)
 
     resolved_mime = detect_image_mime_type(upload_path, mime_type)
+    uploaded_file_size = upload_path.stat().st_size if upload_path.is_file() else 0
     image_bytes, resolved_mime = prepare_image_bytes_for_openai(upload_path, resolved_mime)
     encoded_image = base64.b64encode(image_bytes).decode("ascii")
     if isinstance(debug, dict):
@@ -6182,7 +6190,9 @@ def send_image_prompt_to_openai(
         debug["filename"] = str(debug.get("filename") or upload_path.name)
         debug["mime_type"] = str(resolved_mime)
         debug["file_exists"] = upload_path.is_file()
-        debug["file_size"] = len(image_bytes)
+        debug["file_size"] = uploaded_file_size
+        debug["uploaded_file_size"] = uploaded_file_size
+        debug["openai_image_bytes"] = len(image_bytes)
         debug["model"] = resolved_model
         debug["encoded_base64_length"] = len(encoded_image)
         debug["request_started"] = False
@@ -6199,7 +6209,8 @@ def send_image_prompt_to_openai(
     print(f"[Vision] Model: {resolved_model}")
     print(f"[Vision] Image path: {upload_path}")
     print(f"[Vision] File exists: {upload_path.is_file()}")
-    print(f"[Vision] File size: {len(image_bytes)}")
+    print(f"[Vision] Uploaded file size: {uploaded_file_size}")
+    print(f"[Vision] OpenAI image bytes: {len(image_bytes)}")
     print(f"[Vision] MIME type: {resolved_mime}")
     print(f"[Vision] Encoded base64 length: {len(encoded_image)}")
     debug_action = (
@@ -6212,7 +6223,8 @@ def send_image_prompt_to_openai(
     log_vision_debug_step(debug, "Model", model=resolved_model)
     log_vision_debug_step(debug, "Image path", image_path=str(upload_path))
     log_vision_debug_step(debug, "File exists", file_exists=upload_path.is_file())
-    log_vision_debug_step(debug, "File size", file_size=len(image_bytes))
+    log_vision_debug_step(debug, "Uploaded file size", uploaded_file_size=uploaded_file_size)
+    log_vision_debug_step(debug, "OpenAI image bytes", openai_image_bytes=len(image_bytes))
     log_vision_debug_step(debug, "MIME type", mime_type=resolved_mime)
     log_vision_debug_step(debug, "Encoded base64 length", encoded_base64_length=len(encoded_image))
 
