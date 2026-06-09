@@ -739,6 +739,7 @@ def vision_failure_response(
     source_name = source_name or (Path(upload_path_text).name if upload_path_text else "")
     error_code = debug.get("error_code") or error_code
     error_message = debug.get("error_message") or error_message
+    model_used = str(debug.get("model") or MODEL)
 
     payload = build_upload_failure_result(
         {
@@ -754,6 +755,7 @@ def vision_failure_response(
     )
     payload.update({
         "success": False,
+        "model_used": model_used,
         "error_code": error_code,
         "error_message": error_message,
         "debug": debug,
@@ -770,6 +772,7 @@ def vision_failure_response(
         payload["source_url"] = source_url
     if extra:
         payload.update(extra)
+    payload.setdefault("model_used", model_used)
     return jsonify(payload), status
 
 
@@ -1215,6 +1218,7 @@ def api_generate_recipe_from_image_route():
     result["raw"] = parsed_recipe
     result["recipe_json"] = parsed_recipe
     result["success"] = bool(result.get("ok"))
+    result["model_used"] = str(debug.get("model") or MODEL)
     result["debug"] = debug
     debug["recipe_creation_success"] = bool(result.get("ok"))
     log_vision_debug_step(debug, "Recipe creation success", recipe_creation_success=debug["recipe_creation_success"])

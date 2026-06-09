@@ -6440,6 +6440,8 @@ async function submitRecipeMediaVision() {
             }),
         });
         const data = await response.json();
+        const responseModelUsed = String((data && data.model_used) || "").trim();
+        setRecipeFileModelUsed(responseModelUsed || "Unknown");
         setRecipeFileVisionDebug(data && data.debug, {
             visible: true,
             recipeJson: data && data.recipe_json,
@@ -6513,6 +6515,7 @@ async function submitRecipeMediaVision() {
         const data = err && err.data ? err.data : {};
         const responseErrorMessage = String((data && (data.error_message || data.error)) || "").trim();
         const debug = data && data.debug ? data.debug : {};
+        const responseModelUsed = String((data && data.model_used) || "").trim();
         const connectionErrorMessage = buildVisionConnectionErrorMessage(responseErrorMessage, debug);
         const reason = responseErrorMessage || "No failure reason was returned by the backend.";
         const message = connectionErrorMessage
@@ -6523,6 +6526,7 @@ async function submitRecipeMediaVision() {
         if (responsePath) {
             setRecipeMediaUploadPath(responsePath);
         }
+        setRecipeFileModelUsed(responseModelUsed || "Unknown");
         setRecipeFileVisionDebug(data && data.debug, {
             visible: true,
             recipeJson: data && data.recipe_json,
@@ -6639,6 +6643,14 @@ function setRecipeFileExtractionMode(modeLabel) {
     }
 }
 
+function setRecipeFileModelUsed(modelUsed) {
+    const node = document.getElementById("recipeFileModelUsed");
+
+    if (node) {
+        node.textContent = `Model Used: ${modelUsed || "Unknown"}`;
+    }
+}
+
 function showRecipeFileLoadingOverlay(fileName, sourceTypeLabel, showImageActions = false) {
     let overlay = document.getElementById("recipeFileLoadingOverlay");
 
@@ -6655,6 +6667,7 @@ function showRecipeFileLoadingOverlay(fileName, sourceTypeLabel, showImageAction
                 </div>
                 <div id="recipeFileSourceType" class="recipe-qty-progress-summary">Source Type: File</div>
                 <div id="recipeFileExtractionMode" class="recipe-qty-progress-summary">Extraction Mode: OCR</div>
+                <div id="recipeFileModelUsed" class="recipe-qty-progress-summary">Model Used: Unknown</div>
                 <div id="recipeFileImageActionPanel"${showImageActions ? "" : " hidden"}>
                     <div class="recipe-file-action-title">Image Actions</div>
                     <div class="recipe-file-action-buttons">
@@ -6746,6 +6759,7 @@ function showRecipeFileLoadingOverlay(fileName, sourceTypeLabel, showImageAction
     }
 
     setRecipeFileSourceType(sourceTypeLabel);
+    setRecipeFileModelUsed("Unknown");
 
     const list = overlay.querySelector("#recipeFileLoadingList");
     const steps = [
@@ -6902,7 +6916,26 @@ function setRecipeFileVisionDebug(debug = null, options = {}) {
 
     const errorNode = document.getElementById("recipeFileVisionDebugError");
     if (errorNode) {
+        const responseModelUsed = String(
+            (options.errorData && options.errorData.model_used)
+            || (options.errorData && options.errorData.model)
+            || normalizedDebug.model
+            || "Unknown"
+        ).trim();
+        const responseExtractionMode = String(
+            (options.errorData && options.errorData.extraction_mode_label)
+            || (options.errorData && options.errorData.extraction_mode)
+            || "Vision"
+        ).trim() || "Vision";
+        const responseSourceType = String(
+            (options.errorData && options.errorData.source_type_label)
+            || (options.errorData && options.errorData.source_type)
+            || "Image"
+        ).trim() || "Image";
         const errorDetails = {
+            model_used: responseModelUsed,
+            extraction_mode: responseExtractionMode,
+            source_type: responseSourceType,
             error_code: normalizedDebug.error_code || (options.errorData && options.errorData.error_code) || "",
             error_message: normalizedDebug.error_message || (options.errorData && (options.errorData.error_message || options.errorData.error)) || "",
             model: normalizedDebug.model || "",
@@ -6923,7 +6956,14 @@ function setRecipeFileVisionDebug(debug = null, options = {}) {
             recipe_creation_success: normalizedDebug.recipe_creation_success,
             steps: normalizedDebug.steps || [],
         };
-        errorNode.textContent = recipeFileDebugText(errorDetails, "No errors yet.");
+        const errorText = recipeFileDebugText(errorDetails, "No errors yet.");
+        const headerLines = [
+            `Model Used: ${responseModelUsed || "Unknown"}`,
+            `Extraction Mode: ${responseExtractionMode || "Vision"}`,
+            `Source Type: ${responseSourceType || "Image"}`,
+            "",
+        ];
+        errorNode.textContent = `${headerLines.join("\n")}${errorText}`;
     }
 }
 

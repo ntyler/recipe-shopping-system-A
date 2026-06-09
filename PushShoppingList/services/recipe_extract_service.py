@@ -5773,6 +5773,10 @@ def send_image_prompt_to_openai(prompt_text, image_path, mime_type, model=None, 
         debug["exception_type"] = ""
         debug["exception_message"] = ""
 
+    openai_env_model = os.getenv("OPENAI_RECIPE_MODEL", "")
+    print(f"[Recipe AI] OPENAI_RECIPE_MODEL env = {openai_env_model}")
+    print(f"[Recipe AI] MODEL used = {MODEL}")
+    print(f"[Vision] Model used = {resolved_model}")
     print(f"[Vision] Model: {resolved_model}")
     print(f"[Vision] Image path: {upload_path}")
     print(f"[Vision] File exists: {upload_path.is_file()}")
