@@ -81,6 +81,7 @@ VIDEO_FOLDER.mkdir(parents=True, exist_ok=True)
 PDF_FOLDER.mkdir(parents=True, exist_ok=True)
 
 MODEL = os.getenv("OPENAI_RECIPE_MODEL", "gpt-4o-mini")
+VISION_MODEL_DEFAULT = "gpt-5.5"
 OPENAI_PING_TEXT_MODEL = os.getenv("OPENAI_PING_TEXT_MODEL", "gpt-4o-mini")
 VISION_REQUEST_TIMEOUT_SECONDS = _safe_int(
     os.getenv("OPENAI_VISION_REQUEST_TIMEOUT_SECONDS", "120"),
@@ -95,7 +96,7 @@ VISION_MAX_RETRIES = _safe_int(
     2,
 )
 print(f"[Recipe AI] OPENAI_API_KEY present: {'yes' if bool(os.getenv('OPENAI_API_KEY')) else 'no'}")
-print(f"[Recipe AI] Vision model: {MODEL}")
+print(f"[Recipe AI] Vision model: {os.getenv('OPENAI_VISION_MODEL') or os.getenv('OPENAI_RECIPE_MODEL') or VISION_MODEL_DEFAULT}")
 MAX_PAGE_TEXT_CHARS = 35000
 MAX_SOCIAL_VIDEO_PROMPT_CHARS = 12000
 MAX_VIDEO_TRANSCRIPTION_SECONDS = int(os.getenv("MAX_VIDEO_TRANSCRIPTION_SECONDS", "180"))
@@ -122,6 +123,13 @@ VISION_SUPPORTED_IMAGE_SUFFIXES = {
     ".webp",
     ".gif",
 }
+
+def resolve_vision_model():
+    return str(
+        os.getenv("OPENAI_VISION_MODEL", "").strip()
+        or os.getenv("OPENAI_RECIPE_MODEL", "").strip()
+        or VISION_MODEL_DEFAULT
+    )
 NON_RECIPE_FOOD_DISH_ERROR = "This upload does not appear to contain a recipe or recognizable food dish."
 NO_READABLE_UPLOAD_TEXT_ERROR = "No readable recipe text was found in this uploaded file."
 NO_WRITTEN_PHOTO_TEXT_ERROR = "No written recipe text was found in this photo."
@@ -5744,7 +5752,7 @@ def prepare_image_bytes_for_openai(image_path, mime_type):
 
 
 def send_image_prompt_to_openai(prompt_text, image_path, mime_type, model=None, request_timeout=None, max_retries=None, debug=None):
-    resolved_model = str(model or MODEL).strip() or MODEL
+    resolved_model = str(model or resolve_vision_model()).strip() or VISION_MODEL_DEFAULT
     resolved_timeout = (
         _safe_int(request_timeout, VISION_REQUEST_TIMEOUT_SECONDS)
         if request_timeout is not None
@@ -5774,8 +5782,10 @@ def send_image_prompt_to_openai(prompt_text, image_path, mime_type, model=None, 
         debug["exception_message"] = ""
 
     openai_env_model = os.getenv("OPENAI_RECIPE_MODEL", "")
+    openai_env_vision_model = os.getenv("OPENAI_VISION_MODEL", "")
     print(f"[Recipe AI] OPENAI_RECIPE_MODEL env = {openai_env_model}")
-    print(f"[Recipe AI] MODEL used = {MODEL}")
+    print(f"[Recipe AI] OPENAI_VISION_MODEL env = {openai_env_vision_model}")
+    print(f"[Recipe AI] MODEL used = {resolved_model}")
     print(f"[Vision] Model used = {resolved_model}")
     print(f"[Vision] Model: {resolved_model}")
     print(f"[Vision] Image path: {upload_path}")
@@ -6033,7 +6043,9 @@ def upload_source_type_label(source_type):
 def build_upload_failure_result(import_object, error_message, failed_step="extract", **extra):
     import_object = import_object if isinstance(import_object, dict) else {}
     import_object["error_message"] = error_message
-    model_used = str(extra.pop("model_used", MODEL)).strip() or str(MODEL)
+    source_type = str(import_object.get("source_type") or "").strip().lower()
+    default_model = resolve_vision_model() if source_type == "image" else MODEL
+    model_used = str(extra.pop("model_used", "")).strip() or str(default_model).strip() or str(MODEL)
 
     print(
         "[recipe_import] action=upload_import_failed "
@@ -6403,18 +6415,19 @@ Rules:
 
 
 def infer_food_image_recipe(recipe_url, upload_path, mime_type, filename, user_description="", debug=None):
+    vision_model = resolve_vision_model()
     prompt_text = build_food_image_inference_prompt(recipe_url, filename, user_description)
     if isinstance(debug, dict):
         debug["vision_request"] = {
-            "model": str(MODEL),
+            "model": str(vision_model),
             "filename": str(filename or ""),
             "mime_type": str(mime_type or ""),
             "prompt_length": len(prompt_text),
             "prompt": prompt_text,
         }
-        debug["model"] = str(MODEL)
+        debug["model"] = str(vision_model)
 
-    if not str(MODEL or "").strip():
+    if not str(vision_model or "").strip():
         return None, set_vision_debug_error(
             debug,
             "VISION_MODEL_NOT_CONFIGURED",
@@ -6432,14 +6445,14 @@ def infer_food_image_recipe(recipe_url, upload_path, mime_type, filename, user_d
 
     if isinstance(debug, dict):
         debug["vision_request_sent"] = True
-    log_vision_debug_step(debug, "Sending image to AI", model=MODEL, filename=filename, mime_type=mime_type)
+    log_vision_debug_step(debug, "Sending image to AI", model=vision_model, filename=filename, mime_type=mime_type)
 
     try:
         response_text = send_image_prompt_to_openai(
             prompt_text,
             upload_path,
             mime_type,
-            model=MODEL,
+            model=vision_model,
             debug=debug,
         )
     except APIConnectionError as exc:
@@ -6547,6 +6560,9 @@ def infer_food_image_recipe(recipe_url, upload_path, mime_type, filename, user_d
     log_vision_debug_step(debug, "Ingredient count", ingredient_count=len(ingredients))
 
     parsed["equipment"] = normalize_recipe_text_list(parsed.get("equipment"))
+
+    parsed["model_used"] = str(vision_model)
+    parsed["model"] = str(vision_model)
 
     instructions = normalize_recipe_text_list(
         parsed.get("instructions")
@@ -7696,7 +7712,12 @@ def extract_text_from_docx(upload_path):
 def build_extract_result(recipe_url, json_data, extraction_method):
     json_data = json_data if isinstance(json_data, dict) else {}
     ingredients = extract_ingredients_from_result(json_data)
-    model_used = str(MODEL)
+    model_used = str(
+        json_data.get("model_used")
+        or json_data.get("model")
+        or json_data.get("vision_request", {}).get("model")
+        or MODEL
+    ).strip() or str(MODEL)
 
     return {
         "success": True,

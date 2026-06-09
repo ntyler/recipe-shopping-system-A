@@ -36,6 +36,7 @@ from PushShoppingList.services.recipe_extract_service import generateRecipeFromI
 from PushShoppingList.services.recipe_extract_service import build_vision_debug
 from PushShoppingList.services.recipe_extract_service import MODEL
 from PushShoppingList.services.recipe_extract_service import OPENAI_PING_TEXT_MODEL
+from PushShoppingList.services.recipe_extract_service import resolve_vision_model
 from PushShoppingList.services.recipe_extract_service import classify_vision_ai_exception
 from PushShoppingList.services.recipe_extract_service import get_openai_client
 from PushShoppingList.services.recipe_extract_service import build_extract_result
@@ -752,10 +753,13 @@ def upload_recipe_media_route():
     )
     if isinstance(result, dict):
         result.setdefault("success", bool(result.get("ok")))
-        result.setdefault("model_used", MODEL)
+        result.setdefault(
+            "model_used",
+            resolve_vision_model() if str(result.get("source_type") or "").lower() == "image" else MODEL,
+        )
         if "debug" not in result:
             result["debug"] = {
-                "model": MODEL,
+                "model": resolve_vision_model() if str(result.get("source_type") or "").lower() == "image" else MODEL,
             }
 
     if wants_json:
@@ -866,7 +870,7 @@ def vision_failure_response(
     source_name = source_name or (Path(upload_path_text).name if upload_path_text else "")
     error_code = debug.get("error_code") or error_code
     error_message = debug.get("error_message") or error_message
-    model_used = str(debug.get("model") or MODEL)
+    model_used = str(debug.get("model") or resolve_vision_model())
 
     payload = build_upload_failure_result(
         {
@@ -1072,10 +1076,11 @@ def api_debug_vision_ping():
             prompt,
             upload_path,
             resolved_mime,
-            model=MODEL,
+            model=resolve_vision_model(),
             debug=debug,
         )
     except Exception as exc:
+        debug_model = str(debug.get("model") or resolve_vision_model())
         error_code, error_message = classify_vision_ai_exception(exc)
         set_vision_debug_error(
             debug,
@@ -1086,7 +1091,7 @@ def api_debug_vision_ping():
         return jsonify(
             {
                 "success": False,
-                "model": debug.get("model") or MODEL,
+                "model": debug_model,
                 "error_code": error_code,
                 "error_type": type(exc).__name__,
                 "error_message": error_message,
@@ -1097,10 +1102,11 @@ def api_debug_vision_ping():
     try:
         parsed_response = json.loads(response_text)
     except Exception as exc:
+        debug_model = str(debug.get("model") or resolve_vision_model())
         return jsonify(
             {
                 "success": False,
-                "model": debug.get("model") or MODEL,
+                "model": debug_model,
                 "error_code": "VISION_PING_PARSE_ERROR",
                 "error_message": str(exc),
                 "raw_response": response_text,
@@ -1111,7 +1117,7 @@ def api_debug_vision_ping():
     return jsonify(
         {
             "success": True,
-            "model": debug.get("model") or MODEL,
+            "model": str(debug.get("model") or resolve_vision_model()),
             "raw_response": response_text,
             "parsed_response": parsed_response,
             "debug": debug,
@@ -1345,7 +1351,7 @@ def api_generate_recipe_from_image_route():
     result["raw"] = parsed_recipe
     result["recipe_json"] = parsed_recipe
     result["success"] = bool(result.get("ok"))
-    result["model_used"] = str(debug.get("model") or MODEL)
+    result["model_used"] = str(debug.get("model") or resolve_vision_model())
     result["debug"] = debug
     _mark_uploaded_recipe_nutrition_estimated(recipe_url, False)
     debug["recipe_creation_success"] = bool(result.get("ok"))
