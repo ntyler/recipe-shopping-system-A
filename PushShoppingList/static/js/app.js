@@ -11073,6 +11073,10 @@ function updateRecipeEditorPdfControls(recipe, options = {}) {
     const deletePdfButton = document.getElementById("recipeEditDeletePdfButton");
     const copyPdfLinkButton = document.getElementById("recipeEditCopyPdfLinkButton");
     const uploadPdfButton = document.getElementById("recipeEditUploadPdfButton");
+    const createPdfButtons = [
+        document.getElementById("recipeEditCreatePdfButton"),
+        document.getElementById("recipeEditCreatePdfButtonLegacy"),
+    ];
     const pdfValues = normalizeRecipeEditorPdfValues(recipe || {}, recipeEditorCurrentUrl(), {
         useCurrentForMissing: options.useCurrentForMissing !== false,
     });
@@ -11101,6 +11105,8 @@ function updateRecipeEditorPdfControls(recipe, options = {}) {
         : "";
     const sourceOpenUrl = sourceCloudflareUrl;
     const hasGeneratedPdf = Boolean(generatedCloudflareUrl || generatedArchiveUrl);
+    const requiresServingEstimate = isUploadedRecipeSourceUrl(sourceUrl) && !recipeHasPerServingEstimate(recipe || {});
+    const createPdfUnavailableReason = "Estimate per serving basis is required before creating the recipe PDF.";
 
     setRecipePdfFieldOpenTarget(sourcePdfPathInput, sourcePdfPathLink, sourcePdfPath, sourceArchiveUrl, "Open Source PDF Path", {
         updateInput: updateInputValues,
@@ -11156,6 +11162,16 @@ function updateRecipeEditorPdfControls(recipe, options = {}) {
     if (uploadPdfButton) {
         uploadPdfButton.hidden = !sourceUrl || !hasGeneratedLocalPdf || Boolean(generatedCloudflareUrl);
     }
+
+    createPdfButtons.forEach((button) => {
+        if (!button) {
+            return;
+        }
+
+        button.disabled = requiresServingEstimate;
+        button.title = requiresServingEstimate ? createPdfUnavailableReason : "Create recipe PDF";
+        button.setAttribute("aria-label", requiresServingEstimate ? createPdfUnavailableReason : "Create recipe PDF");
+    });
 }
 
 function syncRecipeEditSourceFilesDetails() {
@@ -14232,6 +14248,13 @@ async function estimateRecipeNutrition(button) {
         }
 
         applyEstimatedNutritionRows(data.nutrition || []);
+        const currentRecipePayload = collectRecipeEditorPayload();
+        if (currentRecipePayload && currentRecipePayload.recipe) {
+            updateRecipeEditorPdfControls(currentRecipePayload.recipe, {
+                updateInputValues: false,
+                useCurrentForMissing: true,
+            });
+        }
         setRecipeEditStatus("Nutrition estimate added. Review values, then Save Recipe.");
     } catch (err) {
         console.warn("Unable to estimate nutrition.", err);
@@ -14717,7 +14740,7 @@ async function saveRecipeEditor(event) {
         );
     } catch (err) {
         console.warn("Unable to save recipe.", err);
-        setRecipeEditStatus("Unable to save recipe.", true);
+        setRecipeEditStatus((err && err.message) || "Unable to save recipe.", true);
         setRecipeSaveProgressSummary("Unable to save recipe.");
         updateRecipeSaveProgressFailed();
         setRecipeSaveProgressActionsState("failed");
@@ -14848,7 +14871,7 @@ async function createRecipeEditorPdf(button) {
         showRecipeQuantityUpdatedMessage("", "", "", statusMessage);
     } catch (err) {
         console.warn("Unable to create recipe PDF.", err);
-        setRecipeEditStatus("Unable to create PDF.", true);
+        setRecipeEditStatus((err && err.message) || "Unable to create PDF.", true);
     } finally {
         if (button) {
             button.disabled = false;
