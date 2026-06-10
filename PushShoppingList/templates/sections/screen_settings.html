@@ -1,12 +1,19 @@
-<section id="screenSettingsCard" class="app-card screen-settings-card">
-    <button type="button"
-            class="card-collapse-toggle screen-settings-toggle"
-            data-collapse-toggle="screen-settings"
-            aria-expanded="true"
-            onclick="toggleCardCollapse('screen-settings')">
-        <span>Screen Settings</span>
-        <span class="card-collapse-icon" data-collapse-icon="screen-settings">Hide ^</span>
-    </button>
+<section id="screenSettingsCard" class="app-card screen-settings-card" hidden>
+    <div class="screen-settings-header">
+        <button type="button"
+                class="card-collapse-toggle screen-settings-toggle"
+                data-collapse-toggle="screen-settings"
+                aria-expanded="true"
+                onclick="toggleCardCollapse('screen-settings')">
+            <span>Screen Settings</span>
+            <span class="card-collapse-icon" data-collapse-icon="screen-settings">Hide ^</span>
+        </button>
+        <button type="button"
+                class="secondary screen-settings-close"
+                onclick="return closeScreenSettingsPanel()">
+            Close
+        </button>
+    </div>
 
     <div class="card-collapse-content screen-settings-content"
          data-collapse-content="screen-settings"

@@ -1032,6 +1032,9 @@ function toggleScreenSettingsPanel(open = null) {
         closeAccountMenuDropdown(accountMenu);
     }
 
+    panel.hidden = false;
+    document.body.classList.add("screen-settings-open");
+
     const content = panel.querySelector('[data-collapse-content="screen-settings"]');
     if (content && content.classList.contains("collapsed")) {
         setCardCollapseContentCollapsed(content, false);
@@ -1045,6 +1048,22 @@ function toggleScreenSettingsPanel(open = null) {
             firstControl.focus({ preventScroll: true });
         }
     });
+
+    return false;
+}
+
+function closeScreenSettingsPanel() {
+    const panel = document.getElementById("screenSettingsCard");
+
+    if (panel) {
+        panel.hidden = true;
+    }
+
+    document.body.classList.remove("screen-settings-open");
+
+    if (typeof scrollToUserAccountTop === "function") {
+        scrollToUserAccountTop("auto");
+    }
 
     return false;
 }

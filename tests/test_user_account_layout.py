@@ -613,7 +613,7 @@ def test_account_action_token_pages_stay_focused_and_visible():
     assert "account-action-token" in index_template
     assert "{% elif not account_action_token %}" in account_template
     assert "cancelAccountActionLink()" in account_template
-    assert "body.account-action-token.screen-preview-active #appContent" in css
+    assert "body.account-action-token.screen-settings-open.screen-preview-active #appContent" in css
     assert "body.account-action-token .app-content > :not(#userAccountSection)" in css
     assert "function hasAccountActionToken()" in script
     assert 'setScreenPreviewMode("live", { persist: false })' in script
