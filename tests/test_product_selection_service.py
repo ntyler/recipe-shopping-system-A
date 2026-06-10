@@ -796,16 +796,19 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertEqual(cover_image["url"], "https://example.com/covers/finished-dish.jpg")
         self.assertEqual(cover_image["source"], "html_metadata")
 
-    def test_screen_settings_section_is_available_from_account_menu(self):
+    def test_screen_settings_section_stays_at_top_and_opens_from_account_menu(self):
         index_template = Path("PushShoppingList/templates/index.html").read_text(encoding="utf-8")
         account_template = Path("PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")
         screen_template = Path("PushShoppingList/templates/sections/screen_settings.html").read_text(encoding="utf-8")
         css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
         script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
 
-        self.assertNotIn('{% include "sections/screen_settings.html" %}', index_template)
-        self.assertIn("{% if current_user.is_admin %}", account_template)
-        self.assertIn('{% include "sections/screen_settings.html" %}', account_template)
+        self.assertIn("{% if current_user and current_user.is_admin %}", index_template)
+        self.assertLess(
+            index_template.index('{% include "sections/screen_settings.html" %}'),
+            index_template.index('<main id="appContent"'),
+        )
+        self.assertNotIn('{% include "sections/screen_settings.html" %}', account_template)
         self.assertIn('aria-controls="screenSettingsCard"', account_template)
         self.assertIn("toggleScreenSettingsPanel()", account_template)
         self.assertIn("Screen Settings", screen_template)
