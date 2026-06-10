@@ -1,0 +1,17 @@
+{
+  "mappings": {
+    "OPENAI_MENU_MODEL": "gpt-5.5",
+    "OPENAI_VISION_MODEL": "gpt-5.5",
+    "OPENAI_RECIPE_MODEL": "gpt-5.5-mini",
+    "OPENAI_RECIPE_CATEGORY_MODEL": "gpt-5.5-mini",
+    "OPENAI_NUTRITION_MODEL": "gpt-5.5-mini",
+    "OPENAI_RECIPE_NOTE_MODEL": "gpt-5.5-mini",
+    "OPENAI_PRODUCT_ANALYSIS_MODEL": "gpt-5.5-mini",
+    "OPENAI_INGREDIENT_REVIEW_MODEL": "gpt-5.5-mini",
+    "OPENAI_FOOD_RULES_MODEL": "gpt-5.5-mini",
+    "OPENAI_FOOD_REVIEW_MODEL": "gpt-5.5-mini",
+    "OPENAI_ADDRESS_MODEL": "gpt-5.5-mini"
+  },
+  "last_refreshed": "2026-06-10T02:45:35Z",
+  "total_count": 11
+}

@@ -68,8 +68,7 @@
             <table class="chatgpt-model-table">
                 <thead>
                     <tr>
-                        <th scope="col">Feature Name</th>
-                        <th scope="col">Description</th>
+                        <th scope="col">Feature</th>
                         <th scope="col">Environment Variable</th>
                         <th scope="col">Active Model</th>
                         <th scope="col">Proposed Model</th>
@@ -80,14 +79,14 @@
                         <tr class="chatgpt-model-row">
                             <td class="chatgpt-model-feature">
                                 <strong>{{ row.feature }}</strong>
+                                <p>{{ row.description }}</p>
                                 <div class="chatgpt-model-meta">
                                     <span>Default: {{ row.default_model }}</span>
                                     <span>Source: {{ row.source }}</span>
                                     <span>Temperature: {{ "yes" if row.supports_temperature else "no" }}</span>
                                 </div>
                             </td>
-                            <td class="chatgpt-model-description">{{ row.description }}</td>
-                            <td>
+                            <td class="chatgpt-model-env">
                                 <code>{{ row.env_var }}</code>
                             </td>
                             <td>

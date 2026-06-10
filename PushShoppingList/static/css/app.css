@@ -17513,7 +17513,7 @@ body {
 .chatgpt-model-table th,
 .chatgpt-model-table td {
     min-width: 0;
-    padding: 10px 11px;
+    padding: 14px 12px;
     border-bottom: 1px solid #26384b;
     text-align: left;
     vertical-align: top;
@@ -17530,23 +17530,19 @@ body {
 }
 
 .chatgpt-model-table th:nth-child(1) {
-    width: 22%;
+    width: 42%;
 }
 
 .chatgpt-model-table th:nth-child(2) {
-    width: 24%;
+    width: 22%;
 }
 
 .chatgpt-model-table th:nth-child(3) {
-    width: 18%;
+    width: 15%;
 }
 
 .chatgpt-model-table th:nth-child(4) {
-    width: 16%;
-}
-
-.chatgpt-model-table th:nth-child(5) {
-    width: 20%;
+    width: 21%;
 }
 
 .chatgpt-model-table tbody tr:last-child td {
@@ -17561,19 +17557,47 @@ body {
 
 .chatgpt-model-feature strong {
     color: #f8fafc;
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 900;
     line-height: 1.25;
     overflow-wrap: anywhere;
 }
 
-.chatgpt-model-description,
+.chatgpt-model-feature p,
 .chatgpt-model-proposed small,
 .chatgpt-model-meta {
     color: #cbd5e1;
     font-size: 12px;
-    font-weight: 800;
+    font-weight: 760;
     line-height: 1.35;
+}
+
+.chatgpt-model-feature p {
+    max-width: 40rem;
+    margin: 0;
+    color: #d5dde8;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.chatgpt-model-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    color: #d5e4f6;
+    font-size: 11px;
+    line-height: 1.25;
+}
+
+.chatgpt-model-meta span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 3px 7px;
+    border: 1px solid #29445f;
+    border-radius: 999px;
+    background: #0b1724;
+    white-space: nowrap;
 }
 
 .chatgpt-model-row td > code,
@@ -17605,6 +17629,10 @@ body {
     overflow-wrap: anywhere;
 }
 
+.chatgpt-model-env code {
+    font-size: 11px;
+}
+
 .chatgpt-model-use-proposed-btn {
     width: 100%;
     min-height: 34px;
@@ -17628,12 +17656,6 @@ body {
     letter-spacing: 0;
     line-height: 1.25;
     text-transform: none;
-}
-
-.chatgpt-model-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 10px;
 }
 
 .chatgpt-model-save-btn {

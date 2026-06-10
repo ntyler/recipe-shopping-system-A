@@ -301,8 +301,8 @@ def test_chatgpt_models_live_inside_account_menu_panel():
     assert "Recommended Mappings:" in models_template
     assert "Last Mapping Refresh:" in models_template
     assert "Source:" in models_template
-    assert "Feature Name" in models_template
-    assert "Description" in models_template
+    assert "<th scope=\"col\">Feature</th>" in models_template
+    assert "<p>{{ row.description }}</p>" in models_template
     assert "Proposed Model" in models_template
     assert '<table class="chatgpt-model-table">' in models_template
     assert '<th scope="col">Active Model</th>' in models_template
