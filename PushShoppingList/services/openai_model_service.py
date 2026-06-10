@@ -14,6 +14,12 @@ MODEL_OVERRIDES_FILE = Path(
 MODEL_LIST_CACHE_FILE = Path(
     os.getenv("SHOPPING_APP_OPENAI_MODEL_LIST_CACHE_FILE", PACKAGE_DIR / "openai_model_list_cache.json")
 )
+MODEL_RECOMMENDATION_CACHE_FILE = Path(
+    os.getenv(
+        "SHOPPING_APP_OPENAI_MODEL_RECOMMENDATION_CACHE_FILE",
+        PACKAGE_DIR / "openai_model_recommendation_cache.json",
+    )
+)
 MODEL_LIST_CACHE_TTL_SECONDS = 60 * 60
 
 
@@ -91,6 +97,32 @@ OPENAI_MODEL_SETTINGS = (
         "description": "Address completion when local parsing needs help.",
     },
 )
+
+DEFAULT_RECOMMENDED_MODEL_BY_ENV = {
+    "OPENAI_MENU_MODEL": "gpt-5.5",
+    "OPENAI_VISION_MODEL": "gpt-5.5",
+    "OPENAI_RECIPE_MODEL": "gpt-5.5-mini",
+    "OPENAI_RECIPE_CATEGORY_MODEL": "gpt-5.5-mini",
+    "OPENAI_NUTRITION_MODEL": "gpt-5.5-mini",
+    "OPENAI_RECIPE_NOTE_MODEL": "gpt-5.5-mini",
+    "OPENAI_PRODUCT_ANALYSIS_MODEL": "gpt-5.5-mini",
+    "OPENAI_INGREDIENT_REVIEW_MODEL": "gpt-5.5-mini",
+    "OPENAI_FOOD_RULES_MODEL": "gpt-5.5-mini",
+    "OPENAI_FOOD_REVIEW_MODEL": "gpt-5.5-mini",
+    "OPENAI_ADDRESS_MODEL": "gpt-5.5-mini",
+}
+
+LEGACY_MODEL_RECOMMENDATIONS = {
+    "gpt-4-0613": "gpt-5.5",
+    "gpt-4-0314": "gpt-5.5",
+    "gpt-4-32k": "gpt-5.5",
+    "gpt-4-32k-0613": "gpt-5.5",
+    "gpt-3.5-turbo": "gpt-5.5-mini",
+    "gpt-3.5-turbo-0125": "gpt-5.5-mini",
+    "gpt-3.5-turbo-1106": "gpt-5.5-mini",
+    "gpt-3.5-turbo-16k": "gpt-5.5-mini",
+    "gpt-4o-mini": "gpt-5.5-mini",
+}
 
 DEFAULT_VISIBLE_MODEL_PREFIXES = (
     "gpt-",
@@ -195,6 +227,95 @@ def save_openai_model_cache(models):
         encoding="utf-8",
     )
     return payload
+
+
+def load_openai_model_recommendation_cache():
+    if not MODEL_RECOMMENDATION_CACHE_FILE.exists():
+        return {}
+
+    try:
+        payload = json.loads(MODEL_RECOMMENDATION_CACHE_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+    return payload if isinstance(payload, dict) else {}
+
+
+def save_openai_model_recommendation_cache(mappings):
+    clean_mappings = {
+        env_var: normalize_model_name(model)
+        for env_var, model in (mappings or {}).items()
+        if env_var in {setting["env_var"] for setting in unique_model_settings()}
+        and normalize_model_name(model)
+    }
+    payload = {
+        "mappings": clean_mappings,
+        "last_refreshed": utc_timestamp(),
+        "total_count": len(clean_mappings),
+    }
+    MODEL_RECOMMENDATION_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    MODEL_RECOMMENDATION_CACHE_FILE.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    return payload
+
+
+def refresh_openai_model_recommendations():
+    return save_openai_model_recommendation_cache(DEFAULT_RECOMMENDED_MODEL_BY_ENV)
+
+
+def openai_model_recommendations():
+    cache_payload = load_openai_model_recommendation_cache()
+    cached_mappings = cache_payload.get("mappings", {}) if isinstance(cache_payload.get("mappings"), dict) else {}
+    mappings = {
+        **DEFAULT_RECOMMENDED_MODEL_BY_ENV,
+        **{
+            env_var: normalize_model_name(model)
+            for env_var, model in cached_mappings.items()
+            if normalize_model_name(model)
+        },
+    }
+
+    if cache_payload.get("last_refreshed"):
+        last_refreshed = cache_payload.get("last_refreshed", "")
+        source = "Cached"
+    else:
+        try:
+            last_refreshed = datetime.fromtimestamp(Path(__file__).stat().st_mtime, timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        except Exception:
+            last_refreshed = ""
+        source = "Bundled"
+
+    return {
+        "mappings": mappings,
+        "source": source,
+        "last_refreshed": last_refreshed,
+        "last_refreshed_display": format_model_cache_timestamp(last_refreshed) if last_refreshed else "Never",
+        "total_count": len([
+            env_var
+            for env_var in {setting["env_var"] for setting in unique_model_settings()}
+            if normalize_model_name(mappings.get(env_var))
+        ]),
+    }
+
+
+def proposed_model_for_row(env_var, active_model, recommendations):
+    env_var = str(env_var or "").strip()
+    active_model = normalize_model_name(active_model)
+    mappings = recommendations.get("mappings", {}) if isinstance(recommendations, dict) else {}
+    proposed = normalize_model_name(mappings.get(env_var))
+    legacy_proposed = normalize_model_name(LEGACY_MODEL_RECOMMENDATIONS.get(active_model))
+
+    if legacy_proposed and legacy_proposed != active_model:
+        return legacy_proposed, "Recommended replacement based on current OpenAI model mappings."
+
+    if proposed:
+        if proposed == active_model:
+            return proposed, "Current model already matches recommendation."
+        return proposed, "Recommended replacement based on current OpenAI model mappings."
+
+    return active_model, "No separate recommendation is configured for this route."
 
 
 def openai_model_cache_is_fresh(cache_payload):
@@ -395,6 +516,7 @@ def chatgpt_models_dashboard_for_user(user, show_advanced_models=False, force_re
 
     is_admin = is_admin_user(user)
     overrides = load_openai_model_overrides()
+    recommendations = openai_model_recommendations()
     model_list = openai_model_list(force_refresh=force_refresh) if is_admin else {
         "models": [],
         "source": "Cached",
@@ -417,6 +539,11 @@ def chatgpt_models_dashboard_for_user(user, show_advanced_models=False, force_re
             if row["env_var"] == setting["env_var"]
         ]
         model, source = model_value_for_env(setting["env_var"], setting["default_model"])
+        proposed_model, proposed_model_reason = proposed_model_for_row(
+            setting["env_var"],
+            model,
+            recommendations,
+        )
         choices = model_choices_for_row(
             available_models,
             model,
@@ -434,7 +561,9 @@ def chatgpt_models_dashboard_for_user(user, show_advanced_models=False, force_re
                 for model in group["models"]
             ],
             "selected_available": choices["selected_available"],
-            "unavailable_warning": "" if choices["selected_available"] else "⚠ Model not currently available to this API key",
+            "unavailable_warning": "" if choices["selected_available"] else "⚠ Deprecated or unavailable",
+            "proposed_model": proposed_model,
+            "proposed_model_reason": proposed_model_reason,
             "source": source,
             "is_override": setting["env_var"] in overrides,
             "supports_temperature": supports_custom_temperature(model),
@@ -454,6 +583,10 @@ def chatgpt_models_dashboard_for_user(user, show_advanced_models=False, force_re
         "last_refreshed": model_list.get("last_refreshed", ""),
         "last_refreshed_display": model_list.get("last_refreshed_display", "Never"),
         "model_list_source": model_list.get("source", "Cached"),
+        "recommended_mapping_count": int(recommendations.get("total_count") or 0),
+        "last_mapping_refreshed": recommendations.get("last_refreshed", ""),
+        "last_mapping_refreshed_display": recommendations.get("last_refreshed_display", "Never"),
+        "mapping_source": recommendations.get("source", "Bundled"),
         "show_advanced_models": bool(show_advanced_models),
     }
 
@@ -465,12 +598,26 @@ def update_openai_model_settings_for_admin(user, form):
         return {"ok": False, "errors": ["Admin access is required."]}
 
     overrides = load_openai_model_overrides()
+    recommendations = openai_model_recommendations()
+    action = str((form or {}).get("action") or "").strip()
+    use_proposed_env = action.removeprefix("use_proposed:") if action.startswith("use_proposed:") else ""
+    allowed_env_vars = {setting["env_var"] for setting in unique_model_settings()}
+    if use_proposed_env not in allowed_env_vars:
+        use_proposed_env = ""
     errors = []
 
     for setting in unique_model_settings():
         env_var = setting["env_var"]
         field_name = f"model_{env_var}"
         raw_value = str((form or {}).get(field_name) or "").strip()
+
+        if env_var == use_proposed_env:
+            raw_value, _reason = proposed_model_for_row(
+                env_var,
+                raw_value or model_value_for_env(env_var, setting["default_model"])[0],
+                recommendations,
+            )
+
         model = normalize_model_name(raw_value)
 
         if raw_value and not model:

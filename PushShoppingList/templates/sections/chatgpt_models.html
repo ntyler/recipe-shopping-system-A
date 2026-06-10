@@ -25,6 +25,8 @@
     <div class="chatgpt-model-status-banner">
         <span>Available Models: {{ model_dashboard.available_models_count }}</span>
         <span>Last Refreshed: {{ model_dashboard.last_refreshed_display }}</span>
+        <span>Recommended Mappings: {{ model_dashboard.recommended_mapping_count }}</span>
+        <span>Last Mapping Refresh: {{ model_dashboard.last_mapping_refreshed_display }}</span>
         <span>Source: {{ model_dashboard.model_list_source }}</span>
     </div>
 
@@ -47,18 +49,30 @@
                        {% if model_dashboard.show_advanced_models %}checked{% endif %}>
                 <span>Show Advanced Models</span>
             </label>
-            <button type="submit"
-                    class="secondary chatgpt-model-refresh-btn"
-                    name="action"
-                    value="refresh_models">
-                Refresh Model List
-            </button>
+            <div class="chatgpt-model-toolbar-actions">
+                <button type="submit"
+                        class="secondary chatgpt-model-refresh-btn"
+                        name="action"
+                        value="refresh_models">
+                    Refresh Model List
+                </button>
+                <button type="submit"
+                        class="secondary chatgpt-model-refresh-btn"
+                        name="action"
+                        value="refresh_mappings">
+                    Refresh Recommended Mappings
+                </button>
+            </div>
         </div>
         <div class="chatgpt-model-grid">
             {% for row in model_dashboard.rows %}
                 <div class="chatgpt-model-row">
                     <div class="chatgpt-model-feature">
+                        <span>Feature Name</span>
                         <strong>{{ row.feature }}</strong>
+                    </div>
+                    <div class="chatgpt-model-description">
+                        <span>Description</span>
                         <span>{{ row.description }}</span>
                     </div>
                     <label>
@@ -83,6 +97,17 @@
                             <span class="chatgpt-model-warning-badge">{{ row.unavailable_warning }}</span>
                         {% endif %}
                     </label>
+                    <div class="chatgpt-model-proposed">
+                        <span>Proposed Model</span>
+                        <code>{{ row.proposed_model }}</code>
+                        <small>Reason: {{ row.proposed_model_reason }}</small>
+                        <button type="submit"
+                                class="secondary chatgpt-model-use-proposed-btn"
+                                name="action"
+                                value="use_proposed:{{ row.env_var }}">
+                            Use Proposed Model
+                        </button>
+                    </div>
                     <div class="chatgpt-model-meta">
                         <span>Default: {{ row.default_model }}</span>
                         <span>Source: {{ row.source }}</span>

@@ -295,15 +295,32 @@ def test_chatgpt_models_live_inside_account_menu_panel():
     assert "optgroup label=\"{{ model_group.label }}\"" in models_template
     assert "Show Advanced Models" in models_template
     assert "Refresh Model List" in models_template
+    assert "Refresh Recommended Mappings" in models_template
     assert "Available Models:" in models_template
     assert "Last Refreshed:" in models_template
+    assert "Recommended Mappings:" in models_template
+    assert "Last Mapping Refresh:" in models_template
     assert "Source:" in models_template
-    assert "Model not currently available to this API key" in models_template
+    assert "Feature Name" in models_template
+    assert "Description" in models_template
+    assert "Proposed Model" in models_template
+    assert "Reason: {{ row.proposed_model_reason }}" in models_template
+    assert "Use Proposed Model" in models_template
+    assert 'value="use_proposed:{{ row.env_var }}"' in models_template
     assert "type=\"text\"" not in models_template
     assert "account_panel=\"chatgpt_models\"" in route
+    assert "refresh_openai_model_recommendations" in route
+    assert "refresh_mappings" in route
+    assert "chatgpt_model_force_refresh" in route
     assert "OPENAI_MODEL_CHOICES" not in service
     assert "fetch_openai_models_from_api" in service
     assert "openai_model_list(force_refresh=force_refresh)" in service
+    assert "openai_model_recommendations()" in service
+    assert "proposed_model_for_row" in service
+    assert "Deprecated or unavailable" in service
+    assert '"proposed_model": proposed_model' in service
+    assert '"proposed_model_reason": proposed_model_reason' in service
+    assert '"recommended_mapping_count": int(recommendations.get("total_count") or 0)' in service
     assert '"model_groups": choices["groups"]' in service
     assert ".chatgpt-models-card" in css
     assert "background: transparent;" in css
@@ -311,6 +328,8 @@ def test_chatgpt_models_live_inside_account_menu_panel():
     assert ".chatgpt-models-header-actions" in css
     assert ".chatgpt-model-status-banner" in css
     assert ".chatgpt-model-refresh-btn" in css
+    assert ".chatgpt-model-use-proposed-btn" in css
+    assert ".chatgpt-model-toolbar-actions" in css
     assert ".chatgpt-model-warning-badge" in css
     assert ".chatgpt-model-row select" in css
     assert "function toggleChatGptModelsPanel(open = null)" in script

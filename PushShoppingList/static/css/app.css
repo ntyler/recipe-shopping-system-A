@@ -17458,6 +17458,13 @@ body {
     justify-content: space-between;
 }
 
+.chatgpt-model-toolbar-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
 .chatgpt-model-advanced-toggle {
     display: inline-flex;
     align-items: center;
@@ -17496,7 +17503,7 @@ body {
 
 .chatgpt-model-row {
     display: grid;
-    grid-template-columns: minmax(220px, 1.4fr) minmax(190px, 0.8fr) minmax(180px, 0.8fr);
+    grid-template-columns: minmax(170px, 1fr) minmax(190px, 1.2fr) minmax(170px, 0.9fr) minmax(170px, 0.9fr) minmax(170px, 0.9fr);
     gap: 12px;
     align-items: end;
     padding: 12px;
@@ -17505,9 +17512,11 @@ body {
     background: #101820;
 }
 
-.chatgpt-model-feature {
+.chatgpt-model-feature,
+.chatgpt-model-description,
+.chatgpt-model-proposed {
     display: grid;
-    gap: 4px;
+    gap: 6px;
     min-width: 0;
 }
 
@@ -17517,7 +17526,8 @@ body {
     overflow-wrap: anywhere;
 }
 
-.chatgpt-model-feature span,
+.chatgpt-model-description > span:last-child,
+.chatgpt-model-proposed small,
 .chatgpt-model-meta {
     color: #cbd5e1;
     font-size: 12px;
@@ -17531,7 +17541,10 @@ body {
     min-width: 0;
 }
 
-.chatgpt-model-row label span {
+.chatgpt-model-row label > span:first-child,
+.chatgpt-model-feature > span:first-child,
+.chatgpt-model-description > span:first-child,
+.chatgpt-model-proposed > span:first-child {
     color: #d4d0c8;
     font-size: 12px;
     font-weight: 900;
@@ -17564,6 +17577,20 @@ body {
     align-items: center;
     color: #bfdbfe;
     overflow-wrap: anywhere;
+}
+
+.chatgpt-model-use-proposed-btn {
+    width: 100%;
+    min-height: 36px;
+    margin-top: 2px;
+    padding: 0 10px;
+    border: 1px solid #245b8e;
+    border-radius: 7px;
+    background: #0d253d;
+    color: #dceeff;
+    font-size: 12px;
+    font-weight: 900;
+    cursor: pointer;
 }
 
 .chatgpt-model-row label .chatgpt-model-warning-badge {
@@ -18911,6 +18938,11 @@ body {
         flex-direction: column;
     }
 
+    .chatgpt-model-toolbar-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
     .chatgpt-model-status-banner span {
         border-right: 0;
         border-bottom: 1px solid #284058;
@@ -18932,6 +18964,7 @@ body {
 
     .admin-support-submit-btn,
     .chatgpt-model-refresh-btn,
+    .chatgpt-model-use-proposed-btn,
     .chatgpt-model-save-btn {
         width: 100%;
     }
