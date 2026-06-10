@@ -1010,6 +1010,19 @@
             <p class="helper-text user-account-helper">
                 You are using the guest workspace. Sign in to keep recipes, stores, product picks, and preferences private to your account.
             </p>
+            <form class="user-guest-demo-access"
+                  method="GET"
+                  action="{{ url_for('account_bp.guest_start_route') }}">
+                <div class="user-guest-demo-badge" aria-hidden="true">✨ Guest Demo</div>
+                <button type="submit"
+                        aria-label="Start temporary guest demo session">
+                    Try Demo Without Password
+                </button>
+                <p class="user-guest-demo-note">
+                    Explore with temporary demo data. Nothing is saved permanently.
+                </p>
+            </form>
+            <div class="app-section-divider recipe-entry-section-divider user-guest-demo-divider" aria-hidden="true"></div>
         {% endif %}
 
         <div class="user-account-forms">

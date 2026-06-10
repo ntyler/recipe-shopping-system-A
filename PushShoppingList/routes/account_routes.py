@@ -255,6 +255,14 @@ def firebase_logout_route():
     return jsonify({"success": True, "authenticated": False, "user": None})
 
 
+@account_bp.route("/guest/start", methods=["GET"])
+def guest_start_route():
+    clear_admin_support_session()
+    sign_out_user()
+    flash("Demo workspace started. Nothing is saved permanently.", "success")
+    return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+
 @account_bp.route("/account/create", methods=["POST"])
 def create_account_route():
     result = create_user(

@@ -15,6 +15,54 @@ def test_two_factor_remember_checkbox_text_stays_adjacent():
     assert "justify-content: flex-start;" in css
 
 
+def test_guest_demo_access_is_primary_path_above_account_forms():
+    template = (ROOT / "PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    route = (ROOT / "PushShoppingList/routes/account_routes.py").read_text(encoding="utf-8")
+    app_config = (ROOT / "PushShoppingList/app.py").read_text(encoding="utf-8")
+
+    demo_start = template.index('class="user-guest-demo-access"')
+    create_start = template.index('id="firebaseCreateAccountForm"')
+    sign_in_start = template.index('id="firebaseSignInForm"')
+
+    assert demo_start < create_start < sign_in_start
+    assert 'method="GET"' in template[demo_start:create_start]
+    assert "url_for('account_bp.guest_start_route')" in template[demo_start:create_start]
+    assert "✨ Guest Demo" in template[demo_start:create_start]
+    assert "Try Demo Without Password" in template[demo_start:create_start]
+    assert 'aria-label="Start temporary guest demo session"' in template[demo_start:create_start]
+    assert "Explore with temporary demo data. Nothing is saved permanently." in template[demo_start:create_start]
+    assert ".user-guest-demo-access {" in css
+    assert "width: min(100%, 500px);" in css
+    assert ".user-guest-demo-access button {" in css
+    assert "background: #115e9f;" in css
+    assert ".user-guest-demo-access button:focus-visible" in css
+    assert "@media (max-width: 650px)" in css
+    assert '@account_bp.route("/guest/start", methods=["GET"])' in route
+    assert "account_bp.guest_start_route" in app_config
+
+
+def test_guest_start_route_returns_to_guest_account_section():
+    from PushShoppingList.app import create_app
+
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["user_id"] = "signed-in-user"
+            session["firebase_uid"] = "firebase-user"
+
+        response = client.get("/guest/start")
+
+        assert response.status_code == 302
+        assert response.headers["Location"].endswith("/#userAccountSection")
+
+        with client.session_transaction() as session:
+            assert "user_id" not in session
+            assert "firebase_uid" not in session
+
+
 def test_verified_email_menu_action_is_disabled():
     template = (ROOT / "PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")

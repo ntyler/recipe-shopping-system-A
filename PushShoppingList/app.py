@@ -32,6 +32,7 @@ PUBLIC_ENDPOINTS = {
     "account_bp.firebase_session_route",
     "account_bp.firebase_login_route",
     "account_bp.firebase_logout_route",
+    "account_bp.guest_start_route",
     "account_bp.create_account_route",
     "account_bp.verify_account_creation_route",
     "account_bp.sign_in_route",

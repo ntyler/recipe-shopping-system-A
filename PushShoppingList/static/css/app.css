@@ -4683,6 +4683,65 @@ body {
             text-align: center;
         }
 
+        .user-guest-demo-access {
+            display: grid;
+            justify-items: center;
+            gap: 8px;
+            width: min(100%, 500px);
+            margin: 0 auto 16px;
+            text-align: center;
+        }
+
+        .user-guest-demo-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 26px;
+            padding: 3px 10px;
+            border: 1px solid #2f4054;
+            border-radius: 999px;
+            background: #0d1722;
+            color: #dbeafe;
+            font-size: 13px;
+            font-weight: 900;
+            line-height: 1.2;
+        }
+
+        .user-guest-demo-access button {
+            width: min(100%, 440px);
+            min-height: 48px;
+            margin: 0;
+            border: 1px solid #1b75bb;
+            border-radius: 7px;
+            background: #115e9f;
+            color: #fff;
+            font-weight: 900;
+            box-shadow: 0 0 0 1px rgba(27, 117, 187, 0.25);
+        }
+
+        .user-guest-demo-access button:hover,
+        .user-guest-demo-access button:focus-visible {
+            border-color: #4da3ff;
+            background: #155a95;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(77, 163, 255, 0.28);
+        }
+
+        .user-guest-demo-note {
+            max-width: 440px;
+            margin: 0;
+            color: #cbd5e1;
+            font-size: 14px;
+            font-weight: 700;
+            line-height: 1.35;
+        }
+
+        .user-guest-demo-divider {
+            width: 100%;
+            max-width: none;
+            margin: 2px 0 18px;
+        }
+
         .user-account-messages {
             display: grid;
             gap: 8px;
@@ -11946,6 +12005,13 @@ body {
             .user-account-profile,
             .user-account-edit-form {
                 grid-template-columns: minmax(0, 1fr);
+            }
+
+            .user-guest-demo-access,
+            .user-guest-demo-access button,
+            .user-guest-demo-note {
+                width: 100%;
+                max-width: none;
             }
 
             .user-account-profile {
