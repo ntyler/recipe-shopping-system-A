@@ -332,6 +332,8 @@ def test_chatgpt_models_live_inside_account_menu_panel():
     assert ".chatgpt-model-toolbar-actions" in css
     assert ".chatgpt-model-warning-badge" in css
     assert ".chatgpt-model-row select" in css
+    chatgpt_row_css = css[css.index(".chatgpt-model-row {"):css.index(".chatgpt-model-feature,", css.index(".chatgpt-model-row {"))]
+    assert "align-items: start;" in chatgpt_row_css
     assert "function toggleChatGptModelsPanel(open = null)" in script
     assert "[data-chatgpt-models-panel]" in script
     assert "#chatGptModelsSection" in script

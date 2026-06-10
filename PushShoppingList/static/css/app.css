@@ -17505,7 +17505,7 @@ body {
     display: grid;
     grid-template-columns: minmax(170px, 1fr) minmax(190px, 1.2fr) minmax(170px, 0.9fr) minmax(170px, 0.9fr) minmax(170px, 0.9fr);
     gap: 12px;
-    align-items: end;
+    align-items: start;
     padding: 12px;
     border: 1px solid #2f4054;
     border-radius: 8px;
