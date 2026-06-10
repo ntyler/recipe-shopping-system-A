@@ -155,6 +155,7 @@ Optional app and product-lookup controls:
 
 ```powershell
 $env:SHOPPING_APP_PORT="5083"
+$env:MENU_ITEM_INFERENCE_WORKERS="8"
 $env:PRODUCT_SEARCH_WORKERS="2"
 $env:PRODUCT_DETAIL_LIMIT_PER_STORE="4"
 $env:PRODUCT_AI_ANALYSIS_LIMIT_PER_STORE="2"
@@ -168,6 +169,7 @@ Notes:
 - Leave `DISABLE_RECIPE_HTML_CACHE_FALLBACK` unset if you want the app to reuse cached recipe HTML when a live page fails.
 - Leave `DISABLE_RECIPE_PDF_ARCHIVE` unset if you want each extracted recipe page saved as a PDF for later review.
 - Set `FORCE_OPENAI_RECIPE_EXTRACTION=1` only when you want the OpenAI extractor used even if recipe-card HTML already has enough structured data.
+- `MENU_ITEM_INFERENCE_WORKERS` controls how many restaurant menu item recipe predictions run at once during Menu Extract imports. The default is `8`, and the app clamps it between `1` and `32`.
 - Leave `SHOPPING_APP_PORT` unset when running `C:\Python39\python.exe app.py` directly and you want the default Flask port `5000`. The included `start_app.bat` currently sets `SHOPPING_APP_PORT=5083`.
 - Set `SHOPPING_APP_PASSWORD_RESET_BASE_URL` to the address users should open from password reset emails and signed-in two-factor disable verification emails, such as your LAN, Tailscale, or public HTTPS URL. If unset, reset emails use the current request host.
 - Set `SHOPPING_APP_ACCOUNT_LINK_BASE_URL` to the address users should open from account verification and account deletion emails. If unset, account links fall back to `SHOPPING_APP_PASSWORD_RESET_BASE_URL` or the current request host.

@@ -13,6 +13,8 @@ import time
 import uuid
 import zipfile
 import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import as_completed
 from dataclasses import asdict
 from dataclasses import dataclass
 from datetime import datetime
@@ -54,6 +56,7 @@ from PushShoppingList.services.openai_model_service import model_value_for_env
 from PushShoppingList.services.openai_model_service import supports_custom_temperature
 from PushShoppingList.services.openai_usage_service import record_openai_usage
 from PushShoppingList.services.purchase_mapping_service import apply_purchase_mapping_to_ingredient
+from PushShoppingList.services.storage_service import active_user_id
 from PushShoppingList.services.storage_service import scoped_extractor_data_path
 from PushShoppingList.services.storage_service import scoped_extractor_path
 from PushShoppingList.services.user_account_service import current_public_user
@@ -97,6 +100,10 @@ OPENAI_RECIPE_MODEL_DEFAULT = "gpt-4o-mini"
 OPENAI_MENU_MODEL_DEFAULT = "gpt-5.5"
 MENU_ITEM_INFERENCE_MODEL = "gpt-5.5"
 OPENAI_PING_TEXT_MODEL = os.getenv("OPENAI_PING_TEXT_MODEL", "gpt-4o-mini")
+MENU_ITEM_INFERENCE_WORKERS = _safe_int(
+    os.getenv("MENU_ITEM_INFERENCE_WORKERS", "8"),
+    8,
+)
 VISION_REQUEST_TIMEOUT_SECONDS = _safe_int(
     os.getenv("OPENAI_VISION_REQUEST_TIMEOUT_SECONDS", "120"),
     120,
@@ -9196,6 +9203,15 @@ def menu_item_recipe_model_resolution():
     )
 
 
+def menu_item_inference_worker_count(total_items=None):
+    configured = max(1, min(32, int(MENU_ITEM_INFERENCE_WORKERS or 1)))
+
+    if total_items:
+        return max(1, min(configured, int(total_items)))
+
+    return configured
+
+
 def menu_page_request_headers():
     return {
         "User-Agent": (
@@ -9503,7 +9519,7 @@ Return ONLY valid JSON using this shape:
 """
 
 
-def send_menu_item_recipe_prompt_to_openai(prompt_text, action_name="menu-item-recipe-inference"):
+def send_menu_item_recipe_prompt_to_openai(prompt_text, action_name="menu-item-recipe-inference", user_id=None):
     model_resolution = menu_item_recipe_model_resolution()
     payload, temperature_included, resolved_model = build_openai_chat_payload(
         model_resolution.model,
@@ -9530,17 +9546,18 @@ def send_menu_item_recipe_prompt_to_openai(prompt_text, action_name="menu-item-r
         f"temperature_included={temperature_included}"
     )
     response = get_openai_client().chat.completions.create(**payload)
-    record_openai_usage(response, action_name, model=resolved_model)
+    record_openai_usage(response, action_name, model=resolved_model, user_id=user_id)
     return response.choices[0].message.content
 
 
-def infer_menu_item_recipe(menu_url, item, index, total):
+def infer_menu_item_recipe(menu_url, item, index, total, user_id=None):
     model_resolution = menu_item_recipe_model_resolution()
     action_name = "menu-item-recipe-inference"
     try:
         response_text = send_menu_item_recipe_prompt_to_openai(
             build_menu_item_recipe_prompt(menu_url, item, index, total),
             action_name=action_name,
+            user_id=user_id,
         )
         payload = json.loads(clean_json_response(response_text))
         recipe = payload.get("recipe") if isinstance(payload, dict) and isinstance(payload.get("recipe"), dict) else payload
@@ -9576,6 +9593,16 @@ def infer_menu_item_recipe(menu_url, item, index, total):
             "model": model_resolution.model,
             "model_source": model_resolution.source,
         }
+
+
+def infer_menu_item_recipe_for_worker(menu_url, item, index, total, user_id=None):
+    try:
+        return infer_menu_item_recipe(menu_url, item, index, total, user_id=user_id)
+    except TypeError as exc:
+        # Some tests monkeypatch infer_menu_item_recipe with the older 4-arg shape.
+        if "user_id" not in str(exc):
+            raise
+        return infer_menu_item_recipe(menu_url, item, index, total)
 
 
 def menu_item_source_url(menu_url, title, index):
@@ -9893,23 +9920,38 @@ def build_menu_extract_result_from_items(
             "item_failures": [],
         }
 
+    worker_count = menu_item_inference_worker_count(total_items)
+    usage_user_id = active_user_id()
+    inference_results = [None] * total_items
+    diagnostics["menu_item_inference_workers"] = worker_count
+
     if progress_callback:
         progress_callback(
             "Inferring recipes with GPT-5.5",
-            f"Creating one AI-inferred recipe for each of {total_items} menu items.",
+            (
+                f"Creating one AI-inferred recipe for each of {total_items} menu items "
+                f"with up to {worker_count} running at once."
+            ),
         )
 
-    raw_response_path.write_text("", encoding="utf-8")
-    for index, menu_item in enumerate(menu_items):
-        if progress_callback:
-            progress_callback(
-                f"Inferring recipes with GPT-5.5 ({index + 1}/{total_items})",
-                clean_recipe_text(
-                    f"{menu_item.get('menu_section')}: {menu_item.get('item_name')}"
-                ),
-            )
+    def run_inference(index, menu_item):
+        recipe, inference = infer_menu_item_recipe_for_worker(
+            source_url,
+            menu_item,
+            index,
+            total_items,
+            user_id=usage_user_id,
+        )
+        return index, menu_item, recipe, inference
 
-        recipe, inference = infer_menu_item_recipe(source_url, menu_item, index, total_items)
+    def record_inference_result(index, menu_item, recipe, inference):
+        inference = inference if isinstance(inference, dict) else {}
+        inference_results[index] = {
+            "index": index,
+            "item": menu_item,
+            "recipe": recipe,
+            "inference": inference,
+        }
         with raw_response_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps({
                 "index": index,
@@ -9918,6 +9960,70 @@ def build_menu_extract_result_from_items(
                 "response": inference.get("raw_response", ""),
                 "error": inference if not inference.get("ok") else {},
             }, ensure_ascii=False) + "\n")
+
+    raw_response_path.write_text("", encoding="utf-8")
+    completed_items = 0
+
+    if worker_count == 1:
+        for index, menu_item in enumerate(menu_items):
+            index, menu_item, recipe, inference = run_inference(index, menu_item)
+            completed_items += 1
+            record_inference_result(index, menu_item, recipe, inference)
+            if progress_callback:
+                progress_callback(
+                    f"Inferring recipes with GPT-5.5 ({completed_items}/{total_items})",
+                    clean_recipe_text(
+                        f"{menu_item.get('menu_section')}: {menu_item.get('item_name')}"
+                    ),
+                )
+    else:
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            future_map = {
+                executor.submit(run_inference, index, menu_item): (index, menu_item)
+                for index, menu_item in enumerate(menu_items)
+            }
+            for future in as_completed(future_map):
+                fallback_index, fallback_item = future_map[future]
+                try:
+                    index, menu_item, recipe, inference = future.result()
+                except Exception as exc:
+                    index = fallback_index
+                    menu_item = fallback_item
+                    recipe = None
+                    error_code, error_message = classify_vision_ai_exception(exc)
+                    openai_error_code, openai_error_param = get_openai_error_code_and_param(exc)
+                    inference = {
+                        "ok": False,
+                        "item_name": menu_item.get("item_name") if isinstance(menu_item, dict) else "",
+                        "menu_section": menu_item.get("menu_section") if isinstance(menu_item, dict) else "",
+                        "error_code": error_code,
+                        "error_message": error_message or str(exc),
+                        "technical_message": str(exc),
+                        "exception_type": type(exc).__name__,
+                        "openai_error_code": openai_error_code,
+                        "openai_error_param": openai_error_param,
+                        "model": model_resolution.model,
+                        "model_source": model_resolution.source,
+                    }
+
+                completed_items += 1
+                record_inference_result(index, menu_item, recipe, inference)
+                if progress_callback:
+                    progress_callback(
+                        f"Inferring recipes with GPT-5.5 ({completed_items}/{total_items})",
+                        clean_recipe_text(
+                            f"{menu_item.get('menu_section')}: {menu_item.get('item_name')}"
+                        ),
+                    )
+
+    for result in inference_results:
+        if not result:
+            continue
+
+        index = result["index"]
+        menu_item = result["item"]
+        recipe = result["recipe"]
+        inference = result["inference"]
 
         if not recipe:
             failures.append(inference)

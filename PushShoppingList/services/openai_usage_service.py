@@ -1,5 +1,6 @@
 import json
 import os
+import threading
 from datetime import datetime
 
 from PushShoppingList.services.storage_service import active_user_id
@@ -33,6 +34,7 @@ RECIPE_IMPORT_ACTIVITY_FEATURES = {
 OPENAI_RECORD_TYPE = "openai-api"
 APP_ACTIVITY_RECORD_TYPE = "app-activity"
 DEFAULT_BILLING_CURRENCY = "USD"
+OPENAI_USAGE_LOCK = threading.RLock()
 
 
 def now_iso():
@@ -110,9 +112,10 @@ def record_openai_usage(response, feature, model=None, metadata=None, user_id=No
         **billing_costs,
         "metadata": metadata if isinstance(metadata, dict) else {},
     })
-    payload = load_openai_usage_payload(usage_file)
-    payload.setdefault("records", []).append(record)
-    save_openai_usage_payload(payload, usage_file)
+    with OPENAI_USAGE_LOCK:
+        payload = load_openai_usage_payload(usage_file)
+        payload.setdefault("records", []).append(record)
+        save_openai_usage_payload(payload, usage_file)
     return record
 
 
@@ -137,9 +140,10 @@ def record_app_activity(feature, metadata=None, user_id=None):
         "billableCostUsd": None,
         "metadata": metadata if isinstance(metadata, dict) else {},
     })
-    payload = load_openai_usage_payload(usage_file)
-    payload.setdefault("records", []).append(record)
-    save_openai_usage_payload(payload, usage_file)
+    with OPENAI_USAGE_LOCK:
+        payload = load_openai_usage_payload(usage_file)
+        payload.setdefault("records", []).append(record)
+        save_openai_usage_payload(payload, usage_file)
     return record
 
 
