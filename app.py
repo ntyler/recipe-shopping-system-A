@@ -2,6 +2,8 @@ import os
 import sys
 from pathlib import Path
 
+from PushShoppingList.services.openai_model_service import apply_openai_model_overrides
+
 
 def enforce_required_python_runtime():
     required_python = Path(os.getenv("SHOPPING_APP_PYTHON_EXE", r"C:\Python39\python.exe"))
@@ -27,6 +29,7 @@ def enforce_required_python_runtime():
 
 
 enforce_required_python_runtime()
+apply_openai_model_overrides()
 
 from PushShoppingList.app import create_app
 

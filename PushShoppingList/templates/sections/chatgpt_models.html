@@ -1,0 +1,53 @@
+{% set model_dashboard = chatgpt_models_dashboard|default({}) %}
+{% if model_dashboard.is_admin %}
+<section id="chatGptModelsSection" class="recipe-card chatgpt-models-card">
+    <div class="chatgpt-models-header">
+        <div>
+            <h2>Chat GPT Models</h2>
+            <p>Current OpenAI model routing by app feature.</p>
+        </div>
+        <span class="chatgpt-models-count">{{ model_dashboard.rows|length }} entries</span>
+    </div>
+
+    {% if model_dashboard.messages %}
+        <div class="chatgpt-model-messages" aria-live="polite">
+            {% for message in model_dashboard.messages %}
+                <div class="chatgpt-model-message {{ message.category }}">{{ message.text }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <form class="chatgpt-model-form"
+          method="POST"
+          action="{{ url_for('main_bp.update_chatgpt_models_route') }}">
+        <div class="chatgpt-model-grid">
+            {% for row in model_dashboard.rows %}
+                <div class="chatgpt-model-row">
+                    <div class="chatgpt-model-feature">
+                        <strong>{{ row.feature }}</strong>
+                        <span>{{ row.description }}</span>
+                    </div>
+                    <label>
+                        <span>Environment Variable</span>
+                        <code>{{ row.env_var }}</code>
+                    </label>
+                    <label>
+                        <span>Active Model</span>
+                        <input type="text"
+                               name="model_{{ row.env_var }}"
+                               value="{{ row.model }}"
+                               autocomplete="off"
+                               spellcheck="false">
+                    </label>
+                    <div class="chatgpt-model-meta">
+                        <span>Default: {{ row.default_model }}</span>
+                        <span>Source: {{ row.source }}</span>
+                        <span>Temperature: {{ "yes" if row.supports_temperature else "no" }}</span>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        <button type="submit" class="chatgpt-model-save-btn">Save Models</button>
+    </form>
+</section>
+{% endif %}

@@ -17297,10 +17297,17 @@ body {
     max-width: 980px;
 }
 
+.chatgpt-models-card {
+    display: grid;
+    gap: 16px;
+    max-width: 980px;
+}
+
 .admin-support-header,
 .admin-support-selected-header,
 .admin-support-audit-header,
-.admin-support-audit-top {
+.admin-support-audit-top,
+.chatgpt-models-header {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
@@ -17309,11 +17316,13 @@ body {
 
 .admin-support-header h2,
 .admin-support-selected-header h3,
-.admin-support-audit-header h3 {
+.admin-support-audit-header h3,
+.chatgpt-models-header h2 {
     margin: 0;
 }
 
-.admin-support-header p {
+.admin-support-header p,
+.chatgpt-models-header p {
     margin: 4px 0 0;
     color: #d7ddd9;
     font-weight: 800;
@@ -17321,7 +17330,8 @@ body {
 }
 
 .admin-support-count,
-.admin-support-role {
+.admin-support-role,
+.chatgpt-models-count {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -17336,12 +17346,14 @@ body {
     white-space: nowrap;
 }
 
-.admin-support-messages {
+.admin-support-messages,
+.chatgpt-model-messages {
     display: grid;
     gap: 8px;
 }
 
-.admin-support-message {
+.admin-support-message,
+.chatgpt-model-message {
     padding: 10px 12px;
     border: 1px solid #2d4157;
     border-radius: 8px;
@@ -17351,10 +17363,112 @@ body {
     text-align: center;
 }
 
-.admin-support-message.error {
+.admin-support-message.error,
+.chatgpt-model-message.error {
     border-color: #b91c1c;
     background: #3b1111;
     color: #ffb4b4;
+}
+
+.chatgpt-model-message.success {
+    border-color: #047857;
+    background: #052e23;
+    color: #bbf7d0;
+}
+
+.chatgpt-model-form {
+    display: grid;
+    gap: 12px;
+}
+
+.chatgpt-model-grid {
+    display: grid;
+    gap: 10px;
+}
+
+.chatgpt-model-row {
+    display: grid;
+    grid-template-columns: minmax(220px, 1.4fr) minmax(190px, 0.8fr) minmax(180px, 0.8fr);
+    gap: 12px;
+    align-items: end;
+    padding: 12px;
+    border: 1px solid #2f4054;
+    border-radius: 8px;
+    background: #101820;
+}
+
+.chatgpt-model-feature {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+
+.chatgpt-model-feature strong {
+    color: #f8fafc;
+    font-weight: 900;
+    overflow-wrap: anywhere;
+}
+
+.chatgpt-model-feature span,
+.chatgpt-model-meta {
+    color: #cbd5e1;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.35;
+}
+
+.chatgpt-model-row label {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+
+.chatgpt-model-row label span {
+    color: #d4d0c8;
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.chatgpt-model-row code,
+.chatgpt-model-row input {
+    width: 100%;
+    min-width: 0;
+    min-height: 38px;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    border: 1px solid #655f50;
+    border-radius: 7px;
+    background: #1b1f1f;
+    color: #f5f7f7;
+    font-size: 14px;
+}
+
+.chatgpt-model-row code {
+    display: flex;
+    align-items: center;
+    color: #bfdbfe;
+    overflow-wrap: anywhere;
+}
+
+.chatgpt-model-meta {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+}
+
+.chatgpt-model-save-btn {
+    justify-self: end;
+    min-height: 42px;
+    padding: 0 16px;
+    border: 1px solid #1e80c9;
+    border-radius: 8px;
+    background: #155a92;
+    color: white;
+    font-weight: 900;
+    cursor: pointer;
 }
 
 .admin-support-form {
@@ -18656,23 +18770,27 @@ body {
 @media (max-width: 760px) {
     .admin-support-header,
     .admin-support-selected-header,
-    .admin-support-audit-top {
+    .admin-support-audit-top,
+    .chatgpt-models-header {
         align-items: stretch;
         flex-direction: column;
     }
 
     .admin-support-count,
-    .admin-support-role {
+    .admin-support-role,
+    .chatgpt-models-count {
         align-self: flex-start;
     }
 
     .admin-support-form,
     .admin-support-detail-grid,
-    .admin-support-detail-grid div {
+    .admin-support-detail-grid div,
+    .chatgpt-model-row {
         grid-template-columns: 1fr;
     }
 
-    .admin-support-submit-btn {
+    .admin-support-submit-btn,
+    .chatgpt-model-save-btn {
         width: 100%;
     }
 

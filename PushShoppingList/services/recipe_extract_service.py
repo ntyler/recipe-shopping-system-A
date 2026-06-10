@@ -47,6 +47,7 @@ except Exception:  # pragma: no cover
         pass
 
 from PushShoppingList.services import cloudflare_r2_storage
+from PushShoppingList.services.openai_model_service import model_value_for_env
 from PushShoppingList.services.openai_model_service import supports_custom_temperature
 from PushShoppingList.services.openai_usage_service import record_openai_usage
 from PushShoppingList.services.purchase_mapping_service import apply_purchase_mapping_to_ingredient
@@ -86,10 +87,11 @@ UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 VIDEO_FOLDER.mkdir(parents=True, exist_ok=True)
 PDF_FOLDER.mkdir(parents=True, exist_ok=True)
 
-MODEL = os.getenv("OPENAI_RECIPE_MODEL", "gpt-5.5")
+MODEL = os.getenv("OPENAI_RECIPE_MODEL", "gpt-4o-mini")
 VISION_MODEL_DEFAULT = "gpt-5.5"
 VISION_MODEL_FALLBACK = "gpt-4o-mini"
-OPENAI_RECIPE_MODEL_DEFAULT = "gpt-5.5"
+OPENAI_RECIPE_MODEL_DEFAULT = "gpt-4o-mini"
+OPENAI_MENU_MODEL_DEFAULT = "gpt-5.5"
 OPENAI_PING_TEXT_MODEL = os.getenv("OPENAI_PING_TEXT_MODEL", "gpt-4o-mini")
 VISION_REQUEST_TIMEOUT_SECONDS = _safe_int(
     os.getenv("OPENAI_VISION_REQUEST_TIMEOUT_SECONDS", "120"),
@@ -105,6 +107,7 @@ VISION_MAX_RETRIES = _safe_int(
 )
 print(f"[Recipe AI] OPENAI_API_KEY present: {'yes' if bool(os.getenv('OPENAI_API_KEY')) else 'no'}")
 print(f"[Recipe AI] Recipe model: {os.getenv('OPENAI_RECIPE_MODEL') or OPENAI_RECIPE_MODEL_DEFAULT}")
+print(f"[Recipe AI] Menu model: {os.getenv('OPENAI_MENU_MODEL') or OPENAI_MENU_MODEL_DEFAULT}")
 print(f"[Recipe AI] Vision model: {os.getenv('OPENAI_VISION_MODEL') or VISION_MODEL_DEFAULT}")
 MAX_PAGE_TEXT_CHARS = 35000
 MAX_SOCIAL_VIDEO_PROMPT_CHARS = 12000
@@ -214,11 +217,11 @@ def resolve_openai_model(purpose="recipe", preferred_model=None, fallback=False)
         )
 
     if purpose == "vision":
-        env_model = os.getenv("OPENAI_VISION_MODEL", "").strip()
-        if env_model:
+        env_model, env_source = model_value_for_env("OPENAI_VISION_MODEL", VISION_MODEL_DEFAULT)
+        if env_source != "default":
             return OpenAIModelResolution(
                 model=env_model,
-                source="env:OPENAI_VISION_MODEL",
+                source=f"{env_source}:OPENAI_VISION_MODEL",
                 purpose=purpose,
             )
         return OpenAIModelResolution(
@@ -227,17 +230,31 @@ def resolve_openai_model(purpose="recipe", preferred_model=None, fallback=False)
             purpose=purpose,
         )
 
-    env_model = os.getenv("OPENAI_RECIPE_MODEL", "").strip()
-    if env_model:
+    if purpose == "menu":
+        env_model, env_source = model_value_for_env("OPENAI_MENU_MODEL", OPENAI_MENU_MODEL_DEFAULT)
+        if env_source != "default":
+            return OpenAIModelResolution(
+                model=env_model,
+                source=f"{env_source}:OPENAI_MENU_MODEL",
+                purpose=purpose,
+            )
+        return OpenAIModelResolution(
+            model=OPENAI_MENU_MODEL_DEFAULT,
+            source="default:gpt-5.5",
+            purpose=purpose,
+        )
+
+    env_model, env_source = model_value_for_env("OPENAI_RECIPE_MODEL", OPENAI_RECIPE_MODEL_DEFAULT)
+    if env_source != "default":
         return OpenAIModelResolution(
             model=env_model,
-            source="env:OPENAI_RECIPE_MODEL",
+            source=f"{env_source}:OPENAI_RECIPE_MODEL",
             purpose=purpose,
         )
 
     return OpenAIModelResolution(
         model=OPENAI_RECIPE_MODEL_DEFAULT,
-        source="default:gpt-5.5",
+        source="default:gpt-4o-mini",
         purpose=purpose,
     )
 
@@ -252,6 +269,14 @@ def resolve_vision_model_source():
 
 def resolve_recipe_model():
     return resolve_openai_model("recipe").model
+
+
+def resolve_menu_model():
+    return resolve_openai_model("menu").model
+
+
+def resolve_menu_model_source():
+    return resolve_openai_model("menu").source
 
 
 OPENAI_UNSUPPORTED_PARAMETER_MESSAGE = (
@@ -678,9 +703,12 @@ def openai_runtime_diagnostics(debug_mode=None, reloader_mode=None):
         "openai.__file__": getattr(openai, "__file__", ""),
         "OPENAI_API_KEY_present": "yes" if bool(os.getenv("OPENAI_API_KEY")) else "no",
         "OPENAI_RECIPE_MODEL": os.getenv("OPENAI_RECIPE_MODEL", ""),
+        "OPENAI_MENU_MODEL": os.getenv("OPENAI_MENU_MODEL", ""),
         "OPENAI_VISION_MODEL": os.getenv("OPENAI_VISION_MODEL", ""),
         "resolved_recipe_model": recipe_resolution.model,
         "resolved_recipe_model_source": recipe_resolution.source,
+        "resolved_menu_model": resolve_openai_model("menu").model,
+        "resolved_menu_model_source": resolve_openai_model("menu").source,
         "resolved_vision_model": vision_resolution.model,
         "resolved_vision_model_source": vision_resolution.source,
         "flask_debug": bool(debug_mode) if debug_mode is not None else "",
@@ -5018,7 +5046,7 @@ def extract_video_recipe_pdf_data_with_openai(recipe_url, page_text, progress_ca
         final_error_code, final_error_message = classify_vision_ai_exception(exc)
         print(
             "[OpenAI] action=video-recipe-pdf-extraction "
-            f"model={MODEL} exception_type={type(exc).__name__} "
+            f"model={resolve_menu_model()} exception_type={type(exc).__name__} "
             f"openai_error_code={openai_error_code or 'n/a'} "
             f"openai_error_param={openai_error_param or 'n/a'} "
             f"final_error_code={final_error_code} "
@@ -5031,7 +5059,7 @@ def extract_video_recipe_pdf_data_with_openai(recipe_url, page_text, progress_ca
 
 def send_video_recipe_pdf_prompt_to_openai(prompt_text):
     payload, temperature_included, resolved_model = build_openai_chat_payload(
-        MODEL,
+        resolve_menu_model(),
         "video-recipe-pdf-extraction",
         [
             {
@@ -5054,7 +5082,7 @@ def send_video_recipe_pdf_prompt_to_openai(prompt_text):
         f"model={resolved_model} temperature_included={temperature_included}"
     )
     response = get_openai_client().chat.completions.create(**payload)
-    record_openai_usage(response, "video-recipe-pdf-extraction", model=MODEL)
+    record_openai_usage(response, "video-recipe-pdf-extraction", model=resolved_model)
 
     return response.choices[0].message.content
 
@@ -6161,13 +6189,13 @@ def send_prompt_to_openai(prompt_text):
             "content": prompt_text,
         },
     ]
-    model_resolution = resolve_openai_model("recipe")
+    model_resolution = resolve_openai_model("menu")
     attempts = [model_resolution]
     if model_resolution.model != VISION_MODEL_FALLBACK:
         attempts.append(OpenAIModelResolution(
             model=VISION_MODEL_FALLBACK,
             source="fallback:gpt-4o-mini",
-            purpose="recipe",
+            purpose="menu",
         ))
 
     first_failure = None
@@ -6724,7 +6752,7 @@ def send_social_video_audio_image_prompt_to_openai(prompt_text, image_urls):
         })
 
     payload, temperature_included, resolved_model = build_openai_chat_payload(
-        MODEL,
+        resolve_menu_model(),
         "social-video-audio-image-extraction",
         [
             {
@@ -6747,7 +6775,7 @@ def send_social_video_audio_image_prompt_to_openai(prompt_text, image_urls):
         f"model={resolved_model} temperature_included={temperature_included}"
     )
     response = get_openai_client().chat.completions.create(**payload)
-    record_openai_usage(response, "social-video-audio-image-extraction", model=MODEL)
+    record_openai_usage(response, "social-video-audio-image-extraction", model=resolved_model)
 
     return response.choices[0].message.content
 
@@ -6757,7 +6785,7 @@ def send_file_prompt_to_openai(prompt_text, file_path, mime_type, filename):
     file_data = base64.b64encode(file_bytes).decode("ascii")
 
     payload, temperature_included, resolved_model = build_openai_chat_payload(
-        MODEL,
+        resolve_menu_model(),
         "recipe-file-extraction",
         [
             {
@@ -6786,7 +6814,7 @@ def send_file_prompt_to_openai(prompt_text, file_path, mime_type, filename):
         f"model={resolved_model} temperature_included={temperature_included}"
     )
     response = get_openai_client().chat.completions.create(**payload)
-    record_openai_usage(response, "recipe-file-extraction", model=MODEL)
+    record_openai_usage(response, "recipe-file-extraction", model=resolved_model)
 
     return response.choices[0].message.content
 
@@ -6913,7 +6941,7 @@ def build_upload_failure_result(import_object, error_message, failed_step="extra
     import_object = import_object if isinstance(import_object, dict) else {}
     import_object["error_message"] = error_message
     source_type = str(import_object.get("source_type") or "").strip().lower()
-    default_model = resolve_vision_model() if source_type == "image" else MODEL
+    default_model = resolve_vision_model() if source_type == "image" else resolve_menu_model()
     model_used = str(extra.pop("model_used", "")).strip() or str(default_model).strip() or str(MODEL)
     action = str(extra.pop("action", "read_text")).strip() or "read_text"
     error_code = str(extra.pop("error_code", "")).strip() or "OPENAI_REQUEST_FAILED"
@@ -6929,7 +6957,7 @@ def build_upload_failure_result(import_object, error_message, failed_step="extra
     debug_payload.setdefault("model", model_used)
     debug_payload.setdefault(
         "model_source",
-        resolve_vision_model_source() if source_type == "image" else resolve_openai_model("recipe").source,
+        resolve_vision_model_source() if source_type == "image" else resolve_menu_model_source(),
     )
     debug_payload["action"] = action
     debug_payload["error_code"] = error_code
@@ -8183,7 +8211,7 @@ def extract_recipe_from_upload(file_storage, manual_description="", upload_mode=
         raw_error_path.write_text(str(exc), encoding="utf-8")
         error_code, error_message = classify_vision_ai_exception(exc)
         openai_error_code, error_param = get_openai_error_code_and_param(exc)
-        request_model = resolve_vision_model() if import_source_type == "image" else MODEL
+        request_model = resolve_vision_model() if import_source_type == "image" else resolve_menu_model()
         print(
             "[recipe_import] action=upload_extract_exception "
             f"source_type={import_source_type} action={requested_upload_action} "
@@ -8206,7 +8234,7 @@ def extract_recipe_from_upload(file_storage, manual_description="", upload_mode=
             error_code=error_code,
             technical_message=str(exc),
             debug={
-                "model": resolve_vision_model() if import_source_type == "image" else MODEL,
+                "model": resolve_vision_model() if import_source_type == "image" else resolve_menu_model(),
                 "action": requested_upload_action,
                 "openai_error_code": openai_error_code,
                 "openai_error_param": error_param,
@@ -8758,8 +8786,8 @@ def build_extract_result(recipe_url, json_data, extraction_method):
         json_data.get("model_used")
         or json_data.get("model")
         or json_data.get("vision_request", {}).get("model")
-        or MODEL
-    ).strip() or str(MODEL)
+        or resolve_menu_model()
+    ).strip() or str(resolve_menu_model())
 
     return {
         "success": True,
@@ -8998,8 +9026,8 @@ def extract_recipe_from_url(recipe_url, progress_callback=None):
                 "error_code": "OPENAI_API_KEY_MISSING",
                 "error_message": "OPENAI_API_KEY is missing or invalid.",
                 "technical_message": "Missing OPENAI_API_KEY environment variable.",
-                "model": MODEL,
-                "model_used": MODEL,
+                "model": resolve_menu_model(),
+                "model_used": resolve_menu_model(),
                 "action": "read_text",
                 "ingredients": [],
             }
@@ -9033,7 +9061,7 @@ def extract_recipe_from_url(recipe_url, progress_callback=None):
         openai_error_code, openai_error_param = get_openai_error_code_and_param(exc)
         print(
             "[OpenAI] action=recipe-text-extraction "
-            f"model={MODEL} exception_type={type(exc).__name__} "
+            f"model={resolve_menu_model()} exception_type={type(exc).__name__} "
             f"openai_error_code={openai_error_code or 'n/a'} "
             f"openai_error_param={openai_error_param or 'n/a'} "
             f"final_error_code={error_code}"
@@ -9045,8 +9073,8 @@ def extract_recipe_from_url(recipe_url, progress_callback=None):
             "error_code": error_code,
             "error_message": error_message or str(exc),
             "technical_message": str(exc),
-            "model": MODEL,
-            "model_used": MODEL,
+            "model": resolve_menu_model(),
+            "model_used": resolve_menu_model(),
             "action": "read_text",
             "ingredients": [],
         }

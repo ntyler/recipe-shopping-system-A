@@ -87,9 +87,12 @@ from PushShoppingList.services.shopping_list_service import add_items
 from PushShoppingList.services.shopping_list_service import save_items
 from PushShoppingList.services.store_settings_service import load_store_settings
 from PushShoppingList.services.firebase_auth_service import firebase_web_config
+from PushShoppingList.services.openai_model_service import chatgpt_models_dashboard_for_user
+from PushShoppingList.services.openai_model_service import update_openai_model_settings_for_admin
 from PushShoppingList.services.openai_usage_service import openai_usage_dashboard_for_user
 from PushShoppingList.services.openai_usage_service import record_openai_usage
 from PushShoppingList.services.user_account_service import current_public_user
+from PushShoppingList.services.user_account_service import is_admin_user
 from PushShoppingList.services.user_account_service import public_two_factor_recovery_user
 from PushShoppingList.services.admin_support_service import admin_support_dashboard_for_user
 from PushShoppingList.services.admin_support_service import support_access_notices_for_user
@@ -111,6 +114,30 @@ def api_openai_usage_dashboard_route():
         "ok": True,
         "dashboard": openai_usage_dashboard_for_user(current_public_user()),
     })
+
+
+@main_bp.route("/admin/chatgpt-models", methods=["POST"])
+def update_chatgpt_models_route():
+    user = current_public_user()
+    if not is_admin_user(user):
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "Admin access is required.",
+        }), 403
+
+    result = update_openai_model_settings_for_admin(user, request.form)
+    if result.get("ok"):
+        session["chatgpt_model_messages"] = [
+            {"category": "success", "text": "Chat GPT model settings updated."}
+        ]
+    else:
+        session["chatgpt_model_messages"] = [
+            {"category": "error", "text": error}
+            for error in result.get("errors", ["Unable to update Chat GPT model settings."])
+        ]
+
+    return redirect(url_for("main_bp.index", _anchor="chatGptModelsSection"))
 
 
 def pdf_share_view_for_render():
@@ -1448,6 +1475,10 @@ def index():
         food_rule_status=shopping_item_food_rule_status,
         feedback_dashboard=feedback_dashboard_for_user(active_public_user),
         openai_usage_dashboard=openai_usage_dashboard_for_user(active_public_user),
+        chatgpt_models_dashboard={
+            **chatgpt_models_dashboard_for_user(active_public_user),
+            "messages": session.pop("chatgpt_model_messages", []),
+        },
         feedback_messages=session.pop("feedback_messages", []),
         admin_support_dashboard=admin_support_dashboard_for_user(
             active_public_user,
