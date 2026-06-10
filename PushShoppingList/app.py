@@ -43,6 +43,7 @@ PUBLIC_ENDPOINTS = {
     "account_bp.firebase_logout_route",
     "account_bp.guest_start_route",
     "account_bp.guest_expired_route",
+    "account_bp.guest_delete_route",
     "account_bp.logout_route",
     "account_bp.create_account_route",
     "account_bp.verify_account_creation_route",

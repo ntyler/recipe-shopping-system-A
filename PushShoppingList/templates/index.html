@@ -18,7 +18,13 @@
     <div>
         <strong>Guest Demo Mode</strong>
         <span>your data is temporary and will be deleted after 24 hours.</span>
-        <span class="guest-demo-expiry">Expires in: {{ guest_demo.remaining_label }}</span>
+        <span class="guest-demo-expiry">
+            Expires in:
+            <strong data-guest-countdown
+                    data-guest-expires-at="{{ guest_demo.expires_at }}">
+                {{ guest_demo.remaining_label }}
+            </strong>
+        </span>
     </div>
     <a href="#userAccountSection">Create Full Account</a>
 </div>

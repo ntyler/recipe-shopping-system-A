@@ -4827,6 +4827,65 @@ body {
             line-height: 1.35;
         }
 
+        .user-guest-session-panel {
+            display: grid;
+            justify-items: center;
+            gap: 10px;
+            width: min(100%, 500px);
+            margin: 0 auto 16px;
+            padding: 12px;
+            border: 1px solid #2f4054;
+            border-radius: 8px;
+            background: #0b1118;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        .user-guest-countdown {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: baseline;
+            justify-content: center;
+            gap: 8px;
+            color: #cbd5e1;
+            font-size: 14px;
+            font-weight: 800;
+            line-height: 1.25;
+        }
+
+        .user-guest-countdown strong {
+            color: #fff;
+            font-size: 22px;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0;
+        }
+
+        .user-guest-session-panel form {
+            width: min(100%, 320px);
+            margin: 0;
+        }
+
+        .user-guest-session-panel .user-guest-delete-btn {
+            width: 100%;
+            min-height: 40px;
+            margin: 0;
+            padding: 8px 12px;
+            border: 1px solid #a33a3a;
+            border-radius: 7px;
+            background: #7f1515;
+            color: #fff;
+            font-size: 15px;
+            font-weight: 900;
+        }
+
+        .user-guest-session-panel .user-guest-delete-btn:hover,
+        .user-guest-session-panel .user-guest-delete-btn:focus-visible {
+            border-color: #f87171;
+            background: #991b1b;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.24);
+        }
+
         .user-guest-demo-divider {
             width: 100%;
             max-width: none;
@@ -12100,7 +12159,9 @@ body {
 
             .user-guest-demo-access,
             .user-guest-demo-access button,
-            .user-guest-demo-note {
+            .user-guest-demo-note,
+            .user-guest-session-panel,
+            .user-guest-session-panel form {
                 width: 100%;
                 max-width: none;
             }

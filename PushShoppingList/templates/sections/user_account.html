@@ -1022,6 +1022,25 @@
                     Explore with temporary demo data. Nothing is saved permanently.
                 </p>
             </form>
+            {% if guest_demo %}
+                <div class="user-guest-session-panel" data-guest-session-panel>
+                    <div class="user-guest-countdown" aria-live="polite">
+                        <span>Demo auto-deletes in</span>
+                        <strong data-guest-countdown
+                                data-guest-expires-at="{{ guest_demo.expires_at }}">
+                            {{ guest_demo.remaining_label }}
+                        </strong>
+                    </div>
+                    <form method="POST"
+                          action="{{ url_for('account_bp.guest_delete_route') }}">
+                        <button type="submit"
+                                class="user-guest-delete-btn"
+                                aria-label="Delete temporary demo session">
+                            Delete Demo Session
+                        </button>
+                    </form>
+                </div>
+            {% endif %}
             <div class="app-section-divider recipe-entry-section-divider user-guest-demo-divider" aria-hidden="true"></div>
         {% endif %}
 

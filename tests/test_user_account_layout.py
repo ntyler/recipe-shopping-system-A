@@ -18,6 +18,7 @@ def test_two_factor_remember_checkbox_text_stays_adjacent():
 def test_guest_demo_access_is_primary_path_above_account_forms():
     template = (ROOT / "PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     route = (ROOT / "PushShoppingList/routes/account_routes.py").read_text(encoding="utf-8")
     app_config = (ROOT / "PushShoppingList/app.py").read_text(encoding="utf-8")
 
@@ -32,14 +33,26 @@ def test_guest_demo_access_is_primary_path_above_account_forms():
     assert "Try Demo Without Password" in template[demo_start:create_start]
     assert 'aria-label="Start temporary guest demo session"' in template[demo_start:create_start]
     assert "Explore with temporary demo data. Nothing is saved permanently." in template[demo_start:create_start]
+    assert 'data-guest-countdown' in template[demo_start:create_start]
+    assert "Demo auto-deletes in" in template[demo_start:create_start]
+    assert "url_for('account_bp.guest_delete_route')" in template[demo_start:create_start]
+    assert "Delete Demo Session" in template[demo_start:create_start]
     assert ".user-guest-demo-access {" in css
     assert "width: min(100%, 500px);" in css
     assert ".user-guest-demo-access button {" in css
     assert "background: #115e9f;" in css
     assert ".user-guest-demo-access button:focus-visible" in css
+    assert ".user-guest-session-panel {" in css
+    assert ".user-guest-countdown strong" in css
+    assert ".user-guest-delete-btn" in css
+    assert "function initGuestCountdowns()" in script
+    assert "function formatGuestCountdown(msRemaining)" in script
+    assert "initGuestCountdowns();" in script
     assert "@media (max-width: 650px)" in css
     assert '@account_bp.route("/guest/start", methods=["GET"])' in route
+    assert '@account_bp.route("/guest/delete", methods=["POST"])' in route
     assert "account_bp.guest_start_route" in app_config
+    assert "account_bp.guest_delete_route" in app_config
 
 
 def test_guest_start_route_returns_to_guest_account_section():

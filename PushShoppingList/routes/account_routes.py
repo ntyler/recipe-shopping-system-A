@@ -15,6 +15,7 @@ from flask import url_for
 from PushShoppingList.services.guest_session_service import GUEST_COOKIE_NAME
 from PushShoppingList.services.guest_session_service import clear_guest_cookie
 from PushShoppingList.services.guest_session_service import cleanup_expired_guest_sessions
+from PushShoppingList.services.guest_session_service import delete_current_guest_session
 from PushShoppingList.services.guest_session_service import set_guest_cookie
 from PushShoppingList.services.guest_session_service import start_or_restore_guest_session
 from PushShoppingList.services.firebase_auth_service import firebase_account_exists_by_email
@@ -281,6 +282,16 @@ def guest_start_route():
 def guest_expired_route():
     sign_out_user()
     response = make_response(render_template("guest_expired.html"))
+    clear_guest_cookie(response)
+    return response
+
+
+@account_bp.route("/guest/delete", methods=["POST"])
+def guest_delete_route():
+    delete_current_guest_session()
+    clear_admin_support_session()
+    flash("Temporary demo session deleted.", "success")
+    response = make_response(redirect(url_for("main_bp.index", _anchor="userAccountSection")))
     clear_guest_cookie(response)
     return response
 

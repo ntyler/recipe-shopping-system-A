@@ -60,6 +60,56 @@ function getPublicSupportIdentity(email) {
 let openAiUsageDashboardRefreshTimer = null;
 let openAiUsageDashboardRefreshPromise = null;
 
+function formatGuestCountdown(msRemaining) {
+    const totalSeconds = Math.max(0, Math.floor(Number(msRemaining || 0) / 1000));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const parts = [hours, minutes, seconds].map(value => String(value).padStart(2, "0"));
+    return parts.join(":");
+}
+
+function updateGuestCountdownElement(element) {
+    if (!element) {
+        return false;
+    }
+
+    const expiresAt = Date.parse(element.dataset.guestExpiresAt || "");
+    if (!Number.isFinite(expiresAt)) {
+        return false;
+    }
+
+    const remaining = expiresAt - Date.now();
+    element.textContent = remaining > 0 ? formatGuestCountdown(remaining) : "Expired";
+    return remaining > 0;
+}
+
+function initGuestCountdowns() {
+    const countdowns = Array.from(document.querySelectorAll("[data-guest-countdown]"));
+    if (!countdowns.length) {
+        return;
+    }
+
+    const tick = () => {
+        let hasActiveCountdown = false;
+        countdowns.forEach(element => {
+            hasActiveCountdown = updateGuestCountdownElement(element) || hasActiveCountdown;
+        });
+
+        if (!hasActiveCountdown && window.guestCountdownTimer) {
+            window.clearInterval(window.guestCountdownTimer);
+            window.guestCountdownTimer = null;
+        }
+    };
+
+    tick();
+
+    if (window.guestCountdownTimer) {
+        window.clearInterval(window.guestCountdownTimer);
+    }
+    window.guestCountdownTimer = window.setInterval(tick, 1000);
+}
+
 function formatOpenAiUsageNumber(value) {
     const number = Number(value || 0);
     if (!Number.isFinite(number)) {
@@ -20706,6 +20756,7 @@ document.addEventListener("DOMContentLoaded", function () {
     restoreItemCheckState();
     bindAccountMenuDropdowns();
     restoreRememberedAccountPanelOpen();
+    initGuestCountdowns();
     bindFeedbackTickets();
     initPhoneCountryInputs();
     bindRecipeUrlLogDragAndDrop();

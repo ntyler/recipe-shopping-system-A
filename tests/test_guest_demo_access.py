@@ -69,6 +69,24 @@ def test_guest_start_reuses_remembered_session_and_index_restores_it(monkeypatch
     assert [record["id"] for record in records] == [first_guest_session_id]
 
 
+def test_guest_account_page_shows_countdown_and_delete_button(monkeypatch, tmp_path):
+    configure_guest_demo_paths(monkeypatch, tmp_path)
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    with app.test_client() as client:
+        client.get("/guest/start")
+        response = client.get("/")
+        html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "Demo auto-deletes in" in html
+    assert "data-guest-countdown" in html
+    assert "data-guest-expires-at=" in html
+    assert "Delete Demo Session" in html
+    assert "/guest/delete" in html
+
+
 def test_expired_remembered_guest_redirects_to_expired_and_clears_cookie(monkeypatch, tmp_path):
     configure_guest_demo_paths(monkeypatch, tmp_path)
     app = create_app()
@@ -162,3 +180,31 @@ def test_logout_clears_guest_session_and_cookie(monkeypatch, tmp_path):
         with client.session_transaction() as session:
             assert "is_guest" not in session
             assert "guest_session_id" not in session
+
+
+def test_guest_delete_route_removes_temp_demo_session(monkeypatch, tmp_path):
+    configure_guest_demo_paths(monkeypatch, tmp_path)
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    with app.test_client() as client:
+        client.get("/guest/start")
+        with client.session_transaction() as session:
+            guest_session_id = session["guest_session_id"]
+
+        guest_file = tmp_path / "guests" / guest_session_id / "shopping_list.txt"
+        guest_file.write_text("temporary item", encoding="utf-8")
+
+        response = client.post("/guest/delete")
+
+        assert response.status_code == 302
+        assert response.headers["Location"].endswith("/#userAccountSection")
+        assert "guest_demo_session=;" in response.headers.get("Set-Cookie", "")
+        assert not guest_file.exists()
+
+        with client.session_transaction() as session:
+            assert "is_guest" not in session
+            assert "guest_session_id" not in session
+
+    payload = guest_sessions_payload()
+    assert payload["guest_sessions"][0]["is_active"] is False

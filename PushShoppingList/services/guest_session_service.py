@@ -219,6 +219,34 @@ def cleanup_expired_guest_sessions(at_time=None):
     return payload
 
 
+def deactivate_guest_session(guest_session_id, delete_data=True):
+    guest_session_id = str(guest_session_id or "").strip()
+    payload = load_guest_sessions()
+    record = find_guest_session(payload, guest_session_id)
+
+    if not record:
+        return False
+
+    record["is_active"] = False
+    record["ended_at"] = now_iso()
+    save_guest_sessions(payload)
+
+    if delete_data:
+        delete_guest_temporary_data(guest_session_id)
+
+    return True
+
+
+def delete_current_guest_session():
+    if not has_request_context():
+        return False
+
+    guest_session_id = str(session.get("guest_session_id") or "").strip()
+    deleted = deactivate_guest_session(guest_session_id, delete_data=True) if guest_session_id else False
+    clear_guest_session_flags()
+    return deleted
+
+
 def get_current_guest_session():
     if not has_request_context() or not session.get("is_guest"):
         return None
