@@ -148,7 +148,7 @@ def test_cleanup_deletes_only_expired_guest_data(monkeypatch, tmp_path):
     assert payload["guest_sessions"][1]["is_active"] is True
 
 
-def test_guest_routes_block_sensitive_surfaces(monkeypatch, tmp_path):
+def test_guest_session_can_use_temporary_workspace_controls(monkeypatch, tmp_path):
     configure_guest_demo_paths(monkeypatch, tmp_path)
     app = create_app()
     app.config.update(TESTING=True)
@@ -158,19 +158,107 @@ def test_guest_routes_block_sensitive_surfaces(monkeypatch, tmp_path):
 
         pantry = client.post("/pantry/items/add", data={"ingredient_name": "Milk"})
         assert pantry.status_code == 302
-        assert pantry.headers["Location"].endswith("/#userAccountSection")
+        assert pantry.headers["Location"].endswith("/#aiPantryInventory")
 
-        usage = client.get("/api/openai_usage_dashboard")
-        assert usage.status_code == 403
-        assert usage.get_json()["guest_restricted"] is True
+        progress = client.post(
+            "/api/start_extract_progress",
+            json={"urls": ["https://example.com/recipe"], "job_id": "guest-import-job"},
+            headers={"X-Requested-With": "fetch"},
+        )
+        assert progress.status_code == 200
+        assert progress.get_json()["job_id"] == "guest-import-job"
 
-        home = client.post("/save_home_address", data={"address_city": "Indianapolis"})
-        assert home.status_code == 302
-        assert home.headers["Location"].endswith("/#userAccountSection")
+        home = client.post(
+            "/save_home_address",
+            data={"ajax": "1", "address_city": "Indianapolis"},
+            headers={"X-Requested-With": "fetch"},
+        )
+        assert home.status_code == 200
+        assert home.get_json()["home_address"]["city"] == "Indianapolis"
 
-        store = client.post("/update_store/aldi", data={"username": "demo", "password": "secret"})
-        assert store.status_code == 302
-        assert store.headers["Location"].endswith("/#userAccountSection")
+        store = client.post(
+            "/save_store_settings",
+            data={"ajax": "1", "enabled_stores": "aldi"},
+            headers={"X-Requested-With": "fetch"},
+        )
+        assert store.status_code == 200
+        assert store.get_json()["enabled_stores"] == ["aldi"]
+
+
+def test_guest_session_can_run_recipe_url_import_api(monkeypatch, tmp_path):
+    configure_guest_demo_paths(monkeypatch, tmp_path)
+
+    from PushShoppingList.routes import recipe_routes
+
+    monkeypatch.setattr(
+        recipe_routes,
+        "extract_recipe_from_url",
+        lambda url, progress_callback=None: {
+            "ok": True,
+            "display_name": "Guest Demo Pretzels",
+            "recipe_title": "Guest Demo Pretzels",
+            "ingredients": ["1 cup flour"],
+            "source_url": url,
+        },
+    )
+    monkeypatch.setattr(
+        recipe_routes,
+        "apply_imported_recipe_category_routine",
+        lambda url, result, assignment: {"ok": True, "status": "skipped"},
+    )
+    monkeypatch.setattr(recipe_routes, "create_source_url_pdf", lambda url: {"ok": True})
+    monkeypatch.setattr(recipe_routes, "schedule_generated_recipe_pdf_creation", lambda url, context="": {"ok": True})
+
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    with app.test_client() as client:
+        client.get("/guest/start")
+        client.post(
+            "/api/start_extract_progress",
+            json={"urls": ["https://example.com/demo-recipe"], "job_id": "guest-import-job"},
+            headers={"X-Requested-With": "fetch"},
+        )
+
+        response = client.post(
+            "/api/extract_recipe",
+            json={
+                "url": "https://example.com/demo-recipe",
+                "urls": ["https://example.com/demo-recipe"],
+                "job_id": "guest-import-job",
+                "index": 0,
+            },
+            headers={"X-Requested-With": "fetch"},
+        )
+
+    data = response.get_json()
+    guest_files = list((tmp_path / "guests").glob("*/recipe-extractor/data/output/*.json"))
+
+    assert response.status_code == 200
+    assert data["ok"] is True
+    assert data["display_name"] == "Guest Demo Pretzels"
+    assert guest_files
+
+
+def test_guest_session_still_blocks_account_and_admin_surfaces(monkeypatch, tmp_path):
+    configure_guest_demo_paths(monkeypatch, tmp_path)
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    with app.test_client() as client:
+        client.get("/guest/start")
+
+        profile = client.post("/account/profile", data={"display_name": "Demo"})
+        assert profile.status_code == 302
+        assert profile.headers["Location"].endswith("/#userAccountSection")
+
+        store_admin = client.post(
+            "/add_store",
+            data={"ajax": "1", "store_label": "Target", "store_url": "https://target.example/search?q="},
+            headers={"X-Requested-With": "fetch"},
+        )
+        assert store_admin.status_code == 403
+        assert store_admin.get_json()["guest_restricted"] is True
 
 
 def test_logout_clears_guest_session_and_cookie(monkeypatch, tmp_path):

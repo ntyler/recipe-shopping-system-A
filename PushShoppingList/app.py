@@ -63,10 +63,6 @@ PUBLIC_ENDPOINTS = {
     "feedback_bp.submit_feedback_route",
 }
 
-GUEST_BLOCKED_BLUEPRINTS = {
-    "pantry_bp",
-}
-
 GUEST_BLOCKED_ENDPOINTS = {
     "account_bp.open_admin_support_record_route",
     "account_bp.update_profile_route",
@@ -83,19 +79,9 @@ GUEST_BLOCKED_ENDPOINTS = {
     "account_bp.cancel_two_factor_setup_route",
     "account_bp.disable_two_factor_route",
     "account_bp.regenerate_two_factor_backup_codes_route",
-    "main_bp.api_openai_usage_dashboard_route",
     "main_bp.update_chatgpt_models_route",
-    "main_bp.save_home_address_route",
-    "main_bp.update_home_address_history_label_route",
-    "main_bp.delete_home_address_history_entry_route",
-    "main_bp.reverse_geocode_route",
-    "main_bp.address_options_route",
-    "main_bp.complete_address_route",
-    "store_bp.save_store_settings_route",
     "store_bp.add_store_route",
-    "store_bp.update_store_route",
     "store_bp.delete_store_route",
-    "store_bp.select_nearby_store_location_route",
 }
 
 PROTECTED_BLUEPRINTS = {
@@ -151,8 +137,8 @@ def admin_required_response():
 
 def guest_restricted_response():
     message = (
-        "AI Pantry is only available for full accounts. "
-        "Create a free account to save pantry items, store preferences, and long-term shopping history."
+        "That account or admin setting is only available for full accounts. "
+        "Create a free account to keep workspace settings permanently."
     )
 
     if wants_json_response():
@@ -228,7 +214,7 @@ def create_app():
         if not full_account_active and not guest_active:
             return auth_required_response()
 
-        if guest_active and (blueprint in GUEST_BLOCKED_BLUEPRINTS or endpoint in GUEST_BLOCKED_ENDPOINTS or endpoint in ADMIN_ENDPOINTS):
+        if guest_active and (endpoint in GUEST_BLOCKED_ENDPOINTS or endpoint in ADMIN_ENDPOINTS):
             return guest_restricted_response()
 
         if endpoint in ADMIN_ENDPOINTS and not is_admin_user(user):

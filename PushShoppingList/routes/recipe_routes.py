@@ -112,6 +112,7 @@ from PushShoppingList.services.recipe_url_service import save_recipe_urls
 from PushShoppingList.services.recipe_quantity_service import update_recipe_ingredient_quantity
 from PushShoppingList.services.recipe_quantity_service import update_recipe_quantity
 from PushShoppingList.services.shopping_list_service import add_items
+from PushShoppingList.services.guest_session_service import is_guest_session
 from PushShoppingList.services.openai_usage_service import openai_usage_dashboard_for_user
 from PushShoppingList.services.openai_usage_service import record_app_activity
 from PushShoppingList.services.user_account_service import current_user
@@ -554,8 +555,8 @@ def ensure_menu_recipe_serving_basis_estimate(recipe_url, recipe_result):
 
 
 def require_account_for_import(wants_json=False):
-    """Keep recipe imports bound to a signed-in user's scoped storage."""
-    if current_user():
+    """Keep recipe imports bound to signed-in or temporary demo scoped storage."""
+    if current_user() or is_guest_session():
         return None
 
     if wants_json:
@@ -566,8 +567,8 @@ def require_account_for_import(wants_json=False):
 
 
 def require_account_for_food_review():
-    """Food-review alternatives use account-specific food rules and saved recipe data."""
-    if current_user():
+    """Food-review alternatives use workspace-specific food rules and saved recipe data."""
+    if current_user() or is_guest_session():
         return None
 
     return jsonify({"ok": False, "error": FOOD_REVIEW_LOGIN_ERROR}), 401
