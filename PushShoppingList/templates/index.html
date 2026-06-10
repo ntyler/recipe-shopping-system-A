@@ -15,7 +15,7 @@
 
 {% if guest_demo %}
 <div class="guest-demo-banner" role="status" aria-live="polite">
-    <div>
+    <div class="guest-demo-banner-content">
         <strong>Guest Demo Mode</strong>
         <span>your data is temporary and will be deleted after 24 hours.</span>
         <span class="guest-demo-expiry">
@@ -26,7 +26,19 @@
             </strong>
         </span>
     </div>
-    <a href="#userAccountSection">Create Full Account</a>
+    <div class="guest-demo-banner-actions">
+        <a href="#userAccountSection"
+           data-guest-auth-choice="create"
+           aria-label="Create a full account from this guest demo">
+            Create Full Account
+        </a>
+        <a href="#userAccountSection"
+           class="secondary"
+           data-guest-auth-choice="sign-in"
+           aria-label="Sign in to an existing account from this guest demo">
+            Sign In
+        </a>
+    </div>
 </div>
 {% endif %}
 

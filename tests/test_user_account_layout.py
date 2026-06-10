@@ -37,6 +37,11 @@ def test_guest_demo_access_is_primary_path_above_account_forms():
     assert "Demo auto-deletes in" in template[demo_start:create_start]
     assert "url_for('account_bp.guest_delete_route')" in template[demo_start:create_start]
     assert "Delete Demo Session" in template[demo_start:create_start]
+    assert 'data-guest-auth-choice="create"' in template[demo_start:create_start]
+    assert 'data-guest-auth-choice="sign-in"' in template[demo_start:create_start]
+    assert "Create Full Account" in template[demo_start:create_start]
+    assert 'data-guest-auth-form="create" hidden' in template
+    assert 'data-guest-auth-form="sign-in" hidden' in template
     assert ".user-guest-demo-access {" in css
     assert "width: min(100%, 500px);" in css
     assert ".user-guest-demo-access button {" in css
@@ -45,14 +50,37 @@ def test_guest_demo_access_is_primary_path_above_account_forms():
     assert ".user-guest-session-panel {" in css
     assert ".user-guest-countdown strong" in css
     assert ".user-guest-delete-btn" in css
+    assert ".user-guest-auth-choice {" in css
+    assert ".user-guest-auth-choice button {" in css
     assert "function initGuestCountdowns()" in script
     assert "function formatGuestCountdown(msRemaining)" in script
+    assert "function bindGuestAuthChoices()" in script
+    assert "function showGuestAuthForm(choice, options = {})" in script
     assert "initGuestCountdowns();" in script
+    assert "bindGuestAuthChoices();" in script
     assert "@media (max-width: 650px)" in css
     assert '@account_bp.route("/guest/start", methods=["GET"])' in route
     assert '@account_bp.route("/guest/delete", methods=["POST"])' in route
     assert "account_bp.guest_start_route" in app_config
     assert "account_bp.guest_delete_route" in app_config
+
+
+def test_guest_demo_banner_has_create_and_sign_in_shortcuts():
+    index_template = (ROOT / "PushShoppingList/templates/index.html").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    banner_start = index_template.index('class="guest-demo-banner"')
+    banner_end = index_template.index("</div>", index_template.index('class="guest-demo-banner-actions"', banner_start))
+    banner_markup = index_template[banner_start:banner_end]
+
+    assert "guest-demo-banner-actions" in banner_markup
+    assert 'data-guest-auth-choice="create"' in banner_markup
+    assert 'data-guest-auth-choice="sign-in"' in banner_markup
+    assert "Create Full Account" in banner_markup
+    assert "Sign In" in banner_markup
+    assert ".guest-demo-banner-content {" in css
+    assert ".guest-demo-banner-actions {" in css
+    assert ".guest-demo-banner a.secondary" in css
 
 
 def test_guest_start_route_returns_to_guest_account_section():

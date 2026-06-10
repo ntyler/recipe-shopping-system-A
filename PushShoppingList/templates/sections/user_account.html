@@ -1042,6 +1042,21 @@
                 </div>
             {% endif %}
             <div class="app-section-divider recipe-entry-section-divider user-guest-demo-divider" aria-hidden="true"></div>
+            {% if guest_demo %}
+                <div class="user-guest-auth-choice" aria-label="Guest demo account options">
+                    <button type="button"
+                            data-guest-auth-choice="create"
+                            aria-controls="firebaseCreateAccountForm">
+                        Create Full Account
+                    </button>
+                    <button type="button"
+                            class="secondary"
+                            data-guest-auth-choice="sign-in"
+                            aria-controls="firebaseSignInForm">
+                        Sign In
+                    </button>
+                </div>
+            {% endif %}
         {% endif %}
 
         <div class="user-account-forms">
@@ -1099,7 +1114,8 @@
                 </form>
             {% else %}
                 <form id="firebaseCreateAccountForm"
-                      class="user-account-form"
+                      class="user-account-form{% if guest_demo %} user-guest-auth-form{% endif %}"
+                      {% if guest_demo %}data-guest-auth-form="create" hidden{% endif %}
                       data-firebase-create-form
                       method="POST"
                       action="{{ url_for('account_bp.create_account_route') }}"
@@ -1136,7 +1152,8 @@
                 </form>
 
                 <form id="firebaseSignInForm"
-                      class="user-account-form"
+                      class="user-account-form{% if guest_demo %} user-guest-auth-form{% endif %}"
+                      {% if guest_demo %}data-guest-auth-form="sign-in" hidden{% endif %}
                       data-firebase-sign-in-form
                       method="POST"
                       action="{{ url_for('account_bp.sign_in_route') }}">

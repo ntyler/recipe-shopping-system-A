@@ -110,6 +110,51 @@ function initGuestCountdowns() {
     window.guestCountdownTimer = window.setInterval(tick, 1000);
 }
 
+function showGuestAuthForm(choice, options = {}) {
+    const normalizedChoice = choice === "sign-in" ? "sign-in" : "create";
+    const forms = Array.from(document.querySelectorAll("[data-guest-auth-form]"));
+    const targetForm = forms.find(form => form.dataset.guestAuthForm === normalizedChoice);
+
+    if (!targetForm) {
+        const accountSection = document.getElementById("userAccountSection");
+        if (accountSection && options.scroll !== false) {
+            accountSection.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+        return false;
+    }
+
+    forms.forEach(form => {
+        form.hidden = form !== targetForm;
+    });
+
+    if (options.scroll !== false) {
+        targetForm.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    window.requestAnimationFrame(() => {
+        const firstInput = targetForm.querySelector("input, button, select, textarea");
+        if (firstInput) {
+            firstInput.focus({ preventScroll: true });
+        }
+    });
+
+    return false;
+}
+
+function bindGuestAuthChoices() {
+    document.querySelectorAll("[data-guest-auth-choice]").forEach(control => {
+        control.addEventListener("click", event => {
+            const choice = control.dataset.guestAuthChoice;
+            if (!choice) {
+                return;
+            }
+
+            event.preventDefault();
+            showGuestAuthForm(choice);
+        });
+    });
+}
+
 function formatOpenAiUsageNumber(value) {
     const number = Number(value || 0);
     if (!Number.isFinite(number)) {
@@ -20757,6 +20802,7 @@ document.addEventListener("DOMContentLoaded", function () {
     bindAccountMenuDropdowns();
     restoreRememberedAccountPanelOpen();
     initGuestCountdowns();
+    bindGuestAuthChoices();
     bindFeedbackTickets();
     initPhoneCountryInputs();
     bindRecipeUrlLogDragAndDrop();

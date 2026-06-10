@@ -85,6 +85,13 @@ def test_guest_account_page_shows_countdown_and_delete_button(monkeypatch, tmp_p
     assert "data-guest-expires-at=" in html
     assert "Delete Demo Session" in html
     assert "/guest/delete" in html
+    assert "Create Full Account" in html
+    assert 'data-guest-auth-choice="create"' in html
+    assert 'data-guest-auth-choice="sign-in"' in html
+    assert 'id="firebaseCreateAccountForm"' in html
+    assert 'data-guest-auth-form="create" hidden' in html
+    assert 'id="firebaseSignInForm"' in html
+    assert 'data-guest-auth-form="sign-in" hidden' in html
 
 
 def test_expired_remembered_guest_redirects_to_expired_and_clears_cookie(monkeypatch, tmp_path):
