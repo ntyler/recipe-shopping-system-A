@@ -194,10 +194,13 @@ body {
         .screen-settings-header .screen-settings-toggle {
             flex: 1 1 auto;
             min-width: 0;
+            width: auto;
         }
 
         .screen-settings-close {
             flex: 0 0 auto;
+            width: auto;
+            min-width: 128px;
             min-height: 42px;
             margin-top: 0;
             padding: 0 14px;
