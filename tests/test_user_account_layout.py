@@ -291,15 +291,27 @@ def test_chatgpt_models_live_inside_account_menu_panel():
     assert "data-chatgpt-models-close" in models_template
     assert "toggleChatGptModelsPanel(false)" in models_template
     assert "<select name=\"model_{{ row.env_var }}\">" in models_template
-    assert "row.model_choices" in models_template
+    assert "row.model_groups" in models_template
+    assert "optgroup label=\"{{ model_group.label }}\"" in models_template
+    assert "Show Advanced Models" in models_template
+    assert "Refresh Model List" in models_template
+    assert "Available Models:" in models_template
+    assert "Last Refreshed:" in models_template
+    assert "Source:" in models_template
+    assert "Model not currently available to this API key" in models_template
     assert "type=\"text\"" not in models_template
     assert "account_panel=\"chatgpt_models\"" in route
-    assert "OPENAI_MODEL_CHOICES" in service
-    assert '"model_choices": model_choices' in service
+    assert "OPENAI_MODEL_CHOICES" not in service
+    assert "fetch_openai_models_from_api" in service
+    assert "openai_model_list(force_refresh=force_refresh)" in service
+    assert '"model_groups": choices["groups"]' in service
     assert ".chatgpt-models-card" in css
     assert "background: transparent;" in css
     assert ".user-chatgpt-models-divider" in css
     assert ".chatgpt-models-header-actions" in css
+    assert ".chatgpt-model-status-banner" in css
+    assert ".chatgpt-model-refresh-btn" in css
+    assert ".chatgpt-model-warning-badge" in css
     assert ".chatgpt-model-row select" in css
     assert "function toggleChatGptModelsPanel(open = null)" in script
     assert "[data-chatgpt-models-panel]" in script

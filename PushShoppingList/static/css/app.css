@@ -17382,6 +17382,33 @@ body {
     white-space: nowrap;
 }
 
+.chatgpt-model-status-banner {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    padding: 10px 12px;
+    border: 1px solid #2d4157;
+    border-radius: 8px;
+    background: #07111c;
+    color: #dceeff;
+    font-size: 12px;
+    font-weight: 900;
+}
+
+.chatgpt-model-status-banner span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding-right: 10px;
+    border-right: 1px solid #284058;
+}
+
+.chatgpt-model-status-banner span:last-child {
+    border-right: 0;
+    padding-right: 0;
+}
+
 .admin-support-messages,
 .chatgpt-model-messages {
     display: grid;
@@ -17412,9 +17439,54 @@ body {
     color: #bbf7d0;
 }
 
+.chatgpt-model-message.warning {
+    border-color: #b45309;
+    background: #351c05;
+    color: #fde68a;
+}
+
 .chatgpt-model-form {
     display: grid;
     gap: 12px;
+}
+
+.chatgpt-model-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.chatgpt-model-advanced-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 38px;
+    color: #e5edf5;
+    font-size: 13px;
+    font-weight: 900;
+}
+
+.chatgpt-model-advanced-toggle input {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: #155a92;
+}
+
+.chatgpt-model-refresh-btn {
+    width: auto;
+    min-height: 38px;
+    margin-top: 0;
+    padding: 0 12px;
+    border: 1px solid #245b8e;
+    border-radius: 8px;
+    background: #101820;
+    color: #dceeff;
+    font-size: 13px;
+    font-weight: 900;
+    cursor: pointer;
 }
 
 .chatgpt-model-grid {
@@ -17481,11 +17553,26 @@ body {
     font-size: 14px;
 }
 
+.chatgpt-model-row select option,
+.chatgpt-model-row select optgroup {
+    background: #1b1f1f;
+    color: #f5f7f7;
+}
+
 .chatgpt-model-row code {
     display: flex;
     align-items: center;
     color: #bfdbfe;
     overflow-wrap: anywhere;
+}
+
+.chatgpt-model-row label .chatgpt-model-warning-badge {
+    color: #fde68a;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0;
+    line-height: 1.25;
+    text-transform: none;
 }
 
 .chatgpt-model-meta {
@@ -18818,6 +18905,24 @@ body {
         align-self: flex-start;
     }
 
+    .chatgpt-model-status-banner,
+    .chatgpt-model-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .chatgpt-model-status-banner span {
+        border-right: 0;
+        border-bottom: 1px solid #284058;
+        padding-right: 0;
+        padding-bottom: 6px;
+    }
+
+    .chatgpt-model-status-banner span:last-child {
+        border-bottom: 0;
+        padding-bottom: 0;
+    }
+
     .admin-support-form,
     .admin-support-detail-grid,
     .admin-support-detail-grid div,
@@ -18826,6 +18931,7 @@ body {
     }
 
     .admin-support-submit-btn,
+    .chatgpt-model-refresh-btn,
     .chatgpt-model-save-btn {
         width: 100%;
     }

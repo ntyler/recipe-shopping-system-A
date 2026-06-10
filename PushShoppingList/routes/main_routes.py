@@ -126,16 +126,27 @@ def update_chatgpt_models_route():
             "error": "Admin access is required.",
         }), 403
 
-    result = update_openai_model_settings_for_admin(user, request.form)
-    if result.get("ok"):
+    show_advanced_models = request.form.get("show_advanced_models") == "1"
+    refresh_models = request.form.get("action") == "refresh_models"
+
+    if refresh_models:
+        session["chatgpt_model_force_refresh"] = True
+        session["chatgpt_model_show_advanced"] = show_advanced_models
         session["chatgpt_model_messages"] = [
-            {"category": "success", "text": "Chat GPT model settings updated."}
+            {"category": "success", "text": "Refreshing OpenAI model list."}
         ]
     else:
-        session["chatgpt_model_messages"] = [
-            {"category": "error", "text": error}
-            for error in result.get("errors", ["Unable to update Chat GPT model settings."])
-        ]
+        result = update_openai_model_settings_for_admin(user, request.form)
+        if result.get("ok"):
+            session["chatgpt_model_show_advanced"] = show_advanced_models
+            session["chatgpt_model_messages"] = [
+                {"category": "success", "text": "Chat GPT model settings updated."}
+            ]
+        else:
+            session["chatgpt_model_messages"] = [
+                {"category": "error", "text": error}
+                for error in result.get("errors", ["Unable to update Chat GPT model settings."])
+            ]
 
     return redirect(url_for("main_bp.index", account_panel="chatgpt_models", _anchor="chatGptModelsSection"))
 
@@ -1427,6 +1438,18 @@ def index():
 
     admin_support_history = support_access_notices_for_user(active_public_user, limit=None)
 
+    chatgpt_force_refresh = bool(session.pop("chatgpt_model_force_refresh", False))
+    chatgpt_show_advanced = bool(session.get("chatgpt_model_show_advanced", False))
+    chatgpt_models_dashboard = chatgpt_models_dashboard_for_user(
+        active_public_user,
+        show_advanced_models=chatgpt_show_advanced,
+        force_refresh=chatgpt_force_refresh,
+    )
+    chatgpt_models_dashboard["messages"] = [
+        *session.pop("chatgpt_model_messages", []),
+        *chatgpt_models_dashboard.get("messages", []),
+    ]
+
     return render_template(
         "index.html",
         message="",
@@ -1475,10 +1498,7 @@ def index():
         food_rule_status=shopping_item_food_rule_status,
         feedback_dashboard=feedback_dashboard_for_user(active_public_user),
         openai_usage_dashboard=openai_usage_dashboard_for_user(active_public_user),
-        chatgpt_models_dashboard={
-            **chatgpt_models_dashboard_for_user(active_public_user),
-            "messages": session.pop("chatgpt_model_messages", []),
-        },
+        chatgpt_models_dashboard=chatgpt_models_dashboard,
         feedback_messages=session.pop("feedback_messages", []),
         admin_support_dashboard=admin_support_dashboard_for_user(
             active_public_user,

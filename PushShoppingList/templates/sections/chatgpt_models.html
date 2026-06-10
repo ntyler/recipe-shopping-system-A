@@ -22,6 +22,12 @@
         </div>
     </div>
 
+    <div class="chatgpt-model-status-banner">
+        <span>Available Models: {{ model_dashboard.available_models_count }}</span>
+        <span>Last Refreshed: {{ model_dashboard.last_refreshed_display }}</span>
+        <span>Source: {{ model_dashboard.model_list_source }}</span>
+    </div>
+
     {% if model_dashboard.messages %}
         <div class="chatgpt-model-messages" aria-live="polite">
             {% for message in model_dashboard.messages %}
@@ -33,6 +39,21 @@
     <form class="chatgpt-model-form"
           method="POST"
           action="{{ url_for('main_bp.update_chatgpt_models_route') }}">
+        <div class="chatgpt-model-toolbar">
+            <label class="chatgpt-model-advanced-toggle">
+                <input type="checkbox"
+                       name="show_advanced_models"
+                       value="1"
+                       {% if model_dashboard.show_advanced_models %}checked{% endif %}>
+                <span>Show Advanced Models</span>
+            </label>
+            <button type="submit"
+                    class="secondary chatgpt-model-refresh-btn"
+                    name="action"
+                    value="refresh_models">
+                Refresh Model List
+            </button>
+        </div>
         <div class="chatgpt-model-grid">
             {% for row in model_dashboard.rows %}
                 <div class="chatgpt-model-row">
@@ -47,13 +68,20 @@
                     <label>
                         <span>Active Model</span>
                         <select name="model_{{ row.env_var }}">
-                            {% for model_choice in row.model_choices %}
-                                <option value="{{ model_choice }}"
-                                        {% if model_choice == row.model %}selected{% endif %}>
-                                    {{ model_choice }}
-                                </option>
+                            {% for model_group in row.model_groups %}
+                                <optgroup label="{{ model_group.label }}">
+                                    {% for model_choice in model_group.models %}
+                                        <option value="{{ model_choice }}"
+                                                {% if model_choice == row.model %}selected{% endif %}>
+                                            {{ model_choice }}{% if model_choice == row.model and not row.selected_available %} ⚠{% endif %}
+                                        </option>
+                                    {% endfor %}
+                                </optgroup>
                             {% endfor %}
                         </select>
+                        {% if not row.selected_available %}
+                            <span class="chatgpt-model-warning-badge">{{ row.unavailable_warning }}</span>
+                        {% endif %}
                     </label>
                     <div class="chatgpt-model-meta">
                         <span>Default: {{ row.default_model }}</span>
