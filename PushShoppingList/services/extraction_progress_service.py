@@ -63,16 +63,23 @@ def save_progress(progress):
         return progress
 
 
-def start_progress(urls, job_id=None):
+def start_progress(urls, job_id=None, extraction_mode="recipe"):
     with PROGRESS_LOCK:
         urls = [str(url).strip() for url in urls if str(url).strip()]
         job_id = job_id or new_job_id()
+        extraction_mode = str(extraction_mode or "recipe").strip().lower()
+        is_menu_extract = extraction_mode in {"menu", "menu_extract", "menu-extract"}
         progress = {
             "active": True,
             "job_id": job_id,
+            "extraction_mode": "menu_extract" if is_menu_extract else "recipe",
             "status": "running",
             "cancel_requested": False,
-            "summary": "Fetching recipe page and extracting ingredients.",
+            "summary": (
+                "Fetching menu page and extracting menu items."
+                if is_menu_extract
+                else "Fetching recipe page and extracting ingredients."
+            ),
             "current_index": 0,
             "total": len(urls),
             "percent": 10 if urls else 0,
@@ -101,12 +108,21 @@ def mark_url_running(job_id, urls, index):
         progress["active"] = True
         progress["status"] = "running"
         progress["current_index"] = index
-        progress["summary"] = "Fetching recipe page and extracting ingredients."
+        is_menu_extract = progress.get("extraction_mode") == "menu_extract"
+        progress["summary"] = (
+            "Fetching menu page and extracting menu items."
+            if is_menu_extract
+            else "Fetching recipe page and extracting ingredients."
+        )
         progress["percent"] = progress_percent(index, progress["total"])
 
         if 0 <= index < len(progress["urls"]):
             progress["urls"][index]["state"] = "running"
-            progress["urls"][index]["message"] = "extracting - Running recipe extractor..."
+            progress["urls"][index]["message"] = (
+                "extracting - Running menu extractor..."
+                if is_menu_extract
+                else "extracting - Running recipe extractor..."
+            )
 
         return save_progress(progress)
 
@@ -141,7 +157,10 @@ def mark_url_done(job_id, urls, index, ingredients_count):
 
         if 0 <= index < len(progress["urls"]):
             progress["urls"][index]["state"] = "done"
-            progress["urls"][index]["message"] = f"done - {ingredients_count} ingredients extracted"
+            if progress.get("extraction_mode") == "menu_extract":
+                progress["urls"][index]["message"] = f"done - {ingredients_count} menu item recipes created"
+            else:
+                progress["urls"][index]["message"] = f"done - {ingredients_count} ingredients extracted"
             progress["urls"][index]["ingredients_count"] = ingredients_count
 
         progress["percent"] = progress_percent(completed_count(progress), progress["total"])

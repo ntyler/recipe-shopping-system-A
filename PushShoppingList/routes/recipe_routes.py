@@ -483,6 +483,76 @@ def schedule_generated_recipe_pdf_creation(recipe_url, context="import"):
     }
 
 
+def _menu_progress(progress_callback, message, summary=""):
+    if progress_callback:
+        progress_callback(message, summary)
+
+
+def ensure_menu_recipe_serving_basis_estimate(recipe_url, recipe_result):
+    recipe_url = str(recipe_url or "").strip()
+    recipe_payload = (
+        recipe_result.get("raw")
+        if isinstance(recipe_result, dict) and isinstance(recipe_result.get("raw"), dict)
+        else {}
+    )
+
+    if not recipe_payload:
+        try:
+            loaded_recipe = load_editable_recipe(recipe_url) or {}
+            recipe_payload = loaded_recipe.get("recipe") if isinstance(loaded_recipe, dict) else {}
+        except Exception:
+            recipe_payload = {}
+
+    recipe_payload = recipe_payload if isinstance(recipe_payload, dict) else {}
+
+    if not recipe_payload:
+        return {
+            "ok": False,
+            "recipe_url": recipe_url,
+            "error": "Recipe payload is required before estimating serving basis.",
+        }
+
+    if _has_per_serving_estimate(recipe_payload.get("nutrition")):
+        return {
+            "ok": True,
+            "recipe_url": recipe_url,
+            "already_complete": True,
+        }
+
+    estimate_result = estimate_recipe_nutrition(recipe_payload)
+    if not estimate_result.get("ok"):
+        return {
+            **estimate_result,
+            "ok": False,
+            "recipe_url": recipe_url,
+        }
+
+    updated_recipe = {
+        **recipe_payload,
+        "nutrition": estimate_result.get("nutrition", []),
+    }
+    save_result = save_editable_recipe(recipe_url, updated_recipe)
+    if not save_result.get("ok"):
+        return {
+            "ok": False,
+            "recipe_url": recipe_url,
+            "error": save_result.get("error") or "Unable to save estimated serving basis.",
+            "recipe_json": updated_recipe,
+        }
+
+    if isinstance(recipe_result, dict):
+        recipe_result["raw"] = updated_recipe
+        recipe_result["nutrition"] = updated_recipe.get("nutrition", [])
+
+    return {
+        **estimate_result,
+        "ok": True,
+        "estimated": True,
+        "recipe_url": recipe_url,
+        "recipe_json": updated_recipe,
+    }
+
+
 def require_account_for_import(wants_json=False):
     """Keep recipe imports bound to a signed-in user's scoped storage."""
     if current_user():
@@ -801,7 +871,7 @@ def extract_recipe_route():
     ]
 
     job_id = new_job_id()
-    start_progress(urls, job_id=job_id)
+    start_progress(urls, job_id=job_id, extraction_mode="menu_extract" if menu_extract else "recipe")
     cookbook = selected_import_cookbook_from_form(request.form)
     log_selected_import_cookbook("form-url", cookbook)
 
@@ -854,10 +924,14 @@ def extract_recipe_route():
                     result,
                     cookbook,
                     context="form-menu-url",
+                    progress_callback=progress_callback,
                 )
                 if committed.get("ok"):
                     extracted_any = True
-                    mark_url_done(job_id, urls, index, committed.get("created_count", 0))
+                    if committed.get("partial_failure"):
+                        mark_url_failed(job_id, urls, index, committed.get("error") or "Some menu items failed.")
+                    else:
+                        mark_url_done(job_id, urls, index, committed.get("created_count", 0))
                 else:
                     mark_url_failed(job_id, urls, index, committed.get("error") or "No menu item recipes were created.")
                 continue
@@ -1101,7 +1175,10 @@ def commit_media_import_result(result, cookbook, recipe_url="", context="media-u
             or ""
         ).strip()
         if _should_auto_generate_recipe_pdf(recipe_url, extraction_source):
-            pdf_job = schedule_generated_recipe_pdf_creation(recipe_url, context=context)
+            if context == "media-upload":
+                pdf_job = schedule_generated_recipe_pdf_creation(recipe_url, context="media-upload")
+            else:
+                pdf_job = schedule_generated_recipe_pdf_creation(recipe_url, context=context)
             result = {
                 **result,
                 "generated_recipe_pdf_job": pdf_job,
@@ -1118,7 +1195,7 @@ def commit_media_import_result(result, cookbook, recipe_url="", context="media-u
     return result
 
 
-def commit_menu_import_result(result, cookbook, context="menu-import"):
+def commit_menu_import_result(result, cookbook, context="menu-import", progress_callback=None):
     result = result if isinstance(result, dict) else {}
     recipes = result.get("recipes") if isinstance(result.get("recipes"), list) else []
     existing_keys = {
@@ -1127,7 +1204,18 @@ def commit_menu_import_result(result, cookbook, context="menu-import"):
     }
     committed = []
     newly_created = []
+    new_recipe_entries = []
     category_statuses = []
+    serving_basis_statuses = []
+    pdf_statuses = []
+    source_pdf_statuses = []
+    commit_failures = []
+
+    _menu_progress(
+        progress_callback,
+        "Predicting ingredients",
+        "Saving inferred menu item ingredients into the recipe pipeline.",
+    )
 
     for recipe_result in recipes:
         if not isinstance(recipe_result, dict):
@@ -1136,6 +1224,11 @@ def commit_menu_import_result(result, cookbook, context="menu-import"):
         recipe_url = str(recipe_result.get("source_url") or "").strip()
         ingredients = recipe_result.get("ingredients") if isinstance(recipe_result.get("ingredients"), list) else []
         if not recipe_url or not recipe_result.get("ok") or not ingredients:
+            commit_failures.append({
+                "item_name": recipe_result.get("menu_item_name") or recipe_result.get("recipe_title") or recipe_url,
+                "error_code": "MENU_ITEM_COMMIT_SKIPPED",
+                "error_message": "Menu item recipe was missing a recipe URL, success flag, or ingredients.",
+            })
             continue
 
         recipe_key = normalize_recipe_url_key(recipe_url)
@@ -1158,25 +1251,24 @@ def commit_menu_import_result(result, cookbook, context="menu-import"):
 
         if is_new_recipe:
             newly_created.append(recipe_url)
-            category_status = apply_imported_recipe_category_routine(
-                recipe_url,
-                recipe_result,
-                assignment,
-            )
+            new_recipe_entries.append({
+                "url": recipe_url,
+                "result": recipe_result,
+                "assignment": assignment,
+            })
         else:
             print(
                 "[recipe_import_category] action=skipped "
                 f"title={import_recipe_title(recipe_result, recipe_url)} "
                 f"url={recipe_url} reason=existing_recipe"
             )
-            category_status = {
+            category_statuses.append({
                 "ok": False,
                 "title": import_recipe_title(recipe_result, recipe_url),
                 "status": "skipped_existing_recipe",
                 "error": "",
-            }
+            })
 
-        category_statuses.append(category_status)
         record_recipe_import_activity(recipe_url, recipe_result, context)
         committed.append(recipe_url)
         existing_keys.add(recipe_key)
@@ -1184,8 +1276,107 @@ def commit_menu_import_result(result, cookbook, context="menu-import"):
     if committed:
         sort_ingredients()
 
+    if new_recipe_entries:
+        _menu_progress(
+            progress_callback,
+            "Predicting equipment",
+            "Normalizing equipment for the newly inferred menu item recipes.",
+        )
+
+        _menu_progress(
+            progress_callback,
+            "Estimating serving basis",
+            "Running the existing per-serving estimate routine for new menu item recipes.",
+        )
+        for entry in new_recipe_entries:
+            try:
+                serving_basis_statuses.append(
+                    ensure_menu_recipe_serving_basis_estimate(entry["url"], entry["result"])
+                )
+            except Exception as exc:
+                serving_basis_statuses.append({
+                    "ok": False,
+                    "recipe_url": entry["url"],
+                    "error": str(exc),
+                })
+
+        _menu_progress(
+            progress_callback,
+            "Generating PDFs",
+            "Creating generated recipe PDFs for the new menu item recipes.",
+        )
+        for entry in new_recipe_entries:
+            recipe_url = entry["url"]
+            try:
+                source_pdf_statuses.append({
+                    "recipe_url": recipe_url,
+                    "result": create_source_url_pdf(recipe_url),
+                })
+            except Exception as exc:
+                source_pdf_statuses.append({
+                    "recipe_url": recipe_url,
+                    "ok": False,
+                    "error": str(exc),
+                })
+
+            _menu_progress(
+                progress_callback,
+                "Uploading PDFs",
+                f"Creating and uploading PDF for {import_recipe_title(entry['result'], recipe_url)}.",
+            )
+            try:
+                pdf_result = run_generated_recipe_pdf_creation(recipe_url, context=context)
+            except Exception as exc:
+                pdf_result = {
+                    "ok": False,
+                    "error": str(exc),
+                }
+            pdf_statuses.append({
+                "recipe_url": recipe_url,
+                "ok": bool(pdf_result.get("ok")),
+                "generated_pdf_path": (
+                    pdf_result.get("generated_pdf_path")
+                    or pdf_result.get("generated_recipe_pdf_path")
+                    or pdf_result.get("pdf_path")
+                    or ""
+                ),
+                "generated_cloudflare_pdf_url": (
+                    pdf_result.get("generated_cloudflare_pdf_url")
+                    or pdf_result.get("generated_recipe_pdf_url")
+                    or pdf_result.get("pdf_public_url")
+                    or pdf_result.get("public_url")
+                    or ""
+                ),
+                "error": pdf_result.get("error", ""),
+                "result": pdf_result,
+            })
+
+        _menu_progress(
+            progress_callback,
+            "Categorizing new recipes",
+            "Running Have ChatGPT Decide All only for newly created menu item recipes.",
+        )
+        for entry in new_recipe_entries:
+            recipe_url = entry["url"]
+            category_status = apply_imported_recipe_category_routine(
+                recipe_url,
+                entry["result"],
+                entry["assignment"],
+            )
+            category_statuses.append(category_status)
+
     category_success_count = sum(1 for status in category_statuses if status.get("ok"))
+    pdf_success_count = sum(1 for status in pdf_statuses if status.get("ok"))
+    pdf_upload_count = sum(
+        1
+        for status in pdf_statuses
+        if str(status.get("generated_cloudflare_pdf_url") or "").strip()
+    )
     ok = bool(committed)
+    item_failures = [
+        *(result.get("item_failures") if isinstance(result.get("item_failures"), list) else []),
+        *commit_failures,
+    ]
     result = {
         **result,
         "ok": ok,
@@ -1196,6 +1387,13 @@ def commit_menu_import_result(result, cookbook, context="menu-import"):
         "committed_recipe_urls": committed,
         "created_recipe_urls": newly_created,
         "category_statuses": category_statuses,
+        "serving_basis_statuses": serving_basis_statuses,
+        "source_pdf_statuses": source_pdf_statuses,
+        "pdf_statuses": pdf_statuses,
+        "pdfs_generated": pdf_success_count,
+        "pdfs_uploaded": pdf_upload_count,
+        "item_failures": item_failures,
+        "partial_failure": bool(item_failures),
         "category_status": {
             "ok": True,
             "status": "updated",
@@ -1209,6 +1407,14 @@ def commit_menu_import_result(result, cookbook, context="menu-import"):
     if not ok:
         result["error"] = result.get("error") or "No menu item recipes were created."
         result["error_message"] = result.get("error_message") or result["error"]
+    elif item_failures:
+        result["error"] = (
+            f"Created {len(newly_created)} new menu item recipe"
+            f"{'' if len(newly_created) == 1 else 's'}, "
+            f"but {len(item_failures)} menu item"
+            f"{'' if len(item_failures) == 1 else 's'} failed."
+        )
+        result["error_message"] = result["error"]
     return result
 
 
@@ -2185,15 +2391,20 @@ def api_extract_recipe_route():
                 result,
                 cookbook,
                 context="api-menu-url",
+                progress_callback=progress_callback,
             )
             if not committed.get("ok"):
                 progress = mark_url_failed(job_id, urls, index, committed.get("error") or "No menu item recipes were created.")
                 finish_batch_if_ready(job_id, progress)
                 return jsonify(with_openai_usage_dashboard(committed)), 400
 
-            progress = mark_url_done(job_id, urls, index, committed.get("created_count", 0))
+            if committed.get("partial_failure"):
+                progress = mark_url_failed(job_id, urls, index, committed.get("error") or "Some menu items failed.")
+            else:
+                progress = mark_url_done(job_id, urls, index, committed.get("created_count", 0))
             finish_batch_if_ready(job_id, progress)
-            return jsonify(with_openai_usage_dashboard(committed))
+            status = 207 if committed.get("partial_failure") else 200
+            return jsonify(with_openai_usage_dashboard(committed)), status
 
         ingredients = result.get("ingredients", [])
 
@@ -2265,7 +2476,8 @@ def api_start_extract_progress_route():
     cookbook = selected_import_cookbook_from_json(data)
     log_selected_import_cookbook("api-url-batch", cookbook)
 
-    return jsonify(start_progress(urls, job_id=job_id))
+    extraction_mode = str(data.get("extraction_mode") or "").strip().lower()
+    return jsonify(start_progress(urls, job_id=job_id, extraction_mode=extraction_mode))
 
 
 @recipe_bp.route("/api/extract_progress", methods=["GET"])

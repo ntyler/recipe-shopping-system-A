@@ -122,6 +122,21 @@ def test_menu_import_category_routine_only_runs_for_new_recipes(monkeypatch):
         "apply_imported_recipe_category_routine",
         lambda url, result, assignment: categorized.append(url) or {"ok": True, "status": "updated"},
     )
+    monkeypatch.setattr(
+        recipe_routes,
+        "ensure_menu_recipe_serving_basis_estimate",
+        lambda url, result: {"ok": True, "recipe_url": url, "already_complete": True},
+    )
+    monkeypatch.setattr(
+        recipe_routes,
+        "create_source_url_pdf",
+        lambda url: {"ok": True, "recipe_url": url},
+    )
+    monkeypatch.setattr(
+        recipe_routes,
+        "run_generated_recipe_pdf_creation",
+        lambda url, context="test": {"ok": True, "pdf_path": f"{url}.pdf"},
+    )
     monkeypatch.setattr(recipe_routes, "record_recipe_import_activity", lambda *args, **kwargs: None)
     monkeypatch.setattr(recipe_routes, "sort_ingredients", lambda: None)
 
@@ -152,5 +167,6 @@ def test_menu_import_category_routine_only_runs_for_new_recipes(monkeypatch):
     assert result["created_count"] == 1
     assert result["committed_count"] == 2
     assert result["created_recipe_urls"] == [new_url]
+    assert result["pdfs_generated"] == 1
     assert saved == [existing_url, new_url]
     assert categorized == [new_url]

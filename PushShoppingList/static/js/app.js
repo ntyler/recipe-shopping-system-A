@@ -21091,6 +21091,7 @@ function progressStatusText(progress) {
     }
 
     const total = progress.total || 0;
+    const isMenuExtract = progress.extraction_mode === "menu_extract";
 
     if (!total) {
         return "Starting...";
@@ -21100,7 +21101,9 @@ function progressStatusText(progress) {
         return item.state === "done" || item.state === "failed" || item.state === "cancelled";
     }).length;
 
-    return `Downloading recipes ${completed} of ${total} complete...`;
+    return isMenuExtract
+        ? `Extracting menus ${completed} of ${total} complete...`
+        : `Downloading recipes ${completed} of ${total} complete...`;
 }
 
 function updateExtractionActionButtons(progress) {
@@ -21118,9 +21121,11 @@ function updateExtractionActionButtons(progress) {
             !progress.active &&
             (progress.urls || []).some(item => item.state !== "done")
         );
+        const isMenuExtract = progress && progress.extraction_mode === "menu_extract";
 
         redoBtn.style.display = hasMissing ? "inline-flex" : "none";
         redoBtn.disabled = !hasMissing;
+        redoBtn.textContent = isMenuExtract ? "Redo Failed Menu Items" : "Redo Missing";
     }
 }
 

@@ -20,6 +20,7 @@ from datetime import timezone
 from pathlib import Path
 from typing import Optional
 from urllib.parse import quote
+from urllib.parse import parse_qs
 from urllib.parse import unquote
 from urllib.parse import urljoin
 from urllib.parse import urlparse
@@ -94,6 +95,7 @@ VISION_MODEL_DEFAULT = "gpt-5.5"
 VISION_MODEL_FALLBACK = "gpt-4o-mini"
 OPENAI_RECIPE_MODEL_DEFAULT = "gpt-4o-mini"
 OPENAI_MENU_MODEL_DEFAULT = "gpt-5.5"
+MENU_ITEM_INFERENCE_MODEL = "gpt-5.5"
 OPENAI_PING_TEXT_MODEL = os.getenv("OPENAI_PING_TEXT_MODEL", "gpt-4o-mini")
 VISION_REQUEST_TIMEOUT_SECONDS = _safe_int(
     os.getenv("OPENAI_VISION_REQUEST_TIMEOUT_SECONDS", "120"),
@@ -9186,6 +9188,396 @@ def send_menu_file_prompt_to_openai(prompt_text, file_path, mime_type, filename)
     return response.choices[0].message.content
 
 
+def menu_item_recipe_model_resolution():
+    return OpenAIModelResolution(
+        model=MENU_ITEM_INFERENCE_MODEL,
+        source="forced:menu_item_inference",
+        purpose="menu",
+    )
+
+
+def menu_page_request_headers():
+    return {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/147.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+    }
+
+
+def fetch_menu_page_html(menu_url):
+    response = requests.get(menu_url, headers=menu_page_request_headers(), timeout=(8, 20))
+    response.raise_for_status()
+    return response.text
+
+
+def menu_page_visible_text(html_text):
+    soup = BeautifulSoup(html_text or "", "html.parser")
+    for tag in soup(["script", "style", "noscript", "svg"]):
+        tag.decompose()
+    page_text = soup.get_text(" ", strip=True)
+    page_text = re.sub(r"\s+", " ", page_text).strip()
+    return page_text[:MAX_PAGE_TEXT_CHARS]
+
+
+def extract_cartana_restaurant_id(menu_url, html_text=""):
+    parsed = urlparse(str(menu_url or ""))
+    query = parse_qs(parsed.query or "")
+    for key in ("resInput", "restaurantId", "resIdInput"):
+        values = query.get(key)
+        if values and str(values[0] or "").strip():
+            return str(values[0]).strip()
+
+    match = re.search(r"\bresInput\s*=\s*['\"]?([A-Za-z0-9_-]+)", str(html_text or ""))
+    if match:
+        return match.group(1).strip()
+
+    match = re.search(r"showRestaurantObj\(['\"]([^'\"]+)['\"]\)", str(html_text or ""))
+    if match:
+        return match.group(1).strip()
+
+    return ""
+
+
+def cartana_menu_api_url(menu_url):
+    parsed = urlparse(str(menu_url or ""))
+    if not parsed.scheme or not parsed.netloc:
+        return ""
+    base_path = parsed.path.rsplit("/", 1)[0] + "/"
+    return urlunparse((
+        parsed.scheme,
+        parsed.netloc,
+        urljoin(base_path, "getRestaurantMenu_home.action"),
+        "",
+        "",
+        "",
+    ))
+
+
+def fetch_cartana_menu_payload(menu_url, html_text=""):
+    restaurant_id = extract_cartana_restaurant_id(menu_url, html_text)
+    api_url = cartana_menu_api_url(menu_url)
+    if not restaurant_id or not api_url:
+        return None, {
+            "ok": False,
+            "error": "Cartana menu endpoint or restaurant id was not found.",
+            "restaurant_id": restaurant_id,
+            "api_url": api_url,
+        }
+
+    headers = {
+        **menu_page_request_headers(),
+        "Accept": "application/json, text/javascript, */*; q=0.01",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": menu_url,
+    }
+    response = requests.post(
+        api_url,
+        data={"resInput": restaurant_id},
+        headers=headers,
+        timeout=(8, 30),
+    )
+    response.raise_for_status()
+    return response.json(), {
+        "ok": True,
+        "restaurant_id": restaurant_id,
+        "api_url": api_url,
+    }
+
+
+def clean_menu_price(value):
+    if value in (None, ""):
+        return ""
+    try:
+        return f"${float(value):.2f}"
+    except (TypeError, ValueError):
+        return clean_recipe_text(value)
+
+
+def parse_cartana_menu_sections(payload, source_url):
+    sections = []
+    raw_sections = payload if isinstance(payload, list) else []
+
+    for section_index, section in enumerate(raw_sections):
+        if not isinstance(section, dict):
+            continue
+
+        menu_data = (
+            section.get("menu", {}).get("menuData")
+            if isinstance(section.get("menu"), dict)
+            else {}
+        )
+        menu_data = menu_data if isinstance(menu_data, dict) else {}
+        section_name = clean_recipe_text(
+            menu_data.get("enMenuTitle")
+            or menu_data.get("menuTitle")
+            or section.get("section_name")
+            or section.get("name")
+            or f"Menu Section {section_index + 1}"
+        )
+        section_description = clean_recipe_text(
+            menu_data.get("enMenuText")
+            or menu_data.get("menuText")
+            or ""
+        )
+        items = []
+
+        for item_index, item in enumerate(section.get("itemList") or []):
+            if not isinstance(item, dict):
+                continue
+
+            item_data = item.get("menuItemData") if isinstance(item.get("menuItemData"), dict) else {}
+            item_name = clean_recipe_text(
+                item_data.get("enItemTitle")
+                or item_data.get("itemTitle")
+                or item.get("name")
+                or item.get("title")
+                or ""
+            )
+            if not item_name:
+                continue
+
+            description = clean_recipe_text(
+                item_data.get("enItemText")
+                or item_data.get("itemText")
+                or item.get("description")
+                or ""
+            )
+            price = clean_menu_price(item.get("price") or item_data.get("price"))
+            items.append({
+                "item_name": item_name,
+                "menu_section": section_name,
+                "section_description": section_description,
+                "description": description,
+                "price": price,
+                "source_url": source_url,
+                "menu_item_id": clean_recipe_text(item.get("menuItemId") or ""),
+                "menu_id": clean_recipe_text(section.get("menu", {}).get("menuId") if isinstance(section.get("menu"), dict) else ""),
+                "is_spicy": bool(item.get("isSpicy")),
+                "is_veggie": bool(item.get("isVeggie")),
+                "index": item_index,
+            })
+
+        if items:
+            sections.append({
+                "section_name": section_name,
+                "description": section_description,
+                "items": items,
+            })
+
+    return sections
+
+
+def flatten_menu_sections(sections):
+    return [
+        item
+        for section in (sections or [])
+        if isinstance(section, dict)
+        for item in (section.get("items") or [])
+        if isinstance(item, dict)
+    ]
+
+
+def extract_structured_menu_items_from_html(html_text, source_url):
+    soup = BeautifulSoup(html_text or "", "html.parser")
+    sections = []
+
+    for script in soup.find_all("script"):
+        script_text = script.get_text("\n", strip=True)
+        if "getRestaurantMenu_home.action" not in script_text:
+            continue
+        try:
+            payload, _debug = fetch_cartana_menu_payload(source_url, html_text)
+            parsed = parse_cartana_menu_sections(payload, source_url)
+            if parsed:
+                return parsed, "cartana_api"
+        except Exception:
+            continue
+
+    current_section = None
+    for element in soup.find_all(["h2", "h3", "h4", "strong", "b", "li", "div"]):
+        text = clean_recipe_text(element.get_text(" ", strip=True))
+        if not text or len(text) > 220:
+            continue
+        classes = " ".join(element.get("class") or []).lower()
+        if element.name in {"h2", "h3", "h4"} or "menu-title" in classes or "category" in classes:
+            current_section = {"section_name": text, "description": "", "items": []}
+            sections.append(current_section)
+            continue
+        price_match = re.search(r"(?P<name>.+?)\s+\$?(?P<price>\d{1,3}(?:\.\d{2})?)$", text)
+        if price_match and current_section is not None:
+            current_section["items"].append({
+                "item_name": clean_recipe_text(price_match.group("name")),
+                "menu_section": current_section["section_name"],
+                "description": "",
+                "price": clean_menu_price(price_match.group("price")),
+                "source_url": source_url,
+            })
+
+    sections = [
+        section
+        for section in sections
+        if section.get("items")
+    ]
+    return sections, "html_heuristic" if sections else ""
+
+
+def build_menu_item_recipe_prompt(menu_url, item, index, total):
+    item = item if isinstance(item, dict) else {}
+    return f"""
+Infer a practical home-cooking recipe from one restaurant menu item.
+
+This is not the restaurant's exact recipe. Mark the result clearly as AI-inferred.
+
+Menu source URL: {menu_url}
+Menu item {index + 1} of {total}
+Section/category: {item.get("menu_section") or ""}
+Section description: {item.get("section_description") or ""}
+Item name: {item.get("item_name") or ""}
+Menu description: {item.get("description") or ""}
+Price: {item.get("price") or ""}
+Spicy flag: {item.get("is_spicy")}
+Vegetarian flag: {item.get("is_veggie")}
+
+Infer:
+- servings
+- serving basis
+- ingredients with plausible restaurant-style quantities
+- equipment
+- instructions
+- prep time and cook time when reasonable
+- nutrition estimate if reasonable
+- confidence notes when uncertain
+
+Return ONLY valid JSON using this shape:
+{{
+  "recipe": {{
+    "display_name": "{item.get("item_name") or "Menu Item"}",
+    "recipe_title": "{item.get("item_name") or "Menu Item"}",
+    "recipe_amount": "1 batch",
+    "servings": 4,
+    "level": "Intermediate",
+    "total_time": "45 minutes",
+    "prep_time": "15 minutes",
+    "inactive_time": "",
+    "cook_time": "30 minutes",
+    "source_type": "menu_item_inferred",
+    "ai_inferred": true,
+    "ingredients": [
+      {{
+        "quantity": "1",
+        "unit": "pound",
+        "ingredient": "example ingredient",
+        "preparation": "prepared",
+        "original_text": "1 pound example ingredient, prepared"
+      }}
+    ],
+    "equipment": [
+      {{"name": "large skillet"}}
+    ],
+    "instructions": [
+      {{
+        "step": 1,
+        "instruction": "Cook the dish."
+      }}
+    ],
+    "nutrition": {{
+      "serving_basis": "per serving (estimated)",
+      "calories": null,
+      "protein": null,
+      "carbohydrates": null,
+      "fat": null
+    }},
+    "extraction_confidence": 0.6,
+    "confidence_notes": [
+      "AI-inferred from a restaurant menu item, not an exact restaurant recipe."
+    ]
+  }}
+}}
+"""
+
+
+def send_menu_item_recipe_prompt_to_openai(prompt_text, action_name="menu-item-recipe-inference"):
+    model_resolution = menu_item_recipe_model_resolution()
+    payload, temperature_included, resolved_model = build_openai_chat_payload(
+        model_resolution.model,
+        action_name,
+        [
+            {
+                "role": "system",
+                "content": (
+                    "You infer practical, clearly labeled AI-inferred recipes from restaurant menu items. "
+                    "Return only valid JSON."
+                ),
+            },
+            {
+                "role": "user",
+                "content": prompt_text,
+            },
+        ],
+        response_format={"type": "json_object"},
+        temperature=0,
+    )
+    print(
+        f"[OpenAI] action={action_name} "
+        f"model={resolved_model} model_source={model_resolution.source} "
+        f"temperature_included={temperature_included}"
+    )
+    response = get_openai_client().chat.completions.create(**payload)
+    record_openai_usage(response, action_name, model=resolved_model)
+    return response.choices[0].message.content
+
+
+def infer_menu_item_recipe(menu_url, item, index, total):
+    model_resolution = menu_item_recipe_model_resolution()
+    action_name = "menu-item-recipe-inference"
+    try:
+        response_text = send_menu_item_recipe_prompt_to_openai(
+            build_menu_item_recipe_prompt(menu_url, item, index, total),
+            action_name=action_name,
+        )
+        payload = json.loads(clean_json_response(response_text))
+        recipe = payload.get("recipe") if isinstance(payload, dict) and isinstance(payload.get("recipe"), dict) else payload
+        if not isinstance(recipe, dict):
+            raise ValueError("Menu item inference did not return a recipe object.")
+        return recipe, {
+            "ok": True,
+            "model": model_resolution.model,
+            "model_source": model_resolution.source,
+            "raw_response": response_text,
+        }
+    except Exception as exc:
+        error_code, error_message = classify_vision_ai_exception(exc)
+        openai_error_code, openai_error_param = get_openai_error_code_and_param(exc)
+        print(
+            "[OpenAI] action=menu-item-recipe-inference_exception "
+            f"item={item.get('item_name') if isinstance(item, dict) else ''!r} "
+            f"model={model_resolution.model} model_source={model_resolution.source} "
+            f"exception_type={type(exc).__name__} error={exc} "
+            f"openai_error_code={openai_error_code or 'n/a'} "
+            f"openai_error_param={openai_error_param or 'n/a'}"
+        )
+        return None, {
+            "ok": False,
+            "item_name": item.get("item_name") if isinstance(item, dict) else "",
+            "menu_section": item.get("menu_section") if isinstance(item, dict) else "",
+            "error_code": error_code,
+            "error_message": error_message or str(exc),
+            "technical_message": str(exc),
+            "exception_type": type(exc).__name__,
+            "openai_error_code": openai_error_code,
+            "openai_error_param": openai_error_param,
+            "model": model_resolution.model,
+            "model_source": model_resolution.source,
+        }
+
+
 def menu_item_source_url(menu_url, title, index):
     base_url = str(menu_url or "").split("#", 1)[0].strip() or "menu-item://uploaded-menu"
     slug = quote(safe_filename(title or f"menu item {index + 1}")[:90])
@@ -9268,10 +9660,51 @@ def normalize_menu_item_recipe(recipe, menu_url, section_name, item_name, index,
     if not notes:
         notes = ["AI-inferred from a restaurant menu item."]
     recipe["confidence_notes"] = notes
-    recipe["source_url"] = menu_item_source_url(menu_url, title, index)
+    recipe["source_url"] = str(menu_url or "").strip()
+    recipe["recipe_record_url"] = menu_item_source_url(menu_url, title, index)
     normalize_extracted_recipe_identity(recipe)
     normalize_extracted_ingredient_fields(recipe)
     normalize_extracted_equipment_fields(recipe)
+    return recipe
+
+
+def attach_menu_item_metadata(recipe, menu_item):
+    recipe = recipe if isinstance(recipe, dict) else {}
+    menu_item = menu_item if isinstance(menu_item, dict) else {}
+    description = clean_recipe_text(menu_item.get("description") or "")
+    price = clean_recipe_text(menu_item.get("price") or "")
+    section = clean_recipe_text(menu_item.get("menu_section") or "")
+
+    recipe["menu_section"] = recipe.get("menu_section") or section
+    recipe["menu_item_name"] = recipe.get("menu_item_name") or clean_recipe_text(menu_item.get("item_name") or "")
+    recipe["menu_description"] = description
+    recipe["menu_price"] = price
+    recipe["source_metadata"] = {
+        **(recipe.get("source_metadata") if isinstance(recipe.get("source_metadata"), dict) else {}),
+        "source_type": "restaurant_menu",
+        "menu_section": section,
+        "menu_item_name": clean_recipe_text(menu_item.get("item_name") or ""),
+        "description": description,
+        "price": price,
+        "menu_item_id": clean_recipe_text(menu_item.get("menu_item_id") or ""),
+        "menu_id": clean_recipe_text(menu_item.get("menu_id") or ""),
+    }
+
+    if description or price:
+        notes = recipe.get("confidence_notes")
+        if not isinstance(notes, list):
+            notes = []
+        detail = "Menu details preserved: "
+        detail_parts = []
+        if description:
+            detail_parts.append(f"description={description}")
+        if price:
+            detail_parts.append(f"price={price}")
+        detail += "; ".join(detail_parts)
+        if detail not in notes:
+            notes.append(detail)
+        recipe["confidence_notes"] = notes
+
     return recipe
 
 
@@ -9326,7 +9759,7 @@ def build_menu_extract_result(
         )
         if not structured_recipe_data_is_usable(normalized):
             continue
-        recipe_url = normalized["source_url"]
+        recipe_url = normalized.get("recipe_record_url") or menu_item_source_url(source_url, normalized.get("recipe_title"), index)
         save_extracted_recipe_json(recipe_url, normalized)
         result = build_extract_result(recipe_url, normalized, "menu_extract")
         result["source_url"] = recipe_url
@@ -9388,6 +9821,223 @@ def build_menu_extract_result(
     }
 
 
+def menu_diagnostics_message(diagnostics, failures=None):
+    diagnostics = diagnostics if isinstance(diagnostics, dict) else {}
+    failures = failures if isinstance(failures, list) else []
+    parts = [
+        f"menu page fetched={'yes' if diagnostics.get('menu_page_fetched') else 'no'}",
+        f"rendered={'yes' if diagnostics.get('rendered_page_used') else 'no'}",
+        f"sections={int(diagnostics.get('menu_sections_found') or 0)}",
+        f"items={int(diagnostics.get('menu_items_found') or 0)}",
+        f"recipes_created={int(diagnostics.get('recipes_created') or 0)}",
+    ]
+    if failures:
+        parts.append(f"failed_items={len(failures)}")
+    if diagnostics.get("menu_fetch_error"):
+        parts.append(f"fetch_error={diagnostics.get('menu_fetch_error')}")
+    return "; ".join(parts)
+
+
+def build_menu_extract_result_from_items(
+    source_url,
+    sections,
+    source_name="",
+    source_type="menu_url",
+    extracted_text="",
+    diagnostics=None,
+    progress_callback=None,
+):
+    diagnostics = diagnostics if isinstance(diagnostics, dict) else {}
+    menu_items = flatten_menu_sections(sections)
+    model_resolution = menu_item_recipe_model_resolution()
+    raw_response_path = RAW_FOLDER / f"{safe_filename(source_url)}_MENU_ITEM_API_RESPONSES.jsonl"
+    failures = []
+    recipes = []
+    total_items = len(menu_items)
+
+    diagnostics.update({
+        "menu_sections_found": len(sections or []),
+        "menu_items_found": total_items,
+        "recipe_schema_found": False,
+        "model": model_resolution.model,
+        "model_source": model_resolution.source,
+    })
+
+    if not total_items:
+        message = (
+            "No visible menu items were found. "
+            + menu_diagnostics_message(diagnostics)
+        )
+        return {
+            "ok": False,
+            "success": False,
+            "source_url": source_url,
+            "source_name": source_name,
+            "source_type": source_type,
+            "extracted_text": extracted_text,
+            "menu_extract": True,
+            "recipes": [],
+            "created_count": 0,
+            "error": message,
+            "error_code": "NO_MENU_ITEMS_FOUND",
+            "error_message": message,
+            "technical_message": menu_diagnostics_message(diagnostics),
+            "model": model_resolution.model,
+            "model_used": model_resolution.model,
+            "model_source": model_resolution.source,
+            "debug": diagnostics,
+            "menu_sections_found": 0,
+            "menu_items_found": 0,
+            "recipes_created": 0,
+            "pdfs_generated": 0,
+            "item_failures": [],
+        }
+
+    if progress_callback:
+        progress_callback(
+            "Inferring recipes with GPT-5.5",
+            f"Creating one AI-inferred recipe for each of {total_items} menu items.",
+        )
+
+    raw_response_path.write_text("", encoding="utf-8")
+    for index, menu_item in enumerate(menu_items):
+        if progress_callback:
+            progress_callback(
+                f"Inferring recipes with GPT-5.5 ({index + 1}/{total_items})",
+                clean_recipe_text(
+                    f"{menu_item.get('menu_section')}: {menu_item.get('item_name')}"
+                ),
+            )
+
+        recipe, inference = infer_menu_item_recipe(source_url, menu_item, index, total_items)
+        with raw_response_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps({
+                "index": index,
+                "item": menu_item,
+                "ok": bool(inference.get("ok")),
+                "response": inference.get("raw_response", ""),
+                "error": inference if not inference.get("ok") else {},
+            }, ensure_ascii=False) + "\n")
+
+        if not recipe:
+            failures.append(inference)
+            continue
+
+        recipe = attach_menu_item_metadata(recipe, menu_item)
+        normalized = normalize_menu_item_recipe(
+            recipe,
+            source_url,
+            menu_item.get("menu_section", ""),
+            menu_item.get("item_name", ""),
+            index,
+            source_name=source_name,
+        )
+        normalized["model"] = model_resolution.model
+        normalized["model_used"] = model_resolution.model
+        normalized["model_source"] = model_resolution.source
+
+        if not structured_recipe_data_is_usable(normalized):
+            failures.append({
+                "ok": False,
+                "item_name": menu_item.get("item_name", ""),
+                "menu_section": menu_item.get("menu_section", ""),
+                "error_code": "NO_USABLE_INFERRED_RECIPE",
+                "error_message": "GPT returned a menu item recipe without usable ingredients and instructions.",
+                "model": model_resolution.model,
+                "model_source": model_resolution.source,
+            })
+            continue
+
+        recipe_url = normalized.get("recipe_record_url") or menu_item_source_url(source_url, normalized.get("recipe_title"), index)
+        save_extracted_recipe_json(recipe_url, normalized)
+        result = build_extract_result(recipe_url, normalized, "menu_extract")
+        result.update({
+            "source_url": recipe_url,
+            "menu_source_url": source_url,
+            "source_display_url": source_url,
+            "menu_section": normalized.get("menu_section", ""),
+            "menu_item_name": normalized.get("menu_item_name", ""),
+            "menu_description": normalized.get("menu_description", ""),
+            "menu_price": normalized.get("menu_price", ""),
+            "source_type": "menu_item_inferred",
+            "ai_inferred": True,
+            "model": model_resolution.model,
+            "model_used": model_resolution.model,
+            "model_source": model_resolution.source,
+        })
+        recipes.append(result)
+
+    diagnostics["recipes_created"] = len(recipes)
+    diagnostics["item_failures"] = failures
+    diagnostics["menu_sections"] = [
+        {
+            "section_name": section.get("section_name", ""),
+            "item_count": len(section.get("items") or []),
+        }
+        for section in sections
+        if isinstance(section, dict)
+    ]
+
+    if not recipes:
+        message = (
+            "Menu items were found, but no usable inferred recipes were created. "
+            + menu_diagnostics_message(diagnostics, failures)
+        )
+        return {
+            "ok": False,
+            "success": False,
+            "source_url": source_url,
+            "source_name": source_name,
+            "source_type": source_type,
+            "extracted_text": extracted_text,
+            "menu_extract": True,
+            "recipes": [],
+            "created_count": 0,
+            "error": message,
+            "error_code": "NO_USABLE_MENU_RECIPES",
+            "error_message": message,
+            "technical_message": menu_diagnostics_message(diagnostics, failures),
+            "model": model_resolution.model,
+            "model_used": model_resolution.model,
+            "model_source": model_resolution.source,
+            "debug": diagnostics,
+            "menu_sections_found": len(sections or []),
+            "menu_items_found": total_items,
+            "recipes_created": 0,
+            "pdfs_generated": 0,
+            "item_failures": failures,
+        }
+
+    return {
+        "ok": True,
+        "success": True,
+        "source_url": source_url,
+        "source_name": source_name,
+        "source_type": source_type,
+        "extracted_text": extracted_text,
+        "menu_extract": True,
+        "recipes": recipes,
+        "created_count": len(recipes),
+        "ingredients": [
+            ingredient
+            for recipe in recipes
+            for ingredient in recipe.get("ingredients", [])
+        ],
+        "model": model_resolution.model,
+        "model_used": model_resolution.model,
+        "model_source": model_resolution.source,
+        "raw_menu": {"menu_sections": sections},
+        "debug": diagnostics,
+        "menu_sections_found": len(sections or []),
+        "menu_items_found": total_items,
+        "recipes_created": len(recipes),
+        "pdfs_generated": 0,
+        "item_failures": failures,
+        "partial_failure": bool(failures),
+        "diagnostics_message": menu_diagnostics_message(diagnostics, failures),
+    }
+
+
 def extract_menu_recipes_from_url(menu_url, progress_callback=None):
     menu_url = str(menu_url or "").strip()
     if not menu_url:
@@ -9403,36 +10053,80 @@ def extract_menu_recipes_from_url(menu_url, progress_callback=None):
             if progress_callback:
                 progress_callback(message, summary)
 
-        report(
-            "downloading menu webpage HTML...",
-            "Opening the menu URL and reading visible menu text.",
-        )
-        html_text, page_text = fetch_recipe_page(menu_url, progress_callback=report)
-        if not page_text:
-            return {
-                "ok": False,
-                "source_url": menu_url,
-                "error": "No menu page text found.",
-                "recipes": [],
-                "created_count": 0,
-            }
+        diagnostics = {
+            "menu_page_fetched": False,
+            "rendered_page_used": False,
+            "menu_fetch_error": "",
+            "menu_extraction_source": "",
+        }
+        html_text = ""
+        page_text = ""
+        sections = []
 
         report(
-            "sending menu content to OpenAI API...",
-            "ChatGPT is extracting menu items and creating inferred recipes.",
+            "Fetching menu page",
+            "Opening the restaurant menu page.",
         )
-        response_text = send_menu_extraction_prompt_to_openai(
-            build_menu_extraction_prompt(menu_url, page_text),
-            action_name="menu-url-extraction",
+        try:
+            html_text = fetch_menu_page_html(menu_url)
+            diagnostics["menu_page_fetched"] = True
+            (RAW_FOLDER / f"{safe_filename(menu_url)}_MENU_PAGE_HTML.html").write_text(html_text, encoding="utf-8")
+            page_text = menu_page_visible_text(html_text)
+            (RAW_FOLDER / f"{safe_filename(menu_url)}_MENU_PAGE_TEXT.txt").write_text(page_text, encoding="utf-8")
+        except Exception as exc:
+            diagnostics["menu_fetch_error"] = str(exc)
+            print(f"[recipe_import] action=menu_page_fetch_failed url={menu_url} error={exc}")
+
+        report(
+            "Extracting menu items",
+            "Reading visible menu sections and items before recipe inference.",
         )
-        raw_api_path = RAW_FOLDER / f"{safe_filename(menu_url)}_MENU_API_RESPONSE.txt"
-        raw_api_path.write_text(response_text, encoding="utf-8")
-        return build_menu_extract_result(
+        if html_text:
+            try:
+                payload, cartana_debug = fetch_cartana_menu_payload(menu_url, html_text)
+                diagnostics["cartana_menu_api"] = cartana_debug
+                sections = parse_cartana_menu_sections(payload, menu_url)
+                diagnostics["menu_extraction_source"] = "cartana_api" if sections else ""
+            except Exception as exc:
+                diagnostics["cartana_menu_api"] = {
+                    "ok": False,
+                    "error": str(exc),
+                }
+                print(f"[recipe_import] action=cartana_menu_api_failed url={menu_url} error={exc}")
+
+        if not flatten_menu_sections(sections) and html_text:
+            fallback_sections, fallback_source = extract_structured_menu_items_from_html(html_text, menu_url)
+            if fallback_sections:
+                sections = fallback_sections
+                diagnostics["menu_extraction_source"] = fallback_source
+
+        if not flatten_menu_sections(sections) and os.getenv("DISABLE_BROWSER_RECIPE_FETCH") != "1":
+            report(
+                "Fetching menu page",
+                "The raw page did not expose menu items, so Chrome is rendering the menu.",
+            )
+            try:
+                rendered_html = fetch_recipe_page_with_browser(menu_url)
+                diagnostics["rendered_page_used"] = True
+                diagnostics["menu_page_fetched"] = True
+                (RAW_FOLDER / f"{safe_filename(menu_url)}_MENU_RENDERED_HTML.html").write_text(rendered_html, encoding="utf-8")
+                rendered_text = menu_page_visible_text(rendered_html)
+                if rendered_text:
+                    page_text = rendered_text
+                sections, fallback_source = extract_structured_menu_items_from_html(rendered_html, menu_url)
+                diagnostics["menu_extraction_source"] = fallback_source or diagnostics.get("menu_extraction_source", "")
+            except Exception as exc:
+                diagnostics["rendered_page_error"] = str(exc)
+                print(f"[recipe_import] action=menu_rendered_fetch_failed url={menu_url} error={exc}")
+
+        return build_menu_extract_result_from_items(
             menu_url,
-            response_text,
+            sections,
             source_name=menu_url,
             source_type="menu_url",
             extracted_text=page_text,
+            diagnostics=diagnostics,
+            progress_callback=report,
         )
     except Exception as exc:
         error_code, error_message = classify_vision_ai_exception(exc)
