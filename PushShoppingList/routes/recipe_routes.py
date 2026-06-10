@@ -32,12 +32,16 @@ from PushShoppingList.services.extraction_progress_service import start_progress
 from PushShoppingList.services.recipe_extract_service import extract_recipe_from_upload
 from PushShoppingList.services.recipe_extract_service import extract_recipe_cover_image_from_upload
 from PushShoppingList.services.recipe_extract_service import extract_recipe_from_url
+from PushShoppingList.services.recipe_extract_service import extract_menu_recipes_from_upload
+from PushShoppingList.services.recipe_extract_service import extract_menu_recipes_from_url
 from PushShoppingList.services.recipe_extract_service import generateRecipeFromImage
 from PushShoppingList.services.recipe_extract_service import build_vision_debug
 from PushShoppingList.services.recipe_extract_service import call_openai_vision_image
 from PushShoppingList.services.recipe_extract_service import MODEL
 from PushShoppingList.services.recipe_extract_service import OPENAI_PING_TEXT_MODEL
 from PushShoppingList.services.recipe_extract_service import openai_runtime_diagnostics
+from PushShoppingList.services.recipe_extract_service import resolve_menu_model
+from PushShoppingList.services.recipe_extract_service import resolve_menu_model_source
 from PushShoppingList.services.recipe_extract_service import resolve_vision_model
 from PushShoppingList.services.recipe_extract_service import resolve_vision_model_source
 from PushShoppingList.services.recipe_extract_service import classify_vision_ai_exception
@@ -672,6 +676,16 @@ def record_recipe_import_activity(url, result, source):
     )
 
 
+def import_request_is_menu_extract(source):
+    mode = str(
+        (source or {}).get("extraction_mode")
+        or (source or {}).get("import_mode")
+        or (source or {}).get("mode")
+        or ""
+    ).strip().lower()
+    return mode in {"menu", "menu_extract", "menu-extract"}
+
+
 def apply_imported_recipe_category_routine(url, recipe_metadata, assignment):
     url = str(url or "").strip()
     recipe_metadata = recipe_metadata if isinstance(recipe_metadata, dict) else {}
@@ -778,6 +792,7 @@ def extract_recipe_route():
         return account_response
 
     recipe_urls = request.form.get("recipe_urls", "")
+    menu_extract = import_request_is_menu_extract(request.form)
 
     urls = [
         line.strip()
@@ -798,16 +813,23 @@ def extract_recipe_route():
 
         mark_url_running(job_id, urls, index)
         try:
-            result = extract_recipe_from_url(
-                url,
-                progress_callback=lambda message, summary=None, idx=index: mark_url_message(
-                    job_id,
-                    urls,
-                    idx,
-                    message,
-                    summary,
-                ),
+            progress_callback = lambda message, summary=None, idx=index: mark_url_message(
+                job_id,
+                urls,
+                idx,
+                message,
+                summary,
             )
+            if menu_extract:
+                result = extract_menu_recipes_from_url(
+                    url,
+                    progress_callback=progress_callback,
+                )
+            else:
+                result = extract_recipe_from_url(
+                    url,
+                    progress_callback=progress_callback,
+                )
         except Exception as exc:
             mark_url_failed(job_id, urls, index, str(exc))
             continue
@@ -816,6 +838,30 @@ def extract_recipe_route():
             break
 
         try:
+            if menu_extract:
+                if not result.get("ok"):
+                    mark_url_failed(job_id, urls, index, result.get("error") or "Menu extraction failed.")
+                    continue
+
+                mark_url_message(
+                    job_id,
+                    urls,
+                    index,
+                    IMPORT_CATEGORY_STATUS_MESSAGE,
+                    summary="Generating categories for new menu item recipes.",
+                )
+                committed = commit_menu_import_result(
+                    result,
+                    cookbook,
+                    context="form-menu-url",
+                )
+                if committed.get("ok"):
+                    extracted_any = True
+                    mark_url_done(job_id, urls, index, committed.get("created_count", 0))
+                else:
+                    mark_url_failed(job_id, urls, index, committed.get("error") or "No menu item recipes were created.")
+                continue
+
             ingredients = result.get("ingredients", [])
 
             if result.get("ok") and ingredients:
@@ -869,6 +915,7 @@ def upload_recipe_media_route():
         or ""
     ).strip()
     upload_mode = str(request.form.get("upload_mode") or "").strip().lower()
+    menu_extract = import_request_is_menu_extract(request.form)
     normalized_upload_mode = upload_mode if upload_mode in {
         "auto",
         "read",
@@ -907,7 +954,30 @@ def upload_recipe_media_route():
         return redirect("/")
 
     cookbook = selected_import_cookbook_from_form(request.form)
-    log_selected_import_cookbook("media-upload", cookbook)
+    log_selected_import_cookbook("media-menu-upload" if menu_extract else "media-upload", cookbook)
+
+    if menu_extract:
+        result = extract_menu_recipes_from_upload(uploaded_file)
+        if result.get("ok"):
+            result = commit_menu_import_result(
+                result,
+                cookbook,
+                context="media-menu-upload",
+            )
+        if isinstance(result, dict):
+            result.setdefault("success", bool(result.get("ok")))
+            result.setdefault("menu_extract", True)
+            result.setdefault("extraction_method", "menu_extract")
+            result.setdefault("extraction_mode", "menu_extract")
+            result.setdefault("extraction_mode_label", "Menu Extract")
+            result.setdefault("model_used", result.get("model") or resolve_menu_model())
+            result.setdefault("model_source", result.get("model_source") or resolve_menu_model_source())
+
+        if wants_json:
+            status = 200 if result.get("ok") else 400
+            return jsonify(result), status
+
+        return redirect("/")
 
     result = extract_recipe_from_upload(
         uploaded_file,
@@ -1045,6 +1115,100 @@ def commit_media_import_result(result, cookbook, recipe_url="", context="media-u
         result["error"] = result.get("error") or NO_UPLOAD_INGREDIENTS_ERROR
         result["ok"] = False
 
+    return result
+
+
+def commit_menu_import_result(result, cookbook, context="menu-import"):
+    result = result if isinstance(result, dict) else {}
+    recipes = result.get("recipes") if isinstance(result.get("recipes"), list) else []
+    existing_keys = {
+        normalize_recipe_url_key(url)
+        for url in load_recipe_urls()
+    }
+    committed = []
+    newly_created = []
+    category_statuses = []
+
+    for recipe_result in recipes:
+        if not isinstance(recipe_result, dict):
+            continue
+
+        recipe_url = str(recipe_result.get("source_url") or "").strip()
+        ingredients = recipe_result.get("ingredients") if isinstance(recipe_result.get("ingredients"), list) else []
+        if not recipe_url or not recipe_result.get("ok") or not ingredients:
+            continue
+
+        recipe_key = normalize_recipe_url_key(recipe_url)
+        is_new_recipe = recipe_key not in existing_keys
+        add_items(ingredients)
+        save_ingredients_for_recipe(recipe_url, ingredients, recipe_result)
+        if recipe_result.get("display_name") or recipe_result.get("recipe_title"):
+            save_recipe_url_name(
+                recipe_url,
+                recipe_result.get("display_name") or recipe_result.get("recipe_title"),
+            )
+
+        add_recipe_urls([recipe_url])
+        assignment = save_import_cookbook_assignment(recipe_url, recipe_result, cookbook)
+        print(
+            "[recipe_import] action=menu_item_created "
+            f"title={import_recipe_title(recipe_result, recipe_url)} "
+            f"url={recipe_url} is_new_recipe={is_new_recipe}"
+        )
+
+        if is_new_recipe:
+            newly_created.append(recipe_url)
+            category_status = apply_imported_recipe_category_routine(
+                recipe_url,
+                recipe_result,
+                assignment,
+            )
+        else:
+            print(
+                "[recipe_import_category] action=skipped "
+                f"title={import_recipe_title(recipe_result, recipe_url)} "
+                f"url={recipe_url} reason=existing_recipe"
+            )
+            category_status = {
+                "ok": False,
+                "title": import_recipe_title(recipe_result, recipe_url),
+                "status": "skipped_existing_recipe",
+                "error": "",
+            }
+
+        category_statuses.append(category_status)
+        record_recipe_import_activity(recipe_url, recipe_result, context)
+        committed.append(recipe_url)
+        existing_keys.add(recipe_key)
+
+    if committed:
+        sort_ingredients()
+
+    category_success_count = sum(1 for status in category_statuses if status.get("ok"))
+    ok = bool(committed)
+    result = {
+        **result,
+        "ok": ok,
+        "success": ok,
+        "menu_extract": True,
+        "created_count": len(newly_created),
+        "committed_count": len(committed),
+        "committed_recipe_urls": committed,
+        "created_recipe_urls": newly_created,
+        "category_statuses": category_statuses,
+        "category_status": {
+            "ok": True,
+            "status": "updated",
+            "count": category_success_count,
+        },
+        "category_status_message": (
+            f"Generated categories for {category_success_count} new menu item recipe"
+            f"{'' if category_success_count == 1 else 's'}."
+        ),
+    }
+    if not ok:
+        result["error"] = result.get("error") or "No menu item recipes were created."
+        result["error_message"] = result.get("error_message") or result["error"]
     return result
 
 
@@ -1967,8 +2131,9 @@ def api_extract_recipe_route():
     ]
     job_id = str(data.get("job_id") or new_job_id())
     index = int(data.get("index", 0))
+    menu_extract = import_request_is_menu_extract(data)
     cookbook = selected_import_cookbook_from_json(data)
-    log_selected_import_cookbook("api-url", cookbook)
+    log_selected_import_cookbook("api-menu-url" if menu_extract else "api-url", cookbook)
 
     if not urls:
         urls = [url]
@@ -1982,19 +2147,53 @@ def api_extract_recipe_route():
         return jsonify({"ok": False, "cancelled": True, "error": "Extraction superseded."}), 409
 
     try:
-        result = extract_recipe_from_url(
-            url,
-            progress_callback=lambda message, summary=None: mark_url_message(
-                job_id,
-                urls,
-                index,
-                message,
-                summary,
-            ),
+        progress_callback = lambda message, summary=None: mark_url_message(
+            job_id,
+            urls,
+            index,
+            message,
+            summary,
         )
+        if menu_extract:
+            result = extract_menu_recipes_from_url(
+                url,
+                progress_callback=progress_callback,
+            )
+        else:
+            result = extract_recipe_from_url(
+                url,
+                progress_callback=progress_callback,
+            )
 
         if is_cancel_requested(job_id) or not is_current_job(job_id):
             return jsonify({"ok": False, "cancelled": True, "error": "Extraction cancelled."}), 409
+
+        if menu_extract:
+            if not result.get("ok"):
+                progress = mark_url_failed(job_id, urls, index, result.get("error") or "Menu extraction failed.")
+                finish_batch_if_ready(job_id, progress)
+                return jsonify(with_openai_usage_dashboard(result)), 400
+
+            mark_url_message(
+                job_id,
+                urls,
+                index,
+                IMPORT_CATEGORY_STATUS_MESSAGE,
+                summary="Generating categories for new menu item recipes.",
+            )
+            committed = commit_menu_import_result(
+                result,
+                cookbook,
+                context="api-menu-url",
+            )
+            if not committed.get("ok"):
+                progress = mark_url_failed(job_id, urls, index, committed.get("error") or "No menu item recipes were created.")
+                finish_batch_if_ready(job_id, progress)
+                return jsonify(with_openai_usage_dashboard(committed)), 400
+
+            progress = mark_url_done(job_id, urls, index, committed.get("created_count", 0))
+            finish_batch_if_ready(job_id, progress)
+            return jsonify(with_openai_usage_dashboard(committed))
 
         ingredients = result.get("ingredients", [])
 

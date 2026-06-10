@@ -15,7 +15,10 @@
     <h2 class="recipe-entry-heading">Enter Recipe Links</h2>
     <p class="helper-text recipe-entry-helper">Paste one recipe URL per line</p>
 
-    <form id="extractRecipeForm" onsubmit="startRecipeExtraction(event)">
+    <form id="extractRecipeForm"
+          method="POST"
+          action="/extract_recipe"
+          onsubmit="startRecipeExtraction(event)">
         <input type="hidden"
                name="cookbook_id"
                data-import-cookbook-id-field
@@ -95,7 +98,12 @@
     </div>
 
     <div class="recipe-import-actions">
-        <button class="extract-btn" type="submit" form="extractRecipeForm">Import Recipe URLs</button>
+        <button class="extract-btn recipe-import-action-url"
+                type="submit"
+                form="extractRecipeForm"
+                name="extraction_mode"
+                value="recipe"
+                data-extraction-mode="recipe">Import Recipe URLs</button>
 
         <form id="recipeMediaUploadForm"
               class="recipe-media-upload-form"
@@ -117,10 +125,20 @@
                    accept="image/*,application/pdf,.pdf,.doc,.docx,.txt,.md"
                    onchange="submitRecipeMediaUpload(this)"
                    hidden>
-            <button class="recipe-media-upload-btn" type="button" onclick="openRecipeMediaUpload()">
+            <button class="recipe-media-upload-btn recipe-import-action-upload" type="button" onclick="openRecipeMediaUpload('recipe')">
                 Import Doc / Photo
             </button>
+            <button class="recipe-media-upload-btn recipe-import-action-upload-menu" type="button" onclick="openRecipeMediaUpload('menu_extract')">
+                Import Doc / Photo (Menu Extract)
+            </button>
         </form>
+
+        <button class="extract-btn recipe-import-action-url-menu"
+                type="submit"
+                form="extractRecipeForm"
+                name="extraction_mode"
+                value="menu_extract"
+                data-extraction-mode="menu_extract">Import Recipe URLs (Menu Extract)</button>
     </div>
     <div id="recipeMediaUploadStatus" class="recipe-media-upload-status" aria-live="polite"></div>
 </div>

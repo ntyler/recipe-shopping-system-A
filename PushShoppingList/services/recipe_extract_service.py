@@ -19,9 +19,11 @@ from datetime import datetime
 from datetime import timezone
 from pathlib import Path
 from typing import Optional
+from urllib.parse import quote
 from urllib.parse import unquote
 from urllib.parse import urljoin
 from urllib.parse import urlparse
+from urllib.parse import urlunparse
 
 import openai
 import requests
@@ -7706,6 +7708,207 @@ def save_extracted_recipe_json(recipe_url, json_data):
     return json_path
 
 
+def extract_menu_recipes_from_upload(file_storage):
+    filename = Path(file_storage.filename or "uploaded-menu").name
+    safe_name = f"{uuid.uuid4().hex}_{safe_filename(filename)}"
+    upload_path = UPLOAD_FOLDER / safe_name
+    file_storage.save(upload_path)
+
+    recipe_url = f"uploaded-menu://{safe_name}"
+    mime_type = (
+        file_storage.mimetype
+        or mimetypes.guess_type(str(upload_path))[0]
+        or "application/octet-stream"
+    )
+    mime_type = normalize_upload_mime_type(mime_type, filename, upload_path)
+    upload_suffix = upload_file_suffix(filename, upload_path)
+    import_source_type = upload_import_source_type(mime_type, filename, upload_path)
+    extracted_text = ""
+    response_text = ""
+    debug_payload = {
+        "action": "menu-upload-extraction",
+        "source_type": import_source_type,
+        "filename": filename,
+        "mime_type": mime_type,
+        "model": resolve_menu_model(),
+        "model_source": resolve_menu_model_source(),
+    }
+
+    try:
+        if import_source_type == "image":
+            vision_debug = build_vision_debug(uploaded_file_path=str(upload_path), filename=filename, mime_type=mime_type)
+            vision_debug["action"] = "menu-image-extraction"
+            vision_result = call_openai_vision_image(
+                str(upload_path),
+                build_menu_extraction_prompt(filename),
+                "menu-image-extraction",
+                preferred_model=resolve_menu_model(),
+                debug=vision_debug,
+            )
+            debug_payload.update(vision_debug)
+            if not vision_result.ok:
+                return build_upload_failure_result(
+                    build_normalized_import_object(
+                        import_source_type,
+                        source_name=filename,
+                        source_url=recipe_url,
+                        uploaded_file_path=str(upload_path),
+                    ),
+                    vision_result.error_message or "Unable to extract menu items from this image.",
+                    failed_step="extract",
+                    extraction_method="menu_extract",
+                    action="menu-image-extraction",
+                    error_code=vision_result.error_code or "OPENAI_REQUEST_FAILED",
+                    technical_message=vision_result.technical_message or vision_result.error_message,
+                    model_used=vision_result.model_used,
+                    debug=debug_payload,
+                )
+            response_text = vision_result.text
+            debug_payload["model"] = vision_result.model_used
+            debug_payload["model_source"] = vision_result.model_source
+        elif upload_is_word_document(mime_type, filename, upload_path):
+            if upload_suffix == ".docx":
+                try:
+                    extracted_text = extract_text_from_generic_document(upload_path, filename)
+                except Exception as exc:
+                    extracted_text = ""
+                    print(
+                        "[recipe_import] action=menu_upload_word_text_failed "
+                        f"file={filename!r} error={exc}"
+                    )
+
+            converted_pdf_path, extracted_text = convert_word_upload_to_pdf(
+                recipe_url,
+                upload_path,
+                filename,
+                page_text=extracted_text,
+            )
+            if extracted_text.strip():
+                response_text = send_menu_extraction_prompt_to_openai(
+                    build_menu_extraction_prompt(filename, extracted_text),
+                    action_name="menu-document-text-extraction",
+                )
+            else:
+                response_text = send_menu_file_prompt_to_openai(
+                    build_menu_extraction_prompt(filename),
+                    converted_pdf_path,
+                    "application/pdf",
+                    f"{Path(filename).stem or 'uploaded-menu'}.pdf",
+                )
+        elif import_source_type == "pdf":
+            try:
+                extracted_text = extract_text_from_pdf(upload_path)
+            except Exception as exc:
+                extracted_text = ""
+                print(
+                    "[recipe_import] action=menu_upload_pdf_text_failed "
+                    f"file={filename!r} error={exc}"
+                )
+            if extracted_text.strip():
+                response_text = send_menu_extraction_prompt_to_openai(
+                    build_menu_extraction_prompt(filename, extracted_text),
+                    action_name="menu-document-text-extraction",
+                )
+            elif upload_can_use_openai_file_input(mime_type, filename, upload_path):
+                response_text = send_menu_file_prompt_to_openai(
+                    build_menu_extraction_prompt(filename),
+                    upload_path,
+                    mime_type,
+                    filename,
+                )
+            else:
+                return build_upload_failure_result(
+                    build_normalized_import_object(
+                        import_source_type,
+                        source_name=filename,
+                        source_url=recipe_url,
+                        uploaded_file_path=str(upload_path),
+                    ),
+                    NO_READABLE_UPLOAD_TEXT_ERROR,
+                    failed_step="read",
+                    extraction_method="menu_extract",
+                    action="menu-upload-extraction",
+                    error_code="OPENAI_REQUEST_FAILED",
+                    technical_message=NO_READABLE_UPLOAD_TEXT_ERROR,
+                    debug=debug_payload,
+                )
+        else:
+            extracted_text = extract_text_from_generic_document(upload_path, filename)
+            if not extracted_text.strip():
+                return build_upload_failure_result(
+                    build_normalized_import_object(
+                        import_source_type,
+                        source_name=filename,
+                        source_url=recipe_url,
+                        uploaded_file_path=str(upload_path),
+                    ),
+                    NO_READABLE_UPLOAD_TEXT_ERROR,
+                    failed_step="read",
+                    extraction_method="menu_extract",
+                    action="menu-upload-extraction",
+                    error_code="OPENAI_REQUEST_FAILED",
+                    technical_message=NO_READABLE_UPLOAD_TEXT_ERROR,
+                    debug=debug_payload,
+                )
+            response_text = send_menu_extraction_prompt_to_openai(
+                build_menu_extraction_prompt(filename, extracted_text),
+                action_name="menu-document-text-extraction",
+            )
+
+        raw_api_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_MENU_API_RESPONSE.txt"
+        raw_api_path.write_text(response_text, encoding="utf-8")
+        result = build_menu_extract_result(
+            recipe_url,
+            response_text,
+            source_name=filename,
+            source_type=f"menu_{import_source_type}",
+            uploaded_file_path=str(upload_path),
+            extracted_text=extracted_text,
+            model_used=str(debug_payload.get("model") or resolve_menu_model()),
+            model_source=str(debug_payload.get("model_source") or resolve_menu_model_source()),
+            debug=debug_payload,
+        )
+        result["source_type_label"] = upload_source_type_label(import_source_type)
+        result["source_name"] = filename
+        result["uploaded_file_path"] = str(upload_path)
+        result["extraction_method"] = "menu_extract"
+        result["extraction_mode"] = "menu_extract"
+        result["extraction_mode_label"] = "Menu Extract"
+        return result
+    except Exception as exc:
+        raw_error_path = RAW_FOLDER / f"{safe_filename(recipe_url)}_MENU_UPLOAD_ERROR.txt"
+        raw_error_path.write_text(str(exc), encoding="utf-8")
+        error_code, error_message = classify_vision_ai_exception(exc)
+        openai_error_code, error_param = get_openai_error_code_and_param(exc)
+        print(
+            "[recipe_import] action=menu_upload_extract_exception "
+            f"source_type={import_source_type} model={resolve_menu_model()} "
+            f"file={filename!r} error={exc}"
+        )
+        return build_upload_failure_result(
+            build_normalized_import_object(
+                import_source_type,
+                source_name=filename,
+                source_url=recipe_url,
+                uploaded_file_path=str(upload_path),
+                extracted_text=extracted_text,
+            ),
+            error_message or f"Menu upload extraction failed: {exc}",
+            failed_step="extract",
+            extraction_method="menu_extract",
+            action="menu-upload-extraction",
+            error_code=error_code,
+            technical_message=str(exc),
+            debug={
+                **debug_payload,
+                "openai_error_code": openai_error_code,
+                "openai_error_param": error_param,
+                "exception_type": type(exc).__name__,
+                "exception_message": str(exc),
+            },
+        )
+
+
 def extract_recipe_from_upload(file_storage, manual_description="", upload_mode="auto"):
     filename = Path(file_storage.filename or "uploaded-recipe").name
     safe_name = f"{uuid.uuid4().hex}_{safe_filename(filename)}"
@@ -8822,6 +9025,444 @@ def build_extract_result(recipe_url, json_data, extraction_method):
             "model": model_used,
         },
     }
+
+
+def build_menu_extraction_prompt(source_label, page_text=""):
+    page_text = str(page_text or "").strip()
+    visible_text = (
+        f"\nVisible menu text:\n{page_text[:MAX_PAGE_TEXT_CHARS]}\n"
+        if page_text
+        else "\nNo reliable text was extracted. Use visual/menu context if an image or file is provided.\n"
+    )
+    return f"""
+You are extracting a restaurant menu and creating practical home-cooking recipes.
+
+Source: {source_label}
+
+Tasks:
+1. Identify menu sections such as Appetizers, Salads, Entrees, Desserts, Drinks, or specials.
+2. Identify each real menu item in those sections.
+3. For every menu item, create one complete AI-inferred recipe using the app's existing recipe schema.
+
+Rules:
+- Use GPT-5.5-level reasoning to infer likely ingredients, equipment, and clear cooking steps.
+- Preserve the restaurant menu item name as the recipe title.
+- Include the menu section name on each recipe.
+- Set source_type to "menu_item_inferred" on every recipe.
+- Set ai_inferred to true on every recipe.
+- Do not include prices, allergens, descriptions, ads, hours, navigation text, or restaurant policy text as recipes.
+- Return only valid JSON.
+
+Return this JSON shape:
+{{
+  "menu_sections": [
+    {{
+      "section_name": "Entrees",
+      "items": [
+        {{
+          "item_name": "Chicken Marsala",
+          "menu_description": "Menu description if present",
+          "recipe": {{
+            "display_name": "Chicken Marsala",
+            "recipe_title": "Chicken Marsala",
+            "recipe_amount": "1 batch",
+            "servings": 4,
+            "level": "Intermediate",
+            "total_time": "45 minutes",
+            "prep_time": "15 minutes",
+            "inactive_time": "",
+            "cook_time": "30 minutes",
+            "source_type": "menu_item_inferred",
+            "ai_inferred": true,
+            "ingredients": [
+              {{
+                "quantity": "1",
+                "unit": "pound",
+                "ingredient": "chicken cutlets",
+                "preparation": "pounded thin",
+                "original_text": "1 pound chicken cutlets, pounded thin"
+              }}
+            ],
+            "equipment": [
+              {{"name": "large skillet"}}
+            ],
+            "instructions": [
+              {{
+                "step": 1,
+                "instruction": "Season and sear the chicken until browned."
+              }}
+            ],
+            "nutrition": {{
+              "serving_basis": "estimated per serving",
+              "calories": null,
+              "protein": null,
+              "carbohydrates": null,
+              "fat": null
+            }},
+            "extraction_confidence": 0.65,
+            "confidence_notes": [
+              "AI-inferred from a restaurant menu item."
+            ]
+          }}
+        }}
+      ]
+    }}
+  ]
+}}
+{visible_text}
+"""
+
+
+def send_menu_extraction_prompt_to_openai(prompt_text, action_name="menu-extraction"):
+    model_resolution = resolve_openai_model("menu")
+    payload, temperature_included, resolved_model = build_openai_chat_payload(
+        model_resolution.model,
+        action_name,
+        [
+            {
+                "role": "system",
+                "content": (
+                    "You extract restaurant menus and infer recipe JSON. "
+                    "Return only valid JSON."
+                ),
+            },
+            {
+                "role": "user",
+                "content": prompt_text,
+            },
+        ],
+        response_format={"type": "json_object"},
+        temperature=0,
+    )
+    print(
+        f"[OpenAI] action={action_name} "
+        f"model={resolved_model} model_source={model_resolution.source} "
+        f"temperature_included={temperature_included}"
+    )
+    response = get_openai_client().chat.completions.create(**payload)
+    record_openai_usage(response, action_name, model=resolved_model)
+    return response.choices[0].message.content
+
+
+def send_menu_file_prompt_to_openai(prompt_text, file_path, mime_type, filename):
+    file_bytes = Path(file_path).read_bytes()
+    file_data = base64.b64encode(file_bytes).decode("ascii")
+    model_resolution = resolve_openai_model("menu")
+    payload, temperature_included, resolved_model = build_openai_chat_payload(
+        model_resolution.model,
+        "menu-file-extraction",
+        [
+            {
+                "role": "system",
+                "content": (
+                    "You extract restaurant menus from uploaded files and infer recipe JSON. "
+                    "Return only valid JSON."
+                ),
+            },
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "file",
+                        "file": {
+                            "filename": filename,
+                            "file_data": f"data:{mime_type};base64,{file_data}",
+                        },
+                    },
+                    {"type": "text", "text": prompt_text},
+                ],
+            },
+        ],
+        response_format={"type": "json_object"},
+        temperature=0,
+    )
+    print(
+        "[OpenAI] action=menu-file-extraction "
+        f"model={resolved_model} model_source={model_resolution.source} "
+        f"temperature_included={temperature_included}"
+    )
+    response = get_openai_client().chat.completions.create(**payload)
+    record_openai_usage(response, "menu-file-extraction", model=resolved_model)
+    return response.choices[0].message.content
+
+
+def menu_item_source_url(menu_url, title, index):
+    base_url = str(menu_url or "").split("#", 1)[0].strip() or "menu-item://uploaded-menu"
+    slug = quote(safe_filename(title or f"menu item {index + 1}")[:90])
+    marker = f"menu-item-{index + 1}-{slug}"
+    parsed = urlparse(base_url)
+    if parsed.scheme and parsed.netloc:
+        query = f"{parsed.query}&menu_item={marker}" if parsed.query else f"menu_item={marker}"
+        return urlunparse((
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path,
+            parsed.params,
+            query,
+            "",
+        ))
+    separator = "&" if "?" in base_url else "?"
+    return f"{base_url}{separator}menu_item={marker}"
+
+
+def _iter_menu_recipe_entries(menu_payload):
+    payload = menu_payload if isinstance(menu_payload, dict) else {}
+    direct_recipes = payload.get("recipes")
+    if isinstance(direct_recipes, list):
+        for item in direct_recipes:
+            if isinstance(item, dict):
+                yield "", item.get("recipe_title") or item.get("display_name") or item.get("item_name") or "", item
+
+    sections = payload.get("menu_sections") or payload.get("sections") or []
+    if not isinstance(sections, list):
+        return
+
+    for section in sections:
+        if not isinstance(section, dict):
+            continue
+        section_name = clean_recipe_text(
+            section.get("section_name")
+            or section.get("name")
+            or section.get("title")
+            or ""
+        )
+        items = section.get("items") or section.get("menu_items") or []
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            item_name = clean_recipe_text(
+                item.get("item_name")
+                or item.get("name")
+                or item.get("title")
+                or ""
+            )
+            recipe = item.get("recipe") if isinstance(item.get("recipe"), dict) else item
+            yield section_name, item_name, recipe
+
+
+def normalize_menu_item_recipe(recipe, menu_url, section_name, item_name, index, source_name=""):
+    recipe = dict(recipe) if isinstance(recipe, dict) else {}
+    title = clean_recipe_text(
+        recipe.get("recipe_title")
+        or recipe.get("display_name")
+        or item_name
+        or f"Menu Item {index + 1}"
+    )
+    recipe["recipe_title"] = title
+    recipe["display_name"] = clean_recipe_text(recipe.get("display_name") or title)
+    recipe["source_type"] = "menu_item_inferred"
+    recipe["ai_inferred"] = True
+    recipe["menu_source_url"] = str(menu_url or "").strip()
+    recipe["source_display_url"] = str(menu_url or "").strip()
+    recipe["menu_section"] = clean_recipe_text(section_name)
+    recipe["menu_item_name"] = clean_recipe_text(item_name or title)
+    recipe["import_source_name"] = clean_recipe_text(source_name)
+    recipe["extraction_method"] = "menu_extract"
+    recipe["extraction_mode"] = "menu_extract"
+    recipe.setdefault("extraction_confidence", 0.65)
+    notes = recipe.get("confidence_notes")
+    if not isinstance(notes, list):
+        notes = []
+    if not notes:
+        notes = ["AI-inferred from a restaurant menu item."]
+    recipe["confidence_notes"] = notes
+    recipe["source_url"] = menu_item_source_url(menu_url, title, index)
+    normalize_extracted_recipe_identity(recipe)
+    normalize_extracted_ingredient_fields(recipe)
+    normalize_extracted_equipment_fields(recipe)
+    return recipe
+
+
+def build_menu_extract_result(
+    source_url,
+    response_text,
+    source_name="",
+    source_type="url",
+    uploaded_file_path="",
+    extracted_text="",
+    model_used="",
+    model_source="",
+    debug=None,
+):
+    model_used = str(model_used or resolve_menu_model()).strip() or resolve_menu_model()
+    model_source = str(model_source or resolve_menu_model_source()).strip() or resolve_menu_model_source()
+    try:
+        menu_payload = json.loads(clean_json_response(response_text))
+    except Exception as exc:
+        raw_error_path = RAW_FOLDER / f"{safe_filename(source_url)}_MENU_PARSE_ERROR.txt"
+        raw_error_path.write_text(str(response_text or ""), encoding="utf-8")
+        return {
+            "ok": False,
+            "success": False,
+            "source_url": source_url,
+            "source_name": source_name,
+            "source_type": source_type,
+            "uploaded_file_path": uploaded_file_path,
+            "extracted_text": extracted_text,
+            "menu_extract": True,
+            "recipes": [],
+            "created_count": 0,
+            "error": "Unable to parse menu extraction JSON.",
+            "error_code": "VISION_RESPONSE_PARSE_FAILED",
+            "error_message": "Unable to parse menu extraction JSON.",
+            "technical_message": str(exc),
+            "model": model_used,
+            "model_used": model_used,
+            "model_source": model_source,
+            "debug": debug if isinstance(debug, dict) else {},
+        }
+
+    recipes = []
+    for index, (section_name, item_name, recipe) in enumerate(_iter_menu_recipe_entries(menu_payload)):
+        normalized = normalize_menu_item_recipe(
+            recipe,
+            source_url,
+            section_name,
+            item_name,
+            index,
+            source_name=source_name,
+        )
+        if not structured_recipe_data_is_usable(normalized):
+            continue
+        recipe_url = normalized["source_url"]
+        save_extracted_recipe_json(recipe_url, normalized)
+        result = build_extract_result(recipe_url, normalized, "menu_extract")
+        result["source_url"] = recipe_url
+        result["menu_source_url"] = source_url
+        result["source_display_url"] = source_url
+        result["menu_section"] = normalized.get("menu_section", "")
+        result["menu_item_name"] = normalized.get("menu_item_name", "")
+        result["source_type"] = "menu_item_inferred"
+        result["ai_inferred"] = True
+        result["model"] = model_used
+        result["model_used"] = model_used
+        result["model_source"] = model_source
+        recipes.append(result)
+
+    if not recipes:
+        return {
+            "ok": False,
+            "success": False,
+            "source_url": source_url,
+            "source_name": source_name,
+            "source_type": source_type,
+            "uploaded_file_path": uploaded_file_path,
+            "extracted_text": extracted_text,
+            "menu_extract": True,
+            "recipes": [],
+            "created_count": 0,
+            "error": "No menu items with usable inferred recipes were found.",
+            "error_code": "NO_MENU_ITEMS_FOUND",
+            "error_message": "No menu items with usable inferred recipes were found.",
+            "technical_message": "The menu extraction response did not contain usable recipe ingredients and instructions.",
+            "model": model_used,
+            "model_used": model_used,
+            "model_source": model_source,
+            "raw_menu": menu_payload,
+            "debug": debug if isinstance(debug, dict) else {},
+        }
+
+    return {
+        "ok": True,
+        "success": True,
+        "source_url": source_url,
+        "source_name": source_name,
+        "source_type": source_type,
+        "uploaded_file_path": uploaded_file_path,
+        "extracted_text": extracted_text,
+        "menu_extract": True,
+        "recipes": recipes,
+        "created_count": len(recipes),
+        "ingredients": [
+            ingredient
+            for recipe in recipes
+            for ingredient in recipe.get("ingredients", [])
+        ],
+        "model": model_used,
+        "model_used": model_used,
+        "model_source": model_source,
+        "raw_menu": menu_payload,
+        "debug": debug if isinstance(debug, dict) else {},
+    }
+
+
+def extract_menu_recipes_from_url(menu_url, progress_callback=None):
+    menu_url = str(menu_url or "").strip()
+    if not menu_url:
+        return {
+            "ok": False,
+            "error": "Missing menu URL.",
+            "recipes": [],
+            "created_count": 0,
+        }
+
+    try:
+        def report(message, summary=None):
+            if progress_callback:
+                progress_callback(message, summary)
+
+        report(
+            "downloading menu webpage HTML...",
+            "Opening the menu URL and reading visible menu text.",
+        )
+        html_text, page_text = fetch_recipe_page(menu_url, progress_callback=report)
+        if not page_text:
+            return {
+                "ok": False,
+                "source_url": menu_url,
+                "error": "No menu page text found.",
+                "recipes": [],
+                "created_count": 0,
+            }
+
+        report(
+            "sending menu content to OpenAI API...",
+            "ChatGPT is extracting menu items and creating inferred recipes.",
+        )
+        response_text = send_menu_extraction_prompt_to_openai(
+            build_menu_extraction_prompt(menu_url, page_text),
+            action_name="menu-url-extraction",
+        )
+        raw_api_path = RAW_FOLDER / f"{safe_filename(menu_url)}_MENU_API_RESPONSE.txt"
+        raw_api_path.write_text(response_text, encoding="utf-8")
+        return build_menu_extract_result(
+            menu_url,
+            response_text,
+            source_name=menu_url,
+            source_type="menu_url",
+            extracted_text=page_text,
+        )
+    except Exception as exc:
+        error_code, error_message = classify_vision_ai_exception(exc)
+        openai_error_code, openai_error_param = get_openai_error_code_and_param(exc)
+        print(
+            "[OpenAI] action=menu-url-extraction_exception "
+            f"model={resolve_menu_model()} exception_type={type(exc).__name__} "
+            f"openai_error_code={openai_error_code or 'n/a'} "
+            f"openai_error_param={openai_error_param or 'n/a'} "
+            f"final_error_code={error_code}"
+        )
+        return {
+            "ok": False,
+            "success": False,
+            "source_url": menu_url,
+            "source_type": "menu_url",
+            "menu_extract": True,
+            "recipes": [],
+            "created_count": 0,
+            "error": error_message or str(exc),
+            "error_code": error_code,
+            "error_message": error_message or str(exc),
+            "technical_message": str(exc),
+            "exception_type": type(exc).__name__,
+            "openai_error_code": openai_error_code,
+            "openai_error_param": openai_error_param,
+            "model": resolve_menu_model(),
+            "model_used": resolve_menu_model(),
+            "model_source": resolve_menu_model_source(),
+        }
 
 
 def normalize_ingredient_key(text):

@@ -81,3 +81,76 @@ def test_import_cookbook_selector_static_hooks_are_present():
     assert "bindImportCookbookSelector()" in script
     assert "selected_import_cookbook_from_json(data)" in routes
     assert "save_import_cookbook_assignment(url, result, cookbook)" in routes
+
+
+def test_enter_recipe_links_has_four_independent_import_actions():
+    template = (ROOT / "PushShoppingList/templates/sections/enter_recipe_links.html").read_text(encoding="utf-8")
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    assert "Import Recipe URLs" in template
+    assert "Import Doc / Photo" in template
+    assert "Import Recipe URLs (Menu Extract)" in template
+    assert "Import Doc / Photo (Menu Extract)" in template
+    assert 'data-extraction-mode="menu_extract"' in template
+    assert "openRecipeMediaUpload('menu_extract')" in template
+    assert 'formData.set("import_mode", normalizedImportMode)' in script
+    assert 'extraction_mode: extractionMode' in script
+    assert "grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));" in css
+    assert ".recipe-import-action-url-menu { order: 3; }" in css
+    assert ".recipe-import-action-upload-menu { order: 4; }" in css
+
+
+def test_menu_import_category_routine_only_runs_for_new_recipes(monkeypatch):
+    existing_url = "https://example.com/menu?menu_item=menu-item-1-existing"
+    new_url = "https://example.com/menu?menu_item=menu-item-2-new"
+    categorized = []
+    saved = []
+
+    monkeypatch.setattr(recipe_routes, "load_recipe_urls", lambda: [existing_url])
+    monkeypatch.setattr(recipe_routes, "add_items", lambda ingredients: None)
+    monkeypatch.setattr(recipe_routes, "save_ingredients_for_recipe", lambda url, ingredients, result: saved.append(url))
+    monkeypatch.setattr(recipe_routes, "save_recipe_url_name", lambda url, name: None)
+    monkeypatch.setattr(recipe_routes, "add_recipe_urls", lambda urls: None)
+    monkeypatch.setattr(
+        recipe_routes,
+        "save_import_cookbook_assignment",
+        lambda url, result, cookbook: {"cookbook_id": cookbook["id"], "cookbook_name": cookbook["name"]},
+    )
+    monkeypatch.setattr(
+        recipe_routes,
+        "apply_imported_recipe_category_routine",
+        lambda url, result, assignment: categorized.append(url) or {"ok": True, "status": "updated"},
+    )
+    monkeypatch.setattr(recipe_routes, "record_recipe_import_activity", lambda *args, **kwargs: None)
+    monkeypatch.setattr(recipe_routes, "sort_ingredients", lambda: None)
+
+    result = recipe_routes.commit_menu_import_result(
+        {
+            "ok": True,
+            "menu_extract": True,
+            "recipes": [
+                {
+                    "ok": True,
+                    "source_url": existing_url,
+                    "display_name": "Existing",
+                    "ingredients": ["tomato"],
+                },
+                {
+                    "ok": True,
+                    "source_url": new_url,
+                    "display_name": "New",
+                    "ingredients": ["basil"],
+                },
+            ],
+        },
+        {"id": "cookbook-1", "name": "Dinner"},
+        context="test-menu-import",
+    )
+
+    assert result["ok"] is True
+    assert result["created_count"] == 1
+    assert result["committed_count"] == 2
+    assert result["created_recipe_urls"] == [new_url]
+    assert saved == [existing_url, new_url]
+    assert categorized == [new_url]

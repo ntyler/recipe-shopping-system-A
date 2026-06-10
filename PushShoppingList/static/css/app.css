@@ -420,14 +420,16 @@ body {
 
         .recipe-import-actions {
             display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 10px;
             margin-top: 10px;
+            align-items: stretch;
         }
 
         .recipe-media-upload-form {
             min-width: 0;
             margin-top: 0;
+            display: contents;
         }
 
         .recipe-media-upload-btn {
@@ -472,7 +474,20 @@ body {
         .recipe-import-actions .extract-btn,
         .recipe-import-actions .recipe-media-upload-btn {
             margin-top: 0;
+            min-height: 52px;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1.15;
+            white-space: normal;
+            word-break: normal;
         }
+
+        .recipe-import-action-url { order: 1; }
+        .recipe-import-action-upload { order: 2; }
+        .recipe-import-action-url-menu { order: 3; }
+        .recipe-import-action-upload-menu { order: 4; }
 
         .pdf-share-card {
             border: 0;

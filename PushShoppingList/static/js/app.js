@@ -1407,6 +1407,7 @@ let lastRenderedExtractProgress = null;
 let currentExtractAbortController = null;
 let currentExtractAbortControllers = [];
 let cancelExtractRequested = false;
+let lastRecipeUrlExtractionMode = "recipe";
 let productProgressTimer = null;
 let activeProductJobId = null;
 let activeProductPromptChoice = null;
@@ -5931,7 +5932,17 @@ async function deleteCookbook(button) {
     return false;
 }
 
-function openRecipeMediaUpload() {
+let recipeMediaImportMode = "recipe";
+
+function normalizeRecipeImportMode(mode) {
+    const normalized = String(mode || "recipe").trim().toLowerCase();
+    return (normalized === "menu" || normalized === "menu_extract" || normalized === "menu-extract")
+        ? "menu_extract"
+        : "recipe";
+}
+
+function openRecipeMediaUpload(importMode = "recipe") {
+    recipeMediaImportMode = normalizeRecipeImportMode(importMode);
     const input = document.getElementById("recipeMediaUploadInput");
 
     if (input) {
@@ -6119,12 +6130,14 @@ function resetRecipeFileImageNextSteps() {
     setRecipeFileImageNextStepsPanelVisible(false);
 }
 
-async function submitRecipeMediaUpload(input, manualDescription = "", uploadMode = "read_text") {
+async function submitRecipeMediaUpload(input, manualDescription = "", uploadMode = "read_text", importMode = null) {
     const form = document.getElementById("recipeMediaUploadForm");
     const status = document.getElementById("recipeMediaUploadStatus");
     const fileInput = input && input.files ? input : getRecipeMediaUploadInput();
     const photoDescription = String(manualDescription || "").trim();
     const normalizedUploadMode = normalizeRecipeUploadMode(uploadMode);
+    const normalizedImportMode = normalizeRecipeImportMode(importMode || recipeMediaImportMode);
+    const isMenuExtract = normalizedImportMode === "menu_extract";
     const selectedFile = fileInput && fileInput.files && fileInput.files.length
         ? fileInput.files[0]
         : null;
@@ -6151,7 +6164,7 @@ async function submitRecipeMediaUpload(input, manualDescription = "", uploadMode
     showRecipeFileLoadingOverlay(file.name, sourceTypeLabel, isImageUpload);
     setRecipeFileManualDescriptionPanelVisible(false);
     setRecipeFileEstimatedBanner(false);
-    setRecipeFileExtractionMode(isImageUpload ? recipeUploadModeLabel(normalizedUploadMode) : "N/A");
+    setRecipeFileExtractionMode(isMenuExtract ? "Menu Extract" : (isImageUpload ? recipeUploadModeLabel(normalizedUploadMode) : "N/A"));
     setRecipeFileActionButtonsEnabled(false);
     await waitForNextPaint();
 
@@ -6160,6 +6173,8 @@ async function submitRecipeMediaUpload(input, manualDescription = "", uploadMode
     formData.set("cookbook_id", destination.cookbookId || "");
     formData.set("cookbook_name", destination.cookbookName || "");
     formData.set("upload_mode", normalizedUploadMode);
+    formData.set("import_mode", normalizedImportMode);
+    formData.set("extraction_mode", normalizedImportMode);
 
     if (photoDescription) {
         formData.set("photo_description", photoDescription);
@@ -6171,7 +6186,12 @@ async function submitRecipeMediaUpload(input, manualDescription = "", uploadMode
     const isReadMode = !isImageUpload || normalizedUploadMode === "read_text";
 
     updateRecipeFileLoadingStep("upload", "running", "Uploading file");
-    if (isReadMode) {
+    if (isMenuExtract) {
+        updateRecipeFileLoadingStep("read", "running", "Reading menu");
+        updateRecipeFileLoadingStep("extract", "running", "Extracting menu items");
+        updateRecipeFileLoadingStep("estimate", "running", "Inferring recipes");
+        setRecipeFileLoadingSummary("Extracting menu items and creating inferred recipes...");
+    } else if (isReadMode) {
         updateRecipeFileLoadingStep("read", "running", "Reading file contents");
         updateRecipeFileLoadingStep("extract", "waiting", "Waiting");
         updateRecipeFileLoadingStep("estimate", "waiting", "Waiting");
@@ -6216,6 +6236,24 @@ async function submitRecipeMediaUpload(input, manualDescription = "", uploadMode
             const error = new Error((data && data.error) || "Unable to load file.");
             error.data = data;
             throw error;
+        }
+
+        if (data && data.menu_extract) {
+            const createdCount = Number(data.created_count || 0);
+            updateRecipeFileLoadingStep("read", "done", "Menu read");
+            updateRecipeFileLoadingStep("estimate", "done", "Recipes inferred");
+            updateRecipeFileLoadingStep("extract", "done", `${createdCount} recipe${createdCount === 1 ? "" : "s"} created`);
+            updateRecipeFileLoadingStep("save", "done", "Saved");
+            setRecipeFileExtractionMode("Menu Extract");
+            setRecipeFileLoadingSummary(
+                `Created ${createdCount} menu item recipe${createdCount === 1 ? "" : "s"}. Refreshing...`
+            );
+            if (status) {
+                status.textContent = `Created ${createdCount} menu item recipe${createdCount === 1 ? "" : "s"}.`;
+            }
+            await waitForNextPaint();
+            window.location.reload();
+            return;
         }
 
         if (isImageUpload && data && data.read_text_only) {
@@ -6435,7 +6473,8 @@ async function submitRecipeMediaDescription() {
         await submitRecipeMediaUpload(
             document.getElementById("recipeMediaUploadInput"),
             rawDescription,
-            "manual_description"
+            "manual_description",
+            "recipe"
         );
     } finally {
         if (submitButton) {
@@ -6455,7 +6494,7 @@ async function submitRecipeMediaDescribeImage() {
         : (String(uploadedFilePath || "").split(/[\\/]/).pop() || "uploaded file");
 
     if (!uploadedFilePath) {
-        await submitRecipeMediaUpload(fileInput, "", "read_text");
+        await submitRecipeMediaUpload(fileInput, "", "read_text", "recipe");
         return;
     }
 
@@ -6764,7 +6803,7 @@ async function createRecipePdfFromMediaImport() {
 }
 
 async function submitRecipeMediaReadText() {
-    await submitRecipeMediaUpload(getRecipeMediaUploadInput(), "", "read_text");
+    await submitRecipeMediaUpload(getRecipeMediaUploadInput(), "", "read_text", "recipe");
 }
 
 async function openImportedRecipeEditorAfterMediaImport(data = {}, options = {}) {
@@ -6940,7 +6979,7 @@ async function submitRecipeMediaVision() {
     const visionModeLabel = photoDescription ? "Vision + Description" : "Vision";
 
     if (!isImageUpload) {
-        await submitRecipeMediaUpload(fileInput, "", "vision");
+        await submitRecipeMediaUpload(fileInput, "", "vision", "recipe");
         return;
     }
 
@@ -7199,7 +7238,7 @@ async function submitRecipeMediaRetry() {
         return;
     }
 
-    await submitRecipeMediaUpload(getRecipeMediaUploadInput(), "", "retry");
+    await submitRecipeMediaUpload(getRecipeMediaUploadInput(), "", "retry", "recipe");
 }
 
 function setRecipeFileManualDescriptionPanelVisible(visible, message = "", description = "") {
@@ -20665,6 +20704,10 @@ async function startRecipeExtraction(event) {
     event.preventDefault();
 
     const textarea = document.getElementById("recipeUrlsTextarea");
+    const submitterMode = event && event.submitter
+        ? event.submitter.dataset.extractionMode || event.submitter.value || ""
+        : "";
+    const extractionMode = normalizeRecipeImportMode(submitterMode);
     const urls = textarea.value
         .split(/\r?\n/)
         .map(x => x.trim())
@@ -20675,10 +20718,13 @@ async function startRecipeExtraction(event) {
         return;
     }
 
-    await startRecipeExtractionUrls(urls);
+    await startRecipeExtractionUrls(urls, { extractionMode });
 }
 
-async function startRecipeExtractionUrls(urls) {
+async function startRecipeExtractionUrls(urls, options = {}) {
+    const extractionMode = normalizeRecipeImportMode(options.extractionMode || lastRecipeUrlExtractionMode);
+    const isMenuExtract = extractionMode === "menu_extract";
+    lastRecipeUrlExtractionMode = extractionMode;
     const destination = currentImportCookbookDestination();
     syncImportCookbookHiddenInputs(destination);
     console.log("[recipe_import] selected import cookbook", destination);
@@ -20728,8 +20774,12 @@ async function startRecipeExtractionUrls(urls) {
 
     await waitForNextPaint();
 
-    status.textContent = `Downloading ${urls.length} recipe${urls.length === 1 ? "" : "s"}...`;
-    summary.textContent = "Fetching recipe pages and extracting ingredients.";
+    status.textContent = isMenuExtract
+        ? `Downloading ${urls.length} menu page${urls.length === 1 ? "" : "s"}...`
+        : `Downloading ${urls.length} recipe${urls.length === 1 ? "" : "s"}...`;
+    summary.textContent = isMenuExtract
+        ? "Fetching menu pages, extracting menu items, and creating inferred recipes."
+        : "Fetching recipe pages and extracting ingredients.";
     if (bar) {
         bar.style.width = "10%";
     }
@@ -20744,6 +20794,7 @@ async function startRecipeExtractionUrls(urls) {
             job_id: jobId,
             cookbook_id: destination.cookbookId || "",
             cookbook_name: destination.cookbookName || "",
+            extraction_mode: extractionMode,
         }),
     });
     scheduleExtractionProgressPoll(250);
@@ -20756,7 +20807,9 @@ async function startRecipeExtractionUrls(urls) {
         const reason = row ? row.querySelector(".bulk-skip-reason") : null;
 
         if (reason) {
-            reason.textContent = "extracting - Running recipe extractor...";
+            reason.textContent = isMenuExtract
+                ? "extracting - Running menu extractor..."
+                : "extracting - Running recipe extractor...";
         }
 
         if (text) {
@@ -20780,6 +20833,7 @@ async function startRecipeExtractionUrls(urls) {
                 job_id: jobId,
                 cookbook_id: destination.cookbookId || "",
                 cookbook_name: destination.cookbookName || "",
+                extraction_mode: extractionMode,
             }),
         }).then(async response => {
             let data = {};
@@ -20789,7 +20843,7 @@ async function startRecipeExtractionUrls(urls) {
                 data = {};
             }
             syncOpenAiUsageDashboardFromResponse(data);
-            if (response.ok && data && data.ok !== false) {
+            if (!isMenuExtract && response.ok && data && data.ok !== false) {
                 scheduleOpenRecipeEditorPdfRefresh({
                     recipeUrl: url,
                     waitForGeneratedCloudflare: true,
