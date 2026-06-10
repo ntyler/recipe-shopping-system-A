@@ -812,16 +812,17 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn('aria-controls="screenSettingsCard"', account_template)
         self.assertIn("toggleScreenSettingsPanel()", account_template)
         self.assertIn("Screen Settings", screen_template)
-        self.assertIn("data-screen-settings-panel", screen_template)
-        self.assertIn("data-screen-settings-close", screen_template)
-        self.assertIn("toggleScreenSettingsPanel(false)", screen_template)
+        self.assertIn('id="screenSettingsCard"', screen_template)
+        self.assertNotIn("data-screen-settings-panel", screen_template)
+        self.assertNotIn("data-screen-settings-close", screen_template)
         self.assertIn('data-screen-mode-button="phone"', screen_template)
         self.assertIn('id="screenPreviewFrame"', screen_template)
         self.assertIn("body.screen-preview-active #appContent", css)
-        self.assertIn(".screen-settings-header", css)
         self.assertIn("screen_preview_frame", script)
         self.assertIn("setScreenPreviewMode", script)
         self.assertIn("function toggleScreenSettingsPanel(open = null)", script)
+        self.assertIn('document.getElementById("screenSettingsCard")', script)
+        self.assertIn("setCardCollapseContentCollapsed(content, false)", script)
 
     def test_recipe_cover_images_can_open_lightbox(self):
         current_recipe_template = Path(

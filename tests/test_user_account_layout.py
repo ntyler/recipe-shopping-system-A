@@ -244,7 +244,6 @@ def test_account_panels_remember_open_state_across_refreshes():
     for panel_key in (
         "accountSettings",
         "accountNotices",
-        "screenSettings",
         "usageDashboard",
         "chatGptModels",
         "twoFactor",
@@ -255,7 +254,6 @@ def test_account_panels_remember_open_state_across_refreshes():
     for selector in (
         "#userProfileEditForm",
         "[data-account-notices-panel]",
-        "[data-screen-settings-panel]",
         "[data-usage-dashboard-panel]",
         "[data-chatgpt-models-panel]",
         "[data-two-factor-panel]",

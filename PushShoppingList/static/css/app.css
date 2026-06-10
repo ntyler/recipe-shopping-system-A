@@ -185,30 +185,6 @@ body {
             max-width: min(1400px, calc(100vw - 32px));
         }
 
-        .screen-settings-header {
-            display: flex;
-            gap: 10px;
-            align-items: stretch;
-        }
-
-        .screen-settings-header .screen-settings-toggle {
-            flex: 1 1 auto;
-            min-width: 0;
-        }
-
-        .screen-settings-close {
-            flex: 0 0 auto;
-            min-height: 42px;
-            margin-top: 0;
-            padding: 0 14px;
-            border: 1px solid #245b8e;
-            border-radius: 8px;
-            background: #101820;
-            color: #dceeff;
-            font-weight: 900;
-            cursor: pointer;
-        }
-
         .screen-settings-content {
             display: grid;
             gap: 14px;
