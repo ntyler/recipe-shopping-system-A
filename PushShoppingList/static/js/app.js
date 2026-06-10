@@ -22,6 +22,7 @@ const USER_PROFILE_EDITOR_OPEN_KEY = "user-account-settings-open";
 const USER_ACCOUNT_REMEMBERED_PANEL_SELECTORS = {
     accountSettings: "#userProfileEditForm",
     accountNotices: "[data-account-notices-panel]",
+    screenSettings: "[data-screen-settings-panel]",
     usageDashboard: "[data-usage-dashboard-panel]",
     chatGptModels: "[data-chatgpt-models-panel]",
     sharedRecipePdfs: "[data-shared-recipe-pdfs-panel]",
@@ -37,6 +38,7 @@ const IMPORT_COOKBOOK_STORAGE_KEY = "import-recipe-cookbook-destination";
 const USER_ACCOUNT_PANEL_HASH_KEYS = {
     "#userProfileEditForm": "accountSettings",
     "#accountNoticesPanel": "accountNotices",
+    "#screenSettingsCard": "screenSettings",
     "#accountUsageDashboardPanel": "usageDashboard",
     "#chatGptModelsSection": "chatGptModels",
     "#sharedRecipePdfsSection": "sharedRecipePdfs",
@@ -1017,6 +1019,50 @@ function toggleAccountAccessHistory(button) {
 
     button.setAttribute("aria-expanded", open ? "true" : "false");
     button.textContent = open ? "Hide account access history" : "View account access history";
+    return false;
+}
+
+function toggleScreenSettingsPanel(open = null) {
+    const panel = document.querySelector("[data-screen-settings-panel]");
+
+    if (!panel) {
+        return false;
+    }
+
+    const accountMenu = document.querySelector("[data-account-menu]");
+    const closeAccountMenu = () => {
+        if (accountMenu) {
+            accountMenu.open = false;
+        }
+    };
+    const explicitState = typeof open === "boolean";
+    const isAlreadyOpen = !panel.hidden;
+
+    if (!explicitState && isAlreadyOpen) {
+        closeAccountMenu();
+        return false;
+    }
+
+    const shouldOpen = explicitState ? open : true;
+    panel.hidden = !shouldOpen;
+    rememberAccountPanelElement(panel, shouldOpen);
+
+    if (shouldOpen) {
+        closeAccountMenu();
+        hideRememberedAccountPanels(panel);
+
+        window.requestAnimationFrame(() => {
+            panel.scrollIntoView({ behavior: "smooth", block: "start" });
+            const firstControl = panel.querySelector("[data-screen-settings-close]")
+                || panel.querySelector("button, input, select, textarea");
+            if (firstControl) {
+                firstControl.focus({ preventScroll: true });
+            }
+        });
+    } else if (typeof scrollToUserAccountTop === "function") {
+        scrollToUserAccountTop("auto");
+    }
+
     return false;
 }
 

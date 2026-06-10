@@ -275,6 +275,20 @@
                             {% endif %}
                         </div>
 
+                        {% if current_user.is_admin %}
+                            <div class="user-account-menu-section">
+                                <div class="user-account-menu-section-title">DISPLAY</div>
+                                <button type="button"
+                                        class="user-account-menu-item"
+                                        role="menuitem"
+                                        aria-controls="screenSettingsCard"
+                                        onclick="return toggleScreenSettingsPanel()">
+                                    <span class="user-account-menu-item-icon" aria-hidden="true">â–£</span>
+                                    <span class="user-account-menu-item-label">Screen Settings</span>
+                                </button>
+                            </div>
+                        {% endif %}
+
                         <div class="user-account-menu-section">
                             <div class="user-account-menu-section-title">SECURITY</div>
                             {% if current_user.auth_provider == "firebase" %}
@@ -440,6 +454,10 @@
                     {% endfor %}
                 </div>
             </div>
+        {% endif %}
+
+        {% if current_user.is_admin %}
+            {% include "sections/screen_settings.html" %}
         {% endif %}
 
         <div id="accountUsageDashboardPanel"

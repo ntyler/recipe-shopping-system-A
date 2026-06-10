@@ -42,13 +42,14 @@ def test_account_menu_uses_compact_grouped_dropdown_style():
     assert 'role="menuitem"' in menu_markup
     assert 'class="sr-only">Account Menu</span>' in menu_markup
     assert "user-account-menu-trigger-icon" in menu_markup
-    for label in ("PROFILE", "USAGE &amp; BILLING", "SECURITY", "COMMUNICATIONS", "SESSION", "DANGER ZONE"):
+    for label in ("PROFILE", "USAGE &amp; BILLING", "DISPLAY", "SECURITY", "COMMUNICATIONS", "SESSION", "DANGER ZONE"):
         assert f">{label}</div>" in menu_markup
     for label in (
         "Account Settings",
         "Account Notices",
         "AI Usage &amp; Billing",
         "Chat GPT Models",
+        "Screen Settings",
         "Change Password",
         "Email Verified",
         "Two-Factor Authentication",
@@ -60,7 +61,9 @@ def test_account_menu_uses_compact_grouped_dropdown_style():
         assert label in menu_markup
     assert menu_markup.index(">PROFILE</div>") < menu_markup.index("Account Settings")
     assert menu_markup.index(">USAGE &amp; BILLING</div>") < menu_markup.index("AI Usage &amp; Billing")
-    assert menu_markup.index(">USAGE &amp; BILLING</div>") < menu_markup.index(">SECURITY</div>")
+    assert menu_markup.index(">USAGE &amp; BILLING</div>") < menu_markup.index(">DISPLAY</div>")
+    assert menu_markup.index(">DISPLAY</div>") < menu_markup.index("Screen Settings")
+    assert menu_markup.index(">DISPLAY</div>") < menu_markup.index(">SECURITY</div>")
     assert menu_markup.index(">SESSION</div>") < menu_markup.index("Sign Out")
     assert menu_markup.index(">DANGER ZONE</div>") < menu_markup.index("Delete Account")
     assert menu_markup.index("Sign Out") < menu_markup.index("Delete Account")
@@ -83,9 +86,12 @@ def test_account_menu_uses_compact_grouped_dropdown_style():
     assert ".user-account-menu-panel .user-account-menu-danger" in css
     assert 'aria-controls="accountUsageDashboardPanel"' in menu_markup
     assert 'aria-controls="chatGptModelsSection"' in menu_markup
+    assert 'aria-controls="screenSettingsCard"' in menu_markup
     assert "toggleUsageDashboardPanel()" in menu_markup
     assert "toggleChatGptModelsPanel()" in menu_markup
+    assert "toggleScreenSettingsPanel()" in menu_markup
     assert "function toggleUsageDashboardPanel(open = null)" in script
+    assert "function toggleScreenSettingsPanel(open = null)" in script
     assert "function bindAccountMenuDropdowns()" in script
     assert "function closeAccountMenuDropdown(menu, options = {})" in script
     assert 'event.target.closest("[data-account-menu]")' in script
@@ -238,6 +244,7 @@ def test_account_panels_remember_open_state_across_refreshes():
     for panel_key in (
         "accountSettings",
         "accountNotices",
+        "screenSettings",
         "usageDashboard",
         "chatGptModels",
         "twoFactor",
@@ -248,6 +255,7 @@ def test_account_panels_remember_open_state_across_refreshes():
     for selector in (
         "#userProfileEditForm",
         "[data-account-notices-panel]",
+        "[data-screen-settings-panel]",
         "[data-usage-dashboard-panel]",
         "[data-chatgpt-models-panel]",
         "[data-two-factor-panel]",
