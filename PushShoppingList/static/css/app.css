@@ -17496,37 +17496,74 @@ body {
     cursor: pointer;
 }
 
-.chatgpt-model-grid {
-    display: grid;
-    gap: 10px;
-}
-
-.chatgpt-model-row {
-    display: grid;
-    grid-template-columns: minmax(170px, 1fr) minmax(190px, 1.2fr) minmax(170px, 0.9fr) minmax(170px, 0.9fr) minmax(170px, 0.9fr);
-    gap: 12px;
-    align-items: start;
-    padding: 12px;
+.chatgpt-model-table-wrap {
+    overflow-x: auto;
     border: 1px solid #2f4054;
     border-radius: 8px;
     background: #101820;
 }
 
+.chatgpt-model-table {
+    width: 100%;
+    min-width: 980px;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.chatgpt-model-table th,
+.chatgpt-model-table td {
+    min-width: 0;
+    padding: 12px;
+    border-bottom: 1px solid #26384b;
+    text-align: left;
+    vertical-align: top;
+}
+
+.chatgpt-model-table th {
+    color: #d4d0c8;
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    background: #0b1420;
+}
+
+.chatgpt-model-table th:nth-child(1) {
+    width: 22%;
+}
+
+.chatgpt-model-table th:nth-child(2) {
+    width: 23%;
+}
+
+.chatgpt-model-table th:nth-child(3) {
+    width: 19%;
+}
+
+.chatgpt-model-table th:nth-child(4),
+.chatgpt-model-table th:nth-child(5) {
+    width: 18%;
+}
+
+.chatgpt-model-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
 .chatgpt-model-feature,
-.chatgpt-model-description,
 .chatgpt-model-proposed {
     display: grid;
-    gap: 6px;
-    min-width: 0;
+    gap: 8px;
 }
 
 .chatgpt-model-feature strong {
     color: #f8fafc;
+    font-size: 16px;
     font-weight: 900;
+    line-height: 1.25;
     overflow-wrap: anywhere;
 }
 
-.chatgpt-model-description > span:last-child,
+.chatgpt-model-description,
 .chatgpt-model-proposed small,
 .chatgpt-model-meta {
     color: #cbd5e1;
@@ -17535,25 +17572,9 @@ body {
     line-height: 1.35;
 }
 
-.chatgpt-model-row label {
-    display: grid;
-    gap: 6px;
-    min-width: 0;
-}
-
-.chatgpt-model-row label > span:first-child,
-.chatgpt-model-feature > span:first-child,
-.chatgpt-model-description > span:first-child,
-.chatgpt-model-proposed > span:first-child {
-    color: #d4d0c8;
-    font-size: 12px;
-    font-weight: 900;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-}
-
-.chatgpt-model-row code,
-.chatgpt-model-row select {
+.chatgpt-model-row td > code,
+.chatgpt-model-row select,
+.chatgpt-model-proposed code {
     width: 100%;
     min-width: 0;
     min-height: 38px;
@@ -17572,7 +17593,8 @@ body {
     color: #f5f7f7;
 }
 
-.chatgpt-model-row code {
+.chatgpt-model-row td > code,
+.chatgpt-model-proposed code {
     display: flex;
     align-items: center;
     color: #bfdbfe;
@@ -17603,10 +17625,9 @@ body {
 }
 
 .chatgpt-model-meta {
-    grid-column: 1 / -1;
     display: flex;
     flex-wrap: wrap;
-    gap: 8px 14px;
+    gap: 4px 10px;
 }
 
 .chatgpt-model-save-btn {
@@ -18957,8 +18978,7 @@ body {
 
     .admin-support-form,
     .admin-support-detail-grid,
-    .admin-support-detail-grid div,
-    .chatgpt-model-row {
+    .admin-support-detail-grid div {
         grid-template-columns: 1fr;
     }
 

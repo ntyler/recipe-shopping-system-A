@@ -64,57 +64,64 @@
                 </button>
             </div>
         </div>
-        <div class="chatgpt-model-grid">
-            {% for row in model_dashboard.rows %}
-                <div class="chatgpt-model-row">
-                    <div class="chatgpt-model-feature">
-                        <span>Feature Name</span>
-                        <strong>{{ row.feature }}</strong>
-                    </div>
-                    <div class="chatgpt-model-description">
-                        <span>Description</span>
-                        <span>{{ row.description }}</span>
-                    </div>
-                    <label>
-                        <span>Environment Variable</span>
-                        <code>{{ row.env_var }}</code>
-                    </label>
-                    <label>
-                        <span>Active Model</span>
-                        <select name="model_{{ row.env_var }}">
-                            {% for model_group in row.model_groups %}
-                                <optgroup label="{{ model_group.label }}">
-                                    {% for model_choice in model_group.models %}
-                                        <option value="{{ model_choice }}"
-                                                {% if model_choice == row.model %}selected{% endif %}>
-                                            {{ model_choice }}{% if model_choice == row.model and not row.selected_available %} ⚠{% endif %}
-                                        </option>
+        <div class="chatgpt-model-table-wrap">
+            <table class="chatgpt-model-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Feature Name</th>
+                        <th scope="col">Description</th>
+                        <th scope="col">Environment Variable</th>
+                        <th scope="col">Active Model</th>
+                        <th scope="col">Proposed Model</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in model_dashboard.rows %}
+                        <tr class="chatgpt-model-row">
+                            <td class="chatgpt-model-feature">
+                                <strong>{{ row.feature }}</strong>
+                                <div class="chatgpt-model-meta">
+                                    <span>Default: {{ row.default_model }}</span>
+                                    <span>Source: {{ row.source }}</span>
+                                    <span>Temperature: {{ "yes" if row.supports_temperature else "no" }}</span>
+                                </div>
+                            </td>
+                            <td class="chatgpt-model-description">{{ row.description }}</td>
+                            <td>
+                                <code>{{ row.env_var }}</code>
+                            </td>
+                            <td>
+                                <label class="sr-only" for="chatgpt_model_{{ row.env_var }}">Active Model</label>
+                                <select id="chatgpt_model_{{ row.env_var }}" name="model_{{ row.env_var }}">
+                                    {% for model_group in row.model_groups %}
+                                        <optgroup label="{{ model_group.label }}">
+                                            {% for model_choice in model_group.models %}
+                                                <option value="{{ model_choice }}"
+                                                        {% if model_choice == row.model %}selected{% endif %}>
+                                                    {{ model_choice }}{% if model_choice == row.model and not row.selected_available %} ⚠{% endif %}
+                                                </option>
+                                            {% endfor %}
+                                        </optgroup>
                                     {% endfor %}
-                                </optgroup>
-                            {% endfor %}
-                        </select>
-                        {% if not row.selected_available %}
-                            <span class="chatgpt-model-warning-badge">{{ row.unavailable_warning }}</span>
-                        {% endif %}
-                    </label>
-                    <div class="chatgpt-model-proposed">
-                        <span>Proposed Model</span>
-                        <code>{{ row.proposed_model }}</code>
-                        <small>Reason: {{ row.proposed_model_reason }}</small>
-                        <button type="submit"
-                                class="secondary chatgpt-model-use-proposed-btn"
-                                name="action"
-                                value="use_proposed:{{ row.env_var }}">
-                            Use Proposed Model
-                        </button>
-                    </div>
-                    <div class="chatgpt-model-meta">
-                        <span>Default: {{ row.default_model }}</span>
-                        <span>Source: {{ row.source }}</span>
-                        <span>Temperature: {{ "yes" if row.supports_temperature else "no" }}</span>
-                    </div>
-                </div>
-            {% endfor %}
+                                </select>
+                                {% if not row.selected_available %}
+                                    <span class="chatgpt-model-warning-badge">{{ row.unavailable_warning }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="chatgpt-model-proposed">
+                                <code>{{ row.proposed_model }}</code>
+                                <small>Reason: {{ row.proposed_model_reason }}</small>
+                                <button type="submit"
+                                        class="secondary chatgpt-model-use-proposed-btn"
+                                        name="action"
+                                        value="use_proposed:{{ row.env_var }}">
+                                    Use Proposed Model
+                                </button>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
         <button type="submit" class="chatgpt-model-save-btn">Save Models</button>
     </form>

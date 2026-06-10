@@ -290,7 +290,7 @@ def test_chatgpt_models_live_inside_account_menu_panel():
     assert "user-chatgpt-models-divider" in models_template
     assert "data-chatgpt-models-close" in models_template
     assert "toggleChatGptModelsPanel(false)" in models_template
-    assert "<select name=\"model_{{ row.env_var }}\">" in models_template
+    assert 'name="model_{{ row.env_var }}"' in models_template
     assert "row.model_groups" in models_template
     assert "optgroup label=\"{{ model_group.label }}\"" in models_template
     assert "Show Advanced Models" in models_template
@@ -304,6 +304,10 @@ def test_chatgpt_models_live_inside_account_menu_panel():
     assert "Feature Name" in models_template
     assert "Description" in models_template
     assert "Proposed Model" in models_template
+    assert '<table class="chatgpt-model-table">' in models_template
+    assert '<th scope="col">Active Model</th>' in models_template
+    assert '<th scope="col">Proposed Model</th>' in models_template
+    assert '<tr class="chatgpt-model-row">' in models_template
     assert "Reason: {{ row.proposed_model_reason }}" in models_template
     assert "Use Proposed Model" in models_template
     assert 'value="use_proposed:{{ row.env_var }}"' in models_template
@@ -330,10 +334,12 @@ def test_chatgpt_models_live_inside_account_menu_panel():
     assert ".chatgpt-model-refresh-btn" in css
     assert ".chatgpt-model-use-proposed-btn" in css
     assert ".chatgpt-model-toolbar-actions" in css
+    assert ".chatgpt-model-table-wrap" in css
+    assert ".chatgpt-model-table {" in css
     assert ".chatgpt-model-warning-badge" in css
     assert ".chatgpt-model-row select" in css
-    chatgpt_row_css = css[css.index(".chatgpt-model-row {"):css.index(".chatgpt-model-feature,", css.index(".chatgpt-model-row {"))]
-    assert "align-items: start;" in chatgpt_row_css
+    assert "border-collapse: collapse;" in css
+    assert "table-layout: fixed;" in css
     assert "function toggleChatGptModelsPanel(open = null)" in script
     assert "[data-chatgpt-models-panel]" in script
     assert "#chatGptModelsSection" in script
