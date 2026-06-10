@@ -17497,7 +17497,7 @@ body {
 }
 
 .chatgpt-model-table-wrap {
-    overflow-x: auto;
+    overflow-x: visible;
     border: 1px solid #2f4054;
     border-radius: 8px;
     background: #101820;
@@ -17505,7 +17505,7 @@ body {
 
 .chatgpt-model-table {
     width: 100%;
-    min-width: 980px;
+    min-width: 0;
     border-collapse: collapse;
     table-layout: fixed;
 }
@@ -17513,7 +17513,7 @@ body {
 .chatgpt-model-table th,
 .chatgpt-model-table td {
     min-width: 0;
-    padding: 12px;
+    padding: 10px 11px;
     border-bottom: 1px solid #26384b;
     text-align: left;
     vertical-align: top;
@@ -17524,6 +17524,7 @@ body {
     font-size: 12px;
     font-weight: 900;
     letter-spacing: 0.03em;
+    line-height: 1.25;
     text-transform: uppercase;
     background: #0b1420;
 }
@@ -17533,16 +17534,19 @@ body {
 }
 
 .chatgpt-model-table th:nth-child(2) {
-    width: 23%;
+    width: 24%;
 }
 
 .chatgpt-model-table th:nth-child(3) {
-    width: 19%;
+    width: 18%;
 }
 
-.chatgpt-model-table th:nth-child(4),
+.chatgpt-model-table th:nth-child(4) {
+    width: 16%;
+}
+
 .chatgpt-model-table th:nth-child(5) {
-    width: 18%;
+    width: 20%;
 }
 
 .chatgpt-model-table tbody tr:last-child td {
@@ -17557,7 +17561,7 @@ body {
 
 .chatgpt-model-feature strong {
     color: #f8fafc;
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 900;
     line-height: 1.25;
     overflow-wrap: anywhere;
@@ -17579,12 +17583,12 @@ body {
     min-width: 0;
     min-height: 38px;
     box-sizing: border-box;
-    padding: 8px 10px;
+    padding: 8px 9px;
     border: 1px solid #655f50;
     border-radius: 7px;
     background: #1b1f1f;
     color: #f5f7f7;
-    font-size: 14px;
+    font-size: 13px;
 }
 
 .chatgpt-model-row select option,
@@ -17603,16 +17607,18 @@ body {
 
 .chatgpt-model-use-proposed-btn {
     width: 100%;
-    min-height: 36px;
+    min-height: 34px;
     margin-top: 2px;
-    padding: 0 10px;
+    padding: 7px 9px;
     border: 1px solid #245b8e;
     border-radius: 7px;
     background: #0d253d;
     color: #dceeff;
     font-size: 12px;
     font-weight: 900;
+    line-height: 1.2;
     cursor: pointer;
+    white-space: normal;
 }
 
 .chatgpt-model-row label .chatgpt-model-warning-badge {
@@ -18962,6 +18968,14 @@ body {
     .chatgpt-model-toolbar-actions {
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .chatgpt-model-table-wrap {
+        overflow-x: auto;
+    }
+
+    .chatgpt-model-table {
+        min-width: 760px;
     }
 
     .chatgpt-model-status-banner span {
