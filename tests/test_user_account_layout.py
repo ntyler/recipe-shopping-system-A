@@ -48,6 +48,7 @@ def test_account_menu_uses_compact_grouped_dropdown_style():
         "Account Settings",
         "Account Notices",
         "AI Usage &amp; Billing",
+        "Chat GPT Models",
         "Change Password",
         "Email Verified",
         "Two-Factor Authentication",
@@ -81,7 +82,9 @@ def test_account_menu_uses_compact_grouped_dropdown_style():
     assert ".user-account-menu-item-label" in css
     assert ".user-account-menu-panel .user-account-menu-danger" in css
     assert 'aria-controls="accountUsageDashboardPanel"' in menu_markup
+    assert 'aria-controls="chatGptModelsSection"' in menu_markup
     assert "toggleUsageDashboardPanel()" in menu_markup
+    assert "toggleChatGptModelsPanel()" in menu_markup
     assert "function toggleUsageDashboardPanel(open = null)" in script
     assert "function bindAccountMenuDropdowns()" in script
     assert "function closeAccountMenuDropdown(menu, options = {})" in script
@@ -236,6 +239,7 @@ def test_account_panels_remember_open_state_across_refreshes():
         "accountSettings",
         "accountNotices",
         "usageDashboard",
+        "chatGptModels",
         "twoFactor",
         "pushNotifications",
         "deleteAccount",
@@ -245,6 +249,7 @@ def test_account_panels_remember_open_state_across_refreshes():
         "#userProfileEditForm",
         "[data-account-notices-panel]",
         "[data-usage-dashboard-panel]",
+        "[data-chatgpt-models-panel]",
         "[data-two-factor-panel]",
         "[data-push-notifications-panel]",
         "[data-delete-account-panel]",
@@ -264,6 +269,42 @@ def test_account_panels_remember_open_state_across_refreshes():
     assert "hideRememberedAccountPanels(panel)" in script
     assert "window.rememberAccountPanelElement(exceptPanel, true)" in firebase_script
     assert "window.rememberAccountPanelElement(panel, false)" in firebase_script
+
+
+def test_chatgpt_models_live_inside_account_menu_panel():
+    index_template = (ROOT / "PushShoppingList/templates/index.html").read_text(encoding="utf-8")
+    account_template = (ROOT / "PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")
+    models_template = (ROOT / "PushShoppingList/templates/sections/chatgpt_models.html").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    firebase_script = (ROOT / "PushShoppingList/static/js/firebase-auth.js").read_text(encoding="utf-8")
+    route = (ROOT / "PushShoppingList/routes/main_routes.py").read_text(encoding="utf-8")
+    service = (ROOT / "PushShoppingList/services/openai_model_service.py").read_text(encoding="utf-8")
+
+    assert '{% include "sections/chatgpt_models.html" %}' not in index_template
+    assert '{% include "sections/chatgpt_models.html" %}' in account_template
+    assert 'aria-controls="chatGptModelsSection"' in account_template
+    assert "toggleChatGptModelsPanel()" in account_template
+    assert 'data-chatgpt-models-panel' in models_template
+    assert 'request.args.get("account_panel") == "chatgpt_models"' in models_template
+    assert "user-chatgpt-models-divider" in models_template
+    assert "data-chatgpt-models-close" in models_template
+    assert "toggleChatGptModelsPanel(false)" in models_template
+    assert "<select name=\"model_{{ row.env_var }}\">" in models_template
+    assert "row.model_choices" in models_template
+    assert "type=\"text\"" not in models_template
+    assert "account_panel=\"chatgpt_models\"" in route
+    assert "OPENAI_MODEL_CHOICES" in service
+    assert '"model_choices": model_choices' in service
+    assert ".chatgpt-models-card" in css
+    assert "background: transparent;" in css
+    assert ".user-chatgpt-models-divider" in css
+    assert ".chatgpt-models-header-actions" in css
+    assert ".chatgpt-model-row select" in css
+    assert "function toggleChatGptModelsPanel(open = null)" in script
+    assert "[data-chatgpt-models-panel]" in script
+    assert "#chatGptModelsSection" in script
+    assert "[data-chatgpt-models-panel]" in firebase_script
 
 
 def test_usage_dashboard_receives_openai_usage_summary_from_route():

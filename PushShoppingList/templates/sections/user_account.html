@@ -263,6 +263,16 @@
                                 <span class="user-account-menu-item-icon" aria-hidden="true">📊</span>
                                 <span class="user-account-menu-item-label">AI Usage &amp; Billing</span>
                             </button>
+                            {% if chatgpt_models_dashboard and chatgpt_models_dashboard.is_admin %}
+                                <button type="button"
+                                        class="user-account-menu-item"
+                                        role="menuitem"
+                                        aria-controls="chatGptModelsSection"
+                                        onclick="return toggleChatGptModelsPanel()">
+                                    <span class="user-account-menu-item-icon" aria-hidden="true">🤖</span>
+                                    <span class="user-account-menu-item-label">Chat GPT Models</span>
+                                </button>
+                            {% endif %}
                         </div>
 
                         <div class="user-account-menu-section">
@@ -605,6 +615,10 @@
                 {% endif %}
             </div>
         </div>
+
+        {% if chatgpt_models_dashboard and chatgpt_models_dashboard.is_admin %}
+            {% include "sections/chatgpt_models.html" %}
+        {% endif %}
 
         <form id="userProfileEditForm"
               class="user-account-form user-account-edit-form"

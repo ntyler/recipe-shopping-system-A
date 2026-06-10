@@ -1,12 +1,25 @@
 {% set model_dashboard = chatgpt_models_dashboard|default({}) %}
 {% if model_dashboard.is_admin %}
-<section id="chatGptModelsSection" class="recipe-card chatgpt-models-card">
+{% set chatgpt_models_panel_open = request.args.get("account_panel") == "chatgpt_models" %}
+<section id="chatGptModelsSection"
+         class="user-account-form chatgpt-models-card"
+         data-chatgpt-models-panel
+         {% if not chatgpt_models_panel_open %}hidden{% endif %}>
+    <div class="app-section-divider recipe-entry-section-divider user-chatgpt-models-divider" aria-hidden="true"></div>
     <div class="chatgpt-models-header">
         <div>
-            <h2>Chat GPT Models</h2>
+            <h3>Chat GPT Models</h3>
             <p>Current OpenAI model routing by app feature.</p>
         </div>
-        <span class="chatgpt-models-count">{{ model_dashboard.rows|length }} entries</span>
+        <div class="chatgpt-models-header-actions">
+            <span class="chatgpt-models-count">{{ model_dashboard.rows|length }} entries</span>
+            <button type="button"
+                    class="secondary user-push-panel-close chatgpt-models-close"
+                    data-chatgpt-models-close
+                    onclick="return toggleChatGptModelsPanel(false)">
+                Close
+            </button>
+        </div>
     </div>
 
     {% if model_dashboard.messages %}
@@ -33,11 +46,14 @@
                     </label>
                     <label>
                         <span>Active Model</span>
-                        <input type="text"
-                               name="model_{{ row.env_var }}"
-                               value="{{ row.model }}"
-                               autocomplete="off"
-                               spellcheck="false">
+                        <select name="model_{{ row.env_var }}">
+                            {% for model_choice in row.model_choices %}
+                                <option value="{{ model_choice }}"
+                                        {% if model_choice == row.model %}selected{% endif %}>
+                                    {{ model_choice }}
+                                </option>
+                            {% endfor %}
+                        </select>
                     </label>
                     <div class="chatgpt-model-meta">
                         <span>Default: {{ row.default_model }}</span>

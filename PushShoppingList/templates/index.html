@@ -53,10 +53,6 @@
         <div class="app-section-divider" aria-hidden="true"></div>
         {% include "sections/admin_support.html" %}
     {% endif %}
-    {% if chatgpt_models_dashboard and chatgpt_models_dashboard.is_admin %}
-        <div class="app-section-divider" aria-hidden="true"></div>
-        {% include "sections/chatgpt_models.html" %}
-    {% endif %}
     <div class="app-section-divider recipe-entry-section-divider" aria-hidden="true"></div>
     {% include "sections/ai_pantry.html" %}
     {% include "sections/enter_recipe_links.html" %}

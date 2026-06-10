@@ -137,7 +137,7 @@ def update_chatgpt_models_route():
             for error in result.get("errors", ["Unable to update Chat GPT model settings."])
         ]
 
-    return redirect(url_for("main_bp.index", _anchor="chatGptModelsSection"))
+    return redirect(url_for("main_bp.index", account_panel="chatgpt_models", _anchor="chatGptModelsSection"))
 
 
 def pdf_share_view_for_render():

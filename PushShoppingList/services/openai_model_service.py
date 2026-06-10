@@ -85,6 +85,14 @@ OPENAI_MODEL_SETTINGS = (
     },
 )
 
+OPENAI_MODEL_CHOICES = (
+    "gpt-5.5",
+    "gpt-4o-mini",
+    "gpt-4o",
+    "gpt-4.1",
+    "gpt-4.1-mini",
+)
+
 
 def unique_model_settings():
     seen = set()
@@ -190,11 +198,17 @@ def chatgpt_models_dashboard_for_user(user):
             if row["env_var"] == setting["env_var"]
         ]
         model, source = model_value_for_env(setting["env_var"], setting["default_model"])
+        model_choices = []
+        for candidate in (model, setting["default_model"], *OPENAI_MODEL_CHOICES):
+            candidate = normalize_model_name(candidate)
+            if candidate and candidate not in model_choices:
+                model_choices.append(candidate)
         rows.append({
             **setting,
             "feature": " / ".join(feature_names),
             "description": " ".join(descriptions),
             "model": model,
+            "model_choices": model_choices,
             "source": source,
             "is_override": setting["env_var"] in overrides,
             "supports_temperature": supports_custom_temperature(model),

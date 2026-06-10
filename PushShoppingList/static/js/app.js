@@ -23,6 +23,7 @@ const USER_ACCOUNT_REMEMBERED_PANEL_SELECTORS = {
     accountSettings: "#userProfileEditForm",
     accountNotices: "[data-account-notices-panel]",
     usageDashboard: "[data-usage-dashboard-panel]",
+    chatGptModels: "[data-chatgpt-models-panel]",
     sharedRecipePdfs: "[data-shared-recipe-pdfs-panel]",
     twoFactor: "[data-two-factor-panel]",
     pushNotifications: "[data-push-notifications-panel]",
@@ -37,6 +38,7 @@ const USER_ACCOUNT_PANEL_HASH_KEYS = {
     "#userProfileEditForm": "accountSettings",
     "#accountNoticesPanel": "accountNotices",
     "#accountUsageDashboardPanel": "usageDashboard",
+    "#chatGptModelsSection": "chatGptModels",
     "#sharedRecipePdfsSection": "sharedRecipePdfs",
     "#accountTwoFactorPanel": "twoFactor",
     "#accountPushNotificationsPanel": "pushNotifications",
@@ -1070,6 +1072,50 @@ function toggleUsageDashboardPanel(open = null) {
         window.requestAnimationFrame(() => {
             panel.scrollIntoView({ behavior: "smooth", block: "start" });
             const firstControl = panel.querySelector("[data-usage-dashboard-close]");
+            if (firstControl) {
+                firstControl.focus({ preventScroll: true });
+            }
+        });
+    } else if (typeof scrollToUserAccountProfile === "function") {
+        scrollToUserAccountProfile("auto");
+    }
+
+    return false;
+}
+
+function toggleChatGptModelsPanel(open = null) {
+    const panel = document.querySelector("[data-chatgpt-models-panel]");
+
+    if (!panel) {
+        return false;
+    }
+
+    const accountMenu = document.querySelector("[data-account-menu]");
+    const closeAccountMenu = () => {
+        if (accountMenu) {
+            accountMenu.open = false;
+        }
+    };
+    const explicitState = typeof open === "boolean";
+    const isAlreadyOpen = !panel.hidden;
+
+    if (!explicitState && isAlreadyOpen) {
+        closeAccountMenu();
+        return false;
+    }
+
+    const shouldOpen = explicitState ? open : true;
+    panel.hidden = !shouldOpen;
+    rememberAccountPanelElement(panel, shouldOpen);
+
+    if (shouldOpen) {
+        closeAccountMenu();
+        hideRememberedAccountPanels(panel);
+
+        window.requestAnimationFrame(() => {
+            panel.scrollIntoView({ behavior: "smooth", block: "start" });
+            const firstControl = panel.querySelector("[data-chatgpt-models-close]")
+                || panel.querySelector("button, input, select, textarea");
             if (firstControl) {
                 firstControl.focus({ preventScroll: true });
             }
