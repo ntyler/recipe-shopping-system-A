@@ -31,7 +31,7 @@ def test_save_home_address_records_recent_history(monkeypatch, tmp_path):
     assert history[0]["saved_at_display"]
 
 
-def test_save_home_address_ajax_returns_history(monkeypatch, tmp_path):
+def test_unauthenticated_visitor_cannot_save_home_address(monkeypatch, tmp_path):
     configure_legacy_home_data(monkeypatch, tmp_path)
     app = create_app()
 
@@ -52,11 +52,12 @@ def test_save_home_address_ajax_returns_history(monkeypatch, tmp_path):
 
     data = response.get_json()
 
-    assert response.status_code == 200
-    assert data["home_address_history"][0]["full_address"] == data["home_address"]["full_address"]
+    assert response.status_code == 401
+    assert data["error"] == "Sign in before managing this workspace."
+    assert home_address_service.load_home_address_history() == []
 
 
-def test_home_address_history_label_and_delete_routes(monkeypatch, tmp_path):
+def test_unauthenticated_visitor_cannot_update_home_address_history(monkeypatch, tmp_path):
     configure_legacy_home_data(monkeypatch, tmp_path)
     app = create_app()
 
@@ -81,14 +82,10 @@ def test_home_address_history_label_and_delete_routes(monkeypatch, tmp_path):
             headers={"X-Requested-With": "fetch"},
         )
 
-    label_data = label_response.get_json()
-    delete_data = delete_response.get_json()
-
     assert saved["full_address"]
-    assert label_response.status_code == 200
-    assert label_data["home_address_history"][0]["label"] == "Grandma's House"
-    assert delete_response.status_code == 200
-    assert delete_data["home_address_history"] == []
+    assert label_response.status_code == 401
+    assert delete_response.status_code == 401
+    assert home_address_service.load_home_address_history()[0]["label"] == "Home"
 
 
 def test_home_address_template_renders_history_panel():

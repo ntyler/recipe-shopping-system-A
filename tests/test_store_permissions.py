@@ -235,7 +235,7 @@ def test_store_action_menu_keeps_actions_readable():
     assert "white-space: nowrap" in css
 
 
-def test_guest_can_update_store_credentials(monkeypatch, tmp_path):
+def test_unauthenticated_visitor_cannot_update_store_credentials(monkeypatch, tmp_path):
     configure_user_data(monkeypatch, tmp_path)
     monkeypatch.setattr(storage_service, "LEGACY_EXTRACTOR_DIR", tmp_path / "legacy-extractor")
     write_legacy_store_settings(
@@ -267,19 +267,14 @@ def test_guest_can_update_store_credentials(monkeypatch, tmp_path):
             headers={"X-Requested-With": "fetch"},
         )
 
-    assert response.status_code == 200
+    assert response.status_code == 401
     settings = read_legacy_store_settings(tmp_path)
     assert settings["stores"]["aldi"]["label"] == "Aldi"
     assert settings["stores"]["aldi"]["url"] == "https://aldi.example/search?q="
-
-    credentials = read_legacy_store_credentials(tmp_path)
-    assert credentials["credentials"]["aldi"] == {
-        "username": "guest@example.com",
-        "password": "guest-secret",
-    }
+    assert not (legacy_store_data_dir(tmp_path) / "store_credentials.json").exists()
 
 
-def test_guest_can_toggle_enabled_stores(monkeypatch, tmp_path):
+def test_unauthenticated_visitor_cannot_toggle_enabled_stores(monkeypatch, tmp_path):
     configure_user_data(monkeypatch, tmp_path)
     monkeypatch.setattr(storage_service, "LEGACY_EXTRACTOR_DIR", tmp_path / "legacy-extractor")
     write_legacy_store_settings(
@@ -309,9 +304,8 @@ def test_guest_can_toggle_enabled_stores(monkeypatch, tmp_path):
             headers={"X-Requested-With": "fetch"},
         )
 
-    assert response.status_code == 200
-    assert response.get_json()["enabled_stores"] == ["meijer"]
-    assert read_legacy_store_settings(tmp_path)["enabled_stores"] == ["meijer"]
+    assert response.status_code == 401
+    assert read_legacy_store_settings(tmp_path)["enabled_stores"] == ["aldi"]
 
 
 def test_admin_can_manage_store_fields(monkeypatch, tmp_path):

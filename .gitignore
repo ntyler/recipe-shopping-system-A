@@ -32,6 +32,7 @@ PushShoppingList/services/recipe-extractor/data/browser_profiles/
 PushShoppingList/cookbooks.json
 PushShoppingList/shopping_stores_Results.json
 PushShoppingList/users.json
+PushShoppingList/guest_sessions.json
 PushShoppingList/user_data/
 PushShoppingList/static/uploads/avatars/*
 !PushShoppingList/static/uploads/avatars/.gitkeep

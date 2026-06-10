@@ -3,6 +3,7 @@ from datetime import timedelta
 
 from flask import Flask
 from flask import flash
+from flask import g
 from flask import jsonify
 from flask import redirect
 from flask import request
@@ -18,6 +19,14 @@ from PushShoppingList.routes.recipe_routes import recipe_bp
 from PushShoppingList.routes.store_routes import store_bp
 from PushShoppingList.routes.product_routes import product_bp
 from PushShoppingList.services.email_service import password_reset_email_configured
+from PushShoppingList.services.guest_session_service import GUEST_COOKIE_NAME
+from PushShoppingList.services.guest_session_service import clear_guest_cookie
+from PushShoppingList.services.guest_session_service import cleanup_expired_guest_sessions
+from PushShoppingList.services.guest_session_service import get_current_guest_session
+from PushShoppingList.services.guest_session_service import guest_banner_context
+from PushShoppingList.services.guest_session_service import is_guest_session
+from PushShoppingList.services.guest_session_service import remembered_guest_cookie_status
+from PushShoppingList.services.guest_session_service import restore_guest_session_from_cookie
 from PushShoppingList.services.sms_service import password_reset_sms_configured
 from PushShoppingList.services.user_account_service import current_public_user
 from PushShoppingList.services.user_account_service import current_user
@@ -33,6 +42,8 @@ PUBLIC_ENDPOINTS = {
     "account_bp.firebase_login_route",
     "account_bp.firebase_logout_route",
     "account_bp.guest_start_route",
+    "account_bp.guest_expired_route",
+    "account_bp.logout_route",
     "account_bp.create_account_route",
     "account_bp.verify_account_creation_route",
     "account_bp.sign_in_route",
@@ -49,6 +60,41 @@ PUBLIC_ENDPOINTS = {
     "pdf_bp.share_pdf_route",
     "pdf_bp.download_shared_pdf_route",
     "feedback_bp.submit_feedback_route",
+}
+
+GUEST_BLOCKED_BLUEPRINTS = {
+    "pantry_bp",
+}
+
+GUEST_BLOCKED_ENDPOINTS = {
+    "account_bp.open_admin_support_record_route",
+    "account_bp.update_profile_route",
+    "account_bp.update_notification_settings_route",
+    "account_bp.start_device_notification_subscription_route",
+    "account_bp.send_test_notification_route",
+    "account_bp.request_phone_verification_route",
+    "account_bp.confirm_phone_verification_route",
+    "account_bp.request_account_delete_route",
+    "account_bp.open_account_delete_route",
+    "account_bp.complete_account_delete_route",
+    "account_bp.start_two_factor_setup_route",
+    "account_bp.enable_two_factor_route",
+    "account_bp.cancel_two_factor_setup_route",
+    "account_bp.disable_two_factor_route",
+    "account_bp.regenerate_two_factor_backup_codes_route",
+    "main_bp.api_openai_usage_dashboard_route",
+    "main_bp.update_chatgpt_models_route",
+    "main_bp.save_home_address_route",
+    "main_bp.update_home_address_history_label_route",
+    "main_bp.delete_home_address_history_entry_route",
+    "main_bp.reverse_geocode_route",
+    "main_bp.address_options_route",
+    "main_bp.complete_address_route",
+    "store_bp.save_store_settings_route",
+    "store_bp.add_store_route",
+    "store_bp.update_store_route",
+    "store_bp.delete_store_route",
+    "store_bp.select_nearby_store_location_route",
 }
 
 PROTECTED_BLUEPRINTS = {
@@ -102,6 +148,24 @@ def admin_required_response():
     }), 403
 
 
+def guest_restricted_response():
+    message = (
+        "AI Pantry is only available for full accounts. "
+        "Create a free account to save pantry items, store preferences, and long-term shopping history."
+    )
+
+    if wants_json_response():
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": message,
+            "guest_restricted": True,
+        }), 403
+
+    flash(message, "error")
+    return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+
 def create_app():
     app = Flask(
         __name__,
@@ -132,6 +196,23 @@ def create_app():
             return None
 
         endpoint = request.endpoint or ""
+        g.clear_guest_demo_cookie = False
+
+        cleanup_expired_guest_sessions()
+
+        if session.get("is_guest") and not get_current_guest_session():
+            g.clear_guest_demo_cookie = True
+            if endpoint != "account_bp.guest_expired_route":
+                return redirect(url_for("account_bp.guest_expired_route"))
+
+        if not current_user() and not session.get("is_guest"):
+            remembered_status = remembered_guest_cookie_status(request.cookies.get(GUEST_COOKIE_NAME, ""))
+            if remembered_status == "valid":
+                restore_guest_session_from_cookie(request.cookies.get(GUEST_COOKIE_NAME, ""))
+            elif remembered_status in {"invalid", "expired"}:
+                g.clear_guest_demo_cookie = True
+                if remembered_status == "expired" and endpoint == "main_bp.index":
+                    return redirect(url_for("account_bp.guest_expired_route"))
 
         if endpoint in PUBLIC_ENDPOINTS:
             return None
@@ -141,8 +222,13 @@ def create_app():
             return None
 
         user = current_user()
-        if not user:
+        full_account_active = bool(user or session.get("user_id"))
+        guest_active = is_guest_session()
+        if not full_account_active and not guest_active:
             return auth_required_response()
+
+        if guest_active and (blueprint in GUEST_BLOCKED_BLUEPRINTS or endpoint in GUEST_BLOCKED_ENDPOINTS or endpoint in ADMIN_ENDPOINTS):
+            return guest_restricted_response()
 
         if endpoint in ADMIN_ENDPOINTS and not is_admin_user(user):
             return admin_required_response()
@@ -159,6 +245,8 @@ def create_app():
             "pending_two_factor_context": session.get("pending_2fa_context", ""),
             "two_factor_setup": pending_two_factor_setup(session.get("user_id")),
             "two_factor_backup_codes": session.pop("two_factor_backup_codes", None),
+            "guest_demo": guest_banner_context(),
+            "is_guest_demo": is_guest_session(),
         }
 
     @app.after_request
@@ -179,6 +267,9 @@ def create_app():
             response.headers["Access-Control-Allow-Headers"] = "Content-Type"
             response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
             response.headers.add("Vary", "Origin")
+
+        if getattr(g, "clear_guest_demo_cookie", False):
+            clear_guest_cookie(response)
 
         return response
 

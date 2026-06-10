@@ -9,6 +9,7 @@ from flask import session
 PACKAGE_DIR = Path(__file__).resolve().parent.parent
 LEGACY_EXTRACTOR_DIR = PACKAGE_DIR / "services" / "recipe-extractor"
 USER_DATA_DIR = Path(os.getenv("SHOPPING_APP_USER_DATA_DIR", PACKAGE_DIR / "user_data" / "users"))
+GUEST_DATA_DIR = Path(os.getenv("SHOPPING_APP_GUEST_DATA_DIR", PACKAGE_DIR / "user_data" / "guests"))
 
 
 def active_user_id():
@@ -17,6 +18,14 @@ def active_user_id():
         return ""
 
     return str(session.get("user_id") or "").strip()
+
+
+def active_guest_session_id():
+    """Return the active guest session id for request-scoped temporary data."""
+    if not has_request_context() or not session.get("is_guest"):
+        return ""
+
+    return str(session.get("guest_session_id") or "").strip()
 
 
 def safe_user_id(user_id):
@@ -34,7 +43,30 @@ def user_data_root(user_id=None):
     return root
 
 
+def guest_data_root(guest_session_id=None):
+    guest_session_id = safe_user_id(guest_session_id or active_guest_session_id())
+
+    if not guest_session_id:
+        return PACKAGE_DIR
+
+    root = GUEST_DATA_DIR / guest_session_id
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def workspace_data_root():
+    if active_guest_session_id():
+        return guest_data_root()
+
+    return user_data_root()
+
+
 def extractor_root(user_id=None):
+    if not user_id and active_guest_session_id():
+        root = guest_data_root() / "recipe-extractor"
+        root.mkdir(parents=True, exist_ok=True)
+        return root
+
     user_id = safe_user_id(user_id or active_user_id())
 
     if not user_id:
@@ -46,7 +78,7 @@ def extractor_root(user_id=None):
 
 
 def package_data_path(*parts):
-    return user_data_root().joinpath(*parts)
+    return workspace_data_root().joinpath(*parts)
 
 
 def extractor_data_path(*parts):
@@ -123,7 +155,7 @@ class ScopedPath:
 
 
 def scoped_package_path(*parts):
-    return ScopedPath(user_data_root, *parts)
+    return ScopedPath(workspace_data_root, *parts)
 
 
 def scoped_extractor_path(*parts):

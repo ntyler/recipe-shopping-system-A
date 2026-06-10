@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Guest Demo Expired</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body>
+    <main class="app-content">
+        <section class="recipe-card user-account-card guest-expired-card">
+            <h1>Guest Demo Expired</h1>
+            <p class="helper-text">
+                Your demo session has expired. Temporary demo data has been deleted.
+            </p>
+            <div class="guest-account-only-actions">
+                <a href="{{ url_for('account_bp.guest_start_route') }}">Start New Demo</a>
+                <a class="secondary" href="{{ url_for('main_bp.index', _anchor='userAccountSection') }}">Create Account</a>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

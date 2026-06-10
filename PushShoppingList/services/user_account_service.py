@@ -618,6 +618,8 @@ def name_parts_from_display_name(display_name):
 def set_signed_in_session(user):
     session.permanent = True
     session["user_id"] = user["user_id"]
+    session.pop("is_guest", None)
+    session.pop("guest_session_id", None)
 
     if str((user or {}).get("auth_provider") or "").strip().lower() == "firebase":
         session["firebase_uid"] = user.get("firebase_uid", "")
@@ -1785,6 +1787,8 @@ def find_user_by_id_in_payload(payload, user_id):
 
 def sign_out_user():
     session.pop("user_id", None)
+    session.pop("is_guest", None)
+    session.pop("guest_session_id", None)
     session.pop("firebase_uid", None)
     session.pop("email", None)
     session.pop("display_name", None)

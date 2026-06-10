@@ -7,10 +7,16 @@ from flask import flash
 from flask import jsonify
 from flask import make_response
 from flask import redirect
+from flask import render_template
 from flask import request
 from flask import session
 from flask import url_for
 
+from PushShoppingList.services.guest_session_service import GUEST_COOKIE_NAME
+from PushShoppingList.services.guest_session_service import clear_guest_cookie
+from PushShoppingList.services.guest_session_service import cleanup_expired_guest_sessions
+from PushShoppingList.services.guest_session_service import set_guest_cookie
+from PushShoppingList.services.guest_session_service import start_or_restore_guest_session
 from PushShoppingList.services.firebase_auth_service import firebase_account_exists_by_email
 from PushShoppingList.services.firebase_auth_service import firebase_user_from_id_token
 from PushShoppingList.services.email_service import password_reset_email_configured
@@ -245,22 +251,48 @@ def firebase_login_route():
         profile=payload.get("profile") if isinstance(payload.get("profile"), dict) else {},
         trusted_device_token=request.cookies.get(TWO_FACTOR_TRUST_COOKIE, ""),
     )
-    return json_account_result(result, success_status=200, error_status=400)
+    response = make_response(json_account_result(result, success_status=200, error_status=400))
+    if result.get("ok"):
+        clear_guest_cookie(response)
+    return response
 
 
 @account_bp.route("/auth/logout", methods=["POST"])
 def firebase_logout_route():
     clear_admin_support_session()
     sign_out_user()
-    return jsonify({"success": True, "authenticated": False, "user": None})
+    response = jsonify({"success": True, "authenticated": False, "user": None})
+    clear_guest_cookie(response)
+    return response
 
 
 @account_bp.route("/guest/start", methods=["GET"])
 def guest_start_route():
+    cleanup_expired_guest_sessions()
+    clear_admin_support_session()
+    record = start_or_restore_guest_session(request.cookies.get(GUEST_COOKIE_NAME, ""))
+    flash("Demo workspace started. Nothing is saved permanently.", "success")
+    response = make_response(redirect(url_for("main_bp.index", _anchor="userAccountSection")))
+    set_guest_cookie(response, record["id"])
+    return response
+
+
+@account_bp.route("/guest/expired", methods=["GET"])
+def guest_expired_route():
+    sign_out_user()
+    response = make_response(render_template("guest_expired.html"))
+    clear_guest_cookie(response)
+    return response
+
+
+@account_bp.route("/logout", methods=["GET", "POST"])
+def logout_route():
     clear_admin_support_session()
     sign_out_user()
-    flash("Demo workspace started. Nothing is saved permanently.", "success")
-    return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+    flash("Signed out. You are using the guest workspace.", "success")
+    response = make_response(redirect(url_for("main_bp.index", _anchor="userAccountSection")))
+    clear_guest_cookie(response)
+    return response
 
 
 @account_bp.route("/account/create", methods=["POST"])
@@ -332,7 +364,10 @@ def sign_in_route():
         return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
 
     flash_account_result(result, "Signed in.")
-    return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+    response = make_response(redirect(url_for("main_bp.index", _anchor="userAccountSection")))
+    if result.get("ok"):
+        clear_guest_cookie(response)
+    return response
 
 
 @account_bp.route("/account/2fa/verify", methods=["POST"])
@@ -351,6 +386,7 @@ def verify_two_factor_route():
         response = make_response(redirect(url_for("main_bp.index", _anchor="userAccountSection")))
 
         set_two_factor_trust_cookie(response, result.get("trust_token", ""))
+        clear_guest_cookie(response)
 
         return response
 
@@ -538,7 +574,9 @@ def sign_out_route():
     clear_admin_support_session()
     sign_out_user()
     flash("Signed out. You are using the guest workspace.", "success")
-    return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+    response = make_response(redirect(url_for("main_bp.index", _anchor="userAccountSection")))
+    clear_guest_cookie(response)
+    return response
 
 
 @account_bp.route("/account/admin-support", methods=["POST"])
