@@ -52,6 +52,7 @@ except Exception:  # pragma: no cover
         pass
 
 from PushShoppingList.services import cloudflare_r2_storage
+from PushShoppingList.services.image_variant_service import ensure_webp_variants
 from PushShoppingList.services.openai_model_service import model_value_for_env
 from PushShoppingList.services.openai_model_service import supports_custom_temperature
 from PushShoppingList.services.openai_usage_service import record_openai_usage
@@ -8473,6 +8474,8 @@ def extract_recipe_cover_image_from_upload(upload_path, mime_type, filename, rec
         relative_path = upload_path.resolve().relative_to(EXTRACTOR_FOLDER.resolve())
     except ValueError:
         return {}
+
+    ensure_webp_variants(upload_path)
 
     return normalize_recipe_cover_image(
         {

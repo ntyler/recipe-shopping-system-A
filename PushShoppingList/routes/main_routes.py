@@ -46,6 +46,8 @@ from PushShoppingList.services.home_store_location_service import load_nearest_s
 from PushShoppingList.services.home_store_location_service import resolve_nearest_stores_for_home_address
 from PushShoppingList.services.ingredient_text_review_service import fallback_ingredient_text_review
 from PushShoppingList.services.ingredient_text_review_service import normalize_ingredient_text_review
+from PushShoppingList.services.image_variant_service import cover_image_variant_payload as build_cover_image_variant_payload
+from PushShoppingList.services.image_variant_service import local_static_image_variants
 from PushShoppingList.services.item_state_service import load_item_state
 from PushShoppingList.services.item_state_service import save_item_manual_qty
 from PushShoppingList.services.item_state_service import save_item_purchase_mapping
@@ -73,6 +75,7 @@ from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
 from PushShoppingList.services.recipe_extract_service import STORE_SECTION_ORDER
 from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_exists
 from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_path
+from PushShoppingList.services.recipe_extract_service import recipe_cover_image_file_path
 from PushShoppingList.services.recipe_extract_service import recipe_scaling_from_data
 from PushShoppingList.services.recipe_extract_service import scaling_multiplier_label
 from PushShoppingList.services.recipe_extract_service import supports_custom_temperature
@@ -317,7 +320,7 @@ def recipe_pdf_public_url(recipe_url):
     return public_url if is_shareable_pdf_public_url(public_url) else ""
 
 
-def recipe_view_rows(recipe_urls):
+def recipe_view_rows(recipe_urls, food_rules=None):
     rows = []
     recipe_ingredient_data = load_recipe_ingredients()
 
@@ -350,7 +353,7 @@ def recipe_view_rows(recipe_urls):
             "quantity": recipe_quantity,
             "scaling_options": recipe_log_scaling_options(recipe_data, recipe_quantity),
             "archive_pdf_available": recipe_archive_pdf_exists(recipe["url"]),
-            "food_rule_status": recipe_food_rule_status(recipe_data),
+            "food_rule_status": recipe_food_rule_status(recipe_data, food_rules=food_rules),
             "rating": recipe_rating_for_view(recipe_data),
             "rating_stars": recipe_rating_stars_for_view(recipe_data),
             "base_servings": recipe_data.get("servings"),
@@ -416,7 +419,7 @@ def apply_cookbook_assignments_to_recipe_rows(rows, cookbook_assignments):
     return rows
 
 
-def recipe_url_log_rows(recipe_urls, cookbook_assignments=None):
+def recipe_url_log_rows(recipe_urls, cookbook_assignments=None, food_rules=None):
     rows = []
     recipe_ingredient_data = load_recipe_ingredients()
     cookbook_assignments = cookbook_assignments or {}
@@ -445,7 +448,7 @@ def recipe_url_log_rows(recipe_urls, cookbook_assignments=None):
             "inactive_time": recipe_data.get("inactive_time", ""),
             "cook_time": recipe_data.get("cook_time", ""),
             "total_time": recipe_data.get("total_time", ""),
-            "food_rule_status": recipe_food_rule_status(recipe_data),
+            "food_rule_status": recipe_food_rule_status(recipe_data, food_rules=food_rules),
             "rating": recipe_rating_for_view(recipe_data),
             "rating_stars": recipe_rating_stars_for_view(recipe_data),
             "archive_pdf_available": recipe_archive_pdf_exists(recipe["url"]),
@@ -479,6 +482,7 @@ def recipe_cover_image_for_view(recipe_url, recipe_data, recipe_meta=None):
         if not src:
             continue
 
+        variant_payload = recipe_cover_image_variant_payload(recipe_url, cover_image, src)
         alt = (
             str(cover_image.get("alt") or "").strip()
             or str((recipe_data or {}).get("recipe_title") or "").strip()
@@ -488,9 +492,27 @@ def recipe_cover_image_for_view(recipe_url, recipe_data, recipe_meta=None):
             **cover_image,
             "src": src,
             "alt": alt,
+            **variant_payload,
         }
 
     return {}
+
+
+def recipe_cover_image_variant_payload(recipe_url, cover_image, original_src):
+    image_path = recipe_cover_image_file_path(cover_image)
+
+    if not image_path:
+        return local_static_image_variants(original_src)
+
+    def build_url(variant, version):
+        return url_for(
+            "recipe_bp.recipe_cover_image_route",
+            url=recipe_url,
+            variant=variant,
+            v=version,
+        )
+
+    return build_cover_image_variant_payload(original_src, image_path, build_url)
 
 
 def recipe_cover_image_src(recipe_url, cover_image):
@@ -529,7 +551,7 @@ def cookbook_cover_image_for_view(recipe):
     )
 
 
-def cookbook_view_for_render(recipe_rows):
+def cookbook_view_for_render(recipe_rows, food_rules=None):
     view = cookbook_view(recipe_rows)
     recipe_ingredient_data = load_recipe_ingredients()
 
@@ -556,7 +578,7 @@ def cookbook_view_for_render(recipe_rows):
             recipe["cook_time"] = recipe.get("cook_time") or recipe_data.get("cook_time", "")
             recipe["total_time"] = recipe.get("total_time") or recipe_data.get("total_time", "")
             recipe["scaling_options"] = recipe_log_scaling_options(recipe_data, recipe_quantity)
-            recipe["food_rule_status"] = recipe_food_rule_status(recipe_data)
+            recipe["food_rule_status"] = recipe_food_rule_status(recipe_data, food_rules=food_rules)
             recipe["rating"] = recipe_rating_for_view(recipe_data)
             recipe["rating_stars"] = recipe_rating_stars_for_view(recipe_data)
             recipe["pdf_public_url"] = recipe_pdf_public_url(recipe_url)
@@ -626,7 +648,7 @@ def imported_recipe_uses_pdf_path(recipe_url):
     return recipe_url_type(recipe_url) == "File" and recipe_archive_pdf_exists(recipe_url)
 
 
-def recipe_food_rule_status(recipe_data):
+def recipe_food_rule_status(recipe_data, food_rules=None):
     flagged_items = []
 
     for ingredient in recipe_data.get("ingredients", []) or []:
@@ -644,7 +666,7 @@ def recipe_food_rule_status(recipe_data):
         if not text.strip():
             continue
 
-        status = shopping_item_food_rule_status(text)
+        status = shopping_item_food_rule_status(text, rules=food_rules)
         label = name or "Ingredient"
 
         if status.get("needs_review"):
@@ -1265,11 +1287,15 @@ def normalize_equipment_items(value):
             equipment_image_generated_at = ""
 
         if text:
+            image_variants = local_static_image_variants(equipment_image_url)
             items.append({
                 "number": index,
                 "text": text,
                 "equipment": text,
                 "equipment_image_url": equipment_image_url,
+                "equipment_image_display_url": image_variants.get("display_url") or equipment_image_url,
+                "equipment_image_srcset": image_variants.get("srcset", ""),
+                "equipment_image_full_url": image_variants.get("full_url") or equipment_image_url,
                 "equipment_image_generated_at": equipment_image_generated_at,
             })
 
@@ -1299,11 +1325,15 @@ def normalize_instruction_items(value):
             step_image_generated_at = ""
 
         if text:
+            image_variants = local_static_image_variants(step_image_url)
             items.append({
                 "step_number": step_number,
                 "text": text,
                 "instruction": text,
                 "step_image_url": step_image_url,
+                "step_image_display_url": image_variants.get("display_url") or step_image_url,
+                "step_image_srcset": image_variants.get("srcset", ""),
+                "step_image_full_url": image_variants.get("full_url") or step_image_url,
                 "step_image_generated_at": step_image_generated_at,
             })
 
@@ -1426,12 +1456,13 @@ def index():
     store_settings = load_store_settings()
     recipe_urls = recipe_url_rows()
     item_state = load_item_state()
-    recipe_rows = recipe_view_rows(recipe_urls)
+    food_rules = load_food_rules()
+    recipe_rows = recipe_view_rows(recipe_urls, food_rules=food_rules)
     ensure_unclassified_cookbook_for_recipes(recipe_rows)
     cookbook_assignments = recipe_cookbook_assignments()
     apply_cookbook_assignments_to_recipe_rows(recipe_rows, cookbook_assignments)
-    recipe_log_rows = recipe_url_log_rows(recipe_urls, cookbook_assignments)
-    rendered_cookbook_view = cookbook_view_for_render(recipe_rows)
+    recipe_log_rows = recipe_url_log_rows(recipe_urls, cookbook_assignments, food_rules=food_rules)
+    rendered_cookbook_view = cookbook_view_for_render(recipe_rows, food_rules=food_rules)
     cookbook_recipe_count = sum(
         len(cookbook.get("recipes", []))
         for cookbook in rendered_cookbook_view.get("cookbooks", [])
@@ -1504,9 +1535,9 @@ def index():
         pdf_share_view=pdf_share_view_for_render(),
         normalize=normalize,
         is_section_header=is_section_header,
-        food_rules=load_food_rules(),
+        food_rules=food_rules,
         rules_display=load_rules_display(),
-        food_rule_status=shopping_item_food_rule_status,
+        food_rule_status=lambda item_name: shopping_item_food_rule_status(item_name, rules=food_rules),
         feedback_dashboard=feedback_dashboard_for_user(active_public_user),
         openai_usage_dashboard=openai_usage_dashboard_for_user(active_public_user),
         chatgpt_models_dashboard=chatgpt_models_dashboard,

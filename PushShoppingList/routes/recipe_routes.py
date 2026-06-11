@@ -113,6 +113,9 @@ from PushShoppingList.services.recipe_quantity_service import update_recipe_ingr
 from PushShoppingList.services.recipe_quantity_service import update_recipe_quantity
 from PushShoppingList.services.shopping_list_service import add_items
 from PushShoppingList.services.guest_session_service import is_guest_session
+from PushShoppingList.services.image_variant_service import ensure_webp_variant
+from PushShoppingList.services.image_variant_service import generated_static_cache_seconds
+from PushShoppingList.services.image_variant_service import image_mimetype_for_path
 from PushShoppingList.services.openai_usage_service import openai_usage_dashboard_for_user
 from PushShoppingList.services.openai_usage_service import record_app_activity
 from PushShoppingList.services.user_account_service import current_user
@@ -572,6 +575,13 @@ def require_account_for_food_review():
         return None
 
     return jsonify({"ok": False, "error": FOOD_REVIEW_LOGIN_ERROR}), 401
+
+
+def wants_fetch_json_response():
+    return (
+        request.headers.get("X-Requested-With") == "fetch"
+        or request.form.get("ajax") == "1"
+    )
 
 
 def ensure_recipe_has_default_cookbook(url, recipe_metadata=None):
@@ -2851,6 +2861,7 @@ def recipe_archive_pdf_route():
 @recipe_bp.route("/recipe_cover_image", methods=["GET"])
 def recipe_cover_image_route():
     url = str(request.args.get("url", "") or "").strip()
+    variant = str(request.args.get("variant", "") or "").strip().lower()
 
     if not url:
         abort(404)
@@ -2861,9 +2872,27 @@ def recipe_cover_image_route():
     if not image_path:
         abort(404)
 
+    if variant:
+        variant_path = ensure_webp_variant(image_path, variant)
+
+        if not variant_path:
+            abort(404)
+
+        return send_file(
+            variant_path,
+            mimetype="image/webp",
+            as_attachment=False,
+            download_name=variant_path.name,
+            max_age=generated_static_cache_seconds(),
+        )
+
     return send_file(
         image_path,
-        mimetype=cover_image.get("mime_type") if isinstance(cover_image, dict) else None,
+        mimetype=(
+            cover_image.get("mime_type")
+            if isinstance(cover_image, dict) and cover_image.get("mime_type")
+            else image_mimetype_for_path(image_path)
+        ),
         as_attachment=False,
         download_name=image_path.name,
         max_age=0,
@@ -2908,10 +2937,26 @@ def api_food_review_alternatives_route():
 @recipe_bp.route("/remove_recipe", methods=["POST"])
 def remove_recipe_route():
     data = request.get_json(silent=True) or {}
-    url = request.form.get("url") or data.get("url", "")
+    url = str(request.form.get("url") or data.get("url", "")).strip()
+    wants_json = wants_fetch_json_response()
 
-    remove_recipe_and_unused_ingredients(url)
-    remove_recipe_url(url)
+    if not url:
+        message = "Recipe URL is required."
+        if wants_json:
+            return jsonify({"ok": False, "error": message}), 400
+        flash(message, "error")
+        return redirect("/")
+
+    try:
+        remove_recipe_and_unused_ingredients(url)
+        remove_recipe_url(url)
+    except Exception as exc:
+        if wants_json:
+            return jsonify({"ok": False, "error": str(exc) or "Unable to delete recipe."}), 500
+        raise
+
+    if wants_json:
+        return jsonify({"ok": True, "redirect_url": "/"})
 
     return redirect("/")
 
@@ -2919,11 +2964,27 @@ def remove_recipe_route():
 @recipe_bp.route("/purge_recipe", methods=["POST"])
 def purge_recipe_route():
     data = request.get_json(silent=True) or {}
-    url = request.form.get("url") or data.get("url", "")
+    url = str(request.form.get("url") or data.get("url", "")).strip()
+    wants_json = wants_fetch_json_response()
 
-    purge_recipe_from_all_cookbooks(url)
-    remove_recipe_and_unused_ingredients(url)
-    remove_recipe_url(url)
+    if not url:
+        message = "Recipe URL is required."
+        if wants_json:
+            return jsonify({"ok": False, "error": message}), 400
+        flash(message, "error")
+        return redirect("/")
+
+    try:
+        purge_recipe_from_all_cookbooks(url)
+        remove_recipe_and_unused_ingredients(url)
+        remove_recipe_url(url)
+    except Exception as exc:
+        if wants_json:
+            return jsonify({"ok": False, "error": str(exc) or "Unable to purge recipe."}), 500
+        raise
+
+    if wants_json:
+        return jsonify({"ok": True, "redirect_url": "/"})
 
     return redirect("/")
 

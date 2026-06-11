@@ -839,23 +839,26 @@ class ProductSelectionServiceTest(unittest.TestCase):
         script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
 
         self.assertIn("recipe-cover-image recipe-url-summary-cover", current_recipe_template)
-        self.assertIn("recipe-cover-image cookbook-source-cover", cookbook_template)
-        self.assertIn("recipe-cover-image cookbook-recipe-cover", cookbook_template)
+        self.assertIn("recipe-cover-image cookbook-menu-recipe-image", cookbook_template)
+        self.assertIn("recipe-cover-image recipe-url-summary-cover", cookbook_template)
         self.assertIn("recipe-cover-image recipe-view-cover", items_template)
+        self.assertIn("data-full-src", current_recipe_template)
+        self.assertIn("data-full-src", cookbook_template)
+        self.assertIn("data-full-src", items_template)
         self.assertIn("recipe-url-summary-header", current_recipe_template)
         self.assertIn("recipe-url-summary-servings", current_recipe_template)
         self.assertIn("cookbook-recipe-summary", cookbook_template)
         self.assertLess(
-            cookbook_template.index("cookbook-source-servings"),
-            cookbook_template.index("recipe-cover-image cookbook-source-cover"),
+            cookbook_template.index("recipe-cover-image cookbook-menu-recipe-image"),
+            cookbook_template.index("cookbook-menu-recipe-meta"),
         )
         self.assertLess(
-            current_recipe_template.index("recipe-url-summary-servings"),
             current_recipe_template.index("recipe-cover-image recipe-url-summary-cover"),
+            current_recipe_template.index("recipe-url-summary-servings"),
         )
         self.assertLess(
-            cookbook_template.index("cookbook-recipe-servings"),
-            cookbook_template.index("recipe-cover-image cookbook-recipe-cover"),
+            cookbook_template.index("recipe-cover-image recipe-url-summary-cover"),
+            cookbook_template.index("recipe-url-summary-servings"),
         )
         self.assertLess(
             items_template.index("recipe-view-title-servings"),

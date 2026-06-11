@@ -277,9 +277,9 @@ Output shape:
 """
 
 
-def product_matches_food_rules(product):
+def product_matches_food_rules(product, rules=None):
     text = product_search_text(product)
-    rules = load_food_rules()
+    rules = rules if rules is not None else load_food_rules()
 
     missing_required = [
         rule["label"]
@@ -320,9 +320,9 @@ def annotate_product_food_rules(product):
     return annotated
 
 
-def shopping_item_food_rule_status(item_name):
+def shopping_item_food_rule_status(item_name, rules=None):
     text = str(item_name or "").lower()
-    rules = load_food_rules()
+    rules = rules if rules is not None else load_food_rules()
     blocked_by = [
         rule["label"]
         for rule in rules["avoid"]

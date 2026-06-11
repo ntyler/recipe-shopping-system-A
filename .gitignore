@@ -36,5 +36,8 @@ PushShoppingList/guest_sessions.json
 PushShoppingList/user_data/
 PushShoppingList/static/uploads/avatars/*
 !PushShoppingList/static/uploads/avatars/.gitkeep
+PushShoppingList/static/generated/**/*__thumb.webp
+PushShoppingList/static/generated/**/*__card.webp
+PushShoppingList/static/generated/**/*__detail.webp
 shopping_app_*.log
 flask_*.log

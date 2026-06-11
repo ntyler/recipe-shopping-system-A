@@ -10241,20 +10241,25 @@ async function handleRecipeRemovalFormSubmit(form, submitter = null) {
             redirect: "follow",
         });
 
-        if (!response.ok) {
+        let payload = null;
+
+        try {
+            payload = await response.clone().json();
+        } catch (err) {
+            payload = null;
+        }
+
+        if (!response.ok || (payload && payload.ok === false)) {
             let message = parseFormError(response, "Unable to delete recipe.");
 
-            try {
-                const payload = await response.json();
+            if (payload) {
                 message = String((payload && (payload.error || payload.message)) || message).trim() || message;
-            } catch (err) {
-                // Keep fallback message if JSON cannot be read.
             }
 
             throw new Error(message);
         }
 
-        window.location.href = "/";
+        window.location.href = (payload && payload.redirect_url) || "/";
     } catch (err) {
         console.warn("Unable to delete recipe.", err);
         alert(err.message || "Unable to delete recipe.");
@@ -12109,6 +12114,11 @@ function normalizeRecipeEditorCoverImage(value = {}) {
     const alt = String(value.alt || "").trim();
     const mimeType = String(value.mime_type || value.mimeType || "").trim();
     const source = String(value.source || "").trim();
+    const thumbUrl = String(value.thumb_url || value.thumbUrl || "").trim();
+    const cardUrl = String(value.card_url || value.cardUrl || "").trim();
+    const detailUrl = String(value.detail_url || value.detailUrl || "").trim();
+    const srcset = String(value.srcset || "").trim();
+    const fullUrl = String(value.full_url || value.fullUrl || "").trim();
     const normalized = {};
 
     if (path) {
@@ -12137,6 +12147,26 @@ function normalizeRecipeEditorCoverImage(value = {}) {
         normalized.source = source;
     }
 
+    if (thumbUrl) {
+        normalized.thumb_url = thumbUrl;
+    }
+
+    if (cardUrl) {
+        normalized.card_url = cardUrl;
+    }
+
+    if (detailUrl) {
+        normalized.detail_url = detailUrl;
+    }
+
+    if (srcset) {
+        normalized.srcset = srcset;
+    }
+
+    if (fullUrl) {
+        normalized.full_url = fullUrl;
+    }
+
     return normalized.path || normalized.url || normalized.src ? normalized : {};
 }
 
@@ -12149,6 +12179,8 @@ function setRecipeEditorCoverImage(coverImage = {}, fallbackAlt = "") {
     const uploadLabel = document.getElementById("recipeEditCoverUploadLabel");
     const alt = normalized.alt || fallbackAlt || "Recipe title image";
     const src = normalized.src || normalized.url || "";
+    const displaySrc = normalized.card_url || normalized.thumb_url || src;
+    const fullSrc = normalized.full_url || src;
     const hasImage = Boolean(src || normalized.path || normalized.url);
 
     if (field) {
@@ -12162,11 +12194,22 @@ function setRecipeEditorCoverImage(coverImage = {}, fallbackAlt = "") {
                 : ""
         );
         image.alt = alt;
-        if (nextSrc) {
-            image.src = nextSrc;
+        if (displaySrc || nextSrc) {
+            image.src = displaySrc || nextSrc;
+            image.dataset.fullSrc = fullSrc || nextSrc;
+            image.loading = "lazy";
+            image.decoding = "async";
+            if (normalized.srcset) {
+                image.srcset = normalized.srcset;
+                image.sizes = "(max-width: 900px) 92vw, 720px";
+            } else {
+                image.removeAttribute("srcset");
+            }
             image.hidden = false;
         } else {
             image.removeAttribute("src");
+            image.removeAttribute("srcset");
+            image.removeAttribute("data-full-src");
             image.hidden = true;
         }
     }
@@ -14598,6 +14641,64 @@ function escapeRegExp(value) {
     return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function recipeImageVariantUrl(url, variant = "card") {
+    const value = String(url || "").trim();
+    const normalizedVariant = String(variant || "card").trim().toLowerCase();
+
+    if (!value || !["thumb", "card", "detail"].includes(normalizedVariant)) {
+        return value;
+    }
+
+    const match = value.match(/^([^?#]*\/static\/generated\/[^?#]+?)(\.[a-zA-Z0-9]+)([?#].*)?$/);
+
+    if (!match || /__(thumb|card|detail)\.webp$/i.test(match[1] + match[2])) {
+        return value;
+    }
+
+    return `${match[1]}__${normalizedVariant}.webp${match[3] || ""}`;
+}
+
+function recipeImageVariantSrcSet(url) {
+    const value = String(url || "").trim();
+
+    if (!value || recipeImageVariantUrl(value, "card") === value) {
+        return "";
+    }
+
+    return [
+        `${recipeImageVariantUrl(value, "thumb")} 240w`,
+        `${recipeImageVariantUrl(value, "card")} 640w`,
+        `${recipeImageVariantUrl(value, "detail")} 1280w`,
+    ].join(", ");
+}
+
+function setRecipeImageElementSource(image, originalUrl, displayVariant = "card", sizes = "(max-width: 900px) 92vw, 720px") {
+    if (!image) {
+        return;
+    }
+
+    const original = String(originalUrl || "").trim();
+    const displayUrl = recipeImageVariantUrl(original, displayVariant);
+    const srcset = recipeImageVariantSrcSet(original);
+
+    if (original) {
+        image.src = displayUrl || original;
+        image.dataset.fullSrc = original;
+        image.loading = "lazy";
+        image.decoding = "async";
+        image.sizes = sizes;
+        if (srcset) {
+            image.srcset = srcset;
+        } else {
+            image.removeAttribute("srcset");
+        }
+    } else {
+        image.removeAttribute("src");
+        image.removeAttribute("srcset");
+        image.removeAttribute("data-full-src");
+    }
+}
+
 function recipeStoreSectionOptions(selected) {
     const selectedValue = String(selected || "").toUpperCase();
     const sections = recipeEditStoreSections.length ? recipeEditStoreSections : ["MISC"];
@@ -14622,6 +14723,8 @@ function addRecipeEquipmentRow(value = "") {
     const equipmentImageUrl = typeof value === "object" && value !== null
         ? (value.equipment_image_url || value.image_url || "")
         : "";
+    const equipmentImageDisplayUrl = recipeImageVariantUrl(equipmentImageUrl, "card");
+    const equipmentImageSrcSet = recipeImageVariantSrcSet(equipmentImageUrl);
     const equipmentImageGeneratedAt = typeof value === "object" && value !== null
         ? (value.equipment_image_generated_at || value.image_generated_at || "")
         : "";
@@ -14644,9 +14747,13 @@ function addRecipeEquipmentRow(value = "") {
                 ${equipmentImageUrl ? "" : "No image generated for this equipment."}
             </div>
             <img class="recipe-step-image recipe-equipment-image"
-                 ${equipmentImageUrl ? `src="${escapeAttribute(equipmentImageUrl)}"` : ""}
+                 ${equipmentImageUrl ? `src="${escapeAttribute(equipmentImageDisplayUrl)}"` : ""}
+                 ${equipmentImageSrcSet ? `srcset="${escapeAttribute(equipmentImageSrcSet)}"` : ""}
+                 sizes="(max-width: 900px) 92vw, 720px"
+                 data-full-src="${escapeAttribute(equipmentImageUrl)}"
                  alt="Equipment image"
                  loading="lazy"
+                 decoding="async"
                  ${equipmentImageUrl ? "" : "hidden"}>
             <div class="recipe-step-image-actions">
                 <button type="button"
@@ -14778,6 +14885,8 @@ function addRecipeInstructionRow(value = "", stepNumber = null) {
     const stepImageUrl = typeof value === "object" && value !== null
         ? (value.step_image_url || value.image_url || "")
         : "";
+    const stepImageDisplayUrl = recipeImageVariantUrl(stepImageUrl, "card");
+    const stepImageSrcSet = recipeImageVariantSrcSet(stepImageUrl);
     const stepImageGeneratedAt = typeof value === "object" && value !== null
         ? (value.step_image_generated_at || value.image_generated_at || "")
         : "";
@@ -14805,9 +14914,13 @@ function addRecipeInstructionRow(value = "", stepNumber = null) {
                 ${stepImageUrl ? "" : "No image generated for this step."}
             </div>
             <img class="recipe-step-image"
-                 ${stepImageUrl ? `src="${escapeAttribute(stepImageUrl)}"` : ""}
+                 ${stepImageUrl ? `src="${escapeAttribute(stepImageDisplayUrl)}"` : ""}
+                 ${stepImageSrcSet ? `srcset="${escapeAttribute(stepImageSrcSet)}"` : ""}
+                 sizes="(max-width: 900px) 92vw, 720px"
+                 data-full-src="${escapeAttribute(stepImageUrl)}"
                  alt="Instruction step image"
                  loading="lazy"
+                 decoding="async"
                  ${stepImageUrl ? "" : "hidden"}>
             <div class="recipe-step-image-actions">
                 <button type="button"
@@ -17784,7 +17897,7 @@ function setRecipeImagePanelComplete(panel, item) {
     panel.classList.remove("recipe-image-visibility-hidden");
 
     if (imageUrl && image) {
-        image.src = imageUrl;
+        setRecipeImageElementSource(image, imageUrl, "card");
         image.hidden = false;
     }
 
@@ -20695,7 +20808,7 @@ function openRecipeImageLightbox(image) {
         return;
     }
 
-    lightboxImage.src = image.currentSrc || image.src;
+    lightboxImage.src = image.dataset.fullSrc || image.currentSrc || image.src;
     lightboxImage.alt = image.alt || "Recipe image";
     lightbox.classList.add("open");
     lightbox.setAttribute("aria-hidden", "false");

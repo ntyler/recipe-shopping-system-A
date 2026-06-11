@@ -472,9 +472,13 @@
                 {% if recipe.cover_image and recipe.cover_image.src %}
                     <div class="recipe-view-title-media recipe-view-body-media">
                         <img class="recipe-cover-image recipe-view-cover"
-                             src="{{ recipe.cover_image.src }}"
+                             src="{{ recipe.cover_image.card_url or recipe.cover_image.thumb_url or recipe.cover_image.src }}"
+                             {% if recipe.cover_image.srcset %}srcset="{{ recipe.cover_image.srcset }}"{% endif %}
+                             sizes="(max-width: 900px) 92vw, 720px"
+                             data-full-src="{{ recipe.cover_image.src }}"
                              alt="{{ recipe.cover_image.alt or recipe.name }}"
-                             loading="lazy">
+                             loading="lazy"
+                             decoding="async">
                     </div>
                 {% endif %}
 
@@ -553,9 +557,13 @@
                                             {% endif %}
                                         </div>
                                         <img class="recipe-step-image recipe-equipment-image"
-                                             {% if equipment_item.equipment_image_url %}src="{{ equipment_item.equipment_image_url }}"{% endif %}
+                                             {% if equipment_item.equipment_image_url %}src="{{ equipment_item.equipment_image_display_url or equipment_item.equipment_image_url }}"{% endif %}
+                                             {% if equipment_item.equipment_image_srcset %}srcset="{{ equipment_item.equipment_image_srcset }}"{% endif %}
+                                             sizes="(max-width: 900px) 92vw, 720px"
+                                             data-full-src="{{ equipment_item.equipment_image_full_url or equipment_item.equipment_image_url }}"
                                              alt="Recipe {{ recipe.number }} equipment {{ equipment_item.number }} image"
                                              loading="lazy"
+                                             decoding="async"
                                              {% if not equipment_item.equipment_image_url %}hidden{% endif %}>
                                         <div class="recipe-step-image-actions">
                                             <button type="button"
@@ -669,9 +677,13 @@
                                             {% endif %}
                                         </div>
                                         <img class="recipe-step-image"
-                                             {% if instruction.step_image_url %}src="{{ instruction.step_image_url }}"{% endif %}
+                                             {% if instruction.step_image_url %}src="{{ instruction.step_image_display_url or instruction.step_image_url }}"{% endif %}
+                                             {% if instruction.step_image_srcset %}srcset="{{ instruction.step_image_srcset }}"{% endif %}
+                                             sizes="(max-width: 900px) 92vw, 720px"
+                                             data-full-src="{{ instruction.step_image_full_url or instruction.step_image_url }}"
                                              alt="Recipe {{ recipe.number }} step {{ instruction.step_number }} image"
                                              loading="lazy"
+                                             decoding="async"
                                              {% if not instruction.step_image_url %}hidden{% endif %}>
                                         <div class="recipe-step-image-actions">
                                             <button type="button"

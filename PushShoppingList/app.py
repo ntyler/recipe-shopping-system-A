@@ -1,4 +1,5 @@
 import os
+import mimetypes
 from datetime import timedelta
 
 from flask import Flask
@@ -27,12 +28,17 @@ from PushShoppingList.services.guest_session_service import guest_banner_context
 from PushShoppingList.services.guest_session_service import is_guest_session
 from PushShoppingList.services.guest_session_service import remembered_guest_cookie_status
 from PushShoppingList.services.guest_session_service import restore_guest_session_from_cookie
+from PushShoppingList.services.image_variant_service import generated_static_cache_seconds
+from PushShoppingList.services.image_variant_service import is_cacheable_generated_static_path
 from PushShoppingList.services.sms_service import password_reset_sms_configured
 from PushShoppingList.services.user_account_service import current_public_user
 from PushShoppingList.services.user_account_service import current_user
 from PushShoppingList.services.user_account_service import is_admin_user
 from PushShoppingList.services.user_account_service import pending_two_factor_setup
 from PushShoppingList.services.recipe_extract_service import log_openai_startup_diagnostics
+
+
+mimetypes.add_type("image/webp", ".webp")
 
 
 PUBLIC_ENDPOINTS = {
@@ -254,6 +260,13 @@ def create_app():
             response.headers["Access-Control-Allow-Headers"] = "Content-Type"
             response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
             response.headers.add("Vary", "Origin")
+
+        if is_cacheable_generated_static_path(request.path):
+            if request.path.lower().endswith(".webp"):
+                response.mimetype = "image/webp"
+            response.headers["Cache-Control"] = (
+                f"public, max-age={generated_static_cache_seconds()}, immutable"
+            )
 
         if getattr(g, "clear_guest_demo_cookie", False):
             clear_guest_cookie(response)

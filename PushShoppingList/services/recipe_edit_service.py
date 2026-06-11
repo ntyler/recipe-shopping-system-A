@@ -24,6 +24,8 @@ from PushShoppingList.services.cookbook_service import infer_recipe_categories
 from PushShoppingList.services.cookbook_service import recipe_category_metadata_for_editor
 from PushShoppingList.services.cookbook_service import recipe_cookbook_assignments
 from PushShoppingList.services.ingredient_text_review_service import annotate_ingredients_for_food_review
+from PushShoppingList.services.image_variant_service import cover_image_variant_payload
+from PushShoppingList.services.image_variant_service import ensure_webp_variants
 from PushShoppingList.services.recipe_extract_service import MODEL
 from PushShoppingList.services.recipe_extract_service import OUTPUT_FOLDER
 from PushShoppingList.services.recipe_extract_service import RAW_FOLDER
@@ -47,6 +49,7 @@ from PushShoppingList.services.recipe_extract_service import normalize_recipe_sc
 from PushShoppingList.services.recipe_extract_service import PDF_KIND_GENERATED_RECIPE
 from PushShoppingList.services.recipe_extract_service import PDF_KIND_WEBPAGE_BACKUP
 from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_path
+from PushShoppingList.services.recipe_extract_service import recipe_cover_image_file_path
 from PushShoppingList.services.recipe_extract_service import recipe_pdf_path
 from PushShoppingList.services.recipe_extract_service import safe_filename
 from PushShoppingList.services.recipe_extract_service import write_recipe_page_pdf
@@ -427,10 +430,24 @@ def editable_recipe_cover_image(url, recipe_data, recipe_meta=None):
     elif normalized.get("url"):
         src = normalized.get("url")
 
+    variants = {}
+    image_path = recipe_cover_image_file_path(normalized)
+    if image_path and source_url:
+        version = f"{int(image_path.stat().st_mtime)}-{image_path.stat().st_size}"
+
+        def build_variant_url(variant, version_value):
+            return (
+                f"/recipe_cover_image?url={quote(source_url, safe='')}"
+                f"&variant={quote(variant, safe='')}&v={quote(version_value, safe='')}"
+            )
+
+        variants = cover_image_variant_payload(src, image_path, build_variant_url)
+
     return {
         **normalized,
         "alt": normalized.get("alt") or fallback_alt,
         "src": src,
+        **variants,
     }
 
 
@@ -2761,6 +2778,7 @@ def save_recipe_step_image_file(recipe_url, step_number, image_bytes):
     filename = f"{safe_filename(recipe_url)}_step_{step_key}_{uuid.uuid4().hex[:12]}.png"
     image_path = STEP_IMAGE_FOLDER / filename
     image_path.write_bytes(image_bytes)
+    ensure_webp_variants(image_path)
     return f"{STEP_IMAGE_URL_PREFIX}/{filename}"
 
 
@@ -2770,6 +2788,7 @@ def save_recipe_equipment_image_file(recipe_url, equipment_index, image_bytes):
     filename = f"{safe_filename(recipe_url)}_equipment_{equipment_key}_{uuid.uuid4().hex[:12]}.png"
     image_path = STEP_IMAGE_FOLDER / filename
     image_path.write_bytes(image_bytes)
+    ensure_webp_variants(image_path)
     return f"{STEP_IMAGE_URL_PREFIX}/{filename}"
 
 
@@ -2780,6 +2799,7 @@ def save_uploaded_recipe_detail_image_file(recipe_url, image_kind, target, uploa
     filename = f"{safe_filename(recipe_url)}_{kind_key}_{target_key}_{uuid.uuid4().hex[:12]}{extension}"
     image_path = STEP_IMAGE_FOLDER / filename
     uploaded_file.save(image_path)
+    ensure_webp_variants(image_path)
     return f"{STEP_IMAGE_URL_PREFIX}/{filename}"
 
 
