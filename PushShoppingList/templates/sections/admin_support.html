@@ -14,14 +14,6 @@
         </div>
         <div class="admin-support-header-actions">
             <span class="admin-support-count">{{ admin_support.users|length }} accounts</span>
-            {% if admin_support_account_panel %}
-                <button type="button"
-                        class="secondary user-push-panel-close user-admin-support-close"
-                        data-admin-support-close
-                        onclick="return closeAdminSupportPanel()">
-                    Close
-                </button>
-            {% endif %}
         </div>
     </div>
 
