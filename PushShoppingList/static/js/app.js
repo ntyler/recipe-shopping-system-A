@@ -9969,6 +9969,46 @@ function updateActiveStoreCardActivationState(card, isActive) {
     filterActiveStores();
 }
 
+async function activateAllStoresFromMenu(button, activate) {
+    closeRecipeEditRowMenus();
+
+    if (!canToggleStores()) {
+        return false;
+    }
+
+    const inputs = Array.from(document.querySelectorAll('input[form="store-options-form"][name="enabled_stores"]'));
+
+    if (!inputs.length) {
+        return false;
+    }
+
+    const previousStates = inputs.map(input => input.checked);
+
+    inputs.forEach(input => {
+        input.checked = Boolean(activate);
+    });
+
+    if (button) {
+        button.disabled = true;
+        button.setAttribute("aria-busy", "true");
+    }
+
+    const saved = await saveStoreToggle(inputs[0]);
+
+    if (!saved) {
+        inputs.forEach((input, index) => {
+            input.checked = previousStates[index];
+        });
+    }
+
+    if (button) {
+        button.disabled = false;
+        button.removeAttribute("aria-busy");
+    }
+
+    return false;
+}
+
 async function toggleStoreActivationFromCard(card) {
     if (!canToggleStores()) {
         return false;

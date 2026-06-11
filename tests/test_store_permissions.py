@@ -226,11 +226,46 @@ def test_store_options_store_rows_show_credentials_under_selector_url():
     assert "saved-password" not in store_detail
 
 
+def test_store_options_menu_renders_bulk_activation_actions():
+    app = create_app()
+
+    with app.test_request_context("/"):
+        html = render_template(
+            "sections/store_options.html",
+            current_user=None,
+            available_stores={
+                "aldi": {
+                    "label": "Aldi",
+                    "url": "https://aldi.example/search?q=",
+                    "urlStoreSelector": "https://aldi.example/stores",
+                },
+            },
+            enabled_stores=[],
+            nearest_store_locations={},
+            nearest_store_results={},
+            nearest_store_search_radius_miles=5,
+        )
+
+    assert 'data-store-bulk-activation="activate"' in html
+    assert 'data-store-bulk-activation="deactivate"' in html
+    assert "Activate all stores" in html
+    assert "Deactivate all stores" in html
+    assert "activateAllStoresFromMenu(this, true)" in html
+    assert "activateAllStoresFromMenu(this, false)" in html
+
+
 def test_inactive_store_row_does_not_dim_edit_modal():
     css = open("PushShoppingList/static/css/app.css", encoding="utf-8").read()
 
     assert ".store-manager-row.inactive > :not(.store-edit-form)" in css
     assert ".store-manager-row.inactive {\n            opacity" not in css
+
+
+def test_store_options_bulk_activation_has_script_handler():
+    script = open("PushShoppingList/static/js/app.js", encoding="utf-8").read()
+
+    assert "async function activateAllStoresFromMenu(button, activate)" in script
+    assert "saveStoreToggle(inputs[0])" in script
 
 
 def test_store_options_admin_menu_renders_store_management_actions():

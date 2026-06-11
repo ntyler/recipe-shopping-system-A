@@ -54,6 +54,18 @@
                             onclick="toggleStoreOptionsDisplay('maps'); return false;">
                         Show Maps
                     </button>
+                    {% if can_toggle_stores %}
+                        <button type="button"
+                                data-store-bulk-activation="activate"
+                                onclick="return activateAllStoresFromMenu(this, true);">
+                            Activate all stores
+                        </button>
+                        <button type="button"
+                                data-store-bulk-activation="deactivate"
+                                onclick="return activateAllStoresFromMenu(this, false);">
+                            Deactivate all stores
+                        </button>
+                    {% endif %}
 
                     <div class="recipe-view-menu-subsection-title">Mode Options</div>
                     <div class="active-store-mode-controls">
