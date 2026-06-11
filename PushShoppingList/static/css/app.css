@@ -5855,9 +5855,22 @@ body {
             width: auto;
             min-height: 30px;
             padding: 5px 11px;
+            border: 1px solid #b8e9c9;
             border-radius: 6px;
+            background: #f8fafc;
+            color: #10231a;
             font-size: 13px;
             font-weight: 900;
+            cursor: pointer;
+        }
+
+        .user-firebase-info-learn:hover,
+        .user-firebase-info-learn:focus-visible {
+            border-color: #8dffb4;
+            background: #dff7e8;
+            color: #07130d;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(25, 195, 107, 0.18);
         }
 
         .user-firebase-info-modal-backdrop {

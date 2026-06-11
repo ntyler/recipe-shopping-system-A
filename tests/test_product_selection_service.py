@@ -452,6 +452,18 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn(".cookbook-recipe-details.collapsed", css)
         self.assertIn(".cookbook-source-cover", css)
 
+    def test_cookbook_view_recipe_loads_editor_modal_lazily(self):
+        cookbook_template = Path("PushShoppingList/templates/sections/cookbooks.html").read_text(encoding="utf-8")
+        script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+        start = script.index("async function openRecipeEditor")
+        block = script[start:script.index("function openRecipeEditorSection", start)]
+
+        self.assertIn("View Recipe", cookbook_template)
+        self.assertIn("openRecipeEditor(this); return false;", cookbook_template)
+        self.assertIn('lazySectionElement("current-recipes")', block)
+        self.assertIn('await loadLazySection("current-recipes", { allowDuringAuthCollapse: true });', block)
+        self.assertIn('modal = document.getElementById("recipeEditModal");', block)
+
     def test_cookbook_move_reassigns_recipes_with_details_between_cookbooks(self):
         from PushShoppingList.services import cookbook_service
 

@@ -247,6 +247,10 @@ def test_firebase_connected_status_has_customer_friendly_security_details():
     assert "width: min(360px, calc(100vw - 56px));" in css
     assert "max-width: calc(100vw - 56px);" in css
     assert "overflow-wrap: anywhere;" in css
+    assert ".user-firebase-info-learn" in css
+    assert "background: #f8fafc;" in css
+    assert "color: #10231a;" in css
+    assert ".user-firebase-info-learn:hover" in css
     assert "width: min(100%, calc(100vw - 96px));" in css
     assert ".user-firebase-info-modal-backdrop" in css
     assert ".user-firebase-info-modal-backdrop.open" in css

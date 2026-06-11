@@ -12218,7 +12218,7 @@ async function decideRecipeEditCategoriesWithChatGPT(button, mode = "missing") {
 
 async function openRecipeEditor(button, options = {}) {
     const url = button ? button.dataset.recipeUrl || "" : "";
-    const modal = document.getElementById("recipeEditModal");
+    let modal = document.getElementById("recipeEditModal");
     const shouldScrollToFoodReview = options === true || Boolean(options.scrollToFoodReview);
     const targetIngredient = options && typeof options === "object"
         ? String(options.ingredient || options.scrollToIngredient || "").trim()
@@ -12227,7 +12227,22 @@ async function openRecipeEditor(button, options = {}) {
         ? String(options.section || options.scrollToSection || "").trim()
         : "";
 
-    if (!url || !modal) {
+    if (!url) {
+        return;
+    }
+
+    if (!modal && lazySectionElement("current-recipes")) {
+        await loadLazySection("current-recipes", { allowDuringAuthCollapse: true });
+        modal = document.getElementById("recipeEditModal");
+    }
+
+    if (!modal && lazySectionElement("recipe-view")) {
+        await loadLazySection("recipe-view", { allowDuringAuthCollapse: true });
+        modal = document.getElementById("recipeEditModal");
+    }
+
+    if (!modal) {
+        console.warn("Unable to open recipe editor: modal markup is not loaded.");
         return;
     }
 
