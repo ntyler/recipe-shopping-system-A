@@ -73,12 +73,13 @@ def remove_recipe_url(url):
 
 
 def recipe_url_rows():
+    meta = load_recipe_url_meta()
     return [
         {
             "url": url,
-            "name": recipe_url_display_name(url),
+            "name": recipe_url_display_name(url, meta=meta),
             "type": recipe_url_type(url),
-            "quantity": recipe_url_quantity(url),
+            "quantity": recipe_url_quantity(url, meta=meta),
         }
         for url in load_recipe_urls()
     ]
@@ -96,16 +97,16 @@ def recipe_url_type(url):
     return "URL"
 
 
-def recipe_url_quantity(url):
+def recipe_url_quantity(url, meta=None):
     key = normalize_recipe_url_key(url)
-    meta = load_recipe_url_meta()
+    meta = meta if isinstance(meta, dict) else load_recipe_url_meta()
     recipe_meta = meta.get(key, {})
     return normalize_recipe_quantity(recipe_meta.get("quantity", 1))
 
 
-def recipe_url_display_name(url):
+def recipe_url_display_name(url, meta=None):
     key = normalize_recipe_url_key(url)
-    meta = load_recipe_url_meta()
+    meta = meta if isinstance(meta, dict) else load_recipe_url_meta()
     recipe_meta = meta.get(key, {})
     custom_name = str(recipe_meta.get("name") or "").strip()
 
