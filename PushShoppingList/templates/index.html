@@ -6,7 +6,6 @@
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=app_css_version) }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/extraction_overlay_old.css') }}">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 
 <body class="{% if password_reset_token|default('') or two_factor_recovery_token|default('') or account_delete_token|default('') %}account-action-token{% endif %}">
@@ -109,7 +108,6 @@
     {% include "sections/items.html" %}
 </main>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="{{ url_for('static', filename='js/app.js', v=app_js_version) }}"></script>
 <script id="firebaseWebConfig" type="application/json">{{ firebase_web_config|tojson }}</script>
 <script type="module" src="{{ url_for('static', filename='js/firebase-auth.js', v=firebase_auth_js_version) }}"></script>

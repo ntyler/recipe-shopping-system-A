@@ -17,6 +17,8 @@ const CATEGORY_ALL_FIELD_NAMES = [...CATEGORY_FIELD_NAMES, "custom_categories"];
 const CATEGORY_SOURCE_USER_SELECTED = "user_selected";
 const CATEGORY_SOURCE_AI_INFERRED = "ai_inferred";
 const CATEGORY_SOURCE_BLANK = "blank";
+const LEAFLET_CSS_URL = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+const LEAFLET_JS_URL = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
 const USER_ACCOUNT_OPEN_PANEL_KEY = "user-account-open-panel";
 const USER_PROFILE_EDITOR_OPEN_KEY = "user-account-settings-open";
 const USER_ACCOUNT_REMEMBERED_PANEL_SELECTORS = {
@@ -59,6 +61,92 @@ function getPublicSupportIdentity(email) {
 
 let openAiUsageDashboardRefreshTimer = null;
 let openAiUsageDashboardRefreshPromise = null;
+let leafletAssetsPromise = null;
+
+function scheduleIdleTask(callback, timeout = 1200) {
+    if (window.requestIdleCallback) {
+        window.requestIdleCallback(callback, { timeout });
+        return;
+    }
+
+    window.setTimeout(callback, 0);
+}
+
+function runStartupTask(name, callback) {
+    try {
+        callback();
+    } catch (err) {
+        console.error(`Startup task failed: ${name}`, err);
+    }
+}
+
+function runIdleStartupTasks(tasks) {
+    const queue = [...tasks];
+
+    const runNext = () => {
+        const task = queue.shift();
+
+        if (!task) {
+            return;
+        }
+
+        runStartupTask(task.name, task.run);
+
+        if (queue.length) {
+            scheduleIdleTask(runNext);
+        }
+    };
+
+    scheduleIdleTask(runNext);
+}
+
+function loadLeafletAssets() {
+    if (window.L) {
+        return Promise.resolve(window.L);
+    }
+
+    if (leafletAssetsPromise) {
+        return leafletAssetsPromise;
+    }
+
+    const cssPromise = new Promise((resolve, reject) => {
+        const existing = document.querySelector(`link[href="${LEAFLET_CSS_URL}"]`);
+
+        if (existing) {
+            resolve();
+            return;
+        }
+
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = LEAFLET_CSS_URL;
+        link.onload = resolve;
+        link.onerror = reject;
+        document.head.appendChild(link);
+    });
+
+    const jsPromise = new Promise((resolve, reject) => {
+        const existing = document.querySelector(`script[src="${LEAFLET_JS_URL}"]`);
+
+        if (existing) {
+            existing.addEventListener("load", () => resolve(window.L), { once: true });
+            existing.addEventListener("error", reject, { once: true });
+            return;
+        }
+
+        const script = document.createElement("script");
+        script.src = LEAFLET_JS_URL;
+        script.async = true;
+        script.onload = () => resolve(window.L);
+        script.onerror = reject;
+        document.body.appendChild(script);
+    });
+
+    leafletAssetsPromise = Promise.all([cssPromise, jsPromise])
+        .then(() => window.L);
+
+    return leafletAssetsPromise;
+}
 
 function formatGuestCountdown(msRemaining) {
     const totalSeconds = Math.max(0, Math.floor(Number(msRemaining || 0) / 1000));
@@ -20519,7 +20607,14 @@ function addressMatches(addressA, addressB) {
 }
 
 function initStoreLocationMaps() {
+    if (!document.querySelector("[data-store-map]")) {
+        return;
+    }
+
     if (!window.L) {
+        loadLeafletAssets()
+            .then(() => initStoreLocationMaps())
+            .catch(err => console.warn("Unable to load map assets.", err));
         return;
     }
 
@@ -20905,41 +21000,47 @@ function buildAddressSummaryFromForm(form) {
 }
 
 document.addEventListener("DOMContentLoaded", function () {
-    restoreScroll();
-    restoreScreenSettings();
-    restoreCardCollapseState();
-    restoreHomeAddressHistoryCollapseState();
-    restoreOpenStorePanels();
-    restoreViewBehaviorSettings();
-    restoreItemCheckState();
-    bindAccountMenuDropdowns();
-    restoreRememberedAccountPanelOpen();
-    initGuestCountdowns();
-    bindGuestAuthChoices();
-    bindFeedbackTickets();
-    initPhoneCountryInputs();
-    bindRecipeUrlLogDragAndDrop();
-    bindRecipeViewDragAndDrop();
-    bindCurrentRecipeUrlSummaryToggles();
-    bindRecipeRemovalForms();
-    bindRecipeQuantityInputs();
-    bindRecipeNameInputs();
-    bindCookbooks();
-    bindImportCookbookSelector();
-    bindStoreButtons();
-    bindSectionHeaderToggles();
-    bindRecipeDetailToggles();
-    bindRecipeTaskChecks();
-    bindRecipeEditCategorySourceTracking();
-    keepRecipeCoverImagesVisible();
-    initRecipeImageProgressSync();
-    updateRecipeEditStickyOffsets();
-    updateViewSwitcherStickyOffset();
-    restoreStoreOptionsDisplaySettings();
-    restoreActiveStoreIconMode();
-    restoreStoreOptionsListSort();
-    initStoreLocationMaps();
-    startExtractionProgressPolling();
+    [
+        ["restoreScroll", restoreScroll],
+        ["restoreScreenSettings", restoreScreenSettings],
+        ["restoreCardCollapseState", restoreCardCollapseState],
+        ["restoreHomeAddressHistoryCollapseState", restoreHomeAddressHistoryCollapseState],
+        ["restoreOpenStorePanels", restoreOpenStorePanels],
+        ["restoreViewBehaviorSettings", restoreViewBehaviorSettings],
+        ["restoreItemCheckState", restoreItemCheckState],
+        ["bindAccountMenuDropdowns", bindAccountMenuDropdowns],
+        ["restoreRememberedAccountPanelOpen", restoreRememberedAccountPanelOpen],
+        ["initGuestCountdowns", initGuestCountdowns],
+        ["bindGuestAuthChoices", bindGuestAuthChoices],
+        ["bindFeedbackTickets", bindFeedbackTickets],
+        ["initPhoneCountryInputs", initPhoneCountryInputs],
+        ["bindCurrentRecipeUrlSummaryToggles", bindCurrentRecipeUrlSummaryToggles],
+        ["bindRecipeRemovalForms", bindRecipeRemovalForms],
+        ["bindRecipeQuantityInputs", bindRecipeQuantityInputs],
+        ["bindRecipeNameInputs", bindRecipeNameInputs],
+        ["bindImportCookbookSelector", bindImportCookbookSelector],
+        ["bindStoreButtons", bindStoreButtons],
+        ["bindSectionHeaderToggles", bindSectionHeaderToggles],
+    ].forEach(([name, callback]) => runStartupTask(name, callback));
+
+    runIdleStartupTasks([
+        { name: "bindRecipeUrlLogDragAndDrop", run: bindRecipeUrlLogDragAndDrop },
+        { name: "bindRecipeViewDragAndDrop", run: bindRecipeViewDragAndDrop },
+        { name: "bindCookbooks", run: bindCookbooks },
+        { name: "bindRecipeDetailToggles", run: bindRecipeDetailToggles },
+        { name: "bindRecipeTaskChecks", run: bindRecipeTaskChecks },
+        { name: "bindRecipeEditCategorySourceTracking", run: bindRecipeEditCategorySourceTracking },
+        { name: "keepRecipeCoverImagesVisible", run: keepRecipeCoverImagesVisible },
+        { name: "initRecipeImageProgressSync", run: initRecipeImageProgressSync },
+        { name: "updateRecipeEditStickyOffsets", run: updateRecipeEditStickyOffsets },
+        { name: "updateViewSwitcherStickyOffset", run: updateViewSwitcherStickyOffset },
+        { name: "restoreStoreOptionsDisplaySettings", run: restoreStoreOptionsDisplaySettings },
+        { name: "restoreActiveStoreIconMode", run: restoreActiveStoreIconMode },
+        { name: "restoreStoreOptionsListSort", run: restoreStoreOptionsListSort },
+        { name: "initStoreLocationMaps", run: initStoreLocationMaps },
+        { name: "startExtractionProgressPolling", run: startExtractionProgressPolling },
+        { name: "updateAddStoreStickyVisibility", run: updateAddStoreStickyVisibility },
+    ]);
     document.addEventListener("click", handleRecipeCoverImageClick, true);
     document.addEventListener("click", handleRecipeEditRowMenuOutsideClick);
     document.addEventListener("scroll", handleRecipeEditRowMenuScrollOrResize, true);
@@ -20948,7 +21049,6 @@ document.addEventListener("DOMContentLoaded", function () {
     document.addEventListener("keydown", handleRecipeCoverImageKeydown, true);
     document.addEventListener("keydown", closeAddStoreModalOnEscape);
     document.addEventListener("keydown", closeRecipeImageLightboxOnEscape);
-    updateAddStoreStickyVisibility();
 });
 
 window.addEventListener("resize", updateRecipeEditStickyOffsets);
