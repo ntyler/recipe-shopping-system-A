@@ -17893,6 +17893,10 @@ body {
     max-width: 980px;
 }
 
+.user-admin-support-panel[hidden] {
+    display: none;
+}
+
 .chatgpt-models-card {
     display: grid;
     gap: 16px;
