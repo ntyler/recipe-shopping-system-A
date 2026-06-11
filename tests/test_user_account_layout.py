@@ -244,6 +244,10 @@ def test_firebase_connected_status_has_customer_friendly_security_details():
     assert "cursor: pointer;" in css
     assert ".user-firebase-info-btn" in css
     assert ".user-firebase-info-popover" in css
+    assert "width: min(360px, calc(100vw - 56px));" in css
+    assert "max-width: calc(100vw - 56px);" in css
+    assert "overflow-wrap: anywhere;" in css
+    assert "width: min(100%, calc(100vw - 96px));" in css
     assert ".user-firebase-info-modal-backdrop" in css
     assert ".user-firebase-info-modal-backdrop.open" in css
 
