@@ -70,7 +70,8 @@ def test_recipe_menu_edit_opens_editor_after_closing_menu():
     cookbooks = (ROOT / "PushShoppingList/templates/sections/cookbooks.html").read_text(encoding="utf-8")
 
     assert "function openRecipeEditorFromMenu(button, options = {})" in script
-    assert "window.requestAnimationFrame(() => openRecipeEditor(button, options));" in script
+    assert 'const recipeUrl = button ? button.dataset.recipeUrl || "" : "";' in script
+    assert "openRecipeEditor({ dataset: { recipeUrl } }, options);" in script
     assert "await waitForNextPaint();" in script
     assert "scheduleRecipeImageProgressPoll(750);" in script
     assert "onclick=\"return openRecipeEditorFromMenu(this)\"" in current_recipes

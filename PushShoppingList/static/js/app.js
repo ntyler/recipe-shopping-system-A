@@ -12880,8 +12880,17 @@ async function openRecipeEditor(button, options = {}) {
 }
 
 function openRecipeEditorFromMenu(button, options = {}) {
+    const recipeUrl = button ? button.dataset.recipeUrl || "" : "";
+
     closeRecipeEditRowMenus();
-    window.requestAnimationFrame(() => openRecipeEditor(button, options));
+
+    if (!recipeUrl) {
+        return false;
+    }
+
+    window.requestAnimationFrame(() => {
+        openRecipeEditor({ dataset: { recipeUrl } }, options);
+    });
     return false;
 }
 
