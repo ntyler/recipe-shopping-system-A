@@ -96,6 +96,7 @@ from PushShoppingList.services.shopping_list_service import save_items
 from PushShoppingList.services.store_settings_service import load_store_settings
 from PushShoppingList.services.firebase_auth_service import firebase_web_config
 from PushShoppingList.services.openai_model_service import chatgpt_models_dashboard_for_user
+from PushShoppingList.services.openai_model_service import refresh_lowest_viable_openai_model_recommendations
 from PushShoppingList.services.openai_model_service import refresh_openai_model_recommendations
 from PushShoppingList.services.openai_model_service import update_openai_model_settings_for_admin
 from PushShoppingList.services.openai_usage_service import openai_usage_dashboard_for_user
@@ -404,6 +405,7 @@ def update_chatgpt_models_route():
     action = request.form.get("action")
     refresh_models = action == "refresh_models"
     refresh_mappings = action == "refresh_mappings"
+    refresh_lowest_viable_mappings = action == "refresh_lowest_viable_mappings"
 
     if refresh_models:
         session["chatgpt_model_force_refresh"] = True
@@ -416,6 +418,12 @@ def update_chatgpt_models_route():
         session["chatgpt_model_show_advanced"] = show_advanced_models
         session["chatgpt_model_messages"] = [
             {"category": "success", "text": "Refreshing recommended model mappings."}
+        ]
+    elif refresh_lowest_viable_mappings:
+        refresh_lowest_viable_openai_model_recommendations()
+        session["chatgpt_model_show_advanced"] = show_advanced_models
+        session["chatgpt_model_messages"] = [
+            {"category": "success", "text": "Refreshing lowest viable model mappings."}
         ]
     else:
         result = update_openai_model_settings_for_admin(user, request.form)

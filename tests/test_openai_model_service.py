@@ -73,6 +73,23 @@ def test_use_proposed_model_persists_recommended_value(monkeypatch, tmp_path):
     assert overrides["models"]["OPENAI_RECIPE_MODEL"] == "gpt-5.5-mini"
 
 
+def test_lowest_viable_model_refresh_updates_recommended_mappings(monkeypatch, tmp_path):
+    configure_model_files(
+        monkeypatch,
+        tmp_path,
+        ["gpt-5.4-mini", "gpt-5.4-nano", "gpt-5.5"],
+    )
+
+    payload = models.refresh_lowest_viable_openai_model_recommendations()
+    dashboard = models.chatgpt_models_dashboard_for_user(ADMIN_USER)
+    rows = {row["env_var"]: row for row in dashboard["rows"]}
+
+    assert payload["mappings"]["OPENAI_MENU_MODEL"] == "gpt-5.4-mini"
+    assert payload["mappings"]["OPENAI_RECIPE_MODEL"] == "gpt-5.4-nano"
+    assert rows["OPENAI_MENU_MODEL"]["proposed_model"] == "gpt-5.4-mini"
+    assert rows["OPENAI_RECIPE_MODEL"]["proposed_model"] == "gpt-5.4-nano"
+
+
 def test_unavailable_active_model_stays_visible_with_warning(monkeypatch, tmp_path):
     configure_model_files(monkeypatch, tmp_path, ["gpt-5.5", "gpt-5.5-mini"])
     monkeypatch.setenv("OPENAI_MENU_MODEL", "gpt-4-0613")

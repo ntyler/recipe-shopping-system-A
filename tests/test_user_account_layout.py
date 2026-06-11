@@ -481,6 +481,8 @@ def test_chatgpt_models_live_inside_account_menu_panel():
     assert "Show Advanced Models" in models_template
     assert "Refresh Model List" in models_template
     assert "Refresh Recommended Mappings" in models_template
+    assert "Refresh Lowest Viable Mappings" in models_template
+    assert 'value="refresh_lowest_viable_mappings"' in models_template
     assert "Available Models:" in models_template
     assert "Last Refreshed:" in models_template
     assert "Recommended Mappings:" in models_template
@@ -498,6 +500,7 @@ def test_chatgpt_models_live_inside_account_menu_panel():
     assert 'value="use_proposed:{{ row.env_var }}"' in models_template
     assert "type=\"text\"" not in models_template
     assert "account_panel=\"chatgpt_models\"" in route
+    assert "refresh_lowest_viable_mappings" in route
     assert "refresh_openai_model_recommendations" in route
     assert "refresh_mappings" in route
     assert "chatgpt_model_force_refresh" in route

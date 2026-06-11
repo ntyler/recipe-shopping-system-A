@@ -112,6 +112,20 @@ DEFAULT_RECOMMENDED_MODEL_BY_ENV = {
     "OPENAI_ADDRESS_MODEL": "gpt-5.5-mini",
 }
 
+LOWEST_VIABLE_MODEL_BY_ENV = {
+    "OPENAI_MENU_MODEL": "gpt-5.4-mini",
+    "OPENAI_VISION_MODEL": "gpt-5.4-mini",
+    "OPENAI_RECIPE_MODEL": "gpt-5.4-nano",
+    "OPENAI_RECIPE_CATEGORY_MODEL": "gpt-5.4-nano",
+    "OPENAI_NUTRITION_MODEL": "gpt-5.4-nano",
+    "OPENAI_RECIPE_NOTE_MODEL": "gpt-5.4-nano",
+    "OPENAI_PRODUCT_ANALYSIS_MODEL": "gpt-5.4-nano",
+    "OPENAI_INGREDIENT_REVIEW_MODEL": "gpt-5.4-nano",
+    "OPENAI_FOOD_RULES_MODEL": "gpt-5.4-nano",
+    "OPENAI_FOOD_REVIEW_MODEL": "gpt-5.4-nano",
+    "OPENAI_ADDRESS_MODEL": "gpt-5.4-nano",
+}
+
 LEGACY_MODEL_RECOMMENDATIONS = {
     "gpt-4-0613": "gpt-5.5",
     "gpt-4-0314": "gpt-5.5",
@@ -265,6 +279,10 @@ def refresh_openai_model_recommendations():
     return save_openai_model_recommendation_cache(DEFAULT_RECOMMENDED_MODEL_BY_ENV)
 
 
+def refresh_lowest_viable_openai_model_recommendations():
+    return save_openai_model_recommendation_cache(LOWEST_VIABLE_MODEL_BY_ENV)
+
+
 def openai_model_recommendations():
     cache_payload = load_openai_model_recommendation_cache()
     cached_mappings = cache_payload.get("mappings", {}) if isinstance(cache_payload.get("mappings"), dict) else {}
@@ -307,13 +325,13 @@ def proposed_model_for_row(env_var, active_model, recommendations):
     proposed = normalize_model_name(mappings.get(env_var))
     legacy_proposed = normalize_model_name(LEGACY_MODEL_RECOMMENDATIONS.get(active_model))
 
-    if legacy_proposed and legacy_proposed != active_model:
-        return legacy_proposed, "Recommended replacement based on current OpenAI model mappings."
-
     if proposed:
         if proposed == active_model:
             return proposed, "Current model already matches recommendation."
         return proposed, "Recommended replacement based on current OpenAI model mappings."
+
+    if legacy_proposed and legacy_proposed != active_model:
+        return legacy_proposed, "Recommended replacement based on current OpenAI model mappings."
 
     return active_model, "No separate recommendation is configured for this route."
 
