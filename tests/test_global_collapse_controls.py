@@ -66,6 +66,21 @@ def test_global_collapse_action_targets_page_sections_and_nested_panels():
     assert ".recipe-global-image-hidden" in css
 
 
+def test_auth_transition_can_request_collapse_before_lazy_sections_load():
+    script = read_text("PushShoppingList/static/js/app.js")
+
+    assert 'const AUTH_COLLAPSE_PENDING_KEY = "shopping-auth-collapse-all-pending";' in script
+    assert 'const AUTH_COLLAPSE_ACTIVE_KEY = "shopping-auth-collapse-all-active";' in script
+    assert "function requestShoppingListAuthCollapseAll()" in script
+    assert "function consumeAuthCollapseAllRequest()" in script
+    assert "function persistShoppingListCollapsedState()" in script
+    assert "window.requestShoppingListAuthCollapseAll = requestShoppingListAuthCollapseAll;" in script
+    assert '["consumeAuthCollapseAllRequest", consumeAuthCollapseAllRequest]' in script
+    assert "if (authCollapseAllIsActive())" in script
+    assert 'safeStorageSet(localStorage, `card-collapse:${key}`, "collapsed");' in script
+    assert "safeStorageRemove(localStorage, USER_ACCOUNT_OPEN_PANEL_KEY);" in script
+
+
 def test_global_collapse_keeps_recipe_title_images_visible():
     script = read_text("PushShoppingList/static/js/app.js")
 

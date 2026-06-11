@@ -215,12 +215,29 @@ async function logoutBackend() {
     });
 }
 
+function requestCollapseAllBeforeAuthReload() {
+    if (typeof window.requestShoppingListAuthCollapseAll === "function") {
+        window.requestShoppingListAuthCollapseAll();
+        return;
+    }
+
+    try {
+        localStorage.setItem("shopping-auth-collapse-all-pending", "1");
+    } catch (error) {
+        // Collapse-on-auth is a UI preference; auth should continue if storage is unavailable.
+    }
+}
+
 async function accountExistsForPasswordReset(email) {
     const query = new URLSearchParams({ email });
     return backendJson(`/auth/account-exists?${query.toString()}`, { method: "GET" });
 }
 
-function reloadAccountSection() {
+function reloadAccountSection(options = {}) {
+    if (options.collapseAllBeforeReload) {
+        requestCollapseAllBeforeAuthReload();
+    }
+
     window.location.hash = "userAccountSection";
     window.location.reload();
 }
@@ -253,6 +270,7 @@ async function finishPostTwoFactorDisableSignOut() {
     }
 
     explicitAuthInProgress = true;
+    requestCollapseAllBeforeAuthReload();
 
     try {
         await signOut(auth);
@@ -279,7 +297,7 @@ function handleFirebaseBackendLogin(result, form, successMessage) {
     }
 
     setStatus(form, successMessage, "success");
-    reloadAccountSection();
+    reloadAccountSection({ collapseAllBeforeReload: true });
     return true;
 }
 
@@ -1096,6 +1114,7 @@ function bindSignOutForm() {
     form.addEventListener("submit", async (event) => {
         event.preventDefault();
         setBusy(form, true);
+        requestCollapseAllBeforeAuthReload();
 
         try {
             await signOut(auth);
@@ -1103,7 +1122,7 @@ function bindSignOutForm() {
             try {
                 await logoutBackend();
             } finally {
-                reloadAccountSection();
+                reloadAccountSection({ collapseAllBeforeReload: true });
             }
         }
     });
@@ -1119,6 +1138,7 @@ function bindTwoFactorCancelButton() {
     button.addEventListener("click", async (event) => {
         event.preventDefault();
         button.disabled = true;
+        requestCollapseAllBeforeAuthReload();
 
         try {
             await signOut(auth);
@@ -1208,6 +1228,7 @@ function bindAccountDeleteConfirmForm() {
         form.querySelectorAll("button").forEach((button) => {
             button.disabled = true;
         });
+        requestCollapseAllBeforeAuthReload();
 
         try {
             await signOut(auth);
@@ -1271,13 +1292,13 @@ if (auth) {
                     reloadAccountSection();
                     return;
                 }
-                reloadAccountSection();
+                reloadAccountSection({ collapseAllBeforeReload: true });
                 return;
             }
 
             if (!firebaseUser && session.user && session.user.auth_provider === "firebase") {
                 await logoutBackend();
-                reloadAccountSection();
+                reloadAccountSection({ collapseAllBeforeReload: true });
             }
         } catch (error) {
             console.warn("Firebase auth state sync failed.", error);

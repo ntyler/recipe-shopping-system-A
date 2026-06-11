@@ -35,6 +35,20 @@ const USER_ACCOUNT_PANEL_HIDE_SELECTOR = [
     ...Object.values(USER_ACCOUNT_REMEMBERED_PANEL_SELECTORS),
     "[data-feedback-support-panel]",
 ].join(", ");
+const AUTH_COLLAPSE_PENDING_KEY = "shopping-auth-collapse-all-pending";
+const AUTH_COLLAPSE_ACTIVE_KEY = "shopping-auth-collapse-all-active";
+const AUTH_COLLAPSE_CONTENT_KEYS = [
+    "ai-pantry",
+    "recipe-url-log",
+    "cookbooks",
+    "rules",
+    "store-options",
+    "home-address",
+    "feedback-support",
+    "food-restrictions",
+    "screen-settings",
+    "shared-recipe-pdfs",
+];
 const IMPORT_COOKBOOK_STORAGE_KEY = "import-recipe-cookbook-destination";
 const USER_ACCOUNT_PANEL_HASH_KEYS = {
     "#userProfileEditForm": "accountSettings",
@@ -137,6 +151,64 @@ function setLazySectionStatus(placeholder, text, isError = false) {
 
     status.textContent = text || "";
     status.classList.toggle("lazy-section-error", isError);
+}
+
+function safeStorageSet(storage, key, value) {
+    try {
+        storage.setItem(key, value);
+    } catch (err) {
+        // Storage can be unavailable in private or restricted browser contexts.
+    }
+}
+
+function safeStorageRemove(storage, key) {
+    try {
+        storage.removeItem(key);
+    } catch (err) {
+        // Storage can be unavailable in private or restricted browser contexts.
+    }
+}
+
+function safeStorageGet(storage, key) {
+    try {
+        return storage.getItem(key);
+    } catch (err) {
+        return null;
+    }
+}
+
+function persistShoppingListCollapsedState() {
+    AUTH_COLLAPSE_CONTENT_KEYS.forEach(key => {
+        safeStorageSet(localStorage, `card-collapse:${key}`, "collapsed");
+    });
+    safeStorageRemove(localStorage, USER_ACCOUNT_OPEN_PANEL_KEY);
+    safeStorageRemove(localStorage, USER_PROFILE_EDITOR_OPEN_KEY);
+    safeStorageSet(localStorage, "store-open-panels", "[]");
+}
+
+function requestShoppingListAuthCollapseAll() {
+    persistShoppingListCollapsedState();
+    safeStorageSet(localStorage, AUTH_COLLAPSE_PENDING_KEY, "1");
+}
+
+function authCollapseAllIsActive() {
+    return safeStorageGet(sessionStorage, AUTH_COLLAPSE_ACTIVE_KEY) === "1";
+}
+
+function clearAuthCollapseAllMode() {
+    safeStorageRemove(sessionStorage, AUTH_COLLAPSE_ACTIVE_KEY);
+}
+
+function consumeAuthCollapseAllRequest() {
+    if (safeStorageGet(localStorage, AUTH_COLLAPSE_PENDING_KEY) !== "1") {
+        return false;
+    }
+
+    safeStorageRemove(localStorage, AUTH_COLLAPSE_PENDING_KEY);
+    safeStorageSet(sessionStorage, AUTH_COLLAPSE_ACTIVE_KEY, "1");
+    persistShoppingListCollapsedState();
+    applyShoppingListCollapsedDomState({ showStatus: true });
+    return true;
 }
 
 function loadDeferredImage(image) {
@@ -244,6 +316,9 @@ function afterDynamicMarkupLoaded(options = {}) {
     restoreActiveStoreIconMode();
     restoreStoreOptionsListSort();
     initStoreLocationMaps();
+    if (authCollapseAllIsActive()) {
+        applyShoppingListCollapsedDomState({ showStatus: false });
+    }
     scheduleRecipeImageProgressPoll(250);
 
     if (options.updateSticky !== false) {
@@ -355,6 +430,11 @@ function initLazySections() {
     const hashSection = hashTargetId ? lazySectionFromTargetId(hashTargetId) : "";
     if (hashSection) {
         loadLazySection(hashSection, { focus: true });
+        return;
+    }
+
+    if (authCollapseAllIsActive()) {
+        return;
     }
 
     const scheduleEagerLoad = placeholder => {
@@ -8439,18 +8519,31 @@ function setShoppingGlobalCollapseStatus(message) {
     status.textContent = message;
 }
 
-function collapseAllShoppingListPage() {
+function applyShoppingListCollapsedDomState(options = {}) {
     closeShoppingListExpandedPanels();
     setAllCardCollapseContentCollapsed(true);
     setShoppingListViewRowsCollapsed(true);
     setAllRecipeViewNestedPanelsCollapsed(true);
     setAllCookbookPanelsCollapsed(true);
     setAllShoppingListRecipeImagesVisible(false, { keepTitleImages: true });
-    setShoppingGlobalCollapseStatus("Everything collapsed.");
+
+    if (options.showStatus !== false) {
+        setShoppingGlobalCollapseStatus("Everything collapsed.");
+    }
+}
+
+function collapseAllShoppingListPage(options = {}) {
+    if (options.keepAuthCollapseMode !== true) {
+        clearAuthCollapseAllMode();
+    }
+
+    persistShoppingListCollapsedState();
+    applyShoppingListCollapsedDomState({ showStatus: options.showStatus !== false });
     return false;
 }
 
 function expandAllShoppingListPage() {
+    clearAuthCollapseAllMode();
     closeShoppingListExpandedPanels();
     setAllCardCollapseContentCollapsed(false);
     setShoppingListViewRowsCollapsed(false);
@@ -8458,6 +8551,7 @@ function expandAllShoppingListPage() {
     setAllCookbookPanelsCollapsed(false);
     setAllShoppingListRecipeImagesVisible(recipeImagesShownByDefault());
     setShoppingGlobalCollapseStatus("Everything expanded.");
+    initLazySections();
     return false;
 }
 
@@ -21300,8 +21394,11 @@ function buildAddressSummaryFromForm(form) {
     return [streetLine, cityLine, country].filter(Boolean).join(", ");
 }
 
+window.requestShoppingListAuthCollapseAll = requestShoppingListAuthCollapseAll;
+
 document.addEventListener("DOMContentLoaded", function () {
     [
+        ["consumeAuthCollapseAllRequest", consumeAuthCollapseAllRequest],
         ["restoreScroll", restoreScroll],
         ["restoreScreenSettings", restoreScreenSettings],
         ["restoreCardCollapseState", restoreCardCollapseState],
