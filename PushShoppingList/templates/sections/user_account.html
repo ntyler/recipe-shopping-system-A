@@ -1208,6 +1208,24 @@
                         <span>Confirm Password</span>
                         <input type="password" name="confirm_password" required autocomplete="new-password">
                     </label>
+                    <div class="user-password-safety-notice" data-password-safety-info>
+                        <span>🔒 Passwords are handled by Firebase Authentication. AI Pantry does not store or see your password.</span>
+                        <button type="button"
+                                class="user-password-safety-learn"
+                                data-password-safety-trigger
+                                aria-expanded="false"
+                                aria-controls="createPasswordSafetyPopover">
+                            Learn more
+                        </button>
+                        <div id="createPasswordSafetyPopover"
+                             class="user-password-safety-popover"
+                             data-password-safety-popover
+                             role="dialog"
+                             aria-label="Password safety details"
+                             hidden>
+                            AI Pantry uses Firebase Authentication for account sign-in. Your password is handled by Firebase or your login provider, such as Google. AI Pantry stores your account preferences, recipes, cookbooks, shopping lists, and settings — not your password.
+                        </div>
+                    </div>
                     <button type="submit">Create Account</button>
                 </form>
 
@@ -1226,6 +1244,24 @@
                         <span>Password</span>
                         <input type="password" name="password" required autocomplete="current-password">
                     </label>
+                    <div class="user-password-safety-notice" data-password-safety-info>
+                        <span>🔒 Passwords are handled by Firebase Authentication. AI Pantry does not store or see your password.</span>
+                        <button type="button"
+                                class="user-password-safety-learn"
+                                data-password-safety-trigger
+                                aria-expanded="false"
+                                aria-controls="signInPasswordSafetyPopover">
+                            Learn more
+                        </button>
+                        <div id="signInPasswordSafetyPopover"
+                             class="user-password-safety-popover"
+                             data-password-safety-popover
+                             role="dialog"
+                             aria-label="Password safety details"
+                             hidden>
+                            AI Pantry uses Firebase Authentication for account sign-in. Your password is handled by Firebase or your login provider, such as Google. AI Pantry stores your account preferences, recipes, cookbooks, shopping lists, and settings — not your password.
+                        </div>
+                    </div>
                     <button type="submit">Sign In</button>
                     <button type="button"
                             class="secondary"

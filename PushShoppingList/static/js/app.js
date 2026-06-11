@@ -300,6 +300,7 @@ function afterDynamicMarkupLoaded(options = {}) {
     restoreItemCheckState();
     bindAccountMenuDropdowns();
     bindFirebaseAuthInfo();
+    bindPasswordSafetyInfo();
     restoreRememberedAccountPanelOpenWithOptions({ scroll: false });
     if (document.querySelector("[data-usage-dashboard-panel]:not([hidden])")) {
         scheduleOpenAiUsageDashboardRefresh(250);
@@ -2050,6 +2051,98 @@ function bindFirebaseAuthInfo() {
 
         if (document.querySelector("[data-firebase-auth-info-popover]:not([hidden])")) {
             closeFirebaseAuthInfoPopovers({ focusTrigger: true });
+            event.preventDefault();
+        }
+    });
+}
+
+function setPasswordSafetyPopoverOpen(wrapper, open) {
+    if (!wrapper) {
+        return;
+    }
+
+    const shouldOpen = Boolean(open);
+    const popover = wrapper.querySelector("[data-password-safety-popover]");
+    const trigger = wrapper.querySelector("[data-password-safety-trigger]");
+
+    if (popover) {
+        popover.hidden = !shouldOpen;
+    }
+
+    if (trigger) {
+        trigger.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
+    }
+}
+
+function closePasswordSafetyPopovers() {
+    document.querySelectorAll("[data-password-safety-info]").forEach(wrapper => {
+        setPasswordSafetyPopoverOpen(wrapper, false);
+    });
+}
+
+function bindPasswordSafetyInfo() {
+    document.querySelectorAll("[data-password-safety-info]").forEach(wrapper => {
+        if (wrapper.dataset.passwordSafetyInfoBound === "1") {
+            return;
+        }
+
+        wrapper.dataset.passwordSafetyInfoBound = "1";
+        const trigger = wrapper.querySelector("[data-password-safety-trigger]");
+
+        if (trigger) {
+            trigger.addEventListener("click", event => {
+                event.preventDefault();
+                const popover = wrapper.querySelector("[data-password-safety-popover]");
+                closePasswordSafetyPopovers();
+                setPasswordSafetyPopoverOpen(wrapper, !popover || popover.hidden);
+            });
+
+            trigger.addEventListener("keydown", event => {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    const popover = wrapper.querySelector("[data-password-safety-popover]");
+                    closePasswordSafetyPopovers();
+                    setPasswordSafetyPopoverOpen(wrapper, !popover || popover.hidden);
+                    return;
+                }
+
+                if (event.key === "Escape") {
+                    event.preventDefault();
+                    setPasswordSafetyPopoverOpen(wrapper, false);
+                }
+            });
+        }
+
+        wrapper.addEventListener("focusout", () => {
+            window.setTimeout(() => {
+                if (!wrapper.contains(document.activeElement)) {
+                    setPasswordSafetyPopoverOpen(wrapper, false);
+                }
+            }, 0);
+        });
+    });
+
+    if (document.documentElement.dataset.passwordSafetyInfoGlobalBound === "1") {
+        return;
+    }
+
+    document.documentElement.dataset.passwordSafetyInfoGlobalBound = "1";
+
+    document.addEventListener("click", event => {
+        if (event.target && event.target.closest && event.target.closest("[data-password-safety-info]")) {
+            return;
+        }
+
+        closePasswordSafetyPopovers();
+    });
+
+    document.addEventListener("keydown", event => {
+        if (event.key !== "Escape") {
+            return;
+        }
+
+        if (document.querySelector("[data-password-safety-popover]:not([hidden])")) {
+            closePasswordSafetyPopovers();
             event.preventDefault();
         }
     });
@@ -21634,6 +21727,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ["restoreItemCheckState", restoreItemCheckState],
         ["bindAccountMenuDropdowns", bindAccountMenuDropdowns],
         ["bindFirebaseAuthInfo", bindFirebaseAuthInfo],
+        ["bindPasswordSafetyInfo", bindPasswordSafetyInfo],
         ["restoreRememberedAccountPanelOpen", restoreRememberedAccountPanelOpen],
         ["initGuestCountdowns", initGuestCountdowns],
         ["bindGuestAuthChoices", bindGuestAuthChoices],

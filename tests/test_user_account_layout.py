@@ -256,6 +256,47 @@ def test_firebase_connected_status_has_customer_friendly_security_details():
     assert '["bindFirebaseAuthInfo", bindFirebaseAuthInfo]' in script
 
 
+def test_login_forms_include_password_safety_notice_and_learn_more():
+    template = (ROOT / "PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+
+    notice = "🔒 Passwords are handled by Firebase Authentication. AI Pantry does not store or see your password."
+    details = (
+        "AI Pantry uses Firebase Authentication for account sign-in. Your password is handled by Firebase or your "
+        "login provider, such as Google. AI Pantry stores your account preferences, recipes, cookbooks, shopping "
+        "lists, and settings — not your password."
+    )
+
+    create_markup = template[template.index('id="firebaseCreateAccountForm"'):template.index('id="firebaseSignInForm"')]
+    sign_in_markup = template[template.index('id="firebaseSignInForm"'):template.index('id="forgotPasswordForm"')]
+
+    assert create_markup.index('name="password"') < create_markup.index("user-password-safety-notice")
+    assert create_markup.index('name="confirm_password"') < create_markup.index("user-password-safety-notice")
+    assert sign_in_markup.index('name="password"') < sign_in_markup.index("user-password-safety-notice")
+    assert create_markup.count(notice) == 1
+    assert sign_in_markup.count(notice) == 1
+    assert create_markup.count("Learn more") == 1
+    assert sign_in_markup.count("Learn more") == 1
+    assert details in create_markup
+    assert details in sign_in_markup
+    assert "plain text" not in create_markup.lower()
+    assert "plain text" not in sign_in_markup.lower()
+
+    assert ".user-password-safety-notice" in css
+    assert ".user-password-safety-learn" in css
+    assert ".user-password-safety-popover" in css
+    assert "font-size: 12px;" in css
+    assert "color: #aebbd0;" in css
+
+    assert "function bindPasswordSafetyInfo()" in script
+    assert "function setPasswordSafetyPopoverOpen(wrapper, open)" in script
+    assert "function closePasswordSafetyPopovers()" in script
+    assert 'event.key === "Enter" || event.key === " "' in script
+    assert 'event.key === "Escape"' in script
+    assert '["bindPasswordSafetyInfo", bindPasswordSafetyInfo]' in script
+
+
 def test_usage_dashboard_menu_opens_visible_account_panel():
     template = (ROOT / "PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
