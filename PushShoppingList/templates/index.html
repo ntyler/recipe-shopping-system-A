@@ -9,7 +9,8 @@
 </head>
 
 <body class="{% if password_reset_token|default('') or two_factor_recovery_token|default('') or account_delete_token|default('') %}account-action-token{% endif %}"
-      data-performance-diagnostics="{{ '1' if performance_diagnostics_enabled else '0' }}">
+      data-performance-diagnostics="{{ '1' if performance_diagnostics_enabled else '0' }}"
+      data-user-id="{{ current_user.user_id if current_user else '' }}">
 
 <h1>Shopping List</h1>
 
@@ -79,19 +80,6 @@
         {% include "sections/feedback_support.html" %}
     {% endif %}
     {% if admin_support_dashboard and admin_support_dashboard.is_admin %}
-        <div class="app-section-divider" aria-hidden="true"></div>
-        <section id="adminSupportSection"
-                 class="recipe-card admin-support-card lazy-section-placeholder"
-                 data-lazy-section="admin-support"
-                 data-lazy-url="{{ url_for('main_bp.admin_support_section') }}"
-                 aria-busy="false">
-            <button type="button"
-                    class="card-collapse-toggle admin-support-lazy-toggle"
-                    onclick="loadLazySection('admin-support', { focus: true }); return false;">
-                <span>Admin Support</span>
-            </button>
-            <div class="lazy-section-status" data-lazy-section-status aria-live="polite"></div>
-        </section>
         <section id="performanceDiagnosticsSection"
                  class="recipe-card performance-diagnostics-card"
                  data-performance-diagnostics-panel

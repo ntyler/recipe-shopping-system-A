@@ -44,6 +44,7 @@ mimetypes.add_type("image/webp", ".webp")
 
 PUBLIC_ENDPOINTS = {
     "main_bp.index",
+    "main_bp.api_device_stale_route",
     "static",
     "account_bp.firebase_session_route",
     "account_bp.firebase_login_route",

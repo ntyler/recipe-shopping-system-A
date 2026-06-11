@@ -337,6 +337,18 @@
 
                         {% if current_user.is_admin %}
                             <div class="user-account-menu-section">
+                                <div class="user-account-menu-section-title">ADMIN</div>
+                                <button type="button"
+                                        class="user-account-menu-item"
+                                        role="menuitem"
+                                        aria-controls="adminSupportSection"
+                                        onclick="return openAdminSupportPanel()">
+                                    <span class="user-account-menu-item-icon" aria-hidden="true">A</span>
+                                    <span class="user-account-menu-item-label">Admin Support</span>
+                                </button>
+                            </div>
+
+                            <div class="user-account-menu-section">
                                 <div class="user-account-menu-section-title">DISPLAY</div>
                                 <button type="button"
                                         class="user-account-menu-item"
@@ -888,6 +900,30 @@
         {% set feedback_support_account_panel = false %}
 
         {% if current_user.is_admin %}
+            <section id="adminSupportSection"
+                     class="admin-support-card user-admin-support-panel lazy-section-placeholder"
+                     data-admin-support-panel
+                     data-lazy-section="admin-support"
+                     data-lazy-url="{{ url_for('main_bp.admin_support_section') }}"
+                     aria-busy="false"
+                     hidden>
+                <div class="app-section-divider recipe-entry-section-divider user-admin-support-divider" aria-hidden="true"></div>
+                <div class="user-push-panel-header user-admin-support-header">
+                    <button type="button"
+                            class="card-collapse-toggle admin-support-lazy-toggle"
+                            onclick="loadLazySection('admin-support', { focus: true }); return false;">
+                        <span>Admin Support</span>
+                    </button>
+                    <button type="button"
+                            class="secondary user-push-panel-close user-admin-support-close"
+                            data-admin-support-close
+                            onclick="return closeAdminSupportPanel()">
+                        Close
+                    </button>
+                </div>
+                <div class="lazy-section-status" data-lazy-section-status aria-live="polite"></div>
+            </section>
+
             <section id="sharedRecipePdfsSection"
                      class="pdf-share-card user-shared-recipe-pdfs-panel lazy-section-placeholder"
                      data-shared-recipe-pdfs-panel

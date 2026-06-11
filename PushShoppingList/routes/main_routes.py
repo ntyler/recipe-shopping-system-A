@@ -106,6 +106,8 @@ from PushShoppingList.services.user_account_service import is_admin_user
 from PushShoppingList.services.user_account_service import public_two_factor_recovery_user
 from PushShoppingList.services.admin_support_service import admin_support_dashboard_for_user
 from PushShoppingList.services.admin_support_service import support_access_notices_for_user
+from PushShoppingList.services.device_status_service import device_status_summary
+from PushShoppingList.services.device_status_service import record_device_stale_event
 
 main_bp = Blueprint("main_bp", __name__)
 address_openai_client = None
@@ -165,6 +167,7 @@ def shared_page_context(active_public_user=None):
             "is_admin": is_admin_user(active_public_user),
             "users": [],
             "recent_audit": [],
+            "device_status_events": [],
             "selected_user": None,
             "errors": [],
             "reason": session.get("admin_support_reason", ""),
@@ -392,15 +395,46 @@ def shell_context(active_public_user=None):
 
 def admin_support_context(active_public_user=None):
     active_public_user = active_public_user or current_public_user()
+    dashboard = admin_support_dashboard_for_user(
+        active_public_user,
+        selected_user=session.get("admin_support_selected_user"),
+        errors=session.pop("admin_support_errors", []),
+        reason=session.get("admin_support_reason", ""),
+    )
+    if dashboard.get("is_admin"):
+        dashboard["device_status_events"] = device_status_summary()
+
     return {
         **shared_page_context(active_public_user),
-        "admin_support_dashboard": admin_support_dashboard_for_user(
-            active_public_user,
-            selected_user=session.get("admin_support_selected_user"),
-            errors=session.pop("admin_support_errors", []),
-            reason=session.get("admin_support_reason", ""),
-        ),
+        "admin_support_dashboard": dashboard,
     }
+
+
+@main_bp.route("/api/device-stale", methods=["POST"])
+def api_device_stale_route():
+    payload = request.get_json(silent=True) or {}
+    active_public_user = current_public_user() or {}
+    user_id = str(
+        active_public_user.get("user_id")
+        or session.get("user_id")
+        or payload.get("user_id")
+        or ""
+    ).strip()
+    guest_session_id = str(session.get("guest_session_id") or "").strip()
+    event = record_device_stale_event(
+        payload,
+        request_user_agent=request.headers.get("User-Agent", ""),
+        session_user_id=user_id,
+        guest_session_id=guest_session_id,
+    )
+    return jsonify({
+        "ok": True,
+        "event": {
+            "timestamp": event.get("timestamp"),
+            "device_id": event.get("device_id"),
+            "stale_reason": event.get("stale_reason"),
+        },
+    })
 
 
 @main_bp.route("/api/openai_usage_dashboard", methods=["GET"])
@@ -1810,6 +1844,7 @@ def admin_support_section():
     return render_template(
         "sections/admin_support.html",
         **admin_support_context(active_public_user),
+        admin_support_account_panel=True,
     )
 
 

@@ -17939,6 +17939,14 @@ body {
     flex-wrap: wrap;
 }
 
+.admin-support-header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
 .admin-support-count,
 .admin-support-role,
 .chatgpt-models-count {
@@ -18388,6 +18396,33 @@ body {
     font-size: 12px;
     font-weight: 800;
     overflow-wrap: anywhere;
+}
+
+.admin-device-status-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    color: #d7ddd9;
+    font-size: 12px;
+    font-weight: 900;
+}
+
+.admin-device-status-meta span {
+    display: inline-flex;
+    min-height: 22px;
+    align-items: center;
+    padding: 2px 8px;
+    border: 1px solid #284058;
+    border-radius: 999px;
+    background: #091521;
+}
+
+.admin-device-status-agent {
+    overflow-wrap: anywhere;
+    color: #96a3ad;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.35;
 }
 
 .feedback-support-card {
@@ -19567,6 +19602,10 @@ body {
     .chatgpt-model-toolbar-actions {
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .admin-support-header-actions {
+        justify-content: flex-start;
     }
 
     .chatgpt-model-table-wrap {

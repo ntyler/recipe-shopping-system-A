@@ -805,7 +805,7 @@ function bindPushNotificationsPanel() {
 
 function hideAccountMenuPanels(exceptPanel = null) {
     document.querySelectorAll(
-        "#userProfileEditForm, [data-account-notices-panel], [data-usage-dashboard-panel], [data-chatgpt-models-panel], [data-shared-recipe-pdfs-panel], [data-push-notifications-panel], [data-feedback-support-panel], [data-two-factor-panel], [data-delete-account-panel]"
+        "#userProfileEditForm, [data-account-notices-panel], [data-usage-dashboard-panel], [data-admin-support-panel], [data-chatgpt-models-panel], [data-shared-recipe-pdfs-panel], [data-push-notifications-panel], [data-feedback-support-panel], [data-two-factor-panel], [data-delete-account-panel]"
     ).forEach((panel) => {
         if (panel !== exceptPanel) {
             panel.hidden = true;
@@ -976,6 +976,14 @@ function applyBackendSessionState(session) {
 
     window.shoppingFirebaseAuthStatus.backendVerified = connected;
 }
+
+window.addEventListener("shopping:device-stale-revalidate", async () => {
+    try {
+        await loadBackendSession();
+    } catch (error) {
+        console.warn("Could not revalidate Flask auth session after stale report.", error);
+    }
+});
 
 function firebaseUserProfile(firebaseUser, extra = {}) {
     const providerData = Array.isArray(firebaseUser.providerData) ? firebaseUser.providerData : [];

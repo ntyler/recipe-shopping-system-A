@@ -25,6 +25,7 @@ const USER_ACCOUNT_REMEMBERED_PANEL_SELECTORS = {
     accountSettings: "#userProfileEditForm",
     accountNotices: "[data-account-notices-panel]",
     usageDashboard: "[data-usage-dashboard-panel]",
+    adminSupport: "[data-admin-support-panel]",
     chatGptModels: "[data-chatgpt-models-panel]",
     sharedRecipePdfs: "[data-shared-recipe-pdfs-panel]",
     twoFactor: "[data-two-factor-panel]",
@@ -40,6 +41,11 @@ const AUTH_COLLAPSE_ACTIVE_KEY = "shopping-auth-collapse-all-active";
 const GLOBAL_COLLAPSE_STATE_KEY = "shopping-global-collapse-state";
 const PERFORMANCE_STARTUP_LAST_OPENED_KEY = "shopping-list-lastPageOpenedAt";
 const PERFORMANCE_STARTUP_STALE_MS = 60 * 60 * 1000;
+const DEVICE_ID_STORAGE_KEY = "shopping-device-id";
+const DEVICE_STALE_LAST_ACTIVITY_KEY = "shopping-device-last-activity-at";
+const DEVICE_STALE_LAST_SENT_KEY = "shopping-device-stale-last-sent";
+const DEVICE_STALE_REVALIDATE_EVENT = "shopping:device-stale-revalidate";
+const DEVICE_STALE_MIN_SEND_INTERVAL_MS = 60 * 1000;
 const AUTH_COLLAPSE_CONTENT_KEYS = [
     "ai-pantry",
     "recipe-url-log",
@@ -85,6 +91,7 @@ const USER_ACCOUNT_PANEL_HASH_KEYS = {
     "#userProfileEditForm": "accountSettings",
     "#accountNoticesPanel": "accountNotices",
     "#accountUsageDashboardPanel": "usageDashboard",
+    "#adminSupportSection": "adminSupport",
     "#chatGptModelsSection": "chatGptModels",
     "#sharedRecipePdfsSection": "sharedRecipePdfs",
     "#accountTwoFactorPanel": "twoFactor",
@@ -108,6 +115,11 @@ let openAiUsageDashboardRefreshTimer = null;
 let openAiUsageDashboardRefreshPromise = null;
 let leafletAssetsPromise = null;
 let performanceStartupForced = false;
+let deviceStaleReportingInitialized = false;
+let deviceLastUserActivityAt = Date.now();
+let devicePageHiddenAt = document.hidden ? Date.now() : 0;
+let deviceLastHiddenMinutes = 0;
+let deviceLastOfflineAt = 0;
 const performanceDiagnostics = {
     enabled: false,
     startupStartedAt: (window.performance && performance.now) ? performance.now() : Date.now(),
@@ -351,6 +363,208 @@ function initPerformanceStartupMode() {
 
 function isPerformanceStartupForced() {
     return performanceStartupForced;
+}
+
+function generateShoppingDeviceId() {
+    if (window.crypto && typeof window.crypto.randomUUID === "function") {
+        return window.crypto.randomUUID();
+    }
+
+    return `device-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function shoppingDeviceId() {
+    let deviceId = safeStorageGet(localStorage, DEVICE_ID_STORAGE_KEY);
+    if (!deviceId) {
+        deviceId = generateShoppingDeviceId();
+        safeStorageSet(localStorage, DEVICE_ID_STORAGE_KEY, deviceId);
+    }
+
+    return deviceId;
+}
+
+function minutesSince(timestamp, fallback = 0) {
+    const startedAt = Number(timestamp || 0);
+    if (!Number.isFinite(startedAt) || startedAt <= 0) {
+        return fallback;
+    }
+
+    return Math.max(0, Math.round(((Date.now() - startedAt) / 60000) * 10) / 10);
+}
+
+function shoppingRouteForDeviceStatus() {
+    return `${window.location.pathname || "/"}${window.location.search || ""}${window.location.hash || ""}`;
+}
+
+function markDeviceUserActivity() {
+    deviceLastUserActivityAt = Date.now();
+    safeStorageSet(localStorage, DEVICE_STALE_LAST_ACTIVITY_KEY, String(deviceLastUserActivityAt));
+}
+
+function deviceStaleReportRecentlySent(reason) {
+    try {
+        const sentMap = JSON.parse(safeStorageGet(sessionStorage, DEVICE_STALE_LAST_SENT_KEY) || "{}");
+        const previousSentAt = Number(sentMap[reason] || 0);
+        if (previousSentAt && Date.now() - previousSentAt < DEVICE_STALE_MIN_SEND_INTERVAL_MS) {
+            return true;
+        }
+
+        sentMap[reason] = Date.now();
+        safeStorageSet(sessionStorage, DEVICE_STALE_LAST_SENT_KEY, JSON.stringify(sentMap));
+        return false;
+    } catch (err) {
+        safeStorageSet(sessionStorage, DEVICE_STALE_LAST_SENT_KEY, JSON.stringify({ [reason]: Date.now() }));
+        return false;
+    }
+}
+
+function buildDeviceStalePayload(reason, options = {}) {
+    return {
+        user_id: document.body ? document.body.dataset.userId || "" : "",
+        device_id: shoppingDeviceId(),
+        route: shoppingRouteForDeviceStatus(),
+        user_agent: navigator.userAgent || "",
+        timestamp: new Date().toISOString(),
+        last_active_at: deviceLastUserActivityAt
+            ? new Date(deviceLastUserActivityAt).toISOString()
+            : "",
+        stale_reason: reason,
+        minutes_inactive: options.minutesInactive !== undefined
+            ? options.minutesInactive
+            : minutesSince(deviceLastUserActivityAt),
+        minutes_hidden: options.minutesHidden !== undefined
+            ? options.minutesHidden
+            : deviceLastHiddenMinutes,
+        is_stale: true,
+    };
+}
+
+function applyDeviceStalePerformanceMode() {
+    performanceStartupForced = true;
+
+    if (document.readyState === "loading") {
+        return;
+    }
+
+    applyShoppingListCollapsedDomState({
+        showStatus: false,
+        persist: false,
+    });
+}
+
+function sendDeviceStaleReport(reason, options = {}) {
+    if (!reason || deviceStaleReportRecentlySent(reason)) {
+        return;
+    }
+
+    const payload = buildDeviceStalePayload(reason, options);
+    const body = JSON.stringify(payload);
+    applyDeviceStalePerformanceMode();
+
+    let sent = false;
+    if (navigator.sendBeacon) {
+        try {
+            sent = navigator.sendBeacon(
+                "/api/device-stale",
+                new Blob([body], { type: "application/json" })
+            );
+        } catch (err) {
+            sent = false;
+        }
+    }
+
+    if (!sent && window.fetch) {
+        fetch("/api/device-stale", {
+            method: "POST",
+            body,
+            headers: { "Content-Type": "application/json" },
+            keepalive: true,
+        }).catch(err => {
+            if (performanceDiagnostics.enabled) {
+                console.warn("Device stale report failed.", err);
+            }
+        });
+    }
+
+    window.dispatchEvent(new CustomEvent(DEVICE_STALE_REVALIDATE_EVENT, { detail: payload }));
+}
+
+function handleDeviceVisibilityChange() {
+    if (document.hidden) {
+        devicePageHiddenAt = Date.now();
+        return;
+    }
+
+    const hiddenMinutes = minutesSince(devicePageHiddenAt);
+    deviceLastHiddenMinutes = hiddenMinutes;
+    devicePageHiddenAt = 0;
+
+    if (hiddenMinutes >= 60) {
+        sendDeviceStaleReport("hidden-timeout", { minutesHidden: hiddenMinutes });
+    }
+}
+
+function checkDeviceInactiveState() {
+    const inactiveMinutes = minutesSince(deviceLastUserActivityAt);
+    if (inactiveMinutes >= 60) {
+        sendDeviceStaleReport("inactive-timeout", { minutesInactive: inactiveMinutes });
+    }
+}
+
+function initDeviceStaleReporting() {
+    if (deviceStaleReportingInitialized) {
+        return;
+    }
+
+    deviceStaleReportingInitialized = true;
+    shoppingDeviceId();
+
+    const savedActivityAt = Number.parseInt(
+        safeStorageGet(localStorage, DEVICE_STALE_LAST_ACTIVITY_KEY) || "0",
+        10
+    );
+    if (Number.isFinite(savedActivityAt) && savedActivityAt > 0) {
+        deviceLastUserActivityAt = savedActivityAt;
+    }
+    markDeviceUserActivity();
+
+    ["pointerdown", "keydown", "touchstart", "scroll"].forEach(eventName => {
+        window.addEventListener(eventName, markDeviceUserActivity, { passive: true });
+    });
+
+    document.addEventListener("visibilitychange", handleDeviceVisibilityChange);
+    window.addEventListener("pageshow", event => {
+        if (event.persisted) {
+            sendDeviceStaleReport("bfcache-restore");
+        }
+    });
+    window.addEventListener("offline", () => {
+        deviceLastOfflineAt = Date.now();
+    });
+    window.addEventListener("online", () => {
+        if (!deviceLastOfflineAt) {
+            return;
+        }
+
+        const offlineMinutes = minutesSince(deviceLastOfflineAt);
+        sendDeviceStaleReport("network-reconnect", {
+            minutesInactive: minutesSince(deviceLastUserActivityAt),
+            minutesHidden: Math.max(deviceLastHiddenMinutes, offlineMinutes),
+        });
+        deviceLastOfflineAt = 0;
+    });
+
+    window.setInterval(checkDeviceInactiveState, 60000);
+
+    if (navigator.onLine === false) {
+        deviceLastOfflineAt = Date.now();
+    }
+
+    if (isPerformanceStartupForced()) {
+        sendDeviceStaleReport("session-revalidation", {
+            minutesInactive: minutesSince(savedActivityAt),
+        });
+    }
 }
 
 function lazySectionPreferenceKey(sectionName) {
@@ -1191,6 +1405,16 @@ function restoreRememberedAccountPanelOpenWithOptions(options = {}) {
         });
     }
 
+    if (panelKey === "adminSupport") {
+        loadLazySection("admin-support", { focus: false }).then(() => {
+            const adminPanel = document.querySelector("[data-admin-support-panel]");
+            if (adminPanel) {
+                adminPanel.hidden = false;
+                rememberAccountPanelElement(adminPanel, true);
+            }
+        });
+    }
+
     const accountMenu = document.querySelector("[data-account-menu]");
     if (accountMenu) {
         closeAccountMenuDropdown(accountMenu);
@@ -1974,6 +2198,62 @@ function expandSharedRecipePdfsContent() {
     if (content && content.classList.contains("collapsed")) {
         setCardCollapseContentCollapsed(content, false);
     }
+}
+
+async function openAdminSupportPanel() {
+    const panel = document.querySelector("[data-admin-support-panel]");
+
+    if (!panel) {
+        return false;
+    }
+
+    const accountMenu = document.querySelector("[data-account-menu]");
+    if (accountMenu) {
+        closeAccountMenuDropdown(accountMenu);
+    }
+
+    panel.hidden = false;
+    rememberAccountPanelElement(panel, true);
+    hideRememberedAccountPanels(panel);
+
+    if (panel.dataset.lazySection === "admin-support" && panel.dataset.lazyLoaded !== "1") {
+        await loadLazySection("admin-support", { focus: false });
+    }
+
+    const activePanel = document.querySelector("[data-admin-support-panel]") || panel;
+    activePanel.hidden = false;
+    rememberAccountPanelElement(activePanel, true);
+    hideRememberedAccountPanels(activePanel);
+
+    window.requestAnimationFrame(() => {
+        const loadedPanel = document.querySelector("[data-admin-support-panel]") || activePanel;
+        loadedPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+        const firstControl = loadedPanel.querySelector("[data-admin-support-close]")
+            || loadedPanel.querySelector("button, input, select, textarea");
+
+        if (firstControl) {
+            firstControl.focus({ preventScroll: true });
+        }
+    });
+
+    return false;
+}
+
+function closeAdminSupportPanel() {
+    const panel = document.querySelector("[data-admin-support-panel]");
+
+    if (!panel) {
+        return false;
+    }
+
+    panel.hidden = true;
+    rememberAccountPanelElement(panel, false);
+
+    if (typeof scrollToUserAccountProfile === "function") {
+        scrollToUserAccountProfile("auto");
+    }
+
+    return false;
 }
 
 async function openSharedRecipePdfsPanel() {
@@ -8830,7 +9110,7 @@ function setSavedCardCollapseState(key, content, state) {
     }
 }
 
-function setCardCollapseContentCollapsed(content, collapsed) {
+function setCardCollapseContentCollapsed(content, collapsed, options = {}) {
     if (!content) {
         return;
     }
@@ -8838,6 +9118,7 @@ function setCardCollapseContentCollapsed(content, collapsed) {
     const key = content.dataset.collapseContent;
     const isCollapsed = Boolean(collapsed);
     const card = content.closest(".app-card");
+    const shouldPersist = options.persist !== false;
 
     content.classList.toggle("collapsed", isCollapsed);
 
@@ -8845,8 +9126,10 @@ function setCardCollapseContentCollapsed(content, collapsed) {
         card.classList.toggle("card-collapsed", isCollapsed);
     }
 
-    setSavedCardCollapseState(key, content, isCollapsed ? "collapsed" : "expanded");
-    if (COLLAPSE_KEY_LAZY_SECTIONS[key]) {
+    if (shouldPersist) {
+        setSavedCardCollapseState(key, content, isCollapsed ? "collapsed" : "expanded");
+    }
+    if (shouldPersist && COLLAPSE_KEY_LAZY_SECTIONS[key]) {
         setLazySectionSavedState(COLLAPSE_KEY_LAZY_SECTIONS[key], !isCollapsed);
     }
     updateCardCollapseToggleState(key, isCollapsed);
@@ -8877,9 +9160,9 @@ function toggleCardCollapse(key) {
     }
 }
 
-function setAllCardCollapseContentCollapsed(collapsed) {
+function setAllCardCollapseContentCollapsed(collapsed, options = {}) {
     document.querySelectorAll("[data-collapse-content]").forEach(content => {
-        setCardCollapseContentCollapsed(content, collapsed);
+        setCardCollapseContentCollapsed(content, collapsed, options);
     });
 
     window.setTimeout(initStoreLocationMaps, 0);
@@ -8910,7 +9193,9 @@ function setShoppingListViewRowsCollapsed(collapsed) {
     );
 }
 
-function setAllRecipeViewNestedPanelsCollapsed(collapsed) {
+function setAllRecipeViewNestedPanelsCollapsed(collapsed, options = {}) {
+    const shouldPersist = options.persist !== false;
+
     document.querySelectorAll("[data-recipe-view-card]").forEach(card => {
         const toggle = card.querySelector("[data-recipe-card-toggle]");
         const key = card.dataset.recipeCardKey || (toggle ? toggle.dataset.recipeCardKey : "");
@@ -8918,7 +9203,7 @@ function setAllRecipeViewNestedPanelsCollapsed(collapsed) {
         if (!collapsed) {
             setRecipeCardCollapsed(card, toggle, false);
 
-            if (key) {
+            if (shouldPersist && key) {
                 localStorage.setItem(`recipe-card-collapsed:${key}`, "0");
             }
         }
@@ -8931,7 +9216,9 @@ function setAllRecipeViewNestedPanelsCollapsed(collapsed) {
             }
 
             setRecipeDetailSectionCollapsed(detailToggle, collapsed);
-            localStorage.setItem(parts.storageKey, collapsed ? "1" : "0");
+            if (shouldPersist) {
+                localStorage.setItem(parts.storageKey, collapsed ? "1" : "0");
+            }
         });
 
         card.querySelectorAll('.collapsible-header[data-collapse-scope="recipe-section"]').forEach(header => {
@@ -8941,7 +9228,7 @@ function setAllRecipeViewNestedPanelsCollapsed(collapsed) {
 
             setSectionCollapsed(header, icon, collapsed);
 
-            if (collapseKey) {
+            if (shouldPersist && collapseKey) {
                 localStorage.setItem(`section-collapsed:${collapseKey}`, collapsed ? "1" : "0");
             }
         });
@@ -8949,20 +9236,22 @@ function setAllRecipeViewNestedPanelsCollapsed(collapsed) {
         if (collapsed) {
             setRecipeCardCollapsed(card, toggle, true);
 
-            if (key) {
+            if (shouldPersist && key) {
                 localStorage.setItem(`recipe-card-collapsed:${key}`, "1");
             }
         }
     });
 }
 
-function setAllCookbookPanelsCollapsed(collapsed) {
+function setAllCookbookPanelsCollapsed(collapsed, options = {}) {
+    const shouldPersist = options.persist !== false;
+
     document.querySelectorAll("[data-cookbook-card]").forEach(card => {
         const storageKey = cookbookCardCollapseStorageKey(card.dataset.cookbookId || "");
 
         setCookbookCardCollapsed(card, collapsed);
 
-        if (storageKey) {
+        if (shouldPersist && storageKey) {
             localStorage.setItem(storageKey, collapsed ? "collapsed" : "expanded");
         }
     });
@@ -8972,7 +9261,7 @@ function setAllCookbookPanelsCollapsed(collapsed) {
 
         setCookbookRecipeCollapsed(card, collapsed);
 
-        if (storageKey) {
+        if (shouldPersist && storageKey) {
             localStorage.setItem(storageKey, collapsed ? "collapsed" : "expanded");
         }
     });
@@ -9065,10 +9354,10 @@ function setShoppingGlobalCollapseStatus(message) {
 
 function applyShoppingListCollapsedDomState(options = {}) {
     closeShoppingListExpandedPanels();
-    setAllCardCollapseContentCollapsed(true);
+    setAllCardCollapseContentCollapsed(true, { persist: options.persist !== false });
     setShoppingListViewRowsCollapsed(true);
-    setAllRecipeViewNestedPanelsCollapsed(true);
-    setAllCookbookPanelsCollapsed(true);
+    setAllRecipeViewNestedPanelsCollapsed(true, { persist: options.persist !== false });
+    setAllCookbookPanelsCollapsed(true, { persist: options.persist !== false });
     setAllShoppingListRecipeImagesVisible(false, { keepTitleImages: true });
 
     if (options.showStatus !== false) {
@@ -22090,6 +22379,7 @@ document.addEventListener("DOMContentLoaded", function () {
     [
         ["initPerformanceDiagnostics", initPerformanceDiagnostics],
         ["initPerformanceStartupMode", initPerformanceStartupMode],
+        ["initDeviceStaleReporting", initDeviceStaleReporting],
         ["consumeAuthCollapseAllRequest", consumeAuthCollapseAllRequest],
         ["restoreScroll", restoreScroll],
         ["restoreScreenSettings", restoreScreenSettings],

@@ -1,12 +1,28 @@
 {% set admin_support = admin_support_dashboard|default({}) %}
+{% set admin_support_account_panel = admin_support_account_panel|default(false) %}
 {% if admin_support.is_admin %}
-<section id="adminSupportSection" class="recipe-card admin-support-card">
+<section id="adminSupportSection"
+         class="{% if not admin_support_account_panel %}recipe-card {% endif %}admin-support-card{% if admin_support_account_panel %} user-admin-support-panel{% endif %}"
+         {% if admin_support_account_panel %}data-admin-support-panel hidden{% endif %}>
+    {% if admin_support_account_panel %}
+        <div class="app-section-divider recipe-entry-section-divider user-admin-support-divider" aria-hidden="true"></div>
+    {% endif %}
     <div class="admin-support-header">
         <div>
             <h2>Admin Support</h2>
             <p>Read-only user account checks are logged.</p>
         </div>
-        <span class="admin-support-count">{{ admin_support.users|length }} accounts</span>
+        <div class="admin-support-header-actions">
+            <span class="admin-support-count">{{ admin_support.users|length }} accounts</span>
+            {% if admin_support_account_panel %}
+                <button type="button"
+                        class="secondary user-push-panel-close user-admin-support-close"
+                        data-admin-support-close
+                        onclick="return closeAdminSupportPanel()">
+                    Close
+                </button>
+            {% endif %}
+        </div>
     </div>
 
     {% if admin_support.errors %}
@@ -126,6 +142,36 @@
                         <div class="admin-support-audit-meta">
                             {{ entry.actorPrivateEmail or entry.admin_email }} - {{ entry.reason }}
                         </div>
+                    </li>
+                {% endfor %}
+            </ol>
+        </div>
+    {% endif %}
+
+    {% if admin_support.device_status_events %}
+        <div class="admin-support-audit admin-device-status">
+            <div class="admin-support-audit-header">
+                <h3>Device Status</h3>
+            </div>
+            <ol class="admin-support-audit-list admin-device-status-list">
+                {% for event in admin_support.device_status_events %}
+                    <li>
+                        <div class="admin-support-audit-top">
+                            <strong>{{ event.device_label }}</strong>
+                            <span>Last stale event {{ event.timestamp_label }}</span>
+                        </div>
+                        <div class="admin-support-audit-meta">
+                            {{ event.stale_reason }} - {{ event.route or "Route unavailable" }}
+                        </div>
+                        <div class="admin-device-status-meta">
+                            <span>Status {{ "Stale" if event.is_stale else "Active" }}</span>
+                            <span>Last active {{ event.last_active_label }}</span>
+                            <span>User {{ event.user_id or event.guest_session_id or "anonymous" }}</span>
+                            <span>Device {{ event.device_id }}</span>
+                            <span>Inactive {{ event.minutes_inactive }}m</span>
+                            <span>Hidden {{ event.minutes_hidden }}m</span>
+                        </div>
+                        <div class="admin-device-status-agent">{{ event.user_agent }}</div>
                     </li>
                 {% endfor %}
             </ol>
