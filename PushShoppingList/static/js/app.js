@@ -100,7 +100,9 @@ function runIdleStartupTasks(tasks) {
     scheduleIdleTask(runNext);
 }
 
+const DEFERRED_IMAGE_PLACEHOLDER = "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
 const lazySectionPromises = new Map();
+let deferredImageObserver = null;
 
 function lazySectionElement(sectionName) {
     return document.querySelector(`[data-lazy-section="${sectionName}"]`);
@@ -137,6 +139,72 @@ function setLazySectionStatus(placeholder, text, isError = false) {
     status.classList.toggle("lazy-section-error", isError);
 }
 
+function loadDeferredImage(image) {
+    if (!image || image.dataset.deferredLoaded === "1") {
+        return;
+    }
+
+    const src = image.dataset.deferredSrc || "";
+    const srcset = image.dataset.deferredSrcset || "";
+
+    if (src) {
+        image.src = src;
+    }
+
+    if (srcset) {
+        image.srcset = srcset;
+    } else if (image.hasAttribute("data-deferred-srcset")) {
+        image.removeAttribute("srcset");
+    }
+
+    image.dataset.deferredLoaded = "1";
+    image.removeAttribute("data-deferred-src");
+    image.removeAttribute("data-deferred-srcset");
+    image.classList.remove("deferred-image-pending");
+}
+
+function initDeferredImages(scope = document) {
+    const root = scope && scope.querySelectorAll ? scope : document;
+    const images = [
+        ...(root.matches && root.matches("img[data-deferred-src]") ? [root] : []),
+        ...root.querySelectorAll("img[data-deferred-src]"),
+    ].filter(image => image.dataset.deferredLoaded !== "1");
+
+    if (!images.length) {
+        return;
+    }
+
+    images.forEach(image => {
+        image.classList.add("deferred-image-pending");
+        if (!image.getAttribute("src")) {
+            image.src = DEFERRED_IMAGE_PLACEHOLDER;
+        }
+    });
+
+    if (!("IntersectionObserver" in window)) {
+        images.slice(0, 8).forEach(loadDeferredImage);
+        return;
+    }
+
+    if (!deferredImageObserver) {
+        deferredImageObserver = new IntersectionObserver(entries => {
+            entries.forEach(entry => {
+                if (!entry.isIntersecting) {
+                    return;
+                }
+
+                deferredImageObserver.unobserve(entry.target);
+                loadDeferredImage(entry.target);
+            });
+        }, {
+            rootMargin: "650px 0px",
+            threshold: 0.01,
+        });
+    }
+
+    images.forEach(image => deferredImageObserver.observe(image));
+}
+
 function firstRenderableElementFromHtml(html) {
     const nextPage = new DOMParser().parseFromString(html, "text/html");
     return nextPage.body ? nextPage.body.firstElementChild : null;
@@ -168,6 +236,7 @@ function afterDynamicMarkupLoaded(options = {}) {
     bindRecipeDetailToggles();
     bindRecipeTaskChecks();
     bindRecipeEditCategorySourceTracking();
+    initDeferredImages(options.root || document);
     decorateRecipeCoverImages();
     applyKnownRecipeImageProgressItems();
     updateViewSwitcherStickyOffset();
@@ -229,7 +298,7 @@ async function loadLazySection(sectionName, options = {}) {
             nextElement.dataset.lazyUrl = placeholder.dataset.lazyUrl || requestUrl.pathname;
             nextElement.dataset.lazyLoaded = "1";
             placeholder.replaceWith(nextElement);
-            afterDynamicMarkupLoaded();
+            afterDynamicMarkupLoaded({ root: nextElement });
 
             if (options.focus) {
                 window.requestAnimationFrame(() => {
@@ -260,6 +329,10 @@ async function refreshLazySection(sectionName, options = {}) {
         return false;
     }
 
+    if (target.dataset.lazyLoaded !== "1" && options.force !== true) {
+        return false;
+    }
+
     target.dataset.lazyLoaded = "";
     const nextElement = await loadLazySection(sectionName, {
         ...options,
@@ -271,7 +344,8 @@ async function refreshLazySection(sectionName, options = {}) {
 }
 
 function initLazySections() {
-    const placeholders = [...document.querySelectorAll("[data-lazy-section]")];
+    const placeholders = [...document.querySelectorAll("[data-lazy-section]")]
+        .filter(placeholder => placeholder.dataset.lazyLoaded !== "1");
 
     if (!placeholders.length) {
         return;
@@ -283,7 +357,29 @@ function initLazySections() {
         loadLazySection(hashSection, { focus: true });
     }
 
-    if (!("IntersectionObserver" in window)) {
+    const scheduleEagerLoad = placeholder => {
+        const sectionName = placeholder.dataset.lazySection || "";
+
+        if (!sectionName || placeholder.dataset.lazyQueued === "1") {
+            return;
+        }
+
+        placeholder.dataset.lazyQueued = "1";
+        scheduleIdleTask(() => loadLazySection(sectionName), 1800);
+    };
+
+    const observedPlaceholders = [];
+
+    placeholders.forEach(placeholder => {
+        if (placeholder.dataset.lazyEager === "idle") {
+            scheduleEagerLoad(placeholder);
+            return;
+        }
+
+        observedPlaceholders.push(placeholder);
+    });
+
+    if (!("IntersectionObserver" in window) || !observedPlaceholders.length) {
         return;
     }
 
@@ -298,10 +394,10 @@ function initLazySections() {
             loadLazySection(sectionName);
         });
     }, {
-        rootMargin: "280px 0px",
+        rootMargin: "80px 0px",
     });
 
-    placeholders.forEach(placeholder => observer.observe(placeholder));
+    observedPlaceholders.forEach(placeholder => observer.observe(placeholder));
 }
 
 function loadLeafletAssets() {
@@ -8846,7 +8942,14 @@ function restoreViewBehaviorSettings() {
     restoreToggleSetting("showImagesByDefaultToggle", "show-images-by-default", true);
     applyRecipeImageDefaultVisibility();
     syncViewBehaviorMenuToggles();
-    showView(localStorage.getItem("shopping-view") || "section");
+
+    if (
+        document.getElementById("sectionView")
+        || document.getElementById("storeView")
+        || document.getElementById("recipeView")
+    ) {
+        showView(localStorage.getItem("shopping-view") || "section");
+    }
 }
 
 const SCREEN_PREVIEW_MODE_KEY = "screen-preview-mode";
@@ -15046,13 +15149,15 @@ function addRecipeEquipmentRow(value = "") {
                 ${equipmentImageUrl ? "" : "No image generated for this equipment."}
             </div>
             <img class="recipe-step-image recipe-equipment-image"
-                 ${equipmentImageUrl ? `src="${escapeAttribute(equipmentImageDisplayUrl)}"` : ""}
-                 ${equipmentImageSrcSet ? `srcset="${escapeAttribute(equipmentImageSrcSet)}"` : ""}
+                 ${equipmentImageUrl ? `src="${DEFERRED_IMAGE_PLACEHOLDER}"` : ""}
+                 ${equipmentImageUrl ? `data-deferred-src="${escapeAttribute(equipmentImageDisplayUrl)}"` : ""}
+                 ${equipmentImageSrcSet ? `data-deferred-srcset="${escapeAttribute(equipmentImageSrcSet)}"` : ""}
                  sizes="(max-width: 900px) 92vw, 720px"
                  data-full-src="${escapeAttribute(equipmentImageUrl)}"
                  alt="Equipment image"
                  loading="lazy"
                  decoding="async"
+                 fetchpriority="low"
                  ${equipmentImageUrl ? "" : "hidden"}>
             <div class="recipe-step-image-actions">
                 <button type="button"
@@ -15136,6 +15241,7 @@ function addRecipeEquipmentRow(value = "") {
     wrap.appendChild(row);
     bindRecipeEditDragAndDrop(row);
     updateRecipeEquipmentRowNumbers();
+    initDeferredImages(row);
     return row;
 }
 
@@ -15213,13 +15319,15 @@ function addRecipeInstructionRow(value = "", stepNumber = null) {
                 ${stepImageUrl ? "" : "No image generated for this step."}
             </div>
             <img class="recipe-step-image"
-                 ${stepImageUrl ? `src="${escapeAttribute(stepImageDisplayUrl)}"` : ""}
-                 ${stepImageSrcSet ? `srcset="${escapeAttribute(stepImageSrcSet)}"` : ""}
+                 ${stepImageUrl ? `src="${DEFERRED_IMAGE_PLACEHOLDER}"` : ""}
+                 ${stepImageUrl ? `data-deferred-src="${escapeAttribute(stepImageDisplayUrl)}"` : ""}
+                 ${stepImageSrcSet ? `data-deferred-srcset="${escapeAttribute(stepImageSrcSet)}"` : ""}
                  sizes="(max-width: 900px) 92vw, 720px"
                  data-full-src="${escapeAttribute(stepImageUrl)}"
                  alt="Instruction step image"
                  loading="lazy"
                  decoding="async"
+                 fetchpriority="low"
                  ${stepImageUrl ? "" : "hidden"}>
             <div class="recipe-step-image-actions">
                 <button type="button"
@@ -15303,6 +15411,7 @@ function addRecipeInstructionRow(value = "", stepNumber = null) {
     wrap.appendChild(row);
     bindRecipeEditDragAndDrop(row);
     updateRecipeInstructionStepNumbers();
+    initDeferredImages(row);
     return row;
 }
 
@@ -21007,7 +21116,10 @@ async function refreshStoreMarkup(options = {}) {
     const refreshes = await Promise.all([
         refreshLazySection("pantry", { cacheBust: true }),
         refreshLazySection("store-options", { cacheBust: true }),
-        refreshLazySection("current-recipes", { cacheBust: true }),
+        refreshLazySection("current-recipes", {
+            cacheBust: true,
+            force: options.requireRecipeLog === true,
+        }),
         refreshLazySection("cookbooks", { cacheBust: true }),
         refreshLazySection("rules", { cacheBust: true }),
         refreshLazySection("recipe-view", { cacheBust: true }),

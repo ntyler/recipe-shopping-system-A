@@ -146,13 +146,13 @@ def image_cache_version(image_path):
     return f"{int(stat.st_mtime)}-{stat.st_size}"
 
 
-def local_static_image_variants(image_url):
+def local_static_image_variants(image_url, variants=None):
     image_path = local_static_image_path(image_url)
 
     if not image_path:
         return {}
 
-    variant_paths = ensure_webp_variants(image_path)
+    variant_paths = ensure_webp_variants(image_path, variants=variants)
     variants = {
         name: static_url_for_path(path)
         for name, path in variant_paths.items()
@@ -180,13 +180,13 @@ def image_variant_payload(original_url, variants):
     }
 
 
-def cover_image_variant_payload(original_url, image_path, variant_url_builder):
+def cover_image_variant_payload(original_url, image_path, variant_url_builder, variants=None):
     image_path = Path(image_path) if image_path else None
 
     if not image_path or not image_path.is_file():
         return image_variant_payload(original_url, {})
 
-    variant_paths = ensure_webp_variants(image_path)
+    variant_paths = ensure_webp_variants(image_path, variants=variants)
     version = image_cache_version(image_path)
     variants = {
         name: variant_url_builder(name, version)

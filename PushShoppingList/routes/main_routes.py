@@ -8,7 +8,9 @@ import requests
 from openai import OpenAI
 from flask import Blueprint
 from flask import current_app
+from flask import g
 from flask import jsonify
+from flask import has_request_context
 from flask import redirect
 from flask import request
 from flask import render_template
@@ -127,12 +129,12 @@ def lightweight_cookbook_view():
             "recipes": [],
         })
 
-    return {
+    return prepare_cookbook_menu_view({
         "cookbooks": cookbooks,
         "recipes": [],
         "menu_sort_options": [],
         "menu_views": {},
-    }
+    })
 
 
 def shared_page_context(active_public_user=None):
@@ -177,15 +179,23 @@ def shared_page_context(active_public_user=None):
     }
 
 
-def recipe_workspace_context():
-    recipe_urls = recipe_url_rows()
-    food_rules = load_food_rules()
-    recipe_rows = recipe_view_rows(recipe_urls, food_rules=food_rules)
+def recipe_rows_context(recipe_urls=None, food_rules=None, image_variants=None, include_detail_images=True):
+    recipe_urls = recipe_urls if recipe_urls is not None else recipe_url_rows()
+    food_rules = food_rules if food_rules is not None else load_food_rules()
+    recipe_rows = recipe_view_rows(
+        recipe_urls,
+        food_rules=food_rules,
+        image_variants=image_variants,
+        include_detail_images=include_detail_images,
+    )
     ensure_unclassified_cookbook_for_recipes(recipe_rows)
     cookbook_assignments = recipe_cookbook_assignments()
     apply_cookbook_assignments_to_recipe_rows(recipe_rows, cookbook_assignments)
-    recipe_log_rows = recipe_url_log_rows(recipe_urls, cookbook_assignments, food_rules=food_rules)
-    rendered_cookbook_view = cookbook_view_for_render(recipe_rows, food_rules=food_rules)
+    rendered_cookbook_view = cookbook_view_for_render(
+        recipe_rows,
+        food_rules=food_rules,
+        image_variants=image_variants,
+    )
     cookbook_recipe_count = sum(
         len(cookbook.get("recipes", []))
         for cookbook in rendered_cookbook_view.get("cookbooks", [])
@@ -195,12 +205,64 @@ def recipe_workspace_context():
         "recipe_urls": recipe_urls,
         "food_rules": food_rules,
         "recipe_view_rows": recipe_rows,
-        "current_urls": recipe_log_rows,
-        "current_recipe_count": len(recipe_log_rows),
         "cookbook_view": rendered_cookbook_view,
         "cookbook_count": len(rendered_cookbook_view.get("cookbooks", [])),
         "cookbook_recipe_count": cookbook_recipe_count,
+        "cookbook_assignments": cookbook_assignments,
     }
+
+
+def recipe_workspace_context(image_variants=None, include_detail_images=True):
+    recipe_context = recipe_rows_context(
+        image_variants=image_variants,
+        include_detail_images=include_detail_images,
+    )
+    recipe_log_rows = recipe_url_log_rows(
+        recipe_context["recipe_urls"],
+        recipe_context["cookbook_assignments"],
+        food_rules=recipe_context["food_rules"],
+        image_variants=image_variants,
+    )
+
+    return {
+        **recipe_context,
+        "current_urls": recipe_log_rows,
+        "current_recipe_count": len(recipe_log_rows),
+    }
+
+
+def current_recipes_context():
+    recipe_urls = recipe_url_rows()
+    food_rules = load_food_rules()
+    current_rows = recipe_url_log_rows(
+        recipe_urls,
+        food_rules=food_rules,
+        image_variants=("thumb",),
+    )
+    ensure_unclassified_cookbook_for_recipes(current_rows)
+    cookbook_assignments = recipe_cookbook_assignments()
+    apply_cookbook_assignments_to_recipe_rows(current_rows, cookbook_assignments)
+    cookbook_view_data = lightweight_cookbook_view()
+
+    return {
+        "recipe_urls": recipe_urls,
+        "food_rules": food_rules,
+        "current_urls": current_rows,
+        "current_recipe_count": len(current_rows),
+        "cookbook_view": cookbook_view_data,
+        "cookbook_count": len(cookbook_view_data.get("cookbooks", [])),
+        "cookbook_recipe_count": sum(
+            len(cookbook.get("recipes", []))
+            for cookbook in cookbook_view_data.get("cookbooks", [])
+        ),
+    }
+
+
+def cookbooks_context():
+    return recipe_rows_context(
+        image_variants=("thumb", "card"),
+        include_detail_images=False,
+    )
 
 
 def shopping_views_context():
@@ -208,7 +270,10 @@ def shopping_views_context():
     item_state = load_item_state()
     store_settings = load_store_settings()
     product_choices = product_choices_by_item()
-    recipe_context = recipe_workspace_context()
+    recipe_context = recipe_rows_context(
+        image_variants=("thumb", "card", "detail"),
+        include_detail_images=True,
+    )
     recipe_rows = recipe_context["recipe_view_rows"]
     purchase_mappings = purchase_mapping_lookup_for_items(shopping_items_only(items), item_state)
     recipe_item_quantities = recipe_quantity_lookup(recipe_rows)
@@ -276,7 +341,10 @@ def rules_context():
 
 
 def pantry_context():
-    recipe_context = recipe_workspace_context()
+    recipe_context = recipe_rows_context(
+        image_variants=("thumb",),
+        include_detail_images=False,
+    )
     pantry_items = pantry_items_for_view()
 
     return {
@@ -522,7 +590,7 @@ def recipe_pdf_public_url(recipe_url):
     return public_url if is_shareable_pdf_public_url(public_url) else ""
 
 
-def recipe_view_rows(recipe_urls, food_rules=None):
+def recipe_view_rows(recipe_urls, food_rules=None, image_variants=None, include_detail_images=True):
     rows = []
     recipe_ingredient_data = load_recipe_ingredients()
 
@@ -530,7 +598,12 @@ def recipe_view_rows(recipe_urls, food_rules=None):
         recipe_quantity = normalize_recipe_quantity(recipe.get("quantity") or 1)
         recipe_data = load_saved_recipe_output(recipe["url"])
         recipe_meta = recipe_ingredient_data.get(normalize_recipe_url_key(recipe["url"]), {})
-        cover_image = recipe_cover_image_for_view(recipe["url"], recipe_data, recipe_meta)
+        cover_image = recipe_cover_image_for_view(
+            recipe["url"],
+            recipe_data,
+            recipe_meta,
+            variants=image_variants,
+        )
         nutrition_summary = recipe_view_nutrition_summary(recipe_data.get("nutrition", {}))
         use_scaled_meta = multipliers_match(recipe_meta.get("quantity", 1), recipe_quantity)
         scaled_ingredients = recipe_meta.get("scaled_ingredients", {}) if use_scaled_meta else {}
@@ -562,8 +635,16 @@ def recipe_view_rows(recipe_urls, food_rules=None):
             "scaled_servings": scaled_servings or scale_servings(recipe_data.get("servings"), recipe_quantity),
             "serving_basis": nutrition_summary["serving_basis"],
             "calories": nutrition_summary["calories"],
-            "equipment_items": normalize_equipment_items(recipe_data.get("equipment", [])),
-            "instruction_items": normalize_instruction_items(recipe_data.get("instructions", [])),
+            "equipment_items": (
+                normalize_equipment_items(recipe_data.get("equipment", []), image_variants=image_variants)
+                if include_detail_images
+                else []
+            ),
+            "instruction_items": (
+                normalize_instruction_items(recipe_data.get("instructions", []), image_variants=image_variants)
+                if include_detail_images
+                else []
+            ),
             "nutrition_items": normalize_nutrition_items(recipe_data.get("nutrition", {})),
             "sections": sections,
         })
@@ -621,7 +702,7 @@ def apply_cookbook_assignments_to_recipe_rows(rows, cookbook_assignments):
     return rows
 
 
-def recipe_url_log_rows(recipe_urls, cookbook_assignments=None, food_rules=None):
+def recipe_url_log_rows(recipe_urls, cookbook_assignments=None, food_rules=None, image_variants=None):
     rows = []
     recipe_ingredient_data = load_recipe_ingredients()
     cookbook_assignments = cookbook_assignments or {}
@@ -642,7 +723,12 @@ def recipe_url_log_rows(recipe_urls, cookbook_assignments=None, food_rules=None)
             "source_href": recipe_source_href(recipe["url"]),
             "source_display_url": recipe_source_display_url(recipe["url"]),
             "pdf_public_url": recipe_pdf_public_url(recipe["url"]),
-            "cover_image": recipe_cover_image_for_view(recipe["url"], recipe_data, recipe_meta),
+            "cover_image": recipe_cover_image_for_view(
+                recipe["url"],
+                recipe_data,
+                recipe_meta,
+                variants=image_variants,
+            ),
             "description": recipe_description_for_view(recipe_data),
             "servings": recipe_data.get("servings", ""),
             "level": recipe_data.get("level", ""),
@@ -666,7 +752,7 @@ def recipe_url_log_rows(recipe_urls, cookbook_assignments=None, food_rules=None)
     return rows
 
 
-def recipe_cover_image_for_view(recipe_url, recipe_data, recipe_meta=None):
+def recipe_cover_image_for_view(recipe_url, recipe_data, recipe_meta=None, variants=None):
     recipe_meta = recipe_meta if isinstance(recipe_meta, dict) else {}
     candidates = []
 
@@ -684,7 +770,7 @@ def recipe_cover_image_for_view(recipe_url, recipe_data, recipe_meta=None):
         if not src:
             continue
 
-        variant_payload = recipe_cover_image_variant_payload(recipe_url, cover_image, src)
+        variant_payload = recipe_cover_image_variant_payload(recipe_url, cover_image, src, variants=variants)
         alt = (
             str(cover_image.get("alt") or "").strip()
             or str((recipe_data or {}).get("recipe_title") or "").strip()
@@ -700,11 +786,11 @@ def recipe_cover_image_for_view(recipe_url, recipe_data, recipe_meta=None):
     return {}
 
 
-def recipe_cover_image_variant_payload(recipe_url, cover_image, original_src):
+def recipe_cover_image_variant_payload(recipe_url, cover_image, original_src, variants=None):
     image_path = recipe_cover_image_file_path(cover_image)
 
     if not image_path:
-        return local_static_image_variants(original_src)
+        return local_static_image_variants(original_src, variants=variants)
 
     def build_url(variant, version):
         return url_for(
@@ -714,7 +800,7 @@ def recipe_cover_image_variant_payload(recipe_url, cover_image, original_src):
             v=version,
         )
 
-    return build_cover_image_variant_payload(original_src, image_path, build_url)
+    return build_cover_image_variant_payload(original_src, image_path, build_url, variants=variants)
 
 
 def recipe_cover_image_src(recipe_url, cover_image):
@@ -727,7 +813,7 @@ def recipe_cover_image_src(recipe_url, cover_image):
     return str(cover_image.get("url") or "").strip()
 
 
-def cookbook_cover_image_for_view(recipe):
+def cookbook_cover_image_for_view(recipe, variants=None):
     if not isinstance(recipe, dict):
         return {}
 
@@ -750,10 +836,11 @@ def cookbook_cover_image_for_view(recipe):
             "cover_image": cover_image,
         },
         {"cover_image": cover_image},
+        variants=variants,
     )
 
 
-def cookbook_view_for_render(recipe_rows, food_rules=None):
+def cookbook_view_for_render(recipe_rows, food_rules=None, image_variants=None):
     view = cookbook_view(recipe_rows)
     recipe_ingredient_data = load_recipe_ingredients()
 
@@ -793,10 +880,10 @@ def cookbook_view_for_render(recipe_rows, food_rules=None):
             )
             recipe["serving_basis"] = recipe.get("serving_basis") or nutrition_summary["serving_basis"]
             recipe["calories"] = recipe.get("calories") or nutrition_summary["calories"]
-            recipe["cover_image"] = cookbook_cover_image_for_view(recipe)
+            recipe["cover_image"] = cookbook_cover_image_for_view(recipe, variants=image_variants)
 
     for recipe in view.get("recipes", []):
-        recipe["cover_image"] = cookbook_cover_image_for_view(recipe)
+        recipe["cover_image"] = cookbook_cover_image_for_view(recipe, variants=image_variants)
 
     return prepare_cookbook_menu_view(view)
 
@@ -1107,8 +1194,13 @@ def normalize_quantity_unit(unit):
     return singular_units.get(unit_key, unit)
 
 
-def load_saved_recipe_output(recipe_url):
-    recipe_key = normalize_recipe_url_key(recipe_url)
+def saved_recipe_output_index():
+    if has_request_context():
+        cached = getattr(g, "_saved_recipe_output_index", None)
+        if cached is not None:
+            return cached
+
+    index = {}
 
     for json_path in OUTPUT_FOLDER.glob("*.json"):
         if json_path.name == "sorted_ingredients.json":
@@ -1119,10 +1211,20 @@ def load_saved_recipe_output(recipe_url):
         except Exception:
             continue
 
-        if normalize_recipe_url_key(data.get("source_url", "")) == recipe_key:
-            return data
+        recipe_key = normalize_recipe_url_key(data.get("source_url", ""))
+        if recipe_key:
+            index[recipe_key] = data
 
-    return {}
+    if has_request_context():
+        g._saved_recipe_output_index = index
+
+    return index
+
+
+def load_saved_recipe_output(recipe_url):
+    recipe_key = normalize_recipe_url_key(recipe_url)
+
+    return saved_recipe_output_index().get(recipe_key, {})
 
 
 def build_recipe_sections(recipe_data, recipe_quantity=1, scaled_ingredients=None):
@@ -1468,7 +1570,7 @@ def normalize_text_list(value):
     return items
 
 
-def normalize_equipment_items(value):
+def normalize_equipment_items(value, image_variants=None):
     if isinstance(value, str):
         value = value.splitlines()
 
@@ -1489,22 +1591,25 @@ def normalize_equipment_items(value):
             equipment_image_generated_at = ""
 
         if text:
-            image_variants = local_static_image_variants(equipment_image_url)
+            image_variant_payload = local_static_image_variants(
+                equipment_image_url,
+                variants=image_variants,
+            )
             items.append({
                 "number": index,
                 "text": text,
                 "equipment": text,
                 "equipment_image_url": equipment_image_url,
-                "equipment_image_display_url": image_variants.get("display_url") or equipment_image_url,
-                "equipment_image_srcset": image_variants.get("srcset", ""),
-                "equipment_image_full_url": image_variants.get("full_url") or equipment_image_url,
+                "equipment_image_display_url": image_variant_payload.get("display_url") or equipment_image_url,
+                "equipment_image_srcset": image_variant_payload.get("srcset", ""),
+                "equipment_image_full_url": image_variant_payload.get("full_url") or equipment_image_url,
                 "equipment_image_generated_at": equipment_image_generated_at,
             })
 
     return items
 
 
-def normalize_instruction_items(value):
+def normalize_instruction_items(value, image_variants=None):
     if isinstance(value, str):
         value = value.splitlines()
 
@@ -1527,15 +1632,18 @@ def normalize_instruction_items(value):
             step_image_generated_at = ""
 
         if text:
-            image_variants = local_static_image_variants(step_image_url)
+            image_variant_payload = local_static_image_variants(
+                step_image_url,
+                variants=image_variants,
+            )
             items.append({
                 "step_number": step_number,
                 "text": text,
                 "instruction": text,
                 "step_image_url": step_image_url,
-                "step_image_display_url": image_variants.get("display_url") or step_image_url,
-                "step_image_srcset": image_variants.get("srcset", ""),
-                "step_image_full_url": image_variants.get("full_url") or step_image_url,
+                "step_image_display_url": image_variant_payload.get("display_url") or step_image_url,
+                "step_image_srcset": image_variant_payload.get("srcset", ""),
+                "step_image_full_url": image_variant_payload.get("full_url") or step_image_url,
                 "step_image_generated_at": step_image_generated_at,
             })
 
@@ -1660,7 +1768,7 @@ def index():
 def current_recipes_section():
     return render_template(
         "sections/current_recipe_url_log.html",
-        **recipe_workspace_context(),
+        **current_recipes_context(),
         normalize=normalize,
     )
 
@@ -1669,7 +1777,7 @@ def current_recipes_section():
 def cookbooks_section():
     return render_template(
         "sections/cookbooks.html",
-        **recipe_workspace_context(),
+        **cookbooks_context(),
     )
 
 

@@ -19451,3 +19451,10 @@ body {
 .lazy-section-error {
     color: #b91c1c;
 }
+
+img.deferred-image-pending,
+img[data-deferred-src] {
+    background:
+        linear-gradient(90deg, rgba(148, 163, 184, 0.16), rgba(148, 163, 184, 0.28), rgba(148, 163, 184, 0.16));
+    background-size: 220% 100%;
+}
