@@ -21062,6 +21062,7 @@ async function saveStoreDetailsForm(form) {
         updateStoreDetailsFromForm(form);
         syncStoreEditFormDefaults(form);
         closeStoreEditModal({ returnFocus: false });
+        await refreshStoreMarkup({ cacheBust: true });
     } catch (err) {
         console.warn("Unable to save store details in the background.", err);
     } finally {
@@ -21109,21 +21110,70 @@ function updateStoreDetailLine(container, label, value) {
     }
 }
 
+function updateStoreCredentialDetailLine(container, label, value, options = {}) {
+    if (!container) {
+        return;
+    }
+
+    const normalizedLabel = label.toLowerCase();
+    let line = Array.from(container.querySelectorAll(".store-detail-line"))
+        .find(candidate => {
+            const detailLabel = candidate.querySelector(".store-detail-label");
+            return ((detailLabel && detailLabel.textContent) || "").trim().toLowerCase() === normalizedLabel;
+        });
+
+    if (!line) {
+        line = document.createElement("div");
+        line.className = "store-detail-line";
+
+        const detailLabel = document.createElement("span");
+        detailLabel.className = "store-detail-label";
+        detailLabel.textContent = label;
+
+        const detailValue = document.createElement("span");
+        detailValue.className = "store-detail-value";
+
+        line.append(detailLabel, detailValue);
+        container.appendChild(line);
+    }
+
+    const detailValue = line.querySelector(".store-detail-value") || document.createElement("span");
+    const hasValue = Boolean(String(value || "").trim());
+
+    detailValue.className = "store-detail-value";
+    detailValue.classList.toggle("store-detail-empty", !hasValue);
+    detailValue.classList.toggle("store-detail-secret", Boolean(options.secret && hasValue));
+    detailValue.textContent = hasValue
+        ? (options.secret ? "********" : value)
+        : "Not set";
+
+    if (!detailValue.parentElement) {
+        line.appendChild(detailValue);
+    }
+}
+
 function updateStoreDetailsFromForm(form) {
     const storeKey = (form.id || "").replace(/^store-edit-/, "");
     const row = form.closest(".store-manager-row");
     const labelInput = form.querySelector('[name="store_label"]');
     const searchUrlInput = form.querySelector('[name="store_url"]');
     const selectorUrlInput = form.querySelector('[name="urlStoreSelector"]');
+    const usernameInput = form.querySelector('[name="store_username"]');
+    const passwordInput = form.querySelector('[name="store_password"]');
 
-    if (!labelInput && !searchUrlInput && !selectorUrlInput) {
+    if (!labelInput && !searchUrlInput && !selectorUrlInput && !usernameInput && !passwordInput) {
         return;
     }
 
-    const label = ((labelInput && labelInput.value) || "").trim();
-    const searchUrl = ((searchUrlInput && searchUrlInput.value) || "").trim();
-    const selectorUrl = ((selectorUrlInput && selectorUrlInput.value) || "").trim();
-    const storeName = label || "Store";
+    const label = labelInput ? (labelInput.value || "").trim() : "";
+    const searchUrl = searchUrlInput ? (searchUrlInput.value || "").trim() : "";
+    const selectorUrl = selectorUrlInput ? (selectorUrlInput.value || "").trim() : "";
+    const username = ((usernameInput && usernameInput.value) || "").trim();
+    const password = (passwordInput && passwordInput.value) || "";
+    const currentStoreName = (row && row.querySelector(".store-manager-label"))
+        ? row.querySelector(".store-manager-label").textContent.trim()
+        : "";
+    const storeName = label || currentStoreName || "Store";
     const storeUrl = selectorUrl || searchUrl;
     const managerLabel = row ? row.querySelector(".store-manager-label") : null;
     const managerUrl = row ? row.querySelector(".store-manager-url") : null;
@@ -21132,20 +21182,33 @@ function updateStoreDetailsFromForm(form) {
     const activeCard = Array.from(document.querySelectorAll(".active-store-card"))
         .find(card => card.dataset.storeKey === storeKey);
 
-    if (managerLabel) {
+    if (labelInput && managerLabel) {
         managerLabel.textContent = storeName;
     }
 
-    if (modalTitle) {
+    if (labelInput && modalTitle) {
         modalTitle.textContent = `Edit ${storeName}`;
     }
 
-    if (modalClose) {
+    if (labelInput && modalClose) {
         modalClose.setAttribute("aria-label", `Close ${storeName} editor`);
     }
 
-    updateStoreDetailLine(managerUrl, "Search", searchUrl);
-    updateStoreDetailLine(managerUrl, "Store Selector URL", selectorUrl);
+    if (searchUrlInput) {
+        updateStoreDetailLine(managerUrl, "Search", searchUrl);
+    }
+
+    if (selectorUrlInput) {
+        updateStoreDetailLine(managerUrl, "Store Selector URL", selectorUrl);
+    }
+
+    if (usernameInput) {
+        updateStoreCredentialDetailLine(managerUrl, "Username / Email", username);
+    }
+
+    if (passwordInput) {
+        updateStoreCredentialDetailLine(managerUrl, "Password", password, { secret: true });
+    }
 
     if (!activeCard) {
         return;
@@ -21154,11 +21217,11 @@ function updateStoreDetailsFromForm(form) {
     const activeName = activeCard.querySelector(".active-store-name");
     const isActive = activeCard.dataset.storeActive === "true";
 
-    if (activeName) {
+    if (labelInput && activeName) {
         activeName.textContent = storeName;
     }
 
-    if (storeUrl) {
+    if ((selectorUrlInput || searchUrlInput) && storeUrl) {
         activeCard.href = storeUrl;
         activeCard.dataset.storeUrl = storeUrl;
     }

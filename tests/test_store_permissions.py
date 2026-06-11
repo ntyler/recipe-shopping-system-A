@@ -268,6 +268,18 @@ def test_store_options_bulk_activation_has_script_handler():
     assert "saveStoreToggle(inputs[0])" in script
 
 
+def test_store_detail_save_refreshes_visible_credentials():
+    script = open("PushShoppingList/static/js/app.js", encoding="utf-8").read()
+    save_block = script[script.index("async function saveStoreDetailsForm"):script.index("function updateStoreDetailLine")]
+    update_block = script[script.index("function updateStoreDetailsFromForm"):script.index("async function deleteStore")]
+
+    assert "await refreshStoreMarkup({ cacheBust: true });" in save_block
+    assert 'updateStoreCredentialDetailLine(managerUrl, "Username / Email", username);' in update_block
+    assert 'updateStoreCredentialDetailLine(managerUrl, "Password", password, { secret: true });' in update_block
+    assert "if (searchUrlInput)" in update_block
+    assert "if (selectorUrlInput)" in update_block
+
+
 def test_store_options_admin_menu_renders_store_management_actions():
     app = create_app()
 
