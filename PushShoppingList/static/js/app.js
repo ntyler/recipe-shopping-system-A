@@ -12920,6 +12920,15 @@ function closeRecipeEditor() {
         document.body.classList.remove("recipe-editor-open");
     }
 
+    if (document.body && document.body.dataset.recipeEditPage === "true") {
+        if (window.history.length > 1) {
+            window.history.back();
+        } else {
+            window.location.href = "/";
+        }
+        return;
+    }
+
     window.location.reload();
 }
 

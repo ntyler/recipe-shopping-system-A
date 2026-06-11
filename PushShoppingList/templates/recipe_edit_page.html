@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Recipe</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=app_css_version) }}">
+</head>
+<body class="recipe-edit-standalone-page"
+      data-recipe-edit-page="true"
+      data-recipe-edit-url="{{ recipe_url }}">
+<main class="recipe-edit-standalone-shell" aria-label="Recipe editor">
+    {% set recipe_edit_only = true %}
+    {% include "sections/current_recipe_url_log.html" %}
+</main>
+
+<script src="{{ url_for('static', filename='js/app.js', v=app_js_version) }}"></script>
+<script>
+window.addEventListener("DOMContentLoaded", () => {
+    const recipeUrl = document.body ? document.body.dataset.recipeEditUrl || "" : "";
+
+    if (recipeUrl && typeof openRecipeEditor === "function") {
+        openRecipeEditor({ dataset: { recipeUrl } });
+    }
+});
+</script>
+</body>
+</html>

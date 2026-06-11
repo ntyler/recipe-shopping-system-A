@@ -7,11 +7,13 @@ from time import perf_counter
 from flask import Blueprint
 from flask import abort
 from flask import copy_current_request_context
+from flask import current_app
 from flask import flash
 from flask import has_request_context
 from flask import Response
 from flask import jsonify
 from flask import redirect
+from flask import render_template
 from flask import request
 from flask import send_file
 
@@ -72,6 +74,9 @@ from PushShoppingList.services.recipe_extract_service import ensure_heif_image_s
 from PushShoppingList.services.recipe_extract_service import unsupported_phone_image_message
 from PushShoppingList.services.cookbook_service import ensure_unclassified_cookbook_for_recipes
 from PushShoppingList.services.cookbook_service import ingredient_sections_from_recipe_data
+from PushShoppingList.services.cookbook_service import is_unclassified_cookbook
+from PushShoppingList.services.cookbook_service import load_cookbooks
+from PushShoppingList.services.cookbook_service import prepare_cookbook_menu_view
 from PushShoppingList.services.cookbook_service import COOKBOOK_CATEGORY_ALL_FIELDS
 from PushShoppingList.services.cookbook_service import CATEGORY_SOURCE_AI_INFERRED
 from PushShoppingList.services.cookbook_service import move_recipes_to_cookbook
@@ -128,6 +133,33 @@ IMPORT_LOGIN_ERROR = "Sign in before importing recipes so imported data is saved
 FOOD_REVIEW_LOGIN_ERROR = "Sign in before using food reviews so results stay tied to your account."
 IMPORT_CATEGORY_STATUS_MESSAGE = "Import complete. Generating ChatGPT categories..."
 IMAGE_RECIPE_WORKFLOW_STATES = {}
+
+
+def static_asset_version(filename):
+    try:
+        return int(os.path.getmtime(os.path.join(current_app.static_folder, filename)))
+    except OSError:
+        return 1
+
+
+def recipe_edit_cookbook_view():
+    payload = load_cookbooks()
+    cookbooks = []
+
+    for cookbook in payload.get("cookbooks", []):
+        cookbooks.append({
+            "id": cookbook.get("id", ""),
+            "name": cookbook.get("name", ""),
+            "is_unclassified": is_unclassified_cookbook(cookbook),
+            "recipes": [],
+        })
+
+    return prepare_cookbook_menu_view({
+        "cookbooks": cookbooks,
+        "recipes": [],
+        "menu_sort_options": [],
+        "menu_views": {},
+    })
 
 
 def _uploaded_recipe_workflow_key(url):
@@ -2504,6 +2536,25 @@ def api_cancel_extract_route():
     progress = request_cancel(job_id)
 
     return jsonify(progress)
+
+
+@recipe_bp.route("/recipe/edit", methods=["GET"])
+def edit_recipe_page_route():
+    recipe_url = str(request.args.get("url", "") or "").strip()
+
+    if not recipe_url:
+        abort(400)
+
+    return render_template(
+        "recipe_edit_page.html",
+        recipe_url=recipe_url,
+        current_user=current_user(),
+        current_urls=[],
+        current_recipe_count=0,
+        cookbook_view=recipe_edit_cookbook_view(),
+        app_css_version=static_asset_version("css/app.css"),
+        app_js_version=static_asset_version("js/app.js"),
+    )
 
 
 @recipe_bp.route("/api/recipe_quantity", methods=["POST"])

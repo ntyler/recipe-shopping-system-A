@@ -1,5 +1,9 @@
 from pathlib import Path
 
+from PushShoppingList.app import create_app
+from PushShoppingList.services import storage_service
+from PushShoppingList.services import user_account_service
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -61,19 +65,60 @@ def test_collapsed_ingredient_rows_use_compact_one_line_layout():
     assert "min-height: 20px;" in compact_css
 
 
-def test_recipe_menu_edit_opens_editor_after_closing_menu():
+def test_recipe_menu_edit_links_to_standalone_editor_page():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     current_recipes = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(
         encoding="utf-8",
     )
     recipe_view = (ROOT / "PushShoppingList/templates/sections/items.html").read_text(encoding="utf-8")
     cookbooks = (ROOT / "PushShoppingList/templates/sections/cookbooks.html").read_text(encoding="utf-8")
+    standalone_page = (ROOT / "PushShoppingList/templates/recipe_edit_page.html").read_text(encoding="utf-8")
+    routes = (ROOT / "PushShoppingList/routes/recipe_routes.py").read_text(encoding="utf-8")
 
-    assert "function openRecipeEditorFromMenu(button, options = {})" in script
-    assert 'const recipeUrl = button ? button.dataset.recipeUrl || "" : "";' in script
-    assert "openRecipeEditor({ dataset: { recipeUrl } }, options);" in script
+    assert '@recipe_bp.route("/recipe/edit", methods=["GET"])' in routes
+    assert "recipe_edit_only = true" in standalone_page
+    assert "data-recipe-edit-page=\"true\"" in standalone_page
+    assert "data-recipe-edit-url=\"{{ recipe_url }}\"" in standalone_page
+    assert "openRecipeEditor({ dataset: { recipeUrl } });" in standalone_page
     assert "await waitForNextPaint();" in script
     assert "scheduleRecipeImageProgressPoll(750);" in script
-    assert "onclick=\"return openRecipeEditorFromMenu(this)\"" in current_recipes
-    assert "onclick=\"return openRecipeEditorFromMenu(this)\"" in recipe_view
-    assert "onclick=\"return openRecipeEditorFromMenu(this)\"" in cookbooks
+    assert "document.body.dataset.recipeEditPage" in script
+    assert "recipe_bp.edit_recipe_page_route" in current_recipes
+    assert "recipe_bp.edit_recipe_page_route" in recipe_view
+    assert "recipe_bp.edit_recipe_page_route" in cookbooks
+    assert 'target="_blank"' in current_recipes
+    assert 'target="_blank"' in recipe_view
+    assert 'target="_blank"' in cookbooks
+
+
+def test_standalone_recipe_edit_page_renders_editor(monkeypatch, tmp_path):
+    monkeypatch.setattr(storage_service, "USER_DATA_DIR", tmp_path / "users")
+    monkeypatch.setattr(user_account_service, "USERS_FILE", tmp_path / "users.json")
+    user_account_service.save_users({
+        "users": [{
+            "user_id": "edit-page-user",
+            "email": "editor@example.com",
+            "username": "editor",
+            "account_status": "active",
+        }],
+    })
+
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["user_id"] = "edit-page-user"
+
+        response = client.get(
+            "/recipe/edit",
+            query_string={"url": "https://example.com/soup"},
+        )
+
+    html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert 'data-recipe-edit-page="true"' in html
+    assert 'data-recipe-edit-url="https://example.com/soup"' in html
+    assert 'id="recipeEditModal"' in html
+    assert 'id="currentRecipeUrlLogCard"' not in html
