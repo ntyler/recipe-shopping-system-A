@@ -37,18 +37,49 @@ const USER_ACCOUNT_PANEL_HIDE_SELECTOR = [
 ].join(", ");
 const AUTH_COLLAPSE_PENDING_KEY = "shopping-auth-collapse-all-pending";
 const AUTH_COLLAPSE_ACTIVE_KEY = "shopping-auth-collapse-all-active";
+const GLOBAL_COLLAPSE_STATE_KEY = "shopping-global-collapse-state";
+const PERFORMANCE_STARTUP_LAST_OPENED_KEY = "shopping-list-lastPageOpenedAt";
+const PERFORMANCE_STARTUP_STALE_MS = 60 * 60 * 1000;
 const AUTH_COLLAPSE_CONTENT_KEYS = [
     "ai-pantry",
     "recipe-url-log",
     "cookbooks",
     "rules",
     "store-options",
+    "recipe-view",
     "home-address",
     "feedback-support",
     "food-restrictions",
     "screen-settings",
     "shared-recipe-pdfs",
 ];
+const LAZY_SECTION_COLLAPSE_KEYS = {
+    "admin-support": "admin-support",
+    pantry: "ai-pantry",
+    "current-recipes": "recipe-url-log",
+    cookbooks: "cookbooks",
+    rules: "rules",
+    "store-options": "store-options",
+    "recipe-view": "recipe-view",
+    "shared-recipe-pdfs": "shared-recipe-pdfs",
+};
+const COLLAPSE_KEY_LAZY_SECTIONS = Object.entries(LAZY_SECTION_COLLAPSE_KEYS)
+    .reduce((lookup, [sectionName, collapseKey]) => {
+        lookup[collapseKey] = sectionName;
+        return lookup;
+    }, {});
+const HEAVY_STARTUP_COLLAPSE_KEYS = new Set([
+    "admin-support",
+    "recipe-url-log",
+    "cookbooks",
+    "rules",
+    "store-options",
+    "recipe-view",
+    "shared-recipe-pdfs",
+    "screen-settings",
+    "feedback-support",
+    "home-address",
+]);
 const IMPORT_COOKBOOK_STORAGE_KEY = "import-recipe-cookbook-destination";
 const USER_ACCOUNT_PANEL_HASH_KEYS = {
     "#userProfileEditForm": "accountSettings",
@@ -76,6 +107,18 @@ function getPublicSupportIdentity(email) {
 let openAiUsageDashboardRefreshTimer = null;
 let openAiUsageDashboardRefreshPromise = null;
 let leafletAssetsPromise = null;
+let performanceStartupForced = false;
+const performanceDiagnostics = {
+    enabled: false,
+    startupStartedAt: (window.performance && performance.now) ? performance.now() : Date.now(),
+    initialLoadTime: 0,
+    apiCallCount: 0,
+    firebaseQueryCount: 0,
+    imagesRendered: 0,
+    domNodeCount: 0,
+    sectionTimes: {},
+    queryTimes: [],
+};
 
 function scheduleIdleTask(callback, timeout = 1200) {
     if (window.requestIdleCallback) {
@@ -124,11 +167,13 @@ function lazySectionElement(sectionName) {
 
 function lazySectionFromTargetId(targetId) {
     const sectionsByTargetId = {
+        adminSupportSection: "admin-support",
         aiPantrySection: "pantry",
         currentRecipeUrlLogCard: "current-recipes",
         cookbooksCard: "cookbooks",
         rulesCard: "rules",
         storeOptionsSection: "store-options",
+        sharedRecipePdfsSection: "shared-recipe-pdfs",
         shoppingViewsSection: "recipe-view",
         sectionView: "recipe-view",
         storeView: "recipe-view",
@@ -177,10 +222,162 @@ function safeStorageGet(storage, key) {
     }
 }
 
+function nowForPerformance() {
+    return (window.performance && performance.now) ? performance.now() : Date.now();
+}
+
+function performanceDiagnosticsEnabled() {
+    return document.body && document.body.dataset.performanceDiagnostics === "1";
+}
+
+function initPerformanceDiagnostics() {
+    performanceDiagnostics.enabled = performanceDiagnosticsEnabled();
+
+    if (!performanceDiagnostics.enabled || window.__shoppingPerformanceFetchWrapped) {
+        return;
+    }
+
+    window.__shoppingPerformanceFetchWrapped = true;
+    const originalFetch = window.fetch ? window.fetch.bind(window) : null;
+
+    if (!originalFetch) {
+        return;
+    }
+
+    window.fetch = function performanceFetchWrapper(input, init) {
+        const startedAt = nowForPerformance();
+        const url = typeof input === "string"
+            ? input
+            : (input && input.url ? input.url : "");
+
+        if (url.includes("/api/") || url.includes("/sections/") || url.startsWith("/pdfs")) {
+            performanceDiagnostics.apiCallCount += 1;
+        }
+
+        if (url.toLowerCase().includes("firebase")) {
+            performanceDiagnostics.firebaseQueryCount += 1;
+        }
+
+        return originalFetch(input, init).finally(() => {
+            const elapsed = Math.round(nowForPerformance() - startedAt);
+            performanceDiagnostics.queryTimes.push({
+                url: String(url || "fetch"),
+                elapsed,
+            });
+        });
+    };
+}
+
+function updatePerformanceDiagnosticsPanel() {
+    if (!performanceDiagnostics.enabled) {
+        return;
+    }
+
+    const panel = document.querySelector("[data-performance-diagnostics-panel]");
+    if (!panel) {
+        return;
+    }
+
+    panel.hidden = false;
+    performanceDiagnostics.domNodeCount = document.querySelectorAll("*").length;
+    performanceDiagnostics.imagesRendered = document.querySelectorAll("img").length;
+
+    const sectionEntries = Object.entries(performanceDiagnostics.sectionTimes);
+    const largestSection = sectionEntries
+        .sort((a, b) => b[1] - a[1])[0];
+    const slowestQuery = [...performanceDiagnostics.queryTimes]
+        .sort((a, b) => b.elapsed - a.elapsed)[0];
+    const values = {
+        initialLoadTime: performanceDiagnostics.initialLoadTime
+            ? `${Math.round(performanceDiagnostics.initialLoadTime)} ms`
+            : "--",
+        firebaseQueryCount: String(performanceDiagnostics.firebaseQueryCount),
+        apiCallCount: String(performanceDiagnostics.apiCallCount),
+        imagesRendered: String(performanceDiagnostics.imagesRendered),
+        domNodeCount: String(performanceDiagnostics.domNodeCount),
+        largestSectionRenderTime: largestSection
+            ? `${largestSection[0]}: ${Math.round(largestSection[1])} ms`
+            : "--",
+        slowestQuery: slowestQuery
+            ? `${slowestQuery.elapsed} ms ${slowestQuery.url}`
+            : "--",
+    };
+
+    Object.entries(values).forEach(([key, value]) => {
+        const node = panel.querySelector(`[data-performance-metric="${key}"]`);
+        if (node) {
+            node.textContent = value;
+        }
+    });
+}
+
+function runPerformanceDiagnosticsTest() {
+    performanceDiagnostics.initialLoadTime = Math.round(nowForPerformance() - performanceDiagnostics.startupStartedAt);
+    updatePerformanceDiagnosticsPanel();
+    if (performanceDiagnostics.enabled) {
+        console.log("Performance diagnostics", {
+            initialLoadTime: performanceDiagnostics.initialLoadTime,
+            domNodeCount: performanceDiagnostics.domNodeCount,
+            imagesRendered: performanceDiagnostics.imagesRendered,
+            apiCallCount: performanceDiagnostics.apiCallCount,
+            firebaseQueryCount: performanceDiagnostics.firebaseQueryCount,
+            sectionTimes: performanceDiagnostics.sectionTimes,
+            slowestQuery: [...performanceDiagnostics.queryTimes].sort((a, b) => b.elapsed - a.elapsed)[0] || null,
+        });
+    }
+    return false;
+}
+
+function initPerformanceStartupMode() {
+    const previousOpenedAt = Number.parseInt(
+        safeStorageGet(localStorage, PERFORMANCE_STARTUP_LAST_OPENED_KEY) || "0",
+        10
+    );
+    const openedAt = Date.now();
+
+    performanceStartupForced = Boolean(
+        previousOpenedAt
+        && Number.isFinite(previousOpenedAt)
+        && openedAt - previousOpenedAt > PERFORMANCE_STARTUP_STALE_MS
+    );
+    safeStorageSet(localStorage, PERFORMANCE_STARTUP_LAST_OPENED_KEY, String(openedAt));
+
+    if (performanceDiagnostics.enabled) {
+        console.time("page-startup");
+        console.time("user-account");
+        console.timeEnd("user-account");
+    }
+}
+
+function isPerformanceStartupForced() {
+    return performanceStartupForced;
+}
+
+function lazySectionPreferenceKey(sectionName) {
+    const collapseKey = LAZY_SECTION_COLLAPSE_KEYS[sectionName] || sectionName;
+    return `card-collapse:${collapseKey}`;
+}
+
+function savedLazySectionExpanded(sectionName) {
+    return safeStorageGet(localStorage, lazySectionPreferenceKey(sectionName)) === "expanded";
+}
+
+function setLazySectionSavedState(sectionName, expanded) {
+    safeStorageSet(localStorage, lazySectionPreferenceKey(sectionName), expanded ? "expanded" : "collapsed");
+}
+
+function setLazySectionsSavedState(expanded) {
+    Object.keys(LAZY_SECTION_COLLAPSE_KEYS).forEach(sectionName => {
+        setLazySectionSavedState(sectionName, expanded);
+    });
+}
+
 function persistShoppingListCollapsedState() {
     AUTH_COLLAPSE_CONTENT_KEYS.forEach(key => {
         safeStorageSet(localStorage, `card-collapse:${key}`, "collapsed");
     });
+    setLazySectionsSavedState(false);
+    safeStorageSet(localStorage, GLOBAL_COLLAPSE_STATE_KEY, "collapsed");
     safeStorageRemove(localStorage, USER_ACCOUNT_OPEN_PANEL_KEY);
     safeStorageRemove(localStorage, USER_PROFILE_EDITOR_OPEN_KEY);
     safeStorageSet(localStorage, "store-open-panels", "[]");
@@ -373,6 +570,20 @@ async function loadLazySection(sectionName, options = {}) {
         placeholder.dataset.lazyState = "loading";
         placeholder.setAttribute("aria-busy", "true");
         setLazySectionStatus(placeholder, "Loading...");
+        const sectionStartedAt = nowForPerformance();
+        const timingLabel = {
+            "admin-support": "admin-support",
+            "current-recipes": "recipe-images",
+            "shared-recipe-pdfs": "pdf-section",
+            "store-options": "store-results",
+        }[sectionName] || sectionName;
+
+        if (performanceDiagnostics.enabled && timingLabel) {
+            console.time(timingLabel);
+            if (sectionName === "admin-support") {
+                console.time("support-log-query");
+            }
+        }
 
         try {
             const response = await fetch(requestUrl.toString(), { cache: "no-store" });
@@ -394,6 +605,9 @@ async function loadLazySection(sectionName, options = {}) {
             nextElement.dataset.lazyLoaded = "1";
             placeholder.replaceWith(nextElement);
             afterDynamicMarkupLoaded({ root: nextElement });
+            if (options.persistExpanded !== false) {
+                setLazySectionSavedState(sectionName, true);
+            }
 
             if (options.focus) {
                 window.requestAnimationFrame(() => {
@@ -408,6 +622,14 @@ async function loadLazySection(sectionName, options = {}) {
             setLazySectionStatus(placeholder, "Unable to load. Tap to retry.", true);
             return null;
         } finally {
+            if (performanceDiagnostics.enabled && timingLabel) {
+                console.timeEnd(timingLabel);
+                if (sectionName === "admin-support") {
+                    console.timeEnd("support-log-query");
+                }
+                performanceDiagnostics.sectionTimes[timingLabel] = Math.round(nowForPerformance() - sectionStartedAt);
+                updatePerformanceDiagnosticsPanel();
+            }
             placeholder.setAttribute("aria-busy", "false");
             lazySectionPromises.delete(sectionName);
         }
@@ -457,48 +679,33 @@ function initLazySections() {
         return;
     }
 
-    const scheduleEagerLoad = placeholder => {
+    if (isPerformanceStartupForced() || safeStorageGet(localStorage, GLOBAL_COLLAPSE_STATE_KEY) === "collapsed") {
+        return;
+    }
+
+    const restoreExpandedPlaceholder = placeholder => {
         const sectionName = placeholder.dataset.lazySection || "";
 
         if (!sectionName || placeholder.dataset.lazyQueued === "1") {
             return;
         }
 
-        placeholder.dataset.lazyQueued = "1";
-        const eagerDelay = Number.parseInt(placeholder.dataset.lazyEagerDelay || "1800", 10);
-        scheduleIdleTask(() => loadLazySection(sectionName), Number.isFinite(eagerDelay) ? eagerDelay : 1800);
-    };
-
-    const observedPlaceholders = [];
-
-    placeholders.forEach(placeholder => {
-        if (placeholder.dataset.lazyEager === "idle") {
-            scheduleEagerLoad(placeholder);
+        if (placeholder.hidden) {
             return;
         }
 
-        observedPlaceholders.push(placeholder);
-    });
+        if (
+            safeStorageGet(localStorage, GLOBAL_COLLAPSE_STATE_KEY) !== "expanded"
+            && !savedLazySectionExpanded(sectionName)
+        ) {
+            return;
+        }
 
-    if (!("IntersectionObserver" in window) || !observedPlaceholders.length) {
-        return;
-    }
+        placeholder.dataset.lazyQueued = "1";
+        scheduleIdleTask(() => loadLazySection(sectionName, { persistExpanded: false }), 1200);
+    };
 
-    const observer = new IntersectionObserver(entries => {
-        entries.forEach(entry => {
-            if (!entry.isIntersecting) {
-                return;
-            }
-
-            const sectionName = entry.target.dataset.lazySection || "";
-            observer.unobserve(entry.target);
-            loadLazySection(sectionName);
-        });
-    }, {
-        rootMargin: "80px 0px",
-    });
-
-    observedPlaceholders.forEach(placeholder => observer.observe(placeholder));
+    placeholders.forEach(restoreExpandedPlaceholder);
 }
 
 function loadLeafletAssets() {
@@ -979,7 +1186,9 @@ function restoreRememberedAccountPanelOpenWithOptions(options = {}) {
     hideRememberedAccountPanels(panel);
 
     if (panelKey === "sharedRecipePdfs") {
-        expandSharedRecipePdfsContent();
+        loadLazySection("shared-recipe-pdfs", { focus: false }).then(() => {
+            expandSharedRecipePdfsContent();
+        });
     }
 
     const accountMenu = document.querySelector("[data-account-menu]");
@@ -1767,7 +1976,7 @@ function expandSharedRecipePdfsContent() {
     }
 }
 
-function openSharedRecipePdfsPanel() {
+async function openSharedRecipePdfsPanel() {
     const panel = document.querySelector("[data-shared-recipe-pdfs-panel]");
 
     if (!panel) {
@@ -1782,13 +1991,23 @@ function openSharedRecipePdfsPanel() {
     panel.hidden = false;
     rememberAccountPanelElement(panel, true);
     hideRememberedAccountPanels(panel);
+
+    if (panel.dataset.lazySection === "shared-recipe-pdfs" && panel.dataset.lazyLoaded !== "1") {
+        await loadLazySection("shared-recipe-pdfs", { focus: false });
+    }
+
+    const activePanel = document.querySelector("[data-shared-recipe-pdfs-panel]") || panel;
+    activePanel.hidden = false;
+    rememberAccountPanelElement(activePanel, true);
+    hideRememberedAccountPanels(activePanel);
     expandSharedRecipePdfsContent();
 
     window.requestAnimationFrame(() => {
-        panel.scrollIntoView({ behavior: "smooth", block: "start" });
-        const firstControl = panel.querySelector("[data-shared-recipe-pdfs-close]")
+        const loadedPanel = document.querySelector("[data-shared-recipe-pdfs-panel]") || activePanel;
+        loadedPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+        const firstControl = loadedPanel.querySelector("[data-shared-recipe-pdfs-close]")
             || panel.querySelector("[data-collapse-toggle='shared-recipe-pdfs']")
-            || panel.querySelector("button, a, input, select, textarea");
+            || loadedPanel.querySelector("button, a, input, select, textarea");
 
         if (firstControl) {
             firstControl.focus({ preventScroll: true });
@@ -8627,6 +8846,9 @@ function setCardCollapseContentCollapsed(content, collapsed) {
     }
 
     setSavedCardCollapseState(key, content, isCollapsed ? "collapsed" : "expanded");
+    if (COLLAPSE_KEY_LAZY_SECTIONS[key]) {
+        setLazySectionSavedState(COLLAPSE_KEY_LAZY_SECTIONS[key], !isCollapsed);
+    }
     updateCardCollapseToggleState(key, isCollapsed);
 }
 
@@ -8866,6 +9088,8 @@ function collapseAllShoppingListPage(options = {}) {
 
 function expandAllShoppingListPage() {
     clearAuthCollapseAllMode();
+    safeStorageSet(localStorage, GLOBAL_COLLAPSE_STATE_KEY, "expanded");
+    setLazySectionsSavedState(true);
     closeShoppingListExpandedPanels();
     setAllCardCollapseContentCollapsed(false);
     setShoppingListViewRowsCollapsed(false);
@@ -8873,7 +9097,12 @@ function expandAllShoppingListPage() {
     setAllCookbookPanelsCollapsed(false);
     setAllShoppingListRecipeImagesVisible(recipeImagesShownByDefault());
     setShoppingGlobalCollapseStatus("Everything expanded.");
-    initLazySections();
+    Object.keys(LAZY_SECTION_COLLAPSE_KEYS).forEach(sectionName => {
+        const placeholder = lazySectionElement(sectionName);
+        if (placeholder && !placeholder.hidden) {
+            loadLazySection(sectionName, { persistExpanded: false });
+        }
+    });
     return false;
 }
 
@@ -9057,7 +9286,9 @@ function restoreCardCollapseState() {
     document.querySelectorAll("[data-collapse-content]").forEach(content => {
         const key = content.dataset.collapseContent;
         const savedState = getSavedCardCollapseState(key, content);
-        const shouldCollapse = savedState
+        const shouldCollapse = isPerformanceStartupForced() && HEAVY_STARTUP_COLLAPSE_KEYS.has(key)
+            ? true
+            : savedState
             ? savedState === "collapsed"
             : cardCollapseDefaultIsCollapsed(content);
         const card = content.closest(".app-card");
@@ -21857,6 +22088,8 @@ window.clearShoppingListAuthCollapseAllRequest = clearShoppingListAuthCollapseAl
 
 document.addEventListener("DOMContentLoaded", function () {
     [
+        ["initPerformanceDiagnostics", initPerformanceDiagnostics],
+        ["initPerformanceStartupMode", initPerformanceStartupMode],
         ["consumeAuthCollapseAllRequest", consumeAuthCollapseAllRequest],
         ["restoreScroll", restoreScroll],
         ["restoreScreenSettings", restoreScreenSettings],
@@ -21901,6 +22134,20 @@ document.addEventListener("DOMContentLoaded", function () {
         { name: "startExtractionProgressPolling", run: startExtractionProgressPolling },
         { name: "updateAddStoreStickyVisibility", run: updateAddStoreStickyVisibility },
     ]);
+
+    window.requestAnimationFrame(() => {
+        performanceDiagnostics.initialLoadTime = Math.round(nowForPerformance() - performanceDiagnostics.startupStartedAt);
+        if (performanceDiagnostics.enabled) {
+            console.timeEnd("page-startup");
+            console.log("Shopping startup diagnostics", {
+                domNodeCount: document.querySelectorAll("*").length,
+                imagesRendered: document.querySelectorAll("img").length,
+                firebaseQueryCount: performanceDiagnostics.firebaseQueryCount,
+                apiCallCount: performanceDiagnostics.apiCallCount,
+            });
+        }
+        updatePerformanceDiagnosticsPanel();
+    });
     document.addEventListener("click", handleRecipeCoverImageClick, true);
     document.addEventListener("click", handleRecipeEditRowMenuOutsideClick);
     document.addEventListener("scroll", handleRecipeEditRowMenuScrollOrResize, true);

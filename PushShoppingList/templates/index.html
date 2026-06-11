@@ -8,7 +8,8 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/extraction_overlay_old.css') }}">
 </head>
 
-<body class="{% if password_reset_token|default('') or two_factor_recovery_token|default('') or account_delete_token|default('') %}account-action-token{% endif %}">
+<body class="{% if password_reset_token|default('') or two_factor_recovery_token|default('') or account_delete_token|default('') %}account-action-token{% endif %}"
+      data-performance-diagnostics="{{ '1' if performance_diagnostics_enabled else '0' }}">
 
 <h1>Shopping List</h1>
 
@@ -79,7 +80,40 @@
     {% endif %}
     {% if admin_support_dashboard and admin_support_dashboard.is_admin %}
         <div class="app-section-divider" aria-hidden="true"></div>
-        {% include "sections/admin_support.html" %}
+        <section id="adminSupportSection"
+                 class="recipe-card admin-support-card lazy-section-placeholder"
+                 data-lazy-section="admin-support"
+                 data-lazy-url="{{ url_for('main_bp.admin_support_section') }}"
+                 aria-busy="false">
+            <button type="button"
+                    class="card-collapse-toggle admin-support-lazy-toggle"
+                    onclick="loadLazySection('admin-support', { focus: true }); return false;">
+                <span>Admin Support</span>
+            </button>
+            <div class="lazy-section-status" data-lazy-section-status aria-live="polite"></div>
+        </section>
+        <section id="performanceDiagnosticsSection"
+                 class="recipe-card performance-diagnostics-card"
+                 data-performance-diagnostics-panel
+                 hidden>
+            <div class="performance-diagnostics-header">
+                <h2>Performance Diagnostics</h2>
+                <button type="button"
+                        class="shopping-global-collapse-btn secondary performance-diagnostics-run"
+                        onclick="return runPerformanceDiagnosticsTest()">
+                    Run Performance Test
+                </button>
+            </div>
+            <dl class="performance-diagnostics-grid">
+                <div><dt>Initial Load Time</dt><dd data-performance-metric="initialLoadTime">--</dd></div>
+                <div><dt>Firebase Query Count</dt><dd data-performance-metric="firebaseQueryCount">0</dd></div>
+                <div><dt>API Call Count</dt><dd data-performance-metric="apiCallCount">0</dd></div>
+                <div><dt>Images Rendered</dt><dd data-performance-metric="imagesRendered">0</dd></div>
+                <div><dt>DOM Node Count</dt><dd data-performance-metric="domNodeCount">0</dd></div>
+                <div><dt>Largest Section Render Time</dt><dd data-performance-metric="largestSectionRenderTime">--</dd></div>
+                <div><dt>Slowest Query</dt><dd data-performance-metric="slowestQuery">--</dd></div>
+            </dl>
+        </section>
     {% endif %}
     {% if not is_guest_demo %}
         <div class="app-section-divider recipe-entry-section-divider" aria-hidden="true"></div>
@@ -103,7 +137,6 @@
     <div id="currentRecipeUrlLogCard"
          class="app-card lazy-section-placeholder"
          data-lazy-section="current-recipes"
-         data-lazy-eager="idle"
          data-lazy-url="{{ url_for('main_bp.current_recipes_section') }}"
          aria-busy="false">
         <button type="button"
@@ -122,8 +155,6 @@
     <div id="cookbooksCard"
          class="app-card lazy-section-placeholder"
          data-lazy-section="cookbooks"
-         data-lazy-eager="idle"
-         data-lazy-eager-delay="350"
          data-lazy-url="{{ url_for('main_bp.cookbooks_section') }}"
          aria-busy="false">
         <button type="button"

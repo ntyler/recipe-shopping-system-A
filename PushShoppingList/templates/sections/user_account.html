@@ -888,9 +888,29 @@
         {% set feedback_support_account_panel = false %}
 
         {% if current_user.is_admin %}
-            {% set shared_recipe_pdfs_account_panel = true %}
-            {% include "sections/shared_recipe_pdfs.html" %}
-            {% set shared_recipe_pdfs_account_panel = false %}
+            <section id="sharedRecipePdfsSection"
+                     class="pdf-share-card user-shared-recipe-pdfs-panel lazy-section-placeholder"
+                     data-shared-recipe-pdfs-panel
+                     data-lazy-section="shared-recipe-pdfs"
+                     data-lazy-url="{{ url_for('main_bp.shared_recipe_pdfs_section') }}"
+                     aria-busy="false"
+                     hidden>
+                <div class="app-section-divider recipe-entry-section-divider user-shared-recipe-pdfs-divider" aria-hidden="true"></div>
+                <div class="user-push-panel-header user-shared-recipe-pdfs-header">
+                    <button type="button"
+                            class="card-collapse-toggle pdf-share-toggle"
+                            onclick="loadLazySection('shared-recipe-pdfs', { focus: true }); return false;">
+                        <span>Shared Recipe PDFs</span>
+                    </button>
+                    <button type="button"
+                            class="secondary user-push-panel-close user-shared-recipe-pdfs-close"
+                            data-shared-recipe-pdfs-close
+                            onclick="return closeSharedRecipePdfsPanel()">
+                        Close
+                    </button>
+                </div>
+                <div class="lazy-section-status" data-lazy-section-status aria-live="polite"></div>
+            </section>
         {% endif %}
 
         {% set two_factor_panel_open = two_factor_setup or request.args.get("account_panel") == "two_factor" %}

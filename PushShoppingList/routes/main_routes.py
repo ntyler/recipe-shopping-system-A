@@ -140,7 +140,7 @@ def lightweight_cookbook_view():
 
 def shared_page_context(active_public_user=None):
     active_public_user = active_public_user or current_public_user()
-    admin_support_history = support_access_notices_for_user(active_public_user, limit=None)
+    admin_support_notices = support_access_notices_for_user(active_public_user, limit=2)
     chatgpt_force_refresh = bool(session.pop("chatgpt_model_force_refresh", False))
     chatgpt_show_advanced = bool(session.get("chatgpt_model_show_advanced", False))
     chatgpt_models_dashboard = chatgpt_models_dashboard_for_user(
@@ -158,17 +158,19 @@ def shared_page_context(active_public_user=None):
     return {
         "message": "",
         "feedback_dashboard": feedback_dashboard_for_user(active_public_user),
-        "openai_usage_dashboard": openai_usage_dashboard_for_user(active_public_user),
+        "openai_usage_dashboard": {},
         "chatgpt_models_dashboard": chatgpt_models_dashboard,
         "feedback_messages": session.pop("feedback_messages", []),
-        "admin_support_dashboard": admin_support_dashboard_for_user(
-            active_public_user,
-            selected_user=session.get("admin_support_selected_user"),
-            errors=session.pop("admin_support_errors", []),
-            reason=session.get("admin_support_reason", ""),
-        ),
-        "admin_support_notices": admin_support_history[:2],
-        "admin_support_history": admin_support_history,
+        "admin_support_dashboard": {
+            "is_admin": is_admin_user(active_public_user),
+            "users": [],
+            "recent_audit": [],
+            "selected_user": None,
+            "errors": [],
+            "reason": session.get("admin_support_reason", ""),
+        },
+        "admin_support_notices": admin_support_notices,
+        "admin_support_history": admin_support_notices,
         "password_reset_token": request.args.get("reset_token", ""),
         "two_factor_recovery_token": two_factor_recovery_token,
         "two_factor_recovery_user": public_two_factor_recovery_user(two_factor_recovery_token),
@@ -177,6 +179,11 @@ def shared_page_context(active_public_user=None):
         "app_js_version": static_asset_version("js/app.js"),
         "firebase_auth_js_version": static_asset_version("js/firebase-auth.js"),
         "firebase_web_config": firebase_web_config(),
+        "performance_diagnostics_enabled": (
+            current_app.debug
+            or os.getenv("SHOPPING_PERFORMANCE_DIAGNOSTICS", "").strip().lower()
+            in {"1", "true", "yes", "on"}
+        ),
     }
 
 
@@ -379,7 +386,20 @@ def shell_context(active_public_user=None):
         ),
         "home_address": load_home_address(),
         "home_address_history": load_home_address_history(),
-        "pdf_share_view": pdf_share_view_for_render(),
+        "pdf_share_view": {"pdfs": []},
+    }
+
+
+def admin_support_context(active_public_user=None):
+    active_public_user = active_public_user or current_public_user()
+    return {
+        **shared_page_context(active_public_user),
+        "admin_support_dashboard": admin_support_dashboard_for_user(
+            active_public_user,
+            selected_user=session.get("admin_support_selected_user"),
+            errors=session.pop("admin_support_errors", []),
+            reason=session.get("admin_support_reason", ""),
+        ),
     }
 
 
@@ -1778,6 +1798,32 @@ def current_recipes_section():
         "sections/current_recipe_url_log.html",
         **current_recipes_context(),
         normalize=normalize,
+    )
+
+
+@main_bp.route("/sections/admin-support")
+def admin_support_section():
+    active_public_user = current_public_user()
+    if not is_admin_user(active_public_user):
+        return "", 204
+
+    return render_template(
+        "sections/admin_support.html",
+        **admin_support_context(active_public_user),
+    )
+
+
+@main_bp.route("/sections/shared-recipe-pdfs")
+def shared_recipe_pdfs_section():
+    active_public_user = current_public_user()
+    if not is_admin_user(active_public_user):
+        return "", 204
+
+    return render_template(
+        "sections/shared_recipe_pdfs.html",
+        **shared_page_context(active_public_user),
+        pdf_share_view=pdf_share_view_for_render(),
+        shared_recipe_pdfs_account_panel=True,
     )
 
 

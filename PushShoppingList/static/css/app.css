@@ -19724,6 +19724,71 @@ body {
     color: #b91c1c;
 }
 
+.performance-diagnostics-card {
+    border-color: #27394a;
+    background: #14191f;
+}
+
+.performance-diagnostics-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.performance-diagnostics-header h2 {
+    margin: 0;
+    text-align: left;
+}
+
+.performance-diagnostics-run {
+    max-width: 220px;
+}
+
+.performance-diagnostics-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin: 0;
+}
+
+.performance-diagnostics-grid div {
+    padding: 10px;
+    border: 1px solid #2d3a44;
+    border-radius: 8px;
+    background: #101418;
+}
+
+.performance-diagnostics-grid dt {
+    color: #9fb0bd;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.performance-diagnostics-grid dd {
+    margin: 4px 0 0;
+    color: #f8fafc;
+    font-size: 14px;
+    font-weight: 800;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 650px) {
+    .performance-diagnostics-header {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .performance-diagnostics-run {
+        max-width: none;
+    }
+
+    .performance-diagnostics-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 img.deferred-image-pending,
 img[data-deferred-src] {
     background:
