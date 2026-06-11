@@ -100,6 +100,210 @@ function runIdleStartupTasks(tasks) {
     scheduleIdleTask(runNext);
 }
 
+const lazySectionPromises = new Map();
+
+function lazySectionElement(sectionName) {
+    return document.querySelector(`[data-lazy-section="${sectionName}"]`);
+}
+
+function lazySectionFromTargetId(targetId) {
+    const sectionsByTargetId = {
+        aiPantrySection: "pantry",
+        currentRecipeUrlLogCard: "current-recipes",
+        cookbooksCard: "cookbooks",
+        rulesCard: "rules",
+        storeOptionsSection: "store-options",
+        shoppingViewsSection: "recipe-view",
+        sectionView: "recipe-view",
+        storeView: "recipe-view",
+        recipeView: "recipe-view",
+    };
+
+    return sectionsByTargetId[targetId] || "";
+}
+
+function lazySectionStatusElement(placeholder) {
+    return placeholder ? placeholder.querySelector("[data-lazy-section-status]") : null;
+}
+
+function setLazySectionStatus(placeholder, text, isError = false) {
+    const status = lazySectionStatusElement(placeholder);
+
+    if (!status) {
+        return;
+    }
+
+    status.textContent = text || "";
+    status.classList.toggle("lazy-section-error", isError);
+}
+
+function firstRenderableElementFromHtml(html) {
+    const nextPage = new DOMParser().parseFromString(html, "text/html");
+    return nextPage.body ? nextPage.body.firstElementChild : null;
+}
+
+function afterDynamicMarkupLoaded(options = {}) {
+    restoreCardCollapseState();
+    restoreHomeAddressHistoryCollapseState();
+    restoreOpenStorePanels();
+    restoreViewBehaviorSettings();
+    restoreItemCheckState();
+    bindAccountMenuDropdowns();
+    restoreRememberedAccountPanelOpenWithOptions({ scroll: false });
+    if (document.querySelector("[data-usage-dashboard-panel]:not([hidden])")) {
+        scheduleOpenAiUsageDashboardRefresh(250);
+    }
+    bindFeedbackTickets();
+    initPhoneCountryInputs();
+    bindRecipeUrlLogDragAndDrop();
+    bindRecipeViewDragAndDrop();
+    bindCurrentRecipeUrlSummaryToggles();
+    bindRecipeRemovalForms();
+    bindRecipeQuantityInputs();
+    bindRecipeNameInputs();
+    bindCookbooks();
+    bindImportCookbookSelector();
+    bindStoreButtons();
+    bindSectionHeaderToggles();
+    bindRecipeDetailToggles();
+    bindRecipeTaskChecks();
+    bindRecipeEditCategorySourceTracking();
+    decorateRecipeCoverImages();
+    applyKnownRecipeImageProgressItems();
+    updateViewSwitcherStickyOffset();
+    restoreStoreOptionsDisplaySettings();
+    restoreActiveStoreIconMode();
+    restoreStoreOptionsListSort();
+    initStoreLocationMaps();
+    scheduleRecipeImageProgressPoll(250);
+
+    if (options.updateSticky !== false) {
+        window.setTimeout(updateAddStoreStickyVisibility, 140);
+    }
+}
+
+async function loadLazySection(sectionName, options = {}) {
+    const placeholder = lazySectionElement(sectionName);
+
+    if (!placeholder) {
+        return document.getElementById(options.targetId || "") || null;
+    }
+
+    if (placeholder.dataset.lazyLoaded === "1") {
+        return placeholder;
+    }
+
+    if (lazySectionPromises.has(sectionName)) {
+        return lazySectionPromises.get(sectionName);
+    }
+
+    const requestUrl = new URL(placeholder.dataset.lazyUrl || "", window.location.href);
+    if (!requestUrl.href) {
+        return null;
+    }
+    if (options.cacheBust) {
+        requestUrl.searchParams.set("_refresh", String(Date.now()));
+    }
+
+    const loadPromise = (async () => {
+        placeholder.dataset.lazyState = "loading";
+        placeholder.setAttribute("aria-busy", "true");
+        setLazySectionStatus(placeholder, "Loading...");
+
+        try {
+            const response = await fetch(requestUrl.toString(), { cache: "no-store" });
+            if (response.status === 204) {
+                placeholder.remove();
+                return null;
+            }
+            if (!response.ok) {
+                throw new Error("Unable to load section.");
+            }
+
+            const nextElement = firstRenderableElementFromHtml(await response.text());
+            if (!nextElement) {
+                throw new Error("Section returned empty markup.");
+            }
+
+            nextElement.dataset.lazySection = sectionName;
+            nextElement.dataset.lazyUrl = placeholder.dataset.lazyUrl || requestUrl.pathname;
+            nextElement.dataset.lazyLoaded = "1";
+            placeholder.replaceWith(nextElement);
+            afterDynamicMarkupLoaded();
+
+            if (options.focus) {
+                window.requestAnimationFrame(() => {
+                    nextElement.scrollIntoView({ behavior: "smooth", block: "start" });
+                });
+            }
+
+            return nextElement;
+        } catch (err) {
+            console.warn(`Unable to load ${sectionName}.`, err);
+            placeholder.dataset.lazyState = "error";
+            setLazySectionStatus(placeholder, "Unable to load. Tap to retry.", true);
+            return null;
+        } finally {
+            placeholder.setAttribute("aria-busy", "false");
+            lazySectionPromises.delete(sectionName);
+        }
+    })();
+
+    lazySectionPromises.set(sectionName, loadPromise);
+    return loadPromise;
+}
+
+async function refreshLazySection(sectionName, options = {}) {
+    const target = lazySectionElement(sectionName);
+
+    if (!target) {
+        return false;
+    }
+
+    target.dataset.lazyLoaded = "";
+    const nextElement = await loadLazySection(sectionName, {
+        ...options,
+        focus: false,
+        cacheBust: true,
+    });
+
+    return Boolean(nextElement);
+}
+
+function initLazySections() {
+    const placeholders = [...document.querySelectorAll("[data-lazy-section]")];
+
+    if (!placeholders.length) {
+        return;
+    }
+
+    const hashTargetId = (window.location.hash || "").replace(/^#/, "");
+    const hashSection = hashTargetId ? lazySectionFromTargetId(hashTargetId) : "";
+    if (hashSection) {
+        loadLazySection(hashSection, { focus: true });
+    }
+
+    if (!("IntersectionObserver" in window)) {
+        return;
+    }
+
+    const observer = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+            if (!entry.isIntersecting) {
+                return;
+            }
+
+            const sectionName = entry.target.dataset.lazySection || "";
+            observer.unobserve(entry.target);
+            loadLazySection(sectionName);
+        });
+    }, {
+        rootMargin: "280px 0px",
+    });
+
+    placeholders.forEach(placeholder => observer.observe(placeholder));
+}
+
 function loadLeafletAssets() {
     if (window.L) {
         return Promise.resolve(window.L);
@@ -5091,26 +5295,11 @@ function bindCookbooks() {
 }
 
 async function refreshCookbooksMarkup() {
-    const refreshUrl = new URL(window.location.href);
-    refreshUrl.searchParams.set("_refresh", String(Date.now()));
-
-    const response = await fetch(refreshUrl.toString(), {
-        cache: "no-store",
-    });
-
-    if (!response.ok) {
-        throw new Error("Unable to refresh cookbooks.");
-    }
-
-    const html = await response.text();
-    const nextPage = new DOMParser().parseFromString(html, "text/html");
-
-    if (!replaceSectionFromPage(nextPage, "#cookbooksCard")) {
+    if (!await refreshLazySection("cookbooks", { cacheBust: true })) {
         throw new Error("Cookbooks section was not found.");
     }
 
-    restoreCardCollapseState();
-    bindCookbooks();
+    afterDynamicMarkupLoaded();
 }
 
 async function submitCookbookForm(form, options = {}) {
@@ -8410,6 +8599,18 @@ function togglePasswordVisibility(inputId, button) {
 }
 
 function showView(viewName) {
+    const expectedViewId = {
+        section: "sectionView",
+        store: "storeView",
+        recipe: "recipeView",
+    }[viewName] || "sectionView";
+
+    if (!document.getElementById(expectedViewId) && lazySectionElement("recipe-view")) {
+        localStorage.setItem("shopping-view", viewName);
+        loadLazySection("recipe-view").then(() => showView(viewName));
+        return;
+    }
+
     const views = {
         section: document.getElementById("sectionView"),
         store: document.getElementById("storeView"),
@@ -8468,6 +8669,11 @@ function jumpToRecipeViewRecipe(button, event = null) {
         return false;
     }
 
+    if (!document.getElementById("recipeView") && lazySectionElement("recipe-view")) {
+        loadLazySection("recipe-view").then(() => jumpToRecipeViewRecipe(button));
+        return false;
+    }
+
     showView("recipe");
 
     const target = document.querySelector(`[data-recipe-view-url="${cssEscape(recipeUrl)}"]`);
@@ -8503,6 +8709,11 @@ function jumpToCurrentRecipeLog(button, event = null) {
 
 function jumpToCurrentRecipeLogUrl(recipeUrl) {
     if (!recipeUrl) {
+        return false;
+    }
+
+    if (!document.querySelector('[data-collapse-content="recipe-url-log"]') && lazySectionElement("current-recipes")) {
+        loadLazySection("current-recipes").then(() => jumpToCurrentRecipeLogUrl(recipeUrl));
         return false;
     }
 
@@ -17327,6 +17538,11 @@ function cssEscape(value) {
 
 function bindStoreButtons() {
     document.querySelectorAll(".store-btn").forEach(button => {
+        if (button.dataset.storeButtonBound === "1") {
+            return;
+        }
+
+        button.dataset.storeButtonBound = "1";
         button.addEventListener("click", async () => {
             const rowKey = button.dataset.rowKey || button.dataset.itemKey || "";
             const row = button.closest(".row") || (rowKey
@@ -17405,6 +17621,11 @@ function bindSectionHeaderToggles() {
 
         setSectionCollapsed(header, icon, isCollapsed);
 
+        if (header.dataset.sectionHeaderToggleBound === "1") {
+            return;
+        }
+
+        header.dataset.sectionHeaderToggleBound = "1";
         header.addEventListener("click", () => {
             const shouldCollapse = !(icon && icon.textContent.trim().toLowerCase().startsWith("show"));
             setSectionCollapsed(header, icon, shouldCollapse);
@@ -20780,57 +21001,25 @@ async function refreshStoreMarkup(options = {}) {
 
     const html = await response.text();
     const nextPage = new DOMParser().parseFromString(html, "text/html");
-    replaceSectionFromPage(nextPage, "#aiPantrySection");
     replaceSectionFromPage(nextPage, "#editItemsSection");
     replaceSectionFromPage(nextPage, "#home-address-section");
-    replaceSectionFromPage(nextPage, "#storeOptionsSection");
-    const recipeLogWasRefreshed = replaceSectionFromPage(nextPage, "#currentRecipeUrlLogCard");
-    replaceSectionFromPage(nextPage, "#cookbooksCard");
-    replaceSectionFromPage(nextPage, "#foodRestrictionsCard");
-    replaceSectionFromPage(nextPage, "#rulesCard");
-    replaceSectionFromPage(nextPage, "#sectionView");
-    replaceSectionFromPage(nextPage, "#storeView");
-    replaceSectionFromPage(nextPage, "#recipeView");
+
+    const refreshes = await Promise.all([
+        refreshLazySection("pantry", { cacheBust: true }),
+        refreshLazySection("store-options", { cacheBust: true }),
+        refreshLazySection("current-recipes", { cacheBust: true }),
+        refreshLazySection("cookbooks", { cacheBust: true }),
+        refreshLazySection("rules", { cacheBust: true }),
+        refreshLazySection("recipe-view", { cacheBust: true }),
+    ]);
+    const recipeLogWasRefreshed = refreshes[2];
 
     if (options.requireRecipeLog && !recipeLogWasRefreshed) {
         throw new Error("Recipe log refresh target was not found.");
     }
 
-    restoreCardCollapseState();
-    restoreHomeAddressHistoryCollapseState();
-    restoreOpenStorePanels();
-    restoreViewBehaviorSettings();
-    restoreItemCheckState();
-    bindAccountMenuDropdowns();
-    restoreRememberedAccountPanelOpenWithOptions({ scroll: false });
-    if (document.querySelector("[data-usage-dashboard-panel]:not([hidden])")) {
-        scheduleOpenAiUsageDashboardRefresh(250);
-    }
-    bindFeedbackTickets();
-    initPhoneCountryInputs();
-    bindRecipeUrlLogDragAndDrop();
-    bindRecipeViewDragAndDrop();
-    bindCurrentRecipeUrlSummaryToggles();
-    bindRecipeRemovalForms();
-    bindRecipeQuantityInputs();
-    bindRecipeNameInputs();
-    bindCookbooks();
-    bindImportCookbookSelector();
-    bindStoreButtons();
-    bindSectionHeaderToggles();
-    bindRecipeDetailToggles();
-    bindRecipeTaskChecks();
-    bindRecipeEditCategorySourceTracking();
-    decorateRecipeCoverImages();
-    applyKnownRecipeImageProgressItems();
-    updateViewSwitcherStickyOffset();
-    restoreStoreOptionsDisplaySettings();
-    restoreActiveStoreIconMode();
-    restoreStoreOptionsListSort();
-    initStoreLocationMaps();
+    afterDynamicMarkupLoaded();
     restoreWindowScroll(scrollX, scrollY);
-    scheduleRecipeImageProgressPoll(250);
-    window.setTimeout(updateAddStoreStickyVisibility, 140);
 }
 
 function restoreWindowScroll(scrollX, scrollY) {
@@ -21021,6 +21210,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ["bindImportCookbookSelector", bindImportCookbookSelector],
         ["bindStoreButtons", bindStoreButtons],
         ["bindSectionHeaderToggles", bindSectionHeaderToggles],
+        ["initLazySections", initLazySections],
     ].forEach(([name, callback]) => runStartupTask(name, callback));
 
     runIdleStartupTasks([

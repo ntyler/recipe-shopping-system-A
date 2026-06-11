@@ -1,5 +1,6 @@
 import os
 import mimetypes
+import gzip
 from datetime import timedelta
 
 from flask import Flask
@@ -159,6 +160,40 @@ def guest_restricted_response():
     return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
 
 
+def gzip_response_if_supported(response):
+    if (
+        request.method == "HEAD"
+        or response.status_code < 200
+        or response.status_code >= 300
+        or response.direct_passthrough
+        or response.headers.get("Content-Encoding")
+        or "gzip" not in request.headers.get("Accept-Encoding", "").lower()
+    ):
+        return response
+
+    compressible_mimetypes = {
+        "application/javascript",
+        "application/json",
+        "text/css",
+        "text/html",
+        "text/javascript",
+        "text/plain",
+    }
+    if response.mimetype not in compressible_mimetypes:
+        return response
+
+    body = response.get_data()
+    if len(body) < 1024:
+        return response
+
+    response.set_data(gzip.compress(body, compresslevel=6))
+    response.headers["Content-Encoding"] = "gzip"
+    response.headers["Content-Length"] = str(len(response.get_data()))
+    response.headers.pop("ETag", None)
+    response.headers.add("Vary", "Accept-Encoding")
+    return response
+
+
 def create_app():
     app = Flask(
         __name__,
@@ -271,6 +306,6 @@ def create_app():
         if getattr(g, "clear_guest_demo_cookie", False):
             clear_guest_cookie(response)
 
-        return response
+        return gzip_response_if_supported(response)
 
     return app

@@ -83,29 +83,99 @@
     {% endif %}
     {% if not is_guest_demo %}
         <div class="app-section-divider recipe-entry-section-divider" aria-hidden="true"></div>
-        {% include "sections/ai_pantry.html" %}
-    {% else %}
-        <section class="app-card guest-account-only-panel" aria-label="AI Pantry account requirement">
-            <h2>AI Pantry</h2>
-            <p>AI Pantry is only available for full accounts.</p>
-            <p>Create a free account to save pantry items, store preferences, and long-term shopping history.</p>
-            <div class="guest-account-only-actions">
-                <a href="#userAccountSection">Create Account</a>
-                <a class="secondary" href="#extractRecipeForm">Continue Demo</a>
-            </div>
+        <section id="aiPantrySection"
+                 class="app-card lazy-section-placeholder"
+                 data-lazy-section="pantry"
+                 data-lazy-url="{{ url_for('main_bp.pantry_section') }}"
+                 aria-busy="false">
+            <button type="button"
+                    class="card-collapse-toggle ai-pantry-toggle"
+                    onclick="loadLazySection('pantry', { focus: true }); return false;">
+                <span>AI Pantry</span>
+            </button>
+            <div class="lazy-section-status" data-lazy-section-status aria-live="polite"></div>
         </section>
+    {% else %}
+        {% include "sections/guest_ai_pantry.html" %}
     {% endif %}
     {% include "sections/enter_recipe_links.html" %}
     {% include "sections/edit_items.html" %}
-    {% include "sections/current_recipe_url_log.html" %}
-    {% include "sections/cookbooks.html" %}
-    {% include "sections/rules.html" %}
+    <div id="currentRecipeUrlLogCard"
+         class="app-card lazy-section-placeholder"
+         data-lazy-section="current-recipes"
+         data-lazy-url="{{ url_for('main_bp.current_recipes_section') }}"
+         aria-busy="false">
+        <button type="button"
+                class="card-collapse-toggle recipe-url-log-toggle"
+                onclick="loadLazySection('current-recipes', { focus: true }); return false;">
+            <span class="cookbooks-header-title recipe-url-log-header-title">
+                Current Recipes
+                <span class="cookbooks-header-count recipe-url-log-header-count">
+                    {{ current_recipe_count | default(0) }}
+                    recipe{% if (current_recipe_count | default(0)) != 1 %}s{% endif %}
+                </span>
+            </span>
+        </button>
+        <div class="lazy-section-status" data-lazy-section-status aria-live="polite"></div>
+    </div>
+    <div id="cookbooksCard"
+         class="app-card lazy-section-placeholder"
+         data-lazy-section="cookbooks"
+         data-lazy-url="{{ url_for('main_bp.cookbooks_section') }}"
+         aria-busy="false">
+        <button type="button"
+                class="card-collapse-toggle cookbooks-toggle"
+                onclick="loadLazySection('cookbooks', { focus: true }); return false;">
+            <span class="cookbooks-header-title">
+                Cookbooks
+                <span class="cookbooks-header-count">
+                    {{ cookbook_count | default(0) }}
+                    cookbook{% if (cookbook_count | default(0)) != 1 %}s{% endif %}
+                </span>
+            </span>
+        </button>
+        <div class="lazy-section-status" data-lazy-section-status aria-live="polite"></div>
+    </div>
+    <div id="rulesCard"
+         class="app-card lazy-section-placeholder"
+         data-lazy-section="rules"
+         data-lazy-url="{{ url_for('main_bp.rules_section') }}"
+         aria-busy="false">
+        <button type="button"
+                class="card-collapse-toggle rules-toggle"
+                onclick="loadLazySection('rules', { focus: true }); return false;">
+            <span>Rules</span>
+        </button>
+        <div class="lazy-section-status" data-lazy-section-status aria-live="polite"></div>
+    </div>
     {% if not is_guest_demo %}
         {% include "sections/home_address.html" %}
-        {% include "sections/store_options.html" %}
+        <div id="storeOptionsSection"
+             class="app-card lazy-section-placeholder"
+             data-lazy-section="store-options"
+             data-lazy-url="{{ url_for('main_bp.store_options_section') }}"
+             aria-busy="false">
+            <button type="button"
+                    class="card-collapse-toggle store-options-title-toggle"
+                    onclick="loadLazySection('store-options', { focus: true }); return false;">
+                <span>Store Options</span>
+            </button>
+            <div class="lazy-section-status" data-lazy-section-status aria-live="polite"></div>
+        </div>
     {% endif %}
     {% include "sections/view_behavior.html" %}
-    {% include "sections/items.html" %}
+    <div id="shoppingViewsSection"
+         class="app-card lazy-section-placeholder"
+         data-lazy-section="recipe-view"
+         data-lazy-url="{{ url_for('main_bp.recipe_view_section') }}"
+         aria-busy="false">
+        <button type="button"
+                class="card-collapse-toggle"
+                onclick="loadLazySection('recipe-view', { focus: true }); return false;">
+            <span>Items</span>
+        </button>
+        <div class="lazy-section-status" data-lazy-section-status aria-live="polite"></div>
+    </div>
 </main>
 
 <script src="{{ url_for('static', filename='js/app.js', v=app_js_version) }}"></script>

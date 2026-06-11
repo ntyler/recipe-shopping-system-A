@@ -19,9 +19,12 @@ from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
 from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.food_rules_service import shopping_item_food_rule_status
 from PushShoppingList.services.feedback_service import feedback_dashboard_for_user
+from PushShoppingList.services.guest_session_service import is_guest_session
 from PushShoppingList.services.cookbook_service import cookbook_view
 from PushShoppingList.services.cookbook_service import create_cookbook
 from PushShoppingList.services.cookbook_service import find_or_create_cookbook
+from PushShoppingList.services.cookbook_service import is_unclassified_cookbook
+from PushShoppingList.services.cookbook_service import load_cookbooks
 from PushShoppingList.services.cookbook_service import cookbook_recipes_for_urls
 from PushShoppingList.services.cookbook_service import CookbookCategoryOverwriteConflict
 from PushShoppingList.services.cookbook_service import CookbookRecipeConflict
@@ -110,6 +113,205 @@ def static_asset_version(filename):
         return int(os.path.getmtime(os.path.join(current_app.static_folder, filename)))
     except OSError:
         return 1
+
+
+def lightweight_cookbook_view():
+    payload = load_cookbooks()
+    cookbooks = []
+
+    for cookbook in payload.get("cookbooks", []):
+        cookbooks.append({
+            "id": cookbook.get("id", ""),
+            "name": cookbook.get("name", ""),
+            "is_unclassified": is_unclassified_cookbook(cookbook),
+            "recipes": [],
+        })
+
+    return {
+        "cookbooks": cookbooks,
+        "recipes": [],
+        "menu_sort_options": [],
+        "menu_views": {},
+    }
+
+
+def shared_page_context(active_public_user=None):
+    active_public_user = active_public_user or current_public_user()
+    admin_support_history = support_access_notices_for_user(active_public_user, limit=None)
+    chatgpt_force_refresh = bool(session.pop("chatgpt_model_force_refresh", False))
+    chatgpt_show_advanced = bool(session.get("chatgpt_model_show_advanced", False))
+    chatgpt_models_dashboard = chatgpt_models_dashboard_for_user(
+        active_public_user,
+        show_advanced_models=chatgpt_show_advanced,
+        force_refresh=chatgpt_force_refresh,
+    )
+    chatgpt_models_dashboard["messages"] = [
+        *session.pop("chatgpt_model_messages", []),
+        *chatgpt_models_dashboard.get("messages", []),
+    ]
+
+    two_factor_recovery_token = request.args.get("two_factor_recovery_token", "")
+
+    return {
+        "message": "",
+        "feedback_dashboard": feedback_dashboard_for_user(active_public_user),
+        "openai_usage_dashboard": openai_usage_dashboard_for_user(active_public_user),
+        "chatgpt_models_dashboard": chatgpt_models_dashboard,
+        "feedback_messages": session.pop("feedback_messages", []),
+        "admin_support_dashboard": admin_support_dashboard_for_user(
+            active_public_user,
+            selected_user=session.get("admin_support_selected_user"),
+            errors=session.pop("admin_support_errors", []),
+            reason=session.get("admin_support_reason", ""),
+        ),
+        "admin_support_notices": admin_support_history[:2],
+        "admin_support_history": admin_support_history,
+        "password_reset_token": request.args.get("reset_token", ""),
+        "two_factor_recovery_token": two_factor_recovery_token,
+        "two_factor_recovery_user": public_two_factor_recovery_user(two_factor_recovery_token),
+        "account_delete_token": request.args.get("account_delete_token", ""),
+        "app_css_version": static_asset_version("css/app.css"),
+        "app_js_version": static_asset_version("js/app.js"),
+        "firebase_auth_js_version": static_asset_version("js/firebase-auth.js"),
+        "firebase_web_config": firebase_web_config(),
+    }
+
+
+def recipe_workspace_context():
+    recipe_urls = recipe_url_rows()
+    food_rules = load_food_rules()
+    recipe_rows = recipe_view_rows(recipe_urls, food_rules=food_rules)
+    ensure_unclassified_cookbook_for_recipes(recipe_rows)
+    cookbook_assignments = recipe_cookbook_assignments()
+    apply_cookbook_assignments_to_recipe_rows(recipe_rows, cookbook_assignments)
+    recipe_log_rows = recipe_url_log_rows(recipe_urls, cookbook_assignments, food_rules=food_rules)
+    rendered_cookbook_view = cookbook_view_for_render(recipe_rows, food_rules=food_rules)
+    cookbook_recipe_count = sum(
+        len(cookbook.get("recipes", []))
+        for cookbook in rendered_cookbook_view.get("cookbooks", [])
+    )
+
+    return {
+        "recipe_urls": recipe_urls,
+        "food_rules": food_rules,
+        "recipe_view_rows": recipe_rows,
+        "current_urls": recipe_log_rows,
+        "current_recipe_count": len(recipe_log_rows),
+        "cookbook_view": rendered_cookbook_view,
+        "cookbook_count": len(rendered_cookbook_view.get("cookbooks", [])),
+        "cookbook_recipe_count": cookbook_recipe_count,
+    }
+
+
+def shopping_views_context():
+    items = load_items()
+    item_state = load_item_state()
+    store_settings = load_store_settings()
+    product_choices = product_choices_by_item()
+    recipe_context = recipe_workspace_context()
+    recipe_rows = recipe_context["recipe_view_rows"]
+    purchase_mappings = purchase_mapping_lookup_for_items(shopping_items_only(items), item_state)
+    recipe_item_quantities = recipe_quantity_lookup(recipe_rows)
+    recipe_item_quantity_sources = recipe_quantity_sources_lookup(recipe_rows)
+    item_quantities = apply_manual_item_quantities(
+        recipe_item_quantities,
+        item_state,
+    )
+
+    return {
+        **recipe_context,
+        "items": items,
+        "shopping_items": shopping_items_only(items),
+        "purchase_mappings": purchase_mappings,
+        "item_state": item_state,
+        "item_quantities": item_quantities,
+        "recipe_item_quantities": recipe_item_quantities,
+        "recipe_item_quantity_sources": recipe_item_quantity_sources,
+        "section_counts": section_counts(items),
+        "store_view": build_store_view(
+            items,
+            item_state,
+            store_settings["stores"],
+            store_settings["enabled_stores"],
+        ),
+        "product_choices": product_choices,
+        "item_store_price_cells": store_price_cells_for_item,
+        "normalize": normalize,
+        "is_section_header": is_section_header,
+        "food_rule_status": lambda item_name: shopping_item_food_rule_status(
+            item_name,
+            rules=recipe_context["food_rules"],
+        ),
+    }
+
+
+def store_options_context():
+    store_settings = load_store_settings()
+    nearest_store_results = load_nearest_store_results()
+
+    return {
+        "home_address": load_home_address(),
+        "home_address_history": load_home_address_history(),
+        "nearest_store_results": nearest_store_results,
+        "nearest_store_locations": nearest_store_results.get("store_locations", {}),
+        "nearest_store_search_radius_miles": format_store_search_radius(
+            nearest_store_results.get("search_radius_miles", DEFAULT_STORE_SEARCH_RADIUS_MILES)
+        ),
+        "available_stores": store_settings["stores"],
+        "enabled_stores": store_settings["enabled_stores"],
+    }
+
+
+def rules_context():
+    store_settings = load_store_settings()
+    food_rules = load_food_rules()
+
+    return {
+        "home_address": load_home_address(),
+        "available_stores": store_settings["stores"],
+        "enabled_stores": store_settings["enabled_stores"],
+        "food_rules": food_rules,
+        "rules_display": load_rules_display(),
+    }
+
+
+def pantry_context():
+    recipe_context = recipe_workspace_context()
+    pantry_items = pantry_items_for_view()
+
+    return {
+        **recipe_context,
+        "pantry_items": pantry_items,
+        "pantry_recipe_matches": pantry_recipe_matches_for_view(
+            recipe_context["recipe_view_rows"],
+            pantry_items,
+        ),
+        "pantry_receipt_review": session.get("pantry_receipt_review", {}),
+        "pantry_receipt_history": receipt_history_for_view(),
+        "pantry_messages": session.pop("pantry_messages", []),
+    }
+
+
+def shell_context(active_public_user=None):
+    items = load_items()
+    recipe_urls = recipe_url_rows()
+    cookbook_view_data = lightweight_cookbook_view()
+
+    return {
+        **shared_page_context(active_public_user),
+        "raw_items": "\n".join(items),
+        "items": items,
+        "current_recipe_count": len(recipe_urls),
+        "cookbook_view": cookbook_view_data,
+        "cookbook_count": len(cookbook_view_data.get("cookbooks", [])),
+        "cookbook_recipe_count": sum(
+            len(cookbook.get("recipes", []))
+            for cookbook in cookbook_view_data.get("cookbooks", [])
+        ),
+        "home_address": load_home_address(),
+        "home_address_history": load_home_address_history(),
+        "pdf_share_view": pdf_share_view_for_render(),
+    }
 
 
 @main_bp.route("/api/openai_usage_dashboard", methods=["GET"])
@@ -1451,113 +1653,61 @@ def build_store_view(items, item_state, available_stores, enabled_stores):
 @main_bp.route("/")
 def index():
     active_public_user = current_public_user()
-    two_factor_recovery_token = request.args.get("two_factor_recovery_token", "")
-    items = load_items()
-    store_settings = load_store_settings()
-    recipe_urls = recipe_url_rows()
-    item_state = load_item_state()
-    food_rules = load_food_rules()
-    recipe_rows = recipe_view_rows(recipe_urls, food_rules=food_rules)
-    ensure_unclassified_cookbook_for_recipes(recipe_rows)
-    cookbook_assignments = recipe_cookbook_assignments()
-    apply_cookbook_assignments_to_recipe_rows(recipe_rows, cookbook_assignments)
-    recipe_log_rows = recipe_url_log_rows(recipe_urls, cookbook_assignments, food_rules=food_rules)
-    rendered_cookbook_view = cookbook_view_for_render(recipe_rows, food_rules=food_rules)
-    cookbook_recipe_count = sum(
-        len(cookbook.get("recipes", []))
-        for cookbook in rendered_cookbook_view.get("cookbooks", [])
-    )
-    product_choices = product_choices_by_item()
-    nearest_store_results = load_nearest_store_results()
-    pantry_items = pantry_items_for_view()
-    purchase_mappings = purchase_mapping_lookup_for_items(shopping_items_only(items), item_state)
-    recipe_item_quantities = recipe_quantity_lookup(recipe_rows)
-    recipe_item_quantity_sources = recipe_quantity_sources_lookup(recipe_rows)
-    item_quantities = apply_manual_item_quantities(
-        recipe_item_quantities,
-        item_state,
+    return render_template("index.html", **shell_context(active_public_user))
+
+
+@main_bp.route("/sections/current-recipes")
+def current_recipes_section():
+    return render_template(
+        "sections/current_recipe_url_log.html",
+        **recipe_workspace_context(),
+        normalize=normalize,
     )
 
-    admin_support_history = support_access_notices_for_user(active_public_user, limit=None)
 
-    chatgpt_force_refresh = bool(session.pop("chatgpt_model_force_refresh", False))
-    chatgpt_show_advanced = bool(session.get("chatgpt_model_show_advanced", False))
-    chatgpt_models_dashboard = chatgpt_models_dashboard_for_user(
-        active_public_user,
-        show_advanced_models=chatgpt_show_advanced,
-        force_refresh=chatgpt_force_refresh,
+@main_bp.route("/sections/cookbooks")
+def cookbooks_section():
+    return render_template(
+        "sections/cookbooks.html",
+        **recipe_workspace_context(),
     )
-    chatgpt_models_dashboard["messages"] = [
-        *session.pop("chatgpt_model_messages", []),
-        *chatgpt_models_dashboard.get("messages", []),
-    ]
+
+
+@main_bp.route("/sections/recipe-view")
+def recipe_view_section():
+    return render_template(
+        "sections/shopping_views.html",
+        **shopping_views_context(),
+    )
+
+
+@main_bp.route("/sections/rules")
+def rules_section():
+    return render_template(
+        "sections/rules.html",
+        **rules_context(),
+    )
+
+
+@main_bp.route("/sections/pantry")
+def pantry_section():
+    if is_guest_session():
+        return render_template("sections/guest_ai_pantry.html")
 
     return render_template(
-        "index.html",
-        message="",
-        raw_items="\n".join(items),
-        items=items,
-        current_urls=recipe_log_rows,
-        current_recipe_count=len(recipe_log_rows),
-        cookbook_view=rendered_cookbook_view,
-        cookbook_count=len(rendered_cookbook_view.get("cookbooks", [])),
-        cookbook_recipe_count=cookbook_recipe_count,
-        home_address=load_home_address(),
-        home_address_history=load_home_address_history(),
-        nearest_store_results=nearest_store_results,
-        nearest_store_locations=nearest_store_results.get("store_locations", {}),
-        nearest_store_search_radius_miles=format_store_search_radius(
-            nearest_store_results.get("search_radius_miles", DEFAULT_STORE_SEARCH_RADIUS_MILES)
-        ),
-        available_stores=store_settings["stores"],
-        enabled_stores=store_settings["enabled_stores"],
-        shopping_items=shopping_items_only(items),
-        purchase_mappings=purchase_mappings,
-        item_state=item_state,
-        item_quantities=item_quantities,
-        recipe_item_quantities=recipe_item_quantities,
-        recipe_item_quantity_sources=recipe_item_quantity_sources,
-        section_counts=section_counts(items),
-        store_view=build_store_view(
-            items,
-            item_state,
-            store_settings["stores"],
-            store_settings["enabled_stores"],
-        ),
-        recipe_view_rows=recipe_rows,
-        product_choices=product_choices,
-        item_store_price_cells=store_price_cells_for_item,
-        pantry_items=pantry_items,
-        pantry_recipe_matches=pantry_recipe_matches_for_view(recipe_rows, pantry_items),
-        pantry_receipt_review=session.get("pantry_receipt_review", {}),
-        pantry_receipt_history=receipt_history_for_view(),
-        pantry_messages=session.pop("pantry_messages", []),
-        pdf_share_view=pdf_share_view_for_render(),
-        normalize=normalize,
-        is_section_header=is_section_header,
-        food_rules=food_rules,
-        rules_display=load_rules_display(),
-        food_rule_status=lambda item_name: shopping_item_food_rule_status(item_name, rules=food_rules),
-        feedback_dashboard=feedback_dashboard_for_user(active_public_user),
-        openai_usage_dashboard=openai_usage_dashboard_for_user(active_public_user),
-        chatgpt_models_dashboard=chatgpt_models_dashboard,
-        feedback_messages=session.pop("feedback_messages", []),
-        admin_support_dashboard=admin_support_dashboard_for_user(
-            active_public_user,
-            selected_user=session.get("admin_support_selected_user"),
-            errors=session.pop("admin_support_errors", []),
-            reason=session.get("admin_support_reason", ""),
-        ),
-        admin_support_notices=admin_support_history[:2],
-        admin_support_history=admin_support_history,
-        password_reset_token=request.args.get("reset_token", ""),
-        two_factor_recovery_token=two_factor_recovery_token,
-        two_factor_recovery_user=public_two_factor_recovery_user(two_factor_recovery_token),
-        account_delete_token=request.args.get("account_delete_token", ""),
-        app_css_version=static_asset_version("css/app.css"),
-        app_js_version=static_asset_version("js/app.js"),
-        firebase_auth_js_version=static_asset_version("js/firebase-auth.js"),
-        firebase_web_config=firebase_web_config(),
+        "sections/ai_pantry.html",
+        **pantry_context(),
+    )
+
+
+@main_bp.route("/sections/store-options")
+def store_options_section():
+    if is_guest_session():
+        return "", 204
+
+    return render_template(
+        "sections/store_options.html",
+        **store_options_context(),
     )
 
 

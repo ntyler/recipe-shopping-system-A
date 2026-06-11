@@ -19432,3 +19432,22 @@ body {
         flex-direction: column;
     }
 }
+
+.lazy-section-placeholder {
+    min-height: 86px;
+}
+
+.lazy-section-placeholder .card-collapse-toggle {
+    width: 100%;
+}
+
+.lazy-section-status {
+    color: #64748b;
+    font-size: 14px;
+    min-height: 20px;
+    padding: 10px 0 0;
+}
+
+.lazy-section-error {
+    color: #b91c1c;
+}
