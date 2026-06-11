@@ -25,6 +25,7 @@ const USER_ACCOUNT_REMEMBERED_PANEL_SELECTORS = {
     accountSettings: "#userProfileEditForm",
     accountNotices: "[data-account-notices-panel]",
     usageDashboard: "[data-usage-dashboard-panel]",
+    aiPantry: "[data-ai-pantry-panel]",
     adminSupport: "[data-admin-support-panel]",
     chatGptModels: "[data-chatgpt-models-panel]",
     sharedRecipePdfs: "[data-shared-recipe-pdfs-panel]",
@@ -91,6 +92,7 @@ const USER_ACCOUNT_PANEL_HASH_KEYS = {
     "#userProfileEditForm": "accountSettings",
     "#accountNoticesPanel": "accountNotices",
     "#accountUsageDashboardPanel": "usageDashboard",
+    "#aiPantrySection": "aiPantry",
     "#adminSupportSection": "adminSupport",
     "#chatGptModelsSection": "chatGptModels",
     "#sharedRecipePdfsSection": "sharedRecipePdfs",
@@ -885,6 +887,11 @@ function initLazySections() {
     const hashTargetId = (window.location.hash || "").replace(/^#/, "");
     const hashSection = hashTargetId ? lazySectionFromTargetId(hashTargetId) : "";
     if (hashSection) {
+        if (hashSection === "pantry" && document.querySelector("[data-ai-pantry-panel]")) {
+            openAiPantryPanel();
+            return;
+        }
+
         loadLazySection(hashSection, { focus: true });
         return;
     }
@@ -1402,6 +1409,17 @@ function restoreRememberedAccountPanelOpenWithOptions(options = {}) {
     if (panelKey === "sharedRecipePdfs") {
         loadLazySection("shared-recipe-pdfs", { focus: false }).then(() => {
             expandSharedRecipePdfsContent();
+        });
+    }
+
+    if (panelKey === "aiPantry") {
+        loadLazySection("pantry", { focus: false }).then(() => {
+            const pantryPanel = document.querySelector("[data-ai-pantry-panel]");
+            if (pantryPanel) {
+                pantryPanel.hidden = false;
+                rememberAccountPanelElement(pantryPanel, true);
+                expandAiPantryContent();
+            }
         });
     }
 
@@ -2198,6 +2216,72 @@ function expandSharedRecipePdfsContent() {
     if (content && content.classList.contains("collapsed")) {
         setCardCollapseContentCollapsed(content, false);
     }
+}
+
+function expandAiPantryContent() {
+    const content = document.querySelector('[data-collapse-content="ai-pantry"]');
+
+    if (content && content.classList.contains("collapsed")) {
+        setCardCollapseContentCollapsed(content, false);
+    }
+}
+
+async function openAiPantryPanel() {
+    const panel = document.querySelector("[data-ai-pantry-panel]");
+
+    if (!panel) {
+        return false;
+    }
+
+    const accountMenu = document.querySelector("[data-account-menu]");
+    if (accountMenu) {
+        closeAccountMenuDropdown(accountMenu);
+    }
+
+    panel.hidden = false;
+    rememberAccountPanelElement(panel, true);
+    hideRememberedAccountPanels(panel);
+
+    if (panel.dataset.lazySection === "pantry" && panel.dataset.lazyLoaded !== "1") {
+        await loadLazySection("pantry", { focus: false });
+    }
+
+    const activePanel = document.querySelector("[data-ai-pantry-panel]") || panel;
+    activePanel.hidden = false;
+    rememberAccountPanelElement(activePanel, true);
+    hideRememberedAccountPanels(activePanel);
+    expandAiPantryContent();
+
+    window.requestAnimationFrame(() => {
+        const loadedPanel = document.querySelector("[data-ai-pantry-panel]") || activePanel;
+        loadedPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+        const firstControl = loadedPanel.querySelector("[data-ai-pantry-close]")
+            || loadedPanel.querySelector("[data-collapse-toggle='ai-pantry']")
+            || loadedPanel.querySelector("button, input, select, textarea");
+
+        if (firstControl) {
+            firstControl.focus({ preventScroll: true });
+        }
+    });
+
+    return false;
+}
+
+function closeAiPantryPanel() {
+    const panel = document.querySelector("[data-ai-pantry-panel]");
+
+    if (!panel) {
+        return false;
+    }
+
+    panel.hidden = true;
+    rememberAccountPanelElement(panel, false);
+
+    if (typeof scrollToUserAccountProfile === "function") {
+        scrollToUserAccountProfile("auto");
+    }
+
+    return false;
 }
 
 async function openAdminSupportPanel() {

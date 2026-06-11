@@ -6348,6 +6348,7 @@ body {
             margin: 4px 0 14px;
         }
 
+        .user-ai-pantry-panel,
         .user-shared-recipe-pdfs-panel {
             display: grid;
             gap: 10px;
@@ -6359,16 +6360,19 @@ body {
             background: transparent;
         }
 
+        .user-ai-pantry-panel[hidden],
         .user-shared-recipe-pdfs-panel[hidden] {
             display: none;
         }
 
+        .user-ai-pantry-divider,
         .user-shared-recipe-pdfs-divider {
             width: 100%;
             max-width: none;
             margin: 4px 0 14px;
         }
 
+        .user-ai-pantry-header .ai-pantry-toggle,
         .user-shared-recipe-pdfs-header .pdf-share-toggle {
             flex: 1 1 auto;
             width: auto;
@@ -6376,6 +6380,7 @@ body {
             margin: 0;
         }
 
+        .user-ai-pantry-close,
         .user-shared-recipe-pdfs-close {
             flex: 0 0 auto;
             width: auto;
@@ -6391,6 +6396,8 @@ body {
             font-weight: 800;
         }
 
+        .user-ai-pantry-close:hover,
+        .user-ai-pantry-close:focus-visible,
         .user-shared-recipe-pdfs-close:hover,
         .user-shared-recipe-pdfs-close:focus-visible {
             background: #2a3036;

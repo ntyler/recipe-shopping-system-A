@@ -428,6 +428,18 @@
                             </button>
                         </div>
 
+                        <div class="user-account-menu-section">
+                            <div class="user-account-menu-section-title">PANTRY</div>
+                            <button type="button"
+                                    class="user-account-menu-item"
+                                    role="menuitem"
+                                    aria-controls="aiPantrySection"
+                                    onclick="return openAiPantryPanel()">
+                                <span class="user-account-menu-item-icon" aria-hidden="true">P</span>
+                                <span class="user-account-menu-item-label">AI Pantry</span>
+                            </button>
+                        </div>
+
                         {% if current_user.is_admin %}
                             <div class="user-account-menu-section">
                                 <div class="user-account-menu-section-title">RECIPE SHARING</div>
@@ -898,6 +910,30 @@
         {% set feedback_support_account_panel = true %}
         {% include "sections/feedback_support.html" %}
         {% set feedback_support_account_panel = false %}
+
+        <section id="aiPantrySection"
+                 class="ai-pantry-card user-ai-pantry-panel lazy-section-placeholder"
+                 data-ai-pantry-panel
+                 data-lazy-section="pantry"
+                 data-lazy-url="{{ url_for('main_bp.pantry_section') }}"
+                 aria-busy="false"
+                 hidden>
+            <div class="app-section-divider recipe-entry-section-divider user-ai-pantry-divider" aria-hidden="true"></div>
+            <div class="user-push-panel-header user-ai-pantry-header">
+                <button type="button"
+                        class="card-collapse-toggle ai-pantry-toggle"
+                        onclick="loadLazySection('pantry', { focus: true }); return false;">
+                    <span>AI Pantry</span>
+                </button>
+                <button type="button"
+                        class="secondary user-push-panel-close user-ai-pantry-close"
+                        data-ai-pantry-close
+                        onclick="return closeAiPantryPanel()">
+                    Close
+                </button>
+            </div>
+            <div class="lazy-section-status" data-lazy-section-status aria-live="polite"></div>
+        </section>
 
         {% if current_user.is_admin %}
             <section id="adminSupportSection"

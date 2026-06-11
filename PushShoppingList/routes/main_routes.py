@@ -1889,11 +1889,15 @@ def rules_section():
 @main_bp.route("/sections/pantry")
 def pantry_section():
     if is_guest_session():
-        return render_template("sections/guest_ai_pantry.html")
+        return render_template(
+            "sections/guest_ai_pantry.html",
+            ai_pantry_account_panel=True,
+        )
 
     return render_template(
         "sections/ai_pantry.html",
         **pantry_context(),
+        ai_pantry_account_panel=True,
     )
 
 

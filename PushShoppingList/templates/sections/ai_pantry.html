@@ -1,11 +1,27 @@
-<section id="aiPantrySection" class="app-card ai-pantry-card">
-    <button type="button"
-            class="card-collapse-toggle ai-pantry-toggle"
-            data-collapse-toggle="ai-pantry"
-            aria-expanded="true"
-            onclick="toggleCardCollapse('ai-pantry')">
-        <span>AI Pantry</span>
-    </button>
+{% set ai_pantry_account_panel = ai_pantry_account_panel|default(false) %}
+<section id="aiPantrySection"
+         class="{% if not ai_pantry_account_panel %}app-card {% endif %}ai-pantry-card{% if ai_pantry_account_panel %} user-ai-pantry-panel{% endif %}"
+         {% if ai_pantry_account_panel %}data-ai-pantry-panel hidden{% endif %}>
+    {% if ai_pantry_account_panel %}
+        <div class="app-section-divider recipe-entry-section-divider user-ai-pantry-divider" aria-hidden="true"></div>
+        <div class="user-push-panel-header user-ai-pantry-header">
+    {% endif %}
+        <button type="button"
+                class="card-collapse-toggle ai-pantry-toggle"
+                data-collapse-toggle="ai-pantry"
+                aria-expanded="true"
+                onclick="toggleCardCollapse('ai-pantry')">
+            <span>AI Pantry</span>
+        </button>
+    {% if ai_pantry_account_panel %}
+            <button type="button"
+                    class="secondary user-push-panel-close user-ai-pantry-close"
+                    data-ai-pantry-close
+                    onclick="return closeAiPantryPanel()">
+                Close
+            </button>
+        </div>
+    {% endif %}
 
     <div class="card-collapse-content ai-pantry-content"
          data-collapse-content="ai-pantry"

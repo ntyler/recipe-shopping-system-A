@@ -805,7 +805,7 @@ function bindPushNotificationsPanel() {
 
 function hideAccountMenuPanels(exceptPanel = null) {
     document.querySelectorAll(
-        "#userProfileEditForm, [data-account-notices-panel], [data-usage-dashboard-panel], [data-admin-support-panel], [data-chatgpt-models-panel], [data-shared-recipe-pdfs-panel], [data-push-notifications-panel], [data-feedback-support-panel], [data-two-factor-panel], [data-delete-account-panel]"
+        "#userProfileEditForm, [data-account-notices-panel], [data-usage-dashboard-panel], [data-ai-pantry-panel], [data-admin-support-panel], [data-chatgpt-models-panel], [data-shared-recipe-pdfs-panel], [data-push-notifications-panel], [data-feedback-support-panel], [data-two-factor-panel], [data-delete-account-panel]"
     ).forEach((panel) => {
         if (panel !== exceptPanel) {
             panel.hidden = true;

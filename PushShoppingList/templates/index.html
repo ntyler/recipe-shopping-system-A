@@ -103,23 +103,6 @@
             </dl>
         </section>
     {% endif %}
-    {% if not is_guest_demo %}
-        <div class="app-section-divider recipe-entry-section-divider" aria-hidden="true"></div>
-        <section id="aiPantrySection"
-                 class="app-card lazy-section-placeholder"
-                 data-lazy-section="pantry"
-                 data-lazy-url="{{ url_for('main_bp.pantry_section') }}"
-                 aria-busy="false">
-            <button type="button"
-                    class="card-collapse-toggle ai-pantry-toggle"
-                    onclick="loadLazySection('pantry', { focus: true }); return false;">
-                <span>AI Pantry</span>
-            </button>
-            <div class="lazy-section-status" data-lazy-section-status aria-live="polite"></div>
-        </section>
-    {% else %}
-        {% include "sections/guest_ai_pantry.html" %}
-    {% endif %}
     {% include "sections/enter_recipe_links.html" %}
     {% include "sections/edit_items.html" %}
     <div id="currentRecipeUrlLogCard"
