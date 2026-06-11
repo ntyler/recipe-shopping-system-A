@@ -18432,6 +18432,22 @@ body {
     line-height: 1.35;
 }
 
+.admin-support-card .user-admin-support-close {
+    min-height: 38px;
+    margin: 0;
+    border: 1px solid #3f4b58;
+    border-radius: 7px;
+    background: #23282d;
+    color: #e2e8f0;
+    font-weight: 800;
+}
+
+.admin-support-card .user-admin-support-close:hover,
+.admin-support-card .user-admin-support-close:focus-visible {
+    background: #2a3036;
+    outline: none;
+}
+
 .feedback-support-card {
     display: grid;
     gap: 18px;

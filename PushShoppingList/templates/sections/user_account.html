@@ -950,6 +950,12 @@
                             onclick="loadLazySection('admin-support', { focus: true }); return false;">
                         <span>Admin Support</span>
                     </button>
+                    <button type="button"
+                            class="secondary user-push-panel-close user-admin-support-close"
+                            data-admin-support-close
+                            onclick="return closeAdminSupportPanel()">
+                        Close
+                    </button>
                 </div>
                 <div class="lazy-section-status" data-lazy-section-status aria-live="polite"></div>
             </section>
