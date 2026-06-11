@@ -920,6 +920,7 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("scrollIntoView", script)
 
     def test_store_options_toolbar_only_runs_nearest_stores(self):
+        index_template = Path("PushShoppingList/templates/index.html").read_text(encoding="utf-8")
         home_template = Path("PushShoppingList/templates/sections/home_address.html").read_text(encoding="utf-8")
         store_template = Path("PushShoppingList/templates/sections/store_options.html").read_text(encoding="utf-8")
         css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
@@ -937,11 +938,15 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("Show Maps", store_template)
         self.assertIn("data-store-display-toggle=\"addresses\"", store_template)
         self.assertIn("data-store-display-toggle=\"maps\"", store_template)
+        self.assertIn('data-store-options-account-id="{{ current_user.user_id if current_user else \'\' }}"', store_template)
+        self.assertIn('data-store-options-account-id="{{ current_user.user_id if current_user else \'\' }}"', index_template)
         self.assertIn(".overflow-menu .recipe-view-store-toggle", css)
         self.assertIn("body.store-addresses-hidden", css)
         self.assertIn("body.store-maps-hidden", css)
         self.assertIn("function toggleStoreOptionsDisplay", script)
         self.assertIn("function restoreStoreOptionsDisplaySettings", script)
+        self.assertIn("function storeOptionsAccountStorageKey(baseKey)", script)
+        self.assertIn("storeOptionsAccountStorageKey(storeOptionsDisplayStorageKey(kind))", script)
 
     def test_home_address_summary_opens_google_or_apple_maps(self):
         home_template = Path("PushShoppingList/templates/sections/home_address.html").read_text(encoding="utf-8")
@@ -1047,6 +1052,7 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("active-store-edit-mode", script)
         self.assertIn("openStoreEditModal(`store-edit-${link ? link.dataset.storeKey || \"\" : \"\"}`", script)
         self.assertIn("active-store-icon-mode", script)
+        self.assertIn('storeOptionsAccountStorageKey("active-store-icon-mode")', script)
         self.assertIn("restoreActiveStoreIconMode()", script)
         self.assertIn(".active-store-summary-header", css)
         self.assertIn(".active-store-mode-controls", css)

@@ -3,6 +3,7 @@
 {% set can_edit_store_credentials = true %}
 <div class="app-card"
      id="storeOptionsSection"
+     data-store-options-account-id="{{ current_user.user_id if current_user else '' }}"
      data-store-can-manage="{{ 'true' if can_manage_stores else 'false' }}"
      data-store-can-toggle="{{ 'true' if can_toggle_stores else 'false' }}"
      data-store-can-edit-credentials="{{ 'true' if can_edit_store_credentials else 'false' }}">

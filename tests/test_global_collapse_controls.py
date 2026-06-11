@@ -49,7 +49,7 @@ def test_global_collapse_action_targets_page_sections_and_nested_panels():
     script = read_text("PushShoppingList/static/js/app.js")
     css = read_text("PushShoppingList/static/css/app.css")
 
-    assert "function collapseAllShoppingListPage()" in script
+    assert "function collapseAllShoppingListPage(options = {})" in script
     assert "function expandAllShoppingListPage()" in script
     assert "function setAllCardCollapseContentCollapsed(collapsed)" in script
     assert "function setShoppingListViewRowsCollapsed(collapsed)" in script
@@ -72,13 +72,53 @@ def test_auth_transition_can_request_collapse_before_lazy_sections_load():
     assert 'const AUTH_COLLAPSE_PENDING_KEY = "shopping-auth-collapse-all-pending";' in script
     assert 'const AUTH_COLLAPSE_ACTIVE_KEY = "shopping-auth-collapse-all-active";' in script
     assert "function requestShoppingListAuthCollapseAll()" in script
+    assert 'safeStorageSet(sessionStorage, AUTH_COLLAPSE_ACTIVE_KEY, "1");' in script
+    assert 'applyShoppingListCollapsedDomState({ showStatus: true });' in script
+    assert "function clearShoppingListAuthCollapseAllRequest()" in script
     assert "function consumeAuthCollapseAllRequest()" in script
     assert "function persistShoppingListCollapsedState()" in script
     assert "window.requestShoppingListAuthCollapseAll = requestShoppingListAuthCollapseAll;" in script
+    assert "window.clearShoppingListAuthCollapseAllRequest = clearShoppingListAuthCollapseAllRequest;" in script
     assert '["consumeAuthCollapseAllRequest", consumeAuthCollapseAllRequest]' in script
     assert "if (authCollapseAllIsActive())" in script
+    assert "if (authCollapseAllIsActive() && options.allowDuringAuthCollapse !== true)" in script
     assert 'safeStorageSet(localStorage, `card-collapse:${key}`, "collapsed");' in script
     assert "safeStorageRemove(localStorage, USER_ACCOUNT_OPEN_PANEL_KEY);" in script
+
+
+def test_firebase_auth_requests_collapse_before_sign_in_and_sign_out_work():
+    script = read_text("PushShoppingList/static/js/firebase-auth.js")
+
+    assert "function cancelCollapseAllBeforeAuthReload()" in script
+    assert "window.clearShoppingListAuthCollapseAllRequest" in script
+    assert (
+        "requestCollapseAllBeforeAuthReload();\n"
+        "        try {\n"
+        "            const credential = await createUserWithEmailAndPassword"
+    ) in script
+    assert (
+        "requestCollapseAllBeforeAuthReload();\n"
+        "\n"
+        "        try {\n"
+        "            const credential = await signInWithEmailAndPassword"
+    ) in script
+    assert (
+        "requestCollapseAllBeforeAuthReload();\n"
+        "\n"
+        "            try {\n"
+        "                const credential = await signInWithPopup"
+    ) in script
+    assert "cancelCollapseAllBeforeAuthReload();\n            setStatus(form, firebaseErrorMessage(error), \"error\");" in script
+    assert (
+        "if (firebaseUser && !session.authenticated && !session.pending_2fa) {\n"
+        "                requestCollapseAllBeforeAuthReload();\n"
+        "                const result = await syncFirebaseUser"
+    ) in script
+    assert (
+        "if (!firebaseUser && session.user && session.user.auth_provider === \"firebase\") {\n"
+        "                requestCollapseAllBeforeAuthReload();\n"
+        "                await logoutBackend();"
+    ) in script
 
 
 def test_global_collapse_keeps_recipe_title_images_visible():

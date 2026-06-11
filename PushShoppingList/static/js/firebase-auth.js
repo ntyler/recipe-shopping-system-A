@@ -228,6 +228,20 @@ function requestCollapseAllBeforeAuthReload() {
     }
 }
 
+function cancelCollapseAllBeforeAuthReload() {
+    if (typeof window.clearShoppingListAuthCollapseAllRequest === "function") {
+        window.clearShoppingListAuthCollapseAllRequest();
+        return;
+    }
+
+    try {
+        localStorage.removeItem("shopping-auth-collapse-all-pending");
+        sessionStorage.removeItem("shopping-auth-collapse-all-active");
+    } catch (error) {
+        // Collapse-on-auth is a UI preference; auth should continue if storage is unavailable.
+    }
+}
+
 async function accountExistsForPasswordReset(email) {
     const query = new URLSearchParams({ email });
     return backendJson(`/auth/account-exists?${query.toString()}`, { method: "GET" });
@@ -1007,6 +1021,7 @@ function bindCreateAccountForm() {
 
         setBusy(form, true);
         explicitAuthInProgress = true;
+        requestCollapseAllBeforeAuthReload();
         try {
             const credential = await createUserWithEmailAndPassword(auth, email, password);
             const result = await syncFirebaseUser(credential.user, firebaseUserProfile(credential.user, {
@@ -1017,6 +1032,7 @@ function bindCreateAccountForm() {
             }));
             handleFirebaseBackendLogin(result, form, "Account created. Signing you in...");
         } catch (error) {
+            cancelCollapseAllBeforeAuthReload();
             setStatus(form, firebaseErrorMessage(error), "error");
             setBusy(form, false);
             explicitAuthInProgress = false;
@@ -1036,6 +1052,7 @@ function bindSignInForm() {
         setStatus(form, "", "");
         setBusy(form, true);
         explicitAuthInProgress = true;
+        requestCollapseAllBeforeAuthReload();
 
         try {
             const credential = await signInWithEmailAndPassword(
@@ -1046,6 +1063,7 @@ function bindSignInForm() {
             const result = await syncFirebaseUser(credential.user, firebaseUserProfile(credential.user));
             handleFirebaseBackendLogin(result, form, "Signed in. Loading your workspace...");
         } catch (error) {
+            cancelCollapseAllBeforeAuthReload();
             setStatus(form, firebaseErrorMessage(error), "error");
             setBusy(form, false);
             explicitAuthInProgress = false;
@@ -1058,12 +1076,14 @@ function bindSignInForm() {
             setStatus(form, "", "");
             setBusy(form, true);
             explicitAuthInProgress = true;
+            requestCollapseAllBeforeAuthReload();
 
             try {
                 const credential = await signInWithPopup(auth, googleProvider);
                 const result = await syncFirebaseUser(credential.user, firebaseUserProfile(credential.user));
                 handleFirebaseBackendLogin(result, form, "Signed in with Google. Loading your workspace...");
             } catch (error) {
+                cancelCollapseAllBeforeAuthReload();
                 setStatus(form, firebaseErrorMessage(error), "error");
                 setBusy(form, false);
                 explicitAuthInProgress = false;
@@ -1287,6 +1307,7 @@ if (auth) {
             const session = await loadBackendSession();
 
             if (firebaseUser && !session.authenticated && !session.pending_2fa) {
+                requestCollapseAllBeforeAuthReload();
                 const result = await syncFirebaseUser(firebaseUser, firebaseUserProfile(firebaseUser));
                 if (result && result.requires_2fa) {
                     reloadAccountSection();
@@ -1297,6 +1318,7 @@ if (auth) {
             }
 
             if (!firebaseUser && session.user && session.user.auth_provider === "firebase") {
+                requestCollapseAllBeforeAuthReload();
                 await logoutBackend();
                 reloadAccountSection({ collapseAllBeforeReload: true });
             }

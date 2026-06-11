@@ -189,6 +189,11 @@ function persistShoppingListCollapsedState() {
 function requestShoppingListAuthCollapseAll() {
     persistShoppingListCollapsedState();
     safeStorageSet(localStorage, AUTH_COLLAPSE_PENDING_KEY, "1");
+    safeStorageSet(sessionStorage, AUTH_COLLAPSE_ACTIVE_KEY, "1");
+
+    if (document.readyState !== "loading") {
+        applyShoppingListCollapsedDomState({ showStatus: true });
+    }
 }
 
 function authCollapseAllIsActive() {
@@ -197,6 +202,11 @@ function authCollapseAllIsActive() {
 
 function clearAuthCollapseAllMode() {
     safeStorageRemove(sessionStorage, AUTH_COLLAPSE_ACTIVE_KEY);
+}
+
+function clearShoppingListAuthCollapseAllRequest() {
+    safeStorageRemove(localStorage, AUTH_COLLAPSE_PENDING_KEY);
+    clearAuthCollapseAllMode();
 }
 
 function consumeAuthCollapseAllRequest() {
@@ -331,6 +341,14 @@ async function loadLazySection(sectionName, options = {}) {
 
     if (!placeholder) {
         return document.getElementById(options.targetId || "") || null;
+    }
+
+    if (authCollapseAllIsActive() && options.allowDuringAuthCollapse !== true) {
+        placeholder.dataset.lazyQueued = "";
+        placeholder.dataset.lazyState = "";
+        placeholder.setAttribute("aria-busy", "false");
+        setLazySectionStatus(placeholder, "");
+        return placeholder;
     }
 
     if (placeholder.dataset.lazyLoaded === "1") {
@@ -9312,6 +9330,15 @@ function storeOptionsDisplayStorageKey(kind) {
     return kind === "maps" ? "store-options-show-maps" : "store-options-show-addresses";
 }
 
+function storeOptionsAccountStorageKey(baseKey) {
+    const section = storeOptionsSection();
+    const accountId = section && section.dataset
+        ? String(section.dataset.storeOptionsAccountId || "").trim()
+        : "";
+
+    return accountId ? `${baseKey}:account:${accountId}` : baseKey;
+}
+
 function setStoreOptionsDisplay(kind, shouldShow, options = {}) {
     const bodyClass = storeOptionsDisplayBodyClass(kind);
 
@@ -9322,7 +9349,11 @@ function setStoreOptionsDisplay(kind, shouldShow, options = {}) {
     });
 
     if (options.persist) {
-        localStorage.setItem(storeOptionsDisplayStorageKey(kind), shouldShow ? "1" : "0");
+        safeStorageSet(
+            localStorage,
+            storeOptionsAccountStorageKey(storeOptionsDisplayStorageKey(kind)),
+            shouldShow ? "1" : "0"
+        );
     }
 
     if (kind === "maps" && shouldShow) {
@@ -9339,7 +9370,10 @@ function toggleStoreOptionsDisplay(kind) {
 
 function restoreStoreOptionsDisplaySettings() {
     ["addresses", "maps"].forEach(kind => {
-        const savedValue = localStorage.getItem(storeOptionsDisplayStorageKey(kind));
+        const savedValue = safeStorageGet(
+            localStorage,
+            storeOptionsAccountStorageKey(storeOptionsDisplayStorageKey(kind))
+        );
         setStoreOptionsDisplay(kind, savedValue === null ? true : savedValue === "1");
     });
 }
@@ -9395,14 +9429,16 @@ function setActiveStoreIconMode(mode, options = {}) {
     });
 
     if (options.persist) {
-        localStorage.setItem("active-store-icon-mode", nextMode);
+        safeStorageSet(localStorage, storeOptionsAccountStorageKey("active-store-icon-mode"), nextMode);
     }
 
     filterActiveStores();
 }
 
 function restoreActiveStoreIconMode() {
-    setActiveStoreIconMode(localStorage.getItem("active-store-icon-mode") || "store");
+    setActiveStoreIconMode(
+        safeStorageGet(localStorage, storeOptionsAccountStorageKey("active-store-icon-mode")) || "store"
+    );
 }
 
 function normalizeActiveStoreSearchText(value) {
@@ -21395,6 +21431,7 @@ function buildAddressSummaryFromForm(form) {
 }
 
 window.requestShoppingListAuthCollapseAll = requestShoppingListAuthCollapseAll;
+window.clearShoppingListAuthCollapseAllRequest = clearShoppingListAuthCollapseAllRequest;
 
 document.addEventListener("DOMContentLoaded", function () {
     [

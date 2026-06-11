@@ -154,6 +154,7 @@
         <div id="storeOptionsSection"
              class="app-card lazy-section-placeholder"
              data-lazy-section="store-options"
+             data-store-options-account-id="{{ current_user.user_id if current_user else '' }}"
              data-lazy-url="{{ url_for('main_bp.store_options_section') }}"
              aria-busy="false">
             <button type="button"
