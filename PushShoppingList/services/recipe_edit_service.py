@@ -12,6 +12,9 @@ from urllib.parse import urlparse
 
 import requests
 
+from flask import g
+from flask import has_request_context
+
 from PushShoppingList.services import cloudflare_r2_storage
 from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.cookbook_service import COOKBOOK_CATEGORY_ALL_FIELDS
@@ -22,7 +25,7 @@ from PushShoppingList.services.cookbook_service import cookbook_category_choices
 from PushShoppingList.services.cookbook_service import ensure_unclassified_cookbook_for_recipes
 from PushShoppingList.services.cookbook_service import infer_recipe_categories
 from PushShoppingList.services.cookbook_service import recipe_category_metadata_for_editor
-from PushShoppingList.services.cookbook_service import recipe_cookbook_assignments
+from PushShoppingList.services.cookbook_service import cookbook_recipe_assignment_for_url
 from PushShoppingList.services.ingredient_text_review_service import annotate_ingredients_for_food_review
 from PushShoppingList.services.image_variant_service import cover_image_variant_payload
 from PushShoppingList.services.image_variant_service import ensure_webp_variants
@@ -314,7 +317,7 @@ def load_editable_recipe(url):
     apply_recipe_pdf_asset_aliases(recipe_data)
     log_recipe_pdf_fields("load_editable_recipe", recipe_data)
     meta = load_recipe_ingredients().get(normalize_recipe_url_key(url), {})
-    cookbook_assignment = recipe_cookbook_assignments().get(normalize_recipe_url_key(url), {})
+    cookbook_assignment = cookbook_recipe_assignment_for_url(url)
     pdf = editable_recipe_pdf_info(url, recipe_data)
     scaling = normalize_recipe_scaling_metadata(recipe_data.get("scaling"))
     if recipe_data.get("servings") and not scaling.get("base_servings"):
@@ -2939,22 +2942,54 @@ def sync_saved_recipe_with_shopping_list(recipe_data, previous_ingredients):
     sort_ingredients()
 
 
-def load_recipe_output(url):
-    recipe_key = normalize_recipe_url_key(url)
+def _read_recipe_output_json(json_path):
+    try:
+        return json.loads(json_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def build_recipe_output_index():
+    index = {}
 
     for json_path in OUTPUT_FOLDER.glob("*.json"):
         if json_path.name == "sorted_ingredients.json":
             continue
 
-        try:
-            data = json.loads(json_path.read_text(encoding="utf-8"))
-        except Exception:
+        data = _read_recipe_output_json(json_path)
+        if not isinstance(data, dict):
             continue
 
-        if normalize_recipe_url_key(data.get("source_url", "")) == recipe_key:
-            return data
+        recipe_key = normalize_recipe_url_key(data.get("source_url", ""))
+        if recipe_key:
+            index[recipe_key] = data
 
-    return None
+    return index
+
+
+def recipe_output_index():
+    if has_request_context():
+        cached = getattr(g, "_recipe_edit_output_index", None)
+        if cached is None:
+            cached = build_recipe_output_index()
+            g._recipe_edit_output_index = cached
+        return cached
+
+    return build_recipe_output_index()
+
+
+def load_recipe_output(url):
+    recipe_key = normalize_recipe_url_key(url)
+    direct_path = OUTPUT_FOLDER / f"{safe_filename(url)}.json"
+
+    if direct_path.exists():
+        data = _read_recipe_output_json(direct_path)
+        if isinstance(data, dict):
+            source_key = normalize_recipe_url_key(data.get("source_url", ""))
+            if not source_key or source_key == recipe_key:
+                return data
+
+    return recipe_output_index().get(recipe_key)
 
 
 def save_recipe_output(url, recipe_data):
@@ -2963,6 +2998,14 @@ def save_recipe_output(url, recipe_data):
         json.dumps(recipe_data, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
+    if has_request_context():
+        cached = getattr(g, "_recipe_edit_output_index", None)
+        if isinstance(cached, dict):
+            recipe_key = normalize_recipe_url_key(
+                recipe_data.get("source_url", "") if isinstance(recipe_data, dict) else ""
+            ) or normalize_recipe_url_key(url)
+            if recipe_key:
+                cached[recipe_key] = recipe_data
     return json_path
 
 

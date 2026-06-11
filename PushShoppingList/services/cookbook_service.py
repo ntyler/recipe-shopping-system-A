@@ -5,6 +5,9 @@ from datetime import datetime
 from datetime import timezone
 from pathlib import Path
 
+from flask import g
+from flask import has_request_context
+
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
 from PushShoppingList.services.storage_service import scoped_package_path
 
@@ -488,19 +491,83 @@ def ingredient_sections_from_recipe_data(ingredients):
 
 
 def cookbook_recipe_record_for_url(recipe_url):
+    return cookbook_recipe_context_for_url(recipe_url).get("record", {})
+
+
+def cookbook_recipe_assignment_for_url(recipe_url):
+    return cookbook_recipe_context_for_url(recipe_url).get("assignment", {})
+
+
+def load_cookbooks_raw_payload():
+    with COOKBOOKS_LOCK:
+        if not COOKBOOKS_FILE.exists():
+            return {"cookbooks": []}
+
+        try:
+            payload = json.loads(COOKBOOKS_FILE.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return {"cookbooks": []}
+
+        return payload if isinstance(payload, dict) else {"cookbooks": []}
+
+
+def find_cookbook_recipe_context(recipe_url):
     target_key = recipe_key(recipe_url)
 
     if not target_key:
-        return {}
+        return {"record": {}, "assignment": {}}
 
-    payload = load_cookbooks()
-    for cookbook in payload.get("cookbooks", []):
+    payload = load_cookbooks_raw_payload()
+    raw_cookbooks = payload.get("cookbooks", []) if isinstance(payload, dict) else []
+
+    for cookbook in raw_cookbooks:
+        if not isinstance(cookbook, dict):
+            continue
+
+        cookbook_name = clean_text(cookbook.get("name"))
+        if not cookbook_name:
+            continue
+
+        cookbook_id = clean_text(cookbook.get("id")) or cookbook_slug(cookbook_name)
+        assignment = {
+            "cookbook_id": cookbook_id,
+            "cookbook_name": cookbook_name,
+            "cookbook_is_unclassified": is_unclassified_cookbook(cookbook),
+        }
+
         for recipe in cookbook.get("recipes", []):
-            record = clean_recipe_record(recipe)
-            if record and recipe_key(record.get("url")) == target_key:
-                return record
+            raw_url = recipe.get("url") if isinstance(recipe, dict) else recipe
+            if recipe_key(raw_url) != target_key:
+                continue
 
-    return {}
+            record = clean_recipe_record(recipe)
+            if not record:
+                return {"record": {}, "assignment": {}}
+
+            return {
+                "record": record,
+                "assignment": assignment,
+            }
+
+    return {"record": {}, "assignment": {}}
+
+
+def cookbook_recipe_context_for_url(recipe_url):
+    target_key = recipe_key(recipe_url)
+
+    if not target_key:
+        return {"record": {}, "assignment": {}}
+
+    if has_request_context():
+        cached = getattr(g, "_cookbook_recipe_contexts", None)
+        if cached is None:
+            cached = {}
+            g._cookbook_recipe_contexts = cached
+        if target_key not in cached:
+            cached[target_key] = find_cookbook_recipe_context(recipe_url)
+        return cached[target_key]
+
+    return find_cookbook_recipe_context(recipe_url)
 
 
 def normalized_label_key(value):
@@ -1184,6 +1251,18 @@ def load_cookbooks():
         return normalize_cookbooks_payload(payload)
 
 
+def clear_cookbook_request_cache():
+    if not has_request_context():
+        return
+
+    for name in (
+        "_cookbook_recipe_contexts",
+        "_cookbook_recipe_index",
+    ):
+        if hasattr(g, name):
+            delattr(g, name)
+
+
 def save_cookbooks(payload):
     with COOKBOOKS_LOCK:
         normalized = normalize_cookbooks_payload(payload)
@@ -1191,6 +1270,7 @@ def save_cookbooks(payload):
             json.dumps(normalized, indent=2) + "\n",
             encoding="utf-8",
         )
+        clear_cookbook_request_cache()
         return normalized
 
 
@@ -1275,25 +1355,49 @@ def add_recipe_to_unclassified(payload, recipe):
     return False
 
 
-def recipe_cookbook_assignments():
+def build_cookbook_recipe_index():
     payload = load_cookbooks()
     assignments = {}
+    records_by_key = {}
 
     for cookbook in payload.get("cookbooks", []):
         cookbook_id = cookbook.get("id", "")
         cookbook_name = cookbook.get("name", "")
+        cookbook_is_unclassified = is_unclassified_cookbook(cookbook)
 
         for recipe in cookbook.get("recipes", []):
-            key = recipe_key(recipe.get("url"))
+            record = clean_recipe_record(recipe)
+            key = recipe_key(record.get("url") if record else recipe.get("url"))
 
             if key and key not in assignments:
                 assignments[key] = {
                     "cookbook_id": cookbook_id,
                     "cookbook_name": cookbook_name,
-                    "cookbook_is_unclassified": is_unclassified_cookbook(cookbook),
+                    "cookbook_is_unclassified": cookbook_is_unclassified,
                 }
 
-    return assignments
+            if key and record and key not in records_by_key:
+                records_by_key[key] = record
+
+    return {
+        "assignments": assignments,
+        "records_by_key": records_by_key,
+    }
+
+
+def cookbook_recipe_index():
+    if has_request_context():
+        cached = getattr(g, "_cookbook_recipe_index", None)
+        if cached is None:
+            cached = build_cookbook_recipe_index()
+            g._cookbook_recipe_index = cached
+        return cached
+
+    return build_cookbook_recipe_index()
+
+
+def recipe_cookbook_assignments():
+    return cookbook_recipe_index().get("assignments", {})
 
 
 def ensure_unclassified_cookbook_for_recipes(recipes):
