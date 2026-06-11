@@ -194,6 +194,38 @@ def test_store_options_toggle_controls_render_without_admin():
     assert "Delete store" not in html
 
 
+def test_store_options_store_rows_show_credentials_under_selector_url():
+    app = create_app()
+
+    with app.test_request_context("/"):
+        html = render_template(
+            "sections/store_options.html",
+            current_user=None,
+            available_stores={
+                "aldi": {
+                    "label": "Aldi",
+                    "url": "https://aldi.example/search?q=",
+                    "urlStoreSelector": "https://aldi.example/stores",
+                    "username": "shopper@example.com",
+                    "password": "saved-password",
+                },
+            },
+            enabled_stores=[],
+            nearest_store_locations={},
+            nearest_store_results={},
+            nearest_store_search_radius_miles=5,
+        )
+
+    store_detail = html[
+        html.index('<div class="store-manager-url">'):html.index('<div class="store-action-row">')
+    ]
+    assert store_detail.index("Store Selector URL") < store_detail.index("Username / Email")
+    assert store_detail.index("Username / Email") < store_detail.index("Password")
+    assert "shopper@example.com" in store_detail
+    assert '<span class="store-detail-value store-detail-secret">********</span>' in store_detail
+    assert "saved-password" not in store_detail
+
+
 def test_store_options_admin_menu_renders_store_management_actions():
     app = create_app()
 

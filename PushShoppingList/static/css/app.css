@@ -965,7 +965,7 @@ body {
 
         .store-manager-url .store-detail-line {
             display: grid;
-            grid-template-columns: 112px minmax(0, 1fr);
+            grid-template-columns: minmax(124px, 136px) minmax(0, 1fr);
             align-items: baseline;
             gap: 8px;
             margin-top: 3px;
@@ -977,6 +977,23 @@ body {
 
         .store-manager-url .store-detail-link {
             justify-self: start;
+        }
+
+        .store-manager-url .store-detail-value {
+            min-width: 0;
+            color: #d1d5db;
+            overflow-wrap: anywhere;
+        }
+
+        .store-manager-url .store-detail-empty {
+            color: #888;
+            font-style: italic;
+        }
+
+        .store-manager-url .store-detail-secret {
+            color: #cbd5e1;
+            font-family: Consolas, "Courier New", monospace;
+            letter-spacing: 0.04em;
         }
 
         .store-options-collapsed-summary {

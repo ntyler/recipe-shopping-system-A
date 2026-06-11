@@ -190,6 +190,22 @@
                                 <a class="store-detail-link" href="{{ store.urlStoreSelector }}" target="_blank">{{ store.urlStoreSelector }}</a>
                             </div>
                         {% endif %}
+                        <div class="store-detail-line">
+                            <span class="store-detail-label">Username / Email</span>
+                            {% if store.username %}
+                                <span class="store-detail-value">{{ store.username }}</span>
+                            {% else %}
+                                <span class="store-detail-value store-detail-empty">Not set</span>
+                            {% endif %}
+                        </div>
+                        <div class="store-detail-line">
+                            <span class="store-detail-label">Password</span>
+                            {% if store.password %}
+                                <span class="store-detail-value store-detail-secret">********</span>
+                            {% else %}
+                                <span class="store-detail-value store-detail-empty">Not set</span>
+                            {% endif %}
+                        </div>
                     </div>
 
                     <div class="store-action-row">
