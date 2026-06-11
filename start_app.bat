@@ -2,7 +2,7 @@
 
 cd /d D:\GitHub\recipe-shopping-system-A
 
-echo Starting Flask app...
+echo Starting shopping app with Waitress...
 
 set SHOPPING_APP_PORT=5083
 set SHOPPING_APP_PYTHON_EXE=C:\Python39\python.exe

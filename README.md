@@ -28,6 +28,7 @@ C:\Python39\python.exe -m pip install -r requirements.txt
 Core libraries used by the project:
 
 - `Flask`: web app and routes
+- `waitress`: production WSGI server used when running `app.py` on Windows
 - `requests`: recipe downloads, ntfy notifications, and HTTP calls
 - `beautifulsoup4`: recipe HTML parsing
 - `openai`: recipe extraction, sorting, and quantity scaling
@@ -170,7 +171,8 @@ Notes:
 - Leave `DISABLE_RECIPE_PDF_ARCHIVE` unset if you want each extracted recipe page saved as a PDF for later review.
 - Set `FORCE_OPENAI_RECIPE_EXTRACTION=1` only when you want the OpenAI extractor used even if recipe-card HTML already has enough structured data.
 - `MENU_ITEM_INFERENCE_WORKERS` controls how many restaurant menu item recipe predictions run at once during Menu Extract imports. The default is `8`, and the app clamps it between `1` and `32`.
-- Leave `SHOPPING_APP_PORT` unset when running `C:\Python39\python.exe app.py` directly and you want the default Flask port `5000`. The included `start_app.bat` currently sets `SHOPPING_APP_PORT=5083`.
+- Leave `SHOPPING_APP_PORT` unset when running `C:\Python39\python.exe app.py` directly and you want the default port `5000`. The included `start_app.bat` currently sets `SHOPPING_APP_PORT=5083`.
+- `C:\Python39\python.exe app.py` serves through Waitress by default. Set `SHOPPING_APP_SERVER=flask-dev` only if you intentionally need Flask's development server for local debugging.
 - Set `SHOPPING_APP_PASSWORD_RESET_BASE_URL` to the address users should open from password reset emails and signed-in two-factor disable verification emails, such as your LAN, Tailscale, or public HTTPS URL. If unset, reset emails use the current request host.
 - Set `SHOPPING_APP_ACCOUNT_LINK_BASE_URL` to the address users should open from account verification and account deletion emails. If unset, account links fall back to `SHOPPING_APP_PASSWORD_RESET_BASE_URL` or the current request host.
 - Product lookup uses `OPENAI_API_KEY` for fully loaded product-page analysis and final best-product selection. If no key is set, the app still parses product candidates but skips ChatGPT product analysis.
@@ -201,7 +203,7 @@ Then open:
 http://127.0.0.1:5000
 ```
 
-That direct command uses the default port `5000` unless `SHOPPING_APP_PORT` is set.
+That direct command uses Waitress and the default port `5000` unless `SHOPPING_APP_PORT` is set.
 
 Or use:
 
@@ -408,7 +410,7 @@ PushShoppingList/services/recipe-extractor/data/product_results.json
 
 ## Tailscale Access
 
-The Flask app listens on all network interfaces:
+The Waitress app server listens on all network interfaces:
 
 ```python
 host="0.0.0.0"
@@ -465,10 +467,10 @@ For phone access without making the app public, put your computer and phone on t
 
 Recommended setup:
 
-1. Install Tailscale, ZeroTier, or WireGuard on the computer running Flask.
+1. Install Tailscale, ZeroTier, or WireGuard on the computer running the app.
 2. Install the same mesh/VPN app on your phone.
 3. Join both devices to the same private network.
-4. Start the Flask app on the computer.
+4. Start the app on the computer.
 5. On the phone, open:
 
 ```text
@@ -498,9 +500,12 @@ Tailscale Serve and Tailscale Funnel provide HTTPS at:
 https://desktop-in7s09s.tail906b20.ts.net/
 ```
 
-Quick test with Flask's temporary self-signed certificate:
+Waitress serves HTTP only. For the most reliable phone experience, use Tailscale Funnel, Cloudflare Tunnel, ngrok, Nginx, or another HTTPS proxy in front of the app.
+
+Temporary local self-signed certificates are still available through Flask's development server when you intentionally opt into it:
 
 ```powershell
+$env:SHOPPING_APP_SERVER="flask-dev"
 $env:SHOPPING_APP_SSL_ADHOC="1"
 $env:SHOPPING_APP_PORT="5083"
 C:\Python39\python.exe app.py
@@ -514,9 +519,10 @@ https://<computer-ip>:5083
 
 Your browser will warn because the certificate is self-signed. For the most reliable phone experience, use one of these:
 
-- A trusted local certificate, then start with:
+- A trusted local certificate through Flask's development server, then start with:
 
 ```powershell
+$env:SHOPPING_APP_SERVER="flask-dev"
 $env:SHOPPING_APP_SSL_CERT="C:\path\to\cert.pem"
 $env:SHOPPING_APP_SSL_KEY="C:\path\to\key.pem"
 C:\Python39\python.exe app.py
@@ -567,7 +573,7 @@ Notifications are best treated as convenience alerts. The actual UI sync comes f
 1. Confirm Email/Password is enabled in Firebase Console.
 2. Confirm Google is enabled in Firebase Console.
 3. Confirm `localhost`, `127.0.0.1`, `app.recipeshoppinglist.com`, and `recipeshoppinglist.com` are authorized domains.
-4. Start the Flask app.
+4. Start the app.
 5. Open the app signed out.
 6. Confirm no Firebase setup/debug banners appear.
 7. Create an account with email/password.

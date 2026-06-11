@@ -152,7 +152,7 @@ try:
 
     print("Connecting to Windows PC over Tailscale...")
     ssh = connect_ssh()
-    print(f"Launching Flask app with {WINDOWS_PYTHON_EXE}...")
+    print(f"Launching shopping app with {WINDOWS_PYTHON_EXE}...")
 
     launch_command = (
         f'cmd /c start "" /D "{REPO_DIR}" '

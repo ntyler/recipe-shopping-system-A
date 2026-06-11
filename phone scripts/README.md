@@ -4,7 +4,7 @@ Scripts in this folder are meant to be copied into Pythonista on the iPhone.
 
 ## start_shopping_app.py
 
-Starts the shopping-list Flask app on the Windows PC over Tailscale SSH, ensures Tailscale Funnel is enabled, waits for the public HTTPS URL to respond, then opens Safari.
+Starts the shopping-list app on the Windows PC over Tailscale SSH, ensures Tailscale Funnel is enabled, waits for the public HTTPS URL to respond, then opens Safari.
 
 If the public Funnel URL is already online, the script skips SSH and opens Safari immediately.
 
@@ -98,7 +98,7 @@ tailscale funnel --https=443 off
 
 Follow these steps from top to bottom when setting up or debugging the phone launcher.
 
-### 1. Confirm Flask Is Running Locally
+### 1. Confirm The App Is Running Locally
 
 Run this on the Windows PC from PowerShell:
 
@@ -114,7 +114,7 @@ Expected output:
 
 Next step:
 
-- If you get `200`, Flask is running.
+- If you get `200`, the app is running.
 - If you get `000` or a connection error, start the app:
 
 ```powershell
@@ -127,7 +127,7 @@ or:
 .\start_app.bat
 ```
 
-### 2. Confirm Flask Is Reachable On The LAN
+### 2. Confirm The App Is Reachable On The LAN
 
 Run this on the Windows PC:
 
@@ -295,7 +295,7 @@ Press Enter here after Tailscale is connected...
 Connecting to Windows PC over Tailscale...
 Trying SSH host: 100.112.145.109
 SSH connected: 100.112.145.109
-Launching Flask app...
+Launching shopping app...
 Ensuring Tailscale Funnel is on...
 Waiting for shopping app...
 Shopping app is online
