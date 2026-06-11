@@ -219,6 +219,43 @@ def test_account_settings_editor_has_header_close_and_closes_menu():
     assert 'window.scrollToUserAccountProfile("auto")' in firebase_script
 
 
+def test_firebase_connected_status_has_customer_friendly_security_details():
+    template = (ROOT / "PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+
+    assert "data-firebase-connected-indicator" in template
+    assert "data-firebase-auth-info" in template
+    assert "data-firebase-auth-info-trigger" in template
+    assert "Secure sign-in via Firebase" in template
+    assert "Learn about secure sign-in" in template
+    assert "Your sign-in is handled by Firebase Authentication. AI Pantry does not store or have access to your password." in template
+    assert "Password storage: handled by Firebase / login provider" in template
+    assert "data-firebase-auth-learn-more" in template
+    assert "How your sign-in is protected" in template
+    assert "AI Pantry uses Firebase Authentication to manage sign-ins." in template
+    assert "your plain-text password" in template
+    assert "your password hash" in template
+    assert "your Google/Apple/Microsoft account password" in template
+    assert "firebase_uid" not in template[template.index("data-firebase-auth-info"):template.index("data-firebase-auth-info-modal")]
+
+    assert ".user-firebase-auth-wrap" in css
+    assert ".user-firebase-connected-indicator" in css
+    assert "cursor: pointer;" in css
+    assert ".user-firebase-info-btn" in css
+    assert ".user-firebase-info-popover" in css
+    assert ".user-firebase-info-modal-backdrop" in css
+    assert ".user-firebase-info-modal-backdrop.open" in css
+
+    assert "function bindFirebaseAuthInfo()" in script
+    assert "function setFirebaseAuthInfoPopoverOpen(wrapper, open)" in script
+    assert "function openFirebaseAuthInfoModal(wrapper, trigger)" in script
+    assert "function closeFirebaseAuthInfoModal(options = {})" in script
+    assert 'event.key === "Enter" || event.key === " "' in script
+    assert 'event.key === "Escape"' in script
+    assert '["bindFirebaseAuthInfo", bindFirebaseAuthInfo]' in script
+
+
 def test_usage_dashboard_menu_opens_visible_account_panel():
     template = (ROOT / "PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")

@@ -299,6 +299,7 @@ function afterDynamicMarkupLoaded(options = {}) {
     restoreViewBehaviorSettings();
     restoreItemCheckState();
     bindAccountMenuDropdowns();
+    bindFirebaseAuthInfo();
     restoreRememberedAccountPanelOpenWithOptions({ scroll: false });
     if (document.querySelector("[data-usage-dashboard-panel]:not([hidden])")) {
         scheduleOpenAiUsageDashboardRefresh(250);
@@ -1862,6 +1863,194 @@ function bindAccountMenuDropdowns() {
         if (closedAny) {
             event.preventDefault();
             event.stopPropagation();
+        }
+    });
+}
+
+let firebaseAuthInfoReturnFocus = null;
+
+function firebaseAuthInfoTriggers(wrapper) {
+    return wrapper ? wrapper.querySelectorAll("[data-firebase-auth-info-trigger]") : [];
+}
+
+function setFirebaseAuthInfoPopoverOpen(wrapper, open) {
+    if (!wrapper) {
+        return;
+    }
+
+    const shouldOpen = Boolean(open);
+    const popover = wrapper.querySelector("[data-firebase-auth-info-popover]");
+
+    if (popover) {
+        popover.hidden = !shouldOpen;
+    }
+
+    firebaseAuthInfoTriggers(wrapper).forEach(trigger => {
+        trigger.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
+    });
+}
+
+function closeFirebaseAuthInfoPopovers(options = {}) {
+    document.querySelectorAll("[data-firebase-auth-info]").forEach(wrapper => {
+        setFirebaseAuthInfoPopoverOpen(wrapper, false);
+    });
+
+    if (options.focusTrigger && firebaseAuthInfoReturnFocus && typeof firebaseAuthInfoReturnFocus.focus === "function") {
+        firebaseAuthInfoReturnFocus.focus({ preventScroll: true });
+    }
+}
+
+function openFirebaseAuthInfoModal(wrapper, trigger) {
+    const modal = wrapper ? wrapper.querySelector("[data-firebase-auth-info-modal]") : null;
+
+    if (!modal) {
+        return;
+    }
+
+    firebaseAuthInfoReturnFocus = trigger || document.activeElement;
+    setFirebaseAuthInfoPopoverOpen(wrapper, false);
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+
+    window.requestAnimationFrame(() => {
+        const closeButton = modal.querySelector("[data-firebase-auth-modal-close]");
+        if (closeButton) {
+            closeButton.focus({ preventScroll: true });
+        }
+    });
+}
+
+function closeFirebaseAuthInfoModal(options = {}) {
+    let closedAny = false;
+
+    document.querySelectorAll("[data-firebase-auth-info-modal].open").forEach(modal => {
+        modal.classList.remove("open");
+        modal.setAttribute("aria-hidden", "true");
+        closedAny = true;
+    });
+
+    if (closedAny && !document.querySelector(".user-firebase-info-modal-backdrop.open")) {
+        document.body.classList.remove("modal-open");
+    }
+
+    if (closedAny && options.focusTrigger !== false && firebaseAuthInfoReturnFocus && typeof firebaseAuthInfoReturnFocus.focus === "function") {
+        firebaseAuthInfoReturnFocus.focus({ preventScroll: true });
+    }
+
+    if (closedAny) {
+        firebaseAuthInfoReturnFocus = null;
+    }
+}
+
+function bindFirebaseAuthInfo() {
+    document.querySelectorAll("[data-firebase-auth-info]").forEach(wrapper => {
+        if (wrapper.dataset.firebaseAuthInfoBound === "1") {
+            return;
+        }
+
+        wrapper.dataset.firebaseAuthInfoBound = "1";
+
+        wrapper.addEventListener("mouseenter", () => {
+            setFirebaseAuthInfoPopoverOpen(wrapper, true);
+        });
+
+        wrapper.addEventListener("mouseleave", () => {
+            setFirebaseAuthInfoPopoverOpen(wrapper, false);
+        });
+
+        wrapper.addEventListener("focusout", () => {
+            window.setTimeout(() => {
+                if (!wrapper.contains(document.activeElement)) {
+                    setFirebaseAuthInfoPopoverOpen(wrapper, false);
+                }
+            }, 0);
+        });
+
+        firebaseAuthInfoTriggers(wrapper).forEach(trigger => {
+            trigger.addEventListener("focus", () => {
+                setFirebaseAuthInfoPopoverOpen(wrapper, true);
+            });
+
+            trigger.addEventListener("click", event => {
+                event.preventDefault();
+                firebaseAuthInfoReturnFocus = trigger;
+                const popover = wrapper.querySelector("[data-firebase-auth-info-popover]");
+                setFirebaseAuthInfoPopoverOpen(wrapper, !popover || popover.hidden);
+            });
+
+            trigger.addEventListener("keydown", event => {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    firebaseAuthInfoReturnFocus = trigger;
+                    setFirebaseAuthInfoPopoverOpen(wrapper, true);
+                    return;
+                }
+
+                if (event.key === "Escape") {
+                    event.preventDefault();
+                    setFirebaseAuthInfoPopoverOpen(wrapper, false);
+                }
+            });
+        });
+
+        const learnMore = wrapper.querySelector("[data-firebase-auth-learn-more]");
+        if (learnMore) {
+            learnMore.addEventListener("click", event => {
+                event.preventDefault();
+                openFirebaseAuthInfoModal(wrapper, learnMore);
+            });
+        }
+
+        const modal = wrapper.querySelector("[data-firebase-auth-info-modal]");
+        if (modal) {
+            modal.addEventListener("click", event => {
+                if (event.target === modal) {
+                    closeFirebaseAuthInfoModal();
+                }
+            });
+
+            modal.addEventListener("keydown", event => {
+                if (event.key === "Escape") {
+                    event.preventDefault();
+                    closeFirebaseAuthInfoModal();
+                }
+            });
+        }
+
+        wrapper.querySelectorAll("[data-firebase-auth-modal-close]").forEach(button => {
+            button.addEventListener("click", () => closeFirebaseAuthInfoModal());
+        });
+    });
+
+    if (document.documentElement.dataset.firebaseAuthInfoGlobalBound === "1") {
+        return;
+    }
+
+    document.documentElement.dataset.firebaseAuthInfoGlobalBound = "1";
+
+    document.addEventListener("click", event => {
+        if (event.target && event.target.closest && event.target.closest("[data-firebase-auth-info]")) {
+            return;
+        }
+
+        closeFirebaseAuthInfoPopovers();
+    });
+
+    document.addEventListener("keydown", event => {
+        if (event.key !== "Escape") {
+            return;
+        }
+
+        if (document.querySelector("[data-firebase-auth-info-modal].open")) {
+            closeFirebaseAuthInfoModal();
+            event.preventDefault();
+            return;
+        }
+
+        if (document.querySelector("[data-firebase-auth-info-popover]:not([hidden])")) {
+            closeFirebaseAuthInfoPopovers({ focusTrigger: true });
+            event.preventDefault();
         }
     });
 }
@@ -21444,6 +21633,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ["restoreViewBehaviorSettings", restoreViewBehaviorSettings],
         ["restoreItemCheckState", restoreItemCheckState],
         ["bindAccountMenuDropdowns", bindAccountMenuDropdowns],
+        ["bindFirebaseAuthInfo", bindFirebaseAuthInfo],
         ["restoreRememberedAccountPanelOpen", restoreRememberedAccountPanelOpen],
         ["initGuestCountdowns", initGuestCountdowns],
         ["bindGuestAuthChoices", bindGuestAuthChoices],
