@@ -1891,8 +1891,21 @@ function setFirebaseAuthInfoPopoverOpen(wrapper, open) {
     });
 }
 
+function setFirebaseAuthInfoPinned(wrapper, pinned) {
+    if (!wrapper) {
+        return;
+    }
+
+    wrapper.dataset.firebaseAuthInfoPinned = pinned ? "1" : "";
+}
+
+function firebaseAuthInfoIsPinned(wrapper) {
+    return wrapper && wrapper.dataset.firebaseAuthInfoPinned === "1";
+}
+
 function closeFirebaseAuthInfoPopovers(options = {}) {
     document.querySelectorAll("[data-firebase-auth-info]").forEach(wrapper => {
+        setFirebaseAuthInfoPinned(wrapper, false);
         setFirebaseAuthInfoPopoverOpen(wrapper, false);
     });
 
@@ -1909,6 +1922,7 @@ function openFirebaseAuthInfoModal(wrapper, trigger) {
     }
 
     firebaseAuthInfoReturnFocus = trigger || document.activeElement;
+    setFirebaseAuthInfoPinned(wrapper, false);
     setFirebaseAuthInfoPopoverOpen(wrapper, false);
     modal.classList.add("open");
     modal.setAttribute("aria-hidden", "false");
@@ -1957,12 +1971,14 @@ function bindFirebaseAuthInfo() {
         });
 
         wrapper.addEventListener("mouseleave", () => {
-            setFirebaseAuthInfoPopoverOpen(wrapper, false);
+            if (!firebaseAuthInfoIsPinned(wrapper)) {
+                setFirebaseAuthInfoPopoverOpen(wrapper, false);
+            }
         });
 
         wrapper.addEventListener("focusout", () => {
             window.setTimeout(() => {
-                if (!wrapper.contains(document.activeElement)) {
+                if (!wrapper.contains(document.activeElement) && !firebaseAuthInfoIsPinned(wrapper)) {
                     setFirebaseAuthInfoPopoverOpen(wrapper, false);
                 }
             }, 0);
@@ -1976,20 +1992,25 @@ function bindFirebaseAuthInfo() {
             trigger.addEventListener("click", event => {
                 event.preventDefault();
                 firebaseAuthInfoReturnFocus = trigger;
-                const popover = wrapper.querySelector("[data-firebase-auth-info-popover]");
-                setFirebaseAuthInfoPopoverOpen(wrapper, !popover || popover.hidden);
+                const shouldPinOpen = !firebaseAuthInfoIsPinned(wrapper);
+                closeFirebaseAuthInfoPopovers();
+                setFirebaseAuthInfoPinned(wrapper, shouldPinOpen);
+                setFirebaseAuthInfoPopoverOpen(wrapper, shouldPinOpen);
             });
 
             trigger.addEventListener("keydown", event => {
                 if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
                     firebaseAuthInfoReturnFocus = trigger;
+                    closeFirebaseAuthInfoPopovers();
+                    setFirebaseAuthInfoPinned(wrapper, true);
                     setFirebaseAuthInfoPopoverOpen(wrapper, true);
                     return;
                 }
 
                 if (event.key === "Escape") {
                     event.preventDefault();
+                    setFirebaseAuthInfoPinned(wrapper, false);
                     setFirebaseAuthInfoPopoverOpen(wrapper, false);
                 }
             });

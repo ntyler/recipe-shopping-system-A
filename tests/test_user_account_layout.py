@@ -249,8 +249,12 @@ def test_firebase_connected_status_has_customer_friendly_security_details():
 
     assert "function bindFirebaseAuthInfo()" in script
     assert "function setFirebaseAuthInfoPopoverOpen(wrapper, open)" in script
+    assert "function setFirebaseAuthInfoPinned(wrapper, pinned)" in script
+    assert "function firebaseAuthInfoIsPinned(wrapper)" in script
     assert "function openFirebaseAuthInfoModal(wrapper, trigger)" in script
     assert "function closeFirebaseAuthInfoModal(options = {})" in script
+    assert "if (!firebaseAuthInfoIsPinned(wrapper))" in script
+    assert "setFirebaseAuthInfoPinned(wrapper, true)" in script
     assert 'event.key === "Enter" || event.key === " "' in script
     assert 'event.key === "Escape"' in script
     assert '["bindFirebaseAuthInfo", bindFirebaseAuthInfo]' in script
