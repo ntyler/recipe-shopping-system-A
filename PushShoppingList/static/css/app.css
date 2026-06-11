@@ -867,7 +867,7 @@ body {
             font-weight: 800;
         }
 
-        .store-manager-row.inactive {
+        .store-manager-row.inactive > :not(.store-edit-form) {
             opacity: 0.72;
         }
 

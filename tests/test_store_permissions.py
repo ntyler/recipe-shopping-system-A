@@ -226,6 +226,13 @@ def test_store_options_store_rows_show_credentials_under_selector_url():
     assert "saved-password" not in store_detail
 
 
+def test_inactive_store_row_does_not_dim_edit_modal():
+    css = open("PushShoppingList/static/css/app.css", encoding="utf-8").read()
+
+    assert ".store-manager-row.inactive > :not(.store-edit-form)" in css
+    assert ".store-manager-row.inactive {\n            opacity" not in css
+
+
 def test_store_options_admin_menu_renders_store_management_actions():
     app = create_app()
 
