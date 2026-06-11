@@ -122,6 +122,8 @@
     <div id="cookbooksCard"
          class="app-card lazy-section-placeholder"
          data-lazy-section="cookbooks"
+         data-lazy-eager="idle"
+         data-lazy-eager-delay="350"
          data-lazy-url="{{ url_for('main_bp.cookbooks_section') }}"
          aria-busy="false">
         <button type="button"

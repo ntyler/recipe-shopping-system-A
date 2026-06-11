@@ -86,6 +86,23 @@ def test_auth_transition_can_request_collapse_before_lazy_sections_load():
     assert "safeStorageRemove(localStorage, USER_ACCOUNT_OPEN_PANEL_KEY);" in script
 
 
+def test_cookbooks_lazy_section_preloads_early_but_keeps_images_lazy():
+    index_template = read_text("PushShoppingList/templates/index.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+    cookbooks_template = read_text("PushShoppingList/templates/sections/cookbooks.html")
+
+    cookbooks_start = index_template.index('data-lazy-section="cookbooks"')
+    cookbooks_end = index_template.index('data-lazy-url="{{ url_for(\'main_bp.cookbooks_section\') }}"', cookbooks_start)
+    cookbooks_placeholder = index_template[cookbooks_start:cookbooks_end]
+
+    assert 'data-lazy-eager="idle"' in cookbooks_placeholder
+    assert 'data-lazy-eager-delay="350"' in cookbooks_placeholder
+    assert 'const eagerDelay = Number.parseInt(placeholder.dataset.lazyEagerDelay || "1800", 10);' in script
+    assert "Number.isFinite(eagerDelay) ? eagerDelay : 1800" in script
+    assert 'data-deferred-src="{{ recipe.cover_image.thumb_url or recipe.cover_image.card_url or recipe.cover_image.src }}"' in cookbooks_template
+    assert 'loading="lazy"' in cookbooks_template
+
+
 def test_firebase_auth_requests_collapse_before_sign_in_and_sign_out_work():
     script = read_text("PushShoppingList/static/js/firebase-auth.js")
 

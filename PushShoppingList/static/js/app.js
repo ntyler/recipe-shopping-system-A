@@ -465,7 +465,8 @@ function initLazySections() {
         }
 
         placeholder.dataset.lazyQueued = "1";
-        scheduleIdleTask(() => loadLazySection(sectionName), 1800);
+        const eagerDelay = Number.parseInt(placeholder.dataset.lazyEagerDelay || "1800", 10);
+        scheduleIdleTask(() => loadLazySection(sectionName), Number.isFinite(eagerDelay) ? eagerDelay : 1800);
     };
 
     const observedPlaceholders = [];
