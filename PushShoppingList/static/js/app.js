@@ -12856,6 +12856,7 @@ async function openRecipeEditor(button, options = {}) {
     modal.setAttribute("aria-hidden", "false");
     document.body.classList.add("modal-open");
     document.body.classList.add("recipe-editor-open");
+    await waitForNextPaint();
 
     try {
         const recipe = await fetchRecipeEditorData(url);
@@ -12876,6 +12877,12 @@ async function openRecipeEditor(button, options = {}) {
         console.warn("Unable to open recipe editor.", err);
         setRecipeEditStatus("Unable to load recipe.", true);
     }
+}
+
+function openRecipeEditorFromMenu(button, options = {}) {
+    closeRecipeEditRowMenus();
+    window.requestAnimationFrame(() => openRecipeEditor(button, options));
+    return false;
 }
 
 function openRecipeEditorSection(button, sectionKey) {
@@ -12996,8 +13003,10 @@ function populateRecipeEditor(recipe, originalUrl) {
     }
 
     updateRecipeEditStickyOffsets();
-    applyKnownRecipeImageProgressItems();
-    scheduleRecipeImageProgressPoll(250);
+    window.setTimeout(() => {
+        applyKnownRecipeImageProgressItems();
+        scheduleRecipeImageProgressPoll(750);
+    }, 0);
 }
 
 function recipeEditorCurrentUrl() {

@@ -304,7 +304,7 @@
                                     <div class="overflow-menu-section-title recipe-view-menu-section-title">Recipe</div>
                                     <button type="button"
                                             data-recipe-url="{{ recipe.url }}"
-                                            onclick="openRecipeEditor(this); closeRecipeEditRowMenus(); return false;">
+                                            onclick="return openRecipeEditorFromMenu(this)">
                                         Edit recipe
                                     </button>
                                     {% set recipe_public_pdf_url = recipe.pdf_public_url %}

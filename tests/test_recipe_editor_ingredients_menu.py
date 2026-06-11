@@ -59,3 +59,20 @@ def test_collapsed_ingredient_rows_use_compact_one_line_layout():
     assert "width: 34px;" in compact_css
     assert "height: 34px;" in compact_css
     assert "min-height: 20px;" in compact_css
+
+
+def test_recipe_menu_edit_opens_editor_after_closing_menu():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    current_recipes = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(
+        encoding="utf-8",
+    )
+    recipe_view = (ROOT / "PushShoppingList/templates/sections/items.html").read_text(encoding="utf-8")
+    cookbooks = (ROOT / "PushShoppingList/templates/sections/cookbooks.html").read_text(encoding="utf-8")
+
+    assert "function openRecipeEditorFromMenu(button, options = {})" in script
+    assert "window.requestAnimationFrame(() => openRecipeEditor(button, options));" in script
+    assert "await waitForNextPaint();" in script
+    assert "scheduleRecipeImageProgressPoll(750);" in script
+    assert "onclick=\"return openRecipeEditorFromMenu(this)\"" in current_recipes
+    assert "onclick=\"return openRecipeEditorFromMenu(this)\"" in recipe_view
+    assert "onclick=\"return openRecipeEditorFromMenu(this)\"" in cookbooks
