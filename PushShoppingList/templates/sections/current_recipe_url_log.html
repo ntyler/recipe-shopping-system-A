@@ -317,8 +317,8 @@
                                     </button>
                                     <a class="recipe-edit-menu-link"
                                        href="{{ url_for('recipe_bp.edit_recipe_page_route', url=recipe.url) }}"
-                                       target="_blank"
-                                       rel="noopener noreferrer">
+                                       data-recipe-url="{{ recipe.url }}"
+                                       onclick="return openRecipeEditorFromMenu(this, {}, event)">
                                         Edit recipe
                                     </a>
                                     {% set recipe_public_pdf_url = recipe.pdf_public_url %}
