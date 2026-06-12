@@ -13183,6 +13183,36 @@ async function restoreRecipeEditPageReturnState() {
     restoreWindowScroll(state.scrollX, state.scrollY);
 }
 
+function recipeEditPageReturnUrlFromState() {
+    if (!window.sessionStorage) {
+        return "";
+    }
+
+    let state = null;
+
+    try {
+        state = JSON.parse(sessionStorage.getItem(RECIPE_EDIT_PAGE_RETURN_STATE_KEY) || "null");
+    } catch (err) {
+        return "";
+    }
+
+    if (!state || !state.pageUrl) {
+        return "";
+    }
+
+    try {
+        const returnUrl = new URL(state.pageUrl, window.location.href);
+
+        if (returnUrl.origin !== window.location.origin || returnUrl.href === window.location.href) {
+            return "";
+        }
+
+        return returnUrl.href;
+    } catch (err) {
+        return "";
+    }
+}
+
 function openRecipeEditorSection(button, sectionKey) {
     closeRecipeEditRowMenus();
     openRecipeEditor(button, { scrollToSection: sectionKey });
@@ -13210,6 +13240,13 @@ function closeRecipeEditor() {
     }
 
     if (recipeEditorStandalonePageIsActive()) {
+        const returnUrl = recipeEditPageReturnUrlFromState();
+
+        if (returnUrl) {
+            window.location.assign(returnUrl);
+            return;
+        }
+
         if (window.history.length > 1) {
             window.history.back();
         } else {

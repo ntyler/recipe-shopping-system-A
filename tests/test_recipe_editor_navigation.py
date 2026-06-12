@@ -68,3 +68,17 @@ def test_recipe_editor_modal_close_does_not_reload_current_page():
         script.index("function closeRecipeEditor()"):
         script.index("function populateRecipeEditor")
     ]
+
+
+def test_recipe_editor_cancel_uses_stored_page_return_before_history():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+    close_block = script[
+        script.index("function closeRecipeEditor()"):
+        script.index("function populateRecipeEditor")
+    ]
+
+    assert 'class="recipe-edit-cancel" onclick="closeRecipeEditor()"' in template
+    assert "function recipeEditPageReturnUrlFromState" in script
+    assert "const returnUrl = recipeEditPageReturnUrlFromState();" in close_block
+    assert close_block.index("window.location.assign(returnUrl);") < close_block.index("window.history.back();")
