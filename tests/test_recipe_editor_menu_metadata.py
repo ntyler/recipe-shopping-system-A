@@ -83,6 +83,29 @@ def seed_menu_derived_recipe():
     return url, detail
 
 
+def seed_menu_recipe_url_match():
+    url = "https://velasian.example/menu?resInput=RES4902&menu_item=menu-item-1-AI-Inferred_Crispy_Vegetable_Spring_Rolls"
+    detail = menu_store_service.upsert_menu_from_facts({
+        "source_url": "",
+        "restaurant": {
+            "restaurant_name": "Vel Asian Cuisine",
+        },
+        "menu": {
+            "menu_title": "Vel Asian Cuisine Menu",
+        },
+        "sections": [{
+            "section_name": "Vegetarian",
+            "items": [{
+                "item_name": "Spring Roll",
+                "menu_price": "$18.95",
+                "menu_description": "Featuring wheat spring roll wrappers, cellophane noodles, carrot.",
+                "recipe_url": url,
+            }],
+        }],
+    })
+    return url, detail
+
+
 def editable_payload(url, **overrides):
     payload = {
         "source_url": url,
@@ -225,6 +248,61 @@ def test_menu_metadata_can_resolve_from_section_link(monkeypatch, tmp_path):
     assert loaded["restaurant_name"] == "Vel Asian Cuisine"
     assert loaded["source_menu_url"] == "https://velasian.example/menu"
     assert loaded["menu_section"] == "Kitchen Appetizers"
+
+
+def test_menu_metadata_resolves_from_menu_item_url_when_recipe_json_has_only_pdf_fields(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    url, detail = seed_menu_recipe_url_match()
+    recipe_edit_service.save_recipe_output(url, {
+        "source_url": url,
+        "source_pdf_path": "D:/recipes/spring-roll.pdf",
+        "generated_pdf_path": "D:/recipes/spring-roll-generated.pdf",
+    })
+
+    loaded = recipe_edit_service.load_editable_recipe(url)["recipe"]
+
+    assert loaded["is_menu_derived"] is True
+    assert loaded["menu_metadata_available"] is True
+    assert loaded["restaurant_id"] == detail["restaurant"]["id"]
+    assert loaded["menu_id"] == detail["menu"]["id"]
+    assert loaded["menu_section_id"] == detail["sections"][0]["id"]
+    assert loaded["menu_item_id"] == detail["items"][0]["id"]
+    assert loaded["restaurant_name"] == "Vel Asian Cuisine"
+    assert loaded["source_menu_url"] == "https://velasian.example/menu?resInput=RES4902"
+    assert loaded["menu_section"] == "Vegetarian"
+    assert loaded["menu_item_name"] == "Spring Roll"
+    assert loaded["menu_price"] == "$18.95"
+    assert loaded["menu_description"] == "Featuring wheat spring roll wrappers, cellophane noodles, carrot."
+
+
+def test_url_matched_menu_metadata_save_updates_menu_store(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    url, detail = seed_menu_recipe_url_match()
+    item_id = detail["items"][0]["id"]
+    recipe_edit_service.save_recipe_output(url, {
+        "source_url": url,
+        "source_pdf_path": "D:/recipes/spring-roll.pdf",
+    })
+
+    result = recipe_edit_service.save_editable_recipe(
+        url,
+        editable_payload(
+            url,
+            menu_section="Small Plates",
+            menu_item_name="Spring Roll",
+            menu_price="$19.49",
+            menu_description="Updated spring roll description.",
+        ),
+    )
+    item = menu_store_service.find_menu_item(menu_store_service.load_menu_store(), item_id)
+    saved = recipe_edit_service.load_recipe_output(url)
+
+    assert result["ok"] is True
+    assert item["menu_section"] == "Small Plates"
+    assert item["menu_price"] == "$19.49"
+    assert item["menu_description"] == "Updated spring roll description."
+    assert saved["menu_price"] == "$19.49"
+    assert saved["menu_description"] == "Updated spring roll description."
 
 
 def test_saving_menu_derived_recipe_persists_metadata_updates(monkeypatch, tmp_path):

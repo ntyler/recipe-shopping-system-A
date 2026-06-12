@@ -6,9 +6,13 @@ import uuid
 from datetime import datetime
 from datetime import timezone
 from pathlib import Path
+from urllib.parse import parse_qs
+from urllib.parse import parse_qsl
 from time import perf_counter
 from urllib.parse import quote
+from urllib.parse import urlencode
 from urllib.parse import urlparse
+from urllib.parse import urlunparse
 
 import requests
 
@@ -363,6 +367,101 @@ def recipe_menu_relation_value(recipe_data, key):
     return first_recipe_menu_text(recipe_data.get(key), metadata.get(key))
 
 
+def recipe_menu_source_url_candidates(recipe_data):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    metadata = recipe_menu_source_metadata(recipe_data)
+    candidates = [
+        recipe_data.get("source_url"),
+        recipe_data.get("recipe_record_url"),
+        recipe_data.get("url"),
+        recipe_data.get("source_display_url"),
+        metadata.get("recipe_record_url"),
+        metadata.get("source_url"),
+        metadata.get("source_display_url"),
+    ]
+    return [clean_recipe_menu_text(value) for value in candidates if clean_recipe_menu_text(value)]
+
+
+def recipe_menu_item_token_from_url(url):
+    try:
+        parsed = urlparse(str(url or ""))
+    except ValueError:
+        return ""
+
+    values = parse_qs(parsed.query or "").get("menu_item") or []
+    return clean_recipe_menu_text(values[0]) if values else ""
+
+
+def recipe_menu_source_url_from_item_url(url):
+    try:
+        parsed = urlparse(str(url or ""))
+    except ValueError:
+        return ""
+
+    query_pairs = parse_qsl(parsed.query or "", keep_blank_values=True)
+    if not any(key == "menu_item" for key, _value in query_pairs):
+        return ""
+
+    filtered_query = urlencode(
+        [(key, value) for key, value in query_pairs if key != "menu_item"],
+        doseq=True,
+    )
+    return urlunparse((
+        parsed.scheme,
+        parsed.netloc,
+        parsed.path,
+        parsed.params,
+        filtered_query,
+        "",
+    ))
+
+
+def recipe_menu_source_url_from_candidates(recipe_data):
+    for candidate in recipe_menu_source_url_candidates(recipe_data):
+        source_menu_url = recipe_menu_source_url_from_item_url(candidate)
+        if source_menu_url:
+            return source_menu_url
+    return ""
+
+
+def find_recipe_menu_item_by_url(payload, recipe_data):
+    payload = payload if isinstance(payload, dict) else {}
+    candidates = recipe_menu_source_url_candidates(recipe_data)
+    candidate_keys = {
+        normalize_recipe_url_key(candidate)
+        for candidate in candidates
+        if normalize_recipe_url_key(candidate)
+    }
+    menu_item_tokens = {
+        recipe_menu_item_token_from_url(candidate)
+        for candidate in candidates
+        if recipe_menu_item_token_from_url(candidate)
+    }
+
+    if not candidate_keys and not menu_item_tokens:
+        return {}
+
+    for item in payload.get("items", []):
+        item_urls = [
+            item.get("recipe_url"),
+            item.get("recipe_id"),
+            item.get("url"),
+        ]
+        if any(normalize_recipe_url_key(value) in candidate_keys for value in item_urls if value):
+            return item
+
+        if menu_item_tokens:
+            item_token = first_recipe_menu_text(
+                recipe_menu_item_token_from_url(item.get("recipe_url")),
+                recipe_menu_item_token_from_url(item.get("recipe_id")),
+                item.get("menu_item_token"),
+            )
+            if item_token and item_token in menu_item_tokens:
+                return item
+
+    return {}
+
+
 def linked_recipe_menu_records(recipe_data, payload=None):
     recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
     payload = payload or menu_store_service.load_menu_store()
@@ -374,6 +473,9 @@ def linked_recipe_menu_records(recipe_data, payload=None):
     menu_item_id = recipe_menu_relation_value(recipe_data, "menu_item_id")
     if menu_item_id:
         item = menu_store_service.find_menu_item(payload, menu_item_id) or {}
+
+    if not item:
+        item = find_recipe_menu_item_by_url(payload, recipe_data)
 
     menu_id = first_recipe_menu_text(
         recipe_menu_relation_value(recipe_data, "menu_id"),
@@ -517,6 +619,7 @@ def editable_recipe_menu_metadata(recipe_data):
         metadata.get("source_menu_url"),
         menu.get("source_url"),
         restaurant.get("source_menu_url"),
+        recipe_menu_source_url_from_candidates(recipe_data),
         recipe_data.get("source_display_url") if recipe_has_menu_metadata(recipe_data) else "",
     )
     fields = {
@@ -602,6 +705,23 @@ def editable_recipe_menu_metadata(recipe_data):
 
     return {
         **fields,
+        "restaurant_id": first_recipe_menu_text(
+            recipe_menu_relation_value(recipe_data, "restaurant_id"),
+            restaurant.get("id"),
+        ),
+        "menu_id": first_recipe_menu_text(
+            recipe_menu_relation_value(recipe_data, "menu_id"),
+            menu.get("id"),
+        ),
+        "menu_section_id": first_recipe_menu_text(
+            recipe_menu_relation_value(recipe_data, "menu_section_id"),
+            section.get("id"),
+            item.get("menu_section_id"),
+        ),
+        "menu_item_id": first_recipe_menu_text(
+            recipe_menu_relation_value(recipe_data, "menu_item_id"),
+            item.get("id"),
+        ),
         "is_menu_derived": bool(is_menu_derived or has_metadata),
         "menu_metadata_available": bool(has_metadata),
     }
@@ -726,9 +846,13 @@ def apply_recipe_menu_metadata_payload(recipe_data, payload):
     ):
         return recipe_data
 
+    linked_records = linked_recipe_menu_records(recipe_data)
     has_normalized_link = any(
         recipe_menu_relation_value(recipe_data, field)
         for field in RESTAURANT_MENU_RELATION_FIELDS
+    ) or any(
+        linked_records.get(field)
+        for field in ("restaurant", "menu", "section", "item")
     )
 
     if has_normalized_link:
