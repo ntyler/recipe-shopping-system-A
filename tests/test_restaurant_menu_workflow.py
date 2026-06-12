@@ -186,6 +186,7 @@ def test_menu_workflow_static_hooks_are_present():
     menu_builder_css = (ROOT / "PushShoppingList/static/css/menu_builder.css").read_text(encoding="utf-8")
 
     assert "Import Menu URL" in entry_template
+    assert 'id="enterRecipeLinks"' in entry_template
     assert "menuImportUrlPreviewForm" in entry_template
     assert "menuMediaPreviewForm" in entry_template
     assert "Custom Restaurant Menu Builder" in entry_template
@@ -197,6 +198,8 @@ def test_menu_workflow_static_hooks_are_present():
     assert "Custom Restaurant Menu Builder" not in cookbooks_template
     assert "cookbook-menu-builder-launcher" not in cookbooks_template
     assert "Create a restaurant-style menu from this cookbook." in cookbook_builder_template
+    assert "Back to Enter Recipe Links" in cookbook_builder_template
+    assert "#enterRecipeLinks" in cookbook_builder_template
     assert "Select Cookbook" in cookbook_builder_template
     assert 'name="cookbook_id"' in cookbook_builder_template
     assert "Use Cookbook" in cookbook_builder_template

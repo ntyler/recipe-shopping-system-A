@@ -16,6 +16,13 @@
             <h1>Custom Restaurant Menu Builder</h1>
             <p class="menu-page-subtitle">Create a restaurant-style menu from this cookbook.</p>
         </div>
+        <div class="menu-preview-actions">
+            <a class="menu-secondary-link"
+               href="{{ url_for('main_bp.index') }}#enterRecipeLinks"
+               role="button">
+                Back to Enter Recipe Links
+            </a>
+        </div>
     </section>
 
     {% if error %}
