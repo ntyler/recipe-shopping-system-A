@@ -5352,6 +5352,11 @@ def format_video_recipe_data_for_pdf(recipe_data):
     if meta_html:
         sections.append(meta_html)
 
+    menu_metadata_html = format_recipe_menu_metadata_for_pdf(recipe_data)
+
+    if menu_metadata_html:
+        sections.append(menu_metadata_html)
+
     ingredients_html = format_video_recipe_ingredients_for_pdf(recipe_data.get("ingredients", []))
 
     if ingredients_html:
@@ -5373,6 +5378,129 @@ def format_video_recipe_data_for_pdf(recipe_data):
         sections.append(f"<h2>Nutrition</h2>{nutrition_html}")
 
     return "\n".join(sections)
+
+
+def clean_recipe_pdf_metadata_text(value):
+    if isinstance(value, bool):
+        return "Yes" if value else "No"
+    if isinstance(value, list):
+        return ", ".join(
+            clean_recipe_pdf_metadata_text(item)
+            for item in value
+            if clean_recipe_pdf_metadata_text(item)
+        )
+    return clean_recipe_text(value)
+
+
+def recipe_pdf_bool_text(value):
+    if isinstance(value, bool):
+        return "Yes" if value else "No"
+    text = str(value or "").strip().lower()
+    if text in {"true", "1", "yes", "on"}:
+        return "Yes"
+    if text in {"false", "0", "no", "off"}:
+        return "No"
+    return ""
+
+
+def first_recipe_pdf_metadata_text(*values):
+    for value in values:
+        text = clean_recipe_pdf_metadata_text(value)
+        if text:
+            return text
+    return ""
+
+
+def recipe_has_menu_metadata_for_pdf(recipe_data):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+
+    if clean_recipe_text(recipe_data.get("source_type")).lower() == "menu_item_inferred":
+        return True
+
+    fields = (
+        "restaurant_name",
+        "restaurant_website_url",
+        "source_menu_url",
+        "menu_source_url",
+        "restaurant_cuisine_tags",
+        "restaurant_phone",
+        "restaurant_address",
+        "restaurant_hours_text",
+        "restaurant_current_status",
+        "restaurant_promotions",
+        "menu_section",
+        "menu_item_name",
+        "menu_price",
+        "menu_description",
+    )
+    if any(clean_recipe_pdf_metadata_text(recipe_data.get(field)) for field in fields):
+        return True
+
+    return bool(recipe_data.get("ai_inferred")) and any(
+        clean_recipe_pdf_metadata_text(recipe_data.get(field))
+        for field in ("restaurant_id", "menu_id", "menu_section_id", "menu_item_id")
+    )
+
+
+def format_recipe_pdf_metadata_table(rows):
+    rendered_rows = []
+
+    for label, value in rows:
+        text = clean_recipe_pdf_metadata_text(value)
+        if not text:
+            continue
+        rendered_rows.append(
+            "<tr>"
+            f"<th>{html.escape(label)}</th>"
+            f"<td>{html.escape(text)}</td>"
+            "</tr>"
+        )
+
+    if not rendered_rows:
+        return ""
+
+    return "<table class=\"metadata-table\">" + "".join(rendered_rows) + "</table>"
+
+
+def format_recipe_menu_metadata_for_pdf(recipe_data):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+
+    if not recipe_has_menu_metadata_for_pdf(recipe_data):
+        return ""
+
+    restaurant_rows = [
+        ("Restaurant Name", recipe_data.get("restaurant_name")),
+        ("Restaurant Website", recipe_data.get("restaurant_website_url")),
+        ("Source Menu URL", first_recipe_pdf_metadata_text(
+            recipe_data.get("source_menu_url"),
+            recipe_data.get("menu_source_url"),
+            recipe_data.get("source_display_url"),
+        )),
+        ("Cuisine Tags", recipe_data.get("restaurant_cuisine_tags")),
+        ("Phone", recipe_data.get("restaurant_phone")),
+        ("Address", recipe_data.get("restaurant_address")),
+        ("Hours", recipe_data.get("restaurant_hours_text")),
+        ("Current Status", recipe_data.get("restaurant_current_status")),
+        ("Rewards / Promotions", recipe_data.get("restaurant_promotions")),
+        ("Online Payment Available", recipe_pdf_bool_text(recipe_data.get("restaurant_online_payment_available"))),
+        ("Delivery Available", recipe_pdf_bool_text(recipe_data.get("restaurant_delivery_available"))),
+    ]
+    menu_item_rows = [
+        ("Menu Section", recipe_data.get("menu_section")),
+        ("Menu Item Name", recipe_data.get("menu_item_name")),
+        ("Menu Price", recipe_data.get("menu_price")),
+        ("Menu Description", recipe_data.get("menu_description")),
+    ]
+    restaurant_html = format_recipe_pdf_metadata_table(restaurant_rows)
+    menu_item_html = format_recipe_pdf_metadata_table(menu_item_rows)
+    blocks = []
+
+    if restaurant_html:
+        blocks.append(f"<h2>Restaurant / Menu Source Info</h2>{restaurant_html}")
+    if menu_item_html:
+        blocks.append(f"<h2>Menu Item Details</h2>{menu_item_html}")
+
+    return "\n".join(blocks)
 
 
 def format_video_recipe_meta_for_pdf(recipe_data):

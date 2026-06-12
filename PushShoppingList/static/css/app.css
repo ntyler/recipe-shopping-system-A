@@ -14802,8 +14802,65 @@ body {
     min-width: 0;
 }
 
+.recipe-edit-menu-metadata-details {
+    min-width: 0;
+    border: 1px solid #263447;
+    border-radius: 8px;
+    background: rgba(9, 15, 24, 0.58);
+    overflow: hidden;
+}
+
+.recipe-edit-menu-metadata-details[hidden] {
+    display: none;
+}
+
 .recipe-edit-source-files-summary {
     display: none;
+}
+
+.recipe-edit-menu-metadata-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-height: 42px;
+    padding: 10px 14px;
+    color: #c4ccd8;
+    font-size: 12px;
+    font-weight: 850;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    cursor: pointer;
+    list-style: none;
+}
+
+.recipe-edit-menu-metadata-summary::-webkit-details-marker {
+    display: none;
+}
+
+.recipe-edit-menu-metadata-summary:focus-visible {
+    outline: 2px solid rgba(91, 140, 255, 0.48);
+    outline-offset: -2px;
+}
+
+.recipe-edit-menu-metadata-details[open] .recipe-edit-source-files-chevron {
+    transform: rotate(225deg);
+}
+
+.recipe-edit-menu-metadata-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 22px;
+    min-width: 0;
+    padding: 0 14px 14px;
+}
+
+.recipe-edit-menu-metadata-details:not([open]) .recipe-edit-menu-metadata-grid {
+    display: none;
+}
+
+.recipe-edit-menu-metadata-wide {
+    grid-column: 1 / -1;
 }
 
 .recipe-edit-mobile-pdf-actions {
@@ -16040,6 +16097,10 @@ body {
     }
 
     .recipe-edit-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .recipe-edit-menu-metadata-grid {
         grid-template-columns: 1fr;
     }
 

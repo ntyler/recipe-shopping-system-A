@@ -12551,6 +12551,27 @@ const RECIPE_EDIT_PDF_INPUT_IDS = {
     generated_pdf_path: "recipeEditGeneratedPdfPath",
     generated_cloudflare_pdf_url: "recipeEditGeneratedCloudflarePdfUrl",
 };
+const RECIPE_EDIT_MENU_METADATA_INPUT_IDS = {
+    restaurant_name: "recipeEditRestaurantName",
+    restaurant_website_url: "recipeEditRestaurantWebsiteUrl",
+    source_menu_url: "recipeEditSourceMenuUrl",
+    restaurant_cuisine_tags: "recipeEditRestaurantCuisineTags",
+    restaurant_phone: "recipeEditRestaurantPhone",
+    restaurant_address: "recipeEditRestaurantAddress",
+    restaurant_hours_text: "recipeEditRestaurantHoursText",
+    restaurant_current_status: "recipeEditRestaurantCurrentStatus",
+    restaurant_promotions: "recipeEditRestaurantPromotions",
+    restaurant_online_payment_available: "recipeEditRestaurantOnlinePaymentAvailable",
+    restaurant_delivery_available: "recipeEditRestaurantDeliveryAvailable",
+    menu_section: "recipeEditMenuSection",
+    menu_item_name: "recipeEditMenuItemName",
+    menu_price: "recipeEditMenuPrice",
+    menu_description: "recipeEditMenuDescription",
+};
+const RECIPE_EDIT_MENU_METADATA_URL_LINKS = [
+    ["recipeEditRestaurantWebsiteUrl", "recipeEditRestaurantWebsiteUrlLink"],
+    ["recipeEditSourceMenuUrl", "recipeEditSourceMenuUrlLink"],
+];
 
 async function fetchRecipeEditorData(url) {
     const response = await fetch(`/api/recipe?url=${encodeURIComponent(url)}`, {
@@ -13419,6 +13440,7 @@ function populateRecipeEditor(recipe, originalUrl) {
         equipment: recipe.equipment || [],
         instructions: recipe.instructions || [],
         nutrition: recipe.nutrition || [],
+        menu_metadata: recipeMenuMetadataSnapshot(recipe),
     });
 
     setValue("recipeEditOriginalUrl", originalUrl);
@@ -13438,6 +13460,7 @@ function populateRecipeEditor(recipe, originalUrl) {
     populateRecipeScalingControls(recipe.scaling || {}, recipe.servings || "");
     updateRecipeEditorPdfControls(recipe);
     syncRecipeEditSourceFilesDetails();
+    populateRecipeMenuMetadata(recipe);
     setRecipeEditorCoverImage(coverImage, recipe.recipe_title || recipe.display_name || "Recipe title image");
 
     const ingredientWrap = document.getElementById("recipeEditIngredients");
@@ -13521,6 +13544,121 @@ function recipeObjectValueFromAliases(recipe, aliases = []) {
     }
 
     return "";
+}
+
+function recipeMenuMetadataText(value) {
+    if (Array.isArray(value)) {
+        return value.map(recipeMenuMetadataText).filter(Boolean).join(", ");
+    }
+    if (typeof value === "boolean") {
+        return value ? "true" : "false";
+    }
+    return String(value || "").trim();
+}
+
+function recipeMenuMetadataSnapshot(recipe = {}) {
+    const snapshot = {};
+
+    Object.keys(RECIPE_EDIT_MENU_METADATA_INPUT_IDS).forEach(field => {
+        snapshot[field] = recipeMenuMetadataText(recipe[field]);
+    });
+
+    return snapshot;
+}
+
+function recipeHasMenuMetadata(recipe = {}) {
+    if (!recipe || typeof recipe !== "object") {
+        return false;
+    }
+
+    if (recipe.is_menu_derived || recipe.menu_metadata_available) {
+        return true;
+    }
+
+    if (String(recipe.source_type || "").trim().toLowerCase() === "menu_item_inferred") {
+        return true;
+    }
+
+    return Object.keys(RECIPE_EDIT_MENU_METADATA_INPUT_IDS).some(field => {
+        return recipeMenuMetadataText(recipe[field]);
+    });
+}
+
+function setRecipeMenuMetadataPanelVisibility(recipe = {}) {
+    const showPanels = recipeHasMenuMetadata(recipe);
+    [
+        document.getElementById("recipeEditRestaurantMenuSourceDetails"),
+        document.getElementById("recipeEditMenuItemDetails"),
+    ].forEach(panel => {
+        if (!panel) {
+            return;
+        }
+        panel.hidden = !showPanels;
+        if (showPanels) {
+            panel.open = true;
+        } else {
+            panel.open = false;
+        }
+    });
+}
+
+function updateRecipeMenuMetadataUrlLink(inputId, linkId) {
+    const input = document.getElementById(inputId);
+    const link = document.getElementById(linkId);
+    const url = input ? String(input.value || "").trim() : "";
+    const canOpen = isLegitimateWebUrl(url);
+
+    if (!link) {
+        return;
+    }
+
+    link.href = canOpen ? url : "#";
+    link.hidden = !canOpen;
+    link.setAttribute("aria-disabled", canOpen ? "false" : "true");
+}
+
+function bindRecipeMenuMetadataUrlLinks() {
+    RECIPE_EDIT_MENU_METADATA_URL_LINKS.forEach(([inputId, linkId]) => {
+        const input = document.getElementById(inputId);
+        if (input && input.dataset.menuMetadataLinkBound !== "true") {
+            input.dataset.menuMetadataLinkBound = "true";
+            input.addEventListener("input", () => updateRecipeMenuMetadataUrlLink(inputId, linkId));
+        }
+        updateRecipeMenuMetadataUrlLink(inputId, linkId);
+    });
+}
+
+function populateRecipeMenuMetadata(recipe = {}) {
+    setRecipeMenuMetadataPanelVisibility(recipe);
+    Object.entries(RECIPE_EDIT_MENU_METADATA_INPUT_IDS).forEach(([field, inputId]) => {
+        const input = document.getElementById(inputId);
+        if (input) {
+            input.value = recipeMenuMetadataText(recipe[field]);
+        }
+    });
+    bindRecipeMenuMetadataUrlLinks();
+}
+
+function recipeMenuMetadataPanelsVisible() {
+    return [
+        document.getElementById("recipeEditRestaurantMenuSourceDetails"),
+        document.getElementById("recipeEditMenuItemDetails"),
+    ].some(panel => panel && !panel.hidden);
+}
+
+function collectRecipeMenuMetadataPayload() {
+    const payload = {};
+
+    if (!recipeMenuMetadataPanelsVisible()) {
+        return payload;
+    }
+
+    Object.entries(RECIPE_EDIT_MENU_METADATA_INPUT_IDS).forEach(([field, inputId]) => {
+        const input = document.getElementById(inputId);
+        payload[field] = input ? String(input.value || "").trim() : "";
+    });
+
+    return payload;
 }
 
 function currentRecipeEditorPdfFieldValues() {
@@ -18087,6 +18225,7 @@ function normalizeRecipeEditorSnapshot(recipe) {
         reflection_notes: normalizeRecipeReflectionNotesSnapshot(recipe.reflection_notes || []),
         chatgpt_feedback: String(recipe.chatgpt_feedback || "").trim(),
         chatgpt_feedback_created_at: String(recipe.chatgpt_feedback_created_at || "").trim(),
+        menu_metadata: recipeMenuMetadataSnapshot(recipe.menu_metadata || recipe || {}),
     };
 }
 
@@ -18142,6 +18281,22 @@ function buildRecipeSaveProgressItems(recipe) {
     ].forEach(([label, key]) => {
         if (previous[key] !== next[key]) {
             detailLines.push(`${label}: ${previous[key] || "(blank)"} -> ${next[key] || "(blank)"}`);
+        }
+    });
+
+    [
+        ["Restaurant name", "restaurant_name"],
+        ["Restaurant website", "restaurant_website_url"],
+        ["Source menu URL", "source_menu_url"],
+        ["Menu section", "menu_section"],
+        ["Menu item name", "menu_item_name"],
+        ["Menu price", "menu_price"],
+        ["Menu description", "menu_description"],
+    ].forEach(([label, key]) => {
+        const previousValue = previous.menu_metadata ? previous.menu_metadata[key] || "" : "";
+        const nextValue = next.menu_metadata ? next.menu_metadata[key] || "" : "";
+        if (previousValue !== nextValue) {
+            detailLines.push(`${label}: ${previousValue || "(blank)"} -> ${nextValue || "(blank)"}`);
         }
     });
 
@@ -18410,6 +18565,7 @@ function collectRecipeEditorPayload() {
             instructions: collectRecipeInstructionRows(),
             nutrition: collectRecipeNutritionRows(),
             reflection_notes: collectRecipeReflectionNotes(),
+            ...collectRecipeMenuMetadataPayload(),
         },
     };
 }

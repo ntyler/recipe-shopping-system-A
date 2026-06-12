@@ -1,0 +1,339 @@
+from pathlib import Path
+
+from PushShoppingList.services import menu_store_service
+from PushShoppingList.services import recipe_edit_service
+from PushShoppingList.services import recipe_extract_service
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def read_text(relative_path):
+    return (ROOT / relative_path).read_text(encoding="utf-8")
+
+
+def configure_editor_recipe_storage(monkeypatch, tmp_path):
+    output_dir = tmp_path / "output"
+    pdf_dir = tmp_path / "pdf"
+    output_dir.mkdir()
+    pdf_dir.mkdir()
+
+    monkeypatch.setattr(recipe_edit_service, "OUTPUT_FOLDER", output_dir)
+    monkeypatch.setattr(recipe_extract_service, "OUTPUT_FOLDER", output_dir)
+    monkeypatch.setattr(recipe_extract_service, "PDF_FOLDER", pdf_dir)
+    monkeypatch.setattr(menu_store_service, "MENU_STORE_FILE", tmp_path / "restaurant_menus.json")
+    monkeypatch.setattr(recipe_edit_service, "load_recipe_ingredients", lambda: {})
+    monkeypatch.setattr(recipe_edit_service, "cookbook_recipe_assignment_for_url", lambda url: {})
+    monkeypatch.setattr(recipe_edit_service, "load_food_rules", lambda: {"require": [], "avoid": []})
+    monkeypatch.setattr(recipe_edit_service, "save_recipe_url_quantity", lambda *args, **kwargs: None)
+    monkeypatch.setattr(recipe_edit_service, "save_recipe_url_name", lambda *args, **kwargs: None)
+    monkeypatch.setattr(recipe_edit_service, "update_recipe_ingredient_record", lambda *args, **kwargs: None)
+    monkeypatch.setattr(recipe_edit_service, "update_recipe_quantity", lambda *args, **kwargs: None)
+    monkeypatch.setattr(recipe_edit_service, "sync_saved_recipe_with_shopping_list", lambda *args, **kwargs: None)
+
+    return output_dir, pdf_dir
+
+
+def seed_menu_derived_recipe():
+    detail = menu_store_service.upsert_menu_from_facts({
+        "source_url": "https://velasian.example/menu",
+        "restaurant": {
+            "restaurant_name": "Vel Asian Cuisine",
+            "restaurant_website_url": "https://velasian.example",
+            "cuisine_tags": ["Asian", "Thai"],
+            "phone": "317-555-0100",
+            "full_address": "1 Main St, Indianapolis, IN",
+            "hours_text": "Mon-Sat 10-9",
+            "current_status": "Open",
+            "rewards_text": "Rewards members get lunch specials",
+            "online_payment_available": True,
+            "delivery_available": True,
+        },
+        "menu": {
+            "menu_title": "Vel Asian Cuisine Menu",
+        },
+        "sections": [{
+            "section_name": "Kitchen Appetizers",
+            "items": [{
+                "item_name": "Spring Roll",
+                "menu_price": "$5.99",
+                "menu_description": "Two veggie golden crispy rolls.",
+            }],
+        }],
+    })
+    menu = detail["menu"]
+    restaurant = detail["restaurant"]
+    section = detail["sections"][0]
+    item = detail["items"][0]
+    url = "https://velasian.example/menu#spring-roll"
+
+    recipe_edit_service.save_recipe_output(url, {
+        "source_url": url,
+        "source_type": "menu_item_inferred",
+        "ai_inferred": True,
+        "restaurant_id": restaurant["id"],
+        "menu_id": menu["id"],
+        "menu_section_id": section["id"],
+        "menu_item_id": item["id"],
+        "recipe_title": "Spring Roll",
+        "ingredients": [{"ingredient": "cabbage", "quantity": "1", "unit": "cup"}],
+        "instructions": [{"instruction": "Roll and fry until golden."}],
+    })
+
+    return url, detail
+
+
+def editable_payload(url, **overrides):
+    payload = {
+        "source_url": url,
+        "display_name": overrides.pop("display_name", "Spring Roll"),
+        "recipe_title": overrides.pop("recipe_title", "Spring Roll"),
+        "quantity": 1,
+        "servings": "",
+        "level": "",
+        "total_time": "",
+        "prep_time": "",
+        "inactive_time": "",
+        "cook_time": "",
+        "scaling": {},
+        "ingredients": [{"ingredient": "cabbage", "quantity": "1", "unit": "cup"}],
+        "equipment": [],
+        "instructions": [{"instruction": "Roll and fry until golden."}],
+        "nutrition": [],
+        "rating": 0,
+        "reflection_notes": [],
+    }
+    payload.update(overrides)
+    return payload
+
+
+def empty_menu_metadata_payload():
+    return {
+        "restaurant_name": "",
+        "restaurant_website_url": "",
+        "source_menu_url": "",
+        "restaurant_cuisine_tags": "",
+        "restaurant_phone": "",
+        "restaurant_address": "",
+        "restaurant_hours_text": "",
+        "restaurant_current_status": "",
+        "restaurant_promotions": "",
+        "restaurant_online_payment_available": "",
+        "restaurant_delivery_available": "",
+        "menu_section": "",
+        "menu_item_name": "",
+        "menu_price": "",
+        "menu_description": "",
+    }
+
+
+def test_recipe_editor_menu_metadata_panels_are_wired_before_amount():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    js = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+
+    restaurant_panel = template.index("recipeEditRestaurantMenuSourceDetails")
+    menu_item_panel = template.index("recipeEditMenuItemDetails")
+    recipe_amount = template.index("recipeEditScaleMultiplier")
+    source_files_panel = template.index("recipeEditSourceFilesDetails")
+
+    assert source_files_panel < restaurant_panel < menu_item_panel < recipe_amount
+    assert "Restaurant / Menu Source Info" in template
+    assert "Menu Item Details" in template
+    assert 'id="recipeEditRestaurantWebsiteUrlLink"' in template
+    assert 'id="recipeEditSourceMenuUrlLink"' in template
+    assert '<textarea id="recipeEditMenuDescription" rows="3">' in template
+    assert "panel.hidden = !showPanels;" in js
+    assert "function recipeMenuMetadataPanelsVisible()" in js
+    assert "return payload;" in js[js.index("function collectRecipeMenuMetadataPayload"):js.index("function currentRecipeEditorPdfFieldValues")]
+    assert ".recipe-edit-menu-metadata-details" in css
+    assert ".recipe-edit-menu-metadata-grid" in css
+
+
+def test_normal_recipe_load_and_save_do_not_add_menu_metadata(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    url = "https://example.com/recipes/soup"
+    recipe_edit_service.save_recipe_output(url, {
+        "source_url": url,
+        "recipe_title": "Tomato Soup",
+        "ingredients": [{"ingredient": "tomato"}],
+        "instructions": [{"instruction": "Simmer."}],
+    })
+
+    loaded = recipe_edit_service.load_editable_recipe(url)["recipe"]
+
+    assert loaded["is_menu_derived"] is False
+    assert loaded["menu_metadata_available"] is False
+    assert loaded["restaurant_name"] == ""
+    assert loaded["menu_price"] == ""
+
+    result = recipe_edit_service.save_editable_recipe(
+        url,
+        editable_payload(
+            url,
+            display_name="Tomato Soup",
+            recipe_title="Tomato Soup",
+            ingredients=[{"ingredient": "tomato"}],
+            instructions=[{"instruction": "Simmer."}],
+            **empty_menu_metadata_payload(),
+        ),
+    )
+    saved = recipe_edit_service.load_recipe_output(url)
+
+    assert result["ok"] is True
+    for field in recipe_edit_service.RESTAURANT_MENU_METADATA_FIELDS:
+        assert field not in saved
+
+
+def test_menu_derived_recipe_loads_restaurant_and_menu_item_metadata(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    url, _detail = seed_menu_derived_recipe()
+
+    loaded = recipe_edit_service.load_editable_recipe(url)["recipe"]
+
+    assert loaded["is_menu_derived"] is True
+    assert loaded["menu_metadata_available"] is True
+    assert loaded["restaurant_name"] == "Vel Asian Cuisine"
+    assert loaded["restaurant_website_url"] == "https://velasian.example"
+    assert loaded["source_menu_url"] == "https://velasian.example/menu"
+    assert loaded["restaurant_cuisine_tags"] == "Asian, Thai"
+    assert loaded["restaurant_phone"] == "317-555-0100"
+    assert loaded["restaurant_address"] == "1 Main St, Indianapolis, IN"
+    assert loaded["restaurant_hours_text"] == "Mon-Sat 10-9"
+    assert loaded["restaurant_current_status"] == "Open"
+    assert loaded["restaurant_online_payment_available"] == "true"
+    assert loaded["restaurant_delivery_available"] == "true"
+    assert loaded["menu_section"] == "Kitchen Appetizers"
+    assert loaded["menu_item_name"] == "Spring Roll"
+    assert loaded["menu_price"] == "$5.99"
+    assert loaded["menu_description"] == "Two veggie golden crispy rolls."
+
+
+def test_menu_metadata_can_resolve_from_section_link(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    url, detail = seed_menu_derived_recipe()
+    recipe_data = recipe_edit_service.load_recipe_output(url)
+    recipe_data.pop("restaurant_id", None)
+    recipe_data.pop("menu_id", None)
+    recipe_data.pop("menu_item_id", None)
+    recipe_edit_service.save_recipe_output(url, recipe_data)
+
+    loaded = recipe_edit_service.load_editable_recipe(url)["recipe"]
+
+    assert loaded["is_menu_derived"] is True
+    assert loaded["menu_section_id"] == detail["sections"][0]["id"]
+    assert loaded["restaurant_name"] == "Vel Asian Cuisine"
+    assert loaded["source_menu_url"] == "https://velasian.example/menu"
+    assert loaded["menu_section"] == "Kitchen Appetizers"
+
+
+def test_saving_menu_derived_recipe_persists_metadata_updates(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    url, detail = seed_menu_derived_recipe()
+    restaurant_id = detail["restaurant"]["id"]
+    menu_id = detail["menu"]["id"]
+    item_id = detail["items"][0]["id"]
+
+    result = recipe_edit_service.save_editable_recipe(
+        url,
+        editable_payload(
+            url,
+            restaurant_name="Vel Asian Kitchen",
+            restaurant_website_url="https://velasian.example",
+            source_menu_url="https://velasian.example/current-menu",
+            restaurant_cuisine_tags="Asian, Thai, Vegetarian",
+            restaurant_phone="317-555-0199",
+            restaurant_address="2 Main St, Indianapolis, IN",
+            restaurant_hours_text="Daily 11-8",
+            restaurant_current_status="Open now",
+            restaurant_promotions="Happy hour rolls",
+            restaurant_online_payment_available="false",
+            restaurant_delivery_available="true",
+            menu_section="Starters",
+            menu_item_name="Spring Roll",
+            menu_price="$6.49",
+            menu_description="Updated crispy veggie rolls.",
+        ),
+    )
+    store = menu_store_service.load_menu_store()
+    restaurant = menu_store_service.restaurant_for(store, restaurant_id)
+    menu = menu_store_service.find_menu(store, menu_id)
+    item = menu_store_service.find_menu_item(store, item_id)
+    saved = recipe_edit_service.load_recipe_output(url)
+    loaded = result["recipe"]
+
+    assert result["ok"] is True
+    assert restaurant["restaurant_name"] == "Vel Asian Kitchen"
+    assert restaurant["cuisine_tags"] == ["Asian", "Thai", "Vegetarian"]
+    assert restaurant["phone"] == "317-555-0199"
+    assert restaurant["full_address"] == "2 Main St, Indianapolis, IN"
+    assert restaurant["hours_text"] == "Daily 11-8"
+    assert restaurant["current_status"] == "Open now"
+    assert restaurant["online_payment_available"] is False
+    assert restaurant["delivery_available"] is True
+    assert menu["source_url"] == "https://velasian.example/current-menu"
+    assert item["menu_section"] == "Starters"
+    assert item["menu_price"] == "$6.49"
+    assert item["menu_description"] == "Updated crispy veggie rolls."
+    assert saved["source_menu_url"] == "https://velasian.example/current-menu"
+    assert saved["menu_price"] == "$6.49"
+    assert saved["menu_description"] == "Updated crispy veggie rolls."
+    assert loaded["restaurant_name"] == "Vel Asian Kitchen"
+    assert loaded["menu_price"] == "$6.49"
+
+
+def test_generated_recipe_pdf_includes_menu_metadata_for_menu_recipes(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    url, _detail = seed_menu_derived_recipe()
+    captured = {}
+
+    def fake_write_recipe_page_pdf(recipe_url, html_text, html_path, pdf_path):
+        captured["html"] = html_text
+        path = Path(pdf_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"%PDF-1.4\n%%EOF\n")
+        return path
+
+    monkeypatch.setattr(recipe_edit_service, "write_recipe_page_pdf", fake_write_recipe_page_pdf)
+
+    result = recipe_edit_service.generate_editable_recipe_pdf_file(url)
+    html = captured["html"]
+
+    assert result["ok"] is True
+    assert "Restaurant / Menu Source Info" in html
+    assert "Menu Item Details" in html
+    assert "Vel Asian Cuisine" in html
+    assert "https://velasian.example" in html
+    assert "https://velasian.example/menu" in html
+    assert "Kitchen Appetizers" in html
+    assert "$5.99" in html
+    assert "Two veggie golden crispy rolls." in html
+
+
+def test_normal_recipe_pdf_does_not_include_menu_metadata(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    url = "https://example.com/recipes/soup"
+    recipe_edit_service.save_recipe_output(url, {
+        "source_url": url,
+        "recipe_title": "Tomato Soup",
+        "ingredients": [{"ingredient": "tomato"}],
+        "instructions": [{"instruction": "Simmer."}],
+    })
+    captured = {}
+
+    def fake_write_recipe_page_pdf(recipe_url, html_text, html_path, pdf_path):
+        captured["html"] = html_text
+        path = Path(pdf_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"%PDF-1.4\n%%EOF\n")
+        return path
+
+    monkeypatch.setattr(recipe_edit_service, "write_recipe_page_pdf", fake_write_recipe_page_pdf)
+
+    result = recipe_edit_service.generate_editable_recipe_pdf_file(url)
+    html = captured["html"]
+
+    assert result["ok"] is True
+    assert "Restaurant / Menu Source Info" not in html
+    assert "Menu Item Details" not in html
+    assert "Tomato Soup" in html
