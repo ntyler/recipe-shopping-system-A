@@ -13114,6 +13114,25 @@ function loadRecipeEditorReturnSurface(state) {
     return loadLazySection(sectionName, { allowDuringAuthCollapse: true }).then(() => undefined);
 }
 
+function expandRecipeEditorReturnSurface(state) {
+    const sourceSurface = state && state.sourceSurface ? state.sourceSurface : "";
+    const collapseKey = {
+        "current-recipes": "recipe-url-log",
+        cookbooks: "cookbooks",
+    }[sourceSurface] || "";
+
+    if (collapseKey) {
+        const content = document.querySelector(`[data-collapse-content="${collapseKey}"]`);
+        if (content && content.classList.contains("collapsed")) {
+            toggleCardCollapse(collapseKey);
+        }
+    }
+
+    if (sourceSurface === "recipe-view" && typeof showView === "function") {
+        showView("recipe");
+    }
+}
+
 async function restoreRecipeEditPageReturnState() {
     if (recipeEditorStandalonePageIsActive() || !window.sessionStorage) {
         return;
@@ -13150,6 +13169,7 @@ async function restoreRecipeEditPageReturnState() {
     }
 
     await loadRecipeEditorReturnSurface(state);
+    expandRecipeEditorReturnSurface(state);
     await waitForNextPaint();
 
     const target = findRecipeEditorReturnTarget(state);
@@ -22762,7 +22782,6 @@ document.addEventListener("DOMContentLoaded", function () {
         ["initDeviceStaleReporting", initDeviceStaleReporting],
         ["consumeAuthCollapseAllRequest", consumeAuthCollapseAllRequest],
         ["restoreScroll", restoreScroll],
-        ["restoreRecipeEditPageReturnState", restoreRecipeEditPageReturnState],
         ["restoreScreenSettings", restoreScreenSettings],
         ["restoreCardCollapseState", restoreCardCollapseState],
         ["restoreHomeAddressHistoryCollapseState", restoreHomeAddressHistoryCollapseState],
@@ -22785,6 +22804,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ["bindStoreButtons", bindStoreButtons],
         ["bindSectionHeaderToggles", bindSectionHeaderToggles],
         ["initLazySections", initLazySections],
+        ["restoreRecipeEditPageReturnState", restoreRecipeEditPageReturnState],
     ].forEach(([name, callback]) => runStartupTask(name, callback));
 
     runIdleStartupTasks([
@@ -22835,10 +22855,8 @@ window.addEventListener("resize", invalidateStoreLocationMaps);
 window.addEventListener("resize", handleRecipeEditRowMenuScrollOrResize);
 window.addEventListener("resize", scheduleAddStoreStickyVisibilityUpdate);
 window.addEventListener("scroll", scheduleAddStoreStickyVisibilityUpdate, { passive: true });
-window.addEventListener("pageshow", event => {
-    if (event.persisted) {
-        restoreRecipeEditPageReturnState();
-    }
+window.addEventListener("pageshow", () => {
+    restoreRecipeEditPageReturnState();
 });
 
 async function startRecipeExtraction(event) {

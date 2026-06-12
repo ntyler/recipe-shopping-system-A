@@ -49,7 +49,14 @@ def test_recipe_editor_page_navigation_remembers_return_target():
     ]
     assert "triggerMenu.recipeEditAnchorButton" in script
     assert "restoreRecipeEditPageReturnState" in script
+    assert '["initLazySections", initLazySections]' in script
     assert '["restoreRecipeEditPageReturnState", restoreRecipeEditPageReturnState]' in script
+    assert script.index('["initLazySections", initLazySections]') < script.index(
+        '["restoreRecipeEditPageReturnState", restoreRecipeEditPageReturnState]'
+    )
+    assert "function expandRecipeEditorReturnSurface" in script
+    assert '"current-recipes": "recipe-url-log"' in script
+    assert "toggleCardCollapse(collapseKey);" in script
 
 
 def test_recipe_editor_modal_close_does_not_reload_current_page():
