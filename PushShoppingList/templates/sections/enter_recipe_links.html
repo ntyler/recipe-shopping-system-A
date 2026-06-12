@@ -34,6 +34,22 @@
             placeholder="https://www.forkinthekitchen.com/homemade-cheese-ravioli/&#10;https://www.forkinthekitchen.com/homemade-crispy-falafel/"></textarea>
     </form>
 
+    <form id="menuImportUrlPreviewForm"
+          method="POST"
+          action="{{ url_for('menu_bp.menu_import_preview_route') }}"
+          hidden>
+        <input type="hidden"
+               name="cookbook_id"
+               data-import-cookbook-id-field
+               value="{{ import_unclassified_cookbook.id }}">
+        <input type="hidden"
+               name="cookbook_name"
+               data-import-cookbook-name-field
+               value="{{ import_unclassified_cookbook.name }}">
+        <input type="hidden" name="source_type" value="menu_url">
+        <input type="hidden" name="menu_url" data-menu-import-url-field>
+    </form>
+
     <div class="recipe-import-cookbook-field recipe-edit-cookbook-field"
          data-import-cookbook-selector
          data-default-cookbook-id="{{ import_unclassified_cookbook.id }}"
@@ -133,12 +149,39 @@
             </button>
         </form>
 
+        <form id="menuMediaPreviewForm"
+              class="recipe-media-upload-form"
+              method="POST"
+              action="{{ url_for('menu_bp.menu_import_preview_route') }}"
+              enctype="multipart/form-data">
+            <input type="hidden"
+                   name="cookbook_id"
+                   data-import-cookbook-id-field
+                   value="{{ import_unclassified_cookbook.id }}">
+            <input type="hidden"
+                   name="cookbook_name"
+                   data-import-cookbook-name-field
+                   value="{{ import_unclassified_cookbook.name }}">
+            <input id="menuMediaPreviewInput"
+                   name="menu_media"
+                   type="file"
+                   accept="image/*,application/pdf,.pdf,.doc,.docx,.txt,.md"
+                   onchange="submitMenuMediaPreviewUpload(this)"
+                   hidden>
+        </form>
+
         <button class="extract-btn recipe-import-action-url-menu"
-                type="submit"
-                form="extractRecipeForm"
+                type="button"
                 name="extraction_mode"
                 value="menu_extract"
-                data-extraction-mode="menu_extract">Import Recipe URLs (Menu Extract)</button>
+                data-extraction-mode="menu_extract"
+                aria-label="Import Recipe URLs (Menu Extract)"
+                onclick="return submitMenuUrlPreviewFromEntry()">Import Menu URL</button>
+
+        <a class="recipe-media-upload-btn recipe-import-action-menu-builder"
+           href="{{ url_for('menu_bp.custom_menu_builder_route') }}">
+            Custom Restaurant Menu Builder
+        </a>
     </div>
     <div id="recipeMediaUploadStatus" class="recipe-media-upload-status" aria-live="polite"></div>
 </div>

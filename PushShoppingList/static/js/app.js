@@ -7531,11 +7531,62 @@ function normalizeRecipeImportMode(mode) {
 
 function openRecipeMediaUpload(importMode = "recipe") {
     recipeMediaImportMode = normalizeRecipeImportMode(importMode);
+    if (recipeMediaImportMode === "menu_extract") {
+        openMenuMediaPreviewUpload();
+        return;
+    }
     const input = document.getElementById("recipeMediaUploadInput");
 
     if (input) {
         input.click();
     }
+}
+
+function openMenuMediaPreviewUpload() {
+    const input = document.getElementById("menuMediaPreviewInput");
+
+    if (input) {
+        input.click();
+    }
+}
+
+function submitMenuMediaPreviewUpload(input) {
+    const form = document.getElementById("menuMediaPreviewForm");
+    const fileInput = input && input.files ? input : document.getElementById("menuMediaPreviewInput");
+    const destination = currentImportCookbookDestination();
+    syncImportCookbookHiddenInputs(destination);
+
+    if (!form || !fileInput || !fileInput.files || !fileInput.files.length) {
+        return false;
+    }
+
+    form.submit();
+    return false;
+}
+
+function submitMenuUrlPreviewFromEntry() {
+    const textarea = document.getElementById("recipeUrlsTextarea");
+    const form = document.getElementById("menuImportUrlPreviewForm");
+    const field = form ? form.querySelector("[data-menu-import-url-field]") : null;
+    const destination = currentImportCookbookDestination();
+    const urls = textarea
+        ? textarea.value.split(/\r?\n/).map(url => url.trim()).filter(Boolean)
+        : [];
+
+    if (!urls.length) {
+        alert("Paste at least one menu URL.");
+        return false;
+    }
+
+    if (!form || !field) {
+        alert("Menu import preview is not available.");
+        return false;
+    }
+
+    syncImportCookbookHiddenInputs(destination);
+    field.value = urls[0];
+    form.submit();
+    return false;
 }
 
 function getRecipeMediaUploadInput() {

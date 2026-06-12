@@ -637,6 +637,8 @@ def menu_recipe_progress_payload(recipe_result, recipe_url=""):
         "recipe_url": recipe_url,
         "recipe_name": recipe_name,
         "menu_section": menu_section,
+        "menu_price": str(recipe_result.get("menu_price") or "").strip(),
+        "menu_description": description,
         "extracted_description": description,
         "checklist": checklist,
         "running": running,

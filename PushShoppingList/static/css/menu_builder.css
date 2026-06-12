@@ -1,0 +1,731 @@
+.menu-builder-page {
+    background: #121212;
+    color: #f4f4f5;
+}
+
+.menu-workspace,
+.restaurant-menu-page {
+    width: min(1180px, calc(100vw - 28px));
+    margin: 0 auto 40px;
+}
+
+.menu-preview-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    margin: 20px 0 16px;
+}
+
+.menu-preview-header h1 {
+    margin: 6px 0 0;
+    color: #fff7ed;
+    font-size: 28px;
+    line-height: 1.12;
+    text-align: left;
+}
+
+.menu-back-link,
+.menu-action-link,
+.menu-secondary-link,
+.restaurant-menu-actions a,
+.menu-pdf-log-actions a,
+.cookbook-restaurant-menu-links a {
+    color: #fed7aa;
+    font-weight: 800;
+    text-decoration: none;
+}
+
+.menu-back-link:hover,
+.menu-action-link:hover,
+.menu-secondary-link:hover,
+.restaurant-menu-actions a:hover,
+.menu-pdf-log-actions a:hover,
+.cookbook-restaurant-menu-links a:hover {
+    color: #ffedd5;
+    text-decoration: underline;
+}
+
+.menu-alert,
+.menu-inline-status {
+    color: #fecaca;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.menu-alert {
+    margin: 0 0 14px;
+    padding: 12px 14px;
+    border: 1px solid #7f1d1d;
+    border-radius: 8px;
+    background: #2a1111;
+}
+
+.menu-panel,
+.menu-preview-summary,
+.restaurant-menu-toolbar,
+.menu-pdf-log-panel {
+    border: 1px solid #343434;
+    border-radius: 8px;
+    background: #1b1b1b;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+}
+
+.menu-panel {
+    padding: 18px;
+    margin-bottom: 16px;
+}
+
+.menu-panel h2,
+.restaurant-menu-toolbar h2,
+.menu-pdf-log-panel h2 {
+    margin: 0;
+    color: #fff7ed;
+    font-size: 21px;
+    text-align: left;
+}
+
+.menu-panel-header,
+.restaurant-menu-toolbar {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.menu-preview-actions,
+.restaurant-menu-toolbar-actions,
+.restaurant-menu-actions {
+    display: flex;
+    align-items: stretch;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.menu-preview-actions form,
+.restaurant-menu-toolbar-actions form,
+.restaurant-menu-actions form,
+.menu-pdf-log-actions form {
+    margin: 0;
+}
+
+.menu-primary-btn,
+.menu-secondary-btn,
+.menu-secondary-link,
+.menu-action-link,
+.restaurant-menu-actions button,
+.restaurant-menu-actions a,
+.restaurant-menu-toolbar-actions button,
+.menu-pdf-log-actions button,
+.menu-pdf-log-actions a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    min-width: 112px;
+    min-height: 36px;
+    margin: 0;
+    padding: 8px 12px;
+    border: 1px solid #b45309;
+    border-radius: 7px;
+    background: #c2410c;
+    color: #fff7ed;
+    font-size: 13px;
+    font-weight: 900;
+    line-height: 1.1;
+    text-decoration: none;
+    box-sizing: border-box;
+}
+
+.menu-primary-btn {
+    min-height: 44px;
+    background: #15803d;
+    border-color: #22c55e;
+}
+
+.menu-secondary-btn,
+.menu-secondary-link,
+.menu-action-link,
+.restaurant-menu-actions a,
+.restaurant-menu-toolbar-actions button,
+.menu-pdf-log-actions a {
+    background: #2b2b2b;
+    border-color: #57534e;
+}
+
+.menu-pdf-log-actions button.danger {
+    background: #7f1d1d;
+    border-color: #991b1b;
+}
+
+.menu-preview-summary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    padding: 14px;
+    margin-bottom: 16px;
+}
+
+.menu-preview-summary div {
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid #2f2f2f;
+    border-radius: 8px;
+    background: #111;
+}
+
+.menu-preview-summary span,
+.menu-builder-grid span {
+    display: block;
+    margin-bottom: 5px;
+    color: #b8b8b8;
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.menu-preview-summary strong,
+.menu-preview-summary a {
+    color: #f9fafb;
+    font-size: 13px;
+    font-weight: 850;
+    overflow-wrap: anywhere;
+}
+
+.menu-preview-section {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid #343434;
+}
+
+.menu-preview-section h3,
+.restaurant-menu-section h2 {
+    margin: 0 0 6px;
+    color: #fb923c;
+    font-size: 22px;
+    text-align: left;
+}
+
+.menu-preview-section p,
+.restaurant-section-description,
+.restaurant-menu-toolbar p {
+    margin: 0;
+    color: #cbd5e1;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.menu-preview-item-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.menu-preview-item {
+    display: flex;
+    gap: 10px;
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid #343434;
+    border-radius: 8px;
+    background: #111;
+    cursor: pointer;
+}
+
+.menu-preview-item input,
+.restaurant-menu-item-select input,
+.menu-progress-checks input {
+    flex: 0 0 auto;
+    margin-top: 2px;
+    transform: scale(1.05);
+}
+
+.menu-preview-item-main {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+}
+
+.menu-preview-item-topline,
+.restaurant-menu-item-title {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
+}
+
+.menu-preview-item-topline strong,
+.restaurant-menu-item-title h3 {
+    margin: 0;
+    color: #f9fafb;
+    font-size: 16px;
+    overflow-wrap: anywhere;
+}
+
+.menu-preview-item-topline span,
+.restaurant-menu-item-title strong,
+.menu-progress-card-header strong {
+    color: #fdba74;
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+.menu-preview-item small {
+    color: #9ca3af;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.menu-preview-description,
+.restaurant-menu-item p,
+.menu-progress-description {
+    color: #d1d5db;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.menu-sticky-actions {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    justify-content: flex-end;
+    padding: 12px 0 0;
+    background: linear-gradient(180deg, rgba(27, 27, 27, 0), #1b1b1b 28%);
+}
+
+.restaurant-menu-hero {
+    overflow: hidden;
+    margin: 18px 0 16px;
+    border: 1px solid #3a2a23;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #24130d 0%, #151515 52%, #27150f 100%);
+}
+
+.restaurant-menu-actions {
+    justify-content: flex-start;
+    padding: 12px;
+    border-bottom: 1px solid rgba(251, 146, 60, 0.24);
+    background: rgba(0, 0, 0, 0.18);
+}
+
+.restaurant-menu-hero-main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+    gap: 18px;
+    padding: 26px;
+    align-items: start;
+}
+
+.restaurant-menu-hero h1 {
+    margin: 0;
+    color: #fff7ed;
+    font-size: 42px;
+    line-height: 1;
+    text-align: left;
+}
+
+.restaurant-menu-hero p {
+    max-width: 640px;
+    margin: 10px 0 0;
+    color: #fed7aa;
+    font-size: 16px;
+    line-height: 1.4;
+}
+
+.menu-disclosure {
+    display: inline-flex;
+    max-width: 680px;
+    margin-top: 14px;
+    padding: 8px 10px;
+    border: 1px solid #a16207;
+    border-radius: 7px;
+    background: rgba(113, 63, 18, 0.35);
+    color: #fde68a;
+    font-size: 13px;
+    font-weight: 850;
+    line-height: 1.35;
+}
+
+.restaurant-info-card {
+    border: 1px solid rgba(253, 186, 116, 0.26);
+    border-radius: 8px;
+    background: rgba(17, 17, 17, 0.78);
+    padding: 14px;
+}
+
+.restaurant-info-card dl {
+    display: grid;
+    gap: 9px;
+    margin: 0;
+}
+
+.restaurant-info-card div {
+    display: grid;
+    grid-template-columns: 112px minmax(0, 1fr);
+    gap: 10px;
+}
+
+.restaurant-info-card dt {
+    color: #fdba74;
+    font-size: 12px;
+    font-weight: 900;
+}
+
+.restaurant-info-card dd {
+    margin: 0;
+    color: #f8fafc;
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}
+
+.restaurant-section-nav {
+    display: flex;
+    gap: 9px;
+    flex-wrap: wrap;
+    margin: 0 0 16px;
+    padding: 10px;
+    border: 1px solid #3a2a23;
+    border-radius: 8px;
+    background: #1b1b1b;
+}
+
+.restaurant-section-nav a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: #cf3a24;
+    color: #fff7ed;
+    font-size: 14px;
+    font-weight: 900;
+    text-decoration: none;
+}
+
+.restaurant-menu-toolbar {
+    padding: 16px;
+    margin-bottom: 12px;
+}
+
+.restaurant-menu-section {
+    margin-bottom: 18px;
+    padding: 18px;
+    border: 1px solid #2f2f2f;
+    border-radius: 8px;
+    background: #1b1b1b;
+}
+
+.restaurant-menu-item-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 18px;
+    margin-top: 10px;
+}
+
+.restaurant-menu-item {
+    position: relative;
+    min-width: 0;
+    padding: 13px 0 14px;
+    border-top: 1px solid #343434;
+}
+
+.restaurant-menu-item-select {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 7px;
+    color: #a7f3d0;
+    font-size: 12px;
+    font-weight: 850;
+}
+
+.restaurant-menu-badges {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 9px;
+}
+
+.restaurant-menu-badges span {
+    padding: 3px 7px;
+    border: 1px solid #7c2d12;
+    border-radius: 999px;
+    background: rgba(154, 52, 18, 0.28);
+    color: #fed7aa;
+    font-size: 11px;
+    font-weight: 900;
+}
+
+.menu-builder-form {
+    display: grid;
+    gap: 14px;
+}
+
+.menu-builder-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.menu-builder-grid label,
+.menu-builder-toggle-grid label,
+.menu-builder-public {
+    display: grid;
+    gap: 6px;
+    color: #e5e7eb;
+    font-size: 13px;
+    font-weight: 850;
+}
+
+.menu-builder-grid input,
+.menu-builder-grid select,
+.menu-builder-grid textarea {
+    width: 100%;
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid #4b5563;
+    border-radius: 8px;
+    background: #111;
+    color: #f8fafc;
+    font-size: 15px;
+    box-sizing: border-box;
+}
+
+.menu-builder-notes {
+    grid-column: 1 / -1;
+}
+
+.menu-builder-toggle-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin: 12px 0 14px;
+}
+
+.menu-builder-toggle-grid label,
+.menu-builder-public {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+    border: 1px solid #343434;
+    border-radius: 8px;
+    background: #111;
+}
+
+.menu-progress-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.menu-progress-card {
+    padding: 14px;
+    border: 1px solid #343434;
+    border-radius: 8px;
+    background: #111;
+}
+
+.menu-progress-card-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.menu-progress-card h3,
+.menu-progress-card h4 {
+    margin: 0;
+    color: #f8fafc;
+    text-align: left;
+}
+
+.menu-progress-card h3 {
+    font-size: 17px;
+}
+
+.menu-progress-card h4 {
+    margin-top: 12px;
+    color: #fdba74;
+    font-size: 12px;
+    text-transform: uppercase;
+}
+
+.menu-progress-card-header p {
+    margin: 4px 0 0;
+    color: #9ca3af;
+    font-size: 12px;
+}
+
+.menu-progress-checks {
+    display: grid;
+    gap: 7px;
+}
+
+.menu-progress-checks label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #e5e7eb;
+    font-size: 13px;
+}
+
+.menu-progress-checks span {
+    color: #9ca3af;
+    font-size: 12px;
+}
+
+.menu-pdf-log-panel {
+    padding: 16px;
+    margin-bottom: 32px;
+}
+
+.cookbook-menu-pdf-log-panel {
+    margin-top: 14px;
+    border-top: 1px solid #333;
+    padding-top: 12px;
+}
+
+.cookbook-menu-pdf-log-panel summary {
+    cursor: pointer;
+    color: #fed7aa;
+    font-weight: 900;
+}
+
+.cookbook-restaurant-menu-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 10px 0;
+}
+
+.cookbook-restaurant-menu-links a {
+    display: inline-flex;
+    min-height: 30px;
+    align-items: center;
+    padding: 5px 9px;
+    border: 1px solid #7c2d12;
+    border-radius: 999px;
+    background: rgba(154, 52, 18, 0.22);
+}
+
+.menu-pdf-log-table-wrap {
+    overflow-x: auto;
+    margin-top: 10px;
+}
+
+.menu-pdf-log-table {
+    width: 100%;
+    min-width: 1180px;
+    border-collapse: collapse;
+    color: #e5e7eb;
+    font-size: 12px;
+}
+
+.menu-pdf-log-table th,
+.menu-pdf-log-table td {
+    border: 1px solid #343434;
+    padding: 8px;
+    text-align: left;
+    vertical-align: top;
+}
+
+.menu-pdf-log-table th {
+    background: #111;
+    color: #fdba74;
+    font-size: 11px;
+    text-transform: uppercase;
+}
+
+.menu-pdf-log-table code {
+    color: #d9f99d;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.menu-pdf-status {
+    display: inline-flex;
+    padding: 3px 7px;
+    border-radius: 999px;
+    background: #374151;
+    color: #f9fafb;
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.menu-pdf-status-uploaded {
+    background: #166534;
+}
+
+.menu-pdf-status-failed {
+    background: #7f1d1d;
+}
+
+.menu-pdf-log-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-width: 220px;
+}
+
+.menu-pdf-log-empty {
+    padding: 12px;
+    border: 1px dashed #4b5563;
+    border-radius: 8px;
+    color: #cbd5e1;
+    text-align: center;
+}
+
+@media (max-width: 780px) {
+    .menu-preview-header,
+    .restaurant-menu-hero-main,
+    .restaurant-menu-toolbar {
+        grid-template-columns: 1fr;
+    }
+
+    .menu-preview-summary,
+    .menu-preview-item-grid,
+    .restaurant-menu-item-grid,
+    .menu-builder-grid,
+    .menu-builder-toggle-grid,
+    .menu-progress-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .menu-preview-actions,
+    .restaurant-menu-toolbar-actions,
+    .restaurant-menu-actions {
+        justify-content: stretch;
+        width: 100%;
+    }
+
+    .menu-primary-btn,
+    .menu-secondary-btn,
+    .menu-secondary-link,
+    .menu-action-link,
+    .restaurant-menu-actions button,
+    .restaurant-menu-actions a,
+    .restaurant-menu-toolbar-actions button {
+        width: 100%;
+    }
+
+    .restaurant-menu-hero-main {
+        display: grid;
+        padding: 18px;
+    }
+
+    .restaurant-menu-hero h1 {
+        font-size: 32px;
+    }
+
+    .restaurant-info-card div {
+        grid-template-columns: 1fr;
+        gap: 3px;
+    }
+}

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generating Menu Recipes</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=app_css_version) }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/menu_builder.css', v=menu_builder_css_version) }}">
+</head>
+<body class="menu-builder-page">
+{% set menu = menu_detail.menu %}
+{% set restaurant = menu_detail.restaurant %}
+<main class="menu-workspace">
+    <section class="menu-preview-header">
+        <div>
+            <a class="menu-back-link" href="{{ url_for('menu_bp.menu_view_route', menu_id=menu.id) }}">Back to Menu</a>
+            <h1>Generating Menu Recipes</h1>
+        </div>
+    </section>
+
+    <section class="menu-preview-summary">
+        <div><span>ChatGPT/OpenAI model</span><strong>{{ model_used }}{% if model_source %} ({{ model_source }}){% endif %}</strong></div>
+        <div><span>Source type</span><strong>{{ menu.source_type }}</strong></div>
+        <div><span>Restaurant</span><strong>{{ restaurant.restaurant_name or "Restaurant Menu" }}</strong></div>
+        <div>
+            <span>Restaurant website</span>
+            {% if restaurant.restaurant_website_url %}
+                <a href="{{ restaurant.restaurant_website_url }}" target="_blank" rel="noopener noreferrer">{{ restaurant.restaurant_website_url }}</a>
+            {% else %}
+                <strong>Not found</strong>
+            {% endif %}
+        </div>
+        <div><span>Selected recipe count</span><strong>{{ selected_count }}</strong></div>
+        <div><span>Overall progress count</span><strong>{{ generation_result.committed_count or 0 }} / {{ selected_count }}</strong></div>
+    </section>
+
+    {% if generation_result.error %}
+        <div class="menu-alert" role="alert">{{ generation_result.error }}</div>
+    {% endif %}
+
+    <section class="menu-panel">
+        <h2>Completion Checklist</h2>
+        <div class="menu-progress-grid">
+            {% for item in progress_items %}
+                <article class="menu-progress-card" data-menu-progress-card data-recipe-url="{{ item.recipe_url }}">
+                    <div class="menu-progress-card-header">
+                        <div>
+                            <h3>{{ item.recipe_name }}</h3>
+                            <p>{{ item.menu_section or "Menu Item" }}</p>
+                        </div>
+                        <strong>{{ item.menu_price or "No price found" }}</strong>
+                    </div>
+                    <p class="menu-progress-description">{{ item.menu_description or "No description found" }}</p>
+
+                    <div class="menu-progress-checks">
+                        <h4>Recipe Generation</h4>
+                        <label><input type="checkbox" disabled {% if item.checklist.recipe_extracted %}checked{% endif %}> Recipe Extracted</label>
+                        <h4>Recipe Content</h4>
+                        <label><input type="checkbox" disabled {% if item.checklist.recipe_information %}checked{% endif %}> Recipe Information</label>
+                        <label><input type="checkbox" disabled {% if item.checklist.ingredients %}checked{% endif %}> Ingredients</label>
+                        <label><input type="checkbox" disabled {% if item.checklist.equipment %}checked{% endif %}> Equipment</label>
+                        <label><input type="checkbox" disabled {% if item.checklist.instructions %}checked{% endif %}> Instructions</label>
+                        <label><input type="checkbox" disabled {% if item.checklist.nutrition %}checked{% endif %}> Nutrition</label>
+                        <h4>Review / Estimates</h4>
+                        <label><input type="checkbox" disabled {% if item.checklist.food_review_applied %}checked{% endif %}> Food Review Applied <span>{{ item.messages.food_review_applied }}</span></label>
+                        <label data-estimate-row><input type="checkbox" disabled {% if item.checklist.estimate_per_serving %}checked{% endif %}> Estimate per serving basis <span>{{ item.messages.estimate_per_serving }}</span></label>
+                    </div>
+                    {% if item.checklist.recipe_extracted %}
+                        <button type="button"
+                                class="menu-secondary-btn"
+                                data-estimate-menu-recipe
+                                data-recipe-url="{{ item.recipe_url }}"
+                                data-recipe-id="{{ item.recipe_id or item.recipe_url }}"
+                                onclick="return runMenuProgressEstimate(this)">
+                            Run Estimate per serving basis
+                        </button>
+                    {% endif %}
+                </article>
+            {% endfor %}
+        </div>
+    </section>
+</main>
+
+<script>
+async function runMenuProgressEstimate(button) {
+    const recipeUrl = button.dataset.recipeUrl || "";
+    const recipeId = button.dataset.recipeId || "";
+    const card = button.closest("[data-menu-progress-card]");
+    const row = card ? card.querySelector("[data-estimate-row]") : null;
+    const checkbox = row ? row.querySelector("input") : null;
+    const label = row ? row.querySelector("span") : null;
+    button.disabled = true;
+    if (label) {
+        label.textContent = "Updating...";
+    }
+    try {
+        const response = await fetch(`/menu-import/recipe/${encodeURIComponent(recipeId)}/estimate`, {
+            method: "POST",
+            headers: {"Content-Type": "application/json", "X-Requested-With": "fetch"},
+            body: JSON.stringify({recipe_url: recipeUrl, recipe_id: recipeId})
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) {
+            throw new Error(data.error || "Unable to run estimate.");
+        }
+        if (checkbox) {
+            checkbox.checked = true;
+        }
+        if (label) {
+            label.textContent = data.already_complete ? "Already complete" : "Complete";
+        }
+    } catch (err) {
+        if (label) {
+            label.textContent = err.message || "Unable to run estimate.";
+        }
+    } finally {
+        button.disabled = false;
+    }
+    return false;
+}
+</script>
+</body>
+</html>

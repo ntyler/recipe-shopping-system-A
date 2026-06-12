@@ -12,6 +12,8 @@ REQUIRED_ENV_VARS = [
     "R2_PUBLIC_BASE_URL",
 ]
 PDF_OBJECT_PREFIX = "recipe-pdfs/"
+MENU_PDF_OBJECT_PREFIX = "menu-pdfs/"
+ALLOWED_PDF_OBJECT_PREFIXES = (PDF_OBJECT_PREFIX, MENU_PDF_OBJECT_PREFIX)
 
 
 class CloudflareR2StorageError(Exception):
@@ -86,24 +88,38 @@ def validate_pdf_path(local_pdf_path):
     return path, ""
 
 
-def object_key_for_pdf(local_pdf_path):
+def normalize_object_prefix(object_prefix=None):
+    prefix = str(object_prefix or PDF_OBJECT_PREFIX).strip().replace("\\", "/")
+    if not prefix:
+        prefix = PDF_OBJECT_PREFIX
+    if not prefix.endswith("/"):
+        prefix = f"{prefix}/"
+    if prefix.startswith("/") or ".." in prefix.split("/"):
+        raise CloudflareR2StorageError("Invalid Cloudflare R2 object prefix.")
+    return prefix
+
+
+def object_key_for_pdf(local_pdf_path, object_prefix=PDF_OBJECT_PREFIX):
     path = Path(os.fspath(local_pdf_path))
     filename = Path(path.name).name
 
     if not filename or Path(filename).suffix.lower() != ".pdf":
         raise CloudflareR2StorageError("Only PDF files can be uploaded.")
 
-    return f"{PDF_OBJECT_PREFIX}{filename}"
+    return f"{normalize_object_prefix(object_prefix)}{filename}"
 
 
-def validate_object_key(object_key):
+def validate_object_key(object_key, allowed_prefixes=ALLOWED_PDF_OBJECT_PREFIXES):
     key = str(object_key or "").strip().replace("\\", "/")
 
     if not key or key.startswith("/") or ".." in key.split("/"):
         raise CloudflareR2StorageError("Invalid Cloudflare R2 object key.")
 
-    if not key.startswith(PDF_OBJECT_PREFIX):
-        raise CloudflareR2StorageError(f"Object key must start with {PDF_OBJECT_PREFIX}.")
+    allowed_prefixes = tuple(normalize_object_prefix(prefix) for prefix in (allowed_prefixes or (PDF_OBJECT_PREFIX,)))
+    if not any(key.startswith(prefix) for prefix in allowed_prefixes):
+        raise CloudflareR2StorageError(
+            f"Object key must start with one of: {', '.join(allowed_prefixes)}."
+        )
 
     if not key.lower().endswith(".pdf"):
         raise CloudflareR2StorageError("Only PDF objects can be managed.")
@@ -141,7 +157,7 @@ def object_exists(object_key):
         raise CloudflareR2StorageError(f"Unable to check Cloudflare R2 object: {exc}") from exc
 
 
-def upload_pdf(local_pdf_path):
+def upload_pdf(local_pdf_path, object_prefix=PDF_OBJECT_PREFIX):
     path, validation_error = validate_pdf_path(local_pdf_path)
     if validation_error:
         return {
@@ -151,7 +167,7 @@ def upload_pdf(local_pdf_path):
         }
 
     try:
-        object_key = object_key_for_pdf(path)
+        object_key = object_key_for_pdf(path, object_prefix=object_prefix)
         public_url = get_public_url(object_key)
 
         if object_exists(object_key):

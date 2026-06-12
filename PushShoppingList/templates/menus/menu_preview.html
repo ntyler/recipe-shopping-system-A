@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Review Menu Items Before Recipe Generation</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=app_css_version) }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/menu_builder.css', v=menu_builder_css_version) }}">
+</head>
+<body class="menu-builder-page">
+<main class="menu-workspace">
+    <section class="menu-preview-header">
+        <div>
+            <a class="menu-back-link" href="{{ url_for('main_bp.index') }}#recipeUrlsTextarea">Back to AI Pantry</a>
+            <h1>Review Menu Items Before Recipe Generation</h1>
+        </div>
+        {% if menu_detail and menu_detail.menu %}
+            <a class="menu-action-link" href="{{ url_for('menu_bp.menu_view_route', menu_id=menu_detail.menu.id) }}">View Menu</a>
+        {% endif %}
+    </section>
+
+    {% if validation_message %}
+        <div class="menu-alert" role="alert">{{ validation_message }}</div>
+    {% endif %}
+
+    {% if not menu_detail or not menu_detail.menu %}
+        <section class="menu-panel">
+            <h2>Menu Preview</h2>
+            <p>{{ fact_result.error or "No menu preview is available." }}</p>
+        </section>
+    {% else %}
+        {% set menu = menu_detail.menu %}
+        {% set restaurant = menu_detail.restaurant %}
+        <section class="menu-preview-summary">
+            <div>
+                <span>Source type</span>
+                <strong>{{ menu.source_input_type or menu.source_type }}</strong>
+            </div>
+            <div>
+                <span>Source</span>
+                {% if menu.source_url %}
+                    <a href="{{ menu.source_url }}" target="_blank" rel="noopener noreferrer">{{ menu.source_url }}</a>
+                {% else %}
+                    <strong>{{ menu.source_name or menu.source_uploaded_file_path or "Uploaded menu" }}</strong>
+                {% endif %}
+            </div>
+            <div>
+                <span>Restaurant</span>
+                <strong>{{ restaurant.restaurant_name or "Restaurant Menu" }}</strong>
+            </div>
+            <div>
+                <span>Restaurant website</span>
+                {% if restaurant.restaurant_website_url %}
+                    <a href="{{ restaurant.restaurant_website_url }}" target="_blank" rel="noopener noreferrer">{{ restaurant.restaurant_website_url }}</a>
+                {% else %}
+                    <strong>Not found</strong>
+                {% endif %}
+            </div>
+            <div>
+                <span>Cuisine tags</span>
+                <strong>{{ restaurant.cuisine_tags|join(", ") if restaurant.cuisine_tags else "Not found" }}</strong>
+            </div>
+            <div>
+                <span>Sections found</span>
+                <strong>{{ menu_detail.sections|length }}</strong>
+            </div>
+            <div>
+                <span>Items found</span>
+                <strong>{{ menu_detail.items|length }}</strong>
+            </div>
+            <div>
+                <span>Recipe model</span>
+                <strong>{{ fact_result.recipe_generation_model or "gpt-5.5" }}</strong>
+            </div>
+        </section>
+
+        <section class="menu-panel">
+            <div class="menu-panel-header">
+                <h2>{{ menu.menu_title or "Restaurant Menu" }}</h2>
+                <div class="menu-preview-actions">
+                    <button type="button" class="menu-secondary-btn" onclick="setMenuPreviewSelection(true)">Select All</button>
+                    <button type="button" class="menu-secondary-btn" onclick="setMenuPreviewSelection(false)">Unselect All</button>
+                    <a class="menu-secondary-link" href="{{ url_for('menu_bp.menu_view_route', menu_id=menu.id) }}">Create Restaurant Menu Page</a>
+                    <form method="POST" action="{{ url_for('menu_bp.export_menu_pdf_route', menu_id=menu.id) }}">
+                        <button type="submit" class="menu-secondary-btn">Export Menu PDF</button>
+                    </form>
+                </div>
+            </div>
+
+            <form id="menuPreviewGenerateForm"
+                  method="POST"
+                  action="{{ url_for('menu_bp.menu_import_generate_route') }}"
+                  onsubmit="return validateMenuPreviewSelection()">
+                <input type="hidden" name="menu_id" value="{{ menu.id }}">
+                <div id="menuPreviewValidation" class="menu-inline-status" aria-live="polite"></div>
+
+                {% for section in menu_detail.sections %}
+                    <section class="menu-preview-section">
+                        <h3>{{ section.section_name }}</h3>
+                        {% if section.section_description %}
+                            <p>{{ section.section_description }}</p>
+                        {% endif %}
+                        <div class="menu-preview-item-grid">
+                            {% for item in section.items %}
+                                <label class="menu-preview-item">
+                                    <input type="checkbox"
+                                           name="menu_item_ids"
+                                           value="{{ item.id }}"
+                                           checked
+                                           data-menu-preview-checkbox>
+                                    <span class="menu-preview-item-main">
+                                        <span class="menu-preview-item-topline">
+                                            <strong>{{ item.item_name }}</strong>
+                                            <span>{{ item.menu_price or "No price found" }}</span>
+                                        </span>
+                                        <small>{{ section.section_name }}</small>
+                                        <span class="menu-preview-description">
+                                            {{ item.menu_description or "No description found" }}
+                                        </span>
+                                    </span>
+                                </label>
+                            {% endfor %}
+                        </div>
+                    </section>
+                {% endfor %}
+
+                <div class="menu-sticky-actions">
+                    <button type="submit" class="menu-primary-btn">Generate Selected Recipes</button>
+                </div>
+            </form>
+        </section>
+    {% endif %}
+</main>
+
+<script>
+function setMenuPreviewSelection(checked) {
+    document.querySelectorAll("[data-menu-preview-checkbox]").forEach((box) => {
+        box.checked = Boolean(checked);
+    });
+}
+
+function validateMenuPreviewSelection() {
+    const checked = document.querySelectorAll("[data-menu-preview-checkbox]:checked");
+    const status = document.getElementById("menuPreviewValidation");
+    if (!checked.length) {
+        if (status) {
+            status.textContent = "Select at least one menu item.";
+        }
+        return false;
+    }
+    if (status) {
+        status.textContent = "";
+    }
+    return true;
+}
+</script>
+</body>
+</html>

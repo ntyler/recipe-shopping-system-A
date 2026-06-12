@@ -604,6 +604,7 @@ body {
         .recipe-import-actions .extract-btn,
         .recipe-import-actions .recipe-media-upload-btn {
             margin-top: 0;
+            width: 100%;
             min-height: 52px;
             height: 100%;
             display: flex;
@@ -612,12 +613,19 @@ body {
             line-height: 1.15;
             white-space: normal;
             word-break: normal;
+            color: #fff;
+            text-decoration: none;
+            box-sizing: border-box;
         }
 
         .recipe-import-action-url { order: 1; }
         .recipe-import-action-upload { order: 2; }
         .recipe-import-action-url-menu { order: 3; }
         .recipe-import-action-upload-menu { order: 4; }
+        .recipe-import-action-menu-builder {
+            order: 5;
+            background: #a34716;
+        }
 
         .pdf-share-card {
             border: 0;

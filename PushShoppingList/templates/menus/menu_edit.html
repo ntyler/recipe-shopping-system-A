@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Edit Menu</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=app_css_version) }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/menu_builder.css', v=menu_builder_css_version) }}">
+</head>
+<body class="menu-builder-page">
+{% set menu = menu_detail.menu %}
+{% set restaurant = menu_detail.restaurant %}
+<main class="menu-workspace">
+    <section class="menu-preview-header">
+        <div>
+            <a class="menu-back-link" href="{{ url_for('menu_bp.menu_view_route', menu_id=menu.id) }}">Back to Menu</a>
+            <h1>Edit Menu</h1>
+        </div>
+    </section>
+
+    {% if error %}
+        <div class="menu-alert" role="alert">{{ error }}</div>
+    {% endif %}
+
+    <form class="menu-builder-form" method="POST" action="{{ url_for('menu_bp.menu_edit_route', menu_id=menu.id) }}">
+        <section class="menu-panel">
+            <h2>Restaurant</h2>
+            <div class="menu-builder-grid">
+                <label><span>Restaurant name</span><input name="restaurant_name" value="{{ restaurant.restaurant_name or '' }}"></label>
+                <label><span>Website</span><input name="restaurant_website_url" value="{{ restaurant.restaurant_website_url or '' }}"></label>
+                <label><span>Phone</span><input name="phone" value="{{ restaurant.phone or '' }}"></label>
+                <label><span>Address</span><input name="full_address" value="{{ restaurant.full_address or '' }}"></label>
+                <label><span>Hours</span><input name="hours_text" value="{{ restaurant.hours_text or '' }}"></label>
+                <label><span>Status</span><input name="current_status" value="{{ restaurant.current_status or '' }}"></label>
+                <label class="menu-builder-notes"><span>Rewards / promotions</span><textarea name="rewards_text" rows="3">{{ restaurant.rewards_text or '' }}</textarea></label>
+            </div>
+        </section>
+
+        <section class="menu-panel">
+            <h2>Menu</h2>
+            <div class="menu-builder-grid">
+                <label><span>Menu title</span><input name="menu_title" value="{{ menu.menu_title or '' }}" required></label>
+                <label><span>Menu subtitle</span><input name="menu_subtitle" value="{{ menu.menu_subtitle or '' }}"></label>
+                <label><span>Theme</span><input name="menu_theme" value="{{ menu.menu_theme or '' }}"></label>
+                <label><span>Style</span><input name="menu_style" value="{{ menu.menu_style or '' }}"></label>
+                <label class="menu-builder-notes"><span>Menu description</span><textarea name="menu_description" rows="4">{{ menu.menu_description or '' }}</textarea></label>
+                <label class="menu-builder-public"><input type="checkbox" name="is_public" value="1" {% if menu.is_public %}checked{% endif %}> Public menu page</label>
+            </div>
+            <button type="submit" class="menu-primary-btn">Save Menu</button>
+        </section>
+    </form>
+</main>
+</body>
+</html>

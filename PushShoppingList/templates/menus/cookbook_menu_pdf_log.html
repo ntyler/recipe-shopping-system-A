@@ -1,0 +1,79 @@
+<div class="cookbook-menu-pdf-log">
+    {% if menu_pdf_logs %}
+        <div class="menu-pdf-log-table-wrap">
+            <table class="menu-pdf-log-table">
+                <thead>
+                    <tr>
+                        <th>Generated At</th>
+                        <th>Restaurant</th>
+                        <th>Menu Title</th>
+                        <th>Source Type</th>
+                        <th>PDF Title</th>
+                        <th>Local PDF Path</th>
+                        <th>Cloudflare PDF Path</th>
+                        <th>Cloudflare PDF URL</th>
+                        <th>Status</th>
+                        <th>File Size</th>
+                        <th>Page Count</th>
+                        <th>Model Used</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in menu_pdf_logs %}
+                        <tr>
+                            <td>{{ log.generated_at or "Not generated" }}</td>
+                            <td>{{ log.restaurant_name or "Restaurant Menu" }}</td>
+                            <td>{{ log.menu_title or "Menu" }}</td>
+                            <td>{{ log.source_type or "imported_menu" }}</td>
+                            <td>{{ log.pdf_title or "Menu PDF" }}</td>
+                            <td>
+                                {% if current_user and current_user.is_admin and log.local_pdf_path %}
+                                    <code>{{ log.local_pdf_path }}</code>
+                                {% elif log.local_pdf_path %}
+                                    Local PDF available
+                                {% else %}
+                                    Not generated
+                                {% endif %}
+                            </td>
+                            <td>{{ log.cloudflare_pdf_path or "Not uploaded" }}</td>
+                            <td>
+                                {% if log.cloudflare_pdf_url %}
+                                    <a href="{{ log.cloudflare_pdf_url }}" target="_blank" rel="noopener noreferrer">{{ log.cloudflare_pdf_url }}</a>
+                                {% else %}
+                                    Not uploaded
+                                {% endif %}
+                            </td>
+                            <td><span class="menu-pdf-status menu-pdf-status-{{ log.status or 'generated' }}">{{ log.status or "generated" }}</span></td>
+                            <td>{{ log.file_size_bytes or 0 }}</td>
+                            <td>{{ log.page_count or 0 }}</td>
+                            <td>{{ log.generated_by_model or "" }}</td>
+                            <td>
+                                <div class="menu-pdf-log-actions">
+                                    {% if log.local_pdf_path %}
+                                        <a href="{{ url_for('menu_bp.view_menu_pdf_route', menu_id=log.menu_id, log_id=log.id) }}" target="_blank" rel="noopener noreferrer">View PDF</a>
+                                    {% endif %}
+                                    {% if log.cloudflare_pdf_url %}
+                                        <a href="{{ log.cloudflare_pdf_url }}" target="_blank" rel="noopener noreferrer">Open Cloudflare PDF</a>
+                                    {% endif %}
+                                    <form method="POST" action="{{ url_for('menu_bp.reupload_menu_pdf_log_route', menu_id=log.menu_id, log_id=log.id) }}">
+                                        <button type="submit">Re-upload</button>
+                                    </form>
+                                    <form method="POST" action="{{ url_for('menu_bp.regenerate_menu_pdf_log_route', menu_id=log.menu_id, log_id=log.id) }}">
+                                        <button type="submit">Regenerate PDF</button>
+                                    </form>
+                                    <form method="POST" action="{{ url_for('menu_bp.delete_menu_pdf_log_route', menu_id=log.menu_id, log_id=log.id) }}">
+                                        <button type="submit" class="danger">Delete Log Entry</button>
+                                    </form>
+                                    <a href="{{ url_for('menu_bp.menu_view_route', menu_id=log.menu_id) }}">Open Menu Page</a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="menu-pdf-log-empty">No menu PDFs logged yet.</div>
+    {% endif %}
+</div>

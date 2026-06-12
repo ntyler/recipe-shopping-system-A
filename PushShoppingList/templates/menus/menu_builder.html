@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Custom Restaurant Menu Builder</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=app_css_version) }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/menu_builder.css', v=menu_builder_css_version) }}">
+</head>
+<body class="menu-builder-page">
+<main class="menu-workspace">
+    <section class="menu-preview-header">
+        <div>
+            <a class="menu-back-link" href="{{ url_for('main_bp.index') }}#recipeUrlsTextarea">Back to AI Pantry</a>
+            <h1>Custom Restaurant Menu Builder</h1>
+        </div>
+    </section>
+
+    {% if error %}
+        <div class="menu-alert" role="alert">{{ error }}</div>
+    {% endif %}
+
+    <form class="menu-builder-form"
+          method="POST"
+          action="{{ url_for('menu_bp.custom_menu_builder_route') }}">
+        <input type="hidden" name="include_descriptions" value="0">
+        <input type="hidden" name="include_prices" value="0">
+        <input type="hidden" name="include_dietary_tags" value="0">
+        <input type="hidden" name="include_spicy_indicators" value="0">
+
+        <section class="menu-panel">
+            <h2>Generate Custom Menu</h2>
+            <div class="menu-builder-grid">
+                <label>
+                    <span>Restaurant name</span>
+                    <input name="restaurant_name" value="{{ form_values.restaurant_name or '' }}" required>
+                </label>
+                <label>
+                    <span>Cuisine type</span>
+                    <input name="cuisine_type" value="{{ form_values.cuisine_type or '' }}" placeholder="Thai, ramen, modern diner" required>
+                </label>
+                <label>
+                    <span>Theme / vibe</span>
+                    <input name="theme" value="{{ form_values.theme or '' }}" placeholder="cozy late-night noodle bar">
+                </label>
+                <label>
+                    <span>Price level</span>
+                    <select name="price_level">
+                        {% for value in ["budget", "casual", "upscale", "premium"] %}
+                            <option value="{{ value }}" {% if (form_values.price_level or "casual") == value %}selected{% endif %}>{{ value }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label>
+                    <span>Number of menu sections</span>
+                    <input name="section_count" type="number" min="1" max="12" value="{{ form_values.section_count or 4 }}">
+                </label>
+                <label>
+                    <span>Items per section</span>
+                    <input name="items_per_section" type="number" min="1" max="20" value="{{ form_values.items_per_section or 6 }}">
+                </label>
+                <label>
+                    <span>Cookbook to save under</span>
+                    <select name="cookbook_name">
+                        <option value="unclassified">unclassified</option>
+                        {% for cookbook in cookbooks %}
+                            <option value="{{ cookbook.name }}">{{ cookbook.name }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label class="menu-builder-notes">
+                    <span>Optional notes</span>
+                    <textarea name="notes" rows="4">{{ form_values.notes or '' }}</textarea>
+                </label>
+            </div>
+        </section>
+
+        <section class="menu-panel">
+            <h2>Menu Details</h2>
+            <div class="menu-builder-toggle-grid">
+                <label><input type="checkbox" name="include_descriptions" value="1" checked> Include descriptions</label>
+                <label><input type="checkbox" name="include_prices" value="1" checked> Include prices</label>
+                <label><input type="checkbox" name="include_dietary_tags" value="1" checked> Include dietary tags</label>
+                <label><input type="checkbox" name="include_spicy_indicators" value="1" checked> Include spicy indicators</label>
+            </div>
+            <button type="submit" class="menu-primary-btn">Generate Custom Menu</button>
+        </section>
+    </form>
+</main>
+</body>
+</html>

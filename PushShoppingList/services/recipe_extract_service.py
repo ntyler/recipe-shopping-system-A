@@ -9709,6 +9709,10 @@ def attach_menu_item_metadata(recipe, menu_item):
     recipe["menu_item_name"] = recipe.get("menu_item_name") or clean_recipe_text(menu_item.get("item_name") or "")
     recipe["menu_description"] = description
     recipe["menu_price"] = price
+    for metadata_field in ("restaurant_id", "menu_id", "menu_section_id", "menu_item_id"):
+        metadata_value = clean_recipe_text(menu_item.get(metadata_field) or "")
+        if metadata_value:
+            recipe[metadata_field] = metadata_value
     recipe["source_metadata"] = {
         **(recipe.get("source_metadata") if isinstance(recipe.get("source_metadata"), dict) else {}),
         "source_type": "restaurant_menu",
@@ -9718,6 +9722,8 @@ def attach_menu_item_metadata(recipe, menu_item):
         "price": price,
         "menu_item_id": clean_recipe_text(menu_item.get("menu_item_id") or ""),
         "menu_id": clean_recipe_text(menu_item.get("menu_id") or ""),
+        "restaurant_id": clean_recipe_text(menu_item.get("restaurant_id") or ""),
+        "menu_section_id": clean_recipe_text(menu_item.get("menu_section_id") or ""),
     }
 
     if description or price:
@@ -10068,6 +10074,10 @@ def build_menu_extract_result_from_items(
             "menu_item_name": normalized.get("menu_item_name", ""),
             "menu_description": normalized.get("menu_description", ""),
             "menu_price": normalized.get("menu_price", ""),
+            "restaurant_id": normalized.get("restaurant_id", ""),
+            "menu_id": normalized.get("menu_id", ""),
+            "menu_section_id": normalized.get("menu_section_id", ""),
+            "menu_item_id": normalized.get("menu_item_id", ""),
             "source_type": "menu_item_inferred",
             "ai_inferred": True,
             "model": model_resolution.model,

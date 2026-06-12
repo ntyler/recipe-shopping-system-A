@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>{{ menu_detail.menu.menu_title or "Restaurant Menu" }}</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            color: #1f2933;
+            background: #fff;
+        }
+
+        .pdf-menu-wrap {
+            padding: 28px;
+        }
+
+        .pdf-menu-header {
+            border-bottom: 3px solid #c2410c;
+            padding-bottom: 16px;
+            margin-bottom: 18px;
+        }
+
+        h1 {
+            margin: 0;
+            color: #9a3412;
+            font-size: 32px;
+        }
+
+        h2 {
+            margin: 24px 0 8px;
+            color: #b23b12;
+            font-size: 22px;
+        }
+
+        .pdf-menu-subtitle,
+        .pdf-menu-meta,
+        .pdf-menu-disclosure {
+            margin: 6px 0 0;
+            color: #4b5563;
+            font-size: 12px;
+            line-height: 1.45;
+        }
+
+        .pdf-menu-info {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px 20px;
+            margin: 14px 0;
+            font-size: 12px;
+        }
+
+        .pdf-menu-info strong {
+            color: #111827;
+        }
+
+        .pdf-menu-section {
+            break-inside: avoid;
+        }
+
+        .pdf-menu-item {
+            break-inside: avoid;
+            border-top: 1px solid #e5e7eb;
+            padding: 9px 0;
+        }
+
+        .pdf-menu-item-title {
+            display: flex;
+            justify-content: space-between;
+            gap: 14px;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .pdf-menu-item p {
+            margin: 4px 0 0;
+            color: #4b5563;
+            font-size: 12px;
+            line-height: 1.35;
+        }
+
+        .pdf-menu-badges {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            margin-top: 5px;
+        }
+
+        .pdf-menu-badges span {
+            border: 1px solid #fed7aa;
+            border-radius: 999px;
+            padding: 2px 6px;
+            color: #9a3412;
+            font-size: 10px;
+            font-weight: 700;
+        }
+
+        .pdf-menu-footer {
+            margin-top: 28px;
+            padding-top: 10px;
+            border-top: 1px solid #d1d5db;
+            color: #6b7280;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+{% set menu = menu_detail.menu %}
+{% set restaurant = menu_detail.restaurant %}
+<div class="pdf-menu-wrap">
+    <header class="pdf-menu-header">
+        <h1>{{ restaurant.restaurant_name or menu.menu_title or "Restaurant Menu" }}</h1>
+        {% if menu.menu_subtitle %}
+            <p class="pdf-menu-subtitle">{{ menu.menu_subtitle }}</p>
+        {% endif %}
+        {% if restaurant.cuisine_tags %}
+            <p class="pdf-menu-meta">{{ restaurant.cuisine_tags|join(", ") }}</p>
+        {% endif %}
+    </header>
+
+    <section class="pdf-menu-info">
+        {% if restaurant.phone %}<div><strong>Phone:</strong> {{ restaurant.phone }}</div>{% endif %}
+        {% if restaurant.full_address %}<div><strong>Address:</strong> {{ restaurant.full_address }}</div>{% endif %}
+        {% if restaurant.hours_text or restaurant.current_status %}<div><strong>Hours:</strong> {{ restaurant.current_status or "" }} {{ restaurant.hours_text or "" }}</div>{% endif %}
+        {% if restaurant.promotions %}<div><strong>Promotions:</strong> {{ restaurant.promotions|join("; ") }}</div>{% endif %}
+        {% if restaurant.restaurant_website_url %}<div><strong>Website:</strong> {{ restaurant.restaurant_website_url }}</div>{% endif %}
+        {% if menu.source_url %}<div><strong>Source menu:</strong> {{ menu.source_url }}</div>{% endif %}
+    </section>
+
+    {% for section in menu_detail.sections %}
+        <section class="pdf-menu-section">
+            <h2>{{ section.section_name }}</h2>
+            {% if section.section_description %}
+                <p class="pdf-menu-meta">{{ section.section_description }}</p>
+            {% endif %}
+            {% for item in section.items %}
+                <article class="pdf-menu-item">
+                    <div class="pdf-menu-item-title">
+                        <span>{{ item.item_name }}</span>
+                        <span>{{ item.menu_price or "No price found" }}</span>
+                    </div>
+                    <p>{{ item.menu_description or "No description found" }}</p>
+                    <div class="pdf-menu-badges">
+                        {% if item.spice_level and item.spice_level != "none" %}<span>Spicy</span>{% endif %}
+                        {% if item.chef_recommended %}<span>Chef Recommended</span>{% endif %}
+                        {% for tag in item.dietary_tags or [] %}<span>{{ tag }}</span>{% endfor %}
+                    </div>
+                </article>
+            {% endfor %}
+        </section>
+    {% endfor %}
+
+    <footer class="pdf-menu-footer">
+        Generated by AI Pantry.
+        {% if menu.source_type == "ai_generated_menu" %}
+            This menu was generated with AI and should be reviewed before use.
+        {% elif menu.source_type == "imported_menu" %}
+            Imported menu facts are preserved from the source menu. Recipes are not included unless separately generated.
+        {% endif %}
+    </footer>
+</div>
+</body>
+</html>

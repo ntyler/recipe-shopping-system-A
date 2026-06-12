@@ -104,6 +104,8 @@ from PushShoppingList.services.openai_model_service import refresh_openai_model_
 from PushShoppingList.services.openai_model_service import update_openai_model_settings_for_admin
 from PushShoppingList.services.openai_usage_service import openai_usage_dashboard_for_user
 from PushShoppingList.services.openai_usage_service import record_openai_usage
+from PushShoppingList.services.menu_store_service import menu_pdf_logs_by_cookbook
+from PushShoppingList.services.menu_store_service import menus_by_cookbook
 from PushShoppingList.services.user_account_service import current_public_user
 from PushShoppingList.services.user_account_service import is_admin_user
 from PushShoppingList.services.user_account_service import public_two_factor_recovery_user
@@ -182,6 +184,7 @@ def shared_page_context(active_public_user=None):
         "two_factor_recovery_user": public_two_factor_recovery_user(two_factor_recovery_token),
         "account_delete_token": request.args.get("account_delete_token", ""),
         "app_css_version": static_asset_version("css/app.css"),
+        "menu_builder_css_version": static_asset_version("css/menu_builder.css"),
         "app_js_version": static_asset_version("js/app.js"),
         "firebase_auth_js_version": static_asset_version("js/firebase-auth.js"),
         "firebase_web_config": firebase_web_config(),
@@ -210,6 +213,7 @@ def recipe_rows_context(recipe_urls=None, food_rules=None, image_variants=None, 
         food_rules=food_rules,
         image_variants=image_variants,
     )
+    attach_restaurant_menu_assets_to_cookbooks(rendered_cookbook_view)
     cookbook_recipe_count = sum(
         len(cookbook.get("recipes", []))
         for cookbook in rendered_cookbook_view.get("cookbooks", [])
@@ -224,6 +228,18 @@ def recipe_rows_context(recipe_urls=None, food_rules=None, image_variants=None, 
         "cookbook_recipe_count": cookbook_recipe_count,
         "cookbook_assignments": cookbook_assignments,
     }
+
+
+def attach_restaurant_menu_assets_to_cookbooks(rendered_cookbook_view):
+    logs_by_cookbook = menu_pdf_logs_by_cookbook()
+    menus_grouped = menus_by_cookbook()
+
+    for cookbook in rendered_cookbook_view.get("cookbooks", []):
+        cookbook_id = cookbook.get("id", "")
+        cookbook["menu_pdf_logs"] = logs_by_cookbook.get(cookbook_id, [])
+        cookbook["restaurant_menus"] = menus_grouped.get(cookbook_id, [])
+
+    return rendered_cookbook_view
 
 
 def recipe_workspace_context(image_variants=None, include_detail_images=True):
