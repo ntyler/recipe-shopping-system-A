@@ -17,6 +17,7 @@ const CATEGORY_ALL_FIELD_NAMES = [...CATEGORY_FIELD_NAMES, "custom_categories"];
 const CATEGORY_SOURCE_USER_SELECTED = "user_selected";
 const CATEGORY_SOURCE_AI_INFERRED = "ai_inferred";
 const CATEGORY_SOURCE_BLANK = "blank";
+const RECIPE_EDIT_PAGE_RETURN_STATE_KEY = "recipe-edit-page-return-state";
 const LEAFLET_CSS_URL = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
 const LEAFLET_JS_URL = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
 const USER_ACCOUNT_OPEN_PANEL_KEY = "user-account-open-panel";
@@ -12905,6 +12906,20 @@ function openRecipeEditorFromMenu(button, options = {}, event = null) {
     return false;
 }
 
+function openRecipeEditPageFromMenu(link, event = null) {
+    if (event && shouldLetRecipeEditorLinkNavigate(event)) {
+        return true;
+    }
+
+    if (event) {
+        event.stopPropagation();
+    }
+
+    rememberRecipeEditPageReturnState(link);
+    closeRecipeEditRowMenus();
+    return true;
+}
+
 function shouldLetRecipeEditorLinkNavigate(event) {
     return Boolean(
         event.defaultPrevented
@@ -12920,22 +12935,29 @@ function recipeEditorStandalonePageIsActive() {
     return Boolean(document.body && document.body.dataset.recipeEditPage === "true");
 }
 
+function recipeEditorSourceCardFromTrigger(triggerElement) {
+    if (!triggerElement) {
+        return null;
+    }
+
+    const triggerMenu = triggerElement.closest(".recipe-edit-row-menu");
+    const anchorButton = triggerMenu && triggerMenu.recipeEditAnchorButton
+        ? triggerMenu.recipeEditAnchorButton
+        : null;
+
+    return triggerElement.closest("[data-recipe-view-card], [data-current-recipe-row], [data-cookbook-recipe-card]")
+        || (anchorButton
+            ? anchorButton.closest("[data-recipe-view-card], [data-current-recipe-row], [data-cookbook-recipe-card]")
+            : null);
+}
+
 function rememberRecipeEditorReturnState(trigger, recipeUrl) {
     if (recipeEditorStandalonePageIsActive()) {
         return;
     }
 
     const triggerElement = trigger && trigger.nodeType === 1 ? trigger : null;
-    const triggerMenu = triggerElement ? triggerElement.closest(".recipe-edit-row-menu") : null;
-    const anchorButton = triggerMenu && triggerMenu.recipeEditAnchorButton
-        ? triggerMenu.recipeEditAnchorButton
-        : null;
-    const sourceCard = triggerElement
-        ? triggerElement.closest("[data-recipe-view-card], [data-current-recipe-row], [data-cookbook-recipe-card]")
-            || (anchorButton
-                ? anchorButton.closest("[data-recipe-view-card], [data-current-recipe-row], [data-cookbook-recipe-card]")
-                : null)
-        : null;
+    const sourceCard = recipeEditorSourceCardFromTrigger(triggerElement);
 
     recipeEditReturnState = {
         recipeUrl: String(recipeUrl || "").trim(),
@@ -12943,6 +12965,35 @@ function rememberRecipeEditorReturnState(trigger, recipeUrl) {
         scrollY: window.scrollY,
         sourceSurface: recipeEditorReturnSurface(sourceCard),
     };
+}
+
+function rememberRecipeEditPageReturnState(trigger) {
+    if (recipeEditorStandalonePageIsActive() || !window.sessionStorage) {
+        return;
+    }
+
+    const triggerElement = trigger && trigger.nodeType === 1 ? trigger : null;
+    const recipeUrl = triggerElement ? String(triggerElement.dataset.recipeUrl || "").trim() : "";
+    const sourceCard = recipeEditorSourceCardFromTrigger(triggerElement);
+
+    if (!recipeUrl) {
+        return;
+    }
+
+    const state = {
+        recipeUrl,
+        scrollX: window.scrollX,
+        scrollY: window.scrollY,
+        sourceSurface: recipeEditorReturnSurface(sourceCard),
+        pageUrl: window.location.href,
+        createdAt: Date.now(),
+    };
+
+    try {
+        sessionStorage.setItem(RECIPE_EDIT_PAGE_RETURN_STATE_KEY, JSON.stringify(state));
+    } catch (err) {
+        console.warn("Unable to remember recipe edit return location.", err);
+    }
 }
 
 function recipeEditorReturnSurface(card) {
@@ -13037,6 +13088,69 @@ function restoreRecipeEditorReturnState() {
     if (!state) {
         return;
     }
+
+    const target = findRecipeEditorReturnTarget(state);
+
+    if (target) {
+        scrollRecipeJumpTargetIntoView(target);
+        focusRecipeEditorReturnTarget(target);
+        return;
+    }
+
+    restoreWindowScroll(state.scrollX, state.scrollY);
+}
+
+function loadRecipeEditorReturnSurface(state) {
+    const sectionName = {
+        "recipe-view": "recipe-view",
+        "current-recipes": "current-recipes",
+        cookbooks: "cookbooks",
+    }[state && state.sourceSurface ? state.sourceSurface : ""];
+
+    if (!sectionName || !lazySectionElement(sectionName)) {
+        return Promise.resolve();
+    }
+
+    return loadLazySection(sectionName, { allowDuringAuthCollapse: true }).then(() => undefined);
+}
+
+async function restoreRecipeEditPageReturnState() {
+    if (recipeEditorStandalonePageIsActive() || !window.sessionStorage) {
+        return;
+    }
+
+    let state = null;
+
+    try {
+        state = JSON.parse(sessionStorage.getItem(RECIPE_EDIT_PAGE_RETURN_STATE_KEY) || "null");
+    } catch (err) {
+        state = null;
+    }
+
+    if (!state || !state.recipeUrl) {
+        return;
+    }
+
+    const stateUrl = (() => {
+        try {
+            return new URL(state.pageUrl || "", window.location.href);
+        } catch (err) {
+            return null;
+        }
+    })();
+
+    if (stateUrl && stateUrl.origin === window.location.origin && stateUrl.pathname !== window.location.pathname) {
+        return;
+    }
+
+    try {
+        sessionStorage.removeItem(RECIPE_EDIT_PAGE_RETURN_STATE_KEY);
+    } catch (err) {
+        // Best effort only.
+    }
+
+    await loadRecipeEditorReturnSurface(state);
+    await waitForNextPaint();
 
     const target = findRecipeEditorReturnTarget(state);
 
@@ -22648,6 +22762,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ["initDeviceStaleReporting", initDeviceStaleReporting],
         ["consumeAuthCollapseAllRequest", consumeAuthCollapseAllRequest],
         ["restoreScroll", restoreScroll],
+        ["restoreRecipeEditPageReturnState", restoreRecipeEditPageReturnState],
         ["restoreScreenSettings", restoreScreenSettings],
         ["restoreCardCollapseState", restoreCardCollapseState],
         ["restoreHomeAddressHistoryCollapseState", restoreHomeAddressHistoryCollapseState],
@@ -22720,6 +22835,11 @@ window.addEventListener("resize", invalidateStoreLocationMaps);
 window.addEventListener("resize", handleRecipeEditRowMenuScrollOrResize);
 window.addEventListener("resize", scheduleAddStoreStickyVisibilityUpdate);
 window.addEventListener("scroll", scheduleAddStoreStickyVisibilityUpdate, { passive: true });
+window.addEventListener("pageshow", event => {
+    if (event.persisted) {
+        restoreRecipeEditPageReturnState();
+    }
+});
 
 async function startRecipeExtraction(event) {
     event.preventDefault();
