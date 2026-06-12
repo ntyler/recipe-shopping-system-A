@@ -101,11 +101,89 @@ def test_enter_recipe_links_has_four_independent_import_actions():
     assert ".recipe-import-action-upload-menu { order: 4; }" in css
 
 
+def test_menu_recipe_progress_checklist_static_hooks_are_present():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    routes = (ROOT / "PushShoppingList/routes/recipe_routes.py").read_text(encoding="utf-8")
+
+    assert "MENU_RECIPE_CHECKLIST_GROUPS" in script
+    assert "menu-recipe-completion-check" in script
+    assert "checkbox.readOnly = true" in script
+    assert 'checkbox.disabled = true' in script
+    assert "/api/menu_recipe_estimate_per_serving" in script
+    assert "runMenuRecipeServingBasisEstimate" in script
+    assert ".menu-recipe-progress-card" in css
+    assert ".menu-recipe-check-badge" in css
+    assert "set_url_menu_recipes" in routes
+    assert "update_menu_recipe_step" in routes
+    assert "menu_recipe_progress_callback" in routes
+
+
+def test_menu_recipe_progress_payload_uses_boolean_checklist_and_skipped_review(monkeypatch):
+    monkeypatch.setattr(
+        recipe_routes,
+        "load_food_rules",
+        lambda: {
+            "require": [],
+            "avoid": [{"label": "no peanuts", "terms": ["peanut"]}],
+        },
+    )
+
+    payload = recipe_routes.menu_recipe_progress_payload({
+        "ok": True,
+        "source_url": "https://example.com/menu?menu_item=spring-roll",
+        "display_name": "Spring Roll",
+        "menu_section": "Kitchen Appetizers",
+        "menu_description": "Crispy veggie roll.",
+        "ingredients": ["carrot", "cellophane noodle"],
+        "equipment": [{"name": "skillet"}],
+        "instructions": [{"instruction": "Fry until crisp."}],
+        "nutrition": [{"key": "calories", "value": "180"}],
+    })
+
+    assert payload["recipe_name"] == "Spring Roll"
+    assert payload["menu_section"] == "Kitchen Appetizers"
+    assert payload["checklist"]["recipe_extracted"] is True
+    assert payload["checklist"]["recipe_information"] is True
+    assert payload["checklist"]["ingredients"] is True
+    assert payload["checklist"]["equipment"] is True
+    assert payload["checklist"]["instructions"] is True
+    assert payload["checklist"]["nutrition"] is True
+    assert payload["checklist"]["food_review_applied"] is False
+    assert payload["checklist"]["estimate_per_serving"] is False
+    assert all(isinstance(value, bool) for value in payload["checklist"].values())
+    assert payload["messages"]["food_review_applied"] == "Skipped - no matching rule"
+    assert payload["messages"]["estimate_per_serving"] == "Ready to run"
+
+
+def test_menu_recipe_progress_payload_checks_food_review_only_when_rule_matches(monkeypatch):
+    monkeypatch.setattr(
+        recipe_routes,
+        "load_food_rules",
+        lambda: {
+            "require": [],
+            "avoid": [{"label": "no peanuts", "terms": ["peanut"]}],
+        },
+    )
+
+    payload = recipe_routes.menu_recipe_progress_payload({
+        "ok": True,
+        "source_url": "https://example.com/menu?menu_item=satay",
+        "display_name": "Satay",
+        "ingredients": ["peanut sauce", "chicken"],
+    })
+
+    assert payload["checklist"]["food_review_applied"] is True
+    assert payload["messages"]["food_review_applied"] == "Applied - 1 matching rule"
+
+
 def test_menu_import_category_routine_only_runs_for_new_recipes(monkeypatch):
     existing_url = "https://example.com/menu?menu_item=menu-item-1-existing"
     new_url = "https://example.com/menu?menu_item=menu-item-2-new"
     categorized = []
     saved = []
+    estimated = []
+    progress_updates = []
 
     monkeypatch.setattr(recipe_routes, "load_recipe_urls", lambda: [existing_url])
     monkeypatch.setattr(recipe_routes, "add_items", lambda ingredients: None)
@@ -125,7 +203,7 @@ def test_menu_import_category_routine_only_runs_for_new_recipes(monkeypatch):
     monkeypatch.setattr(
         recipe_routes,
         "ensure_menu_recipe_serving_basis_estimate",
-        lambda url, result: {"ok": True, "recipe_url": url, "already_complete": True},
+        lambda url, result: estimated.append(url) or {"ok": True, "recipe_url": url, "already_complete": True},
     )
     monkeypatch.setattr(
         recipe_routes,
@@ -150,17 +228,24 @@ def test_menu_import_category_routine_only_runs_for_new_recipes(monkeypatch):
                     "source_url": existing_url,
                     "display_name": "Existing",
                     "ingredients": ["tomato"],
+                    "equipment": [{"name": "pan"}],
+                    "instructions": [{"instruction": "Cook."}],
+                    "nutrition": [{"key": "calories", "value": "50"}],
                 },
                 {
                     "ok": True,
                     "source_url": new_url,
                     "display_name": "New",
                     "ingredients": ["basil"],
+                    "equipment": [{"name": "bowl"}],
+                    "instructions": [{"instruction": "Mix."}],
+                    "nutrition": [{"key": "calories", "value": "40"}],
                 },
             ],
         },
         {"id": "cookbook-1", "name": "Dinner"},
         context="test-menu-import",
+        menu_recipe_progress_callback=progress_updates.append,
     )
 
     assert result["ok"] is True
@@ -170,3 +255,13 @@ def test_menu_import_category_routine_only_runs_for_new_recipes(monkeypatch):
     assert result["pdfs_generated"] == 1
     assert saved == [existing_url, new_url]
     assert categorized == [new_url]
+    assert estimated == []
+    assert result["serving_basis_statuses"] == [{
+        "ok": False,
+        "recipe_url": new_url,
+        "status": "manual_ready",
+        "error": "",
+    }]
+    assert len(progress_updates) == 1
+    assert progress_updates[0][0]["checklist"]["recipe_extracted"] is True
+    assert progress_updates[0][0]["checklist"]["estimate_per_serving"] is False

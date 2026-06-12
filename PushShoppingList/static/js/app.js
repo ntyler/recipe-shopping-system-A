@@ -23146,6 +23146,367 @@ function shouldContinueExtractionProgressPolling(progress) {
     return (progress.urls || []).some(item => item.state === "running" || item.state === "waiting");
 }
 
+const MENU_RECIPE_CHECKLIST_GROUPS = [
+    {
+        title: "Recipe Generation",
+        items: [
+            { key: "recipe_extracted", label: "Recipe Extracted" },
+        ],
+    },
+    {
+        title: "Recipe Content",
+        items: [
+            { key: "recipe_information", label: "Recipe Information" },
+            { key: "ingredients", label: "Ingredients" },
+            { key: "equipment", label: "Equipment" },
+            { key: "instructions", label: "Instructions" },
+            { key: "nutrition", label: "Nutrition" },
+        ],
+    },
+    {
+        title: "Review / Estimates",
+        items: [
+            { key: "food_review_applied", label: "Food Review Applied" },
+            { key: "estimate_per_serving", label: "⌁ Estimate per serving basis" },
+        ],
+    },
+];
+
+function buildExtractionSourceProgressRow(item, index) {
+    const row = document.createElement("div");
+    row.className = "bulk-progress-item";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.className = "bulk-progress-check";
+    checkbox.disabled = true;
+    checkbox.checked = item.state === "done";
+
+    const main = document.createElement("div");
+    main.className = "bulk-progress-main";
+
+    const titleLine = document.createElement("div");
+    titleLine.className = "bulk-progress-title-line";
+
+    const prefix = document.createElement("span");
+    prefix.className = "bulk-progress-text";
+    prefix.textContent = `${index + 1}. `;
+
+    const text = document.createElement("a");
+    text.className = "bulk-progress-text";
+    text.classList.add("extract-url-progress-link");
+    text.href = item.url;
+    text.target = "_blank";
+    text.rel = "noopener noreferrer";
+
+    if (item.state === "running") {
+        text.classList.add("active");
+    }
+
+    if (item.state === "done") {
+        text.classList.add("done");
+    }
+
+    if (item.state === "cancelled") {
+        text.classList.add("cancelled");
+    }
+
+    text.textContent = item.url;
+
+    const reason = document.createElement("div");
+    reason.className = "bulk-skip-reason";
+    reason.textContent = item.message || "waiting...";
+
+    titleLine.appendChild(prefix);
+    titleLine.appendChild(text);
+    main.appendChild(titleLine);
+    main.appendChild(reason);
+    row.appendChild(checkbox);
+    row.appendChild(main);
+    return row;
+}
+
+function renderMenuRecipeProgressList(menuRecipes, progress) {
+    const list = document.createElement("div");
+    list.className = "menu-recipe-progress-list";
+
+    menuRecipes.forEach(recipe => {
+        list.appendChild(renderMenuRecipeProgressCard(recipe, progress));
+    });
+
+    return list;
+}
+
+function renderMenuRecipeProgressCard(recipe, progress) {
+    const card = document.createElement("article");
+    card.className = "menu-recipe-progress-card";
+    card.dataset.recipeId = recipe.recipe_id || "";
+    card.dataset.recipeUrl = recipe.recipe_url || "";
+
+    const header = document.createElement("div");
+    header.className = "menu-recipe-progress-header";
+
+    const title = document.createElement(recipe.recipe_url ? "a" : "div");
+    title.className = "menu-recipe-progress-title";
+    title.textContent = recipe.recipe_name || "Menu Recipe";
+    if (recipe.recipe_url) {
+        title.href = recipe.recipe_url;
+        title.target = "_blank";
+        title.rel = "noopener noreferrer";
+    }
+
+    header.appendChild(title);
+
+    if (recipe.menu_section) {
+        const section = document.createElement("div");
+        section.className = "menu-recipe-progress-section";
+        section.textContent = recipe.menu_section;
+        header.appendChild(section);
+    }
+
+    card.appendChild(header);
+
+    if (recipe.extracted_description) {
+        const description = document.createElement("div");
+        description.className = "menu-recipe-progress-description";
+
+        const label = document.createElement("span");
+        label.className = "menu-recipe-progress-description-label";
+        label.textContent = "Extracted Description:";
+
+        const text = document.createElement("span");
+        text.textContent = recipe.extracted_description;
+
+        description.appendChild(label);
+        description.appendChild(text);
+        card.appendChild(description);
+    }
+
+    const checklistTitle = document.createElement("div");
+    checklistTitle.className = "menu-recipe-checklist-heading";
+    checklistTitle.textContent = "Completion Checklist:";
+    card.appendChild(checklistTitle);
+
+    const checklist = document.createElement("div");
+    checklist.className = "menu-recipe-checklist";
+
+    MENU_RECIPE_CHECKLIST_GROUPS.forEach(group => {
+        const groupEl = document.createElement("div");
+        groupEl.className = "menu-recipe-checklist-group";
+
+        const groupTitle = document.createElement("div");
+        groupTitle.className = "menu-recipe-checklist-group-title";
+        groupTitle.textContent = group.title;
+        groupEl.appendChild(groupTitle);
+
+        group.items.forEach(item => {
+            groupEl.appendChild(renderMenuRecipeChecklistItem(recipe, item, progress));
+        });
+
+        checklist.appendChild(groupEl);
+    });
+
+    card.appendChild(checklist);
+    return card;
+}
+
+function renderMenuRecipeChecklistItem(recipe, item, progress) {
+    const checklist = recipe.checklist || {};
+    const running = recipe.running || {};
+    const messages = recipe.messages || {};
+    const errors = recipe.errors || {};
+    const checked = Boolean(checklist[item.key]);
+    const isRunning = Boolean(running[item.key]);
+    const error = errors[item.key] || "";
+    const message = messages[item.key] || "";
+
+    const row = document.createElement("label");
+    row.className = "menu-recipe-checklist-item";
+    row.dataset.checklistKey = item.key;
+    if (checked) {
+        row.classList.add("complete");
+    }
+    if (isRunning) {
+        row.classList.add("running");
+    }
+    if (error) {
+        row.classList.add("failed");
+    }
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.className = "menu-recipe-completion-check";
+    checkbox.disabled = true;
+    checkbox.readOnly = true;
+    checkbox.checked = checked;
+    checkbox.setAttribute("aria-readonly", "true");
+    checkbox.setAttribute("aria-label", item.label);
+
+    const label = document.createElement("span");
+    label.className = "menu-recipe-check-label";
+    label.textContent = item.label;
+
+    const status = document.createElement("span");
+    status.className = "menu-recipe-check-status";
+
+    row.appendChild(checkbox);
+    row.appendChild(label);
+    row.appendChild(status);
+
+    renderMenuRecipeChecklistStatus(status, {
+        key: item.key,
+        checked,
+        isRunning,
+        error,
+        message,
+        recipe,
+        progress,
+    });
+
+    return row;
+}
+
+function renderMenuRecipeChecklistStatus(status, state) {
+    status.textContent = "";
+
+    if (state.isRunning) {
+        const spinner = document.createElement("span");
+        spinner.className = "menu-recipe-check-spinner";
+        spinner.setAttribute("aria-hidden", "true");
+        status.appendChild(spinner);
+        status.appendChild(document.createTextNode("Updating..."));
+        return;
+    }
+
+    if (state.error) {
+        status.classList.add("error");
+        status.textContent = state.error;
+        return;
+    }
+
+    if (state.checked) {
+        status.classList.add("complete");
+        status.textContent = state.message || "Complete";
+        return;
+    }
+
+    if (state.message && state.message.toLowerCase().startsWith("skipped")) {
+        const badge = document.createElement("span");
+        badge.className = "menu-recipe-check-badge";
+        badge.textContent = "Skipped";
+        status.appendChild(badge);
+        const remainder = state.message.replace(/^skipped\s*[-:]\s*/i, "").trim();
+        if (remainder) {
+            status.appendChild(document.createTextNode(` ${remainder}`));
+        }
+        return;
+    }
+
+    if (state.key === "estimate_per_serving") {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "menu-recipe-estimate-run-btn";
+        button.dataset.recipeUrl = state.recipe.recipe_url || "";
+        button.dataset.recipeId = state.recipe.recipe_id || "";
+        button.dataset.jobId = (state.progress && state.progress.job_id) || "";
+        button.textContent = "Run";
+        button.onclick = () => runMenuRecipeServingBasisEstimate(button);
+
+        const hint = document.createElement("span");
+        hint.className = "menu-recipe-check-message";
+        hint.textContent = state.message || "Ready to run";
+
+        status.appendChild(hint);
+        status.appendChild(button);
+        return;
+    }
+
+    if (state.message) {
+        status.textContent = state.message;
+    }
+}
+
+function setMenuRecipeEstimateRowStatus(button, mode, message) {
+    const row = button ? button.closest(".menu-recipe-checklist-item") : null;
+    if (!row) {
+        return;
+    }
+
+    row.classList.toggle("running", mode === "running");
+    row.classList.toggle("failed", mode === "error");
+
+    const checkbox = row.querySelector(".menu-recipe-completion-check");
+    if (checkbox) {
+        checkbox.checked = false;
+    }
+
+    const status = row.querySelector(".menu-recipe-check-status");
+    if (!status) {
+        return;
+    }
+
+    status.textContent = "";
+    status.classList.toggle("error", mode === "error");
+
+    if (mode === "running") {
+        const spinner = document.createElement("span");
+        spinner.className = "menu-recipe-check-spinner";
+        spinner.setAttribute("aria-hidden", "true");
+        status.appendChild(spinner);
+        status.appendChild(document.createTextNode("Updating..."));
+    } else if (mode === "error") {
+        status.textContent = message || "Unable to estimate serving basis.";
+    }
+}
+
+async function runMenuRecipeServingBasisEstimate(button) {
+    const recipeUrl = button && button.dataset ? button.dataset.recipeUrl || "" : "";
+    const recipeId = button && button.dataset ? button.dataset.recipeId || "" : "";
+    const jobId = (button && button.dataset ? button.dataset.jobId || "" : "") || lastRenderedExtractJobId || "";
+
+    if (!recipeUrl) {
+        setMenuRecipeEstimateRowStatus(button, "error", "Recipe URL is missing.");
+        return;
+    }
+
+    if (button) {
+        button.disabled = true;
+    }
+    setMenuRecipeEstimateRowStatus(button, "running");
+
+    try {
+        const response = await fetch("/api/menu_recipe_estimate_per_serving", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "fetch",
+            },
+            body: JSON.stringify({
+                recipe_url: recipeUrl,
+                recipe_id: recipeId,
+                job_id: jobId,
+            }),
+        });
+        const data = await response.json();
+        syncOpenAiUsageDashboardFromResponse(data);
+
+        if (data && data.progress) {
+            renderExtractionProgress(data.progress);
+        }
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to estimate serving basis.");
+        }
+    } catch (err) {
+        console.warn("Unable to estimate menu recipe serving basis.", err);
+        setMenuRecipeEstimateRowStatus(button, "error", err.message || "Unable to estimate serving basis.");
+    } finally {
+        if (button) {
+            button.disabled = false;
+        }
+    }
+}
+
 async function pollExtractionProgress() {
     extractProgressPollTimer = null;
 
@@ -23213,58 +23574,13 @@ function renderExtractionProgress(progress) {
 
     list.innerHTML = "";
 
+    const isMenuExtract = progress.extraction_mode === "menu_extract";
     (progress.urls || []).forEach((item, index) => {
-        const row = document.createElement("div");
-        row.className = "bulk-progress-item";
+        list.appendChild(buildExtractionSourceProgressRow(item, index));
 
-        const checkbox = document.createElement("input");
-        checkbox.type = "checkbox";
-        checkbox.className = "bulk-progress-check";
-        checkbox.disabled = true;
-        checkbox.checked = item.state === "done";
-
-        const main = document.createElement("div");
-        main.className = "bulk-progress-main";
-
-        const titleLine = document.createElement("div");
-        titleLine.className = "bulk-progress-title-line";
-
-        const prefix = document.createElement("span");
-        prefix.className = "bulk-progress-text";
-        prefix.textContent = `${index + 1}. `;
-
-        const text = document.createElement("a");
-        text.className = "bulk-progress-text";
-        text.classList.add("extract-url-progress-link");
-        text.href = item.url;
-        text.target = "_blank";
-        text.rel = "noopener noreferrer";
-
-        if (item.state === "running") {
-            text.classList.add("active");
+        if (isMenuExtract && Array.isArray(item.menu_recipes) && item.menu_recipes.length) {
+            list.appendChild(renderMenuRecipeProgressList(item.menu_recipes, progress));
         }
-
-        if (item.state === "done") {
-            text.classList.add("done");
-        }
-
-        if (item.state === "cancelled") {
-            text.classList.add("cancelled");
-        }
-
-        text.textContent = item.url;
-
-        const reason = document.createElement("div");
-        reason.className = "bulk-skip-reason";
-        reason.textContent = item.message || "waiting...";
-
-        titleLine.appendChild(prefix);
-        titleLine.appendChild(text);
-        main.appendChild(titleLine);
-        main.appendChild(reason);
-        row.appendChild(checkbox);
-        row.appendChild(main);
-        list.appendChild(row);
     });
 
     if (!progress.active && progress.status === "complete") {

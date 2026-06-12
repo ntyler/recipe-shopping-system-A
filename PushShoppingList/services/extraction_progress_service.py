@@ -22,9 +22,87 @@ FALLBACK_NTFY_TOPIC = normalize_ntfy_topic(os.getenv("NTFY_TOPIC", ""))
 PROGRESS_FILE.parent.mkdir(parents=True, exist_ok=True)
 PROGRESS_LOCK = threading.RLock()
 
+MENU_RECIPE_CHECKLIST_KEYS = (
+    "recipe_extracted",
+    "recipe_information",
+    "ingredients",
+    "equipment",
+    "instructions",
+    "nutrition",
+    "food_review_applied",
+    "estimate_per_serving",
+)
+
 
 def new_job_id():
     return uuid.uuid4().hex
+
+
+def menu_recipe_checklist_defaults(checked=False):
+    return {key: bool(checked) for key in MENU_RECIPE_CHECKLIST_KEYS}
+
+
+def normalize_menu_recipe_progress(recipe):
+    recipe = recipe if isinstance(recipe, dict) else {}
+    checklist = recipe.get("checklist") if isinstance(recipe.get("checklist"), dict) else {}
+    running = recipe.get("running") if isinstance(recipe.get("running"), dict) else {}
+    messages = recipe.get("messages") if isinstance(recipe.get("messages"), dict) else {}
+    errors = recipe.get("errors") if isinstance(recipe.get("errors"), dict) else {}
+
+    recipe_url = str(
+        recipe.get("recipe_url")
+        or recipe.get("url")
+        or recipe.get("source_url")
+        or ""
+    ).strip()
+    recipe_id = str(recipe.get("recipe_id") or recipe.get("id") or recipe_url).strip()
+
+    return {
+        "recipe_id": recipe_id,
+        "recipe_url": recipe_url,
+        "recipe_name": str(
+            recipe.get("recipe_name")
+            or recipe.get("name")
+            or recipe.get("display_name")
+            or "Menu Recipe"
+        ).strip(),
+        "menu_section": str(recipe.get("menu_section") or recipe.get("category") or "").strip(),
+        "extracted_description": str(
+            recipe.get("extracted_description")
+            or recipe.get("menu_description")
+            or recipe.get("description")
+            or ""
+        ).strip(),
+        "checklist": {
+            key: bool(checklist.get(key))
+            for key in MENU_RECIPE_CHECKLIST_KEYS
+        },
+        "running": {
+            key: bool(running.get(key))
+            for key in MENU_RECIPE_CHECKLIST_KEYS
+        },
+        "messages": {
+            str(key): str(value)
+            for key, value in messages.items()
+            if key in MENU_RECIPE_CHECKLIST_KEYS and str(value).strip()
+        },
+        "errors": {
+            str(key): str(value)
+            for key, value in errors.items()
+            if key in MENU_RECIPE_CHECKLIST_KEYS and str(value).strip()
+        },
+    }
+
+
+def normalize_menu_recipe_progress_list(menu_recipes):
+    if not isinstance(menu_recipes, list):
+        return []
+
+    return [
+        normalize_menu_recipe_progress(recipe)
+        for recipe in menu_recipes
+        if isinstance(recipe, dict)
+    ]
 
 
 def default_progress():
@@ -89,6 +167,7 @@ def start_progress(urls, job_id=None, extraction_mode="recipe"):
                     "state": "waiting",
                     "message": "waiting...",
                     "ingredients_count": None,
+                    "menu_recipes": [] if is_menu_extract else [],
                 }
                 for url in urls
             ],
@@ -144,6 +223,110 @@ def mark_url_message(job_id, urls, index, message, summary=None):
         if 0 <= index < len(progress["urls"]):
             progress["urls"][index]["state"] = "running"
             progress["urls"][index]["message"] = message
+
+        return save_progress(progress)
+
+
+def set_url_menu_recipes(job_id, urls, index, menu_recipes, message=None, summary=None):
+    with PROGRESS_LOCK:
+        progress = ensure_job(job_id, urls)
+
+        if progress.get("job_id") != job_id or progress.get("cancel_requested"):
+            return progress
+
+        progress["active"] = True
+        progress["status"] = "running"
+        progress["current_index"] = index
+
+        if summary:
+            progress["summary"] = summary
+
+        if 0 <= index < len(progress["urls"]):
+            item = progress["urls"][index]
+            if item.get("state") == "waiting":
+                item["state"] = "running"
+            if message:
+                item["message"] = message
+            item["menu_recipes"] = normalize_menu_recipe_progress_list(menu_recipes)
+
+        return save_progress(progress)
+
+
+def update_menu_recipe_step(
+    job_id,
+    recipe_id="",
+    recipe_url="",
+    step="",
+    checked=None,
+    running=None,
+    message=None,
+    error=None,
+):
+    step = str(step or "").strip()
+    if step not in MENU_RECIPE_CHECKLIST_KEYS:
+        return load_progress()
+
+    recipe_id = str(recipe_id or "").strip()
+    recipe_url = str(recipe_url or "").strip()
+
+    with PROGRESS_LOCK:
+        progress = load_progress()
+        if job_id and progress.get("job_id") != job_id:
+            return progress
+
+        target_recipe = None
+        for item in progress.get("urls", []):
+            recipes = item.get("menu_recipes")
+            if not isinstance(recipes, list):
+                continue
+
+            for index, recipe in enumerate(recipes):
+                normalized = normalize_menu_recipe_progress(recipe)
+                recipes[index] = normalized
+
+                if recipe_id and normalized.get("recipe_id") == recipe_id:
+                    target_recipe = normalized
+                    break
+
+                if recipe_url and normalized.get("recipe_url") == recipe_url:
+                    target_recipe = normalized
+                    break
+
+            if target_recipe:
+                break
+
+        if not target_recipe:
+            return progress
+
+        checklist = target_recipe.setdefault("checklist", menu_recipe_checklist_defaults())
+        running_map = target_recipe.setdefault("running", menu_recipe_checklist_defaults())
+        messages = target_recipe.setdefault("messages", {})
+        errors = target_recipe.setdefault("errors", {})
+
+        if checked is not None:
+            checklist[step] = bool(checked)
+            if checked:
+                running_map[step] = False
+                errors.pop(step, None)
+
+        if running is not None:
+            running_map[step] = bool(running)
+
+        if message is not None:
+            message = str(message or "").strip()
+            if message:
+                messages[step] = message
+            else:
+                messages.pop(step, None)
+
+        if error is not None:
+            error = str(error or "").strip()
+            if error:
+                errors[step] = error
+                checklist[step] = False
+                running_map[step] = False
+            else:
+                errors.pop(step, None)
 
         return save_progress(progress)
 

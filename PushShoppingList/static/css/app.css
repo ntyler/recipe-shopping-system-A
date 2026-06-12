@@ -11818,6 +11818,222 @@ body {
             line-height: 1.25;
         }
 
+        .menu-recipe-progress-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 12px;
+            padding: 12px 8px 14px 38px;
+            border-bottom: 1px solid #2a2a2a;
+        }
+
+        .menu-recipe-progress-card {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-width: 0;
+            padding: 12px;
+            border: 1px solid #3a3a3a;
+            border-radius: 8px;
+            background: #171717;
+            color: #e5e7eb;
+        }
+
+        .menu-recipe-progress-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .menu-recipe-progress-title {
+            color: #f8fafc;
+            font-size: 15px;
+            font-weight: 800;
+            line-height: 1.25;
+            overflow-wrap: anywhere;
+            text-decoration: none;
+        }
+
+        .menu-recipe-progress-title:hover {
+            color: #93c5fd;
+            text-decoration: underline;
+        }
+
+        .menu-recipe-progress-section {
+            flex: 0 0 auto;
+            max-width: 42%;
+            padding: 3px 7px;
+            border: 1px solid #475569;
+            border-radius: 999px;
+            background: #0f172a;
+            color: #bae6fd;
+            font-size: 11px;
+            font-weight: 800;
+            line-height: 1.2;
+            overflow-wrap: anywhere;
+            text-align: center;
+        }
+
+        .menu-recipe-progress-description {
+            display: grid;
+            gap: 3px;
+            color: #d1d5db;
+            font-size: 12px;
+            line-height: 1.35;
+            overflow-wrap: anywhere;
+        }
+
+        .menu-recipe-progress-description-label,
+        .menu-recipe-checklist-heading {
+            color: #f3f4f6;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .menu-recipe-checklist {
+            display: grid;
+            gap: 10px;
+        }
+
+        .menu-recipe-checklist-group {
+            display: grid;
+            gap: 6px;
+            min-width: 0;
+        }
+
+        .menu-recipe-checklist-group-title {
+            color: #9ca3af;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0;
+            text-transform: uppercase;
+        }
+
+        .menu-recipe-checklist-item {
+            display: grid;
+            grid-template-columns: 18px minmax(90px, 1fr) auto;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+            color: #e5e7eb;
+            font-size: 12px;
+            line-height: 1.3;
+        }
+
+        .menu-recipe-completion-check {
+            width: 16px;
+            height: 16px;
+            margin: 0;
+            accent-color: #00cc66;
+            pointer-events: none;
+        }
+
+        .menu-recipe-check-label {
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+
+        .menu-recipe-checklist-item.complete .menu-recipe-check-label {
+            color: #bbf7d0;
+            font-weight: 700;
+        }
+
+        .menu-recipe-check-status {
+            display: inline-flex;
+            align-items: center;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+            gap: 6px;
+            min-width: 0;
+            color: #a7f3d0;
+            font-size: 11px;
+            line-height: 1.25;
+            text-align: right;
+        }
+
+        .menu-recipe-check-status.error {
+            color: #fecaca;
+        }
+
+        .menu-recipe-check-message {
+            color: #cbd5e1;
+        }
+
+        .menu-recipe-check-badge {
+            display: inline-flex;
+            align-items: center;
+            min-height: 18px;
+            padding: 2px 6px;
+            border: 1px solid #52525b;
+            border-radius: 999px;
+            background: #27272a;
+            color: #d4d4d8;
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .menu-recipe-check-spinner {
+            width: 12px;
+            height: 12px;
+            border: 2px solid #475569;
+            border-top-color: #38bdf8;
+            border-radius: 50%;
+            animation: spin 0.85s linear infinite;
+        }
+
+        .menu-recipe-estimate-run-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 24px;
+            padding: 4px 9px;
+            border: 1px solid #2563eb;
+            border-radius: 6px;
+            background: #1d4ed8;
+            color: #fff;
+            font-size: 11px;
+            font-weight: 800;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .menu-recipe-estimate-run-btn:hover:not(:disabled) {
+            background: #2563eb;
+        }
+
+        .menu-recipe-estimate-run-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.72;
+        }
+
+        @media (max-width: 680px) {
+            .menu-recipe-progress-list {
+                grid-template-columns: 1fr;
+                padding-left: 8px;
+            }
+
+            .menu-recipe-progress-header {
+                display: grid;
+            }
+
+            .menu-recipe-progress-section {
+                max-width: none;
+                justify-self: start;
+            }
+
+            .menu-recipe-checklist-item {
+                grid-template-columns: 18px minmax(0, 1fr);
+            }
+
+            .menu-recipe-check-status {
+                grid-column: 2;
+                justify-content: flex-start;
+                text-align: left;
+            }
+        }
+
         .bulk-progress-store-line {
             color: #7dd3fc;
             font-size: 12px;
