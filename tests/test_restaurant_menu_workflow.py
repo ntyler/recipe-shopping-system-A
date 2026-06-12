@@ -331,10 +331,15 @@ def test_cookbook_menu_builder_creates_cookbook_linked_menu(monkeypatch, tmp_pat
                 "include_ai_generated_descriptions": "1",
                 "include_ai_generated_prices": "1",
             },
+            follow_redirects=True,
         )
 
     store = menu_store_service.load_menu_store()
-    assert response.status_code == 302
+    body = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert "Vel Asian Cuisine Menu" in body
+    assert "Spring Roll" in body
+    assert "Mango Salad" in body
     assert len(store["menus"]) == 1
     assert store["menus"][0]["cookbook_id"] == "vel-asian-cuisine"
     assert store["menus"][0]["created_from_cookbook_id"] == "vel-asian-cuisine"

@@ -108,7 +108,7 @@
                     <p class="restaurant-section-description">{{ section.section_description }}</p>
                 {% endif %}
                 <div class="restaurant-menu-item-grid">
-                    {% for item in section.items %}
+                    {% for item in section["items"] %}
                         <article class="restaurant-menu-item">
                             <label class="restaurant-menu-item-select">
                                 <input type="checkbox"

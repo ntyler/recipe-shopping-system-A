@@ -133,7 +133,7 @@
             {% if section.section_description %}
                 <p class="pdf-menu-meta">{{ section.section_description }}</p>
             {% endif %}
-            {% for item in section.items %}
+            {% for item in section["items"] %}
                 <article class="pdf-menu-item">
                     <div class="pdf-menu-item-title">
                         <span>{{ item.item_name }}</span>

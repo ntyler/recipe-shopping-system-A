@@ -65,7 +65,7 @@
             </div>
             <div>
                 <span>Items found</span>
-                <strong>{{ menu_detail.items|length }}</strong>
+                <strong>{{ menu_detail["items"]|length }}</strong>
             </div>
             <div>
                 <span>Recipe model</span>
@@ -100,7 +100,7 @@
                             <p>{{ section.section_description }}</p>
                         {% endif %}
                         <div class="menu-preview-item-grid">
-                            {% for item in section.items %}
+                            {% for item in section["items"] %}
                                 <label class="menu-preview-item">
                                     <input type="checkbox"
                                            name="menu_item_ids"
