@@ -63,13 +63,28 @@
             <section class="cookbook-collection">
                 <div class="cookbook-collection-header">
                     <div class="cookbook-collection-heading">
-                        <input id="cookbookRecipeSearchInput"
-                               class="cookbook-recipe-search"
-                               type="search"
-                               placeholder="Search recipes, ingredients, cuisine, meal type, custom category"
-                               autocomplete="off"
-                               aria-label="Search cookbook recipes"
-                               data-cookbook-recipe-search>
+                        <div class="cookbook-filter-row">
+                            <input id="cookbookRecipeSearchInput"
+                                   class="cookbook-recipe-search"
+                                   type="search"
+                                   placeholder="Search recipes, ingredients, cuisine, meal type, custom category"
+                                   autocomplete="off"
+                                   aria-label="Search cookbook recipes"
+                                   data-cookbook-recipe-search>
+                            <label class="cookbook-filter-control" for="cookbookFilterSelect">
+                                <span>Filter by Cookbook</span>
+                                <select id="cookbookFilterSelect"
+                                        aria-label="Filter by Cookbook"
+                                        data-cookbook-filter-select>
+                                    <option value="">All Cookbooks</option>
+                                    {% for filter_cookbook in cookbook_view.cookbooks %}
+                                        <option value="{{ filter_cookbook.id }}">
+                                            {{ filter_cookbook.name }} ({{ filter_cookbook.recipes | length }})
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </label>
+                        </div>
                     </div>
                     <form id="restoreCookbookRecipesForm"
                           class="cookbook-restore-form"
@@ -139,9 +154,19 @@
                                                             class="delete"
                                                             data-cookbook-id="{{ cookbook.id }}"
                                                             data-cookbook-name="{{ cookbook.name }}"
+                                                            data-cookbook-recipe-count="{{ cookbook.recipes | length }}"
                                                             onclick="closeRecipeEditRowMenus(); deleteCookbook(this); return false;"
                                                             aria-label="Delete {{ cookbook.name }}">
-                                                        Delete cookbook
+                                                        Delete cookbook, keep recipes
+                                                    </button>
+                                                    <button type="button"
+                                                            class="delete"
+                                                            data-cookbook-id="{{ cookbook.id }}"
+                                                            data-cookbook-name="{{ cookbook.name }}"
+                                                            data-cookbook-recipe-count="{{ cookbook.recipes | length }}"
+                                                            onclick="closeRecipeEditRowMenus(); purgeCookbook(this); return false;"
+                                                            aria-label="Delete {{ cookbook.name }} and purge recipes">
+                                                        Delete cookbook and purge recipes
                                                     </button>
                                                 {% endif %}
                                             </div>

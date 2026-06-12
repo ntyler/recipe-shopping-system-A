@@ -1555,6 +1555,47 @@ def delete_cookbook(cookbook_id):
         return save_cookbooks(payload)
 
 
+def delete_cookbook_and_purge_recipe_urls(cookbook_id):
+    with COOKBOOKS_LOCK:
+        payload = load_cookbooks()
+        target = find_cookbook(payload, cookbook_id)
+
+        if target is None:
+            raise ValueError("Cookbook was not found.")
+
+        if is_unclassified_cookbook(target):
+            raise ValueError("The unclassified cookbook cannot be purged.")
+
+        purge_keys = set()
+        purge_urls = []
+
+        for recipe in target.get("recipes", []):
+            raw_url = recipe.get("url") if isinstance(recipe, dict) else recipe
+            url = clean_text(raw_url)
+            key = recipe_key(url)
+
+            if key and key not in purge_keys:
+                purge_keys.add(key)
+                purge_urls.append(url)
+
+        payload["cookbooks"] = [
+            cookbook
+            for cookbook in payload["cookbooks"]
+            if cookbook.get("id") != cookbook_id
+        ]
+
+        if purge_keys:
+            for cookbook in payload["cookbooks"]:
+                cookbook["recipes"] = [
+                    recipe
+                    for recipe in cookbook.get("recipes", [])
+                    if recipe_key(recipe.get("url") if isinstance(recipe, dict) else recipe) not in purge_keys
+                ]
+
+        save_cookbooks(payload)
+        return purge_urls
+
+
 def rename_cookbook(cookbook_id, name):
     name = clean_text(name)
 

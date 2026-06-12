@@ -1,4 +1,5 @@
 from PushShoppingList.app import create_app
+from PushShoppingList.routes import main_routes
 from PushShoppingList.routes import recipe_routes
 from PushShoppingList.services import storage_service
 from PushShoppingList.services import user_account_service
@@ -118,6 +119,49 @@ def test_fetch_purge_recipe_returns_json_without_redirect(monkeypatch, tmp_path)
     assert response.get_json() == {"ok": True, "redirect_url": "/"}
     assert calls == [
         ("cookbooks", "https://example.com/soup"),
+        ("ingredients", "https://example.com/soup"),
+        ("url", "https://example.com/soup"),
+    ]
+
+
+def test_fetch_purge_cookbook_reuses_recipe_cleanup(monkeypatch, tmp_path):
+    app = create_app()
+    app.config.update(TESTING=True)
+    calls = []
+
+    def fake_delete_cookbook_and_purge_recipe_urls(cookbook_id):
+        calls.append(("cookbook", cookbook_id))
+        return ["https://example.com/chili", "https://example.com/soup"]
+
+    monkeypatch.setattr(
+        main_routes,
+        "delete_cookbook_and_purge_recipe_urls",
+        fake_delete_cookbook_and_purge_recipe_urls,
+    )
+    monkeypatch.setattr(
+        main_routes,
+        "remove_recipe_and_unused_ingredients",
+        lambda url: calls.append(("ingredients", url)),
+    )
+    monkeypatch.setattr(
+        main_routes,
+        "remove_recipe_url",
+        lambda url: calls.append(("url", url)),
+    )
+
+    with app.test_client() as client:
+        configure_signed_in_user(monkeypatch, tmp_path, client)
+        response = client.delete(
+            "/api/cookbooks/dinner/purge",
+            headers={"X-Requested-With": "fetch"},
+        )
+
+    assert response.status_code == 200
+    assert response.get_json() == {"ok": True, "purged_recipe_count": 2}
+    assert calls == [
+        ("cookbook", "dinner"),
+        ("ingredients", "https://example.com/chili"),
+        ("url", "https://example.com/chili"),
         ("ingredients", "https://example.com/soup"),
         ("url", "https://example.com/soup"),
     ]

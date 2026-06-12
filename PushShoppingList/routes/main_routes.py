@@ -31,6 +31,7 @@ from PushShoppingList.services.cookbook_service import cookbook_recipes_for_urls
 from PushShoppingList.services.cookbook_service import CookbookCategoryOverwriteConflict
 from PushShoppingList.services.cookbook_service import CookbookRecipeConflict
 from PushShoppingList.services.cookbook_service import delete_cookbook
+from PushShoppingList.services.cookbook_service import delete_cookbook_and_purge_recipe_urls
 from PushShoppingList.services.cookbook_service import ensure_unclassified_cookbook_for_recipes
 from PushShoppingList.services.cookbook_service import move_recipes_to_cookbook
 from PushShoppingList.services.cookbook_service import prepare_cookbook_menu_view
@@ -66,12 +67,14 @@ from PushShoppingList.services.purchase_mapping_service import purchase_mapping_
 from PushShoppingList.services.recipe_url_service import recipe_url_rows
 from PushShoppingList.services.recipe_url_service import recipe_url_type
 from PushShoppingList.services.recipe_url_service import add_recipe_urls
+from PushShoppingList.services.recipe_url_service import remove_recipe_url
 from PushShoppingList.services.recipe_url_service import save_recipe_urls
 from PushShoppingList.services.recipe_url_service import save_recipe_url_name
 from PushShoppingList.services.recipe_url_service import save_recipe_url_quantity
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
 from PushShoppingList.services.recipe_url_service import normalize_recipe_quantity
 from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
+from PushShoppingList.services.recipe_ingredient_service import remove_recipe_and_unused_ingredients
 from PushShoppingList.services.recipe_ingredient_service import save_recipe_ingredients
 from PushShoppingList.services.recipe_ingredient_service import save_ingredients_for_recipe
 from PushShoppingList.services.recipe_ingredient_service import update_saved_recipe_purchase_mapping
@@ -1964,6 +1967,28 @@ def delete_cookbook_route(cookbook_id):
         return jsonify({"ok": False, "error": str(err)}), status
 
     return jsonify({"ok": True})
+
+
+@main_bp.route("/api/cookbooks/<cookbook_id>/purge", methods=["DELETE"])
+def purge_cookbook_route(cookbook_id):
+    try:
+        recipe_urls = delete_cookbook_and_purge_recipe_urls(cookbook_id)
+        for recipe_url in recipe_urls:
+            remove_recipe_and_unused_ingredients(recipe_url)
+            remove_recipe_url(recipe_url)
+    except ValueError as err:
+        status = 400 if "cannot be purged" in str(err).lower() else 404
+        return jsonify({"ok": False, "error": str(err)}), status
+    except Exception as exc:
+        return jsonify({
+            "ok": False,
+            "error": str(exc) or "Unable to purge cookbook.",
+        }), 500
+
+    return jsonify({
+        "ok": True,
+        "purged_recipe_count": len(recipe_urls),
+    })
 
 
 @main_bp.route("/api/cookbooks/<cookbook_id>/rename", methods=["POST"])

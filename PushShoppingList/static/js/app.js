@@ -5591,6 +5591,7 @@ function resolveCookbookOverwritePrompt(shouldOverwrite) {
 }
 
 const COOKBOOK_RECIPE_SEARCH_SESSION_KEY = "cookbook-recipe-search";
+const COOKBOOK_FILTER_SESSION_KEY = "cookbook-filter";
 const COOKBOOK_MENU_MODE_SESSION_KEY = "cookbook-menu-mode";
 const DEFAULT_COOKBOOK_MENU_MODE = "restaurant_menu";
 
@@ -5612,9 +5613,47 @@ function cookbookMenuModeSelect() {
     return document.getElementById("cookbookMenuModeSelect");
 }
 
+function cookbookFilterSelect() {
+    return document.getElementById("cookbookFilterSelect");
+}
+
+function activeCookbookFilter() {
+    const select = cookbookFilterSelect();
+    return select && select.value ? select.value : "";
+}
+
 function activeCookbookMenuMode() {
     const select = cookbookMenuModeSelect();
     return select && select.value ? select.value : DEFAULT_COOKBOOK_MENU_MODE;
+}
+
+function setCookbookFilterValue(value) {
+    const select = cookbookFilterSelect();
+    const nextValue = String(value || "");
+
+    if (!select) {
+        return;
+    }
+
+    select.value = [...select.options].some(option => option.value === nextValue)
+        ? nextValue
+        : "";
+}
+
+function saveCookbookFilterValue(value) {
+    try {
+        sessionStorage.setItem(COOKBOOK_FILTER_SESSION_KEY, value || "");
+    } catch (err) {
+        // Filter persistence is optional.
+    }
+}
+
+function restoreCookbookFilterValue() {
+    try {
+        setCookbookFilterValue(sessionStorage.getItem(COOKBOOK_FILTER_SESSION_KEY) || "");
+    } catch (err) {
+        setCookbookFilterValue("");
+    }
 }
 
 function setCookbookMenuModeValue(value) {
@@ -5663,7 +5702,8 @@ function updateCookbookCardCollapseDisplay(card) {
 
     const isStoredCollapsed = card.dataset.cookbookCollapsed === "1";
     const searchActive = cookbookRecipeSearchTerms().length > 0;
-    const forceOpenForSearch = searchActive && !card.hidden;
+    const filterActive = Boolean(activeCookbookFilter());
+    const forceOpenForSearch = (searchActive || filterActive) && !card.hidden;
     const isVisuallyCollapsed = isStoredCollapsed && !forceOpenForSearch;
     const toggle = card.querySelector("[data-cookbook-toggle]");
     const icon = card.querySelector("[data-cookbook-toggle-icon]");
@@ -5758,37 +5798,41 @@ function recipeCardMatchesCookbookSearch(recipeCard, terms) {
     return terms.every(term => text.includes(term));
 }
 
-function applyCookbookMenuRecipeSearch(terms) {
+function applyCookbookMenuRecipeSearch(terms, cookbookFilter = "") {
     const searchActive = terms.length > 0;
     const activeMode = activeCookbookMenuMode();
     let visibleRecipes = 0;
 
-    document.querySelectorAll("[data-cookbook-menu-view]").forEach(view => {
-        const isActiveView = view.dataset.cookbookMenuView === activeMode;
+    document.querySelectorAll("[data-cookbook-card]").forEach(card => {
+        const cookbookMatches = !cookbookFilter || card.dataset.cookbookId === cookbookFilter;
 
-        view.querySelectorAll("[data-cookbook-menu-section]").forEach(section => {
-            const cards = Array.from(section.querySelectorAll("[data-cookbook-menu-recipe]"));
-            let matchingRecipes = 0;
+        card.querySelectorAll("[data-cookbook-menu-view]").forEach(view => {
+            const isActiveView = view.dataset.cookbookMenuView === activeMode;
 
-            cards.forEach(recipeCard => {
-                const isMatch = isActiveView && recipeCardMatchesCookbookSearch(recipeCard, terms);
-                recipeCard.hidden = !isMatch;
+            view.querySelectorAll("[data-cookbook-menu-section]").forEach(section => {
+                const cards = Array.from(section.querySelectorAll("[data-cookbook-menu-recipe]"));
+                let matchingRecipes = 0;
 
-                if (isMatch) {
-                    matchingRecipes += 1;
+                cards.forEach(recipeCard => {
+                    const isMatch = cookbookMatches && isActiveView && recipeCardMatchesCookbookSearch(recipeCard, terms);
+                    recipeCard.hidden = !isMatch;
+
+                    if (isMatch) {
+                        matchingRecipes += 1;
+                    }
+                });
+
+                const empty = section.querySelector("[data-cookbook-menu-empty]");
+                if (empty) {
+                    empty.hidden = matchingRecipes > 0 || (searchActive && !isActiveView) || !cookbookMatches;
+                }
+
+                section.hidden = (searchActive && isActiveView && matchingRecipes === 0) || !cookbookMatches;
+
+                if (cookbookMatches && isActiveView) {
+                    visibleRecipes += matchingRecipes;
                 }
             });
-
-            const empty = section.querySelector("[data-cookbook-menu-empty]");
-            if (empty) {
-                empty.hidden = matchingRecipes > 0 || (searchActive && !isActiveView);
-            }
-
-            section.hidden = searchActive && isActiveView && matchingRecipes === 0;
-
-            if (isActiveView) {
-                visibleRecipes += matchingRecipes;
-            }
         });
     });
 
@@ -5820,16 +5864,20 @@ function restoreCookbookRecipeSearchValue() {
 function applyCookbookRecipeSearch() {
     const terms = cookbookRecipeSearchTerms();
     const searchActive = terms.length > 0;
+    const cookbookFilter = activeCookbookFilter();
+    const filterActive = Boolean(cookbookFilter);
     const globalEmpty = document.getElementById("cookbookRecipeSearchEmpty");
     let visibleRecipes = 0;
-    const visibleMenuRecipes = applyCookbookMenuRecipeSearch(terms);
+    let visibleCards = 0;
+    const visibleMenuRecipes = applyCookbookMenuRecipeSearch(terms, cookbookFilter);
 
     document.querySelectorAll("[data-cookbook-card]").forEach(card => {
+        const cookbookMatches = !cookbookFilter || card.dataset.cookbookId === cookbookFilter;
         const recipes = Array.from(card.querySelectorAll("[data-cookbook-recipe-card]"));
         let matchingRecipes = 0;
 
         recipes.forEach(recipeCard => {
-            const isMatch = recipeCardMatchesCookbookSearch(recipeCard, terms);
+            const isMatch = cookbookMatches && recipeCardMatchesCookbookSearch(recipeCard, terms);
             recipeCard.hidden = !isMatch;
             recipeCard.classList.toggle("cookbook-recipe-search-hidden", !isMatch);
 
@@ -5838,22 +5886,29 @@ function applyCookbookRecipeSearch() {
             }
         });
 
-        visibleRecipes += matchingRecipes;
+        if (cookbookMatches) {
+            visibleRecipes += matchingRecipes;
+        }
+
         const menuRecipes = Array.from(card.querySelectorAll(`[data-cookbook-menu-view="${activeCookbookMenuMode()}"] [data-cookbook-menu-recipe]`));
         const matchingMenuRecipes = menuRecipes.filter(recipeCard => !recipeCard.hidden).length;
-        card.hidden = searchActive && matchingRecipes === 0 && matchingMenuRecipes === 0;
+        card.hidden = !cookbookMatches || (searchActive && matchingRecipes === 0 && matchingMenuRecipes === 0);
         card.classList.toggle("cookbook-card-search-hidden", Boolean(card.hidden));
+
+        if (!card.hidden) {
+            visibleCards += 1;
+        }
 
         const cardEmpty = card.querySelector("[data-cookbook-search-empty]");
         if (cardEmpty) {
-            cardEmpty.hidden = !searchActive || matchingRecipes > 0;
+            cardEmpty.hidden = !searchActive || matchingRecipes > 0 || !cookbookMatches;
         }
 
         updateCookbookCardCollapseDisplay(card);
     });
 
     if (globalEmpty) {
-        globalEmpty.hidden = !searchActive || (visibleRecipes + visibleMenuRecipes) > 0;
+        globalEmpty.hidden = (!searchActive && !filterActive) || visibleCards > 0 || (visibleRecipes + visibleMenuRecipes) > 0;
     }
 }
 
@@ -6356,6 +6411,15 @@ function bindCookbooks() {
         });
     }
 
+    const filterSelect = cookbookFilterSelect();
+    if (filterSelect && filterSelect.dataset.cookbookFilterBound !== "1") {
+        filterSelect.dataset.cookbookFilterBound = "1";
+        filterSelect.addEventListener("change", () => {
+            saveCookbookFilterValue(filterSelect.value);
+            applyCookbookRecipeSearch();
+        });
+    }
+
     const menuModeSelect = cookbookMenuModeSelect();
     if (menuModeSelect && menuModeSelect.dataset.cookbookMenuModeBound !== "1") {
         menuModeSelect.dataset.cookbookMenuModeBound = "1";
@@ -6370,6 +6434,7 @@ function bindCookbooks() {
     restoreCookbookCardCollapseState();
     restoreCookbookRecipeCollapseState();
     restoreCookbookRecipeSearchValue();
+    restoreCookbookFilterValue();
     restoreCookbookMenuModeValue();
     applyCookbookMenuMode();
     bindCookbookDragAndDrop();
@@ -7387,15 +7452,21 @@ async function saveCookbookName(event) {
     return false;
 }
 
-async function deleteCookbook(button) {
+async function deleteCookbook(button, options = {}) {
     if (!button) {
         return false;
     }
 
+    const purgeRecipes = options.purge === true;
     const cookbookId = button.dataset.cookbookId || "";
     const cookbookName = button.dataset.cookbookName || "this cookbook";
+    const recipeCount = Number(button.dataset.cookbookRecipeCount || 0);
+    const recipeLabel = recipeCount === 1 ? "recipe" : "recipes";
+    const confirmMessage = purgeRecipes
+        ? `Delete ${cookbookName} and purge ${recipeCount} ${recipeLabel}?\n\nThis removes those recipes from cookbooks, current recipes, saved recipe data, and unused shopping-list ingredients.`
+        : `Delete ${cookbookName}?\n\nRecipes in this cookbook will move to unclassified.`;
 
-    if (!cookbookId || !window.confirm(`Delete ${cookbookName}?`)) {
+    if (!cookbookId || !window.confirm(confirmMessage)) {
         return false;
     }
 
@@ -7403,10 +7474,11 @@ async function deleteCookbook(button) {
 
     try {
         button.disabled = true;
-        button.textContent = "...";
-        setCookbookStatus("Deleting cookbook...");
+        button.textContent = purgeRecipes ? "Purging..." : "...";
+        setCookbookStatus(purgeRecipes ? "Purging cookbook recipes..." : "Deleting cookbook...");
 
-        const response = await fetch(`/api/cookbooks/${encodeURIComponent(cookbookId)}`, {
+        const endpoint = `/api/cookbooks/${encodeURIComponent(cookbookId)}${purgeRecipes ? "/purge" : ""}`;
+        const response = await fetch(endpoint, {
             method: "DELETE",
             headers: {
                 "X-Requested-With": "fetch",
@@ -7422,16 +7494,30 @@ async function deleteCookbook(button) {
             cacheBust: true,
             requireRecipeLog: true,
         });
-        showRecipeQuantityUpdatedMessage("", "", "", "Cookbook deleted.");
+        const purgedCount = data && Number.isFinite(Number(data.purged_recipe_count))
+            ? Number(data.purged_recipe_count)
+            : recipeCount;
+        showRecipeQuantityUpdatedMessage(
+            "",
+            "",
+            "",
+            purgeRecipes
+                ? `Cookbook deleted and ${purgedCount} ${purgedCount === 1 ? "recipe was" : "recipes were"} purged.`
+                : "Cookbook deleted; recipes moved to unclassified."
+        );
     } catch (err) {
-        console.warn("Unable to delete cookbook.", err);
-        setCookbookStatus(err.message || "Unable to delete cookbook.", true);
+        console.warn(purgeRecipes ? "Unable to purge cookbook." : "Unable to delete cookbook.", err);
+        setCookbookStatus(err.message || (purgeRecipes ? "Unable to purge cookbook." : "Unable to delete cookbook."), true);
     } finally {
         button.disabled = false;
         button.textContent = originalText || "X";
     }
 
     return false;
+}
+
+function purgeCookbook(button) {
+    return deleteCookbook(button, { purge: true });
 }
 
 let recipeMediaImportMode = "recipe";

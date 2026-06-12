@@ -397,32 +397,28 @@ class ProductSelectionServiceTest(unittest.TestCase):
         script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
         css = Path("PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
-        recipe_log_index = index_template.index('{% include "sections/current_recipe_url_log.html" %}')
-        cookbooks_index = index_template.index('{% include "sections/cookbooks.html" %}')
-        rules_index = index_template.index('{% include "sections/rules.html" %}')
+        recipe_log_index = index_template.index('id="currentRecipeUrlLogCard"')
+        cookbooks_index = index_template.index('id="cookbooksCard"')
+        rules_index = index_template.index('id="rulesCard"')
 
         self.assertGreater(cookbooks_index, recipe_log_index)
         self.assertLess(cookbooks_index, rules_index)
+        self.assertIn('data-lazy-section="cookbooks"', index_template)
         self.assertIn('id="cookbooksCard"', cookbook_template)
-        self.assertIn("Move Selected", cookbook_template)
-        self.assertIn("data-cookbook-recipe-checkbox", cookbook_template)
-        self.assertIn("Equipment", cookbook_template)
-        self.assertIn("Instructions", cookbook_template)
-        self.assertIn("data-cookbook-recipe-toggle", cookbook_template)
+        self.assertIn("Add Selected to Recipe Log", cookbook_template)
         self.assertIn("data-cookbook-restore-checkbox", cookbook_template)
-        self.assertGreaterEqual(cookbook_template.count("data-cookbook-recipe-checkbox"), 2)
         self.assertIn("restoreCookbookRecipes(event)", cookbook_template)
         self.assertIn("openCookbookNameEditor(this)", cookbook_template)
         self.assertIn("cookbookNameEditorModal", cookbook_template)
         self.assertIn("cookbookOverwriteModal", cookbook_template)
         self.assertIn("cookbookRecipeSearchInput", cookbook_template)
-        self.assertIn("data-cookbook-toggle", cookbook_template)
+        self.assertIn("cookbookFilterSelect", cookbook_template)
+        self.assertIn("data-cookbook-filter-select", cookbook_template)
+        self.assertIn("Delete cookbook, keep recipes", cookbook_template)
+        self.assertIn("Delete cookbook and purge recipes", cookbook_template)
         self.assertIn("data-cookbook-card", cookbook_template)
         self.assertIn("resolveCookbookOverwritePrompt(false)", cookbook_template)
         self.assertIn("openRecipeEditor(this)", cookbook_template)
-        self.assertIn("recipe-archive-pdf-btn cookbook-recipe-pdf-btn", cookbook_template)
-        self.assertIn("cookbook-source-servings", cookbook_template)
-        self.assertIn("recipe-cover-image cookbook-source-cover", cookbook_template)
         self.assertIn("/api/cookbooks/restore_recipes", cookbook_template)
         self.assertIn("/rename", script)
         self.assertIn("cookbook_recipe_exists", script)
@@ -433,24 +429,23 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("function promptCookbookOverwrite", script)
         self.assertIn("function toggleCookbookCard", script)
         self.assertIn("function applyCookbookRecipeSearch", script)
+        self.assertIn("COOKBOOK_FILTER_SESSION_KEY", script)
+        self.assertIn("function purgeCookbook", script)
         self.assertIn("cookbook-card-collapse:", script)
         self.assertIn("cookbook-recipe-search", script)
         self.assertIn('savedState !== "expanded"', script)
         self.assertIn("function saveCookbookName", script)
         self.assertIn("restoreCookbookRecipeCollapseState", script)
         self.assertIn('replaceSectionFromPage(nextPage, "#editItemsSection")', script)
-        self.assertIn("/api/cookbooks/move_recipes", cookbook_template)
-        self.assertIn('replaceSectionFromPage(nextPage, "#cookbooksCard")', script)
+        self.assertIn('/api/cookbooks/${encodeURIComponent(cookbookId)}${purgeRecipes ? "/purge" : ""}', script)
+        self.assertIn('refreshLazySection("cookbooks"', script)
         self.assertIn(".cookbooks-layout", css)
-        self.assertIn(".cookbook-edit-btn", css)
         self.assertIn(".cookbook-name-modal-backdrop", css)
         self.assertIn(".cookbook-overwrite-list", css)
-        self.assertIn(".cookbook-card-toggle-btn", css)
         self.assertIn(".cookbook-card-collapsed .cookbook-card-body", css)
         self.assertIn(".cookbook-recipe-search", css)
+        self.assertIn(".cookbook-filter-row", css)
         self.assertIn(".cookbook-restore-btn", css)
-        self.assertIn(".cookbook-recipe-details.collapsed", css)
-        self.assertIn(".cookbook-source-cover", css)
 
     def test_cookbook_view_recipe_loads_editor_modal_lazily(self):
         cookbook_template = Path("PushShoppingList/templates/sections/cookbooks.html").read_text(encoding="utf-8")
@@ -690,6 +685,46 @@ class ProductSelectionServiceTest(unittest.TestCase):
 
             with self.assertRaises(ValueError):
                 cookbook_service.create_cookbook("Weeknight Dinners")
+
+    def test_delete_cookbook_and_purge_recipe_urls_removes_matching_saved_recipes(self):
+        from PushShoppingList.services import cookbook_service
+
+        with TemporaryDirectory() as temp_dir, patch.object(
+            cookbook_service,
+            "COOKBOOKS_FILE",
+            Path(temp_dir) / "cookbooks.json",
+        ):
+            cookbook_service.save_cookbooks({
+                "cookbooks": [
+                    {
+                        "id": "dinner",
+                        "name": "Dinner",
+                        "recipes": [
+                            {"name": "Skillet Chili", "url": "https://example.com/chili"},
+                            {"name": "Bean Soup", "url": "https://example.com/soup"},
+                        ],
+                    },
+                    {
+                        "id": "meal-prep",
+                        "name": "Meal Prep",
+                        "recipes": [
+                            {"name": "Skillet Chili", "url": "https://example.com/chili"},
+                            {"name": "Pasta", "url": "https://example.com/pasta"},
+                        ],
+                    },
+                ],
+            })
+
+            purged_urls = cookbook_service.delete_cookbook_and_purge_recipe_urls("dinner")
+
+            self.assertEqual(purged_urls, ["https://example.com/chili", "https://example.com/soup"])
+            data = cookbook_service.load_cookbooks()
+            self.assertEqual([cookbook["id"] for cookbook in data["cookbooks"]], ["meal-prep"])
+            remaining_urls = [
+                recipe["url"]
+                for recipe in data["cookbooks"][0]["recipes"]
+            ]
+            self.assertEqual(remaining_urls, ["https://example.com/pasta"])
 
     def test_cookbook_restore_adds_recipe_log_and_shopping_items(self):
         from PushShoppingList.routes import main_routes
