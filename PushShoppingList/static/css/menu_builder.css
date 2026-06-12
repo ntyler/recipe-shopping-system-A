@@ -490,6 +490,15 @@
     gap: 12px;
 }
 
+.cookbook-builder-picker {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: end;
+    margin: 12px 0 0;
+}
+
+.cookbook-builder-picker label,
 .menu-builder-grid label,
 .menu-builder-toggle-grid label,
 .menu-builder-public {
@@ -500,6 +509,7 @@
     font-weight: 850;
 }
 
+.cookbook-builder-picker select,
 .menu-builder-grid input,
 .menu-builder-grid select,
 .menu-builder-grid textarea {
@@ -749,6 +759,7 @@
     .menu-preview-summary,
     .menu-preview-item-grid,
     .restaurant-menu-item-grid,
+    .cookbook-builder-picker,
     .menu-builder-grid,
     .menu-builder-toggle-grid,
     .menu-builder-source-options,

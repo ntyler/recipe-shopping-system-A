@@ -129,26 +129,38 @@ def cookbook_builder_options_from_form(cookbook):
     }
 
 
-def render_cookbook_menu_builder(cookbook_id, error="", form_values=None, selected_recipe_urls=None, selected_category_names=None, status_code=200):
-    cookbook = resolve_cookbook_destination(cookbook_id, "", create_missing=False)
-    if not cookbook:
-        abort(404)
+def render_cookbook_menu_builder(cookbook_id="", error="", form_values=None, selected_recipe_urls=None, selected_category_names=None, status_code=200):
+    cookbooks = load_cookbooks().get("cookbooks", [])
+    cookbook = {}
+    existing_menus = []
+    menu_pdf_logs = []
+    preview_sections = []
 
-    cookbook = prepared_cookbook_for_menu_builder(cookbook)
+    if cookbook_id:
+        cookbook = resolve_cookbook_destination(cookbook_id, "", create_missing=False)
+        if not cookbook:
+            abort(404)
+
+        cookbook = prepared_cookbook_for_menu_builder(cookbook)
+        existing_menus = menus_by_cookbook().get(cookbook.get("id", ""), [])
+        menu_pdf_logs = menu_pdf_logs_for_cookbook(cookbook.get("id", ""))
+
     form_values = {**cookbook_builder_form_defaults(cookbook), **(form_values or {})}
-    existing_menus = menus_by_cookbook().get(cookbook.get("id", ""), [])
-    menu_pdf_logs = menu_pdf_logs_for_cookbook(cookbook.get("id", ""))
-    preview_sections = selected_cookbook_menu_sections(
-        cookbook,
-        options=form_values,
-        selected_recipe_urls=selected_recipe_urls,
-        selected_category_names=selected_category_names,
-    )
+
+    if cookbook:
+        preview_sections = selected_cookbook_menu_sections(
+            cookbook,
+            options=form_values,
+            selected_recipe_urls=selected_recipe_urls,
+            selected_category_names=selected_category_names,
+        )
+
     return render_template(
         "menus/cookbook_menu_builder.html",
         **menu_template_context(
             error=error,
             selected_cookbook=cookbook,
+            cookbooks=cookbooks,
             form_values=form_values,
             selected_recipe_urls=set(selected_recipe_urls or []),
             selected_category_names=set(selected_category_names or []),
@@ -361,8 +373,7 @@ def selected_cookbook_menu_builder_route():
 
     cookbook_id = str(request.args.get("cookbook_id") or "").strip()
     if not cookbook_id:
-        flash("Select a cookbook first.", "error")
-        return redirect(url_for("main_bp.index", _anchor="cookbooksCard"))
+        return render_cookbook_menu_builder()
     return redirect(url_for("menu_bp.cookbook_menu_builder_route", cookbook_id=cookbook_id))
 
 

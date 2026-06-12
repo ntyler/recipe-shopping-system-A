@@ -190,12 +190,15 @@ def test_menu_workflow_static_hooks_are_present():
     assert "Custom Restaurant Menu Builder" in entry_template
     assert "recipe-import-action-menu-builder" in entry_template
     assert "selected_cookbook_menu_builder_route" in entry_template
+    assert entry_template.count("data-import-cookbook-id-field") == 4
     assert ".recipe-import-action-menu-builder" in app_css
     assert "background: #155999" in app_css
-    assert "Custom Restaurant Menu Builder" in cookbooks_template
-    assert "cookbook_menu_builder_route" in cookbooks_template
-    assert "selected_cookbook_menu_builder_route" in cookbooks_template
+    assert "Custom Restaurant Menu Builder" not in cookbooks_template
+    assert "cookbook-menu-builder-launcher" not in cookbooks_template
     assert "Create a restaurant-style menu from this cookbook." in cookbook_builder_template
+    assert "Select Cookbook" in cookbook_builder_template
+    assert 'name="cookbook_id"' in cookbook_builder_template
+    assert "Use Cookbook" in cookbook_builder_template
     assert "Create Restaurant Menu Page" in cookbook_builder_template
     assert "Review Menu Items Before Recipe Generation" in preview_template
     assert "Generate Selected Recipes" in preview_template
@@ -278,6 +281,25 @@ def test_cookbook_menu_builder_route_loads_selected_cookbook(monkeypatch, tmp_pa
     assert "Recipes" in body
     assert "Spring Roll" in body
     assert "Mango Salad" in body
+
+
+def test_cookbook_menu_builder_entry_selects_cookbook_inside_builder(monkeypatch, tmp_path):
+    user_id = configure_menu_builder_test_paths(monkeypatch, tmp_path)
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    with app.test_client() as client:
+        sign_in_menu_user(client, user_id)
+        response = client.get("/cookbooks/menu-builder")
+
+    body = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert "Custom Restaurant Menu Builder" in body
+    assert "Select Cookbook" in body
+    assert "Use Cookbook" in body
+    assert "Vel Asian Cuisine" in body
+    assert "Spring Roll" not in body
+    assert "Create Restaurant Menu Page" not in body
 
 
 def test_cookbook_menu_builder_creates_cookbook_linked_menu(monkeypatch, tmp_path):

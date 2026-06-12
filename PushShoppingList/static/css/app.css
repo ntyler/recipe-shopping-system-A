@@ -6979,28 +6979,12 @@ body {
             min-width: 0;
         }
 
-        .cookbook-menu-builder-launcher {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
-            gap: 8px;
-            align-items: end;
-            margin: 0;
-            min-width: 0;
-        }
-
-        .cookbook-menu-builder-launcher label {
-            display: grid;
-            gap: 6px;
-            min-width: 0;
-        }
-
         .cookbook-menu-mode-control {
             display: grid;
             gap: 6px;
             min-width: 0;
         }
 
-        .cookbook-menu-builder-launcher span,
         .cookbook-menu-mode-control span,
         .cookbook-category-grid label span {
             color: #ddd;
@@ -7010,7 +6994,6 @@ body {
             letter-spacing: 0.04em;
         }
 
-        .cookbook-menu-builder-launcher select,
         .cookbook-menu-mode-control select,
         .cookbook-category-grid select,
         .cookbook-category-grid input {
@@ -7026,17 +7009,11 @@ body {
             outline: none;
         }
 
-        .cookbook-menu-builder-launcher select:focus,
         .cookbook-menu-mode-control select:focus,
         .cookbook-category-grid select:focus,
         .cookbook-category-grid input:focus {
             border-color: #00cc66;
             box-shadow: 0 0 0 3px rgba(0,204,102,0.16);
-        }
-
-        .cookbook-menu-builder-btn {
-            background: #a34716;
-            min-width: 176px;
         }
 
         .cookbook-create-form,
@@ -13097,10 +13074,6 @@ body {
 
             .cookbook-menu-heading {
                 align-items: stretch;
-            }
-
-            .cookbook-menu-builder-launcher {
-                grid-template-columns: 1fr;
             }
 
             .cookbook-menu-recipe-actions {

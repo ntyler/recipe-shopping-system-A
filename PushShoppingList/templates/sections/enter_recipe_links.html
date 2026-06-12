@@ -182,14 +182,6 @@
               class="recipe-media-upload-form"
               method="GET"
               action="{{ url_for('menu_bp.selected_cookbook_menu_builder_route') }}">
-            <input type="hidden"
-                   name="cookbook_id"
-                   data-import-cookbook-id-field
-                   value="{{ import_unclassified_cookbook.id }}">
-            <input type="hidden"
-                   name="cookbook_name"
-                   data-import-cookbook-name-field
-                   value="{{ import_unclassified_cookbook.name }}">
             <button class="recipe-media-upload-btn recipe-import-action-menu-builder"
                     type="submit">
                 Custom Restaurant Menu Builder

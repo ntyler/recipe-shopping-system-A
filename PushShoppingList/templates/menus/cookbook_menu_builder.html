@@ -7,7 +7,8 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/menu_builder.css', v=menu_builder_css_version) }}">
 </head>
 <body class="menu-builder-page">
-{% set category_sections = selected_cookbook.menu_sections.get(form_values.category_mode, []) %}
+{% set has_selected_cookbook = selected_cookbook and selected_cookbook.id %}
+{% set category_sections = selected_cookbook.menu_sections.get(form_values.category_mode, []) if has_selected_cookbook else [] %}
 <main class="menu-workspace cookbook-menu-builder-workspace">
     <section class="menu-preview-header">
         <div>
@@ -21,6 +22,36 @@
         <div class="menu-alert" role="alert">{{ error }}</div>
     {% endif %}
 
+    <section class="menu-panel">
+        <h2>Select Cookbook</h2>
+        <form class="cookbook-builder-picker"
+              method="GET"
+              action="{{ url_for('menu_bp.selected_cookbook_menu_builder_route') }}">
+            <label>
+                <span>Cookbook</span>
+                <select name="cookbook_id"
+                        required
+                        {% if not cookbooks %}disabled{% endif %}>
+                    <option value="">Select a cookbook</option>
+                    {% for cookbook in cookbooks %}
+                        <option value="{{ cookbook.id }}" {% if has_selected_cookbook and cookbook.id == selected_cookbook.id %}selected{% endif %}>
+                            {{ cookbook.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </label>
+            <button type="submit"
+                    class="menu-primary-btn"
+                    {% if not cookbooks %}disabled{% endif %}>
+                Use Cookbook
+            </button>
+        </form>
+        {% if not cookbooks %}
+            <div class="menu-pdf-log-empty">Create a cookbook before building a restaurant menu.</div>
+        {% endif %}
+    </section>
+
+    {% if has_selected_cookbook %}
     <section class="menu-preview-summary" aria-label="Cookbook menu builder summary">
         <div><span>Cookbook</span><strong>{{ selected_cookbook.name }}</strong></div>
         <div><span>Recipes</span><strong>{{ builder_stats.recipe_count }}</strong></div>
@@ -190,6 +221,7 @@
             {% endif %}
         </section>
     </form>
+    {% endif %}
 </main>
 </body>
 </html>

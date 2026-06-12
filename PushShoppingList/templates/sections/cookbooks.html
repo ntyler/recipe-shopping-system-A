@@ -44,26 +44,6 @@
                     <p>Browse your cookbook like a restaurant menu.</p>
                 </div>
                 <div class="cookbook-menu-controls">
-                    <form class="cookbook-menu-builder-launcher"
-                          method="GET"
-                          action="{{ url_for('menu_bp.selected_cookbook_menu_builder_route') }}">
-                        <label for="cookbookMenuBuilderSelect">
-                            <span>Select Cookbook</span>
-                            <select id="cookbookMenuBuilderSelect"
-                                    name="cookbook_id"
-                                    aria-label="Select cookbook for Custom Restaurant Menu Builder"
-                                    {% if not cookbook_view.cookbooks %}disabled{% endif %}>
-                                {% for builder_cookbook in cookbook_view.cookbooks %}
-                                    <option value="{{ builder_cookbook.id }}">{{ builder_cookbook.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </label>
-                        <button type="submit"
-                                class="cookbook-action-btn cookbook-menu-builder-btn"
-                                {% if not cookbook_view.cookbooks %}disabled{% endif %}>
-                            Custom Restaurant Menu Builder
-                        </button>
-                    </form>
                     <label class="cookbook-menu-mode-control" for="cookbookMenuModeSelect">
                         <span>Sort Cookbook By</span>
                         <select id="cookbookMenuModeSelect"
@@ -165,11 +145,6 @@
                                                 <span aria-hidden="true"></span>
                                             </button>
                                             <div class="recipe-edit-row-menu cookbook-card-menu" hidden>
-                                                <a class="recipe-edit-menu-link"
-                                                   href="{{ url_for('menu_bp.cookbook_menu_builder_route', cookbook_id=cookbook.id) }}"
-                                                   onclick="closeRecipeEditRowMenus()">
-                                                    Custom Restaurant Menu Builder
-                                                </a>
                                                 <a class="recipe-edit-menu-link"
                                                    href="{{ url_for('menu_bp.cookbook_menu_pdf_log_route', cookbook_id=cookbook.id) }}"
                                                    onclick="closeRecipeEditRowMenus()">
