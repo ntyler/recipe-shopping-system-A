@@ -4314,6 +4314,7 @@ body {
         }
 
         #currentRecipeUrlLogCard > .recipe-url-log-header,
+        #currentRecipeUrlLogCard.lazy-section-placeholder > .recipe-url-log-toggle,
         #cookbooksCard > .card-collapse-toggle,
         #rulesCard > .card-collapse-toggle,
         #home-address-section > .card-collapse-toggle,
@@ -8222,6 +8223,9 @@ body {
             margin-top: 12px;
         }
 
+        #currentRecipeUrlLogCard:not(.card-collapsed) > .recipe-url-log-header,
+        #currentRecipeUrlLogCard.lazy-section-placeholder:not(.card-collapsed) > .recipe-url-log-toggle,
+        #cookbooksCard:not(.card-collapsed) > .cookbooks-toggle,
         #rulesCard:not(.card-collapsed) .rules-toggle {
             position: sticky;
             top: 0;
@@ -8231,10 +8235,15 @@ body {
             box-shadow: 0 8px 24px rgba(0,0,0,0.45);
         }
 
+        #currentRecipeUrlLogCard.lazy-section-placeholder:not(.card-collapsed) > .recipe-url-log-toggle:hover,
+        #cookbooksCard:not(.card-collapsed) > .cookbooks-toggle:hover,
         #rulesCard:not(.card-collapsed) .rules-toggle:hover {
             background: #161b1b;
         }
 
+        #currentRecipeUrlLogCard:not(.card-collapsed) > .recipe-url-log-header,
+        #currentRecipeUrlLogCard.lazy-section-placeholder:not(.card-collapsed) > .recipe-url-log-toggle,
+        #cookbooksCard:not(.card-collapsed) > .cookbooks-toggle,
         #rulesCard:not(.card-collapsed) .rules-toggle {
             border: 0;
             box-shadow: none;
