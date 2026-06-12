@@ -182,11 +182,16 @@ def test_menu_workflow_static_hooks_are_present():
     view_template = (ROOT / "PushShoppingList/templates/menus/menu_view.html").read_text(encoding="utf-8")
     routes = (ROOT / "PushShoppingList/routes/menu_routes.py").read_text(encoding="utf-8")
     app_template = (ROOT / "PushShoppingList/templates/index.html").read_text(encoding="utf-8")
+    app_css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
     assert "Import Menu URL" in entry_template
     assert "menuImportUrlPreviewForm" in entry_template
     assert "menuMediaPreviewForm" in entry_template
-    assert "Custom Restaurant Menu Builder" not in entry_template
+    assert "Custom Restaurant Menu Builder" in entry_template
+    assert "recipe-import-action-menu-builder" in entry_template
+    assert "selected_cookbook_menu_builder_route" in entry_template
+    assert ".recipe-import-action-menu-builder" in app_css
+    assert "background: #155999" in app_css
     assert "Custom Restaurant Menu Builder" in cookbooks_template
     assert "cookbook_menu_builder_route" in cookbooks_template
     assert "selected_cookbook_menu_builder_route" in cookbooks_template

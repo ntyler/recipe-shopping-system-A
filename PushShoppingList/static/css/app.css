@@ -622,6 +622,10 @@ body {
         .recipe-import-action-upload { order: 2; }
         .recipe-import-action-url-menu { order: 3; }
         .recipe-import-action-upload-menu { order: 4; }
+        .recipe-import-action-menu-builder {
+            order: 5;
+            background: #155999;
+        }
 
         .pdf-share-card {
             border: 0;
