@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Custom Restaurant Menu Builder</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=app_css_version) }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/menu_builder.css', v=menu_builder_css_version) }}">
+</head>
+<body class="menu-builder-page">
+{% set category_sections = selected_cookbook.menu_sections.get(form_values.category_mode, []) %}
+<main class="menu-workspace cookbook-menu-builder-workspace">
+    <section class="menu-preview-header">
+        <div>
+            <a class="menu-back-link" href="{{ url_for('main_bp.index') }}#cookbooksCard">Back to Cookbooks</a>
+            <h1>Custom Restaurant Menu Builder</h1>
+            <p class="menu-page-subtitle">Create a restaurant-style menu from this cookbook.</p>
+        </div>
+    </section>
+
+    {% if error %}
+        <div class="menu-alert" role="alert">{{ error }}</div>
+    {% endif %}
+
+    <section class="menu-preview-summary" aria-label="Cookbook menu builder summary">
+        <div><span>Cookbook</span><strong>{{ selected_cookbook.name }}</strong></div>
+        <div><span>Recipes</span><strong>{{ builder_stats.recipe_count }}</strong></div>
+        <div><span>Categories</span><strong>{{ builder_stats.category_count }}</strong></div>
+        <div><span>Menu Pages</span><strong>{{ builder_stats.menu_count }}</strong></div>
+        <div><span>Menu PDFs</span><strong>{{ builder_stats.menu_pdf_count }}</strong></div>
+    </section>
+
+    <form class="menu-builder-form"
+          method="POST"
+          action="{{ url_for('menu_bp.create_cookbook_menu_builder_route', cookbook_id=selected_cookbook.id) }}">
+        <section class="menu-panel">
+            <h2>Choose Menu Source Content</h2>
+            <div class="menu-builder-source-options">
+                <label>
+                    <input type="radio"
+                           name="source_content"
+                           value="all"
+                           {% if form_values.source_content == "all" %}checked{% endif %}>
+                    <span>Use all recipes in this cookbook</span>
+                </label>
+                <label>
+                    <input type="radio"
+                           name="source_content"
+                           value="selected"
+                           {% if form_values.source_content == "selected" %}checked{% endif %}>
+                    <span>Select recipes manually</span>
+                </label>
+                <label>
+                    <input type="radio"
+                           name="source_content"
+                           value="categories"
+                           {% if form_values.source_content == "categories" %}checked{% endif %}>
+                    <span>Use only selected cookbook categories</span>
+                </label>
+                <label>
+                    <input type="checkbox"
+                           name="exclude_sparse_recipe_info"
+                           value="1"
+                           {% if form_values.exclude_sparse_recipe_info %}checked{% endif %}>
+                    <span>Exclude recipes without enough information</span>
+                </label>
+            </div>
+        </section>
+
+        <section class="menu-panel">
+            <h2>Choose Menu Layout and Style</h2>
+            <div class="menu-builder-grid">
+                <label>
+                    <span>Menu title</span>
+                    <input name="menu_title" value="{{ form_values.menu_title or '' }}" required>
+                </label>
+                <label>
+                    <span>Menu subtitle</span>
+                    <input name="menu_subtitle" value="{{ form_values.menu_subtitle or '' }}">
+                </label>
+                <label>
+                    <span>Restaurant name</span>
+                    <input name="restaurant_name" value="{{ form_values.restaurant_name or '' }}" required>
+                </label>
+                <label>
+                    <span>Cuisine / theme</span>
+                    <input name="cuisine_type" value="{{ form_values.cuisine_type or '' }}" placeholder="Asian, Italian, weeknight dinner">
+                </label>
+                <label>
+                    <span>Menu theme</span>
+                    <input name="theme" value="{{ form_values.theme or '' }}">
+                </label>
+                <label>
+                    <span>Price style</span>
+                    <select name="price_style">
+                        {% for value in ["budget", "casual", "upscale", "premium"] %}
+                            <option value="{{ value }}" {% if form_values.price_style == value %}selected{% endif %}>{{ value }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label>
+                    <span>Group sections by</span>
+                    <select name="category_mode">
+                        {% for option in menu_sort_options %}
+                            <option value="{{ option.key }}" {% if form_values.category_mode == option.key %}selected{% endif %}>{{ option.label }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+            </div>
+            <div class="menu-builder-toggle-grid">
+                <label><input type="checkbox" name="include_descriptions" value="1" {% if form_values.include_descriptions %}checked{% endif %}> Include descriptions</label>
+                <label><input type="checkbox" name="include_prices" value="1" {% if form_values.include_prices %}checked{% endif %}> Include prices</label>
+                <label><input type="checkbox" name="include_dietary_tags" value="1" {% if form_values.include_dietary_tags %}checked{% endif %}> Include dietary tags</label>
+                <label><input type="checkbox" name="include_images" value="1" {% if form_values.include_images %}checked{% endif %}> Include images</label>
+                <label><input type="checkbox" name="include_ai_generated_descriptions" value="1" {% if form_values.include_ai_generated_descriptions %}checked{% endif %}> Include generated descriptions</label>
+                <label><input type="checkbox" name="include_ai_generated_prices" value="1" {% if form_values.include_ai_generated_prices %}checked{% endif %}> Include generated prices</label>
+                <label><input type="checkbox" name="is_public" value="1" {% if form_values.is_public %}checked{% endif %}> Public menu page</label>
+            </div>
+        </section>
+
+        <section class="menu-panel">
+            <h2>Select Cookbook Categories</h2>
+            <div class="cookbook-builder-category-grid">
+                {% for section in category_sections %}
+                    {% if section.recipes %}
+                        <label>
+                            <input type="checkbox"
+                                   name="category_names"
+                                   value="{{ section.label }}"
+                                   {% if not has_category_selection or section.label in selected_category_names %}checked{% endif %}>
+                            <span>{{ section.label }}</span>
+                            <small>{{ section.recipes | length }} recipe{% if section.recipes | length != 1 %}s{% endif %}</small>
+                        </label>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="menu-panel">
+            <h2>Select Recipes Manually</h2>
+            <div class="cookbook-builder-recipe-grid">
+                {% for recipe in selected_cookbook.recipes %}
+                    <label>
+                        <input type="checkbox"
+                               name="recipe_urls"
+                               value="{{ recipe.url }}"
+                               {% if not has_recipe_selection or recipe.url in selected_recipe_urls %}checked{% endif %}>
+                        <span>{{ recipe.name }}</span>
+                        {% if recipe.short_description %}
+                            <small>{{ recipe.short_description }}</small>
+                        {% endif %}
+                    </label>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="menu-panel">
+            <div class="menu-panel-header">
+                <h2>Preview Menu Before Saving</h2>
+                <button type="submit" class="menu-primary-btn">Create Restaurant Menu Page</button>
+            </div>
+            {% if preview_sections %}
+                {% for section in preview_sections %}
+                    <section class="menu-preview-section">
+                        <h3>{{ section.section_name }}</h3>
+                        {% if section.section_description %}
+                            <p>{{ section.section_description }}</p>
+                        {% endif %}
+                        <div class="menu-preview-item-grid">
+                            {% for item in section["items"] %}
+                                <article class="menu-preview-item cookbook-builder-preview-item">
+                                    <div class="menu-preview-item-main">
+                                        <div class="menu-preview-item-topline">
+                                            <strong>{{ item.item_name }}</strong>
+                                            {% if item.menu_price %}<span>{{ item.menu_price }}</span>{% endif %}
+                                        </div>
+                                        {% if item.menu_description %}
+                                            <div class="menu-preview-description">{{ item.menu_description }}</div>
+                                        {% endif %}
+                                        {% if item.dietary_tags %}
+                                            <small>{{ item.dietary_tags | join(", ") }}</small>
+                                        {% endif %}
+                                    </div>
+                                </article>
+                            {% endfor %}
+                        </div>
+                    </section>
+                {% endfor %}
+            {% else %}
+                <div class="menu-pdf-log-empty">No cookbook recipes selected for this menu.</div>
+            {% endif %}
+        </section>
+    </form>
+</main>
+</body>
+</html>

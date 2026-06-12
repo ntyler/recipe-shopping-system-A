@@ -19,10 +19,16 @@ from PushShoppingList.routes.recipe_routes import require_account_for_import
 from PushShoppingList.routes.recipe_routes import selected_import_cookbook_from_form
 from PushShoppingList.routes.recipe_routes import selected_import_cookbook_from_json
 from PushShoppingList.routes.recipe_routes import with_openai_usage_dashboard
+from PushShoppingList.services.cookbook_service import cookbook_menu_sort_options
 from PushShoppingList.services.cookbook_service import load_cookbooks
 from PushShoppingList.services.cookbook_service import resolve_cookbook_destination
 from PushShoppingList.services.extraction_progress_service import load_progress
+from PushShoppingList.services.menu_builder_service import cookbook_builder_form_defaults
+from PushShoppingList.services.menu_builder_service import cookbook_builder_stats
+from PushShoppingList.services.menu_builder_service import create_menu_from_cookbook
 from PushShoppingList.services.menu_builder_service import generate_custom_menu
+from PushShoppingList.services.menu_builder_service import prepared_cookbook_for_menu_builder
+from PushShoppingList.services.menu_builder_service import selected_cookbook_menu_sections
 from PushShoppingList.services.menu_import_service import extract_menu_facts_from_upload
 from PushShoppingList.services.menu_import_service import extract_menu_facts_from_url
 from PushShoppingList.services.menu_pdf_service import export_upload_menu_pdf
@@ -30,6 +36,7 @@ from PushShoppingList.services.menu_pdf_service import generate_menu_pdf
 from PushShoppingList.services.menu_pdf_service import upload_menu_pdf
 from PushShoppingList.services.menu_store_service import delete_menu_pdf_log
 from PushShoppingList.services.menu_store_service import get_menu
+from PushShoppingList.services.menu_store_service import menus_by_cookbook
 from PushShoppingList.services.menu_store_service import menu_pdf_logs_for_cookbook
 from PushShoppingList.services.menu_store_service import selected_items_as_sections
 from PushShoppingList.services.menu_store_service import update_menu_fields
@@ -95,6 +102,68 @@ def render_menu_preview(menu_detail, fact_result=None, validation_message="", st
             menu_detail=menu_detail,
             fact_result=fact_result or {},
             validation_message=validation_message,
+        ),
+    ), status_code
+
+
+def cookbook_builder_options_from_form(cookbook):
+    defaults = cookbook_builder_form_defaults(cookbook)
+    return {
+        **defaults,
+        "menu_title": request.form.get("menu_title", defaults["menu_title"]),
+        "menu_subtitle": request.form.get("menu_subtitle", defaults["menu_subtitle"]),
+        "restaurant_name": request.form.get("restaurant_name", defaults["restaurant_name"]),
+        "cuisine_type": request.form.get("cuisine_type", ""),
+        "theme": request.form.get("theme", defaults["theme"]),
+        "price_style": request.form.get("price_style", defaults["price_style"]),
+        "category_mode": request.form.get("category_mode", defaults["category_mode"]),
+        "source_content": request.form.get("source_content", defaults["source_content"]),
+        "include_descriptions": request.form.get("include_descriptions") == "1",
+        "include_prices": request.form.get("include_prices") == "1",
+        "include_dietary_tags": request.form.get("include_dietary_tags") == "1",
+        "include_images": request.form.get("include_images") == "1",
+        "include_ai_generated_descriptions": request.form.get("include_ai_generated_descriptions") == "1",
+        "include_ai_generated_prices": request.form.get("include_ai_generated_prices") == "1",
+        "exclude_sparse_recipe_info": request.form.get("exclude_sparse_recipe_info") == "1",
+        "is_public": request.form.get("is_public") == "1",
+    }
+
+
+def render_cookbook_menu_builder(cookbook_id, error="", form_values=None, selected_recipe_urls=None, selected_category_names=None, status_code=200):
+    cookbook = resolve_cookbook_destination(cookbook_id, "", create_missing=False)
+    if not cookbook:
+        abort(404)
+
+    cookbook = prepared_cookbook_for_menu_builder(cookbook)
+    form_values = {**cookbook_builder_form_defaults(cookbook), **(form_values or {})}
+    existing_menus = menus_by_cookbook().get(cookbook.get("id", ""), [])
+    menu_pdf_logs = menu_pdf_logs_for_cookbook(cookbook.get("id", ""))
+    preview_sections = selected_cookbook_menu_sections(
+        cookbook,
+        options=form_values,
+        selected_recipe_urls=selected_recipe_urls,
+        selected_category_names=selected_category_names,
+    )
+    return render_template(
+        "menus/cookbook_menu_builder.html",
+        **menu_template_context(
+            error=error,
+            selected_cookbook=cookbook,
+            form_values=form_values,
+            selected_recipe_urls=set(selected_recipe_urls or []),
+            selected_category_names=set(selected_category_names or []),
+            has_recipe_selection=selected_recipe_urls is not None,
+            has_category_selection=selected_category_names is not None,
+            builder_stats=cookbook_builder_stats(
+                cookbook,
+                existing_menus=existing_menus,
+                menu_pdf_logs=menu_pdf_logs,
+                category_mode=form_values.get("category_mode"),
+            ),
+            existing_menus=existing_menus,
+            menu_pdf_logs=menu_pdf_logs,
+            preview_sections=preview_sections,
+            menu_sort_options=cookbook_menu_sort_options(),
         ),
     ), status_code
 
@@ -282,6 +351,67 @@ def menu_import_recipe_estimate_route(recipe_id):
     result = ensure_menu_recipe_serving_basis_estimate(recipe_url, {})
     status = 200 if result.get("ok") else 400
     return jsonify(with_openai_usage_dashboard(result)), status
+
+
+@menu_bp.route("/cookbooks/menu-builder", methods=["GET"])
+def selected_cookbook_menu_builder_route():
+    account_response = require_account_for_import(wants_json=False)
+    if account_response:
+        return account_response
+
+    cookbook_id = str(request.args.get("cookbook_id") or "").strip()
+    if not cookbook_id:
+        flash("Select a cookbook first.", "error")
+        return redirect(url_for("main_bp.index", _anchor="cookbooksCard"))
+    return redirect(url_for("menu_bp.cookbook_menu_builder_route", cookbook_id=cookbook_id))
+
+
+@menu_bp.route("/cookbooks/<cookbook_id>/menu-builder", methods=["GET"])
+def cookbook_menu_builder_route(cookbook_id):
+    account_response = require_account_for_import(wants_json=False)
+    if account_response:
+        return account_response
+    return render_cookbook_menu_builder(cookbook_id)
+
+
+@menu_bp.route("/cookbooks/<cookbook_id>/menu-builder/create", methods=["POST"])
+def create_cookbook_menu_builder_route(cookbook_id):
+    account_response = require_account_for_import(wants_json=wants_json_response())
+    if account_response:
+        return account_response
+
+    cookbook = resolve_cookbook_destination(cookbook_id, "", create_missing=False)
+    if not cookbook:
+        abort(404)
+
+    cookbook = prepared_cookbook_for_menu_builder(cookbook)
+    options = cookbook_builder_options_from_form(cookbook)
+    selected_recipe_urls = request.form.getlist("recipe_urls")
+    selected_category_names = request.form.getlist("category_names")
+
+    try:
+        result = create_menu_from_cookbook(
+            cookbook,
+            options=options,
+            selected_recipe_urls=selected_recipe_urls,
+            selected_category_names=selected_category_names,
+        )
+    except Exception as exc:
+        if wants_json_response():
+            return jsonify({"ok": False, "success": False, "error": str(exc)}), 400
+        return render_cookbook_menu_builder(
+            cookbook_id,
+            error=str(exc),
+            form_values=options,
+            selected_recipe_urls=selected_recipe_urls,
+            selected_category_names=selected_category_names,
+            status_code=400,
+        )
+
+    if wants_json_response():
+        return jsonify(result)
+
+    return redirect(url_for("menu_bp.menu_view_route", menu_id=result.get("menu_id", "")))
 
 
 @menu_bp.route("/menus/custom-builder", methods=["GET", "POST"])

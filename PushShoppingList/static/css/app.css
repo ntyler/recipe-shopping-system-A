@@ -622,10 +622,6 @@ body {
         .recipe-import-action-upload { order: 2; }
         .recipe-import-action-url-menu { order: 3; }
         .recipe-import-action-upload-menu { order: 4; }
-        .recipe-import-action-menu-builder {
-            order: 5;
-            background: #a34716;
-        }
 
         .pdf-share-card {
             border: 0;
@@ -6972,12 +6968,35 @@ body {
             line-height: 1.35;
         }
 
+        .cookbook-menu-controls {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .cookbook-menu-builder-launcher {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 8px;
+            align-items: end;
+            margin: 0;
+            min-width: 0;
+        }
+
+        .cookbook-menu-builder-launcher label {
+            display: grid;
+            gap: 6px;
+            min-width: 0;
+        }
+
         .cookbook-menu-mode-control {
             display: grid;
             gap: 6px;
             min-width: 0;
         }
 
+        .cookbook-menu-builder-launcher span,
         .cookbook-menu-mode-control span,
         .cookbook-category-grid label span {
             color: #ddd;
@@ -6987,6 +7006,7 @@ body {
             letter-spacing: 0.04em;
         }
 
+        .cookbook-menu-builder-launcher select,
         .cookbook-menu-mode-control select,
         .cookbook-category-grid select,
         .cookbook-category-grid input {
@@ -7002,11 +7022,17 @@ body {
             outline: none;
         }
 
+        .cookbook-menu-builder-launcher select:focus,
         .cookbook-menu-mode-control select:focus,
         .cookbook-category-grid select:focus,
         .cookbook-category-grid input:focus {
             border-color: #00cc66;
             box-shadow: 0 0 0 3px rgba(0,204,102,0.16);
+        }
+
+        .cookbook-menu-builder-btn {
+            background: #a34716;
+            min-width: 176px;
         }
 
         .cookbook-create-form,
@@ -13067,6 +13093,10 @@ body {
 
             .cookbook-menu-heading {
                 align-items: stretch;
+            }
+
+            .cookbook-menu-builder-launcher {
+                grid-template-columns: 1fr;
             }
 
             .cookbook-menu-recipe-actions {

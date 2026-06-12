@@ -272,6 +272,8 @@ def normalize_item(raw_item, section_name, index):
         "image_url": clean_nullable_text(raw_item.get("image_url")),
         "display_order": int(raw_item.get("display_order") or index + 1),
         "source_type": clean_text(raw_item.get("source_type") or "imported"),
+        "recipe_id": clean_nullable_text(raw_item.get("recipe_id")),
+        "recipe_url": clean_nullable_text(raw_item.get("recipe_url") or raw_item.get("url")),
         "menu_section": section_name,
         "is_spicy": clean_bool(raw_item.get("is_spicy")) or str(raw_item.get("spice_level") or "").lower() in {"medium", "hot"},
         "is_veggie": clean_bool(raw_item.get("is_veggie")) or any(
@@ -284,6 +286,7 @@ def normalize_item(raw_item, section_name, index):
 def replace_menu_sections_and_items(payload, menu, sections):
     menu_id = menu.get("id")
     restaurant_id = menu.get("restaurant_id")
+    cookbook_id = menu.get("cookbook_id", "")
     now = utc_now_iso()
     payload["sections"] = [
         section for section in payload.get("sections", []) if section.get("menu_id") != menu_id
@@ -301,6 +304,7 @@ def replace_menu_sections_and_items(payload, menu, sections):
             "id": new_id("section"),
             "menu_id": menu_id,
             "restaurant_id": restaurant_id,
+            "cookbook_id": cookbook_id,
             **normalized_section,
             "imported_at": now,
             "last_seen_at": now,
@@ -316,6 +320,7 @@ def replace_menu_sections_and_items(payload, menu, sections):
                 "id": new_id("item"),
                 "menu_id": menu_id,
                 "restaurant_id": restaurant_id,
+                "cookbook_id": cookbook_id,
                 "menu_section_id": section["id"],
                 **normalized_item,
                 "imported_at": now,
@@ -335,7 +340,7 @@ def upsert_menu_from_facts(facts, cookbook_id="", cookbook_name=""):
     source_url = clean_text(facts.get("source_url"))
     uploaded_path = clean_text(facts.get("source_uploaded_file_path") or facts.get("uploaded_file_path"))
     source_type = clean_text(facts.get("menu_source_type") or facts.get("source_type") or "imported_menu")
-    menu_source_type = "ai_generated_menu" if source_type == "ai_generated_menu" else "imported_menu"
+    menu_source_type = source_type if source_type in {"ai_generated_menu", "cookbook_generated_menu"} else "imported_menu"
     raw_menu = facts.get("menu") if isinstance(facts.get("menu"), dict) else {}
     raw_restaurant = facts.get("restaurant") if isinstance(facts.get("restaurant"), dict) else {}
     sections = facts.get("sections") if isinstance(facts.get("sections"), list) else []
@@ -373,6 +378,7 @@ def upsert_menu_from_facts(facts, cookbook_id="", cookbook_name=""):
             "source_url": source_url,
             "source_uploaded_file_path": uploaded_path,
             "source_name": clean_text(facts.get("source_name")),
+            "created_from_cookbook_id": clean_text(facts.get("created_from_cookbook_id") or cookbook_id),
             "is_public": clean_bool(raw_menu.get("is_public") or facts.get("is_public")),
             "generated_by_model": clean_text(facts.get("generated_by_model") or facts.get("model_used") or facts.get("model")),
             "model_source": clean_text(facts.get("model_source")),

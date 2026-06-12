@@ -25,6 +25,13 @@
     text-align: left;
 }
 
+.menu-page-subtitle {
+    margin: 6px 0 0;
+    color: #cbd5e1;
+    font-size: 14px;
+    font-weight: 750;
+}
+
 .menu-back-link,
 .menu-action-link,
 .menu-secondary-link,
@@ -461,6 +468,17 @@
     font-weight: 900;
 }
 
+.restaurant-menu-footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    margin: 20px 0 36px;
+    color: #9ca3af;
+    font-size: 12px;
+    font-weight: 800;
+}
+
 .menu-builder-form {
     display: grid;
     gap: 14px;
@@ -507,8 +525,20 @@
     margin: 12px 0 14px;
 }
 
+.menu-builder-source-options,
+.cookbook-builder-category-grid,
+.cookbook-builder-recipe-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.menu-builder-source-options label,
 .menu-builder-toggle-grid label,
-.menu-builder-public {
+.menu-builder-public,
+.cookbook-builder-category-grid label,
+.cookbook-builder-recipe-grid label {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -516,6 +546,33 @@
     border: 1px solid #343434;
     border-radius: 8px;
     background: #111;
+}
+
+.cookbook-builder-category-grid label,
+.cookbook-builder-recipe-grid label {
+    align-items: flex-start;
+    flex-direction: column;
+}
+
+.cookbook-builder-category-grid input,
+.cookbook-builder-recipe-grid input {
+    align-self: flex-start;
+}
+
+.cookbook-builder-category-grid span,
+.cookbook-builder-recipe-grid span,
+.menu-builder-source-options span {
+    color: #f8fafc;
+    font-size: 13px;
+    font-weight: 850;
+}
+
+.cookbook-builder-category-grid small,
+.cookbook-builder-recipe-grid small {
+    color: #9ca3af;
+    font-size: 12px;
+    font-weight: 750;
+    line-height: 1.35;
 }
 
 .menu-progress-grid {
@@ -694,6 +751,9 @@
     .restaurant-menu-item-grid,
     .menu-builder-grid,
     .menu-builder-toggle-grid,
+    .menu-builder-source-options,
+    .cookbook-builder-category-grid,
+    .cookbook-builder-recipe-grid,
     .menu-progress-grid {
         grid-template-columns: 1fr;
     }
