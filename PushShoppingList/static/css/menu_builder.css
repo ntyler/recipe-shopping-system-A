@@ -1,4 +1,11 @@
+.menu-builder-document {
+    min-height: 100%;
+    background: #121212;
+}
+
 .menu-builder-page {
+    min-height: 100vh;
+    margin: 0;
     background: #121212;
     color: #f4f4f5;
 }

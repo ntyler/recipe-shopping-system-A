@@ -183,6 +183,7 @@ def test_menu_workflow_static_hooks_are_present():
     routes = (ROOT / "PushShoppingList/routes/menu_routes.py").read_text(encoding="utf-8")
     app_template = (ROOT / "PushShoppingList/templates/index.html").read_text(encoding="utf-8")
     app_css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    menu_builder_css = (ROOT / "PushShoppingList/static/css/menu_builder.css").read_text(encoding="utf-8")
 
     assert "Import Menu URL" in entry_template
     assert "menuImportUrlPreviewForm" in entry_template
@@ -199,6 +200,9 @@ def test_menu_workflow_static_hooks_are_present():
     assert "Select Cookbook" in cookbook_builder_template
     assert 'name="cookbook_id"' in cookbook_builder_template
     assert "Use Cookbook" in cookbook_builder_template
+    assert '<html class="menu-builder-document">' in cookbook_builder_template
+    assert ".menu-builder-document" in menu_builder_css
+    assert "min-height: 100vh" in menu_builder_css
     assert "Create Restaurant Menu Page" in cookbook_builder_template
     assert "Review Menu Items Before Recipe Generation" in preview_template
     assert "Generate Selected Recipes" in preview_template
