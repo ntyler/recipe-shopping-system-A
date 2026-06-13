@@ -61,6 +61,33 @@ def test_cookbook_menu_mode_static_hooks_are_present():
     assert ".cookbook-category-grid" in css
 
 
+def test_cookbook_recipe_rows_match_current_recipe_summary_layout():
+    template = read_text("PushShoppingList/templates/sections/cookbooks.html")
+    css = read_text("PushShoppingList/static/css/app.css")
+
+    recipe_card_start = template.index("data-cookbook-recipe-card")
+    title_line_start = template.index(
+        '<span class="recipe-url-summary-title-line">',
+        recipe_card_start,
+    )
+    food_review_index = template.index(
+        'class="food-rule-marker recipe-log-food-review-btn recipe-url-summary-food-review"',
+        title_line_start,
+    )
+    summary_body_index = template.index(
+        '<div class="recipe-url-summary-body">',
+        title_line_start,
+    )
+
+    assert food_review_index < summary_body_index
+    assert "recipe-url-summary-row" in template
+    assert 'class="recipe-url-summary-header"' in template
+    assert 'class="recipe-batch-select cookbook-restore-checkbox cookbook-recipe-restore-checkbox"' in template
+    assert 'class="recipe-url-summary-actions cookbook-recipe-actions"' in template
+    assert "display: grid;\n                grid-template-columns: minmax(0, 1fr) auto;" not in css
+    assert "justify-content: flex-end;\n                width: 100%;\n                margin-left: auto;" not in css
+
+
 def test_cookbook_menu_metadata_uses_saved_values_without_render_inference():
     with TemporaryDirectory() as temp_dir, patch.object(
         cookbook_service,

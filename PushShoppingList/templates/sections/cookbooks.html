@@ -384,18 +384,18 @@
                                                                                 {{ recipe.rating_stars }}
                                                                             </span>
                                                                         {% endif %}
+                                                                        {% if recipe.food_rule_status and recipe.food_rule_status.needs_review %}
+                                                                            <button type="button"
+                                                                                    class="food-rule-marker recipe-log-food-review-btn recipe-url-summary-food-review"
+                                                                                    data-recipe-url="{{ recipe.url }}"
+                                                                                    title="{{ recipe.food_rule_status.marker }}"
+                                                                                    aria-label="Food Review: {{ recipe.food_rule_status.count }} item{% if recipe.food_rule_status.count != 1 %}s{% endif %} need review"
+                                                                                    onclick="return openRecipeFoodReviewFromRecipeView(this, event)">
+                                                                                Food Review ({{ recipe.food_rule_status.count }})
+                                                                            </button>
+                                                                        {% endif %}
                                                                     </span>
                                                                 </div>
-                                                                {% if recipe.food_rule_status and recipe.food_rule_status.needs_review %}
-                                                                    <button type="button"
-                                                                            class="food-rule-marker recipe-log-food-review-btn recipe-url-summary-food-review"
-                                                                            data-recipe-url="{{ recipe.url }}"
-                                                                            title="{{ recipe.food_rule_status.marker }}"
-                                                                            aria-label="Food Review: {{ recipe.food_rule_status.count }} item{% if recipe.food_rule_status.count != 1 %}s{% endif %} need review"
-                                                                            onclick="return openRecipeFoodReviewFromRecipeView(this, event)">
-                                                                        Food Review ({{ recipe.food_rule_status.count }})
-                                                                    </button>
-                                                                {% endif %}
                                                             </div>
                                                             <div class="recipe-url-summary-body">
                                                                 {% if recipe.cover_image and recipe.cover_image.src %}
