@@ -1,7 +1,10 @@
+import pytest
+
 from PushShoppingList.app import create_app
 from PushShoppingList.routes import job_routes
 from PushShoppingList.services import guest_session_service
 from PushShoppingList.services import job_service
+from PushShoppingList.services import recipe_extract_service
 from PushShoppingList.services import storage_service
 
 
@@ -90,6 +93,56 @@ def test_job_for_client_shows_safe_sources_and_model_metadata(monkeypatch, tmp_p
     ]
     assert "input_payload" not in payload
     assert str(upload_path) not in str(payload)
+
+
+def test_cancelled_job_cannot_be_revived_by_worker_updates(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    job = job_service.create_job(
+        "menu-import",
+        input_payload={"urls": ["https://example.com/menu"]},
+        user_id="owner",
+        total_items=1,
+    )
+
+    cancelled = job_service.cancel_job(job["id"])
+    assert cancelled["status"] == "cancelled"
+
+    progress = job_service.update_job_progress(
+        job["id"],
+        current_step="Inferring recipes with GPT-5.5 (1/266)",
+        progress_percent=35,
+        completed_items=1,
+        total_items=266,
+    )
+    completed = job_service.complete_job(job["id"], result_payload={"ok": True})
+    failed = job_service.fail_job(job["id"], "Should not overwrite cancellation.")
+
+    assert progress["status"] == "cancelled"
+    assert completed["status"] == "cancelled"
+    assert failed["status"] == "cancelled"
+    assert job_service.get_job(job["id"])["current_step"] == "Cancelled"
+
+
+def test_menu_item_inference_bubbles_job_cancellation(monkeypatch, tmp_path):
+    class JobCancelled(Exception):
+        pass
+
+    monkeypatch.setattr(recipe_extract_service, "RAW_FOLDER", tmp_path)
+
+    def cancellation_check():
+        raise JobCancelled()
+
+    with pytest.raises(JobCancelled):
+        recipe_extract_service.build_menu_extract_result_from_items(
+            "https://example.com/menu",
+            [
+                {
+                    "section_name": "Entrees",
+                    "items": [{"item_name": "Test Noodles", "menu_section": "Entrees"}],
+                }
+            ],
+            cancellation_check=cancellation_check,
+        )
 
 
 def test_guest_cleanup_deletes_guest_jobs(monkeypatch, tmp_path):

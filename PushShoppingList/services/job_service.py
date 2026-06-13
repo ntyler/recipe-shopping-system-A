@@ -379,6 +379,9 @@ def append_job_warning(job_id, message):
 
 
 def start_job(job_id, current_step="Starting"):
+    if job_cancelled(job_id):
+        return get_job(job_id)
+
     return update_job(
         job_id,
         status="running",
@@ -398,6 +401,9 @@ def update_job_progress(
     warning_message=None,
     result_payload=None,
 ):
+    if job_cancelled(job_id):
+        return get_job(job_id)
+
     fields = {}
     if current_step is not None:
         fields["current_step"] = str(current_step or "").strip() or "Running"
@@ -424,6 +430,9 @@ def update_job_progress(
 
 
 def complete_job(job_id, result_payload=None, current_step="Completed"):
+    if job_cancelled(job_id):
+        return get_job(job_id)
+
     return update_job(
         job_id,
         status="completed",
@@ -436,6 +445,9 @@ def complete_job(job_id, result_payload=None, current_step="Completed"):
 
 
 def fail_job(job_id, error_message, result_payload=None, current_step="Failed"):
+    if job_cancelled(job_id):
+        return get_job(job_id)
+
     return update_job(
         job_id,
         status="failed",

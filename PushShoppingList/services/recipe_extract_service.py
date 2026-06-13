@@ -13,8 +13,9 @@ import time
 import uuid
 import zipfile
 import xml.etree.ElementTree as ET
+from concurrent.futures import FIRST_COMPLETED
 from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import as_completed
+from concurrent.futures import wait
 from dataclasses import asdict
 from dataclasses import dataclass
 from datetime import datetime
@@ -78,6 +79,16 @@ def _safe_float(value, default):
         return float(value)
     except (TypeError, ValueError):
         return float(default)
+
+
+def is_job_cancelled_exception(exc):
+    return exc.__class__.__name__ == "JobCancelled"
+
+
+def run_cancellation_check(cancellation_check=None):
+    if callable(cancellation_check):
+        cancellation_check()
+
 
 EXTRACTOR_FOLDER = scoped_extractor_path()
 OUTPUT_FOLDER = scoped_extractor_data_path("output")
@@ -9357,10 +9368,25 @@ def menu_page_request_headers():
     }
 
 
-def fetch_menu_page_html(menu_url):
-    response = requests.get(menu_url, headers=menu_page_request_headers(), timeout=(8, 20))
-    response.raise_for_status()
-    return response.text
+def fetch_menu_page_html(menu_url, cancellation_check=None):
+    run_cancellation_check(cancellation_check)
+    response = requests.get(
+        menu_url,
+        headers=menu_page_request_headers(),
+        timeout=(8, 20),
+        stream=True,
+    )
+    try:
+        response.raise_for_status()
+        chunks = []
+        for chunk in response.iter_content(chunk_size=65536):
+            run_cancellation_check(cancellation_check)
+            if chunk:
+                chunks.append(chunk)
+        response._content = b"".join(chunks)
+        return response.text
+    finally:
+        response.close()
 
 
 def menu_page_visible_text(html_text):
@@ -9406,7 +9432,8 @@ def cartana_menu_api_url(menu_url):
     ))
 
 
-def fetch_cartana_menu_payload(menu_url, html_text=""):
+def fetch_cartana_menu_payload(menu_url, html_text="", cancellation_check=None):
+    run_cancellation_check(cancellation_check)
     restaurant_id = extract_cartana_restaurant_id(menu_url, html_text)
     api_url = cartana_menu_api_url(menu_url)
     if not restaurant_id or not api_url:
@@ -9430,12 +9457,18 @@ def fetch_cartana_menu_payload(menu_url, html_text=""):
         headers=headers,
         timeout=(8, 30),
     )
-    response.raise_for_status()
-    return response.json(), {
-        "ok": True,
-        "restaurant_id": restaurant_id,
-        "api_url": api_url,
-    }
+    try:
+        run_cancellation_check(cancellation_check)
+        response.raise_for_status()
+        payload = response.json()
+        run_cancellation_check(cancellation_check)
+        return payload, {
+            "ok": True,
+            "restaurant_id": restaurant_id,
+            "api_url": api_url,
+        }
+    finally:
+        response.close()
 
 
 def clean_menu_price(value):
@@ -10010,6 +10043,7 @@ def build_menu_extract_result_from_items(
     extracted_text="",
     diagnostics=None,
     progress_callback=None,
+    cancellation_check=None,
 ):
     diagnostics = diagnostics if isinstance(diagnostics, dict) else {}
     menu_items = flatten_menu_sections(sections)
@@ -10062,6 +10096,10 @@ def build_menu_extract_result_from_items(
     inference_results = [None] * total_items
     diagnostics["menu_item_inference_workers"] = worker_count
 
+    def check_cancelled():
+        run_cancellation_check(cancellation_check)
+
+    check_cancelled()
     if progress_callback:
         progress_callback(
             "Inferring recipes with GPT-5.5",
@@ -10070,8 +10108,10 @@ def build_menu_extract_result_from_items(
                 f"with up to {worker_count} running at once."
             ),
         )
+    check_cancelled()
 
     def run_inference(index, menu_item):
+        check_cancelled()
         recipe, inference = infer_menu_item_recipe_for_worker(
             source_url,
             menu_item,
@@ -10079,6 +10119,7 @@ def build_menu_extract_result_from_items(
             total_items,
             user_id=usage_user_id,
         )
+        check_cancelled()
         return index, menu_item, recipe, inference
 
     def record_inference_result(index, menu_item, recipe, inference):
@@ -10103,6 +10144,7 @@ def build_menu_extract_result_from_items(
 
     if worker_count == 1:
         for index, menu_item in enumerate(menu_items):
+            check_cancelled()
             index, menu_item, recipe, inference = run_inference(index, menu_item)
             completed_items += 1
             record_inference_result(index, menu_item, recipe, inference)
@@ -10113,47 +10155,86 @@ def build_menu_extract_result_from_items(
                         f"{menu_item.get('menu_section')}: {menu_item.get('item_name')}"
                     ),
                 )
+            check_cancelled()
     else:
-        with ThreadPoolExecutor(max_workers=worker_count) as executor:
-            future_map = {
-                executor.submit(run_inference, index, menu_item): (index, menu_item)
-                for index, menu_item in enumerate(menu_items)
-            }
-            for future in as_completed(future_map):
-                fallback_index, fallback_item = future_map[future]
-                try:
-                    index, menu_item, recipe, inference = future.result()
-                except Exception as exc:
-                    index = fallback_index
-                    menu_item = fallback_item
-                    recipe = None
-                    error_code, error_message = classify_vision_ai_exception(exc)
-                    openai_error_code, openai_error_param = get_openai_error_code_and_param(exc)
-                    inference = {
-                        "ok": False,
-                        "item_name": menu_item.get("item_name") if isinstance(menu_item, dict) else "",
-                        "menu_section": menu_item.get("menu_section") if isinstance(menu_item, dict) else "",
-                        "error_code": error_code,
-                        "error_message": error_message or str(exc),
-                        "technical_message": str(exc),
-                        "exception_type": type(exc).__name__,
-                        "openai_error_code": openai_error_code,
-                        "openai_error_param": openai_error_param,
-                        "model": model_resolution.model,
-                        "model_source": model_resolution.source,
-                    }
+        executor = ThreadPoolExecutor(max_workers=worker_count)
+        future_map = {}
+        next_index = 0
 
-                completed_items += 1
-                record_inference_result(index, menu_item, recipe, inference)
-                if progress_callback:
-                    progress_callback(
-                        f"Inferring recipes with GPT-5.5 ({completed_items}/{total_items})",
-                        clean_recipe_text(
-                            f"{menu_item.get('menu_section')}: {menu_item.get('item_name')}"
-                        ),
-                    )
+        def submit_next_batch():
+            nonlocal next_index
+            while next_index < total_items and len(future_map) < worker_count:
+                check_cancelled()
+                menu_item = menu_items[next_index]
+                future_map[executor.submit(run_inference, next_index, menu_item)] = (next_index, menu_item)
+                next_index += 1
 
+        try:
+            submit_next_batch()
+            while future_map:
+                check_cancelled()
+                done, _pending = wait(
+                    future_map,
+                    timeout=0.5,
+                    return_when=FIRST_COMPLETED,
+                )
+                if not done:
+                    continue
+
+                for future in done:
+                    fallback_index, fallback_item = future_map.pop(future)
+                    check_cancelled()
+                    try:
+                        index, menu_item, recipe, inference = future.result()
+                    except Exception as exc:
+                        if is_job_cancelled_exception(exc):
+                            raise
+                        index = fallback_index
+                        menu_item = fallback_item
+                        recipe = None
+                        error_code, error_message = classify_vision_ai_exception(exc)
+                        openai_error_code, openai_error_param = get_openai_error_code_and_param(exc)
+                        inference = {
+                            "ok": False,
+                            "item_name": menu_item.get("item_name") if isinstance(menu_item, dict) else "",
+                            "menu_section": menu_item.get("menu_section") if isinstance(menu_item, dict) else "",
+                            "error_code": error_code,
+                            "error_message": error_message or str(exc),
+                            "technical_message": str(exc),
+                            "exception_type": type(exc).__name__,
+                            "openai_error_code": openai_error_code,
+                            "openai_error_param": openai_error_param,
+                            "model": model_resolution.model,
+                            "model_source": model_resolution.source,
+                        }
+
+                    check_cancelled()
+                    completed_items += 1
+                    record_inference_result(index, menu_item, recipe, inference)
+                    if progress_callback:
+                        progress_callback(
+                            f"Inferring recipes with GPT-5.5 ({completed_items}/{total_items})",
+                            clean_recipe_text(
+                                f"{menu_item.get('menu_section')}: {menu_item.get('item_name')}"
+                            ),
+                        )
+                    check_cancelled()
+
+                submit_next_batch()
+        except Exception as exc:
+            for future in future_map:
+                future.cancel()
+            executor.shutdown(
+                wait=not is_job_cancelled_exception(exc),
+                cancel_futures=True,
+            )
+            raise
+        else:
+            executor.shutdown(wait=True)
+
+    check_cancelled()
     for result in inference_results:
+        check_cancelled()
         if not result:
             continue
 
@@ -10285,7 +10366,7 @@ def build_menu_extract_result_from_items(
     }
 
 
-def extract_menu_recipes_from_url(menu_url, progress_callback=None):
+def extract_menu_recipes_from_url(menu_url, progress_callback=None, cancellation_check=None):
     menu_url = str(menu_url or "").strip()
     if not menu_url:
         return {
@@ -10296,9 +10377,14 @@ def extract_menu_recipes_from_url(menu_url, progress_callback=None):
         }
 
     try:
+        def check_cancelled():
+            run_cancellation_check(cancellation_check)
+
         def report(message, summary=None):
+            check_cancelled()
             if progress_callback:
                 progress_callback(message, summary)
+            check_cancelled()
 
         diagnostics = {
             "menu_page_fetched": False,
@@ -10315,12 +10401,16 @@ def extract_menu_recipes_from_url(menu_url, progress_callback=None):
             "Opening the restaurant menu page.",
         )
         try:
-            html_text = fetch_menu_page_html(menu_url)
+            html_text = fetch_menu_page_html(menu_url, cancellation_check=check_cancelled)
+            check_cancelled()
             diagnostics["menu_page_fetched"] = True
             (RAW_FOLDER / f"{safe_filename(menu_url)}_MENU_PAGE_HTML.html").write_text(html_text, encoding="utf-8")
+            check_cancelled()
             page_text = menu_page_visible_text(html_text)
             (RAW_FOLDER / f"{safe_filename(menu_url)}_MENU_PAGE_TEXT.txt").write_text(page_text, encoding="utf-8")
         except Exception as exc:
+            if is_job_cancelled_exception(exc):
+                raise
             diagnostics["menu_fetch_error"] = str(exc)
             print(f"[recipe_import] action=menu_page_fetch_failed url={menu_url} error={exc}")
 
@@ -10330,30 +10420,41 @@ def extract_menu_recipes_from_url(menu_url, progress_callback=None):
         )
         if html_text:
             try:
-                payload, cartana_debug = fetch_cartana_menu_payload(menu_url, html_text)
+                payload, cartana_debug = fetch_cartana_menu_payload(
+                    menu_url,
+                    html_text,
+                    cancellation_check=check_cancelled,
+                )
+                check_cancelled()
                 diagnostics["cartana_menu_api"] = cartana_debug
                 sections = parse_cartana_menu_sections(payload, menu_url)
                 diagnostics["menu_extraction_source"] = "cartana_api" if sections else ""
             except Exception as exc:
+                if is_job_cancelled_exception(exc):
+                    raise
                 diagnostics["cartana_menu_api"] = {
                     "ok": False,
                     "error": str(exc),
                 }
                 print(f"[recipe_import] action=cartana_menu_api_failed url={menu_url} error={exc}")
 
+        check_cancelled()
         if not flatten_menu_sections(sections) and html_text:
             fallback_sections, fallback_source = extract_structured_menu_items_from_html(html_text, menu_url)
             if fallback_sections:
                 sections = fallback_sections
                 diagnostics["menu_extraction_source"] = fallback_source
 
+        check_cancelled()
         if not flatten_menu_sections(sections) and os.getenv("DISABLE_BROWSER_RECIPE_FETCH") != "1":
             report(
                 "Fetching menu page",
                 "The raw page did not expose menu items, so Chrome is rendering the menu.",
             )
             try:
+                check_cancelled()
                 rendered_html = fetch_recipe_page_with_browser(menu_url)
+                check_cancelled()
                 diagnostics["rendered_page_used"] = True
                 diagnostics["menu_page_fetched"] = True
                 (RAW_FOLDER / f"{safe_filename(menu_url)}_MENU_RENDERED_HTML.html").write_text(rendered_html, encoding="utf-8")
@@ -10363,9 +10464,12 @@ def extract_menu_recipes_from_url(menu_url, progress_callback=None):
                 sections, fallback_source = extract_structured_menu_items_from_html(rendered_html, menu_url)
                 diagnostics["menu_extraction_source"] = fallback_source or diagnostics.get("menu_extraction_source", "")
             except Exception as exc:
+                if is_job_cancelled_exception(exc):
+                    raise
                 diagnostics["rendered_page_error"] = str(exc)
                 print(f"[recipe_import] action=menu_rendered_fetch_failed url={menu_url} error={exc}")
 
+        check_cancelled()
         return build_menu_extract_result_from_items(
             menu_url,
             sections,
@@ -10374,8 +10478,11 @@ def extract_menu_recipes_from_url(menu_url, progress_callback=None):
             extracted_text=page_text,
             diagnostics=diagnostics,
             progress_callback=report,
+            cancellation_check=check_cancelled,
         )
     except Exception as exc:
+        if is_job_cancelled_exception(exc):
+            raise
         error_code, error_message = classify_vision_ai_exception(exc)
         openai_error_code, openai_error_param = get_openai_error_code_and_param(exc)
         print(

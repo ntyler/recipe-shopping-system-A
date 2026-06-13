@@ -191,7 +191,11 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
 
         try:
             if menu_extract:
-                result = extract_menu_recipes_from_url(url, progress_callback=progress_callback)
+                result = extract_menu_recipes_from_url(
+                    url,
+                    progress_callback=progress_callback,
+                    cancellation_check=lambda: ensure_not_cancelled(job_id),
+                )
             else:
                 result = extract_recipe_from_url(url, progress_callback=progress_callback)
         except JobCancelled:

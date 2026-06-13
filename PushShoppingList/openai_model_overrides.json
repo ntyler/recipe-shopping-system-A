@@ -1,0 +1,15 @@
+{
+  "models": {
+    "OPENAI_MENU_MODEL": "gpt-4o-mini",
+    "OPENAI_VISION_MODEL": "gpt-5.5",
+    "OPENAI_RECIPE_MODEL": "gpt-4o-mini",
+    "OPENAI_RECIPE_CATEGORY_MODEL": "gpt-4o-mini",
+    "OPENAI_NUTRITION_MODEL": "gpt-4o-mini",
+    "OPENAI_RECIPE_NOTE_MODEL": "gpt-4o-mini",
+    "OPENAI_PRODUCT_ANALYSIS_MODEL": "gpt-4o-mini",
+    "OPENAI_INGREDIENT_REVIEW_MODEL": "gpt-4o-mini",
+    "OPENAI_FOOD_RULES_MODEL": "gpt-4o-mini",
+    "OPENAI_FOOD_REVIEW_MODEL": "gpt-4o-mini",
+    "OPENAI_ADDRESS_MODEL": "gpt-4o-mini"
+  }
+}

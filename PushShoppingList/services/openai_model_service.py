@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import sys
 import time
 from datetime import datetime
 from datetime import timezone
@@ -20,7 +21,15 @@ MODEL_RECOMMENDATION_CACHE_FILE = Path(
         PACKAGE_DIR / "openai_model_recommendation_cache.json",
     )
 )
+LOCAL_ENV_FILE = Path(os.getenv("SHOPPING_APP_LOCAL_ENV_FILE", PACKAGE_DIR.parent / "local_env.bat"))
 MODEL_LIST_CACHE_TTL_SECONDS = 60 * 60
+LOCAL_ENV_MODEL_BLOCK_BEGIN = "rem BEGIN Chat GPT Models admin panel selections"
+LOCAL_ENV_MODEL_BLOCK_END = "rem END Chat GPT Models admin panel selections"
+BAT_SET_ENV_RE = re.compile(r'^\s*set\s+"?([A-Za-z_][A-Za-z0-9_]*)=', re.IGNORECASE)
+BAT_IF_NOT_DEFINED_SET_ENV_RE = re.compile(
+    r'^\s*if\s+not\s+defined\s+([A-Za-z_][A-Za-z0-9_]*)\s+set\s+"?([A-Za-z_][A-Za-z0-9_]*)=',
+    re.IGNORECASE,
+)
 
 
 OPENAI_MODEL_SETTINGS = (
@@ -503,9 +512,121 @@ def save_openai_model_overrides(overrides):
     )
 
 
+def batch_set_line_env_var(line):
+    line = str(line or "")
+    match = BAT_IF_NOT_DEFINED_SET_ENV_RE.match(line)
+    if match:
+        return match.group(2)
+
+    match = BAT_SET_ENV_RE.match(line)
+    if match:
+        return match.group(1)
+
+    return ""
+
+
+def clean_openai_model_mapping(models):
+    allowed = {setting["env_var"] for setting in unique_model_settings()}
+    return {
+        env_var: model
+        for env_var, model in (
+            (str(key or "").strip(), normalize_model_name(value))
+            for key, value in (models or {}).items()
+        )
+        if env_var in allowed and model
+    }
+
+
+def openai_model_env_lines(models):
+    clean_models = clean_openai_model_mapping(models)
+    lines = [
+        LOCAL_ENV_MODEL_BLOCK_BEGIN,
+    ]
+    for setting in unique_model_settings():
+        env_var = setting["env_var"]
+        model = clean_models.get(env_var, "")
+        if model:
+            lines.append(f"set {env_var}={model}")
+    lines.append(LOCAL_ENV_MODEL_BLOCK_END)
+    return lines
+
+
+def save_openai_model_local_env(models):
+    clean_models = clean_openai_model_mapping(models)
+    allowed_env_vars = {setting["env_var"] for setting in unique_model_settings()}
+    existing_lines = []
+    if LOCAL_ENV_FILE.exists():
+        existing_lines = LOCAL_ENV_FILE.read_text(encoding="utf-8").splitlines()
+
+    kept_lines = []
+    skipping_model_block = False
+    for line in existing_lines:
+        stripped = line.strip()
+        if stripped == LOCAL_ENV_MODEL_BLOCK_BEGIN:
+            skipping_model_block = True
+            continue
+        if stripped == LOCAL_ENV_MODEL_BLOCK_END:
+            skipping_model_block = False
+            continue
+        if skipping_model_block:
+            continue
+        if batch_set_line_env_var(line) in allowed_env_vars:
+            continue
+        kept_lines.append(line)
+
+    if not kept_lines:
+        kept_lines = ["@echo off"]
+
+    while kept_lines and not kept_lines[-1].strip():
+        kept_lines.pop()
+
+    if clean_models:
+        kept_lines.extend(["", *openai_model_env_lines(clean_models)])
+
+    LOCAL_ENV_FILE.parent.mkdir(parents=True, exist_ok=True)
+    LOCAL_ENV_FILE.write_text("\n".join(kept_lines) + "\n", encoding="utf-8")
+
+
+def apply_openai_model_environment(models, clear_missing=True):
+    clean_models = clean_openai_model_mapping(models)
+    for setting in unique_model_settings():
+        env_var = setting["env_var"]
+        model = clean_models.get(env_var, "")
+        if model:
+            os.environ[env_var] = model
+        elif clear_missing:
+            os.environ.pop(env_var, None)
+
+    refresh_openai_model_runtime_bindings()
+
+
+def refresh_openai_model_runtime_bindings():
+    recipe_model = os.getenv("OPENAI_RECIPE_MODEL", default_model_for_env("OPENAI_RECIPE_MODEL"))
+    product_model = os.getenv("OPENAI_PRODUCT_ANALYSIS_MODEL", recipe_model)
+    food_rules_model = os.getenv("OPENAI_FOOD_RULES_MODEL", recipe_model)
+    food_review_model = os.getenv("OPENAI_FOOD_REVIEW_MODEL", recipe_model)
+    ingredient_review_model = os.getenv("OPENAI_INGREDIENT_REVIEW_MODEL", recipe_model)
+
+    module_updates = {
+        "PushShoppingList.services.recipe_extract_service": {"MODEL": recipe_model},
+        "PushShoppingList.routes.recipe_routes": {"MODEL": recipe_model},
+        "PushShoppingList.routes.job_routes": {"MODEL": recipe_model},
+        "PushShoppingList.services.recipe_edit_service": {"MODEL": recipe_model},
+        "PushShoppingList.services.product_selection_service": {"PRODUCT_ANALYSIS_MODEL": product_model},
+        "PushShoppingList.services.food_rules_service": {"MODEL": food_rules_model},
+        "PushShoppingList.services.food_review_alternative_service": {"MODEL": food_review_model},
+        "PushShoppingList.services.ingredient_text_review_service": {"MODEL": ingredient_review_model},
+    }
+    for module_name, updates in module_updates.items():
+        module = sys.modules.get(module_name)
+        if not module:
+            continue
+        for name, value in updates.items():
+            setattr(module, name, value)
+
+
 def apply_openai_model_overrides():
-    for env_var, model in load_openai_model_overrides().items():
-        os.environ[env_var] = model
+    apply_openai_model_environment(load_openai_model_overrides(), clear_missing=False)
 
 
 def default_model_for_env(env_var):
@@ -519,10 +640,12 @@ def model_value_for_env(env_var, default_model=None):
     env_var = str(env_var or "").strip()
     default_model = str(default_model or default_model_for_env(env_var)).strip() or "gpt-4o-mini"
     override = load_openai_model_overrides().get(env_var, "")
+    env_model = str(os.getenv(env_var, "")).strip()
     if override:
+        if env_model == override:
+            return env_model, "environment"
         return override, "admin override"
 
-    env_model = str(os.getenv(env_var, "")).strip()
     if env_model:
         return env_model, "environment"
 
@@ -623,6 +746,7 @@ def update_openai_model_settings_for_admin(user, form):
     if use_proposed_env not in allowed_env_vars:
         use_proposed_env = ""
     errors = []
+    next_overrides = dict(overrides)
 
     for setting in unique_model_settings():
         env_var = setting["env_var"]
@@ -643,14 +767,14 @@ def update_openai_model_settings_for_admin(user, form):
             continue
 
         if model:
-            overrides[env_var] = model
-            os.environ[env_var] = model
+            next_overrides[env_var] = model
         else:
-            overrides.pop(env_var, None)
-            os.environ.pop(env_var, None)
+            next_overrides.pop(env_var, None)
 
     if errors:
         return {"ok": False, "errors": errors}
 
-    save_openai_model_overrides(overrides)
+    save_openai_model_overrides(next_overrides)
+    save_openai_model_local_env(next_overrides)
+    apply_openai_model_environment(next_overrides, clear_missing=True)
     return {"ok": True, "errors": []}

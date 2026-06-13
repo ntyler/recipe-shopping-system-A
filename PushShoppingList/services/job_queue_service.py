@@ -95,13 +95,21 @@ def cancel_queued_rq_job(rq_job_id):
     if not rq_job_id:
         return False
 
+    stopped = False
     try:
         from redis import Redis
+        from rq.command import send_stop_job_command
         from rq.job import Job
 
         connection = Redis.from_url(redis_url())
+        try:
+            send_stop_job_command(connection, rq_job_id)
+            stopped = True
+        except Exception:
+            stopped = False
+
         job = Job.fetch(rq_job_id, connection=connection)
         job.cancel()
         return True
     except Exception:
-        return False
+        return stopped
