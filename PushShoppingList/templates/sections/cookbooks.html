@@ -40,13 +40,23 @@
 
             <div class="cookbook-menu-heading" data-cookbook-menu-heading>
                 <div>
-                    <h3>📖 Cookbook Menu</h3>
-                    <p>Browse your cookbook like a restaurant menu.</p>
+                    <h3>Cookbook View</h3>
+                    <p>Browse saved recipes as rows or a restaurant menu.</p>
                 </div>
                 <div class="cookbook-menu-controls">
-                    <label class="cookbook-menu-mode-control" for="cookbookMenuModeSelect">
+                    <label class="cookbook-menu-mode-control cookbook-view-mode-control" for="cookbookViewModeSelect">
+                        <span>View Cookbook As</span>
+                        <select id="cookbookViewModeSelect"
+                                data-cookbook-view-mode-select
+                                aria-label="View Cookbook As">
+                            <option value="recipes">Recipe View</option>
+                            <option value="menu">Cookbook Menu</option>
+                        </select>
+                    </label>
+                    <label class="cookbook-menu-mode-control" for="cookbookMenuModeSelect" hidden>
                         <span>Sort Cookbook By</span>
                         <select id="cookbookMenuModeSelect"
+                                data-cookbook-menu-sort-control
                                 data-cookbook-menu-mode-select
                                 aria-label="Sort Cookbook By">
                             {% for option in cookbook_view.menu_sort_options %}
@@ -195,8 +205,10 @@
                                 <div class="cookbook-card-body" data-cookbook-body>
                                     {% if cookbook.recipes %}
                                         <div class="cookbook-menu-browser"
+                                             data-cookbook-view-panel="menu"
                                              data-cookbook-menu-browser
-                                             data-cookbook-id="{{ cookbook.id }}">
+                                             data-cookbook-id="{{ cookbook.id }}"
+                                             hidden>
                                             {% for option in cookbook_view.menu_sort_options %}
                                                 <div class="cookbook-menu-view"
                                                      data-cookbook-menu-view="{{ option.key }}"
@@ -310,8 +322,9 @@
                                             {% endfor %}
                                         </div>
 
-                                        <details class="cookbook-organizer-details" data-cookbook-organizer-details>
-                                            <summary>Recipe Organizer</summary>
+                                        <div class="cookbook-recipe-log-view"
+                                             data-cookbook-view-panel="recipes"
+                                             data-cookbook-recipe-view>
                                         <div class="cookbook-recipe-list"
                                              data-cookbook-recipe-list
                                              data-cookbook-id="{{ cookbook.id }}">
@@ -325,15 +338,15 @@
                                                          data-cookbook-search-text="{{ recipe.menu_search_text }}"
                                                          draggable="true"
                                                          aria-grabbed="false">
-                                                    <input type="checkbox"
-                                                           class="cookbook-restore-checkbox cookbook-recipe-restore-checkbox"
-                                                           name="recipe_urls"
-                                                           value="{{ recipe.url }}"
-                                                           form="restoreCookbookRecipesForm"
-                                                           data-cookbook-restore-checkbox
-                                                           aria-label="Select {{ recipe.name }} for recipe log"
-                                                           hidden>
                                                     <div class="recipe-url-summary-header">
+                                                        <input type="checkbox"
+                                                               class="recipe-batch-select cookbook-restore-checkbox cookbook-recipe-restore-checkbox"
+                                                               name="recipe_urls"
+                                                               value="{{ recipe.url }}"
+                                                               form="restoreCookbookRecipesForm"
+                                                               data-cookbook-restore-checkbox
+                                                               aria-label="Select {{ recipe.name }} for recipe log"
+                                                               onclick="event.stopPropagation()">
                                                         <button type="button"
                                                                 class="recipe-url-drag-handle cookbook-recipe-drag-handle"
                                                                 data-cookbook-recipe-drag-handle
@@ -344,9 +357,16 @@
                                                                 <span></span><span></span><span></span>
                                                             </span>
                                                         </button>
-                                                        <div class="recipe-url-summary-title cookbook-recipe-summary-title">
+                                                        <div class="recipe-url-summary-title cookbook-recipe-summary-title"
+                                                             onclick="return toggleCookbookRecipeDetails(this, event)">
                                                             <div class="recipe-url-summary-heading">
-                                                                <div class="recipe-url-summary-title-toggle cookbook-recipe-title-toggle">
+                                                                <div class="recipe-url-summary-title-toggle cookbook-recipe-title-toggle"
+                                                                     data-cookbook-recipe-toggle
+                                                                     role="button"
+                                                                     tabindex="0"
+                                                                     aria-expanded="true"
+                                                                     onclick="return toggleCookbookRecipeDetails(this, event)"
+                                                                     onkeydown="return handleCookbookRecipeTitleKeydown(this, event)">
                                                                     <span class="recipe-url-summary-title-line">
                                                                         <span class="recipe-url-summary-number">Recipe {{ recipe.number or loop.index }}:</span>
                                                                         <a class="recipe-url-summary-name recipe-url-summary-name-link"
@@ -526,7 +546,7 @@
                                             {% endfor %}
                                         </div>
                                         <div class="cookbook-empty cookbook-recipe-search-empty" data-cookbook-search-empty hidden>No matching recipes.</div>
-                                        </details>
+                                        </div>
                                     {% else %}
                                         <div class="cookbook-empty">Empty.</div>
                                     {% endif %}

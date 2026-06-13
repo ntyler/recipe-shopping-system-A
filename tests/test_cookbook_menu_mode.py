@@ -22,8 +22,11 @@ def test_cookbook_menu_mode_static_hooks_are_present():
     service = read_text("PushShoppingList/services/cookbook_service.py")
 
     for label in (
-        "📖 Cookbook Menu",
-        "Browse your cookbook like a restaurant menu.",
+        "Cookbook View",
+        "Browse saved recipes as rows or a restaurant menu.",
+        "View Cookbook As",
+        "Recipe View",
+        "Cookbook Menu",
         "Sort Cookbook By",
         "🍽️ Restaurant Menu",
         "🌎 Cuisine",
@@ -39,16 +42,22 @@ def test_cookbook_menu_mode_static_hooks_are_present():
         assert label in template or label in service
 
     assert "data-cookbook-menu-view" in template
+    assert "data-cookbook-view-mode-select" in template
+    assert 'data-cookbook-view-panel="recipes"' in template
+    assert 'data-cookbook-view-panel="menu"' in template
     assert "data-cookbook-menu-section" in template
     assert "No recipes found in this category yet." in template
     assert "Add Ingredients to Shopping List" in template
     assert "cookbookCategoryEditorModal" in template
     assert "/api/cookbooks/<cookbook_id>/recipe_categories" in routes
     assert "function openCookbookCategoryEditor" in script
+    assert "function applyCookbookViewMode" in script
+    assert "COOKBOOK_VIEW_MODE_SESSION_KEY" in script
     assert "function saveCookbookCategories" in script
     assert "cookbook_category_overwrite" in script
     assert "data-cookbook-search-text" in template
     assert ".cookbook-menu-recipe-card" in css
+    assert ".cookbook-recipe-log-view" in css
     assert ".cookbook-category-grid" in css
 
 

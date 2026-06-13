@@ -6157,6 +6157,8 @@ function resolveCookbookOverwritePrompt(shouldOverwrite) {
 
 const COOKBOOK_RECIPE_SEARCH_SESSION_KEY = "cookbook-recipe-search";
 const COOKBOOK_FILTER_SESSION_KEY = "cookbook-filter";
+const COOKBOOK_VIEW_MODE_SESSION_KEY = "cookbook-view-mode";
+const DEFAULT_COOKBOOK_VIEW_MODE = "recipes";
 const COOKBOOK_MENU_MODE_SESSION_KEY = "cookbook-menu-mode";
 const DEFAULT_COOKBOOK_MENU_MODE = "restaurant_menu";
 
@@ -6178,6 +6180,10 @@ function cookbookMenuModeSelect() {
     return document.getElementById("cookbookMenuModeSelect");
 }
 
+function cookbookViewModeSelect() {
+    return document.getElementById("cookbookViewModeSelect");
+}
+
 function cookbookFilterSelect() {
     return document.getElementById("cookbookFilterSelect");
 }
@@ -6190,6 +6196,11 @@ function activeCookbookFilter() {
 function activeCookbookMenuMode() {
     const select = cookbookMenuModeSelect();
     return select && select.value ? select.value : DEFAULT_COOKBOOK_MENU_MODE;
+}
+
+function activeCookbookViewMode() {
+    const select = cookbookViewModeSelect();
+    return select && select.value ? select.value : DEFAULT_COOKBOOK_VIEW_MODE;
 }
 
 function setCookbookFilterValue(value) {
@@ -6230,11 +6241,28 @@ function setCookbookMenuModeValue(value) {
     }
 }
 
+function setCookbookViewModeValue(value) {
+    const select = cookbookViewModeSelect();
+    const nextValue = String(value || DEFAULT_COOKBOOK_VIEW_MODE);
+
+    if (select && [...select.options].some(option => option.value === nextValue)) {
+        select.value = nextValue;
+    }
+}
+
 function saveCookbookMenuModeValue(value) {
     try {
         sessionStorage.setItem(COOKBOOK_MENU_MODE_SESSION_KEY, value || DEFAULT_COOKBOOK_MENU_MODE);
     } catch (err) {
         // Menu mode persistence is optional.
+    }
+}
+
+function saveCookbookViewModeValue(value) {
+    try {
+        sessionStorage.setItem(COOKBOOK_VIEW_MODE_SESSION_KEY, value || DEFAULT_COOKBOOK_VIEW_MODE);
+    } catch (err) {
+        // View mode persistence is optional.
     }
 }
 
@@ -6246,13 +6274,40 @@ function restoreCookbookMenuModeValue() {
     }
 }
 
-function applyCookbookMenuMode() {
+function restoreCookbookViewModeValue() {
+    try {
+        setCookbookViewModeValue(sessionStorage.getItem(COOKBOOK_VIEW_MODE_SESSION_KEY) || DEFAULT_COOKBOOK_VIEW_MODE);
+    } catch (err) {
+        setCookbookViewModeValue(DEFAULT_COOKBOOK_VIEW_MODE);
+    }
+}
+
+function applyCookbookMenuMode(options = {}) {
     const mode = activeCookbookMenuMode();
 
     document.querySelectorAll("[data-cookbook-menu-view]").forEach(view => {
         view.hidden = view.dataset.cookbookMenuView !== mode;
     });
 
+    if (!options.skipSearch) {
+        applyCookbookRecipeSearch();
+    }
+}
+
+function applyCookbookViewMode() {
+    const mode = activeCookbookViewMode();
+    const showingMenu = mode === "menu";
+
+    document.querySelectorAll("[data-cookbook-view-panel]").forEach(panel => {
+        panel.hidden = panel.dataset.cookbookViewPanel !== mode;
+    });
+
+    document.querySelectorAll("[data-cookbook-menu-sort-control]").forEach(control => {
+        const wrapper = control.closest(".cookbook-menu-mode-control") || control;
+        wrapper.hidden = !showingMenu;
+    });
+
+    applyCookbookMenuMode({ skipSearch: true });
     applyCookbookRecipeSearch();
 }
 
@@ -6431,6 +6486,7 @@ function applyCookbookRecipeSearch() {
     const searchActive = terms.length > 0;
     const cookbookFilter = activeCookbookFilter();
     const filterActive = Boolean(cookbookFilter);
+    const viewMode = activeCookbookViewMode();
     const globalEmpty = document.getElementById("cookbookRecipeSearchEmpty");
     let visibleRecipes = 0;
     let visibleCards = 0;
@@ -6457,7 +6513,8 @@ function applyCookbookRecipeSearch() {
 
         const menuRecipes = Array.from(card.querySelectorAll(`[data-cookbook-menu-view="${activeCookbookMenuMode()}"] [data-cookbook-menu-recipe]`));
         const matchingMenuRecipes = menuRecipes.filter(recipeCard => !recipeCard.hidden).length;
-        card.hidden = !cookbookMatches || (searchActive && matchingRecipes === 0 && matchingMenuRecipes === 0);
+        const matchingRecipesForView = viewMode === "menu" ? matchingMenuRecipes : matchingRecipes;
+        card.hidden = !cookbookMatches || (searchActive && matchingRecipesForView === 0);
         card.classList.toggle("cookbook-card-search-hidden", Boolean(card.hidden));
 
         if (!card.hidden) {
@@ -6466,14 +6523,15 @@ function applyCookbookRecipeSearch() {
 
         const cardEmpty = card.querySelector("[data-cookbook-search-empty]");
         if (cardEmpty) {
-            cardEmpty.hidden = !searchActive || matchingRecipes > 0 || !cookbookMatches;
+            cardEmpty.hidden = viewMode !== "recipes" || !searchActive || matchingRecipes > 0 || !cookbookMatches;
         }
 
         updateCookbookCardCollapseDisplay(card);
     });
 
     if (globalEmpty) {
-        globalEmpty.hidden = (!searchActive && !filterActive) || visibleCards > 0 || (visibleRecipes + visibleMenuRecipes) > 0;
+        const visibleRecipesForView = viewMode === "menu" ? visibleMenuRecipes : visibleRecipes;
+        globalEmpty.hidden = (!searchActive && !filterActive) || visibleCards > 0 || visibleRecipesForView > 0;
     }
 }
 
@@ -6492,10 +6550,12 @@ function setCookbookRecipeCollapsed(card, isCollapsed) {
 
     if (!details && !toggle && !icon) {
         card.classList.remove("cookbook-recipe-collapsed");
+        card.classList.remove("recipe-url-summary-collapsed");
         return;
     }
 
     card.classList.toggle("cookbook-recipe-collapsed", isCollapsed);
+    card.classList.toggle("recipe-url-summary-collapsed", isCollapsed);
 
     if (details) {
         details.classList.toggle("collapsed", isCollapsed);
@@ -6519,7 +6579,16 @@ function restoreCookbookRecipeCollapseState() {
     });
 }
 
-function toggleCookbookRecipeDetails(button) {
+function toggleCookbookRecipeDetails(button, event = null) {
+    if (eventStartedInNestedInteractive(event, button)) {
+        return true;
+    }
+
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
     const card = button ? button.closest("[data-cookbook-recipe-card]") : null;
 
     if (!card) {
@@ -6536,6 +6605,14 @@ function toggleCookbookRecipeDetails(button) {
     }
 
     return false;
+}
+
+function handleCookbookRecipeTitleKeydown(button, event) {
+    if (!event || (event.key !== "Enter" && event.key !== " ")) {
+        return true;
+    }
+
+    return toggleCookbookRecipeDetails(button, event);
 }
 
 function cookbookOrder(list) {
@@ -6994,6 +7071,15 @@ function bindCookbooks() {
         });
     }
 
+    const viewModeSelect = cookbookViewModeSelect();
+    if (viewModeSelect && viewModeSelect.dataset.cookbookViewModeBound !== "1") {
+        viewModeSelect.dataset.cookbookViewModeBound = "1";
+        viewModeSelect.addEventListener("change", () => {
+            saveCookbookViewModeValue(viewModeSelect.value);
+            applyCookbookViewMode();
+        });
+    }
+
     updateCookbookMoveButton();
     updateCookbookRestoreButton();
     restoreCookbookCardCollapseState();
@@ -7001,7 +7087,8 @@ function bindCookbooks() {
     restoreCookbookRecipeSearchValue();
     restoreCookbookFilterValue();
     restoreCookbookMenuModeValue();
-    applyCookbookMenuMode();
+    restoreCookbookViewModeValue();
+    applyCookbookViewMode();
     bindCookbookDragAndDrop();
     bindCookbookRecipeDragAndDrop();
 }
