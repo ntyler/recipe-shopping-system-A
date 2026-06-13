@@ -3,6 +3,7 @@ import os
 import sqlite3
 import threading
 import uuid
+from urllib.parse import quote
 from urllib.parse import urlparse
 from contextlib import contextmanager
 from datetime import datetime
@@ -362,10 +363,46 @@ def _append_source_item(items, seen, source_type, value, detail=""):
     items.append(item)
 
 
+def _append_recipe_source_item(items, seen, value, detail="menu item"):
+    label = _safe_source_label(value)
+    if not label:
+        return
+
+    key = ("recipe", label)
+    if key in seen:
+        return
+
+    seen.add(key)
+    items.append({
+        "type": "recipe",
+        "label": label,
+        "detail": str(detail or "").strip(),
+        "url": f"/recipe/edit?url={quote(str(value or '').strip(), safe='')}",
+        "recipe_url": str(value or "").strip(),
+    })
+
+
 def job_source_items(job):
     input_payload = job.get("input_payload") if isinstance(job.get("input_payload"), dict) else {}
     items = []
     seen = set()
+    job_type = normalize_job_type(job.get("job_type"))
+
+    if job_type == "menu-generate-recipes":
+        menu_recipe_urls = []
+        for key in ("recipe_urls", "urls"):
+            values = input_payload.get(key)
+            if isinstance(values, str):
+                values = [line.strip() for line in values.splitlines() if line.strip()]
+            if isinstance(values, list):
+                menu_recipe_urls.extend(str(value or "").strip() for value in values if str(value or "").strip())
+        for key in ("recipe_url", "url", "source_url"):
+            value = str(input_payload.get(key) or "").strip()
+            if value:
+                menu_recipe_urls.append(value)
+        for recipe_url in menu_recipe_urls:
+            _append_recipe_source_item(items, seen, recipe_url)
+        return items
 
     urls = input_payload.get("urls")
     if isinstance(urls, str):

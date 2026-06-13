@@ -100,6 +100,59 @@ def test_job_for_client_shows_safe_sources_and_model_metadata(monkeypatch, tmp_p
     assert str(upload_path) not in str(payload)
 
 
+def test_menu_generate_job_sources_link_to_recipe_item_editor(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    recipe_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=spring-roll"
+
+    job = job_service.create_job(
+        "menu-generate-recipes",
+        input_payload={"recipe_urls": [recipe_url]},
+        user_id="owner",
+        total_items=1,
+    )
+
+    payload = job_service.job_for_client(job)
+
+    assert payload["source_items"] == [
+        {
+            "type": "recipe",
+            "label": recipe_url,
+            "detail": "menu item",
+            "url": "/recipe/edit?url=https%3A%2F%2Fwww.velasiancuisine.com%2Frs%2Fmenu_home.action%3FresInput%3DRES4902%26menu_item%3Dspring-roll",
+            "recipe_url": recipe_url,
+        }
+    ]
+
+
+def test_menu_generate_route_returns_trigger_item_source_link(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    recipe_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=spring-roll"
+    monkeypatch.setattr(
+        job_routes,
+        "enqueue_job",
+        lambda job_id, **kwargs: {"ok": True, "mode": "test", "job_id": job_id, **kwargs},
+    )
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["user_id"] = "owner"
+
+        response = client.post(
+            "/api/jobs/menu-generate-recipes",
+            json={"recipe_urls": [recipe_url]},
+            headers={"X-Requested-With": "fetch"},
+        )
+        data = response.get_json()
+
+    assert response.status_code == 202
+    assert data["job"]["job_type"] == "menu-generate-recipes"
+    assert data["job"]["source_items"][0]["detail"] == "menu item"
+    assert data["job"]["source_items"][0]["url"].startswith("/recipe/edit?url=")
+    assert data["job"]["source_items"][0]["recipe_url"] == recipe_url
+
+
 def test_cancelled_job_cannot_be_revived_by_worker_updates(monkeypatch, tmp_path):
     configure_job_paths(monkeypatch, tmp_path)
     job = job_service.create_job(
