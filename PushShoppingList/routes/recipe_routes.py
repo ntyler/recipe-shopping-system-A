@@ -148,6 +148,7 @@ from PushShoppingList.services.menu_mega_json_service import default_nutrition_i
 from PushShoppingList.services.menu_mega_json_service import default_pdf_generation
 from PushShoppingList.services.menu_mega_json_service import default_recipe_inference
 from PushShoppingList.services.menu_mega_json_service import load_menu_mega_json_snapshot
+from PushShoppingList.services.menu_mega_json_service import NUTRITION_INFERENCE_FIELDS
 from PushShoppingList.services.menu_mega_json_service import unpack_mega_menu_json_to_sections
 from PushShoppingList.services.openai_usage_service import openai_usage_dashboard_for_user
 from PushShoppingList.services.openai_usage_service import record_app_activity
@@ -311,6 +312,14 @@ def _nutrition_row_value(rows, key):
     return ""
 
 
+def _nutrition_row_value_any(rows, *keys):
+    for key in keys:
+        value = _nutrition_row_value(rows, key)
+        if value:
+            return value
+    return ""
+
+
 def _nutrition_number(value):
     match = re.search(r"-?\d+(?:\.\d+)?", str(value or "").replace(",", ""))
     if not match:
@@ -324,18 +333,47 @@ def _nutrition_number(value):
 
 def _menu_nutrition_inference_from_rows(rows, model=""):
     rows = rows if isinstance(rows, list) else []
+    field_values = {
+        "serving_basis": _nutrition_row_value(rows, "serving_basis") or None,
+        "calories": _nutrition_row_value(rows, "calories") or None,
+        "carbohydrates": _nutrition_row_value_any(rows, "carbohydrates", "carbs") or None,
+        "protein": _nutrition_row_value(rows, "protein") or None,
+        "fat": _nutrition_row_value(rows, "fat") or None,
+        "saturated_fat": _nutrition_row_value(rows, "saturated_fat") or None,
+        "polyunsaturated_fat": _nutrition_row_value(rows, "polyunsaturated_fat") or None,
+        "monounsaturated_fat": _nutrition_row_value(rows, "monounsaturated_fat") or None,
+        "trans_fat": _nutrition_row_value(rows, "trans_fat") or None,
+        "cholesterol": _nutrition_row_value(rows, "cholesterol") or None,
+        "sodium": _nutrition_row_value(rows, "sodium") or None,
+        "potassium": _nutrition_row_value(rows, "potassium") or None,
+        "fiber": _nutrition_row_value(rows, "fiber") or None,
+        "sugar": _nutrition_row_value(rows, "sugar") or None,
+        "vitamin_a": _nutrition_row_value(rows, "vitamin_a") or None,
+        "vitamin_c": _nutrition_row_value(rows, "vitamin_c") or None,
+        "calcium": _nutrition_row_value(rows, "calcium") or None,
+        "iron": _nutrition_row_value(rows, "iron") or None,
+    }
+    known_keys = set(NUTRITION_INFERENCE_FIELDS) | {"carbs"}
+    other = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        key = str(row.get("key") or "").strip()
+        value = str(row.get("value") or "").strip()
+        if key and value and key.lower() not in known_keys:
+            other.append({"name": key, "value": value})
+
     return {
         **default_nutrition_inference(),
         "status": "generated",
-        "servings": _nutrition_row_value(rows, "serving_basis") or None,
-        "calories_per_serving": _nutrition_number(_nutrition_row_value(rows, "calories")),
-        "protein_g": _nutrition_number(_nutrition_row_value(rows, "protein")),
-        "carbs_g": _nutrition_number(
-            _nutrition_row_value(rows, "carbohydrates")
-            or _nutrition_row_value(rows, "carbs")
-        ),
-        "fat_g": _nutrition_number(_nutrition_row_value(rows, "fat")),
-        "sodium_mg": _nutrition_number(_nutrition_row_value(rows, "sodium")),
+        **field_values,
+        "other": other,
+        "servings": field_values["serving_basis"],
+        "calories_per_serving": _nutrition_number(field_values["calories"]),
+        "protein_g": _nutrition_number(field_values["protein"]),
+        "carbs_g": _nutrition_number(field_values["carbohydrates"]),
+        "fat_g": _nutrition_number(field_values["fat"]),
+        "sodium_mg": _nutrition_number(field_values["sodium"]),
         "model": str(model or os.getenv("OPENAI_NUTRITION_MODEL", MODEL)),
         "generated_at": _utc_now_iso(),
         "notes": ["Estimated per serving basis was generated lazily."],
@@ -824,6 +862,10 @@ def ensure_menu_recipe_serving_basis_estimate(recipe_url, recipe_result):
     updated_recipe = {
         **recipe_payload,
         "nutrition": estimate_result.get("nutrition", []),
+        "nutrition_inference": _menu_nutrition_inference_from_rows(
+            estimate_result.get("nutrition", []),
+            model=str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL)),
+        ),
     }
     save_result = save_editable_recipe(recipe_url, updated_recipe)
     if not save_result.get("ok"):

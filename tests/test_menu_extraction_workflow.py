@@ -13,6 +13,83 @@ def configure_menu_model_defaults(monkeypatch, tmp_path):
     monkeypatch.delenv("OPENAI_MENU_MODEL", raising=False)
 
 
+def test_default_menu_nutrition_inference_contains_full_nutrition_fields():
+    inference = menu_mega_json_service.default_nutrition_inference()
+
+    for field in [
+        "serving_basis",
+        "calories",
+        "carbohydrates",
+        "protein",
+        "fat",
+        "saturated_fat",
+        "polyunsaturated_fat",
+        "monounsaturated_fat",
+        "trans_fat",
+        "cholesterol",
+        "sodium",
+        "potassium",
+        "fiber",
+        "sugar",
+        "vitamin_a",
+        "vitamin_c",
+        "calcium",
+        "iron",
+    ]:
+        assert field in inference
+        assert inference[field] is None
+
+    assert inference["other"] == []
+    assert inference["status"] == "not_generated"
+    assert inference["calories_per_serving"] is None
+    assert inference["protein_g"] is None
+    assert inference["carbs_g"] is None
+    assert inference["fat_g"] is None
+    assert inference["sodium_mg"] is None
+
+
+def test_menu_nutrition_inference_from_rows_maps_full_nutrition_fields(monkeypatch):
+    monkeypatch.setattr(recipe_routes, "_utc_now_iso", lambda: "2026-06-13T12:00:00Z")
+
+    inference = recipe_routes._menu_nutrition_inference_from_rows(
+        [
+            {"key": "serving_basis", "value": "per bowl"},
+            {"key": "calories", "value": "659 kcal"},
+            {"key": "carbohydrates", "value": "57 g"},
+            {"key": "protein", "value": "17 g"},
+            {"key": "fat", "value": "40 g"},
+            {"key": "saturated_fat", "value": "16 g"},
+            {"key": "cholesterol", "value": "37 mg"},
+            {"key": "sodium", "value": "649 mg"},
+            {"key": "fiber", "value": "3 g"},
+            {"key": "sugar", "value": "0.2 g"},
+            {"key": "caffeine", "value": "2 mg"},
+        ],
+        model="gpt-test",
+    )
+
+    assert inference["status"] == "generated"
+    assert inference["serving_basis"] == "per bowl"
+    assert inference["servings"] == "per bowl"
+    assert inference["calories"] == "659 kcal"
+    assert inference["carbohydrates"] == "57 g"
+    assert inference["protein"] == "17 g"
+    assert inference["fat"] == "40 g"
+    assert inference["saturated_fat"] == "16 g"
+    assert inference["cholesterol"] == "37 mg"
+    assert inference["sodium"] == "649 mg"
+    assert inference["fiber"] == "3 g"
+    assert inference["sugar"] == "0.2 g"
+    assert inference["calories_per_serving"] == 659
+    assert inference["protein_g"] == 17
+    assert inference["carbs_g"] == 57
+    assert inference["fat_g"] == 40
+    assert inference["sodium_mg"] == 649
+    assert inference["other"] == [{"name": "caffeine", "value": "2 mg"}]
+    assert inference["model"] == "gpt-test"
+    assert inference["generated_at"] == "2026-06-13T12:00:00Z"
+
+
 def test_cartana_menu_payload_extracts_sections_items_and_prices():
     payload = [
         {
