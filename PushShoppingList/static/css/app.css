@@ -20518,3 +20518,54 @@ img[data-deferred-src] {
                 justify-content: flex-start;
             }
         }
+
+        .recipe-batch-select {
+            width: 18px;
+            height: 18px;
+            flex: 0 0 auto;
+            margin: 2px 2px 0 0;
+        }
+
+        .menu-recipe-status-badge {
+            display: inline-flex;
+            align-items: center;
+            min-height: 22px;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            line-height: 1.2;
+            vertical-align: middle;
+        }
+
+        .menu-recipe-status-stub {
+            border: 1px solid #b7791f;
+            background: #fff7e6;
+            color: #7c4a03;
+        }
+
+        .menu-recipe-status-generated {
+            border: 1px solid #2f855a;
+            background: #e8f5ee;
+            color: #22543d;
+        }
+
+        .menu-recipe-generate-inline {
+            display: inline-flex;
+            align-items: center;
+            min-height: 24px;
+            padding: 3px 8px;
+            border: 1px solid #1f6f46;
+            border-radius: 6px;
+            background: #f0fff7;
+            color: #1f6f46;
+            font-size: 0.78rem;
+            font-weight: 700;
+            line-height: 1.1;
+            cursor: pointer;
+        }
+
+        .menu-recipe-generate-inline:disabled {
+            cursor: wait;
+            opacity: 0.65;
+        }

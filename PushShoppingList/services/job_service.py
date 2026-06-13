@@ -21,6 +21,7 @@ DEFAULT_JOB_TIMEOUT_MINUTES = 180
 DEFAULT_QUEUED_LIMIT_PER_OWNER_TYPE = 5
 ACTIVE_LIMITS_BY_KEY = {
     "menu-import": 1,
+    "menu-ai": 3,
     "recipe-import": 2,
     "media-import": 1,
 }
@@ -187,6 +188,8 @@ def job_limit_key(job_type, input_payload=None):
     payload = input_payload if isinstance(input_payload, dict) else {}
     if job_type == "menu-import":
         return "menu-import"
+    if job_type == "menu-generate-recipes":
+        return "menu-ai"
     if job_type == "recipe-import":
         return "recipe-import"
     if job_type == "doc-photo-import":
@@ -195,6 +198,8 @@ def job_limit_key(job_type, input_payload=None):
 
 
 def active_limit_for_job(job_type, input_payload=None):
+    if job_limit_key(job_type, input_payload) == "menu-ai":
+        return env_int("MAX_PARALLEL_MENU_AI_JOBS", ACTIVE_LIMITS_BY_KEY["menu-ai"], minimum=1)
     return ACTIVE_LIMITS_BY_KEY.get(job_limit_key(job_type, input_payload), 0)
 
 
@@ -922,6 +927,7 @@ def retryable_job_type(job_type):
         "upload-source-pdf",
         "upload-generated-pdf",
         "recipe-category-decision",
+        "menu-generate-recipes",
     }
 
 

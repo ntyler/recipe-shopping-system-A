@@ -582,7 +582,7 @@ def recipe_has_menu_metadata(recipe_data):
     recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
     metadata = recipe_menu_source_metadata(recipe_data)
 
-    if clean_recipe_menu_text(recipe_data.get("source_type")).lower() == "menu_item_inferred":
+    if clean_recipe_menu_text(recipe_data.get("source_type")).lower() in {"menu_item_inferred", "menu_item_stub"}:
         return True
 
     if any(recipe_menu_relation_value(recipe_data, field) for field in RESTAURANT_MENU_RELATION_FIELDS):
@@ -602,7 +602,7 @@ def recipe_is_menu_derived(recipe_data):
     recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
     source_type = clean_recipe_menu_text(recipe_data.get("source_type")).lower()
 
-    if source_type == "menu_item_inferred":
+    if source_type in {"menu_item_inferred", "menu_item_stub"}:
         return True
 
     return bool(recipe_data.get("ai_inferred")) and recipe_has_menu_metadata(recipe_data)

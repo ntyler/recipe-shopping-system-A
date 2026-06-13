@@ -27,6 +27,7 @@ def run_job_task(job_id):
 
     handlers = {
         "menu-import": run_menu_import_job,
+        "menu-generate-recipes": run_menu_generate_recipes_job,
         "recipe-import": run_recipe_import_job,
         "doc-photo-import": run_doc_photo_import_job,
         "estimate-per-serving": run_estimate_per_serving_job,
@@ -76,6 +77,8 @@ def model_metadata(model_used="", model_source="", model_env_var=""):
 
 def job_start_metadata(job):
     from PushShoppingList.services.recipe_extract_service import MODEL
+    from PushShoppingList.services.recipe_extract_service import resolve_menu_cleanup_model
+    from PushShoppingList.services.recipe_extract_service import resolve_menu_cleanup_model_source
     from PushShoppingList.services.recipe_extract_service import resolve_menu_model
     from PushShoppingList.services.recipe_extract_service import resolve_menu_model_source
     from PushShoppingList.services.recipe_extract_service import resolve_vision_model
@@ -94,7 +97,13 @@ def job_start_metadata(job):
         or filename.endswith((".jpg", ".jpeg", ".png", ".webp", ".gif", ".heic", ".heif"))
     )
 
-    if job_type == "menu-import" or (job_type == "doc-photo-import" and mode in {"menu", "menu_extract", "menu-extract"}):
+    if job_type == "menu-generate-recipes":
+        return model_metadata(resolve_menu_model(), resolve_menu_model_source(), "OPENAI_MENU_MODEL")
+
+    if job_type == "menu-import":
+        return model_metadata(resolve_menu_cleanup_model(), resolve_menu_cleanup_model_source(), "OPENAI_MENU_CLEANUP_MODEL")
+
+    if job_type == "doc-photo-import" and mode in {"menu", "menu_extract", "menu-extract"}:
         return model_metadata(resolve_menu_model(), resolve_menu_model_source(), "OPENAI_MENU_MODEL")
 
     if job_type == "doc-photo-import" and is_image_upload:
@@ -189,6 +198,129 @@ def run_recipe_import_job(job_id, payload):
     return run_import_urls_job(job_id, payload if isinstance(payload, dict) else {}, menu_extract=False)
 
 
+def run_menu_generate_recipes_job(job_id, payload):
+    from PushShoppingList.routes.recipe_routes import add_items
+    from PushShoppingList.routes.recipe_routes import generate_menu_recipe_from_stub
+    from PushShoppingList.routes.recipe_routes import import_recipe_title
+    from PushShoppingList.routes.recipe_routes import load_editable_recipe
+    from PushShoppingList.routes.recipe_routes import record_recipe_import_activity
+    from PushShoppingList.routes.recipe_routes import resolve_menu_model
+    from PushShoppingList.routes.recipe_routes import resolve_menu_model_source
+    from PushShoppingList.routes.recipe_routes import save_ingredients_for_recipe
+    from PushShoppingList.routes.recipe_routes import save_recipe_url_name
+    from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
+    from PushShoppingList.services.recipe_url_service import add_recipe_urls
+    from PushShoppingList.services.storage_service import active_user_id
+
+    payload = payload if isinstance(payload, dict) else {}
+    raw_urls = payload.get("recipe_urls") or payload.get("urls")
+    if isinstance(raw_urls, str):
+        raw_urls = [line.strip() for line in raw_urls.splitlines() if line.strip()]
+    if not isinstance(raw_urls, list):
+        raw_urls = [payload.get("recipe_url") or payload.get("url") or payload.get("source_url") or ""]
+    recipe_urls = [str(url or "").strip() for url in raw_urls if str(url or "").strip()]
+    if not recipe_urls:
+        return fail_job(job_id, "At least one menu item stub URL is required.")
+
+    total = len(recipe_urls)
+    model_info = stored_job_model_metadata(job_id, model_metadata(
+        resolve_menu_model(),
+        resolve_menu_model_source(),
+        "OPENAI_MENU_MODEL",
+    ))
+    created_urls = []
+    skipped_urls = []
+    failed_items = 0
+
+    update_job_progress(
+        job_id,
+        current_step="Generating full recipes",
+        total_items=total,
+        progress_percent=5,
+        result_payload=model_info,
+    )
+
+    for index, recipe_url in enumerate(recipe_urls):
+        ensure_not_cancelled(job_id)
+        update_job_progress(
+            job_id,
+            current_step=f"Generating full recipe {index + 1}/{total}",
+            progress_percent=bounded_percent(index, total, 5, 80),
+            completed_items=len(created_urls),
+            failed_items=failed_items,
+            result_payload=model_info,
+        )
+
+        loaded_recipe = load_editable_recipe(recipe_url) or {}
+        stub = loaded_recipe.get("recipe") if isinstance(loaded_recipe, dict) else {}
+        stub = stub if isinstance(stub, dict) else {}
+        if not stub:
+            failed_items += 1
+            append_job_warning(job_id, f"{recipe_url}: Menu item stub was not found.")
+            continue
+
+        if str(stub.get("recipe_status") or "").strip().lower() == "generated" and not stub.get("needs_ai_recipe"):
+            skipped_urls.append(recipe_url)
+            continue
+
+        result = generate_menu_recipe_from_stub(recipe_url, stub, user_id=active_user_id())
+        if not result.get("ok"):
+            failed_items += 1
+            append_job_warning(job_id, f"{recipe_url}: {result.get('error') or 'Unable to generate full recipe.'}")
+            continue
+
+        ingredients = result.get("ingredients") if isinstance(result.get("ingredients"), list) else []
+        with workspace_write_lock("recipe-imports"):
+            if ingredients:
+                add_items(ingredients)
+                save_ingredients_for_recipe(recipe_url, ingredients, result)
+            if result.get("display_name") or result.get("recipe_title"):
+                save_recipe_url_name(recipe_url, result.get("display_name") or result.get("recipe_title"))
+            add_recipe_urls([recipe_url])
+
+        record_recipe_import_activity(recipe_url, result, "menu-stub-generation")
+        print(
+            "[recipe_import] action=menu_stub_generated "
+            f"title={import_recipe_title(result, recipe_url)} url={recipe_url}"
+        )
+        created_urls.append(recipe_url)
+
+    ensure_not_cancelled(job_id)
+    if created_urls:
+        update_job_progress(job_id, current_step="Finalizing generated recipes", progress_percent=92)
+        with workspace_write_lock("recipe-imports"):
+            sort_ingredients()
+
+    result_payload = {
+        "ok": bool(created_urls or skipped_urls),
+        "created_count": len(created_urls),
+        "generated_count": len(created_urls),
+        "full_recipes_generated": len(created_urls),
+        "skipped_count": len(skipped_urls),
+        "failed_count": failed_items,
+        "recipe_urls": created_urls + skipped_urls,
+        "generated_recipe_urls": created_urls,
+        "skipped_recipe_urls": skipped_urls,
+        "links": recipe_links(created_urls + skipped_urls),
+        "nutrition_estimates_completed": 0,
+        "pdfs_created": 0,
+        **model_info,
+    }
+    update_job_progress(
+        job_id,
+        current_step="Finalizing results",
+        progress_percent=95,
+        total_items=total,
+        completed_items=len(created_urls) + len(skipped_urls),
+        failed_items=failed_items,
+        result_payload=result_payload,
+    )
+
+    if created_urls or skipped_urls:
+        return complete_job(job_id, result_payload=result_payload)
+    return fail_job(job_id, "No menu item stubs were generated.", result_payload=result_payload)
+
+
 def run_import_urls_job(job_id, payload, menu_extract=False):
     from PushShoppingList.routes.recipe_routes import IMPORT_CATEGORY_STATUS_MESSAGE
     from PushShoppingList.routes.recipe_routes import NO_INGREDIENTS_ERROR
@@ -197,10 +329,13 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
     from PushShoppingList.routes.recipe_routes import commit_menu_import_result
     from PushShoppingList.routes.recipe_routes import create_source_url_pdf
     from PushShoppingList.routes.recipe_routes import extract_menu_recipes_from_url
+    from PushShoppingList.routes.recipe_routes import extract_menu_stubs_from_url
     from PushShoppingList.routes.recipe_routes import extract_recipe_from_url
     from PushShoppingList.routes.recipe_routes import import_recipe_title
     from PushShoppingList.routes.recipe_routes import MODEL
     from PushShoppingList.routes.recipe_routes import record_recipe_import_activity
+    from PushShoppingList.routes.recipe_routes import resolve_menu_cleanup_model
+    from PushShoppingList.routes.recipe_routes import resolve_menu_cleanup_model_source
     from PushShoppingList.routes.recipe_routes import resolve_menu_model
     from PushShoppingList.routes.recipe_routes import resolve_menu_model_source
     from PushShoppingList.routes.recipe_routes import save_import_cookbook_assignment
@@ -223,9 +358,9 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
     failed_items = 0
     context = "job-menu-url" if menu_extract else "job-recipe-url"
     job_model = stored_job_model_metadata(job_id, model_metadata(
-        resolve_menu_model() if menu_extract else MODEL,
-        resolve_menu_model_source() if menu_extract else "recipe",
-        "OPENAI_MENU_MODEL" if menu_extract else "OPENAI_RECIPE_MODEL",
+        resolve_menu_cleanup_model() if menu_extract else MODEL,
+        resolve_menu_cleanup_model_source() if menu_extract else "recipe",
+        "OPENAI_MENU_CLEANUP_MODEL" if menu_extract else "OPENAI_RECIPE_MODEL",
     ))
 
     update_job_progress(
@@ -266,7 +401,7 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
 
         try:
             if menu_extract:
-                result = extract_menu_recipes_from_url(
+                result = extract_menu_stubs_from_url(
                     url,
                     progress_callback=progress_callback,
                     cancellation_check=lambda: ensure_not_cancelled(job_id),

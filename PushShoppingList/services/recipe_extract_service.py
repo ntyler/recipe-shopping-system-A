@@ -116,10 +116,16 @@ VISION_MODEL_FALLBACK = "gpt-4o-mini"
 OPENAI_RECIPE_MODEL_DEFAULT = "gpt-4o-mini"
 OPENAI_MENU_MODEL_DEFAULT = "gpt-5.5"
 OPENAI_MENU_MODEL_ENV_VAR = "OPENAI_MENU_MODEL"
+OPENAI_MENU_CLEANUP_MODEL_DEFAULT = "gpt-4o-mini"
+OPENAI_MENU_CLEANUP_MODEL_ENV_VAR = "OPENAI_MENU_CLEANUP_MODEL"
 OPENAI_PING_TEXT_MODEL = os.getenv("OPENAI_PING_TEXT_MODEL", "gpt-4o-mini")
 MENU_ITEM_INFERENCE_WORKERS = _safe_int(
     os.getenv("MENU_ITEM_INFERENCE_WORKERS", "8"),
     8,
+)
+MAX_PARALLEL_MENU_AI_JOBS = _safe_int(
+    os.getenv("MAX_PARALLEL_MENU_AI_JOBS", "3"),
+    3,
 )
 VISION_REQUEST_TIMEOUT_SECONDS = _safe_int(
     os.getenv("OPENAI_VISION_REQUEST_TIMEOUT_SECONDS", "120"),
@@ -136,6 +142,7 @@ VISION_MAX_RETRIES = _safe_int(
 print(f"[Recipe AI] OPENAI_API_KEY present: {'yes' if bool(os.getenv('OPENAI_API_KEY')) else 'no'}")
 print(f"[Recipe AI] Recipe model: {os.getenv('OPENAI_RECIPE_MODEL') or OPENAI_RECIPE_MODEL_DEFAULT}")
 print(f"[Recipe AI] Menu model: {os.getenv('OPENAI_MENU_MODEL') or OPENAI_MENU_MODEL_DEFAULT}")
+print(f"[Recipe AI] Menu cleanup model: {os.getenv('OPENAI_MENU_CLEANUP_MODEL') or OPENAI_MENU_CLEANUP_MODEL_DEFAULT}")
 print(f"[Recipe AI] Vision model: {os.getenv('OPENAI_VISION_MODEL') or VISION_MODEL_DEFAULT}")
 MAX_PAGE_TEXT_CHARS = 35000
 MAX_SOCIAL_VIDEO_PROMPT_CHARS = 12000
@@ -286,6 +293,30 @@ def resolve_openai_model(purpose="recipe", preferred_model=None, fallback=False)
             purpose=purpose,
         )
 
+    if purpose == "menu_cleanup":
+        snapshot = model_snapshot_for_env(OPENAI_MENU_CLEANUP_MODEL_ENV_VAR)
+        if snapshot:
+            return OpenAIModelResolution(
+                model=snapshot["model"],
+                source=snapshot["source"],
+                purpose=purpose,
+            )
+        env_model, env_source = model_value_for_env(
+            OPENAI_MENU_CLEANUP_MODEL_ENV_VAR,
+            OPENAI_MENU_CLEANUP_MODEL_DEFAULT,
+        )
+        if env_source != "default":
+            return OpenAIModelResolution(
+                model=env_model,
+                source=f"{env_source}:{OPENAI_MENU_CLEANUP_MODEL_ENV_VAR}",
+                purpose=purpose,
+            )
+        return OpenAIModelResolution(
+            model=OPENAI_MENU_CLEANUP_MODEL_DEFAULT,
+            source=f"default:{OPENAI_MENU_CLEANUP_MODEL_DEFAULT}",
+            purpose=purpose,
+        )
+
     snapshot = model_snapshot_for_env("OPENAI_RECIPE_MODEL")
     if snapshot:
         return OpenAIModelResolution(
@@ -327,6 +358,14 @@ def resolve_menu_model():
 
 def resolve_menu_model_source():
     return resolve_openai_model("menu").source
+
+
+def resolve_menu_cleanup_model():
+    return resolve_openai_model("menu_cleanup").model
+
+
+def resolve_menu_cleanup_model_source():
+    return resolve_openai_model("menu_cleanup").source
 
 
 OPENAI_UNSUPPORTED_PARAMETER_MESSAGE = (
@@ -9996,6 +10035,687 @@ def attach_menu_item_metadata(recipe, menu_item):
     return recipe
 
 
+def menu_cleanup_enabled():
+    return str(os.getenv("OPENAI_MENU_CLEANUP_ENABLED", "") or "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def menu_cleanup_model_resolution():
+    return resolve_openai_model("menu_cleanup")
+
+
+def compact_menu_items_for_cleanup(sections):
+    compact_items = []
+    display_order = 0
+
+    for section in sections or []:
+        if not isinstance(section, dict):
+            continue
+        section_name = clean_recipe_text(section.get("section_name") or "")
+        for item in section.get("items") or []:
+            if not isinstance(item, dict):
+                continue
+            compact_items.append({
+                "index": display_order,
+                "section_name": section_name or clean_recipe_text(item.get("menu_section") or ""),
+                "item_name": clean_recipe_text(item.get("item_name") or ""),
+                "item_description": clean_recipe_text(item.get("description") or item.get("item_description") or ""),
+                "price": clean_recipe_text(item.get("price") or ""),
+                "menu_item_id": clean_recipe_text(item.get("menu_item_id") or ""),
+            })
+            display_order += 1
+
+    return compact_items
+
+
+def build_menu_cleanup_prompt(sections):
+    compact_items = compact_menu_items_for_cleanup(sections)
+    return f"""
+Normalize this restaurant menu item list. Do not create recipes.
+
+Return only valid JSON with this shape:
+{{
+  "items": [
+    {{
+      "index": 0,
+      "normalized_item_name": "Pad Thai",
+      "normalized_section_name": "Noodles",
+      "item_type": "food",
+      "broad_category": "noodles",
+      "duplicate_of_index": null,
+      "should_create_recipe": true,
+      "skip_reason": ""
+    }}
+  ]
+}}
+
+Rules:
+- Classify item_type as food, drink, modifier, add-on, or unknown.
+- Set should_create_recipe false for modifiers, add-ons, duplicated variants, policies, and non-menu text.
+- Do not infer ingredients, equipment, instructions, nutrition, PDFs, or cooking steps.
+
+Menu items:
+{json.dumps({"items": compact_items}, ensure_ascii=False)}
+"""
+
+
+def send_menu_cleanup_prompt_to_openai(prompt_text, action_name="menu-cleanup"):
+    model_resolution = menu_cleanup_model_resolution()
+    payload, temperature_included, resolved_model = build_openai_chat_payload(
+        model_resolution.model,
+        action_name,
+        [
+            {
+                "role": "system",
+                "content": (
+                    "You normalize restaurant menu item metadata. "
+                    "Return only compact valid JSON and never generate recipes."
+                ),
+            },
+            {
+                "role": "user",
+                "content": prompt_text,
+            },
+        ],
+        response_format={"type": "json_object"},
+        temperature=0,
+    )
+    print(
+        f"[OpenAI] action={action_name} "
+        f"model={resolved_model} model_source={model_resolution.source} "
+        f"temperature_included={temperature_included}"
+    )
+    response = throttled_chat_completion(
+        get_openai_client(),
+        payload,
+        action_name=action_name,
+        model=resolved_model,
+        kind="menu_cleanup",
+    )
+    record_openai_usage(response, action_name, model=resolved_model)
+    usage = getattr(response, "usage", None)
+    usage_payload = {
+        "prompt_tokens": getattr(usage, "prompt_tokens", None),
+        "completion_tokens": getattr(usage, "completion_tokens", None),
+        "total_tokens": getattr(usage, "total_tokens", None),
+    }
+    return response.choices[0].message.content, {
+        "ok": True,
+        "model": resolved_model,
+        "model_source": model_resolution.source,
+        "usage": {
+            key: value
+            for key, value in usage_payload.items()
+            if value is not None
+        },
+        "raw_response": response.choices[0].message.content,
+    }
+
+
+def apply_menu_cleanup_to_sections(sections, cleanup_payload):
+    cleanup_payload = cleanup_payload if isinstance(cleanup_payload, dict) else {}
+    cleanup_items = cleanup_payload.get("items") if isinstance(cleanup_payload.get("items"), list) else []
+    cleanup_by_index = {}
+
+    for item in cleanup_items:
+        if not isinstance(item, dict):
+            continue
+        try:
+            cleanup_by_index[int(item.get("index"))] = item
+        except (TypeError, ValueError):
+            continue
+
+    updated_sections = []
+    display_order = 0
+
+    for section in sections or []:
+        if not isinstance(section, dict):
+            continue
+        next_section = {
+            **section,
+            "items": [],
+        }
+        for item in section.get("items") or []:
+            if not isinstance(item, dict):
+                continue
+            cleanup = cleanup_by_index.get(display_order, {})
+            normalized_section = clean_recipe_text(
+                cleanup.get("normalized_section_name")
+                or cleanup.get("section_name")
+                or section.get("section_name")
+                or item.get("menu_section")
+                or ""
+            )
+            normalized_name = clean_recipe_text(
+                cleanup.get("normalized_item_name")
+                or cleanup.get("item_name")
+                or item.get("item_name")
+                or ""
+            )
+            next_item = {
+                **item,
+                "display_order": display_order + 1,
+                "menu_section": normalized_section,
+                "section_name": normalized_section,
+                "item_name": normalized_name,
+                "original_item_name": clean_recipe_text(item.get("item_name") or ""),
+                "original_section_name": clean_recipe_text(section.get("section_name") or item.get("menu_section") or ""),
+                "item_type": clean_recipe_text(cleanup.get("item_type") or item.get("item_type") or "unknown").lower(),
+                "broad_category": clean_recipe_text(cleanup.get("broad_category") or item.get("broad_category") or ""),
+                "should_create_recipe": bool(cleanup.get("should_create_recipe", True)),
+                "skip_reason": clean_recipe_text(cleanup.get("skip_reason") or ""),
+            }
+            if cleanup.get("duplicate_of_index") not in (None, ""):
+                next_item["duplicate_of_index"] = cleanup.get("duplicate_of_index")
+            next_section["items"].append(next_item)
+            display_order += 1
+        if next_section["items"]:
+            next_section["section_name"] = clean_recipe_text(
+                next_section["items"][0].get("menu_section")
+                or next_section.get("section_name")
+                or ""
+            )
+            updated_sections.append(next_section)
+
+    return updated_sections
+
+
+def maybe_cleanup_menu_sections(sections, progress_callback=None, cancellation_check=None):
+    model_resolution = menu_cleanup_model_resolution()
+    debug = {
+        "enabled": menu_cleanup_enabled(),
+        "model": model_resolution.model,
+        "model_source": model_resolution.source,
+        "openai_calls_used": 0,
+        "estimated_token_usage": {},
+    }
+
+    if not debug["enabled"]:
+        if progress_callback:
+            progress_callback(
+                "Optional AI cleanup",
+                "Skipped. Set OPENAI_MENU_CLEANUP_ENABLED=true to run one low-cost cleanup call.",
+            )
+        return sections, debug
+
+    run_cancellation_check(cancellation_check)
+    if progress_callback:
+        progress_callback(
+            "Optional AI cleanup",
+            f"Normalizing menu item names with {model_resolution.model} via {OPENAI_MENU_CLEANUP_MODEL_ENV_VAR}.",
+        )
+
+    try:
+        response_text, call_debug = send_menu_cleanup_prompt_to_openai(build_menu_cleanup_prompt(sections))
+        payload = json.loads(clean_json_response(response_text))
+        run_cancellation_check(cancellation_check)
+        debug.update({
+            **call_debug,
+            "openai_calls_used": 1,
+            "estimated_token_usage": call_debug.get("usage", {}),
+        })
+        return apply_menu_cleanup_to_sections(sections, payload), debug
+    except Exception as exc:
+        debug.update({
+            "ok": False,
+            "error": str(exc),
+            "openai_calls_used": 1,
+        })
+        print(f"[recipe_import] action=menu_cleanup_failed error={exc}")
+        return sections, debug
+
+
+def menu_item_raw_text(item):
+    item = item if isinstance(item, dict) else {}
+    parts = [
+        clean_recipe_text(item.get("menu_section") or item.get("section_name") or ""),
+        clean_recipe_text(item.get("item_name") or ""),
+        clean_recipe_text(item.get("description") or item.get("item_description") or ""),
+        clean_recipe_text(item.get("price") or ""),
+    ]
+    return " | ".join(part for part in parts if part)
+
+
+def menu_item_dedupe_key(item):
+    item = item if isinstance(item, dict) else {}
+    return "|".join([
+        clean_recipe_text(item.get("menu_section") or item.get("section_name") or "").lower(),
+        clean_recipe_text(item.get("item_name") or "").lower(),
+        clean_recipe_text(item.get("description") or item.get("item_description") or "").lower(),
+        clean_recipe_text(item.get("price") or "").lower(),
+    ])
+
+
+def menu_item_deep_link(menu_url, item):
+    item = item if isinstance(item, dict) else {}
+    explicit = clean_recipe_text(item.get("deep_link_url") or item.get("item_url") or "")
+    if explicit:
+        return explicit
+    item_id = clean_recipe_text(item.get("menu_item_id") or "")
+    if not item_id:
+        return ""
+    base_url = str(menu_url or "").split("#", 1)[0].strip()
+    separator = "&" if "?" in base_url else "?"
+    return f"{base_url}{separator}menu_item_id={quote(item_id)}"
+
+
+def normalize_menu_item_stub(menu_url, menu_item, index, source_name=""):
+    menu_item = menu_item if isinstance(menu_item, dict) else {}
+    title = clean_recipe_text(menu_item.get("item_name") or f"Menu Item {index + 1}")
+    section_name = clean_recipe_text(menu_item.get("menu_section") or menu_item.get("section_name") or "")
+    description = clean_recipe_text(menu_item.get("description") or menu_item.get("item_description") or "")
+    price = clean_recipe_text(menu_item.get("price") or "")
+    recipe_url = menu_item_source_url(menu_url, title, index)
+    deep_link_url = menu_item_deep_link(menu_url, menu_item)
+    raw_text = clean_recipe_text(menu_item.get("raw_text") or menu_item_raw_text(menu_item))
+
+    recipe = {
+        "display_name": title,
+        "recipe_title": title,
+        "recipe_amount": "1 menu item",
+        "servings": "",
+        "level": "",
+        "total_time": "",
+        "prep_time": "",
+        "inactive_time": "",
+        "cook_time": "",
+        "source_type": "menu_item_stub",
+        "ai_inferred": False,
+        "needs_ai_recipe": True,
+        "recipe_status": "stub",
+        "ingredients": [],
+        "equipment": [],
+        "instructions": [],
+        "nutrition": {},
+        "source_url": recipe_url,
+        "recipe_record_url": recipe_url,
+        "source_menu_url": str(menu_url or "").strip(),
+        "menu_source_url": str(menu_url or "").strip(),
+        "source_display_url": deep_link_url or str(menu_url or "").strip(),
+        "deep_link_url": deep_link_url,
+        "menu_section": section_name,
+        "section_name": section_name,
+        "menu_item_name": title,
+        "item_name": title,
+        "menu_description": description,
+        "item_description": description,
+        "description": description,
+        "menu_price": price,
+        "price": price,
+        "raw_text": raw_text,
+        "display_order": int(menu_item.get("display_order") or index + 1),
+        "item_type": clean_recipe_text(menu_item.get("item_type") or "unknown").lower(),
+        "broad_category": clean_recipe_text(menu_item.get("broad_category") or ""),
+        "import_source_name": clean_recipe_text(source_name),
+        "extraction_method": "menu_stub",
+        "extraction_mode": "menu_stub",
+        "extraction_confidence": None,
+        "confidence_notes": [
+            "Menu item imported as a lightweight stub. AI recipe not generated yet.",
+        ],
+    }
+
+    for metadata_field in ("restaurant_id", "menu_id", "menu_section_id", "menu_item_id"):
+        metadata_value = clean_recipe_text(menu_item.get(metadata_field) or "")
+        if metadata_value:
+            recipe[metadata_field] = metadata_value
+
+    recipe["source_metadata"] = {
+        "source_type": "restaurant_menu",
+        "source_url": recipe_url,
+        "source_menu_url": str(menu_url or "").strip(),
+        "deep_link_url": deep_link_url,
+        "menu_section": section_name,
+        "menu_item_name": title,
+        "description": description,
+        "price": price,
+        "raw_text": raw_text,
+        "display_order": recipe["display_order"],
+        "menu_item_id": clean_recipe_text(menu_item.get("menu_item_id") or ""),
+        "menu_id": clean_recipe_text(menu_item.get("menu_id") or ""),
+        "restaurant_id": clean_recipe_text(menu_item.get("restaurant_id") or ""),
+        "menu_section_id": clean_recipe_text(menu_item.get("menu_section_id") or ""),
+        "item_type": recipe["item_type"],
+        "broad_category": recipe["broad_category"],
+    }
+    normalize_extracted_recipe_identity(recipe)
+    return recipe
+
+
+def menu_item_should_skip_stub(item, seen_keys):
+    item = item if isinstance(item, dict) else {}
+    if item.get("duplicate_of_index") not in (None, ""):
+        return True, "duplicate"
+    if item.get("should_create_recipe") is False:
+        return True, clean_recipe_text(item.get("skip_reason") or "not_recipe_item") or "not_recipe_item"
+    key = menu_item_dedupe_key(item)
+    if key and key in seen_keys:
+        return True, "duplicate"
+    if key:
+        seen_keys.add(key)
+    return False, ""
+
+
+def build_menu_stub_extract_result_from_items(
+    source_url,
+    sections,
+    source_name="",
+    source_type="menu_url",
+    extracted_text="",
+    diagnostics=None,
+    progress_callback=None,
+    cancellation_check=None,
+):
+    diagnostics = diagnostics if isinstance(diagnostics, dict) else {}
+    diagnostics.update({
+        "menu_sections_found": len(sections or []),
+        "menu_items_found": len(flatten_menu_sections(sections)),
+        "staged_import": True,
+        "recipe_schema_found": False,
+    })
+
+    if not flatten_menu_sections(sections):
+        message = (
+            "No visible menu items were found. "
+            + menu_diagnostics_message(diagnostics)
+        )
+        return {
+            "ok": False,
+            "success": False,
+            "source_url": source_url,
+            "source_name": source_name,
+            "source_type": source_type,
+            "extracted_text": extracted_text,
+            "menu_extract": True,
+            "staged_import": True,
+            "recipes": [],
+            "created_count": 0,
+            "stubs_created": 0,
+            "duplicates_skipped": 0,
+            "full_recipes_generated": 0,
+            "nutrition_estimates_completed": 0,
+            "pdfs_created": 0,
+            "openai_calls_used": 0,
+            "estimated_token_usage": {},
+            "error": message,
+            "error_code": "NO_MENU_ITEMS_FOUND",
+            "error_message": message,
+            "technical_message": menu_diagnostics_message(diagnostics),
+            "debug": diagnostics,
+            "menu_sections_found": 0,
+            "menu_items_found": 0,
+            "recipes_created": 0,
+            "pdfs_generated": 0,
+            "item_failures": [],
+        }
+
+    run_cancellation_check(cancellation_check)
+    cleaned_sections, cleanup_debug = maybe_cleanup_menu_sections(
+        sections,
+        progress_callback=progress_callback,
+        cancellation_check=cancellation_check,
+    )
+    diagnostics["menu_cleanup"] = cleanup_debug
+    diagnostics["openai_calls_used"] = int(cleanup_debug.get("openai_calls_used") or 0)
+    diagnostics["estimated_token_usage"] = cleanup_debug.get("estimated_token_usage") or {}
+
+    if progress_callback:
+        progress_callback(
+            "Saving menu item stubs",
+            "Creating lightweight recipe records without ingredients, nutrition, or PDFs.",
+        )
+
+    seen_keys = set()
+    skipped = []
+    recipes = []
+    stubs_created = 0
+
+    for index, menu_item in enumerate(flatten_menu_sections(cleaned_sections)):
+        run_cancellation_check(cancellation_check)
+        skip, reason = menu_item_should_skip_stub(menu_item, seen_keys)
+        if skip:
+            skipped.append({
+                "item_name": clean_recipe_text(menu_item.get("item_name") or ""),
+                "menu_section": clean_recipe_text(menu_item.get("menu_section") or ""),
+                "reason": reason,
+            })
+            continue
+
+        stub = normalize_menu_item_stub(source_url, menu_item, index, source_name=source_name)
+        recipe_url = stub["recipe_record_url"]
+        save_extracted_recipe_json(recipe_url, stub)
+        result = build_extract_result(recipe_url, stub, "menu_stub")
+        result.update({
+            "ok": True,
+            "success": True,
+            "source_url": recipe_url,
+            "source_menu_url": source_url,
+            "menu_source_url": source_url,
+            "source_display_url": stub.get("source_display_url") or source_url,
+            "deep_link_url": stub.get("deep_link_url", ""),
+            "menu_section": stub.get("menu_section", ""),
+            "menu_item_name": stub.get("menu_item_name", ""),
+            "menu_description": stub.get("menu_description", ""),
+            "menu_price": stub.get("menu_price", ""),
+            "raw_text": stub.get("raw_text", ""),
+            "display_order": stub.get("display_order"),
+            "restaurant_id": stub.get("restaurant_id", ""),
+            "menu_id": stub.get("menu_id", ""),
+            "menu_section_id": stub.get("menu_section_id", ""),
+            "menu_item_id": stub.get("menu_item_id", ""),
+            "source_type": "menu_item_stub",
+            "ai_inferred": False,
+            "needs_ai_recipe": True,
+            "recipe_status": "stub",
+            "model": "",
+            "model_used": "",
+            "model_source": "deterministic",
+            "raw": stub,
+        })
+        recipes.append(result)
+        stubs_created += 1
+
+    diagnostics["stubs_created"] = stubs_created
+    diagnostics["duplicates_skipped"] = sum(1 for item in skipped if item.get("reason") == "duplicate")
+    diagnostics["items_skipped"] = skipped
+    diagnostics["menu_sections"] = [
+        {
+            "section_name": section.get("section_name", ""),
+            "item_count": len(section.get("items") or []),
+        }
+        for section in cleaned_sections
+        if isinstance(section, dict)
+    ]
+
+    if not recipes:
+        message = "Menu items were found, but every item was skipped as a duplicate or non-recipe item."
+        return {
+            "ok": False,
+            "success": False,
+            "source_url": source_url,
+            "source_name": source_name,
+            "source_type": source_type,
+            "extracted_text": extracted_text,
+            "menu_extract": True,
+            "staged_import": True,
+            "recipes": [],
+            "created_count": 0,
+            "stubs_created": 0,
+            "duplicates_skipped": diagnostics["duplicates_skipped"],
+            "full_recipes_generated": 0,
+            "nutrition_estimates_completed": 0,
+            "pdfs_created": 0,
+            "openai_calls_used": diagnostics["openai_calls_used"],
+            "estimated_token_usage": diagnostics["estimated_token_usage"],
+            "error": message,
+            "error_code": "NO_MENU_STUBS_CREATED",
+            "error_message": message,
+            "technical_message": menu_diagnostics_message(diagnostics, skipped),
+            "debug": diagnostics,
+            "menu_sections_found": len(cleaned_sections or []),
+            "menu_items_found": len(flatten_menu_sections(cleaned_sections)),
+            "recipes_created": 0,
+            "pdfs_generated": 0,
+            "item_failures": skipped,
+        }
+
+    return {
+        "ok": True,
+        "success": True,
+        "source_url": source_url,
+        "source_name": source_name,
+        "source_type": source_type,
+        "extracted_text": extracted_text,
+        "menu_extract": True,
+        "staged_import": True,
+        "recipes": recipes,
+        "created_count": len(recipes),
+        "stubs_created": stubs_created,
+        "duplicates_skipped": diagnostics["duplicates_skipped"],
+        "full_recipes_generated": 0,
+        "nutrition_estimates_completed": 0,
+        "pdfs_created": 0,
+        "pdfs_generated": 0,
+        "openai_calls_used": diagnostics["openai_calls_used"],
+        "estimated_token_usage": diagnostics["estimated_token_usage"],
+        "ingredients": [],
+        "model": cleanup_debug.get("model", ""),
+        "model_used": cleanup_debug.get("model", ""),
+        "model_source": cleanup_debug.get("model_source", "deterministic"),
+        "model_env_var": OPENAI_MENU_CLEANUP_MODEL_ENV_VAR if cleanup_debug.get("enabled") else "",
+        "model_env_var_used": OPENAI_MENU_CLEANUP_MODEL_ENV_VAR if cleanup_debug.get("enabled") else "",
+        "raw_menu": {"menu_sections": cleaned_sections},
+        "debug": diagnostics,
+        "menu_sections_found": len(cleaned_sections or []),
+        "menu_items_found": len(flatten_menu_sections(cleaned_sections)),
+        "recipes_created": len(recipes),
+        "items_skipped": skipped,
+        "item_failures": [],
+        "partial_failure": False,
+        "diagnostics_message": menu_diagnostics_message(diagnostics, skipped),
+    }
+
+
+def menu_stub_item_from_recipe(stub):
+    stub = stub if isinstance(stub, dict) else {}
+    metadata = stub.get("source_metadata") if isinstance(stub.get("source_metadata"), dict) else {}
+    return {
+        "item_name": stub.get("menu_item_name") or stub.get("item_name") or stub.get("recipe_title") or "",
+        "menu_section": stub.get("menu_section") or stub.get("section_name") or metadata.get("menu_section") or "",
+        "section_description": stub.get("section_description") or "",
+        "description": stub.get("menu_description") or stub.get("item_description") or stub.get("description") or metadata.get("description") or "",
+        "price": stub.get("menu_price") or stub.get("price") or metadata.get("price") or "",
+        "source_url": stub.get("source_menu_url") or stub.get("menu_source_url") or "",
+        "menu_item_id": stub.get("menu_item_id") or metadata.get("menu_item_id") or "",
+        "menu_id": stub.get("menu_id") or metadata.get("menu_id") or "",
+        "restaurant_id": stub.get("restaurant_id") or metadata.get("restaurant_id") or "",
+        "menu_section_id": stub.get("menu_section_id") or metadata.get("menu_section_id") or "",
+        "display_order": stub.get("display_order") or metadata.get("display_order") or 1,
+        "item_type": stub.get("item_type") or metadata.get("item_type") or "unknown",
+        "broad_category": stub.get("broad_category") or metadata.get("broad_category") or "",
+        "raw_text": stub.get("raw_text") or metadata.get("raw_text") or "",
+    }
+
+
+def generate_menu_recipe_from_stub(recipe_url, stub, user_id=None):
+    recipe_url = str(recipe_url or "").strip()
+    stub = stub if isinstance(stub, dict) else {}
+    source_menu_url = str(
+        stub.get("source_menu_url")
+        or stub.get("menu_source_url")
+        or stub.get("source_display_url")
+        or stub.get("source_url")
+        or ""
+    ).strip()
+    menu_item = menu_stub_item_from_recipe(stub)
+    try:
+        item_index = max(0, int(menu_item.get("display_order") or 1) - 1)
+    except (TypeError, ValueError):
+        item_index = 0
+
+    recipe, inference = infer_menu_item_recipe_for_worker(
+        source_menu_url,
+        menu_item,
+        item_index,
+        1,
+        user_id=user_id,
+    )
+    inference = inference if isinstance(inference, dict) else {}
+    if not recipe:
+        return {
+            "ok": False,
+            "success": False,
+            "recipe_url": recipe_url,
+            "error": inference.get("error_message") or "Unable to generate full recipe from menu stub.",
+            "inference": inference,
+        }
+
+    recipe = attach_menu_item_metadata(recipe, menu_item)
+    normalized = normalize_menu_item_recipe(
+        recipe,
+        source_menu_url,
+        menu_item.get("menu_section", ""),
+        menu_item.get("item_name", ""),
+        item_index,
+        source_name=stub.get("import_source_name") or source_menu_url,
+    )
+    normalized.update({
+        "source_url": recipe_url,
+        "recipe_record_url": recipe_url,
+        "source_menu_url": source_menu_url,
+        "menu_source_url": source_menu_url,
+        "source_display_url": stub.get("source_display_url") or source_menu_url,
+        "deep_link_url": stub.get("deep_link_url") or "",
+        "source_type": "menu_item_inferred",
+        "ai_inferred": True,
+        "needs_ai_recipe": False,
+        "recipe_status": "generated",
+        "display_order": stub.get("display_order") or normalized.get("display_order") or 1,
+        "raw_text": stub.get("raw_text") or menu_item_raw_text(menu_item),
+        "model": inference.get("model") or resolve_menu_model(),
+        "model_used": inference.get("model") or resolve_menu_model(),
+        "model_source": inference.get("model_source") or resolve_menu_model_source(),
+    })
+    notes = normalized.get("confidence_notes")
+    if not isinstance(notes, list):
+        notes = []
+    generation_note = "AI-inferred recipe generated lazily from a saved menu stub."
+    if generation_note not in notes:
+        notes.append(generation_note)
+    normalized["confidence_notes"] = notes
+    normalize_extracted_recipe_identity(normalized)
+    normalize_extracted_ingredient_fields(normalized)
+    normalize_extracted_equipment_fields(normalized)
+    save_extracted_recipe_json(recipe_url, normalized)
+    result = build_extract_result(recipe_url, normalized, "menu_stub_generation")
+    result.update({
+        "ok": True,
+        "success": True,
+        "source_url": recipe_url,
+        "recipe_url": recipe_url,
+        "source_menu_url": source_menu_url,
+        "menu_source_url": source_menu_url,
+        "menu_section": normalized.get("menu_section", ""),
+        "menu_item_name": normalized.get("menu_item_name", ""),
+        "menu_description": normalized.get("menu_description", ""),
+        "menu_price": normalized.get("menu_price", ""),
+        "source_type": "menu_item_inferred",
+        "ai_inferred": True,
+        "needs_ai_recipe": False,
+        "recipe_status": "generated",
+        "model": normalized.get("model", ""),
+        "model_used": normalized.get("model_used", ""),
+        "model_source": normalized.get("model_source", ""),
+        "raw": normalized,
+        "inference": inference,
+    })
+    return result
+
+
 def build_menu_extract_result(
     source_url,
     response_text,
@@ -10462,14 +11182,15 @@ def build_menu_extract_result_from_items(
     }
 
 
-def extract_menu_recipes_from_url(menu_url, progress_callback=None, cancellation_check=None):
+def extract_menu_sections_from_url(menu_url, progress_callback=None, cancellation_check=None):
     menu_url = str(menu_url or "").strip()
     if not menu_url:
         return {
             "ok": False,
             "error": "Missing menu URL.",
-            "recipes": [],
-            "created_count": 0,
+            "sections": [],
+            "diagnostics": {},
+            "extracted_text": "",
         }
 
     try:
@@ -10511,8 +11232,8 @@ def extract_menu_recipes_from_url(menu_url, progress_callback=None, cancellation
             print(f"[recipe_import] action=menu_page_fetch_failed url={menu_url} error={exc}")
 
         report(
-            "Extracting menu items",
-            "Reading visible menu sections and items before recipe inference.",
+            "Extracting menu items without AI",
+            "Reading visible menu sections and items directly from the page.",
         )
         if html_text:
             try:
@@ -10566,23 +11287,23 @@ def extract_menu_recipes_from_url(menu_url, progress_callback=None, cancellation
                 print(f"[recipe_import] action=menu_rendered_fetch_failed url={menu_url} error={exc}")
 
         check_cancelled()
-        return build_menu_extract_result_from_items(
-            menu_url,
-            sections,
-            source_name=menu_url,
-            source_type="menu_url",
-            extracted_text=page_text,
-            diagnostics=diagnostics,
-            progress_callback=report,
-            cancellation_check=check_cancelled,
-        )
+        return {
+            "ok": True,
+            "success": True,
+            "source_url": menu_url,
+            "source_type": "menu_url",
+            "menu_extract": True,
+            "sections": sections,
+            "extracted_text": page_text,
+            "diagnostics": diagnostics,
+        }
     except Exception as exc:
         if is_job_cancelled_exception(exc):
             raise
         error_code, error_message = classify_vision_ai_exception(exc)
         openai_error_code, openai_error_param = get_openai_error_code_and_param(exc)
         print(
-            "[OpenAI] action=menu-url-extraction_exception "
+            "[OpenAI] action=menu-url-section-extraction_exception "
             f"model={resolve_menu_model()} exception_type={type(exc).__name__} "
             f"openai_error_code={openai_error_code or 'n/a'} "
             f"openai_error_param={openai_error_param or 'n/a'} "
@@ -10594,8 +11315,9 @@ def extract_menu_recipes_from_url(menu_url, progress_callback=None, cancellation
             "source_url": menu_url,
             "source_type": "menu_url",
             "menu_extract": True,
-            "recipes": [],
-            "created_count": 0,
+            "sections": [],
+            "extracted_text": "",
+            "diagnostics": {},
             "error": error_message or str(exc),
             "error_code": error_code,
             "error_message": error_message or str(exc),
@@ -10607,6 +11329,130 @@ def extract_menu_recipes_from_url(menu_url, progress_callback=None, cancellation
             "model_used": resolve_menu_model(),
             "model_source": resolve_menu_model_source(),
         }
+
+
+def _menu_url_error_result(menu_url, exc, staged_import=False):
+    error_code, error_message = classify_vision_ai_exception(exc)
+    openai_error_code, openai_error_param = get_openai_error_code_and_param(exc)
+    print(
+        "[OpenAI] action=menu-url-extraction_exception "
+        f"model={resolve_menu_model()} exception_type={type(exc).__name__} "
+        f"openai_error_code={openai_error_code or 'n/a'} "
+        f"openai_error_param={openai_error_param or 'n/a'} "
+        f"final_error_code={error_code}"
+    )
+    return {
+        "ok": False,
+        "success": False,
+        "source_url": menu_url,
+        "source_type": "menu_url",
+        "menu_extract": True,
+        "staged_import": bool(staged_import),
+        "recipes": [],
+        "created_count": 0,
+        "stubs_created": 0,
+        "duplicates_skipped": 0,
+        "full_recipes_generated": 0,
+        "nutrition_estimates_completed": 0,
+        "pdfs_created": 0,
+        "openai_calls_used": 0,
+        "estimated_token_usage": {},
+        "error": error_message or str(exc),
+        "error_code": error_code,
+        "error_message": error_message or str(exc),
+        "technical_message": str(exc),
+        "exception_type": type(exc).__name__,
+        "openai_error_code": openai_error_code,
+        "openai_error_param": openai_error_param,
+        "model": resolve_menu_model(),
+        "model_used": resolve_menu_model(),
+        "model_source": resolve_menu_model_source(),
+    }
+
+
+def extract_menu_stubs_from_url(menu_url, progress_callback=None, cancellation_check=None):
+    menu_url = str(menu_url or "").strip()
+    if not menu_url:
+        return {
+            "ok": False,
+            "error": "Missing menu URL.",
+            "recipes": [],
+            "created_count": 0,
+            "stubs_created": 0,
+            "staged_import": True,
+            "openai_calls_used": 0,
+        }
+
+    try:
+        section_result = extract_menu_sections_from_url(
+            menu_url,
+            progress_callback=progress_callback,
+            cancellation_check=cancellation_check,
+        )
+        if not section_result.get("ok"):
+            return {
+                **section_result,
+                "recipes": [],
+                "created_count": 0,
+                "stubs_created": 0,
+                "staged_import": True,
+                "openai_calls_used": 0,
+                "estimated_token_usage": {},
+            }
+
+        return build_menu_stub_extract_result_from_items(
+            menu_url,
+            section_result.get("sections") or [],
+            source_name=menu_url,
+            source_type="menu_url",
+            extracted_text=section_result.get("extracted_text", ""),
+            diagnostics=section_result.get("diagnostics") or {},
+            progress_callback=progress_callback,
+            cancellation_check=cancellation_check,
+        )
+    except Exception as exc:
+        if is_job_cancelled_exception(exc):
+            raise
+        return _menu_url_error_result(menu_url, exc, staged_import=True)
+
+
+def extract_menu_recipes_from_url(menu_url, progress_callback=None, cancellation_check=None):
+    menu_url = str(menu_url or "").strip()
+    if not menu_url:
+        return {
+            "ok": False,
+            "error": "Missing menu URL.",
+            "recipes": [],
+            "created_count": 0,
+        }
+
+    try:
+        section_result = extract_menu_sections_from_url(
+            menu_url,
+            progress_callback=progress_callback,
+            cancellation_check=cancellation_check,
+        )
+        if not section_result.get("ok"):
+            return {
+                **section_result,
+                "recipes": [],
+                "created_count": 0,
+            }
+
+        return build_menu_extract_result_from_items(
+            menu_url,
+            section_result.get("sections") or [],
+            source_name=menu_url,
+            source_type="menu_url",
+            extracted_text=section_result.get("extracted_text", ""),
+            diagnostics=section_result.get("diagnostics") or {},
+            progress_callback=progress_callback,
+            cancellation_check=cancellation_check,
+        )
+    except Exception as exc:
+        if is_job_cancelled_exception(exc):
+            raise
+        return _menu_url_error_result(menu_url, exc, staged_import=False)
 
 
 def normalize_ingredient_key(text):

@@ -44,6 +44,22 @@
                 <button type="button" onclick="return setAllCurrentRecipeUrlSummariesCollapsed(true)">
                     Collapse all current recipes
                 </button>
+                <div class="recipe-url-summary-cookbook-menu-label">Menu AI</div>
+                <button type="button" onclick="return generateSelectedMenuStubRecipes(this)">
+                    Generate Selected Recipes
+                </button>
+                <button type="button" onclick="return generateAllMenuStubRecipes(this)">
+                    Generate All Full Recipes
+                </button>
+                <button type="button" onclick="return estimateNutritionForSelectedRecipes(this)">
+                    Estimate Nutrition for Selected
+                </button>
+                <button type="button" onclick="return createPdfsForSelectedRecipes(this)">
+                    Create PDFs for Selected
+                </button>
+                <button type="button" onclick="return runFullRoutineForSelectedRecipes(this)">
+                    Run Full Routine for Selected
+                </button>
             </div>
         </div>
     </div>
@@ -61,8 +77,17 @@
                 <div class="recipe-url-summary-row{% if recipe.cover_image and recipe.cover_image.src %} recipe-url-summary-row-with-cover{% endif %}{% if loop.last %} recipe-url-summary-row-last{% endif %}"
                      data-current-recipe-row
                      data-recipe-url="{{ recipe.url }}"
+                     data-source-type="{{ recipe.source_type or '' }}"
+                     data-needs-ai-recipe="{% if recipe.needs_ai_recipe %}1{% else %}0{% endif %}"
+                     data-menu-section="{{ recipe.menu_section or '' }}"
                      draggable="true">
                     <div class="recipe-url-summary-header">
+                        <input type="checkbox"
+                               class="recipe-batch-select"
+                               data-recipe-batch-select
+                               data-recipe-url="{{ recipe.url }}"
+                               aria-label="Select {{ recipe.name }} for recipe actions"
+                               onclick="event.stopPropagation()">
                         <button type="button"
                                 class="recipe-url-drag-handle"
                                 data-recipe-drag-handle
@@ -98,6 +123,29 @@
                                            title="{{ recipe.source_display_url }}"
                                            onclick="event.stopPropagation()"
                                            data-recipe-url="{{ recipe.url }}">{{ recipe.name }}</a>
+                                        {% if recipe.needs_ai_recipe or recipe.source_type == "menu_item_stub" %}
+                                            <span class="menu-recipe-status-badge menu-recipe-status-stub">
+                                                Menu Stub - AI recipe not generated yet
+                                            </span>
+                                            <button type="button"
+                                                    class="menu-recipe-generate-inline"
+                                                    data-recipe-url="{{ recipe.url }}"
+                                                    onclick="return generateMenuStubRecipe(this, event)">
+                                                Generate Recipe
+                                            </button>
+                                            {% if recipe.menu_section %}
+                                                <button type="button"
+                                                        class="menu-recipe-generate-inline"
+                                                        data-menu-section="{{ recipe.menu_section }}"
+                                                        onclick="return generateMenuStubSection(this, event)">
+                                                    Generate Section
+                                                </button>
+                                            {% endif %}
+                                        {% elif recipe.source_type == "menu_item_inferred" or recipe.ai_inferred %}
+                                            <span class="menu-recipe-status-badge menu-recipe-status-generated">
+                                                AI-Inferred Recipe
+                                            </span>
+                                        {% endif %}
                                     </span>
                                 </div>
                                 {% if recipe.food_rule_status.needs_review %}

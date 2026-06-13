@@ -37,6 +37,8 @@ from PushShoppingList.services.recipe_extract_service import extract_recipe_cove
 from PushShoppingList.services.recipe_extract_service import extract_recipe_from_url
 from PushShoppingList.services.recipe_extract_service import extract_menu_recipes_from_upload
 from PushShoppingList.services.recipe_extract_service import extract_menu_recipes_from_url
+from PushShoppingList.services.recipe_extract_service import extract_menu_stubs_from_url
+from PushShoppingList.services.recipe_extract_service import generate_menu_recipe_from_stub
 from PushShoppingList.services.recipe_extract_service import generateRecipeFromImage
 from PushShoppingList.services.recipe_extract_service import build_vision_debug
 from PushShoppingList.services.recipe_extract_service import call_openai_vision_image
@@ -45,6 +47,8 @@ from PushShoppingList.services.recipe_extract_service import OPENAI_PING_TEXT_MO
 from PushShoppingList.services.recipe_extract_service import openai_runtime_diagnostics
 from PushShoppingList.services.recipe_extract_service import resolve_menu_model
 from PushShoppingList.services.recipe_extract_service import resolve_menu_model_source
+from PushShoppingList.services.recipe_extract_service import resolve_menu_cleanup_model
+from PushShoppingList.services.recipe_extract_service import resolve_menu_cleanup_model_source
 from PushShoppingList.services.recipe_extract_service import resolve_vision_model
 from PushShoppingList.services.recipe_extract_service import resolve_vision_model_source
 from PushShoppingList.services.recipe_extract_service import classify_vision_ai_exception
@@ -735,6 +739,46 @@ def ensure_menu_recipe_serving_basis_estimate(recipe_url, recipe_result):
     }
 
 
+def menu_import_result_is_stub(recipe_result):
+    recipe_result = recipe_result if isinstance(recipe_result, dict) else {}
+    source_type = str(recipe_result.get("source_type") or "").strip().lower()
+    raw = recipe_result.get("raw") if isinstance(recipe_result.get("raw"), dict) else {}
+    return bool(
+        source_type == "menu_item_stub"
+        or str(raw.get("source_type") or "").strip().lower() == "menu_item_stub"
+        or recipe_result.get("needs_ai_recipe")
+        or raw.get("needs_ai_recipe")
+        or str(recipe_result.get("recipe_status") or raw.get("recipe_status") or "").strip().lower() == "stub"
+    )
+
+
+def menu_stub_recipe_payload(recipe_result, recipe_url, cookbook):
+    recipe_result = recipe_result if isinstance(recipe_result, dict) else {}
+    raw = recipe_result.get("raw") if isinstance(recipe_result.get("raw"), dict) else {}
+    payload = {
+        **recipe_result,
+        **raw,
+    }
+    cookbook = cookbook if isinstance(cookbook, dict) else {}
+    payload.update({
+        "source_url": recipe_url,
+        "recipe_record_url": recipe_url,
+        "source_type": "menu_item_stub",
+        "ai_inferred": False,
+        "needs_ai_recipe": True,
+        "recipe_status": "stub",
+        "cookbook_id": cookbook.get("id", ""),
+        "cookbook_name": cookbook.get("name", ""),
+    })
+    payload.setdefault("ingredients", [])
+    payload.setdefault("equipment", [])
+    payload.setdefault("instructions", [])
+    payload.setdefault("nutrition", {})
+    payload.setdefault("recipe_title", recipe_result.get("recipe_title") or recipe_result.get("display_name") or recipe_url)
+    payload.setdefault("display_name", payload.get("recipe_title") or recipe_url)
+    return payload
+
+
 def require_account_for_import(wants_json=False):
     """Keep recipe imports bound to signed-in, session, or temporary demo storage."""
     if current_user() or active_user_id() or is_guest_session():
@@ -1140,10 +1184,10 @@ def extract_recipe_route():
         "extraction_mode": "menu_extract" if menu_extract else "recipe",
         "cookbook_id": cookbook.get("id", "") if isinstance(cookbook, dict) else "",
         "cookbook_name": cookbook.get("name", "") if isinstance(cookbook, dict) else "",
-        "model_used": resolve_menu_model() if menu_extract else MODEL,
-        "model_source": resolve_menu_model_source() if menu_extract else "recipe",
-        "model_env_var": "OPENAI_MENU_MODEL" if menu_extract else "OPENAI_RECIPE_MODEL",
-        "model_env_var_used": "OPENAI_MENU_MODEL" if menu_extract else "OPENAI_RECIPE_MODEL",
+        "model_used": resolve_menu_cleanup_model() if menu_extract else MODEL,
+        "model_source": resolve_menu_cleanup_model_source() if menu_extract else "recipe",
+        "model_env_var": "OPENAI_MENU_CLEANUP_MODEL" if menu_extract else "OPENAI_RECIPE_MODEL",
+        "model_env_var_used": "OPENAI_MENU_CLEANUP_MODEL" if menu_extract else "OPENAI_RECIPE_MODEL",
     }
     job_type = "menu-import" if menu_extract else "recipe-import"
     job, queue_result, error_message = start_import_background_job(job_type, payload, total_items=len(urls))
@@ -1547,16 +1591,22 @@ def commit_menu_import_result(
     committed = []
     newly_created = []
     new_recipe_entries = []
+    new_stub_entries = []
     category_statuses = []
     serving_basis_statuses = []
     pdf_statuses = []
     source_pdf_statuses = []
     commit_failures = []
+    has_stubs = any(menu_import_result_is_stub(recipe_result) for recipe_result in recipes)
 
     _menu_progress(
         progress_callback,
-        "Predicting ingredients",
-        "Saving inferred menu item ingredients into the recipe pipeline.",
+        "Saving menu item stubs" if has_stubs else "Predicting ingredients",
+        (
+            "Saving lightweight menu item stubs without full AI generation."
+            if has_stubs
+            else "Saving inferred menu item ingredients into the recipe pipeline."
+        ),
     )
     if menu_recipe_progress_callback:
         try:
@@ -1574,7 +1624,8 @@ def commit_menu_import_result(
 
         recipe_url = str(recipe_result.get("source_url") or "").strip()
         ingredients = recipe_result.get("ingredients") if isinstance(recipe_result.get("ingredients"), list) else []
-        if not recipe_url or not recipe_result.get("ok") or not ingredients:
+        is_stub = menu_import_result_is_stub(recipe_result)
+        if not recipe_url or not recipe_result.get("ok") or (not ingredients and not is_stub):
             commit_failures.append({
                 "item_name": recipe_result.get("menu_item_name") or recipe_result.get("recipe_title") or recipe_url,
                 "error_code": "MENU_ITEM_COMMIT_SKIPPED",
@@ -1584,8 +1635,26 @@ def commit_menu_import_result(
 
         recipe_key = normalize_recipe_url_key(recipe_url)
         is_new_recipe = recipe_key not in existing_keys
-        add_items(ingredients)
-        save_ingredients_for_recipe(recipe_url, ingredients, recipe_result)
+
+        if is_stub:
+            recipe_payload = menu_stub_recipe_payload(recipe_result, recipe_url, cookbook)
+            save_extracted_recipe_json(recipe_url, recipe_payload)
+            recipe_result = {
+                **recipe_result,
+                "raw": recipe_payload,
+                "source_type": "menu_item_stub",
+                "ai_inferred": False,
+                "needs_ai_recipe": True,
+                "recipe_status": "stub",
+                "ingredients": [],
+                "equipment": recipe_payload.get("equipment", []),
+                "instructions": recipe_payload.get("instructions", []),
+                "nutrition": recipe_payload.get("nutrition", {}),
+            }
+        else:
+            add_items(ingredients)
+            save_ingredients_for_recipe(recipe_url, ingredients, recipe_result)
+
         if recipe_result.get("display_name") or recipe_result.get("recipe_title"):
             save_recipe_url_name(
                 recipe_url,
@@ -1594,19 +1663,24 @@ def commit_menu_import_result(
 
         add_recipe_urls([recipe_url])
         assignment = save_import_cookbook_assignment(recipe_url, recipe_result, cookbook)
+        action_name = "menu_item_stub_created" if is_stub else "menu_item_created"
         print(
-            "[recipe_import] action=menu_item_created "
+            f"[recipe_import] action={action_name} "
             f"title={import_recipe_title(recipe_result, recipe_url)} "
             f"url={recipe_url} is_new_recipe={is_new_recipe}"
         )
 
         if is_new_recipe:
             newly_created.append(recipe_url)
-            new_recipe_entries.append({
+            entry = {
                 "url": recipe_url,
                 "result": recipe_result,
                 "assignment": assignment,
-            })
+            }
+            if is_stub:
+                new_stub_entries.append(entry)
+            else:
+                new_recipe_entries.append(entry)
         else:
             print(
                 "[recipe_import_category] action=skipped "
@@ -1624,7 +1698,7 @@ def commit_menu_import_result(
         committed.append(recipe_url)
         existing_keys.add(recipe_key)
 
-    if committed:
+    if committed and any(not menu_import_result_is_stub(recipe_result) for recipe_result in recipes):
         sort_ingredients()
 
     if new_recipe_entries:
@@ -1725,8 +1799,14 @@ def commit_menu_import_result(
         "menu_extract": True,
         "created_count": len(newly_created),
         "committed_count": len(committed),
+        "stubs_created": len(new_stub_entries),
+        "full_recipes_generated": len(new_recipe_entries),
+        "nutrition_estimates_completed": 0,
+        "pdfs_created": pdf_success_count,
         "committed_recipe_urls": committed,
         "created_recipe_urls": newly_created,
+        "created_urls": newly_created,
+        "recipe_urls": committed,
         "category_statuses": category_statuses,
         "serving_basis_statuses": serving_basis_statuses,
         "source_pdf_statuses": source_pdf_statuses,
@@ -1741,8 +1821,15 @@ def commit_menu_import_result(
             "count": category_success_count,
         },
         "category_status_message": (
-            f"Generated categories for {category_success_count} new menu item recipe"
-            f"{'' if category_success_count == 1 else 's'}."
+            (
+                f"Imported {len(new_stub_entries)} menu item stub"
+                f"{'' if len(new_stub_entries) == 1 else 's'}."
+            )
+            if new_stub_entries and not new_recipe_entries
+            else (
+                f"Generated categories for {category_success_count} new menu item recipe"
+                f"{'' if category_success_count == 1 else 's'}."
+            )
         ),
     }
     if not ok:
@@ -2800,10 +2887,10 @@ def api_extract_recipe_route():
         **data,
         "urls": urls,
         "extraction_mode": "menu_extract" if menu_extract else "recipe",
-        "model_used": resolve_menu_model() if menu_extract else MODEL,
-        "model_source": resolve_menu_model_source() if menu_extract else "recipe",
-        "model_env_var": "OPENAI_MENU_MODEL" if menu_extract else "OPENAI_RECIPE_MODEL",
-        "model_env_var_used": "OPENAI_MENU_MODEL" if menu_extract else "OPENAI_RECIPE_MODEL",
+        "model_used": resolve_menu_cleanup_model() if menu_extract else MODEL,
+        "model_source": resolve_menu_cleanup_model_source() if menu_extract else "recipe",
+        "model_env_var": "OPENAI_MENU_CLEANUP_MODEL" if menu_extract else "OPENAI_RECIPE_MODEL",
+        "model_env_var_used": "OPENAI_MENU_CLEANUP_MODEL" if menu_extract else "OPENAI_RECIPE_MODEL",
     }
     job_type = "menu-import" if menu_extract else "recipe-import"
     job, queue_result, error_message = start_import_background_job(job_type, payload, total_items=len(urls))

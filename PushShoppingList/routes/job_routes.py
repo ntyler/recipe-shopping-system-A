@@ -25,6 +25,8 @@ from PushShoppingList.services.job_service import retryable_job_type
 from PushShoppingList.services.job_service import update_job
 from PushShoppingList.services.job_service import user_can_access_job
 from PushShoppingList.services.recipe_extract_service import MODEL
+from PushShoppingList.services.recipe_extract_service import resolve_menu_cleanup_model
+from PushShoppingList.services.recipe_extract_service import resolve_menu_cleanup_model_source
 from PushShoppingList.services.recipe_extract_service import resolve_menu_model
 from PushShoppingList.services.recipe_extract_service import resolve_menu_model_source
 from PushShoppingList.services.recipe_extract_service import resolve_vision_model
@@ -182,11 +184,37 @@ def start_menu_import_job_route():
     }
     payload = with_model_metadata(
         payload,
+        model_used=resolve_menu_cleanup_model(),
+        model_source=resolve_menu_cleanup_model_source(),
+        model_env_var="OPENAI_MENU_CLEANUP_MODEL",
+    )
+    return create_and_enqueue("menu-import", payload, total_items=len(urls))
+
+
+@job_bp.route("/api/jobs/menu-generate-recipes", methods=["POST"])
+def start_menu_generate_recipes_job_route():
+    payload = json_payload()
+    urls = urls_from_payload(payload, "recipe_url", "url", "source_url")
+    recipe_urls = payload.get("recipe_urls")
+    if isinstance(recipe_urls, str):
+        urls.extend(line.strip() for line in recipe_urls.splitlines() if line.strip())
+    elif isinstance(recipe_urls, list):
+        urls.extend(str(url or "").strip() for url in recipe_urls if str(url or "").strip())
+    urls = list(dict.fromkeys([url for url in urls if url]))
+    if not urls:
+        return jsonify({"ok": False, "error": "At least one menu item stub URL is required."}), 400
+
+    payload = {
+        **payload,
+        "recipe_urls": urls,
+    }
+    payload = with_model_metadata(
+        payload,
         model_used=resolve_menu_model(),
         model_source=resolve_menu_model_source(),
         model_env_var="OPENAI_MENU_MODEL",
     )
-    return create_and_enqueue("menu-import", payload, total_items=len(urls))
+    return create_and_enqueue("menu-generate-recipes", payload, total_items=len(urls))
 
 
 @job_bp.route("/api/jobs/recipe-import", methods=["POST"])

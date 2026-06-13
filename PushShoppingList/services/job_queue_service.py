@@ -77,6 +77,8 @@ def queue_name_for_job(job_type, input_payload=None):
 
     if job_type == "menu-import":
         return QUEUE_AI_PANTRY_MENU
+    if job_type == "menu-generate-recipes":
+        return QUEUE_AI_PANTRY_MENU
     if job_type == "recipe-import":
         return QUEUE_AI_PANTRY_RECIPE
     if job_type == "doc-photo-import":
