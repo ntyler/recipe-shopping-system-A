@@ -129,6 +129,16 @@ def test_menu_import_progress_overlay_shows_model_env_var_reference():
     assert "const runningSummary = job && job.current_step" in script
 
 
+def test_job_activity_can_reopen_import_progress_overlay():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+
+    assert "function openJobActivityImportProgress(jobId)" in script
+    assert "function reopenImportProgressFromJob(jobId)" in script
+    assert "Open Popup" in script
+    assert "hiddenExtractJobId = null" in script
+    assert "renderExtractionProgress(importJobToExtractionProgress(job, urls, isMenuExtract))" in script
+
+
 def test_menu_recipe_progress_payload_uses_boolean_checklist_and_skipped_review(monkeypatch):
     monkeypatch.setattr(
         recipe_routes,

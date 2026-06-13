@@ -358,6 +358,17 @@ function renderJobModelDetails(job) {
     return parts.length ? `<div class="job-activity-model">${parts.join("")}</div>` : "";
 }
 
+function jobSourceUrls(job) {
+    return jobSourceItems(job)
+        .map(source => String(source.url || "").trim())
+        .filter(Boolean);
+}
+
+function jobCanOpenImportProgress(job) {
+    const jobType = String((job && job.job_type) || "").trim();
+    return ["menu-import", "recipe-import"].includes(jobType) && jobSourceUrls(job).length > 0;
+}
+
 function formatJobModelReference(job) {
     const model = String((job && job.model_used) || "").trim();
     const envVar = String((job && job.model_env_var) || "").trim();
@@ -445,6 +456,9 @@ function renderJobActivityRow(job) {
     const sourceHtml = renderJobSourceList(job);
     const modelHtml = renderJobModelDetails(job);
     const active = jobIsActive(job);
+    const openProgressButton = jobCanOpenImportProgress(job)
+        ? `<button type="button" class="job-activity-row-action" onclick="return openJobActivityImportProgress('${escapeAttribute(job.id || job.job_id || "")}')">Open Popup</button>`
+        : "";
     const retryButton = job.status === "failed"
         ? `<button type="button" class="job-activity-row-action" onclick="return retryJobActivityJob('${escapeAttribute(job.id || job.job_id || "")}')">Retry</button>`
         : "";
@@ -486,6 +500,7 @@ function renderJobActivityRow(job) {
                 ${linkHtml}
             </div>
             <div class="job-activity-actions">
+                ${openProgressButton}
                 ${cancelButton}
                 ${retryButton}
             </div>
@@ -697,6 +712,70 @@ async function retryJobActivityJob(jobId) {
         }
     }
     return false;
+}
+
+function openJobActivityImportProgress(jobId) {
+    reopenImportProgressFromJob(jobId);
+    return false;
+}
+
+async function reopenImportProgressFromJob(jobId) {
+    jobId = String(jobId || "").trim();
+    if (!jobId) {
+        return;
+    }
+
+    try {
+        const job = await fetchJobStatus(jobId);
+        const urls = jobSourceUrls(job);
+        if (!urls.length || !jobCanOpenImportProgress(job)) {
+            const summary = jobActivitySummaryElement();
+            if (summary) {
+                summary.textContent = "This job does not have an import progress popup.";
+            }
+            return;
+        }
+
+        const isMenuExtract = String(job.job_type || "") === "menu-import";
+        hiddenExtractJobId = null;
+        cancelExtractRequested = false;
+        renderExtractionProgress(importJobToExtractionProgress(job, urls, isMenuExtract));
+        showExtractionOverlay();
+
+        if (jobIsActive(job)) {
+            waitForJobCompletion(jobId, {
+                onUpdate(updatedJob) {
+                    renderExtractionProgress(importJobToExtractionProgress(updatedJob, urls, isMenuExtract));
+                },
+                pollMs: 1500,
+            }).then(finishedJob => {
+                renderExtractionProgress(importJobToExtractionProgress(finishedJob, urls, isMenuExtract));
+                syncOpenAiUsageDashboardFromResponse(jobResultPayload(finishedJob));
+            }).catch(err => {
+                const progress = lastRenderedExtractProgress || {
+                    job_id: jobId,
+                    active: false,
+                    status: "failed",
+                    extraction_mode: isMenuExtract ? "menu_extract" : "recipe",
+                    total: urls.length,
+                    percent: 100,
+                    summary: err.message || "Unable to refresh import progress.",
+                    urls: urls.map(url => ({ url, state: "failed", message: err.message || "Unable to refresh import progress." })),
+                };
+                renderExtractionProgress({
+                    ...progress,
+                    active: false,
+                    status: "failed",
+                    summary: err.message || "Unable to refresh import progress.",
+                });
+            });
+        }
+    } catch (err) {
+        const summary = jobActivitySummaryElement();
+        if (summary) {
+            summary.textContent = err.message || "Unable to open import progress.";
+        }
+    }
 }
 
 function nowForPerformance() {
