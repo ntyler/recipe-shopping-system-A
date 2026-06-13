@@ -23273,10 +23273,12 @@ async function startRecipeExtractionUrls(urls, options = {}) {
         bar.style.width = "10%";
     }
 
-    await fetch("/api/start_extract_progress", {
+    const startResponse = await fetch("/api/start_extract_progress", {
         method: "POST",
         headers: {
+            "Accept": "application/json",
             "Content-Type": "application/json",
+            "X-Requested-With": "fetch",
         },
         body: JSON.stringify({
             urls: urls,
@@ -23286,6 +23288,40 @@ async function startRecipeExtractionUrls(urls, options = {}) {
             extraction_mode: extractionMode,
         }),
     });
+    let startData = {};
+    try {
+        startData = await startResponse.json();
+    } catch (err) {
+        startData = {};
+    }
+    syncOpenAiUsageDashboardFromResponse(startData);
+    if (!startResponse.ok || (startData && startData.ok === false)) {
+        const message = String(
+            (startData && (startData.error || startData.message))
+            || "Unable to start recipe import."
+        ).trim();
+        status.textContent = "Import could not start.";
+        summary.textContent = message;
+        if (bar) {
+            bar.style.width = "100%";
+        }
+        updateExtractionActionButtons({
+            active: false,
+            status: "failed",
+            extraction_mode: extractionMode,
+            urls: urls.map(url => ({
+                url: url,
+                state: "failed",
+                message: message,
+            })),
+        });
+        if (list) {
+            Array.from(list.querySelectorAll(".bulk-skip-reason")).forEach(reason => {
+                reason.textContent = message;
+            });
+        }
+        return;
+    }
     scheduleExtractionProgressPoll(250);
 
     currentExtractAbortControllers = [];
@@ -23312,7 +23348,9 @@ async function startRecipeExtractionUrls(urls, options = {}) {
         return fetch("/api/extract_recipe", {
             method: "POST",
             headers: {
+                "Accept": "application/json",
                 "Content-Type": "application/json",
+                "X-Requested-With": "fetch",
             },
             signal: controller.signal,
             body: JSON.stringify({

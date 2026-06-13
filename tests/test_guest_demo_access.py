@@ -240,6 +240,66 @@ def test_guest_session_can_run_recipe_url_import_api(monkeypatch, tmp_path):
     assert guest_files
 
 
+def test_session_scoped_demo_account_can_run_recipe_url_import_api(monkeypatch, tmp_path):
+    configure_guest_demo_paths(monkeypatch, tmp_path)
+
+    from PushShoppingList.routes import recipe_routes
+
+    demo_user_id = "demo-session-account"
+    monkeypatch.setattr(
+        recipe_routes,
+        "extract_recipe_from_url",
+        lambda url, progress_callback=None: {
+            "ok": True,
+            "display_name": "Demo Session Pretzels",
+            "recipe_title": "Demo Session Pretzels",
+            "ingredients": ["1 cup flour"],
+            "source_url": url,
+        },
+    )
+    monkeypatch.setattr(
+        recipe_routes,
+        "apply_imported_recipe_category_routine",
+        lambda url, result, assignment: {"ok": True, "status": "skipped"},
+    )
+    monkeypatch.setattr(recipe_routes, "create_source_url_pdf", lambda url: {"ok": True})
+    monkeypatch.setattr(recipe_routes, "schedule_generated_recipe_pdf_creation", lambda url, context="": {"ok": True})
+
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["user_id"] = demo_user_id
+
+        page = client.get("/")
+        progress = client.post(
+            "/api/start_extract_progress",
+            json={"urls": ["https://example.com/demo-session-recipe"], "job_id": "demo-session-import-job"},
+            headers={"X-Requested-With": "fetch"},
+        )
+        response = client.post(
+            "/api/extract_recipe",
+            json={
+                "url": "https://example.com/demo-session-recipe",
+                "urls": ["https://example.com/demo-session-recipe"],
+                "job_id": "demo-session-import-job",
+                "index": 0,
+            },
+            headers={"X-Requested-With": "fetch"},
+        )
+
+    data = response.get_json()
+    user_files = list((tmp_path / "users" / demo_user_id).glob("recipe-extractor/data/output/*.json"))
+
+    assert page.status_code == 200
+    assert progress.status_code == 200
+    assert response.status_code == 200
+    assert data["ok"] is True
+    assert data["display_name"] == "Demo Session Pretzels"
+    assert user_files
+
+
 def test_guest_session_still_blocks_account_and_admin_surfaces(monkeypatch, tmp_path):
     configure_guest_demo_paths(monkeypatch, tmp_path)
     app = create_app()

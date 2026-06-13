@@ -127,6 +127,7 @@ from PushShoppingList.services.image_variant_service import generated_static_cac
 from PushShoppingList.services.image_variant_service import image_mimetype_for_path
 from PushShoppingList.services.openai_usage_service import openai_usage_dashboard_for_user
 from PushShoppingList.services.openai_usage_service import record_app_activity
+from PushShoppingList.services.storage_service import active_user_id
 from PushShoppingList.services.user_account_service import current_user
 from PushShoppingList.services.user_account_service import is_admin_user
 
@@ -713,8 +714,8 @@ def ensure_menu_recipe_serving_basis_estimate(recipe_url, recipe_result):
 
 
 def require_account_for_import(wants_json=False):
-    """Keep recipe imports bound to signed-in or temporary demo scoped storage."""
-    if current_user() or is_guest_session():
+    """Keep recipe imports bound to signed-in, session, or temporary demo storage."""
+    if current_user() or active_user_id() or is_guest_session():
         return None
 
     if wants_json:
