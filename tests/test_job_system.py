@@ -37,6 +37,8 @@ def test_job_routes_create_and_scope_jobs_to_owner(monkeypatch, tmp_path):
         assert data["job_id"]
         assert data["job"]["job_type"] == "recipe-import"
         assert data["job"]["status"] == "queued"
+        assert data["job"]["model_env_var"] == "OPENAI_RECIPE_MODEL"
+        assert data["job"]["source_items"][0]["label"] == "https://example.com/recipe"
 
         status = client.get(
             f"/api/jobs/{data['job_id']}",
@@ -53,6 +55,41 @@ def test_job_routes_create_and_scope_jobs_to_owner(monkeypatch, tmp_path):
             headers={"X-Requested-With": "fetch"},
         )
         assert hidden.status_code == 404
+
+
+def test_job_for_client_shows_safe_sources_and_model_metadata(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    upload_path = tmp_path / "secret" / "staged-menu.pdf"
+    upload_path.parent.mkdir(parents=True)
+    upload_path.write_text("demo")
+
+    job = job_service.create_job(
+        "doc-photo-import",
+        input_payload={
+            "source_path": str(upload_path),
+            "filename": "menu.pdf",
+            "model_used": "gpt-5.5",
+            "model_source": "env:OPENAI_MENU_MODEL",
+            "model_env_var": "OPENAI_MENU_MODEL",
+        },
+        user_id="owner",
+        total_items=1,
+    )
+
+    payload = job_service.job_for_client(job)
+
+    assert payload["model_used"] == "gpt-5.5"
+    assert payload["model_source"] == "env:OPENAI_MENU_MODEL"
+    assert payload["model_env_var"] == "OPENAI_MENU_MODEL"
+    assert payload["source_items"] == [
+        {
+            "type": "file",
+            "label": "menu.pdf",
+            "detail": "",
+        }
+    ]
+    assert "input_payload" not in payload
+    assert str(upload_path) not in str(payload)
 
 
 def test_guest_cleanup_deletes_guest_jobs(monkeypatch, tmp_path):

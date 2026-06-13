@@ -290,6 +290,74 @@ function jobResultLinks(job) {
     return Array.isArray(result.links) ? result.links : [];
 }
 
+function jobSourceItems(job) {
+    return Array.isArray(job && job.source_items)
+        ? job.source_items.filter(item => item && (item.label || item.url))
+        : [];
+}
+
+function jobSourceIsChecked(job, index, sourceCount) {
+    const status = String((job && job.status) || "").toLowerCase();
+    if (status === "completed") {
+        return true;
+    }
+    if (status === "failed" || status === "cancelled") {
+        return false;
+    }
+    const completed = Math.max(0, Number((job && job.completed_items) || 0));
+    const total = Math.max(0, Number((job && job.total_items) || 0));
+    return sourceCount > 1 && (!total || total === sourceCount) && index < completed;
+}
+
+function renderJobSourceList(job) {
+    const sources = jobSourceItems(job);
+    if (!sources.length) {
+        return "";
+    }
+
+    return `
+        <div class="job-activity-sources" aria-label="Job sources">
+            ${sources.map((source, index) => {
+                const href = String(source.url || "").trim();
+                const label = String(source.label || href || "Source").trim();
+                const detail = String(source.detail || source.type || "").trim();
+                const checked = jobSourceIsChecked(job, index, sources.length) ? " checked" : "";
+                const labelHtml = href
+                    ? `<a href="${escapeAttribute(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`
+                    : `<span>${escapeHtml(label)}</span>`;
+                return `
+                    <label class="job-activity-source">
+                        <input type="checkbox" disabled${checked}>
+                        <span class="job-activity-source-text">
+                            ${labelHtml}
+                            ${detail ? `<span class="job-activity-source-detail">${escapeHtml(detail)}</span>` : ""}
+                        </span>
+                    </label>
+                `;
+            }).join("")}
+        </div>
+    `;
+}
+
+function renderJobModelDetails(job) {
+    const model = String((job && job.model_used) || "").trim();
+    const envVar = String((job && job.model_env_var) || "").trim();
+    const source = String((job && job.model_source) || "").trim();
+    const parts = [];
+
+    if (model) {
+        parts.push(`<span>Model: <strong>${escapeHtml(model)}</strong></span>`);
+    }
+    if (envVar) {
+        parts.push(`<span>Env: <strong>${escapeHtml(envVar)}</strong></span>`);
+    }
+    if (source) {
+        parts.push(`<span>Source: <strong>${escapeHtml(source)}</strong></span>`);
+    }
+
+    return parts.length ? `<div class="job-activity-model">${parts.join("")}</div>` : "";
+}
+
 function jobActivitySort(jobs) {
     return [...(jobs || [])].sort((left, right) => {
         const leftActive = jobIsActive(left) ? 0 : 1;
@@ -339,6 +407,8 @@ function renderJobActivityRow(job) {
     const error = String(job.error_message || "").trim();
     const warnings = Array.isArray(job.warning_messages) ? job.warning_messages.filter(Boolean) : [];
     const links = jobResultLinks(job);
+    const sourceHtml = renderJobSourceList(job);
+    const modelHtml = renderJobModelDetails(job);
     const active = jobIsActive(job);
     const retryButton = job.status === "failed"
         ? `<button type="button" class="job-activity-row-action" onclick="return retryJobActivityJob('${escapeAttribute(job.id || job.job_id || "")}')">Retry</button>`
@@ -367,6 +437,8 @@ function renderJobActivityRow(job) {
                     <span class="job-activity-status">${escapeHtml(jobStatusLabel(job.status))}</span>
                 </div>
                 <div class="job-activity-step">${escapeHtml(job.current_step || "Queued")}</div>
+                ${modelHtml}
+                ${sourceHtml}
                 <div class="job-activity-progress" aria-label="${percent}% complete">
                     <span style="width: ${percent}%"></span>
                 </div>
@@ -24773,19 +24845,29 @@ function renderExtractionProgress(progress) {
     const status = document.getElementById("extractStatusText");
     const summary = document.getElementById("extractSummary");
     const bar = document.getElementById("extractProgressBar");
+    const title = document.getElementById("extractProgressTitle");
 
     if (!list || !status || !summary || !bar) {
         return;
     }
 
+    const isMenuExtract = progress.extraction_mode === "menu_extract";
+    if (title) {
+        title.innerHTML = isMenuExtract
+            ? 'Importing<br class="mobile-title-break"> Menu'
+            : 'Extracting<br class="mobile-title-break"> Ingredients';
+    }
     status.textContent = progressStatusText(progress);
-    summary.textContent = progress.summary || "Fetching recipe pages and extracting ingredients.";
+    summary.textContent = progress.summary || (
+        isMenuExtract
+            ? "Fetching menu pages, extracting menu items, and creating inferred recipes."
+            : "Fetching recipe pages and extracting ingredients."
+    );
     bar.style.width = `${Math.max(0, Math.min(100, progress.percent || 0))}%`;
     updateExtractionActionButtons(progress);
 
     list.innerHTML = "";
 
-    const isMenuExtract = progress.extraction_mode === "menu_extract";
     (progress.urls || []).forEach((item, index) => {
         list.appendChild(buildExtractionSourceProgressRow(item, index));
 

@@ -20398,6 +20398,61 @@ img[data-deferred-src] {
             font-size: 0.86rem;
         }
 
+        .job-activity-model {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 12px;
+            color: #dbeafe;
+            font-size: 0.82rem;
+            line-height: 1.35;
+        }
+
+        .job-activity-model strong {
+            color: #f8fafc;
+            font-weight: 800;
+        }
+
+        .job-activity-sources {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin: 2px 0;
+        }
+
+        .job-activity-source {
+            display: grid;
+            grid-template-columns: 18px minmax(0, 1fr);
+            align-items: flex-start;
+            gap: 7px;
+            color: #e5e7eb;
+            font-size: 0.84rem;
+            line-height: 1.32;
+        }
+
+        .job-activity-source input {
+            width: 14px;
+            height: 14px;
+            margin: 2px 0 0;
+            accent-color: #22c55e;
+        }
+
+        .job-activity-source-text {
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+
+        .job-activity-source a {
+            color: #86efac;
+            font-weight: 700;
+        }
+
+        .job-activity-source-detail {
+            display: inline-block;
+            margin-left: 6px;
+            color: #94a3b8;
+            font-size: 0.78rem;
+        }
+
         .job-activity-progress {
             height: 8px;
             overflow: hidden;

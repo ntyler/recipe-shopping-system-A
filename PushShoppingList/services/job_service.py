@@ -3,6 +3,7 @@ import os
 import sqlite3
 import threading
 import uuid
+from urllib.parse import urlparse
 from contextlib import contextmanager
 from datetime import datetime
 from datetime import timedelta
@@ -143,10 +144,85 @@ def row_to_job(row):
     return job
 
 
+def _first_text(*values):
+    for value in values:
+        text = str(value or "").strip()
+        if text:
+            return text
+    return ""
+
+
+def _safe_source_label(value):
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    parsed = urlparse(text)
+    if parsed.scheme and parsed.netloc:
+        return text
+    return Path(text).name or text
+
+
+def _append_source_item(items, seen, source_type, value, detail=""):
+    label = _safe_source_label(value)
+    if not label:
+        return
+
+    key = (source_type, label)
+    if key in seen:
+        return
+
+    item = {
+        "type": source_type,
+        "label": label,
+        "detail": str(detail or "").strip(),
+    }
+    if source_type == "url":
+        item["url"] = str(value or "").strip()
+    seen.add(key)
+    items.append(item)
+
+
+def job_source_items(job):
+    input_payload = job.get("input_payload") if isinstance(job.get("input_payload"), dict) else {}
+    items = []
+    seen = set()
+
+    urls = input_payload.get("urls")
+    if isinstance(urls, str):
+        urls = [line.strip() for line in urls.splitlines() if line.strip()]
+    if not isinstance(urls, list):
+        urls = []
+    for url in urls:
+        _append_source_item(items, seen, "url", url)
+
+    for key in ("url", "recipe_url", "menu_url", "source_url"):
+        _append_source_item(items, seen, "url", input_payload.get(key))
+
+    filename = _first_text(input_payload.get("filename"), input_payload.get("original_filename"))
+    if filename:
+        _append_source_item(items, seen, "file", filename)
+
+    if not filename and input_payload.get("source_path"):
+        _append_source_item(items, seen, "file", Path(str(input_payload.get("source_path"))).name)
+
+    return items
+
+
+def job_model_details(job):
+    input_payload = job.get("input_payload") if isinstance(job.get("input_payload"), dict) else {}
+    result_payload = job.get("result_payload") if isinstance(job.get("result_payload"), dict) else {}
+    return {
+        "model_used": _first_text(result_payload.get("model_used"), result_payload.get("model"), input_payload.get("model_used"), input_payload.get("model")),
+        "model_source": _first_text(result_payload.get("model_source"), input_payload.get("model_source")),
+        "model_env_var": _first_text(result_payload.get("model_env_var"), input_payload.get("model_env_var")),
+    }
+
+
 def job_for_client(job, include_input=False):
     if not job:
         return None
 
+    model_details = job_model_details(job)
     payload = {
         "id": job.get("id", ""),
         "job_id": job.get("id", ""),
@@ -168,6 +244,8 @@ def job_for_client(job, include_input=False):
         "completed_at": job.get("completed_at") or "",
         "expires_at": job.get("expires_at") or "",
         "retry_of": job.get("retry_of") or "",
+        "source_items": job_source_items(job),
+        **model_details,
     }
 
     if include_input:

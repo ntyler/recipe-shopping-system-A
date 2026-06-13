@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 from werkzeug.datastructures import FileStorage
@@ -12,6 +13,9 @@ from PushShoppingList.services.job_service import update_job_progress
 
 class JobCancelled(Exception):
     pass
+
+
+PROGRESS_COUNT_RE = re.compile(r"\((\d+)\s*/\s*(\d+)\)")
 
 
 def run_job_task(job_id):
@@ -59,6 +63,26 @@ def bounded_percent(index, total, start=0, end=100):
     return int(start + ((end - start) * (index / total)))
 
 
+def model_metadata(model_used="", model_source="", model_env_var=""):
+    return {
+        "model_used": str(model_used or "").strip(),
+        "model_source": str(model_source or "").strip(),
+        "model_env_var": str(model_env_var or "").strip(),
+    }
+
+
+def progress_counts(*values):
+    for value in values:
+        match = PROGRESS_COUNT_RE.search(str(value or ""))
+        if not match:
+            continue
+        completed = int(match.group(1))
+        total = int(match.group(2))
+        if total > 0:
+            return completed, total
+    return None, None
+
+
 def recipe_links(urls):
     return [
         {
@@ -100,7 +124,10 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
     from PushShoppingList.routes.recipe_routes import extract_menu_recipes_from_url
     from PushShoppingList.routes.recipe_routes import extract_recipe_from_url
     from PushShoppingList.routes.recipe_routes import import_recipe_title
+    from PushShoppingList.routes.recipe_routes import MODEL
     from PushShoppingList.routes.recipe_routes import record_recipe_import_activity
+    from PushShoppingList.routes.recipe_routes import resolve_menu_model
+    from PushShoppingList.routes.recipe_routes import resolve_menu_model_source
     from PushShoppingList.routes.recipe_routes import save_import_cookbook_assignment
     from PushShoppingList.routes.recipe_routes import save_ingredients_for_recipe
     from PushShoppingList.routes.recipe_routes import save_recipe_url_name
@@ -120,12 +147,18 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
     created_urls = []
     failed_items = 0
     context = "job-menu-url" if menu_extract else "job-recipe-url"
+    job_model = model_metadata(
+        resolve_menu_model() if menu_extract else MODEL,
+        resolve_menu_model_source() if menu_extract else "recipe",
+        "OPENAI_MENU_MODEL" if menu_extract else "OPENAI_RECIPE_MODEL",
+    )
 
     update_job_progress(
         job_id,
         current_step="Reading source URL" if total == 1 else "Reading source URLs",
         total_items=total,
         progress_percent=5,
+        result_payload=job_model,
     )
 
     for index, url in enumerate(urls):
@@ -140,10 +173,20 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
         )
 
         def progress_callback(message, summary=None):
+            ensure_not_cancelled(job_id)
+            item_completed, item_total = progress_counts(message, summary)
+            progress_kwargs = {}
+            if menu_extract and item_total:
+                progress_kwargs = {
+                    "completed_items": item_completed,
+                    "total_items": item_total,
+                }
             update_job_progress(
                 job_id,
                 current_step=str(message or summary or "Running"),
                 progress_percent=bounded_percent(index, total, 15, 65),
+                result_payload=job_model,
+                **progress_kwargs,
             )
 
         try:
@@ -151,6 +194,8 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
                 result = extract_menu_recipes_from_url(url, progress_callback=progress_callback)
             else:
                 result = extract_recipe_from_url(url, progress_callback=progress_callback)
+        except JobCancelled:
+            raise
         except Exception as exc:
             failed_items += 1
             append_job_warning(job_id, f"{url}: {exc}")
@@ -244,6 +289,7 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
         "failed_count": failed_items,
         "recipe_urls": created_urls,
         "links": recipe_links(created_urls),
+        **job_model,
     }
     update_job_progress(
         job_id,
@@ -279,8 +325,19 @@ def run_doc_photo_import_job(job_id, payload):
     upload_mode = str(payload.get("upload_mode") or "auto").strip().lower()
     manual_description = str(payload.get("manual_description") or "").strip()
     cookbook = selected_cookbook_from_payload(payload)
+    initial_model = model_metadata(
+        resolve_menu_model() if menu_extract else (resolve_vision_model() if upload_mode == "image" else MODEL),
+        resolve_menu_model_source() if menu_extract else (resolve_vision_model_source() if upload_mode == "image" else "recipe"),
+        "OPENAI_MENU_MODEL" if menu_extract else ("OPENAI_VISION_MODEL" if upload_mode == "image" else "OPENAI_RECIPE_MODEL"),
+    )
 
-    update_job_progress(job_id, current_step="Reading uploaded file", total_items=1, progress_percent=10)
+    update_job_progress(
+        job_id,
+        current_step="Reading uploaded file",
+        total_items=1,
+        progress_percent=10,
+        result_payload=initial_model,
+    )
     with source_path.open("rb") as stream:
         uploaded = FileStorage(
             stream=stream,
@@ -310,6 +367,7 @@ def run_doc_photo_import_job(job_id, payload):
         result.setdefault("extraction_mode", "menu_extract")
         result.setdefault("model_used", result.get("model") or resolve_menu_model())
         result.setdefault("model_source", result.get("model_source") or resolve_menu_model_source())
+        result.setdefault("model_env_var", "OPENAI_MENU_MODEL")
     else:
         if not result.get("read_text_only"):
             result = commit_media_import_result(
@@ -326,6 +384,10 @@ def run_doc_photo_import_job(job_id, payload):
         result.setdefault(
             "model_source",
             resolve_vision_model_source() if str(result.get("source_type") or "").lower() == "image" else "recipe",
+        )
+        result.setdefault(
+            "model_env_var",
+            "OPENAI_VISION_MODEL" if str(result.get("source_type") or "").lower() == "image" else "OPENAI_RECIPE_MODEL",
         )
 
     recipe_urls = []
@@ -371,8 +433,20 @@ def run_estimate_per_serving_job(job_id, payload):
     recipe_url = str(payload.get("recipe_url") or payload.get("url") or payload.get("source_url") or "").strip()
     recipe = _extract_recipe_payload_for_nutrition(payload)
     saved_recipe = {}
+    nutrition_model = str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL))
+    nutrition_model_info = model_metadata(
+        nutrition_model,
+        "env:OPENAI_NUTRITION_MODEL" if os.getenv("OPENAI_NUTRITION_MODEL") else "fallback:OPENAI_RECIPE_MODEL",
+        "OPENAI_NUTRITION_MODEL",
+    )
 
-    update_job_progress(job_id, current_step="Estimating per serving", total_items=1, progress_percent=10)
+    update_job_progress(
+        job_id,
+        current_step="Estimating per serving",
+        total_items=1,
+        progress_percent=10,
+        result_payload=nutrition_model_info,
+    )
     if recipe_url:
         loaded_recipe = load_editable_recipe(recipe_url) or {}
         saved_recipe = loaded_recipe.get("recipe") if isinstance(loaded_recipe, dict) else {}
@@ -382,7 +456,7 @@ def run_estimate_per_serving_job(job_id, payload):
         saved_recipe = _recipe_with_default_serving_basis(saved_recipe)
         _mark_uploaded_recipe_nutrition_estimated(recipe_url, True)
         result = _existing_nutrition_success(saved_recipe, recipe_url)
-        result["model_used"] = str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL))
+        result.update(nutrition_model_info)
         return complete_job(job_id, result_payload=result)
 
     if not recipe and saved_recipe:
@@ -399,7 +473,7 @@ def run_estimate_per_serving_job(job_id, payload):
                 return fail_job(job_id, save_result.get("error") or "Unable to save existing nutrition.")
             _mark_uploaded_recipe_nutrition_estimated(recipe_url, True)
         result = _existing_nutrition_success(recipe, recipe_url)
-        result["model_used"] = str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL))
+        result.update(nutrition_model_info)
         return complete_job(job_id, result_payload=result)
 
     update_job_progress(job_id, current_step="Estimating per serving", progress_percent=45)
@@ -418,7 +492,7 @@ def run_estimate_per_serving_job(job_id, payload):
         _mark_uploaded_recipe_nutrition_estimated(recipe_url, True)
 
     result["success"] = bool(result.get("ok"))
-    result["model_used"] = str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL))
+    result.update(nutrition_model_info)
     if result.get("ok"):
         return complete_job(job_id, result_payload=result)
     return fail_job(job_id, result.get("error") or "Unable to estimate nutrition.", result_payload=result)
@@ -481,18 +555,30 @@ def run_upload_pdf_job(job_id, payload):
 
 
 def run_product_matching_job(job_id, payload):
+    import os
+
     from PushShoppingList.services.product_selection_service import grab_best_products
+    from PushShoppingList.services.product_selection_service import PRODUCT_ANALYSIS_MODEL
 
     payload = payload if isinstance(payload, dict) else {}
     items = payload.get("items") if isinstance(payload.get("items"), list) else None
     total = len(items) if items else 0
+    product_model_env = "OPENAI_PRODUCT_ANALYSIS_MODEL" if os.getenv("OPENAI_PRODUCT_ANALYSIS_MODEL") else "OPENAI_RECIPE_MODEL"
+    product_model_info = model_metadata(
+        PRODUCT_ANALYSIS_MODEL,
+        f"env:{product_model_env}",
+        product_model_env,
+    )
     update_job_progress(
         job_id,
         current_step="Matching products",
         total_items=total,
         progress_percent=10,
+        result_payload=product_model_info,
     )
     result = grab_best_products(items=items, job_id=job_id)
+    if isinstance(result, dict):
+        result.update({key: value for key, value in product_model_info.items() if value and not result.get(key)})
     selected = int(result.get("selected_count") or 0) if isinstance(result, dict) else 0
     count = int(result.get("count") or total or selected) if isinstance(result, dict) else total
     update_job_progress(
@@ -510,15 +596,18 @@ def run_product_matching_job(job_id, payload):
 
 def run_recipe_category_decision_job(job_id, payload):
     from PushShoppingList.routes.recipe_routes import decide_recipe_categories_with_chatgpt
+    from PushShoppingList.routes.recipe_routes import MODEL
 
     payload = payload if isinstance(payload, dict) else {}
     recipe = payload.get("recipe", payload)
     mode = payload.get("mode", "missing")
+    category_model_info = model_metadata(MODEL, "recipe", "OPENAI_RECIPE_MODEL")
     update_job_progress(
         job_id,
         current_step="Having ChatGPT decide categories",
         total_items=1,
         progress_percent=20,
+        result_payload=category_model_info,
     )
     result = decide_recipe_categories_with_chatgpt(
         recipe,
@@ -526,6 +615,8 @@ def run_recipe_category_decision_job(job_id, payload):
         current_categories=payload.get("current_categories", {}),
         trigger_source=payload.get("trigger_source") or f"recipe_editor:{mode}",
     )
+    if isinstance(result, dict):
+        result.update({key: value for key, value in category_model_info.items() if value and not result.get(key)})
     if result.get("ok"):
         return complete_job(job_id, result_payload=result)
     return fail_job(job_id, result.get("error") or "Unable to decide categories.", result_payload=result)
