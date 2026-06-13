@@ -13,6 +13,7 @@ from PushShoppingList.services.job_queue_service import queue_name_for_job
 from PushShoppingList.services.job_service import active_limit_for_job
 from PushShoppingList.services.job_service import active_limit_wait_message
 from PushShoppingList.services.job_service import cancel_job
+from PushShoppingList.services.job_service import clear_recent_jobs
 from PushShoppingList.services.job_service import create_job
 from PushShoppingList.services.job_service import create_retry_job
 from PushShoppingList.services.job_service import get_job
@@ -363,7 +364,7 @@ def job_status_route(job_id):
     return jsonify({"ok": True, "job": job_for_client(job, include_input=actor_context()["is_admin"])})
 
 
-@job_bp.route("/api/jobs/recent", methods=["GET"])
+@job_bp.route("/api/jobs/recent", methods=["GET", "DELETE"])
 def recent_jobs_route():
     actor = actor_context()
     include_all = actor["is_admin"] and request.args.get("scope") == "all"
@@ -371,6 +372,14 @@ def recent_jobs_route():
         limit = int(request.args.get("limit", "25"))
     except ValueError:
         limit = 25
+
+    deleted_count = 0
+    if request.method == "DELETE":
+        deleted_count = clear_recent_jobs(
+            user_id=actor["user_id"],
+            guest_session_id=actor["guest_session_id"],
+            include_all=include_all,
+        )
 
     jobs = recent_jobs(
         user_id=actor["user_id"],
@@ -383,6 +392,7 @@ def recent_jobs_route():
         "jobs": [job_for_client(job, include_input=include_all) for job in jobs],
         "scope": "all" if include_all else "mine",
         "is_admin": actor["is_admin"],
+        "deleted_count": deleted_count,
     })
 
 

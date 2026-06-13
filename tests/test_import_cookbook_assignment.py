@@ -146,6 +146,7 @@ def test_job_activity_section_has_clear_collapse_control():
 
     collapse_index = template.index('data-collapse-content="job-activity"')
     refresh_index = template.index("job-activity-refresh")
+    clear_index = template.index("job-activity-clear")
 
     assert 'class="job-activity-header recipe-url-log-header"' in template
     assert 'class="card-collapse-toggle recipe-url-log-toggle job-activity-toggle"' in template
@@ -154,8 +155,14 @@ def test_job_activity_section_has_clear_collapse_control():
     assert 'data-collapse-mobile-default="collapsed"' in template
     assert "card-collapse-switch" not in template
     assert refresh_index > collapse_index
+    assert clear_index > refresh_index
+    assert 'data-job-activity-clear' in template
+    assert "clearJobActivityLog(this)" in template
     assert '"job-activity",' in script
+    assert "function clearJobActivityLog" in script
+    assert 'method: "DELETE"' in script
     assert ".job-activity-toolbar" in css
+    assert ".job-activity-clear" in css
     assert "#jobActivitySection:not(.card-collapsed) > .job-activity-header" in css
 
 

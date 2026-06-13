@@ -259,8 +259,17 @@ function jobActivitySummaryElement() {
     return panel ? panel.querySelector("[data-job-activity-summary]") : null;
 }
 
+function jobActivityClearButton() {
+    const panel = jobActivityPanel();
+    return panel ? panel.querySelector("[data-job-activity-clear]") : null;
+}
+
 function jobIsActive(job) {
     return job && (job.status === "queued" || job.status === "running");
+}
+
+function jobIsFinished(job) {
+    return job && ["completed", "failed", "cancelled"].includes(String(job.status || "").trim().toLowerCase());
 }
 
 function jobTypeLabel(jobType) {
@@ -423,6 +432,7 @@ function renderJobActivityPanel(jobs) {
     const list = jobActivityListElement();
     const summary = jobActivitySummaryElement();
     const panel = jobActivityPanel();
+    const clearButton = jobActivityClearButton();
 
     if (!list || !panel) {
         return;
@@ -430,7 +440,15 @@ function renderJobActivityPanel(jobs) {
 
     const sortedJobs = jobActivitySort(jobs);
     const activeCount = sortedJobs.filter(jobIsActive).length;
+    const finishedCount = sortedJobs.filter(jobIsFinished).length;
     lastJobActivityJobs = sortedJobs;
+
+    if (clearButton) {
+        clearButton.disabled = finishedCount === 0;
+        clearButton.title = finishedCount
+            ? `Clear ${finishedCount} finished job ${finishedCount === 1 ? "entry" : "entries"}`
+            : "No finished job activity to clear";
+    }
 
     if (summary) {
         const completedCount = sortedJobs.filter(job => job.status === "completed").length;
@@ -690,6 +708,78 @@ async function cancelJobActivityJob(jobId) {
             summary.textContent = err.message || "Unable to cancel job.";
         }
     }
+    return false;
+}
+
+async function clearJobActivityLog(button) {
+    const panel = jobActivityPanel();
+    if (!panel) {
+        return false;
+    }
+
+    const finishedCount = lastJobActivityJobs.filter(jobIsFinished).length;
+    if (!finishedCount) {
+        const summary = jobActivitySummaryElement();
+        if (summary) {
+            summary.textContent = "No finished job activity to clear.";
+        }
+        return false;
+    }
+
+    const activeCount = lastJobActivityJobs.filter(jobIsActive).length;
+    const confirmation = activeCount
+        ? `Clear ${finishedCount} finished job ${finishedCount === 1 ? "entry" : "entries"}? Active jobs will stay visible.`
+        : `Clear ${finishedCount} finished job ${finishedCount === 1 ? "entry" : "entries"}?`;
+    if (!window.confirm(confirmation)) {
+        return false;
+    }
+
+    const includeAdmin = panel.dataset.adminJobView === "1";
+    const url = includeAdmin
+        ? "/api/jobs/recent?limit=40&scope=all"
+        : "/api/jobs/recent?limit=25";
+    const originalText = button ? button.textContent : "";
+
+    try {
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Clearing...";
+        }
+
+        const response = await fetch(url, {
+            method: "DELETE",
+            headers: {
+                "Accept": "application/json",
+                "X-Requested-With": "fetch",
+            },
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to clear job activity.");
+        }
+
+        renderJobActivityPanel(data.jobs || []);
+        const summary = jobActivitySummaryElement();
+        if (summary) {
+            const deletedCount = Number(data.deleted_count || 0);
+            summary.textContent = deletedCount
+                ? `Cleared ${deletedCount} finished job ${deletedCount === 1 ? "entry" : "entries"}.`
+                : "No finished job activity to clear.";
+        }
+        scheduleJobActivityPolling((data.jobs || []).some(jobIsActive) ? 1500 : 8000);
+    } catch (err) {
+        const summary = jobActivitySummaryElement();
+        if (summary) {
+            summary.textContent = err.message || "Unable to clear job activity.";
+        }
+    } finally {
+        if (button) {
+            button.textContent = originalText || "Clear Log";
+            button.disabled = lastJobActivityJobs.filter(jobIsFinished).length === 0;
+        }
+    }
+
     return false;
 }
 

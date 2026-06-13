@@ -897,6 +897,30 @@ def delete_guest_jobs(guest_session_id):
         return cursor.rowcount
 
 
+def clear_recent_jobs(user_id="", guest_session_id="", include_all=False):
+    cleanup_expired_jobs()
+    mark_stuck_jobs()
+
+    statuses = sorted(TERMINAL_JOB_STATUSES)
+    placeholders = ", ".join("?" for _ in statuses)
+    user_id = str(user_id or "").strip()
+    guest_session_id = str(guest_session_id or "").strip()
+
+    if include_all:
+        query = f"DELETE FROM jobs WHERE status IN ({placeholders})"
+        args = tuple(statuses)
+    elif guest_session_id:
+        query = f"DELETE FROM jobs WHERE guest_session_id = ? AND status IN ({placeholders})"
+        args = (guest_session_id, *statuses)
+    else:
+        query = f"DELETE FROM jobs WHERE COALESCE(user_id, '') = ? AND status IN ({placeholders})"
+        args = (user_id, *statuses)
+
+    with jobs_connection() as connection:
+        cursor = connection.execute(query, args)
+        return cursor.rowcount
+
+
 def mark_stuck_jobs():
     cutoff = utc_now() - timedelta(minutes=job_timeout_minutes())
     cutoff_iso = cutoff.isoformat() + "Z"

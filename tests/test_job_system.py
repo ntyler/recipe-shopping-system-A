@@ -62,6 +62,62 @@ def test_job_routes_create_and_scope_jobs_to_owner(monkeypatch, tmp_path):
         assert hidden.status_code == 404
 
 
+def test_clear_recent_jobs_removes_finished_owner_jobs_only(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    completed = job_service.create_job(
+        "recipe-import",
+        input_payload={"urls": ["https://example.com/completed"]},
+        user_id="owner",
+        total_items=1,
+    )
+    failed = job_service.create_job(
+        "menu-import",
+        input_payload={"urls": ["https://example.com/failed"]},
+        user_id="owner",
+        total_items=1,
+    )
+    running = job_service.create_job(
+        "menu-generate-recipes",
+        input_payload={"recipe_urls": ["https://example.com/running"]},
+        user_id="owner",
+        total_items=1,
+    )
+    other = job_service.create_job(
+        "recipe-import",
+        input_payload={"urls": ["https://example.com/other"]},
+        user_id="other",
+        total_items=1,
+    )
+
+    job_service.complete_job(completed["id"])
+    job_service.fail_job(failed["id"], "Nope")
+    job_service.update_job(running["id"], status="running", started_at=job_service.now_iso())
+    job_service.complete_job(other["id"])
+
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["user_id"] = "owner"
+
+        response = client.delete(
+            "/api/jobs/recent",
+            headers={"X-Requested-With": "fetch"},
+        )
+
+    data = response.get_json()
+
+    assert response.status_code == 200
+    assert data["ok"] is True
+    assert data["deleted_count"] == 2
+    assert [job["id"] for job in data["jobs"]] == [running["id"]]
+    assert job_service.get_job(completed["id"]) is None
+    assert job_service.get_job(failed["id"]) is None
+    assert job_service.get_job(running["id"]) is not None
+    assert job_service.get_job(other["id"]) is not None
+
+
 def test_job_for_client_shows_safe_sources_and_model_metadata(monkeypatch, tmp_path):
     configure_job_paths(monkeypatch, tmp_path)
     upload_path = tmp_path / "secret" / "staged-menu.pdf"

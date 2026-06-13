@@ -24,6 +24,13 @@
                     onclick="return refreshJobActivityPanel({ force: true })">
                 Refresh
             </button>
+            <button type="button"
+                    class="secondary job-activity-clear"
+                    data-job-activity-clear
+                    onclick="return clearJobActivityLog(this)"
+                    disabled>
+                Clear Log
+            </button>
         </div>
         <div class="job-activity-summary" data-job-activity-summary>
             No active jobs.
