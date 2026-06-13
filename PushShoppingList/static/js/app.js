@@ -7689,6 +7689,16 @@ async function restoreSingleCookbookRecipe(button) {
     return false;
 }
 
+function isUnclassifiedCookbookAction(button) {
+    const data = button && button.dataset ? button.dataset : {};
+    const cookbookId = String(data.cookbookId || "").trim().toLowerCase();
+    const cookbookName = String(data.cookbookName || "").trim().toLowerCase();
+
+    return data.cookbookUnclassified === "1"
+        || cookbookId === "unclassified"
+        || cookbookName === "unclassified";
+}
+
 function selectedCookbookRecipeUrlsForCard(button) {
     const card = button ? button.closest("[data-cookbook-card]") : null;
 
@@ -7709,6 +7719,7 @@ async function deleteSelectedCookbookRecipes(button, options = {}) {
     const purgeRecipes = options.purge === true;
     const cookbookId = button.dataset.cookbookId || "";
     const cookbookName = button.dataset.cookbookName || "this cookbook";
+    const isUnclassified = isUnclassifiedCookbookAction(button);
     const selectedUrls = selectedCookbookRecipeUrlsForCard(button);
 
     if (!cookbookId) {
@@ -7721,12 +7732,12 @@ async function deleteSelectedCookbookRecipes(button, options = {}) {
     }
 
     const recipeLabel = selectedUrls.length === 1 ? "recipe" : "recipes";
-    const deleteDetail = button.dataset.cookbookUnclassified === "1"
+    const deleteDetail = isUnclassified
         ? "This removes the selection from the unclassified cookbook. Current Recipes stays untouched."
         : "This removes the selection from this cookbook and moves it to unclassified. Current Recipes stays untouched.";
     const confirmMessage = purgeRecipes
-        ? `Delete and purge ${selectedUrls.length} selected ${recipeLabel} from ${cookbookName}?\n\nThis removes ${recipeLabel === "recipe" ? "it" : "them"} from every cookbook, Current Recipes, saved recipe data, and unused shopping-list ingredients.`
-        : `Delete ${selectedUrls.length} selected ${recipeLabel} from ${cookbookName}?\n\n${deleteDetail}`;
+        ? `${isUnclassified ? "Purge" : "Delete and purge"} ${selectedUrls.length} selected ${recipeLabel} from ${cookbookName}?\n\nThis removes ${recipeLabel === "recipe" ? "it" : "them"} from every cookbook, Current Recipes, saved recipe data, and unused shopping-list ingredients.`
+        : `${isUnclassified ? "Remove" : "Delete"} ${selectedUrls.length} selected ${recipeLabel} from ${cookbookName}?\n\n${deleteDetail}`;
 
     if (!window.confirm(confirmMessage)) {
         return false;
@@ -7738,8 +7749,8 @@ async function deleteSelectedCookbookRecipes(button, options = {}) {
 
     try {
         button.disabled = true;
-        button.textContent = purgeRecipes ? "Purging..." : "Deleting...";
-        setCookbookStatus(purgeRecipes ? "Purging selected recipes..." : "Deleting selected recipes...");
+        button.textContent = purgeRecipes ? "Purging..." : (isUnclassified ? "Removing..." : "Deleting...");
+        setCookbookStatus(purgeRecipes ? "Purging selected recipes..." : (isUnclassified ? "Removing selected recipes..." : "Deleting selected recipes..."));
 
         const endpoint = `/api/cookbooks/${encodeURIComponent(cookbookId)}/${purgeRecipes ? "purge_selected_recipes" : "remove_selected_recipes"}`;
         const data = await submitCookbookApi(endpoint, formData);
@@ -7759,7 +7770,7 @@ async function deleteSelectedCookbookRecipes(button, options = {}) {
             "",
             purgeRecipes
                 ? `${completedCount} selected ${completedCount === 1 ? "recipe was" : "recipes were"} purged.`
-                : `${completedCount} selected ${completedCount === 1 ? "recipe was" : "recipes were"} deleted from ${cookbookName}.`
+                : `${completedCount} selected ${completedCount === 1 ? "recipe was" : "recipes were"} ${isUnclassified ? "removed from" : "deleted from"} ${cookbookName}.`
         );
     } catch (err) {
         console.warn(purgeRecipes ? "Unable to purge selected cookbook recipes." : "Unable to delete selected cookbook recipes.", err);
@@ -7767,7 +7778,9 @@ async function deleteSelectedCookbookRecipes(button, options = {}) {
         window.alert(err.message || (purgeRecipes ? "Unable to purge selected recipes." : "Unable to delete selected recipes."));
     } finally {
         button.disabled = false;
-        button.textContent = originalText || (purgeRecipes ? "Delete and purge selected recipes" : "Delete selected recipes");
+        button.textContent = originalText || (purgeRecipes
+            ? (isUnclassified ? "Purge selected recipes" : "Delete and purge selected recipes")
+            : (isUnclassified ? "Remove selected recipes" : "Delete selected recipes"));
     }
 
     return false;
@@ -7846,6 +7859,11 @@ function openCookbookNameEditor(button) {
     const cookbookName = button.dataset.cookbookName || "";
 
     if (!cookbookId) {
+        return false;
+    }
+
+    if (isUnclassifiedCookbookAction(button)) {
+        setCookbookStatus("The unclassified cookbook is protected and cannot be renamed.", true);
         return false;
     }
 
@@ -8204,6 +8222,14 @@ async function deleteCookbook(button, options = {}) {
     const cookbookName = button.dataset.cookbookName || "this cookbook";
     const recipeCount = Number(button.dataset.cookbookRecipeCount || 0);
     const recipeLabel = recipeCount === 1 ? "recipe" : "recipes";
+
+    if (isUnclassifiedCookbookAction(button)) {
+        const message = "The unclassified cookbook is protected and cannot be deleted.";
+        setCookbookStatus(message, true);
+        window.alert(message);
+        return false;
+    }
+
     const confirmMessage = purgeRecipes
         ? `Delete ${cookbookName} and purge ${recipeCount} ${recipeLabel}?\n\nThis removes those recipes from cookbooks, current recipes, saved recipe data, and unused shopping-list ingredients.`
         : `Delete ${cookbookName}?\n\nRecipes in this cookbook will move to unclassified.`;
@@ -8323,7 +8349,7 @@ async function purgeUnclassifiedCookbookRecipes(button) {
         setCookbookStatus(err.message || "Unable to purge unclassified recipes.", true);
     } finally {
         button.disabled = false;
-        button.textContent = originalText || "Purge all recipes";
+        button.textContent = originalText || "Purge all unclassified recipes";
     }
 
     return false;

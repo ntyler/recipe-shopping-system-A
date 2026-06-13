@@ -422,7 +422,7 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn('data-cookbook-view-panel="menu"', cookbook_template)
         self.assertIn("Delete cookbook, keep recipes", cookbook_template)
         self.assertIn("Delete cookbook and purge recipes", cookbook_template)
-        self.assertIn("Purge all recipes", cookbook_template)
+        self.assertIn("Purge all unclassified recipes", cookbook_template)
         self.assertIn("purgeUnclassifiedCookbookRecipes(this)", cookbook_template)
         self.assertIn("data-cookbook-card", cookbook_template)
         self.assertIn("resolveCookbookOverwritePrompt(false)", cookbook_template)
@@ -698,6 +698,31 @@ class ProductSelectionServiceTest(unittest.TestCase):
 
             with self.assertRaises(ValueError):
                 cookbook_service.create_cookbook("Weeknight Dinners")
+
+    def test_unclassified_cookbook_cannot_be_renamed(self):
+        from PushShoppingList.services import cookbook_service
+
+        with TemporaryDirectory() as temp_dir, patch.object(
+            cookbook_service,
+            "COOKBOOKS_FILE",
+            Path(temp_dir) / "cookbooks.json",
+        ):
+            cookbook_service.save_cookbooks({
+                "cookbooks": [
+                    {
+                        "id": "unclassified",
+                        "name": "unclassified",
+                        "recipes": [{"name": "Skillet Chili", "url": "https://example.com/chili"}],
+                    },
+                ],
+            })
+
+            with self.assertRaisesRegex(ValueError, "cannot be renamed"):
+                cookbook_service.rename_cookbook("unclassified", "Loose Recipes")
+
+            data = cookbook_service.load_cookbooks()
+            self.assertEqual(data["cookbooks"][0]["name"], "unclassified")
+            self.assertEqual(data["cookbooks"][0]["recipes"][0]["name"], "Skillet Chili")
 
     def test_delete_cookbook_and_purge_recipe_urls_removes_matching_saved_recipes(self):
         from PushShoppingList.services import cookbook_service

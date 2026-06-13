@@ -3,7 +3,9 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 import pytest
+from flask import render_template
 
+from PushShoppingList.app import create_app
 from PushShoppingList.services import cookbook_service
 
 
@@ -86,6 +88,69 @@ def test_cookbook_recipe_rows_match_current_recipe_summary_layout():
     assert 'class="recipe-url-summary-actions cookbook-recipe-actions"' in template
     assert "display: grid;\n                grid-template-columns: minmax(0, 1fr) auto;" not in css
     assert "justify-content: flex-end;\n                width: 100%;\n                margin-left: auto;" not in css
+
+
+def test_unclassified_cookbook_menu_keeps_cookbook_management_protected():
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    with TemporaryDirectory() as temp_dir, patch.object(
+        cookbook_service,
+        "COOKBOOKS_FILE",
+        Path(temp_dir) / "cookbooks.json",
+    ):
+        cookbook_service.save_cookbooks({
+            "cookbooks": [
+                {
+                    "id": "unclassified",
+                    "name": "unclassified",
+                    "recipes": [{"url": "https://example.com/loose", "name": "Loose Soup"}],
+                },
+                {
+                    "id": "dinner",
+                    "name": "Dinner",
+                    "recipes": [{"url": "https://example.com/chili", "name": "Chili"}],
+                },
+            ],
+        })
+        view = cookbook_service.cookbook_view([])
+        for cookbook in view["cookbooks"]:
+            cookbook.setdefault("menu_pdf_logs", [])
+            cookbook.setdefault("restaurant_menus", [])
+
+        with app.test_request_context("/"):
+            html = render_template(
+                "sections/cookbooks.html",
+                cookbook_view=view,
+                cookbook_count=len(view["cookbooks"]),
+                cookbook_recipe_count=sum(len(cookbook["recipes"]) for cookbook in view["cookbooks"]),
+            )
+
+    def card_header(cookbook_id):
+        marker = f'data-cookbook-id="{cookbook_id}"'
+        marker_index = html.index(marker)
+        start = html.rfind("<article", 0, marker_index)
+        end = html.index('<div class="cookbook-card-body"', marker_index)
+        return html[start:end]
+
+    unclassified_header = card_header("unclassified")
+    dinner_header = card_header("dinner")
+
+    assert 'data-cookbook-unclassified="1"' in unclassified_header
+    assert "Rename cookbook" not in unclassified_header
+    assert "Delete cookbook, keep recipes" not in unclassified_header
+    assert "Delete cookbook and purge recipes" not in unclassified_header
+    assert "deleteCookbook(this)" not in unclassified_header
+    assert "purgeCookbook(this)" not in unclassified_header
+    assert "Remove selected recipes" in unclassified_header
+    assert "Purge selected recipes" in unclassified_header
+    assert "Purge all unclassified recipes" in unclassified_header
+
+    assert 'data-cookbook-unclassified="0"' in dinner_header
+    assert "Rename cookbook" in dinner_header
+    assert "Delete selected recipes" in dinner_header
+    assert "Delete cookbook, keep recipes" in dinner_header
+    assert "Delete cookbook and purge recipes" in dinner_header
 
 
 def test_remove_selected_cookbook_recipes_moves_them_to_unclassified():

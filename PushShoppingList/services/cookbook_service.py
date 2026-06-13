@@ -1649,6 +1649,9 @@ def rename_cookbook(cookbook_id, name):
         if target is None:
             raise ValueError("Cookbook was not found.")
 
+        if is_unclassified_cookbook(target):
+            raise ValueError("The unclassified cookbook cannot be renamed.")
+
         name_key = normalize_text(name)
         for cookbook in payload["cookbooks"]:
             if cookbook.get("id") != cookbook_id and normalize_text(cookbook.get("name")) == name_key:

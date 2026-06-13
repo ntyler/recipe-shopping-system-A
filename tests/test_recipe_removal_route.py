@@ -3,6 +3,7 @@ from pathlib import Path
 from PushShoppingList.app import create_app
 from PushShoppingList.routes import main_routes
 from PushShoppingList.routes import recipe_routes
+from PushShoppingList.services import cookbook_service
 from PushShoppingList.services import storage_service
 from PushShoppingList.services import user_account_service
 
@@ -390,6 +391,111 @@ def test_fetch_purge_unclassified_recipes_requires_opt_in(monkeypatch, tmp_path)
         "error": "Type PURGE to confirm purging unclassified recipes.",
     }
     assert calls == []
+
+
+def test_fetch_delete_unclassified_cookbook_is_blocked(monkeypatch, tmp_path):
+    app = create_app()
+    app.config.update(TESTING=True)
+    monkeypatch.setattr(cookbook_service, "COOKBOOKS_FILE", tmp_path / "cookbooks.json")
+    cookbook_service.save_cookbooks({
+        "cookbooks": [
+            {
+                "id": "unclassified",
+                "name": "unclassified",
+                "recipes": [{"url": "https://example.com/chili", "name": "Chili"}],
+            },
+        ],
+    })
+
+    with app.test_client() as client:
+        configure_signed_in_user(monkeypatch, tmp_path, client)
+        response = client.delete(
+            "/api/cookbooks/unclassified",
+            headers={"X-Requested-With": "fetch"},
+        )
+
+    assert response.status_code == 400
+    assert response.get_json() == {
+        "ok": False,
+        "error": "The unclassified cookbook cannot be deleted.",
+    }
+    payload = cookbook_service.load_cookbooks()
+    assert [cookbook["id"] for cookbook in payload["cookbooks"]] == ["unclassified"]
+    assert payload["cookbooks"][0]["recipes"][0]["url"] == "https://example.com/chili"
+
+
+def test_fetch_purge_unclassified_cookbook_is_blocked(monkeypatch, tmp_path):
+    app = create_app()
+    app.config.update(TESTING=True)
+    calls = []
+    monkeypatch.setattr(cookbook_service, "COOKBOOKS_FILE", tmp_path / "cookbooks.json")
+    monkeypatch.setattr(
+        main_routes,
+        "remove_recipe_and_unused_ingredients",
+        lambda url: calls.append(("ingredients", url)),
+    )
+    monkeypatch.setattr(
+        main_routes,
+        "remove_recipe_url",
+        lambda url: calls.append(("url", url)),
+    )
+    cookbook_service.save_cookbooks({
+        "cookbooks": [
+            {
+                "id": "unclassified",
+                "name": "unclassified",
+                "recipes": [{"url": "https://example.com/chili", "name": "Chili"}],
+            },
+        ],
+    })
+
+    with app.test_client() as client:
+        configure_signed_in_user(monkeypatch, tmp_path, client)
+        response = client.delete(
+            "/api/cookbooks/unclassified/purge",
+            headers={"X-Requested-With": "fetch"},
+        )
+
+    assert response.status_code == 400
+    assert response.get_json() == {
+        "ok": False,
+        "error": "The unclassified cookbook cannot be purged.",
+    }
+    assert calls == []
+    payload = cookbook_service.load_cookbooks()
+    assert [cookbook["id"] for cookbook in payload["cookbooks"]] == ["unclassified"]
+    assert payload["cookbooks"][0]["recipes"][0]["url"] == "https://example.com/chili"
+
+
+def test_fetch_rename_unclassified_cookbook_is_blocked(monkeypatch, tmp_path):
+    app = create_app()
+    app.config.update(TESTING=True)
+    monkeypatch.setattr(cookbook_service, "COOKBOOKS_FILE", tmp_path / "cookbooks.json")
+    cookbook_service.save_cookbooks({
+        "cookbooks": [
+            {
+                "id": "unclassified",
+                "name": "unclassified",
+                "recipes": [{"url": "https://example.com/chili", "name": "Chili"}],
+            },
+        ],
+    })
+
+    with app.test_client() as client:
+        configure_signed_in_user(monkeypatch, tmp_path, client)
+        response = client.post(
+            "/api/cookbooks/unclassified/rename",
+            data={"name": "Loose Recipes"},
+            headers={"X-Requested-With": "fetch"},
+        )
+
+    assert response.status_code == 400
+    assert response.get_json() == {
+        "ok": False,
+        "error": "The unclassified cookbook cannot be renamed.",
+    }
+    payload = cookbook_service.load_cookbooks()
+    assert payload["cookbooks"][0]["name"] == "unclassified"
 
 
 def test_fetch_remove_selected_cookbook_recipes_reuses_batch_removal(monkeypatch, tmp_path):
