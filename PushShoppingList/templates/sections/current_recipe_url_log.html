@@ -44,6 +44,14 @@
                 <button type="button" onclick="return setAllCurrentRecipeUrlSummariesCollapsed(true)">
                     Collapse all current recipes
                 </button>
+                <form method="POST"
+                      action="{{ url_for('recipe_bp.api_clear_recipe_urls_route') }}"
+                      class="remove-recipe-form recipe-url-log-menu-form"
+                      data-confirm-message="Clear all current recipes? This removes them from Current Recipes and removes unused shopping-list ingredients. Cookbooks are not purged.">
+                    <button type="submit" class="delete">
+                        Clear current recipes
+                    </button>
+                </form>
                 <div class="recipe-url-summary-cookbook-menu-label">Menu AI</div>
                 <button type="button" onclick="return generateSelectedMenuStubRecipes(this)">
                     Generate Selected Recipes

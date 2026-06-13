@@ -3157,6 +3157,30 @@ def api_reorder_recipe_urls_route():
     })
 
 
+@recipe_bp.route("/api/recipe_urls/clear", methods=["POST"])
+def api_clear_recipe_urls_route():
+    current_urls = load_recipe_urls()
+    wants_json = wants_fetch_json_response()
+
+    try:
+        for url in current_urls:
+            remove_recipe_and_unused_ingredients(url)
+            remove_recipe_url(url)
+    except Exception as exc:
+        if wants_json:
+            return jsonify({"ok": False, "error": str(exc) or "Unable to clear current recipes."}), 500
+        raise
+
+    if wants_json:
+        return jsonify({
+            "ok": True,
+            "cleared_recipe_count": len(current_urls),
+            "redirect_url": "/",
+        })
+
+    return redirect("/")
+
+
 @recipe_bp.route("/api/recipe", methods=["GET", "POST"])
 def api_recipe_route():
     if request.method == "GET":

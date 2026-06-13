@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from PushShoppingList.app import create_app
 from PushShoppingList.routes import main_routes
 from PushShoppingList.routes import recipe_routes
@@ -84,6 +86,59 @@ def test_regular_remove_recipe_form_still_redirects(monkeypatch, tmp_path):
 
     assert response.status_code == 302
     assert response.headers["Location"] == "/"
+
+
+def test_current_recipe_menu_has_clear_current_recipes_action():
+    template = Path("PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(
+        encoding="utf-8",
+    )
+
+    assert "Clear current recipes" in template
+    assert "recipe_bp.api_clear_recipe_urls_route" in template
+    assert 'class="remove-recipe-form recipe-url-log-menu-form"' in template
+    assert "Clear all current recipes?" in template
+
+
+def test_fetch_clear_current_recipes_reuses_recipe_cleanup(monkeypatch, tmp_path):
+    app = create_app()
+    app.config.update(TESTING=True)
+    calls = []
+
+    monkeypatch.setattr(
+        recipe_routes,
+        "load_recipe_urls",
+        lambda: ["https://example.com/chili", "https://example.com/soup"],
+    )
+    monkeypatch.setattr(
+        recipe_routes,
+        "remove_recipe_and_unused_ingredients",
+        lambda url: calls.append(("ingredients", url)),
+    )
+    monkeypatch.setattr(
+        recipe_routes,
+        "remove_recipe_url",
+        lambda url: calls.append(("url", url)),
+    )
+
+    with app.test_client() as client:
+        configure_signed_in_user(monkeypatch, tmp_path, client)
+        response = client.post(
+            "/api/recipe_urls/clear",
+            headers={"X-Requested-With": "fetch"},
+        )
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "ok": True,
+        "cleared_recipe_count": 2,
+        "redirect_url": "/",
+    }
+    assert calls == [
+        ("ingredients", "https://example.com/chili"),
+        ("url", "https://example.com/chili"),
+        ("ingredients", "https://example.com/soup"),
+        ("url", "https://example.com/soup"),
+    ]
 
 
 def test_fetch_purge_recipe_returns_json_without_redirect(monkeypatch, tmp_path):
