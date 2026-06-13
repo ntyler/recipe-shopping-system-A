@@ -110,6 +110,28 @@ def test_recipe_editor_uses_split_source_and_generated_pdf_fields():
     assert "function recipePdfSaveChoiceForPayload" in js
 
 
+def test_recipe_overflow_menus_include_source_pdf_near_recipe_pdf():
+    current_recipe_template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    cookbook_template = read_text("PushShoppingList/templates/sections/cookbooks.html")
+    items_template = read_text("PushShoppingList/templates/sections/items.html")
+    routes = read_text("PushShoppingList/routes/main_routes.py")
+
+    assert "source_pdf_public_url" in routes
+
+    menus = [
+        (current_recipe_template, "recipe-url-summary-pdf", "recipe-url-summary-source-pdf"),
+        (cookbook_template, "cookbook-recipe-menu-pdf", "cookbook-recipe-menu-source-pdf"),
+        (items_template, "recipe-view-menu-pdf", "recipe-view-menu-source-pdf"),
+    ]
+
+    for template, recipe_pdf_class, source_pdf_class in menus:
+        assert source_pdf_class in template
+        assert template.index(recipe_pdf_class) < template.index(source_pdf_class)
+        assert "Open recipe PDF" in template
+        assert "Open source PDF" in template
+        assert "kind='webpage_backup'" in template
+
+
 def test_recipe_imports_queue_generated_recipe_pdf_creation():
     routes = read_text("PushShoppingList/routes/recipe_routes.py")
 

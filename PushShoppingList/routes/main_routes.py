@@ -92,6 +92,7 @@ from PushShoppingList.services.recipe_extract_service import scaling_multiplier_
 from PushShoppingList.services.recipe_extract_service import supports_custom_temperature
 from PushShoppingList.services.recipe_edit_service import is_shareable_pdf_public_url
 from PushShoppingList.services.recipe_edit_service import PDF_KIND_GENERATED_RECIPE
+from PushShoppingList.services.recipe_edit_service import PDF_KIND_WEBPAGE_BACKUP
 from PushShoppingList.services.recipe_edit_service import normalize_recipe_pdf_storage_metadata
 from PushShoppingList.services.product_selection_service import product_choices_by_item
 from PushShoppingList.services.product_selection_service import store_price_cells_for_item
@@ -667,9 +668,9 @@ def section_counts(items):
     return counts
 
 
-def recipe_pdf_public_url(recipe_url):
+def recipe_pdf_public_url(recipe_url, pdf_kind=PDF_KIND_GENERATED_RECIPE):
     recipe_data = load_saved_recipe_output(recipe_url)
-    metadata = normalize_recipe_pdf_storage_metadata(recipe_data, PDF_KIND_GENERATED_RECIPE)
+    metadata = normalize_recipe_pdf_storage_metadata(recipe_data, pdf_kind)
     public_url = str(metadata.get("public_url") or "").strip()
 
     return public_url if is_shareable_pdf_public_url(public_url) else ""
@@ -709,6 +710,7 @@ def recipe_view_rows(recipe_urls, food_rules=None, image_variants=None, include_
             "source_href": recipe_source_href(recipe["url"]),
             "source_display_url": recipe_source_display_url(recipe["url"]),
             "pdf_public_url": recipe_pdf_public_url(recipe["url"]),
+            "source_pdf_public_url": recipe_pdf_public_url(recipe["url"], PDF_KIND_WEBPAGE_BACKUP),
             "cover_image": cover_image,
             "description": recipe_description_for_view(recipe_data),
             "servings": recipe_data.get("servings", ""),
@@ -835,6 +837,7 @@ def recipe_url_log_rows(recipe_urls, cookbook_assignments=None, food_rules=None,
             "source_href": recipe_source_href(recipe["url"]),
             "source_display_url": recipe_source_display_url(recipe["url"]),
             "pdf_public_url": recipe_pdf_public_url(recipe["url"]),
+            "source_pdf_public_url": recipe_pdf_public_url(recipe["url"], PDF_KIND_WEBPAGE_BACKUP),
             "cover_image": recipe_cover_image_for_view(
                 recipe["url"],
                 recipe_data,
@@ -983,6 +986,7 @@ def cookbook_view_for_render(recipe_rows, food_rules=None, image_variants=None):
             recipe["rating"] = recipe_rating_for_view(recipe_data)
             recipe["rating_stars"] = recipe_rating_stars_for_view(recipe_data)
             recipe["pdf_public_url"] = recipe_pdf_public_url(recipe_url)
+            recipe["source_pdf_public_url"] = recipe_pdf_public_url(recipe_url, PDF_KIND_WEBPAGE_BACKUP)
             recipe["archive_pdf_available"] = recipe_archive_pdf_exists(recipe_url)
             recipe["base_servings"] = recipe.get("base_servings") or recipe_data.get("servings")
             recipe["scaled_servings"] = (
