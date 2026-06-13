@@ -53,14 +53,16 @@
                         <p>Add, edit, and organize pantry inventory.</p>
                     </div>
                 </div>
-                <div class="recipe-edit-section-actions ai-pantry-inventory-actions">
-                    <button type="button"
-                            class="ai-pantry-action-btn"
-                            onclick="return moveBoughtItemsToPantry(this)">
-                        <span class="recipe-edit-button-icon" aria-hidden="true">+</span>
-                        <span>Move Bought Items to Pantry</span>
-                    </button>
-                </div>
+                {% if not is_guest_demo|default(false) %}
+                    <div class="recipe-edit-section-actions ai-pantry-inventory-actions">
+                        <button type="button"
+                                class="ai-pantry-action-btn"
+                                onclick="return moveBoughtItemsToPantry(this)">
+                            <span class="recipe-edit-button-icon" aria-hidden="true">+</span>
+                            <span>Move Bought Items to Pantry</span>
+                        </button>
+                    </div>
+                {% endif %}
             </div>
 
             <div class="ai-pantry-search">

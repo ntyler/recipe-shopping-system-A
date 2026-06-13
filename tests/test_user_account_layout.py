@@ -713,6 +713,8 @@ def test_feedback_support_follows_account_and_closes_to_profile():
     assert 'scrollToUserAccountProfile("auto")' in script
     assert ".user-feedback-support-panel" in css
     assert ".feedback-support-content" in css
+    assert ".feedback-support-card .user-push-panel-close" in css
+    assert ".feedback-support-card .user-push-panel-close:hover" in css
 
 
 def test_feedback_support_tickets_are_compact_collapsible_portal_rows():

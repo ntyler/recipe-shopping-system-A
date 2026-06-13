@@ -185,6 +185,23 @@ def test_guest_session_can_use_temporary_workspace_controls(monkeypatch, tmp_pat
         assert store.get_json()["enabled_stores"] == ["aldi"]
 
 
+def test_guest_session_hides_move_bought_items_to_pantry_action(monkeypatch, tmp_path):
+    configure_guest_demo_paths(monkeypatch, tmp_path)
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    with app.test_client() as client:
+        client.get("/guest/start")
+
+        response = client.get("/sections/recipe-view")
+
+    html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "Move Bought Items to Pantry" not in html
+    assert "move-bought-pantry-btn" not in html
+
+
 def test_guest_session_can_run_recipe_url_import_api(monkeypatch, tmp_path):
     configure_guest_demo_paths(monkeypatch, tmp_path)
 

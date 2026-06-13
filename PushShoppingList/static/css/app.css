@@ -18797,6 +18797,24 @@ body {
     max-width: 980px;
 }
 
+.feedback-support-card .user-push-panel-close {
+    min-height: 38px;
+    margin: 0;
+    border: 1px solid #3f4b58;
+    border-radius: 7px;
+    background: #23282d;
+    color: #e2e8f0;
+    font-weight: 800;
+}
+
+.feedback-support-card .user-push-panel-close:hover,
+.feedback-support-card .user-push-panel-close:focus-visible {
+    border-color: #60a5fa;
+    background: #2a3036;
+    color: #f8fafc;
+    outline: none;
+}
+
 .feedback-support-content {
     display: grid;
     gap: 18px;

@@ -1,11 +1,13 @@
 <div id="sectionView">
     <div class="items-title-row">
         <h2 class="items-title">Items</h2>
-        <button type="button"
-                class="move-bought-pantry-btn"
-                onclick="return moveBoughtItemsToPantry(this)">
-            Move Bought Items to Pantry
-        </button>
+        {% if not is_guest_demo|default(false) %}
+            <button type="button"
+                    class="move-bought-pantry-btn"
+                    onclick="return moveBoughtItemsToPantry(this)">
+                Move Bought Items to Pantry
+            </button>
+        {% endif %}
     </div>
 
     {% if items %}
