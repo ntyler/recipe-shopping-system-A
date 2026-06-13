@@ -12368,20 +12368,34 @@ async function estimateCurrentRecipeNutritionFromMenu(button) {
 
     try {
         showRecipeQuantityUpdatedMessage(recipeUrl, "", recipeNumber, "Estimating per-serving nutrition...");
-        const response = await fetch("/api/estimate-per-serving", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
+        const startData = await startBackgroundJob("/api/jobs/estimate-per-serving", {
+            button,
+            creatingText: "Starting...",
+            payload: {
                 recipe_url: recipeUrl,
-            }),
+            },
         });
-        const data = await response.json();
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Estimating...";
+        }
+        const finishedJob = await waitForJobCompletion(startData.job_id, {
+            onUpdate(job) {
+                showRecipeQuantityUpdatedMessage(
+                    recipeUrl,
+                    "",
+                    recipeNumber,
+                    job.current_step || "Estimating per-serving nutrition..."
+                );
+            },
+        });
+        const data = finishedJob && finishedJob.result_payload && typeof finishedJob.result_payload === "object"
+            ? finishedJob.result_payload
+            : {};
         syncOpenAiUsageDashboardFromResponse(data);
 
-        if (!response.ok || !data.ok) {
-            throw new Error((data && data.error) || "Unable to estimate nutrition.");
+        if (!finishedJob || finishedJob.status !== "completed" || !data.ok) {
+            throw new Error((finishedJob && finishedJob.error_message) || (data && data.error) || "Unable to estimate nutrition.");
         }
 
         await refreshStoreMarkup({
@@ -24640,6 +24654,13 @@ function setMenuRecipeEstimateRowStatus(button, mode, message) {
         spinner.setAttribute("aria-hidden", "true");
         status.appendChild(spinner);
         status.appendChild(document.createTextNode("Updating..."));
+    } else if (mode === "done") {
+        row.classList.add("complete");
+        if (checkbox) {
+            checkbox.checked = true;
+        }
+        status.classList.add("complete");
+        status.textContent = message || "Complete";
     } else if (mode === "error") {
         status.textContent = message || "Unable to estimate serving basis.";
     }
@@ -24661,28 +24682,32 @@ async function runMenuRecipeServingBasisEstimate(button) {
     setMenuRecipeEstimateRowStatus(button, "running");
 
     try {
-        const response = await fetch("/api/menu_recipe_estimate_per_serving", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-Requested-With": "fetch",
-            },
-            body: JSON.stringify({
+        const startData = await startBackgroundJob("/api/jobs/estimate-per-serving", {
+            button,
+            creatingText: "Starting...",
+            payload: {
                 recipe_url: recipeUrl,
                 recipe_id: recipeId,
-                job_id: jobId,
-            }),
+                import_job_id: jobId,
+            },
         });
-        const data = await response.json();
+        if (button) {
+            button.disabled = true;
+        }
+        const finishedJob = await waitForJobCompletion(startData.job_id, {
+            onUpdate(job) {
+                setMenuRecipeEstimateRowStatus(button, "running", job.current_step || "Updating...");
+            },
+        });
+        const data = finishedJob && finishedJob.result_payload && typeof finishedJob.result_payload === "object"
+            ? finishedJob.result_payload
+            : {};
         syncOpenAiUsageDashboardFromResponse(data);
 
-        if (data && data.progress) {
-            renderExtractionProgress(data.progress);
+        if (!finishedJob || finishedJob.status !== "completed" || !data.ok) {
+            throw new Error((finishedJob && finishedJob.error_message) || (data && data.error) || "Unable to estimate serving basis.");
         }
-
-        if (!response.ok || !data.ok) {
-            throw new Error((data && data.error) || "Unable to estimate serving basis.");
-        }
+        setMenuRecipeEstimateRowStatus(button, "done", "Complete");
     } catch (err) {
         console.warn("Unable to estimate menu recipe serving basis.", err);
         setMenuRecipeEstimateRowStatus(button, "error", err.message || "Unable to estimate serving basis.");
