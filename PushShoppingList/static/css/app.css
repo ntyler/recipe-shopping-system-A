@@ -4337,6 +4337,7 @@ body {
         }
 
         #currentRecipeUrlLogCard .recipe-url-log-toggle,
+        #jobActivitySection .job-activity-toggle,
         #screenSettingsCard .screen-settings-toggle,
         #cookbooksCard > .card-collapse-toggle,
         #rulesCard > .card-collapse-toggle,
@@ -4348,6 +4349,10 @@ body {
         }
 
         #currentRecipeUrlLogCard .recipe-url-log-toggle {
+            padding-left: 54px;
+        }
+
+        #jobActivitySection .job-activity-toggle {
             padding-left: 54px;
         }
 
@@ -4382,6 +4387,7 @@ body {
         }
 
         #currentRecipeUrlLogCard,
+        #jobActivitySection,
         #cookbooksCard,
         #rulesCard,
         #home-address-section {
@@ -4392,6 +4398,7 @@ body {
 
         #currentRecipeUrlLogCard > .recipe-url-log-header,
         #currentRecipeUrlLogCard.lazy-section-placeholder > .recipe-url-log-toggle,
+        #jobActivitySection > .job-activity-header,
         #cookbooksCard > .card-collapse-toggle,
         #rulesCard > .card-collapse-toggle,
         #home-address-section > .card-collapse-toggle,
@@ -8346,6 +8353,7 @@ body {
 
         #currentRecipeUrlLogCard:not(.card-collapsed) > .recipe-url-log-header,
         #currentRecipeUrlLogCard.lazy-section-placeholder:not(.card-collapsed) > .recipe-url-log-toggle,
+        #jobActivitySection:not(.card-collapsed) > .job-activity-header,
         #cookbooksCard:not(.card-collapsed) > .cookbooks-toggle,
         #rulesCard:not(.card-collapsed) .rules-toggle {
             position: sticky;
@@ -8357,6 +8365,7 @@ body {
         }
 
         #currentRecipeUrlLogCard.lazy-section-placeholder:not(.card-collapsed) > .recipe-url-log-toggle:hover,
+        #jobActivitySection:not(.card-collapsed) > .job-activity-header:hover,
         #cookbooksCard:not(.card-collapsed) > .cookbooks-toggle:hover,
         #rulesCard:not(.card-collapsed) .rules-toggle:hover {
             background: #161b1b;
@@ -8364,6 +8373,7 @@ body {
 
         #currentRecipeUrlLogCard:not(.card-collapsed) > .recipe-url-log-header,
         #currentRecipeUrlLogCard.lazy-section-placeholder:not(.card-collapsed) > .recipe-url-log-toggle,
+        #jobActivitySection:not(.card-collapsed) > .job-activity-header,
         #cookbooksCard:not(.card-collapsed) > .cookbooks-toggle,
         #rulesCard:not(.card-collapsed) .rules-toggle {
             border: 0;
@@ -20286,7 +20296,6 @@ img[data-deferred-src] {
         .job-activity-card {
             display: flex;
             flex-direction: column;
-            gap: 10px;
         }
 
         .job-activity-header {
@@ -20294,16 +20303,8 @@ img[data-deferred-src] {
         }
 
         .job-activity-toggle {
-            position: relative;
             justify-content: center;
-            padding-left: 68px;
-            padding-right: 68px;
             text-align: center;
-        }
-
-        .job-activity-toggle .card-collapse-switch {
-            position: absolute;
-            right: 14px;
         }
 
         .job-activity-toolbar {
@@ -20521,13 +20522,6 @@ img[data-deferred-src] {
         @media (max-width: 640px) {
             .job-activity-row {
                 grid-template-columns: 1fr;
-            }
-
-            .job-activity-toggle {
-                padding-left: 14px;
-                padding-right: 68px;
-                text-align: left;
-                justify-content: flex-start;
             }
 
             .job-activity-toolbar {

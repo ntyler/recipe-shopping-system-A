@@ -3,23 +3,21 @@
          data-job-activity-panel
          data-admin-job-view="{{ '1' if current_user and current_user.is_admin else '0' }}"
          aria-live="polite">
-    <div class="job-activity-header">
+    <div class="job-activity-header recipe-url-log-header">
         <button type="button"
-                class="card-collapse-toggle job-activity-toggle"
+                class="card-collapse-toggle recipe-url-log-toggle job-activity-toggle"
                 data-collapse-toggle="job-activity"
                 aria-expanded="true"
-                aria-label="Collapse or expand Job Activity / Import Progress"
                 onclick="toggleCardCollapse('job-activity')">
-            <span>Job Activity / Import Progress</span>
-            <span class="card-collapse-icon card-collapse-switch"
-                  data-collapse-icon="job-activity"
-                  aria-hidden="true"></span>
+            <span class="cookbooks-header-title recipe-url-log-header-title">
+                Job Activity / Import Progress
+            </span>
         </button>
     </div>
     <div class="card-collapse-content job-activity-content"
          data-collapse-content="job-activity"
          data-collapse-default="expanded"
-         data-collapse-mobile-default="expanded">
+         data-collapse-mobile-default="collapsed">
         <div class="job-activity-toolbar">
             <button type="button"
                     class="secondary job-activity-refresh"

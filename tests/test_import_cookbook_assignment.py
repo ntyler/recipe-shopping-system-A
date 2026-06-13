@@ -147,14 +147,16 @@ def test_job_activity_section_has_clear_collapse_control():
     collapse_index = template.index('data-collapse-content="job-activity"')
     refresh_index = template.index("job-activity-refresh")
 
+    assert 'class="job-activity-header recipe-url-log-header"' in template
+    assert 'class="card-collapse-toggle recipe-url-log-toggle job-activity-toggle"' in template
+    assert 'class="cookbooks-header-title recipe-url-log-header-title"' in template
     assert 'data-collapse-toggle="job-activity"' in template
-    assert 'aria-label="Collapse or expand Job Activity / Import Progress"' in template
-    assert 'data-collapse-icon="job-activity"' in template
-    assert "card-collapse-switch" in template
+    assert 'data-collapse-mobile-default="collapsed"' in template
+    assert "card-collapse-switch" not in template
     assert refresh_index > collapse_index
     assert '"job-activity",' in script
     assert ".job-activity-toolbar" in css
-    assert ".job-activity-toggle .card-collapse-switch" in css
+    assert "#jobActivitySection:not(.card-collapsed) > .job-activity-header" in css
 
 
 def test_import_progress_wait_does_not_timeout_long_menu_jobs():
