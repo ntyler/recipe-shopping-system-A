@@ -831,6 +831,12 @@
 
                                 <div class="row recipe-ingredient-row" data-key="{{ item_key }}">
                                     <div class="item">
+                                        {% set item_menu_display_name = display_name %}
+                                        {% set item_menu_store_search_name = purchase_group %}
+                                        {% set item_menu_current_qty = recipe_item.quantity_display or recipe_item.base_display or '' %}
+                                        {% set item_menu_qty_sources = [{"label": "Recipe " ~ recipe.number, "ingredient": recipe_item.name or display_name, "default_quantity": recipe_item.base_display or "", "default_quantity_value": recipe_item.base_quantity or "", "default_unit": recipe_item.unit or "", "recipe_number": recipe.number, "recipe_quantity": recipe.quantity, "scaling_options": recipe.scaling_options, "url": recipe.url, "quantity": recipe_item.quantity_display or recipe_item.base_display or ""}] %}
+                                        {% set item_menu_manual_qty = state.get('manual_qty', '') %}
+                                        {% set item_menu_show_products = True %}
                                         <div class="item-main-line">
                                             <input type="checkbox" class="item-check">
                                             <span class="item-text">{{ display_name }}</span>
@@ -844,6 +850,7 @@
                                                     Food Review
                                                 </button>
                                             {% endif %}
+                                            {% include "sections/item_row_action_menu.html" %}
                                         </div>
                                         {% if purchasable_item and normalize(purchasable_item) != item_key %}
                                             <div class="source-line item-buy-as-line">Buy as: {{ purchasable_item }}</div>
@@ -872,13 +879,6 @@
                                             {% set selected_store_key = purchase_state.get('store', '') %}
                                             {% set store_price_item_label = display_name %}
                                             {% include "sections/item_store_price_grid.html" %}
-                                            {% set item_menu_display_name = display_name %}
-                                            {% set item_menu_store_search_name = purchase_group %}
-                                            {% set item_menu_current_qty = recipe_item.quantity_display or recipe_item.base_display or '' %}
-                                            {% set item_menu_qty_sources = [{"label": "Recipe " ~ recipe.number, "ingredient": recipe_item.name or display_name, "default_quantity": recipe_item.base_display or "", "default_quantity_value": recipe_item.base_quantity or "", "default_unit": recipe_item.unit or "", "recipe_number": recipe.number, "recipe_quantity": recipe.quantity, "scaling_options": recipe.scaling_options, "url": recipe.url, "quantity": recipe_item.quantity_display or recipe_item.base_display or ""}] %}
-                                            {% set item_menu_manual_qty = state.get('manual_qty', '') %}
-                                            {% set item_menu_show_products = True %}
-                                            {% include "sections/item_row_action_menu.html" %}
                                         </div>
 
                                         {% set product_choice_key = purchase_key %}

@@ -4511,7 +4511,7 @@ body {
 
         .recipe-ingredient-row .item-row-tools.recipe-ingredient-store-tools {
             display: grid;
-            grid-template-columns: 30px minmax(0, 1fr) auto;
+            grid-template-columns: 30px minmax(0, 1fr);
             align-items: start;
             gap: 10px;
             width: 100%;
@@ -4523,10 +4523,10 @@ body {
             justify-self: start;
         }
 
-        .recipe-ingredient-store-tools .item-row-menu-wrap {
-            grid-column: 3 / 4;
+        .recipe-ingredient-row .item-main-line .item-row-menu-wrap {
+            align-self: flex-start;
             justify-self: end;
-            margin-left: 0;
+            margin-left: auto;
         }
 
         .item-store-price-panel {
@@ -13333,16 +13333,12 @@ body {
             }
 
             .recipe-ingredient-row .item-row-tools.recipe-ingredient-store-tools {
-                grid-template-columns: minmax(0, 1fr) auto;
+                grid-template-columns: minmax(0, 1fr);
                 margin-top: 6px;
             }
 
             .recipe-ingredient-store-tools .item-store-price-panel {
-                grid-column: 1 / 2;
-            }
-
-            .recipe-ingredient-store-tools .item-row-menu-wrap {
-                grid-column: 2 / 3;
+                grid-column: 1 / -1;
             }
 
             .item-store-price-panel {

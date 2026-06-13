@@ -96,19 +96,21 @@ def test_item_rows_use_price_grid_and_overflow_menu():
     assert "await saveItemStoreSelection(itemKey, storeKey)" in app_js
 
 
-def test_recipe_ingredient_store_tools_sit_under_quantity():
+def test_recipe_ingredient_menu_sits_with_name_and_store_tools_sit_under_quantity():
     root = Path(__file__).resolve().parents[1]
     items_template = (root / "PushShoppingList/templates/sections/items.html").read_text(encoding="utf-8")
     css = (root / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     recipe_ingredient_block = items_template[items_template.index("{% for recipe_item in section_items %}"):]
+    main_line_start = recipe_ingredient_block.index('class="item-main-line"')
+    quantity_start = recipe_ingredient_block.index('class="source-line item-qty-line"')
+    store_tools_start = recipe_ingredient_block.index('class="item-row-tools recipe-ingredient-store-tools"')
 
     assert 'class="row recipe-ingredient-row"' in recipe_ingredient_block
     assert 'class="item-row-tools recipe-ingredient-store-tools"' in recipe_ingredient_block
-    assert recipe_ingredient_block.index('class="source-line item-qty-line"') < recipe_ingredient_block.index(
-        'include "sections/item_store_price_grid.html"'
-    )
-    assert recipe_ingredient_block.index('include "sections/item_store_price_grid.html"') < recipe_ingredient_block.index(
-        'include "sections/product_choice_line.html"'
-    )
+    assert main_line_start < recipe_ingredient_block.index('include "sections/item_row_action_menu.html"') < quantity_start
+    assert quantity_start < store_tools_start < recipe_ingredient_block.index('include "sections/item_store_price_grid.html"')
+    assert store_tools_start < recipe_ingredient_block.index('include "sections/product_choice_line.html"')
     assert ".recipe-ingredient-row .item-row-tools.recipe-ingredient-store-tools" in css
-    assert "grid-template-columns: 30px minmax(0, 1fr) auto" in css
+    assert ".recipe-ingredient-row .item-main-line .item-row-menu-wrap" in css
+    assert "grid-template-columns: 30px minmax(0, 1fr)" in css
+    assert "grid-template-columns: 30px minmax(0, 1fr) auto" not in css
