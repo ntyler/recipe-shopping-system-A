@@ -1831,6 +1831,99 @@ def remove_recipe_from_cookbook(cookbook_id, recipe_url):
         return save_cookbooks(payload)
 
 
+def selected_recipe_keys_and_urls(recipe_urls):
+    selected_keys = set()
+    selected_urls = []
+
+    for recipe_url in recipe_urls or []:
+        url = clean_text(recipe_url)
+        key = recipe_key(url)
+
+        if not key or key in selected_keys:
+            continue
+
+        selected_keys.add(key)
+        selected_urls.append(url)
+
+    if not selected_keys:
+        raise ValueError("Select at least one cookbook recipe.")
+
+    return selected_keys, selected_urls
+
+
+def remove_recipes_from_cookbook(cookbook_id, recipe_urls):
+    selected_keys, _selected_urls = selected_recipe_keys_and_urls(recipe_urls)
+
+    with COOKBOOKS_LOCK:
+        payload = load_cookbooks()
+        target = find_cookbook(payload, cookbook_id)
+
+        if target is None:
+            raise ValueError("Cookbook was not found.")
+
+        removed_recipes = []
+        kept_recipes = []
+
+        for recipe in target.get("recipes", []):
+            if recipe_key(recipe.get("url")) in selected_keys:
+                removed_recipes.append(recipe)
+                continue
+
+            kept_recipes.append(recipe)
+
+        if not removed_recipes:
+            raise ValueError("Selected cookbook recipes were not found.")
+
+        target["recipes"] = kept_recipes
+
+        if not is_unclassified_cookbook(target):
+            for recipe in removed_recipes:
+                add_recipe_to_unclassified(payload, recipe)
+
+        save_cookbooks(payload)
+        return [
+            clean_text(recipe.get("url"))
+            for recipe in removed_recipes
+            if clean_text(recipe.get("url"))
+        ]
+
+
+def purge_selected_cookbook_recipe_urls(cookbook_id, recipe_urls):
+    selected_keys, _selected_urls = selected_recipe_keys_and_urls(recipe_urls)
+
+    with COOKBOOKS_LOCK:
+        payload = load_cookbooks()
+        target = find_cookbook(payload, cookbook_id)
+
+        if target is None:
+            raise ValueError("Cookbook was not found.")
+
+        purge_keys = set()
+        purge_urls = []
+
+        for recipe in target.get("recipes", []):
+            raw_url = recipe.get("url") if isinstance(recipe, dict) else recipe
+            url = clean_text(raw_url)
+            key = recipe_key(url)
+
+            if key and key in selected_keys and key not in purge_keys:
+                purge_keys.add(key)
+                purge_urls.append(url)
+
+        if not purge_keys:
+            raise ValueError("Selected cookbook recipes were not found.")
+
+        for cookbook in payload.get("cookbooks", []):
+            cookbook["recipes"] = [
+                recipe
+                for recipe in cookbook.get("recipes", [])
+                if recipe_key(recipe.get("url") if isinstance(recipe, dict) else recipe) not in purge_keys
+            ]
+
+        save_cookbooks(payload)
+        return purge_urls
+
+
 def update_cookbook_recipe_categories(
     cookbook_id,
     recipe_url,

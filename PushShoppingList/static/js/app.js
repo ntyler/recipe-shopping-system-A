@@ -7689,6 +7689,94 @@ async function restoreSingleCookbookRecipe(button) {
     return false;
 }
 
+function selectedCookbookRecipeUrlsForCard(button) {
+    const card = button ? button.closest("[data-cookbook-card]") : null;
+
+    if (!card) {
+        return [];
+    }
+
+    return uniqueRecipeUrls(Array.from(card.querySelectorAll("[data-cookbook-restore-checkbox]:checked")).map(checkbox => {
+        return checkbox.value || (checkbox.dataset ? checkbox.dataset.recipeUrl || "" : "");
+    }));
+}
+
+async function deleteSelectedCookbookRecipes(button, options = {}) {
+    if (!button) {
+        return false;
+    }
+
+    const purgeRecipes = options.purge === true;
+    const cookbookId = button.dataset.cookbookId || "";
+    const cookbookName = button.dataset.cookbookName || "this cookbook";
+    const selectedUrls = selectedCookbookRecipeUrlsForCard(button);
+
+    if (!cookbookId) {
+        return false;
+    }
+
+    if (!selectedUrls.length) {
+        window.alert(`Select at least one recipe in ${cookbookName}.`);
+        return false;
+    }
+
+    const recipeLabel = selectedUrls.length === 1 ? "recipe" : "recipes";
+    const deleteDetail = button.dataset.cookbookUnclassified === "1"
+        ? "This removes the selection from the unclassified cookbook. Current Recipes stays untouched."
+        : "This removes the selection from this cookbook and moves it to unclassified. Current Recipes stays untouched.";
+    const confirmMessage = purgeRecipes
+        ? `Delete and purge ${selectedUrls.length} selected ${recipeLabel} from ${cookbookName}?\n\nThis removes ${recipeLabel === "recipe" ? "it" : "them"} from every cookbook, Current Recipes, saved recipe data, and unused shopping-list ingredients.`
+        : `Delete ${selectedUrls.length} selected ${recipeLabel} from ${cookbookName}?\n\n${deleteDetail}`;
+
+    if (!window.confirm(confirmMessage)) {
+        return false;
+    }
+
+    const originalText = button.textContent || "";
+    const formData = new FormData();
+    selectedUrls.forEach(url => formData.append("recipe_urls", url));
+
+    try {
+        button.disabled = true;
+        button.textContent = purgeRecipes ? "Purging..." : "Deleting...";
+        setCookbookStatus(purgeRecipes ? "Purging selected recipes..." : "Deleting selected recipes...");
+
+        const endpoint = `/api/cookbooks/${encodeURIComponent(cookbookId)}/${purgeRecipes ? "purge_selected_recipes" : "remove_selected_recipes"}`;
+        const data = await submitCookbookApi(endpoint, formData);
+        await refreshStoreMarkup({
+            cacheBust: true,
+            requireRecipeLog: true,
+        });
+
+        const countKey = purgeRecipes ? "purged_recipe_count" : "removed_recipe_count";
+        const completedCount = data && Number.isFinite(Number(data[countKey]))
+            ? Number(data[countKey])
+            : selectedUrls.length;
+
+        showRecipeQuantityUpdatedMessage(
+            "",
+            "",
+            "",
+            purgeRecipes
+                ? `${completedCount} selected ${completedCount === 1 ? "recipe was" : "recipes were"} purged.`
+                : `${completedCount} selected ${completedCount === 1 ? "recipe was" : "recipes were"} deleted from ${cookbookName}.`
+        );
+    } catch (err) {
+        console.warn(purgeRecipes ? "Unable to purge selected cookbook recipes." : "Unable to delete selected cookbook recipes.", err);
+        setCookbookStatus(err.message || (purgeRecipes ? "Unable to purge selected recipes." : "Unable to delete selected recipes."), true);
+        window.alert(err.message || (purgeRecipes ? "Unable to purge selected recipes." : "Unable to delete selected recipes."));
+    } finally {
+        button.disabled = false;
+        button.textContent = originalText || (purgeRecipes ? "Delete and purge selected recipes" : "Delete selected recipes");
+    }
+
+    return false;
+}
+
+function purgeSelectedCookbookRecipes(button) {
+    return deleteSelectedCookbookRecipes(button, { purge: true });
+}
+
 async function removeCookbookRecipe(button) {
     if (!button) {
         return false;

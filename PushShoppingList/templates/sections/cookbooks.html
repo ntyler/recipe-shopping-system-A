@@ -166,6 +166,25 @@
                                                         onclick="closeRecipeEditRowMenus(); openCookbookNameEditor(this); return false;">
                                                     Rename cookbook
                                                 </button>
+                                                {% if cookbook.recipes %}
+                                                    <button type="button"
+                                                            class="delete"
+                                                            data-cookbook-id="{{ cookbook.id }}"
+                                                            data-cookbook-name="{{ cookbook.name }}"
+                                                            data-cookbook-unclassified="{% if cookbook.is_unclassified %}1{% else %}0{% endif %}"
+                                                            onclick="closeRecipeEditRowMenus(); deleteSelectedCookbookRecipes(this); return false;"
+                                                            aria-label="Delete selected recipes from {{ cookbook.name }}">
+                                                        Delete selected recipes
+                                                    </button>
+                                                    <button type="button"
+                                                            class="delete"
+                                                            data-cookbook-id="{{ cookbook.id }}"
+                                                            data-cookbook-name="{{ cookbook.name }}"
+                                                            onclick="closeRecipeEditRowMenus(); purgeSelectedCookbookRecipes(this); return false;"
+                                                            aria-label="Delete and purge selected recipes from {{ cookbook.name }}">
+                                                        Delete and purge selected recipes
+                                                    </button>
+                                                {% endif %}
                                                 {% if cookbook.is_unclassified and cookbook.recipes %}
                                                     <button type="button"
                                                             class="delete"

@@ -35,10 +35,12 @@ from PushShoppingList.services.cookbook_service import delete_cookbook_and_purge
 from PushShoppingList.services.cookbook_service import ensure_unclassified_cookbook_for_recipes
 from PushShoppingList.services.cookbook_service import move_recipes_to_cookbook
 from PushShoppingList.services.cookbook_service import prepare_cookbook_menu_view
+from PushShoppingList.services.cookbook_service import purge_selected_cookbook_recipe_urls
 from PushShoppingList.services.cookbook_service import purge_unclassified_cookbook_recipe_urls
 from PushShoppingList.services.cookbook_service import recipe_ingredients_for_record
 from PushShoppingList.services.cookbook_service import recipe_cookbook_assignments
 from PushShoppingList.services.cookbook_service import remove_recipe_from_cookbook
+from PushShoppingList.services.cookbook_service import remove_recipes_from_cookbook
 from PushShoppingList.services.cookbook_service import rename_cookbook
 from PushShoppingList.services.cookbook_service import reorder_cookbooks
 from PushShoppingList.services.cookbook_service import update_cookbook_recipe_categories
@@ -2061,6 +2063,69 @@ def purge_unclassified_cookbook_recipes_route(cookbook_id):
         return jsonify({
             "ok": False,
             "error": str(exc) or "Unable to purge unclassified recipes.",
+        }), 500
+
+    return jsonify({
+        "ok": True,
+        "purged_recipe_count": len(recipe_urls),
+    })
+
+
+def selected_cookbook_recipe_urls_from_request():
+    data = request.get_json(silent=True) or {}
+    requested_urls = []
+
+    if isinstance(data, dict):
+        for key in ("recipe_urls", "urls", "selected_recipe_urls"):
+            value = data.get(key)
+
+            if isinstance(value, list):
+                requested_urls.extend(value)
+            elif value:
+                requested_urls.append(value)
+
+    for key in ("recipe_urls", "urls", "selected_recipe_urls"):
+        requested_urls.extend(request.form.getlist(key))
+
+    return [
+        str(url or "").strip()
+        for url in requested_urls
+        if str(url or "").strip()
+    ]
+
+
+@main_bp.route("/api/cookbooks/<cookbook_id>/remove_selected_recipes", methods=["POST"])
+def remove_selected_cookbook_recipes_route(cookbook_id):
+    try:
+        removed_urls = remove_recipes_from_cookbook(
+            cookbook_id,
+            selected_cookbook_recipe_urls_from_request(),
+        )
+    except ValueError as err:
+        return jsonify({"ok": False, "error": str(err)}), 400
+
+    return jsonify({
+        "ok": True,
+        "removed_recipe_count": len(removed_urls),
+    })
+
+
+@main_bp.route("/api/cookbooks/<cookbook_id>/purge_selected_recipes", methods=["POST"])
+def purge_selected_cookbook_recipes_route(cookbook_id):
+    try:
+        recipe_urls = purge_selected_cookbook_recipe_urls(
+            cookbook_id,
+            selected_cookbook_recipe_urls_from_request(),
+        )
+        for recipe_url in recipe_urls:
+            remove_recipe_and_unused_ingredients(recipe_url)
+            remove_recipe_url(recipe_url)
+    except ValueError as err:
+        return jsonify({"ok": False, "error": str(err)}), 400
+    except Exception as exc:
+        return jsonify({
+            "ok": False,
+            "error": str(exc) or "Unable to purge selected cookbook recipes.",
         }), 500
 
     return jsonify({

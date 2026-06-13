@@ -100,6 +100,24 @@ def test_current_recipe_menu_has_clear_selected_recipes_action():
     assert 'body: JSON.stringify({ recipe_urls: urls })' in script
 
 
+def test_cookbook_menu_has_selected_delete_actions():
+    template = Path("PushShoppingList/templates/sections/cookbooks.html").read_text(
+        encoding="utf-8",
+    )
+    script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    routes = Path("PushShoppingList/routes/main_routes.py").read_text(encoding="utf-8")
+
+    assert "Delete selected recipes" in template
+    assert "Delete and purge selected recipes" in template
+    assert "deleteSelectedCookbookRecipes(this)" in template
+    assert "purgeSelectedCookbookRecipes(this)" in template
+    assert "function selectedCookbookRecipeUrlsForCard" in script
+    assert "function deleteSelectedCookbookRecipes" in script
+    assert "function purgeSelectedCookbookRecipes" in script
+    assert "remove_selected_recipes" in routes
+    assert "purge_selected_recipes" in routes
+
+
 def test_fetch_clear_current_recipes_reuses_recipe_cleanup(monkeypatch, tmp_path):
     app = create_app()
     app.config.update(TESTING=True)
@@ -372,3 +390,90 @@ def test_fetch_purge_unclassified_recipes_requires_opt_in(monkeypatch, tmp_path)
         "error": "Type PURGE to confirm purging unclassified recipes.",
     }
     assert calls == []
+
+
+def test_fetch_remove_selected_cookbook_recipes_reuses_batch_removal(monkeypatch, tmp_path):
+    app = create_app()
+    app.config.update(TESTING=True)
+    calls = []
+
+    def fake_remove_recipes_from_cookbook(cookbook_id, recipe_urls):
+        calls.append(("cookbook", cookbook_id, list(recipe_urls)))
+        return ["https://example.com/chili", "https://example.com/soup"]
+
+    monkeypatch.setattr(
+        main_routes,
+        "remove_recipes_from_cookbook",
+        fake_remove_recipes_from_cookbook,
+    )
+
+    with app.test_client() as client:
+        configure_signed_in_user(monkeypatch, tmp_path, client)
+        response = client.post(
+            "/api/cookbooks/dinner/remove_selected_recipes",
+            data={
+                "recipe_urls": [
+                    "https://example.com/chili",
+                    "https://example.com/soup",
+                ],
+            },
+            headers={"X-Requested-With": "fetch"},
+        )
+
+    assert response.status_code == 200
+    assert response.get_json() == {"ok": True, "removed_recipe_count": 2}
+    assert calls == [
+        (
+            "cookbook",
+            "dinner",
+            ["https://example.com/chili", "https://example.com/soup"],
+        ),
+    ]
+
+
+def test_fetch_purge_selected_cookbook_recipes_reuses_recipe_cleanup(monkeypatch, tmp_path):
+    app = create_app()
+    app.config.update(TESTING=True)
+    calls = []
+
+    def fake_purge_selected_cookbook_recipe_urls(cookbook_id, recipe_urls):
+        calls.append(("cookbook", cookbook_id, list(recipe_urls)))
+        return ["https://example.com/chili", "https://example.com/soup"]
+
+    monkeypatch.setattr(
+        main_routes,
+        "purge_selected_cookbook_recipe_urls",
+        fake_purge_selected_cookbook_recipe_urls,
+    )
+    monkeypatch.setattr(
+        main_routes,
+        "remove_recipe_and_unused_ingredients",
+        lambda url: calls.append(("ingredients", url)),
+    )
+    monkeypatch.setattr(
+        main_routes,
+        "remove_recipe_url",
+        lambda url: calls.append(("url", url)),
+    )
+
+    with app.test_client() as client:
+        configure_signed_in_user(monkeypatch, tmp_path, client)
+        response = client.post(
+            "/api/cookbooks/dinner/purge_selected_recipes",
+            json={"recipe_urls": ["https://example.com/chili", "https://example.com/soup"]},
+            headers={"X-Requested-With": "fetch"},
+        )
+
+    assert response.status_code == 200
+    assert response.get_json() == {"ok": True, "purged_recipe_count": 2}
+    assert calls == [
+        (
+            "cookbook",
+            "dinner",
+            ["https://example.com/chili", "https://example.com/soup"],
+        ),
+        ("ingredients", "https://example.com/chili"),
+        ("url", "https://example.com/chili"),
+        ("ingredients", "https://example.com/soup"),
+        ("url", "https://example.com/soup"),
+    ]

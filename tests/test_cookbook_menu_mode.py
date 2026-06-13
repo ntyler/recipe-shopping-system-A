@@ -88,6 +88,84 @@ def test_cookbook_recipe_rows_match_current_recipe_summary_layout():
     assert "justify-content: flex-end;\n                width: 100%;\n                margin-left: auto;" not in css
 
 
+def test_remove_selected_cookbook_recipes_moves_them_to_unclassified():
+    with TemporaryDirectory() as temp_dir, patch.object(
+        cookbook_service,
+        "COOKBOOKS_FILE",
+        Path(temp_dir) / "cookbooks.json",
+    ):
+        cookbook_service.save_cookbooks({
+            "cookbooks": [
+                {
+                    "id": "dinner",
+                    "name": "Dinner",
+                    "recipes": [
+                        {"url": "https://example.com/chili", "name": "Chili"},
+                        {"url": "https://example.com/soup", "name": "Soup"},
+                    ],
+                },
+                {"id": "unclassified", "name": "unclassified", "recipes": []},
+            ],
+        })
+
+        removed_urls = cookbook_service.remove_recipes_from_cookbook(
+            "dinner",
+            ["https://example.com/soup"],
+        )
+        payload = cookbook_service.load_cookbooks()
+
+    dinner = next(cookbook for cookbook in payload["cookbooks"] if cookbook["id"] == "dinner")
+    unclassified = next(
+        cookbook
+        for cookbook in payload["cookbooks"]
+        if cookbook["name"] == "unclassified"
+    )
+
+    assert removed_urls == ["https://example.com/soup"]
+    assert [recipe["url"] for recipe in dinner["recipes"]] == ["https://example.com/chili"]
+    assert [recipe["url"] for recipe in unclassified["recipes"]] == ["https://example.com/soup"]
+
+
+def test_purge_selected_cookbook_recipes_removes_them_from_all_cookbooks():
+    with TemporaryDirectory() as temp_dir, patch.object(
+        cookbook_service,
+        "COOKBOOKS_FILE",
+        Path(temp_dir) / "cookbooks.json",
+    ):
+        cookbook_service.save_cookbooks({
+            "cookbooks": [
+                {
+                    "id": "dinner",
+                    "name": "Dinner",
+                    "recipes": [
+                        {"url": "https://example.com/chili", "name": "Chili"},
+                        {"url": "https://example.com/soup", "name": "Soup"},
+                    ],
+                },
+                {
+                    "id": "favorites",
+                    "name": "Favorites",
+                    "recipes": [
+                        {"url": "https://example.com/soup", "name": "Soup"},
+                    ],
+                },
+            ],
+        })
+
+        purged_urls = cookbook_service.purge_selected_cookbook_recipe_urls(
+            "dinner",
+            ["https://example.com/soup"],
+        )
+        payload = cookbook_service.load_cookbooks()
+
+    dinner = next(cookbook for cookbook in payload["cookbooks"] if cookbook["id"] == "dinner")
+    favorites = next(cookbook for cookbook in payload["cookbooks"] if cookbook["id"] == "favorites")
+
+    assert purged_urls == ["https://example.com/soup"]
+    assert [recipe["url"] for recipe in dinner["recipes"]] == ["https://example.com/chili"]
+    assert favorites["recipes"] == []
+
+
 def test_cookbook_menu_metadata_uses_saved_values_without_render_inference():
     with TemporaryDirectory() as temp_dir, patch.object(
         cookbook_service,
