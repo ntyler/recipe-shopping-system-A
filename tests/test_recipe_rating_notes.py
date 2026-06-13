@@ -108,3 +108,23 @@ def test_recipe_view_rating_is_only_metadata_row_under_cookbook():
     assert ".recipe-view-rating .recipe-rating-display" in css
     assert "background: transparent;" in css
     assert "border: 0;" in css
+
+
+def test_current_recipe_food_review_badge_sits_with_menu_status_badges():
+    current_recipes = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    css = read_text("PushShoppingList/static/css/app.css")
+
+    inferred_block = current_recipes[
+        current_recipes.index('{% elif recipe.source_type == "menu_item_inferred" or recipe.ai_inferred %}'):
+        current_recipes.index('{% elif recipe_needs_food_review %}')
+    ]
+    stub_block = current_recipes[
+        current_recipes.index('{% if recipe.needs_ai_recipe or recipe.source_type == "menu_item_stub" %}'):
+        current_recipes.index('{% elif recipe.source_type == "menu_item_inferred" or recipe.ai_inferred %}')
+    ]
+
+    assert inferred_block.index("menu-recipe-status-generated") < inferred_block.index("recipe-url-summary-food-review")
+    assert inferred_block.index("recipe-url-summary-food-review") < inferred_block.index("View Mega Menu JSON")
+    assert stub_block.index("menu-recipe-status-stub") < stub_block.index("recipe-url-summary-food-review")
+    assert stub_block.index("recipe-url-summary-food-review") < stub_block.index("Generate Recipe")
+    assert "justify-self: start;" in css

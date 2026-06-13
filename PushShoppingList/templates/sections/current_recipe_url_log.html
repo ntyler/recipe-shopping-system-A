@@ -126,10 +126,21 @@
                                            title="{{ recipe.source_display_url }}"
                                            onclick="event.stopPropagation()"
                                            data-recipe-url="{{ recipe.url }}">{{ recipe.name }}</a>
+                                        {% set recipe_needs_food_review = recipe.food_rule_status.needs_review %}
                                         {% if recipe.needs_ai_recipe or recipe.source_type == "menu_item_stub" %}
                                             <span class="menu-recipe-status-badge menu-recipe-status-stub">
                                                 Menu Stub - AI recipe not generated yet
                                             </span>
+                                            {% if recipe_needs_food_review %}
+                                                <button type="button"
+                                                        class="food-rule-marker recipe-log-food-review-btn recipe-url-summary-food-review"
+                                                        data-recipe-url="{{ recipe.url }}"
+                                                        title="{{ recipe.food_rule_status.marker }}"
+                                                        aria-label="Food Review: {{ recipe.food_rule_status.count }} item{% if recipe.food_rule_status.count != 1 %}s{% endif %} need review"
+                                                        onclick="return openRecipeFoodReviewFromRecipeView(this, event)">
+                                                    Food Review ({{ recipe.food_rule_status.count }})
+                                                </button>
+                                            {% endif %}
                                             <button type="button"
                                                     class="menu-recipe-generate-inline"
                                                     data-recipe-url="{{ recipe.url }}"
@@ -156,6 +167,16 @@
                                             <span class="menu-recipe-status-badge menu-recipe-status-generated">
                                                 AI-Inferred Recipe
                                             </span>
+                                            {% if recipe_needs_food_review %}
+                                                <button type="button"
+                                                        class="food-rule-marker recipe-log-food-review-btn recipe-url-summary-food-review"
+                                                        data-recipe-url="{{ recipe.url }}"
+                                                        title="{{ recipe.food_rule_status.marker }}"
+                                                        aria-label="Food Review: {{ recipe.food_rule_status.count }} item{% if recipe.food_rule_status.count != 1 %}s{% endif %} need review"
+                                                        onclick="return openRecipeFoodReviewFromRecipeView(this, event)">
+                                                    Food Review ({{ recipe.food_rule_status.count }})
+                                                </button>
+                                            {% endif %}
                                             {% if recipe.parent_menu_snapshot_id or recipe.menu_mega_snapshot_id %}
                                                 <button type="button"
                                                         class="menu-recipe-generate-inline"
@@ -164,19 +185,18 @@
                                                     View Mega Menu JSON
                                                 </button>
                                             {% endif %}
+                                        {% elif recipe_needs_food_review %}
+                                            <button type="button"
+                                                    class="food-rule-marker recipe-log-food-review-btn recipe-url-summary-food-review"
+                                                    data-recipe-url="{{ recipe.url }}"
+                                                    title="{{ recipe.food_rule_status.marker }}"
+                                                    aria-label="Food Review: {{ recipe.food_rule_status.count }} item{% if recipe.food_rule_status.count != 1 %}s{% endif %} need review"
+                                                    onclick="return openRecipeFoodReviewFromRecipeView(this, event)">
+                                                Food Review ({{ recipe.food_rule_status.count }})
+                                            </button>
                                         {% endif %}
                                     </span>
                                 </div>
-                                {% if recipe.food_rule_status.needs_review %}
-                                    <button type="button"
-                                            class="food-rule-marker recipe-log-food-review-btn recipe-url-summary-food-review"
-                                            data-recipe-url="{{ recipe.url }}"
-                                            title="{{ recipe.food_rule_status.marker }}"
-                                            aria-label="Food Review: {{ recipe.food_rule_status.count }} item{% if recipe.food_rule_status.count != 1 %}s{% endif %} need review"
-                                            onclick="return openRecipeFoodReviewFromRecipeView(this, event)">
-                                        Food Review ({{ recipe.food_rule_status.count }})
-                                    </button>
-                                {% endif %}
                             </div>
                             <div class="recipe-url-summary-body">
                                 {% if recipe.cover_image and recipe.cover_image.src %}

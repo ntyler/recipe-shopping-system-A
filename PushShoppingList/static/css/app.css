@@ -9362,7 +9362,7 @@ body {
         }
 
         .recipe-url-summary-food-review {
-            justify-self: end;
+            justify-self: start;
             margin: 0;
             cursor: pointer;
         }
