@@ -20290,15 +20290,25 @@ img[data-deferred-src] {
         }
 
         .job-activity-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 10px;
+            display: block;
         }
 
         .job-activity-toggle {
-            flex: 1;
-            text-align: left;
+            position: relative;
+            justify-content: center;
+            padding-left: 68px;
+            padding-right: 68px;
+            text-align: center;
+        }
+
+        .job-activity-toggle .card-collapse-switch {
+            position: absolute;
+            right: 14px;
+        }
+
+        .job-activity-toolbar {
+            display: flex;
+            justify-content: flex-end;
         }
 
         .job-activity-refresh,
@@ -20310,6 +20320,11 @@ img[data-deferred-src] {
             padding: 7px 10px;
             font-size: 0.85rem;
             cursor: pointer;
+        }
+
+        .job-activity-refresh {
+            width: min(100%, 240px);
+            margin-top: 0;
         }
 
         .job-activity-row-action.danger {
@@ -20504,14 +20519,23 @@ img[data-deferred-src] {
         }
 
         @media (max-width: 640px) {
-            .job-activity-header,
             .job-activity-row {
                 grid-template-columns: 1fr;
             }
 
-            .job-activity-header {
-                align-items: stretch;
-                flex-direction: column;
+            .job-activity-toggle {
+                padding-left: 14px;
+                padding-right: 68px;
+                text-align: left;
+                justify-content: flex-start;
+            }
+
+            .job-activity-toolbar {
+                justify-content: stretch;
+            }
+
+            .job-activity-refresh {
+                width: 100%;
             }
 
             .job-activity-actions {

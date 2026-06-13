@@ -8,19 +8,25 @@
                 class="card-collapse-toggle job-activity-toggle"
                 data-collapse-toggle="job-activity"
                 aria-expanded="true"
+                aria-label="Collapse or expand Job Activity / Import Progress"
                 onclick="toggleCardCollapse('job-activity')">
             <span>Job Activity / Import Progress</span>
-        </button>
-        <button type="button"
-                class="secondary job-activity-refresh"
-                onclick="return refreshJobActivityPanel({ force: true })">
-            Refresh
+            <span class="card-collapse-icon card-collapse-switch"
+                  data-collapse-icon="job-activity"
+                  aria-hidden="true"></span>
         </button>
     </div>
     <div class="card-collapse-content job-activity-content"
          data-collapse-content="job-activity"
          data-collapse-default="expanded"
          data-collapse-mobile-default="expanded">
+        <div class="job-activity-toolbar">
+            <button type="button"
+                    class="secondary job-activity-refresh"
+                    onclick="return refreshJobActivityPanel({ force: true })">
+                Refresh
+            </button>
+        </div>
         <div class="job-activity-summary" data-job-activity-summary>
             No active jobs.
         </div>

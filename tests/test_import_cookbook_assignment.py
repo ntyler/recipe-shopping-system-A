@@ -139,6 +139,24 @@ def test_job_activity_can_reopen_import_progress_overlay():
     assert "renderExtractionProgress(importJobToExtractionProgress(job, urls, isMenuExtract))" in script
 
 
+def test_job_activity_section_has_clear_collapse_control():
+    template = (ROOT / "PushShoppingList/templates/sections/job_activity.html").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+
+    collapse_index = template.index('data-collapse-content="job-activity"')
+    refresh_index = template.index("job-activity-refresh")
+
+    assert 'data-collapse-toggle="job-activity"' in template
+    assert 'aria-label="Collapse or expand Job Activity / Import Progress"' in template
+    assert 'data-collapse-icon="job-activity"' in template
+    assert "card-collapse-switch" in template
+    assert refresh_index > collapse_index
+    assert '"job-activity",' in script
+    assert ".job-activity-toolbar" in css
+    assert ".job-activity-toggle .card-collapse-switch" in css
+
+
 def test_import_progress_wait_does_not_timeout_long_menu_jobs():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
 
