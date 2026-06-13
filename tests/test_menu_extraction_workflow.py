@@ -86,7 +86,12 @@ def test_mega_menu_json_snapshot_builds_saves_and_unpacks(tmp_path, monkeypatch)
         html_text="<html><title>Vel Asian Cuisine</title><a href='/rs/menu_home.action'>Menu</a></html>",
         html_snapshot_path=str(tmp_path / "vel.html"),
     )
-    snapshot = menu_mega_json_service.save_menu_mega_json_snapshot(mega_json, job_id="job-1")
+    snapshot = menu_mega_json_service.save_menu_mega_json_snapshot(
+        mega_json,
+        job_id="job-1",
+        cookbook_id="cb1",
+        cookbook_name="Dinner",
+    )
     loaded = menu_mega_json_service.load_menu_mega_json_snapshot(snapshot["id"])
     unpacked = menu_mega_json_service.unpack_mega_menu_json_to_sections(
         loaded["menu_mega_json"],
@@ -100,9 +105,36 @@ def test_mega_menu_json_snapshot_builds_saves_and_unpacks(tmp_path, monkeypatch)
     assert loaded["menu_mega_json"]["restaurant"]["name"] == "Vel Asian Cuisine"
     assert loaded["menu_mega_json"]["menu"]["sections"][0]["items"][0]["name"] == "Spring Roll"
     assert loaded["menu_mega_json"]["menu"]["sections"][0]["items"][0]["price"] == 5.99
+    assert loaded["menu_mega_json"]["menu"]["sections"][0]["items"][0]["recipe_inference"]["status"] == "not_generated"
+    assert loaded["menu_mega_json"]["menu"]["sections"][0]["items"][0]["nutrition_inference"]["status"] == "not_generated"
+    assert loaded["menu_mega_json"]["menu"]["sections"][0]["items"][0]["pdf_generation"]["status"] == "not_generated"
     assert loaded["menu_mega_json"]["extraction"]["used_openai"] is False
+    assert loaded["job_id"] == "job-1"
+    assert loaded["import_job_id"] == "job-1"
+    assert loaded["cookbook_id"] == "cb1"
+    assert loaded["cookbook_name"] == "Dinner"
+    assert loaded["duplicate_count"] == 0
     assert unpacked[0]["items"][0]["parent_menu_snapshot_id"] == loaded["id"]
     assert unpacked[0]["items"][0]["price"] == "$5.99"
+
+    loaded["menu_mega_json"]["menu"]["sections"][0]["items"][0].update({
+        "normalized_name": "Crispy Spring Roll",
+        "normalized_section_name": "Appetizers",
+        "item_type": "food",
+        "broad_category": "appetizer",
+        "should_create_recipe_stub": False,
+        "cleanup_notes": ["duplicate"],
+    })
+    cleaned_unpack = menu_mega_json_service.unpack_mega_menu_json_to_sections(
+        loaded["menu_mega_json"],
+        snapshot_id=loaded["id"],
+    )
+    cleaned_item = cleaned_unpack[0]["items"][0]
+    assert cleaned_item["item_name"] == "Crispy Spring Roll"
+    assert cleaned_item["original_item_name"] == "Spring Roll"
+    assert cleaned_item["menu_section"] == "Appetizers"
+    assert cleaned_item["should_create_recipe"] is False
+    assert cleaned_item["skip_reason"] == "duplicate"
 
 
 def test_menu_stub_url_import_saves_mega_snapshot_and_parent_traceability(monkeypatch, tmp_path):
@@ -177,6 +209,9 @@ def test_menu_stub_url_import_saves_mega_snapshot_and_parent_traceability(monkey
     assert saved[0][1]["source_type"] == "menu_item_stub"
     assert saved[0][1]["parent_menu_snapshot_id"] == snapshot["id"]
     assert saved[0][1]["source_metadata"]["parent_menu_snapshot_id"] == snapshot["id"]
+    assert saved[0][1]["recipe_inference"]["status"] == "not_generated"
+    assert saved[0][1]["nutrition_inference"]["status"] == "not_generated"
+    assert saved[0][1]["pdf_generation"]["status"] == "not_generated"
 
 
 def test_mega_menu_json_viewer_static_hooks_are_present():
@@ -187,8 +222,15 @@ def test_mega_menu_json_viewer_static_hooks_are_present():
     assert "View Mega Menu JSON" in template
     assert "viewMegaMenuJson(this, event)" in template
     assert "copyMegaMenuJson" in script
+    assert "downloadMegaMenuJson" in script
+    assert "runFullRoutineForMenuSection" in script
+    assert "runFullRoutineForAllMenuRecipes" in script
     assert "/api/menu_mega_json_snapshots/" in script
+    assert "/api/menu_mega_json_snapshots/<snapshot_id>/download" in routes
+    assert "/api/menu_mega_json_snapshots/<snapshot_id>/retry-unpack" in routes
     assert "api_menu_mega_json_snapshot_route" in routes
+    assert "Run Full Routine for All" in template
+    assert "Run Section Routine" in template
 
 
 def test_menu_item_result_preserves_original_menu_url_and_unique_record_url(monkeypatch, tmp_path):
@@ -452,6 +494,9 @@ def test_menu_stub_result_is_deterministic_without_openai(monkeypatch, tmp_path)
     assert result["recipes"][0]["needs_ai_recipe"] is True
     assert result["recipes"][0]["recipe_status"] == "stub"
     assert result["recipes"][0]["ingredients"] == []
+    assert result["recipes"][0]["recipe_inference"]["status"] == "not_generated"
+    assert result["recipes"][0]["nutrition_inference"]["status"] == "not_generated"
+    assert result["recipes"][0]["pdf_generation"]["status"] == "not_generated"
     assert saved[0][1]["source_menu_url"] == source_url
     assert saved[0][1]["menu_item_id"] == "MIT1"
 
@@ -522,6 +567,77 @@ def test_menu_stub_optional_cleanup_is_one_batch_call_and_skips_duplicate(monkey
     assert result["openai_calls_used"] == 1
     assert result["estimated_token_usage"]["total_tokens"] == 123
     assert result["recipes"][0]["recipe_title"] == "Thai Basil Chicken"
+
+
+def test_menu_stub_url_import_updates_snapshot_with_cookbook_and_cleanup(monkeypatch, tmp_path):
+    monkeypatch.setenv("OPENAI_MENU_CLEANUP_ENABLED", "true")
+    monkeypatch.setattr(menu_mega_json_service, "workspace_data_root", lambda: tmp_path)
+    monkeypatch.setattr(recipe_extract_service, "RAW_FOLDER", tmp_path)
+    source_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902"
+    payload = [
+        {
+            "menu": {"menuId": "MEN1", "menuData": {"enMenuTitle": "Kitchen Appetizers"}},
+            "itemList": [
+                {
+                    "price": 5.99,
+                    "menuItemId": "MIT1",
+                    "menuItemData": {
+                        "enItemTitle": "Spring Roll",
+                        "enItemText": "2 veggie golden crispy rolls.",
+                    },
+                }
+            ],
+        }
+    ]
+
+    def fake_fetch_menu_page_html(url, cancellation_check=None, return_metadata=False):
+        html = "<html><title>Vel Asian Cuisine</title></html>"
+        metadata = {"final_url": url, "http_status": 200, "content_type": "text/html"}
+        return (html, metadata) if return_metadata else html
+
+    def fake_cleanup(prompt_text, action_name="menu-cleanup"):
+        return json.dumps({
+            "items": [
+                {
+                    "index": 0,
+                    "normalized_item_name": "Crispy Spring Roll",
+                    "normalized_section_name": "Appetizers",
+                    "item_type": "food",
+                    "broad_category": "appetizer",
+                    "should_create_recipe": True,
+                }
+            ]
+        }), {
+            "ok": True,
+            "model": "gpt-4o-mini",
+            "model_source": "default:gpt-4o-mini",
+            "usage": {"total_tokens": 42},
+        }
+
+    monkeypatch.setattr(recipe_extract_service, "fetch_menu_page_html", fake_fetch_menu_page_html)
+    monkeypatch.setattr(recipe_extract_service, "fetch_cartana_menu_payload", lambda url, html, cancellation_check=None: (payload, {"ok": True}))
+    monkeypatch.setattr(recipe_extract_service, "send_menu_cleanup_prompt_to_openai", fake_cleanup)
+    monkeypatch.setattr(recipe_extract_service, "save_extracted_recipe_json", lambda recipe_url, json_data: tmp_path / "stub.json")
+
+    result = recipe_extract_service.extract_menu_stubs_from_url(
+        source_url,
+        import_job_id="job-123",
+        cookbook_id="cb1",
+        cookbook_name="Dinner",
+    )
+    snapshot = menu_mega_json_service.load_menu_mega_json_snapshot(result["menu_mega_snapshot_id"])
+    item = snapshot["menu_mega_json"]["menu"]["sections"][0]["items"][0]
+
+    assert snapshot["import_job_id"] == "job-123"
+    assert snapshot["cookbook_id"] == "cb1"
+    assert snapshot["cookbook_name"] == "Dinner"
+    assert snapshot["used_openai"] is True
+    assert snapshot["openai_model"] == "gpt-4o-mini"
+    assert item["name"] == "Spring Roll"
+    assert item["normalized_name"] == "Crispy Spring Roll"
+    assert item["normalized_section_name"] == "Appetizers"
+    assert item["item_type"] == "food"
+    assert item["recipe_inference"]["status"] == "not_generated"
 
 
 def test_commit_menu_import_stubs_skips_full_routine(monkeypatch, tmp_path):

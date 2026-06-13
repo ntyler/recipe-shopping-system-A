@@ -58,8 +58,13 @@ from PushShoppingList.services.image_variant_service import ensure_webp_variants
 from PushShoppingList.services.job_runtime_context import current_job_id
 from PushShoppingList.services.job_runtime_context import model_snapshot_for_env
 from PushShoppingList.services.menu_mega_json_service import build_mega_menu_json
+from PushShoppingList.services.menu_mega_json_service import default_nutrition_inference
+from PushShoppingList.services.menu_mega_json_service import default_pdf_generation
+from PushShoppingList.services.menu_mega_json_service import default_recipe_inference
 from PushShoppingList.services.menu_mega_json_service import save_menu_mega_json_snapshot
 from PushShoppingList.services.menu_mega_json_service import unpack_mega_menu_json_to_sections
+from PushShoppingList.services.menu_mega_json_service import update_mega_menu_json_with_cleanup
+from PushShoppingList.services.menu_mega_json_service import update_menu_mega_json_snapshot
 from PushShoppingList.services.openai_model_service import model_value_for_env
 from PushShoppingList.services.openai_model_service import supports_custom_temperature
 from PushShoppingList.services.openai_throttle_service import throttled_audio_transcription
@@ -10370,6 +10375,9 @@ def normalize_menu_item_stub(menu_url, menu_item, index, source_name=""):
         "equipment": [],
         "instructions": [],
         "nutrition": {},
+        "recipe_inference": default_recipe_inference(),
+        "nutrition_inference": default_nutrition_inference(),
+        "pdf_generation": default_pdf_generation(),
         "source_url": recipe_url,
         "recipe_record_url": recipe_url,
         "source_menu_url": str(menu_url or "").strip(),
@@ -10395,6 +10403,13 @@ def normalize_menu_item_stub(menu_url, menu_item, index, source_name=""):
         "menu_mega_snapshot_id": parent_snapshot_id,
         "item_type": clean_recipe_text(menu_item.get("item_type") or "unknown").lower(),
         "broad_category": clean_recipe_text(menu_item.get("broad_category") or ""),
+        "normalized_name": clean_recipe_text(menu_item.get("item_name") or title),
+        "normalized_section_name": clean_recipe_text(menu_item.get("menu_section") or section_name),
+        "original_item_name": clean_recipe_text(menu_item.get("original_item_name") or title),
+        "original_section_name": clean_recipe_text(menu_item.get("original_section_name") or section_name),
+        "duplicate_group_id": clean_recipe_text(menu_item.get("duplicate_group_id") or ""),
+        "cleanup_confidence": menu_item.get("cleanup_confidence"),
+        "cleanup_notes": menu_item.get("cleanup_notes") if isinstance(menu_item.get("cleanup_notes"), list) else [],
         "tags": menu_item.get("tags") if isinstance(menu_item.get("tags"), list) else [],
         "options": menu_item.get("options") if isinstance(menu_item.get("options"), list) else [],
         "modifiers": menu_item.get("modifiers") if isinstance(menu_item.get("modifiers"), list) else [],
@@ -10435,6 +10450,13 @@ def normalize_menu_item_stub(menu_url, menu_item, index, source_name=""):
         "menu_section_id": clean_recipe_text(menu_item.get("menu_section_id") or ""),
         "item_type": recipe["item_type"],
         "broad_category": recipe["broad_category"],
+        "normalized_name": recipe["normalized_name"],
+        "normalized_section_name": recipe["normalized_section_name"],
+        "original_item_name": recipe["original_item_name"],
+        "original_section_name": recipe["original_section_name"],
+        "duplicate_group_id": recipe["duplicate_group_id"],
+        "cleanup_confidence": recipe["cleanup_confidence"],
+        "cleanup_notes": recipe["cleanup_notes"],
         "tags": recipe["tags"],
         "options": recipe["options"],
         "modifiers": recipe["modifiers"],
@@ -10463,6 +10485,7 @@ def build_menu_stub_extract_result_from_items(
     progress_callback=None,
     cancellation_check=None,
     menu_snapshot=None,
+    skip_cleanup=False,
 ):
     diagnostics = diagnostics if isinstance(diagnostics, dict) else {}
     menu_snapshot = menu_snapshot if isinstance(menu_snapshot, dict) else {}
@@ -10522,11 +10545,22 @@ def build_menu_stub_extract_result_from_items(
         }
 
     run_cancellation_check(cancellation_check)
-    cleaned_sections, cleanup_debug = maybe_cleanup_menu_sections(
-        sections,
-        progress_callback=progress_callback,
-        cancellation_check=cancellation_check,
-    )
+    if skip_cleanup:
+        cleaned_sections = sections
+        cleanup_debug = {
+            "enabled": False,
+            "model": "",
+            "model_source": "deterministic",
+            "openai_calls_used": 0,
+            "estimated_token_usage": {},
+            "skipped_reason": "retry_unpack",
+        }
+    else:
+        cleaned_sections, cleanup_debug = maybe_cleanup_menu_sections(
+            sections,
+            progress_callback=progress_callback,
+            cancellation_check=cancellation_check,
+        )
     diagnostics["menu_cleanup"] = cleanup_debug
     diagnostics["openai_calls_used"] = int(cleanup_debug.get("openai_calls_used") or 0)
     diagnostics["estimated_token_usage"] = cleanup_debug.get("estimated_token_usage") or {}
@@ -10584,6 +10618,9 @@ def build_menu_stub_extract_result_from_items(
             "ai_inferred": False,
             "needs_ai_recipe": True,
             "recipe_status": "stub",
+            "recipe_inference": stub.get("recipe_inference", default_recipe_inference()),
+            "nutrition_inference": stub.get("nutrition_inference", default_nutrition_inference()),
+            "pdf_generation": stub.get("pdf_generation", default_pdf_generation()),
             "model": "",
             "model_used": "",
             "model_source": "deterministic",
@@ -10638,6 +10675,7 @@ def build_menu_stub_extract_result_from_items(
             "error_code": "NO_MENU_STUBS_CREATED",
             "error_message": message,
             "technical_message": menu_diagnostics_message(diagnostics, skipped),
+            "raw_menu": {"menu_sections": cleaned_sections},
             "debug": diagnostics,
             "menu_sections_found": len(cleaned_sections or []),
             "menu_items_found": len(flatten_menu_sections(cleaned_sections)),
@@ -10776,6 +10814,7 @@ def generate_menu_recipe_from_stub(recipe_url, stub, user_id=None):
         "model_used": inference.get("model") or resolve_menu_model(),
         "model_source": inference.get("model_source") or resolve_menu_model_source(),
     })
+    generated_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     notes = normalized.get("confidence_notes")
     if not isinstance(notes, list):
         notes = []
@@ -10783,6 +10822,26 @@ def generate_menu_recipe_from_stub(recipe_url, stub, user_id=None):
     if generation_note not in notes:
         notes.append(generation_note)
     normalized["confidence_notes"] = notes
+    normalized["recipe_inference"] = {
+        **default_recipe_inference(),
+        "status": "generated",
+        "ingredients": normalized.get("ingredients") if isinstance(normalized.get("ingredients"), list) else [],
+        "equipment": normalized.get("equipment") if isinstance(normalized.get("equipment"), list) else [],
+        "instructions": normalized.get("instructions") if isinstance(normalized.get("instructions"), list) else [],
+        "servings": normalized.get("servings") or None,
+        "confidence": normalized.get("extraction_confidence") or normalized.get("confidence") or None,
+        "model": normalized.get("model_used") or resolve_menu_model(),
+        "generated_at": generated_at,
+        "notes": notes,
+    }
+    normalized["nutrition_inference"] = {
+        **default_nutrition_inference(),
+        **(stub.get("nutrition_inference") if isinstance(stub.get("nutrition_inference"), dict) else {}),
+    }
+    normalized["pdf_generation"] = {
+        **default_pdf_generation(),
+        **(stub.get("pdf_generation") if isinstance(stub.get("pdf_generation"), dict) else {}),
+    }
     normalize_extracted_recipe_identity(normalized)
     normalize_extracted_ingredient_fields(normalized)
     normalize_extracted_equipment_fields(normalized)
@@ -11494,7 +11553,14 @@ def _menu_url_error_result(menu_url, exc, staged_import=False):
     }
 
 
-def extract_menu_stubs_from_url(menu_url, progress_callback=None, cancellation_check=None):
+def extract_menu_stubs_from_url(
+    menu_url,
+    progress_callback=None,
+    cancellation_check=None,
+    import_job_id="",
+    cookbook_id="",
+    cookbook_name="",
+):
     menu_url = str(menu_url or "").strip()
     if not menu_url:
         return {
@@ -11547,6 +11613,9 @@ def extract_menu_stubs_from_url(menu_url, progress_callback=None, cancellation_c
         menu_snapshot = save_menu_mega_json_snapshot(
             mega_json,
             job_id=current_job_id(),
+            import_job_id=import_job_id or current_job_id(),
+            cookbook_id=cookbook_id,
+            cookbook_name=cookbook_name,
             extraction_status="saved",
         )
         run_cancellation_check(cancellation_check)
@@ -11556,7 +11625,7 @@ def extract_menu_stubs_from_url(menu_url, progress_callback=None, cancellation_c
             snapshot_id=menu_snapshot.get("id") or menu_snapshot.get("snapshot_id") or "",
         )
 
-        return build_menu_stub_extract_result_from_items(
+        result = build_menu_stub_extract_result_from_items(
             menu_url,
             sections,
             source_name=menu_url,
@@ -11567,6 +11636,31 @@ def extract_menu_stubs_from_url(menu_url, progress_callback=None, cancellation_c
             cancellation_check=cancellation_check,
             menu_snapshot=menu_snapshot,
         )
+        cleanup_debug = (
+            result.get("debug", {}).get("menu_cleanup")
+            if isinstance(result.get("debug"), dict)
+            else {}
+        )
+        cleaned_sections = (
+            result.get("raw_menu", {}).get("menu_sections")
+            if isinstance(result.get("raw_menu"), dict)
+            else None
+        )
+        if menu_snapshot.get("id") and isinstance(cleaned_sections, list):
+            updated_mega_json = update_mega_menu_json_with_cleanup(
+                menu_snapshot.get("menu_mega_json") or mega_json,
+                cleaned_sections,
+                cleanup_debug=cleanup_debug,
+            )
+            update_menu_mega_json_snapshot(
+                menu_snapshot.get("id"),
+                mega_json=updated_mega_json,
+                extraction_status="saved",
+                cookbook_id=cookbook_id,
+                cookbook_name=cookbook_name,
+                import_job_id=import_job_id or current_job_id(),
+            )
+        return result
     except Exception as exc:
         if is_job_cancelled_exception(exc):
             raise

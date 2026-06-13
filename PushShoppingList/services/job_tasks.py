@@ -420,6 +420,9 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
                     url,
                     progress_callback=progress_callback,
                     cancellation_check=lambda: ensure_not_cancelled(job_id),
+                    import_job_id=job_id,
+                    cookbook_id=cookbook.get("id", "") if isinstance(cookbook, dict) else "",
+                    cookbook_name=cookbook.get("name", "") if isinstance(cookbook, dict) else "",
                 )
             else:
                 result = extract_recipe_from_url(url, progress_callback=progress_callback)
@@ -695,6 +698,7 @@ def run_estimate_per_serving_job(job_id, payload):
     from PushShoppingList.routes.recipe_routes import _extract_recipe_payload_for_nutrition
     from PushShoppingList.routes.recipe_routes import _has_per_serving_estimate
     from PushShoppingList.routes.recipe_routes import _mark_uploaded_recipe_nutrition_estimated
+    from PushShoppingList.routes.recipe_routes import _menu_nutrition_inference_from_rows
     from PushShoppingList.routes.recipe_routes import _recipe_with_default_serving_basis
     from PushShoppingList.routes.recipe_routes import estimate_recipe_nutrition
     from PushShoppingList.routes.recipe_routes import load_editable_recipe
@@ -756,6 +760,10 @@ def run_estimate_per_serving_job(job_id, payload):
         updated_recipe = {
             **recipe,
             "nutrition": result.get("nutrition", []),
+            "nutrition_inference": _menu_nutrition_inference_from_rows(
+                result.get("nutrition", []),
+                model=nutrition_model,
+            ),
         }
         with workspace_write_lock("recipe-imports"):
             save_result = save_editable_recipe(recipe_url, updated_recipe)

@@ -73,6 +73,9 @@
                 <button type="button" onclick="return runFullRoutineForSelectedRecipes(this)">
                     Run Full Routine for Selected
                 </button>
+                <button type="button" onclick="return runFullRoutineForAllMenuRecipes(this)">
+                    Run Full Routine for All
+                </button>
             </div>
         </div>
     </div>
@@ -163,6 +166,12 @@
                                                         data-menu-section="{{ recipe.menu_section }}"
                                                         onclick="return generateMenuStubSection(this, event)">
                                                     Generate Section
+                                                </button>
+                                                <button type="button"
+                                                        class="menu-recipe-generate-inline"
+                                                        data-menu-section="{{ recipe.menu_section }}"
+                                                        onclick="return runFullRoutineForMenuSection(this, event)">
+                                                    Run Section Routine
                                                 </button>
                                             {% endif %}
                                             {% if recipe.parent_menu_snapshot_id or recipe.menu_mega_snapshot_id %}

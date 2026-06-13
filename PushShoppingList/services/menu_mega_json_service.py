@@ -163,6 +163,71 @@ def normalize_list(value):
     return value if isinstance(value, list) else []
 
 
+def default_recipe_inference():
+    return {
+        "status": "not_generated",
+        "ingredients": [],
+        "equipment": [],
+        "instructions": [],
+        "servings": None,
+        "confidence": None,
+        "model": None,
+        "generated_at": None,
+        "notes": [],
+    }
+
+
+def default_nutrition_inference():
+    return {
+        "status": "not_generated",
+        "servings": None,
+        "calories_per_serving": None,
+        "protein_g": None,
+        "carbs_g": None,
+        "fat_g": None,
+        "sodium_mg": None,
+        "model": None,
+        "generated_at": None,
+        "notes": [],
+    }
+
+
+def default_pdf_generation():
+    return {
+        "status": "not_generated",
+        "generated_pdf_path": "",
+        "generated_cloudflare_pdf_path": "",
+        "source_pdf_path": "",
+        "source_cloudflare_pdf_path": "",
+        "generated_at": None,
+        "notes": [],
+    }
+
+
+def normalize_placeholder(value, default_factory):
+    default = default_factory()
+    if isinstance(value, dict):
+        default.update(value)
+    return default
+
+
+def normalize_menu_item_placeholders(item):
+    item = item if isinstance(item, dict) else {}
+    item["recipe_inference"] = normalize_placeholder(
+        item.get("recipe_inference"),
+        default_recipe_inference,
+    )
+    item["nutrition_inference"] = normalize_placeholder(
+        item.get("nutrition_inference"),
+        default_nutrition_inference,
+    )
+    item["pdf_generation"] = normalize_placeholder(
+        item.get("pdf_generation"),
+        default_pdf_generation,
+    )
+    return item
+
+
 def build_mega_menu_json(
     source_url,
     sections,
@@ -231,7 +296,7 @@ def build_mega_menu_json(
                 duplicate_keys.add(duplicate_key)
             item_count += 1
 
-            canonical_items.append({
+            canonical_item = {
                 "menu_item_id": menu_item_id,
                 "display_order": safe_int(item.get("display_order") or item.get("index"), item_index) + (
                     0 if item.get("display_order") not in (None, "") else 1
@@ -258,7 +323,23 @@ def build_mega_menu_json(
                     "broad_category": clean_text(item.get("broad_category") or ""),
                     "source_index": item_index,
                 },
-            })
+                "recipe_inference": default_recipe_inference(),
+                "nutrition_inference": default_nutrition_inference(),
+                "pdf_generation": default_pdf_generation(),
+            }
+            for optional_field in (
+                "normalized_name",
+                "normalized_section_name",
+                "item_type",
+                "broad_category",
+                "duplicate_group_id",
+                "should_create_recipe_stub",
+                "cleanup_confidence",
+                "cleanup_notes",
+            ):
+                if optional_field in item:
+                    canonical_item[optional_field] = item.get(optional_field)
+            canonical_items.append(normalize_menu_item_placeholders(canonical_item))
 
         if canonical_items:
             canonical_sections.append({
@@ -338,6 +419,17 @@ def validate_mega_menu_json(mega_json):
         mega_json.setdefault("menu", {})["sections"] = sections
         errors.append("menu_sections_missing")
 
+    for section in sections:
+        if not isinstance(section, dict):
+            continue
+        items = section.get("items")
+        if not isinstance(items, list):
+            section["items"] = []
+            continue
+        for item in items:
+            if isinstance(item, dict):
+                normalize_menu_item_placeholders(item)
+
     item_count = sum(
         len(section.get("items") or [])
         for section in sections
@@ -347,6 +439,7 @@ def validate_mega_menu_json(mega_json):
     extraction["item_count"] = item_count
     extraction["section_count"] = len(sections)
     extraction.setdefault("duplicate_count", 0)
+    extraction.setdefault("method", "deterministic_html_first")
     extraction.setdefault("used_openai", False)
     extraction.setdefault("openai_model", None)
     extraction["warnings"] = [*list(extraction.get("warnings") or []), *warnings]
@@ -372,7 +465,52 @@ def save_snapshot_index(payload):
     return payload
 
 
-def save_menu_mega_json_snapshot(mega_json, job_id="", extraction_status="saved"):
+def snapshot_summary(record):
+    return {
+        "id": record["id"],
+        "source_url": record["source_url"],
+        "final_url": record["final_url"],
+        "saved_at": record["saved_at"],
+        "updated_at": record.get("updated_at", record["saved_at"]),
+        "job_id": record["job_id"],
+        "import_job_id": record.get("import_job_id", record["job_id"]),
+        "cookbook_id": record.get("cookbook_id", ""),
+        "cookbook_name": record.get("cookbook_name", ""),
+        "item_count": record["item_count"],
+        "section_count": record["section_count"],
+        "duplicate_count": record.get("duplicate_count", 0),
+        "extraction_status": record["extraction_status"],
+        "used_openai": bool(record.get("used_openai")),
+        "openai_model": record.get("openai_model"),
+    }
+
+
+def write_snapshot_record(record):
+    (snapshot_dir() / f"{record['id']}.json").write_text(
+        json.dumps(record, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    index = load_snapshot_index()
+    summaries = [
+        item
+        for item in (index.get("snapshots") if isinstance(index.get("snapshots"), list) else [])
+        if isinstance(item, dict) and item.get("id") != record["id"]
+    ]
+    summaries.insert(0, snapshot_summary(record))
+    index["snapshots"] = summaries[:200]
+    save_snapshot_index(index)
+    return record
+
+
+def save_menu_mega_json_snapshot(
+    mega_json,
+    job_id="",
+    extraction_status="saved",
+    import_job_id="",
+    cookbook_id="",
+    cookbook_name="",
+):
     mega_json = validate_mega_menu_json(mega_json)
     snapshot_id = clean_text(mega_json.get("snapshot_id") or uuid.uuid4().hex)
     saved_at = now_iso()
@@ -386,38 +524,119 @@ def save_menu_mega_json_snapshot(mega_json, job_id="", extraction_status="saved"
         "final_url": clean_text(source.get("final_url") or source.get("source_url") or ""),
         "fetched_at": clean_text(source.get("fetched_at") or ""),
         "saved_at": saved_at,
+        "created_at": saved_at,
+        "updated_at": saved_at,
         "job_id": clean_text(job_id),
+        "import_job_id": clean_text(import_job_id or job_id),
+        "cookbook_id": clean_text(cookbook_id),
+        "cookbook_name": clean_text(cookbook_name),
+        "schema_version": clean_text(mega_json.get("schema_version") or SCHEMA_VERSION),
         "menu_mega_json": mega_json,
         "item_count": safe_int(extraction.get("item_count"), 0),
         "section_count": safe_int(extraction.get("section_count"), 0),
+        "duplicate_count": safe_int(extraction.get("duplicate_count"), 0),
         "extraction_status": clean_text(extraction_status or "saved"),
+        "extraction_method": clean_text(extraction.get("method") or ""),
+        "used_openai": bool(extraction.get("used_openai")),
+        "openai_model": extraction.get("openai_model"),
         "extraction_warnings": list(extraction.get("warnings") or []),
         "extraction_errors": list(extraction.get("errors") or []),
     }
-    (snapshot_dir() / f"{snapshot_id}.json").write_text(
-        json.dumps(record, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
+    return write_snapshot_record(record)
 
-    index = load_snapshot_index()
-    summaries = [
-        item
-        for item in (index.get("snapshots") if isinstance(index.get("snapshots"), list) else [])
-        if isinstance(item, dict) and item.get("id") != snapshot_id
-    ]
-    summaries.insert(0, {
-        "id": snapshot_id,
-        "source_url": record["source_url"],
-        "final_url": record["final_url"],
-        "saved_at": record["saved_at"],
-        "job_id": record["job_id"],
-        "item_count": record["item_count"],
-        "section_count": record["section_count"],
-        "extraction_status": record["extraction_status"],
-    })
-    index["snapshots"] = summaries[:200]
-    save_snapshot_index(index)
-    return record
+
+def update_menu_mega_json_snapshot(snapshot_id, mega_json=None, **updates):
+    snapshot_id = clean_text(snapshot_id)
+    record = load_menu_mega_json_snapshot(snapshot_id)
+    if not record:
+        return None
+
+    if isinstance(mega_json, dict):
+        mega_json = validate_mega_menu_json(mega_json)
+        mega_json["snapshot_id"] = snapshot_id
+        source = mega_json.get("source") if isinstance(mega_json.get("source"), dict) else {}
+        extraction = mega_json.get("extraction") if isinstance(mega_json.get("extraction"), dict) else {}
+        record.update({
+            "source_url": clean_text(source.get("source_url") or record.get("source_url") or ""),
+            "final_url": clean_text(source.get("final_url") or source.get("source_url") or record.get("final_url") or ""),
+            "fetched_at": clean_text(source.get("fetched_at") or record.get("fetched_at") or ""),
+            "schema_version": clean_text(mega_json.get("schema_version") or SCHEMA_VERSION),
+            "menu_mega_json": mega_json,
+            "item_count": safe_int(extraction.get("item_count"), 0),
+            "section_count": safe_int(extraction.get("section_count"), 0),
+            "duplicate_count": safe_int(extraction.get("duplicate_count"), 0),
+            "extraction_method": clean_text(extraction.get("method") or record.get("extraction_method") or ""),
+            "used_openai": bool(extraction.get("used_openai")),
+            "openai_model": extraction.get("openai_model"),
+            "extraction_warnings": list(extraction.get("warnings") or []),
+            "extraction_errors": list(extraction.get("errors") or []),
+        })
+
+    for key, value in updates.items():
+        if value is not None:
+            record[key] = value
+    record["updated_at"] = now_iso()
+    return write_snapshot_record(record)
+
+
+def update_mega_menu_json_with_cleanup(mega_json, cleaned_sections, cleanup_debug=None):
+    mega_json = validate_mega_menu_json(mega_json)
+    cleanup_debug = cleanup_debug if isinstance(cleanup_debug, dict) else {}
+    cleaned_items = []
+    for section in cleaned_sections or []:
+        if not isinstance(section, dict):
+            continue
+        for item in section.get("items") or []:
+            if isinstance(item, dict):
+                cleaned_items.append((section, item))
+
+    item_index = 0
+    for section in mega_json.get("menu", {}).get("sections", []):
+        if not isinstance(section, dict):
+            continue
+        for item in section.get("items") or []:
+            if not isinstance(item, dict):
+                continue
+            if item_index >= len(cleaned_items):
+                item_index += 1
+                continue
+            cleaned_section, cleaned_item = cleaned_items[item_index]
+            normalized_name = clean_text(cleaned_item.get("item_name") or "")
+            normalized_section = clean_text(
+                cleaned_item.get("menu_section")
+                or cleaned_item.get("section_name")
+                or cleaned_section.get("section_name")
+                or ""
+            )
+            item["normalized_name"] = normalized_name
+            item["normalized_section_name"] = normalized_section
+            item["item_type"] = clean_text(cleaned_item.get("item_type") or item.get("item_type") or "unknown") or "unknown"
+            item["broad_category"] = clean_text(cleaned_item.get("broad_category") or item.get("broad_category") or "")
+            if cleaned_item.get("duplicate_group_id"):
+                item["duplicate_group_id"] = clean_text(cleaned_item.get("duplicate_group_id"))
+            elif cleaned_item.get("duplicate_of_index") not in (None, ""):
+                item["duplicate_group_id"] = f"duplicate-of-{cleaned_item.get('duplicate_of_index')}"
+            if "should_create_recipe" in cleaned_item:
+                item["should_create_recipe_stub"] = bool(cleaned_item.get("should_create_recipe"))
+            if cleaned_item.get("skip_reason"):
+                item["cleanup_notes"] = [clean_text(cleaned_item.get("skip_reason"))]
+            metadata = item.setdefault("metadata", {})
+            if isinstance(metadata, dict):
+                metadata["item_type"] = item["item_type"]
+                metadata["broad_category"] = item["broad_category"]
+                metadata["normalized_name"] = normalized_name
+                metadata["normalized_section_name"] = normalized_section
+            item_index += 1
+
+    extraction = mega_json.setdefault("extraction", {})
+    if int(cleanup_debug.get("openai_calls_used") or 0) > 0:
+        extraction["used_openai"] = True
+        extraction["openai_model"] = cleanup_debug.get("model")
+        warnings = list(extraction.get("warnings") or [])
+        if cleanup_debug.get("error"):
+            warnings.append("AI cleanup failed, but deterministic menu extraction succeeded.")
+        extraction["warnings"] = warnings
+    return validate_mega_menu_json(mega_json)
 
 
 def load_menu_mega_json_snapshot(snapshot_id):
@@ -453,19 +672,40 @@ def unpack_mega_menu_json_to_sections(mega_json, snapshot_id=""):
         for item_index, item in enumerate(section.get("items") or []):
             if not isinstance(item, dict):
                 continue
-            item_name = clean_text(item.get("name") or item.get("item_name") or "")
+            metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+            original_item_name = clean_text(item.get("name") or item.get("item_name") or "")
+            item_name = clean_text(
+                item.get("normalized_name")
+                or metadata.get("normalized_name")
+                or original_item_name
+            )
             if not item_name:
                 continue
-            metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+            original_section_name = clean_text(
+                item.get("original_section_name")
+                or section.get("section_name")
+                or f"Menu Section {section_index + 1}"
+            )
+            normalized_section_name = clean_text(
+                item.get("normalized_section_name")
+                or metadata.get("normalized_section_name")
+                or section_name
+            )
+            duplicate_group_id = clean_text(item.get("duplicate_group_id") or "")
+            cleanup_notes = normalize_list(item.get("cleanup_notes"))
             item_display_order = safe_int(item.get("display_order"), item_index + 1)
-            items.append({
+            unpacked_item = {
                 "item_name": item_name,
-                "menu_section": section_name,
-                "section_name": section_name,
+                "menu_section": normalized_section_name,
+                "section_name": normalized_section_name,
                 "section_id": section_id,
                 "section_display_order": section_display_order,
                 "item_display_order": item_display_order,
                 "display_order": item_display_order,
+                "original_item_name": original_item_name,
+                "original_section_name": original_section_name,
+                "normalized_name": item_name,
+                "normalized_section_name": normalized_section_name,
                 "description": clean_text(item.get("description") or ""),
                 "price": clean_text(item.get("price_text") or item.get("price") or ""),
                 "price_text": clean_text(item.get("price_text") or ""),
@@ -482,11 +722,19 @@ def unpack_mega_menu_json_to_sections(mega_json, snapshot_id=""):
                 "modifiers": normalize_list(item.get("modifiers")),
                 "raw_text": clean_text(item.get("raw_text") or ""),
                 "raw_html": str(item.get("raw_html") or ""),
-                "item_type": clean_text(metadata.get("item_type") or "unknown") or "unknown",
-                "broad_category": clean_text(metadata.get("broad_category") or ""),
+                "item_type": clean_text(item.get("item_type") or metadata.get("item_type") or "unknown") or "unknown",
+                "broad_category": clean_text(item.get("broad_category") or metadata.get("broad_category") or ""),
+                "duplicate_group_id": duplicate_group_id,
+                "cleanup_notes": cleanup_notes,
                 "parent_menu_snapshot_id": snapshot_id,
                 "menu_mega_snapshot_id": snapshot_id,
-            })
+            }
+            if item.get("should_create_recipe_stub") is False:
+                unpacked_item["should_create_recipe"] = False
+                unpacked_item["skip_reason"] = clean_text((cleanup_notes or ["not_recipe_item"])[0])
+            if duplicate_group_id.startswith("duplicate-of-"):
+                unpacked_item["duplicate_of_index"] = duplicate_group_id.replace("duplicate-of-", "", 1)
+            items.append(unpacked_item)
 
         if items:
             sections.append({

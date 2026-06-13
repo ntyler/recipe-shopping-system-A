@@ -1,5 +1,8 @@
 import json
 import os
+import re
+from datetime import datetime
+from datetime import timezone
 from pathlib import Path
 from time import perf_counter
 from uuid import uuid4
@@ -55,6 +58,7 @@ from PushShoppingList.services.recipe_extract_service import classify_vision_ai_
 from PushShoppingList.services.recipe_extract_service import get_openai_error_code_and_param
 from PushShoppingList.services.recipe_extract_service import get_openai_client
 from PushShoppingList.services.recipe_extract_service import build_extract_result
+from PushShoppingList.services.recipe_extract_service import build_menu_stub_extract_result_from_items
 from PushShoppingList.services.recipe_extract_service import log_vision_debug_step
 from PushShoppingList.services.recipe_extract_service import send_image_prompt_to_openai
 from PushShoppingList.services.recipe_extract_service import supports_custom_temperature
@@ -140,7 +144,11 @@ from PushShoppingList.services.job_service import job_limit_key
 from PushShoppingList.services.job_service import owner_job_count_for_limit_key
 from PushShoppingList.services.job_service import queued_limit_status
 from PushShoppingList.services.job_service import update_job
+from PushShoppingList.services.menu_mega_json_service import default_nutrition_inference
+from PushShoppingList.services.menu_mega_json_service import default_pdf_generation
+from PushShoppingList.services.menu_mega_json_service import default_recipe_inference
 from PushShoppingList.services.menu_mega_json_service import load_menu_mega_json_snapshot
+from PushShoppingList.services.menu_mega_json_service import unpack_mega_menu_json_to_sections
 from PushShoppingList.services.openai_usage_service import openai_usage_dashboard_for_user
 from PushShoppingList.services.openai_usage_service import record_app_activity
 from PushShoppingList.services.openai_throttle_service import throttled_chat_completion
@@ -289,6 +297,80 @@ def _nutrition_rows_from_value(nutrition):
     return []
 
 
+def _utc_now_iso():
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _nutrition_row_value(rows, key):
+    key = str(key or "").strip().lower()
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("key") or "").strip().lower() == key:
+            return str(row.get("value") or "").strip()
+    return ""
+
+
+def _nutrition_number(value):
+    match = re.search(r"-?\d+(?:\.\d+)?", str(value or "").replace(",", ""))
+    if not match:
+        return None
+    try:
+        number = float(match.group(0))
+    except ValueError:
+        return None
+    return int(number) if number.is_integer() else number
+
+
+def _menu_nutrition_inference_from_rows(rows, model=""):
+    rows = rows if isinstance(rows, list) else []
+    return {
+        **default_nutrition_inference(),
+        "status": "generated",
+        "servings": _nutrition_row_value(rows, "serving_basis") or None,
+        "calories_per_serving": _nutrition_number(_nutrition_row_value(rows, "calories")),
+        "protein_g": _nutrition_number(_nutrition_row_value(rows, "protein")),
+        "carbs_g": _nutrition_number(
+            _nutrition_row_value(rows, "carbohydrates")
+            or _nutrition_row_value(rows, "carbs")
+        ),
+        "fat_g": _nutrition_number(_nutrition_row_value(rows, "fat")),
+        "sodium_mg": _nutrition_number(_nutrition_row_value(rows, "sodium")),
+        "model": str(model or os.getenv("OPENAI_NUTRITION_MODEL", MODEL)),
+        "generated_at": _utc_now_iso(),
+        "notes": ["Estimated per serving basis was generated lazily."],
+    }
+
+
+def _menu_pdf_generation_from_result(existing, result):
+    existing = existing if isinstance(existing, dict) else {}
+    result = result if isinstance(result, dict) else {}
+    generated_pdf_path = str(
+        result.get("generated_pdf_path")
+        or result.get("generated_recipe_pdf_path")
+        or result.get("pdf_path")
+        or existing.get("generated_pdf_path")
+        or ""
+    ).strip()
+    generated_cloudflare_pdf_path = str(
+        result.get("generated_cloudflare_pdf_path")
+        or result.get("generated_cloudflare_pdf_url")
+        or result.get("generated_recipe_pdf_url")
+        or result.get("pdf_public_url")
+        or result.get("public_url")
+        or existing.get("generated_cloudflare_pdf_path")
+        or ""
+    ).strip()
+    return {
+        **default_pdf_generation(),
+        **existing,
+        "status": "generated" if result.get("ok") else existing.get("status", "not_generated"),
+        "generated_pdf_path": generated_pdf_path,
+        "generated_cloudflare_pdf_path": generated_cloudflare_pdf_path,
+        "generated_at": _utc_now_iso() if result.get("ok") else existing.get("generated_at"),
+    }
+
+
 def _existing_nutrition_success(recipe, recipe_url=""):
     recipe = _recipe_with_default_serving_basis(recipe)
     nutrition = recipe.get("nutrition")
@@ -414,6 +496,10 @@ def ensure_uploaded_recipe_nutrition_estimate(recipe_url):
     updated_recipe = {
         **recipe_payload,
         "nutrition": estimate_result.get("nutrition", []),
+        "nutrition_inference": _menu_nutrition_inference_from_rows(
+            estimate_result.get("nutrition", []),
+            model=str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL)),
+        ),
     }
     save_result = save_editable_recipe(recipe_url, updated_recipe)
     if not save_result.get("ok"):
@@ -464,7 +550,28 @@ def create_recipe_pdf_from_url(recipe_url):
             "success": False,
         }
 
-    return create_editable_recipe_pdf(recipe_url)
+    result = create_editable_recipe_pdf(recipe_url)
+    if result.get("ok"):
+        try:
+            loaded_recipe = load_editable_recipe(recipe_url) or {}
+            recipe_payload = loaded_recipe.get("recipe") if isinstance(loaded_recipe, dict) else {}
+            recipe_payload = recipe_payload if isinstance(recipe_payload, dict) else {}
+            if recipe_payload:
+                updated_recipe = {
+                    **recipe_payload,
+                    "pdf_generation": _menu_pdf_generation_from_result(
+                        recipe_payload.get("pdf_generation"),
+                        result,
+                    ),
+                }
+                save_result = save_editable_recipe(recipe_url, updated_recipe)
+                if save_result.get("ok"):
+                    result["recipe_json"] = updated_recipe
+                else:
+                    result["pdf_generation_warning"] = save_result.get("error") or "Unable to save PDF generation status."
+        except Exception as exc:
+            result["pdf_generation_warning"] = str(exc)
+    return result
 
 
 def run_generated_recipe_pdf_creation(recipe_url, context="import"):
@@ -775,6 +882,18 @@ def menu_stub_recipe_payload(recipe_result, recipe_url, cookbook):
     payload.setdefault("equipment", [])
     payload.setdefault("instructions", [])
     payload.setdefault("nutrition", {})
+    payload["recipe_inference"] = {
+        **default_recipe_inference(),
+        **(payload.get("recipe_inference") if isinstance(payload.get("recipe_inference"), dict) else {}),
+    }
+    payload["nutrition_inference"] = {
+        **default_nutrition_inference(),
+        **(payload.get("nutrition_inference") if isinstance(payload.get("nutrition_inference"), dict) else {}),
+    }
+    payload["pdf_generation"] = {
+        **default_pdf_generation(),
+        **(payload.get("pdf_generation") if isinstance(payload.get("pdf_generation"), dict) else {}),
+    }
     payload.setdefault("recipe_title", recipe_result.get("recipe_title") or recipe_result.get("display_name") or recipe_url)
     payload.setdefault("display_name", payload.get("recipe_title") or recipe_url)
     return payload
@@ -2329,6 +2448,80 @@ def api_menu_mega_json_snapshot_route(snapshot_id):
         "success": True,
         "snapshot": snapshot,
     })
+
+
+@recipe_bp.route("/api/menu_mega_json_snapshots/<snapshot_id>/download", methods=["GET"])
+def api_menu_mega_json_snapshot_download_route(snapshot_id):
+    account_response = require_account_for_import(wants_json=True)
+    if account_response:
+        return account_response
+
+    snapshot = load_menu_mega_json_snapshot(snapshot_id)
+    if not snapshot:
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "Mega menu JSON snapshot was not found.",
+            "error_code": "MENU_MEGA_JSON_NOT_FOUND",
+        }), 404
+
+    filename = f"mega-menu-{snapshot.get('id') or snapshot_id}.json"
+    return Response(
+        json.dumps(snapshot.get("menu_mega_json") or {}, indent=2, ensure_ascii=False),
+        mimetype="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@recipe_bp.route("/api/menu_mega_json_snapshots/<snapshot_id>/retry-unpack", methods=["POST"])
+def api_menu_mega_json_snapshot_retry_unpack_route(snapshot_id):
+    account_response = require_account_for_import(wants_json=True)
+    if account_response:
+        return account_response
+
+    snapshot = load_menu_mega_json_snapshot(snapshot_id)
+    if not snapshot:
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "Mega menu JSON snapshot was not found.",
+            "error_code": "MENU_MEGA_JSON_NOT_FOUND",
+        }), 404
+
+    data = request.get_json(silent=True) or {}
+    cookbook = selected_import_cookbook(
+        data.get("cookbook_id") or snapshot.get("cookbook_id", ""),
+        data.get("cookbook_name") or snapshot.get("cookbook_name", ""),
+    )
+    mega_json = snapshot.get("menu_mega_json") if isinstance(snapshot.get("menu_mega_json"), dict) else {}
+    source = mega_json.get("source") if isinstance(mega_json.get("source"), dict) else {}
+    sections = unpack_mega_menu_json_to_sections(
+        mega_json,
+        snapshot_id=snapshot.get("id") or snapshot_id,
+    )
+    result = build_menu_stub_extract_result_from_items(
+        source.get("source_url") or snapshot.get("source_url", ""),
+        sections,
+        source_name=source.get("source_url") or snapshot.get("source_url", ""),
+        source_type="menu_url",
+        extracted_text=(mega_json.get("raw_capture") or {}).get("text_snapshot", "")
+        if isinstance(mega_json.get("raw_capture"), dict)
+        else "",
+        diagnostics={
+            "retry_unpack": True,
+            "menu_mega_snapshot_id": snapshot.get("id") or snapshot_id,
+        },
+        menu_snapshot=snapshot,
+        skip_cleanup=True,
+    )
+    if result.get("ok"):
+        result = commit_menu_import_result(
+            result,
+            cookbook,
+            context="retry-menu-mega-unpack",
+        )
+
+    return jsonify(with_openai_usage_dashboard(result)), 200 if result.get("ok") else 400
 
 
 @recipe_bp.route("/api/debug-openai-vision", methods=["GET", "POST"])

@@ -219,6 +219,12 @@
                                                 onclick="return generateMenuStubSection(this, event)">
                                             Generate Section
                                         </button>
+                                        <button type="button"
+                                                class="menu-recipe-generate-inline"
+                                                data-menu-section="{{ recipe.menu_section }}"
+                                                onclick="return runFullRoutineForMenuSection(this, event)">
+                                            Run Section Routine
+                                        </button>
                                     {% endif %}
                                 {% elif recipe.source_type == "menu_item_inferred" or recipe.ai_inferred %}
                                     <span class="menu-recipe-status-badge menu-recipe-status-generated">

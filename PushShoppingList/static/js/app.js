@@ -25266,6 +25266,13 @@ function menuStubRows() {
     return Array.from(document.querySelectorAll('[data-current-recipe-row][data-needs-ai-recipe="1"]'));
 }
 
+function menuRecipeRows() {
+    return Array.from(document.querySelectorAll("[data-current-recipe-row]")).filter(row => {
+        const sourceType = String(row.dataset.sourceType || "").trim().toLowerCase();
+        return row.dataset.needsAiRecipe === "1" || sourceType === "menu_item_stub" || sourceType === "menu_item_inferred";
+    });
+}
+
 function recipeUrlFromElement(element) {
     if (!element) {
         return "";
@@ -25356,12 +25363,26 @@ function allMenuStubRecipeUrls() {
     return uniqueRecipeUrls(menuStubRows().map(row => row.dataset.recipeUrl || ""));
 }
 
+function allMenuRecipeUrls() {
+    return uniqueRecipeUrls(menuRecipeRows().map(row => row.dataset.recipeUrl || ""));
+}
+
 function menuStubRecipeUrlsForSection(sectionName) {
     const target = String(sectionName || "").trim();
     if (!target) {
         return [];
     }
     return uniqueRecipeUrls(menuStubRows()
+        .filter(row => String(row.dataset.menuSection || "").trim() === target)
+        .map(row => row.dataset.recipeUrl || ""));
+}
+
+function menuRecipeUrlsForSection(sectionName) {
+    const target = String(sectionName || "").trim();
+    if (!target) {
+        return [];
+    }
+    return uniqueRecipeUrls(menuRecipeRows()
         .filter(row => String(row.dataset.menuSection || "").trim() === target)
         .map(row => row.dataset.recipeUrl || ""));
 }
@@ -25429,6 +25450,7 @@ function ensureMegaMenuJsonModal() {
             <div class="product-prompt-modal" role="dialog" aria-modal="true" aria-labelledby="megaMenuJsonTitle">
                 <div class="bulk-alt-modal-header">
                     <button type="button" class="bulk-prompt-btn" onclick="copyMegaMenuJson()">Copy</button>
+                    <button type="button" class="bulk-prompt-btn" onclick="downloadMegaMenuJson()">Download</button>
                     <h2 id="megaMenuJsonTitle" class="bulk-alt-modal-title">Mega Menu JSON</h2>
                     <button type="button" class="product-close-btn" onclick="closeMegaMenuJsonModal()">Close</button>
                 </div>
@@ -25461,13 +25483,25 @@ function showMegaMenuJsonSnapshot(snapshot) {
     const megaJson = snapshot && snapshot.menu_mega_json ? snapshot.menu_mega_json : snapshot || {};
     const itemCount = Number((snapshot && snapshot.item_count) || (megaJson.extraction && megaJson.extraction.item_count) || 0);
     const sectionCount = Number((snapshot && snapshot.section_count) || (megaJson.extraction && megaJson.extraction.section_count) || 0);
+    const duplicateCount = Number((snapshot && snapshot.duplicate_count) || (megaJson.extraction && megaJson.extraction.duplicate_count) || 0);
     const sourceUrl = String((snapshot && snapshot.source_url) || (megaJson.source && megaJson.source.source_url) || "").trim();
+    const finalUrl = String((snapshot && snapshot.final_url) || (megaJson.source && megaJson.source.final_url) || "").trim();
+    const fetchedAt = String((snapshot && snapshot.fetched_at) || (megaJson.source && megaJson.source.fetched_at) || "").trim();
+    const method = String((snapshot && snapshot.extraction_method) || (megaJson.extraction && megaJson.extraction.method) || "").trim();
+    const usedOpenAi = Boolean((snapshot && snapshot.used_openai) || (megaJson.extraction && megaJson.extraction.used_openai));
+    const openAiModel = String((snapshot && snapshot.openai_model) || (megaJson.extraction && megaJson.extraction.openai_model) || "").trim();
+    window.currentMegaMenuJsonSnapshotId = String((snapshot && (snapshot.id || snapshot.snapshot_id)) || megaJson.snapshot_id || "").trim();
 
     if (subtitle) {
         subtitle.textContent = [
             sourceUrl,
+            finalUrl && finalUrl !== sourceUrl ? `Final: ${finalUrl}` : "",
+            fetchedAt ? `Fetched: ${fetchedAt}` : "",
             `${sectionCount} sections`,
             `${itemCount} items`,
+            `${duplicateCount} duplicates`,
+            method ? `Method: ${method}` : "",
+            usedOpenAi ? `Cleanup: ${openAiModel || "OpenAI"}` : "Cleanup: not used",
         ].filter(Boolean).join(" | ");
     }
 
@@ -25478,6 +25512,15 @@ function showMegaMenuJsonSnapshot(snapshot) {
     modal.classList.add("open");
     modal.setAttribute("aria-hidden", "false");
     document.body.classList.add("modal-open");
+}
+
+function downloadMegaMenuJson() {
+    const snapshotId = String(window.currentMegaMenuJsonSnapshotId || "").trim();
+    if (!snapshotId) {
+        return false;
+    }
+    window.location.href = `/api/menu_mega_json_snapshots/${encodeURIComponent(snapshotId)}/download`;
+    return false;
 }
 
 async function copyMegaMenuJson() {
@@ -25651,12 +25694,24 @@ function createPdfsForSelectedRecipes(button) {
 }
 
 async function runFullRoutineForSelectedRecipes(button) {
-    const selectedUrls = selectedRecipeBatchUrls();
+    return runFullRoutineForMenuRecipeUrls(
+        selectedRecipeBatchUrls(),
+        selectedRecipeBatchUrls({ stubsOnly: true }),
+        button,
+        "Select at least one recipe."
+    );
+}
+
+async function runFullRoutineForMenuRecipeUrls(urls, stubUrls, button, emptyMessage) {
+    const selectedUrls = uniqueRecipeUrls(urls);
+    const selectedStubs = uniqueRecipeUrls(stubUrls);
     if (!selectedUrls.length) {
-        alert("Select at least one recipe.");
+        alert(emptyMessage || "Select at least one recipe.");
         return false;
     }
-    const selectedStubs = selectedRecipeBatchUrls({ stubsOnly: true });
+    if (selectedUrls.length > 25 && !window.confirm(`This will generate recipes, estimate nutrition, create PDFs, and may increase API cost for ${selectedUrls.length} menu items. Continue?`)) {
+        return false;
+    }
     try {
         if (selectedStubs.length) {
             await startMenuRecipeGeneration(selectedStubs, button);
@@ -25679,6 +25734,29 @@ async function runFullRoutineForSelectedRecipes(button) {
         alert(err.message || "Unable to run full routine.");
     }
     return false;
+}
+
+async function runFullRoutineForMenuSection(button, event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    const sectionName = button && button.dataset ? button.dataset.menuSection || "" : "";
+    return runFullRoutineForMenuRecipeUrls(
+        menuRecipeUrlsForSection(sectionName),
+        menuStubRecipeUrlsForSection(sectionName),
+        button,
+        "No menu recipes were found for this section."
+    );
+}
+
+async function runFullRoutineForAllMenuRecipes(button) {
+    return runFullRoutineForMenuRecipeUrls(
+        allMenuRecipeUrls(),
+        allMenuStubRecipeUrls(),
+        button,
+        "No menu recipes were found."
+    );
 }
 
 async function pollExtractionProgress() {
