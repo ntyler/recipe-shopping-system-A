@@ -109,7 +109,7 @@ def test_cancelled_job_cannot_be_revived_by_worker_updates(monkeypatch, tmp_path
 
     progress = job_service.update_job_progress(
         job["id"],
-        current_step="Inferring recipes with GPT-5.5 (1/266)",
+        current_step="Inferring recipes with gpt-5.5 via OPENAI_MENU_MODEL (1/266)",
         progress_percent=35,
         completed_items=1,
         total_items=266,

@@ -110,7 +110,7 @@ VISION_MODEL_DEFAULT = "gpt-5.5"
 VISION_MODEL_FALLBACK = "gpt-4o-mini"
 OPENAI_RECIPE_MODEL_DEFAULT = "gpt-4o-mini"
 OPENAI_MENU_MODEL_DEFAULT = "gpt-5.5"
-MENU_ITEM_INFERENCE_MODEL = "gpt-5.5"
+OPENAI_MENU_MODEL_ENV_VAR = "OPENAI_MENU_MODEL"
 OPENAI_PING_TEXT_MODEL = os.getenv("OPENAI_PING_TEXT_MODEL", "gpt-4o-mini")
 MENU_ITEM_INFERENCE_WORKERS = _safe_int(
     os.getenv("MENU_ITEM_INFERENCE_WORKERS", "8"),
@@ -9338,11 +9338,20 @@ def send_menu_file_prompt_to_openai(prompt_text, file_path, mime_type, filename)
 
 
 def menu_item_recipe_model_resolution():
-    return OpenAIModelResolution(
-        model=MENU_ITEM_INFERENCE_MODEL,
-        source="forced:menu_item_inference",
-        purpose="menu",
-    )
+    return resolve_openai_model("menu")
+
+
+def menu_model_progress_label(model_resolution):
+    model_resolution = model_resolution or menu_item_recipe_model_resolution()
+    model = str(getattr(model_resolution, "model", "") or resolve_menu_model()).strip()
+    return f"{model} via {OPENAI_MENU_MODEL_ENV_VAR}"
+
+
+def menu_item_inference_progress_message(model_resolution, completed_items=None, total_items=None):
+    message = f"Inferring recipes with {menu_model_progress_label(model_resolution)}"
+    if completed_items is not None and total_items is not None:
+        message += f" ({completed_items}/{total_items})"
+    return message
 
 
 def menu_item_inference_worker_count(total_items=None):
@@ -10102,7 +10111,7 @@ def build_menu_extract_result_from_items(
     check_cancelled()
     if progress_callback:
         progress_callback(
-            "Inferring recipes with GPT-5.5",
+            menu_item_inference_progress_message(model_resolution),
             (
                 f"Creating one AI-inferred recipe for each of {total_items} menu items "
                 f"with up to {worker_count} running at once."
@@ -10150,7 +10159,7 @@ def build_menu_extract_result_from_items(
             record_inference_result(index, menu_item, recipe, inference)
             if progress_callback:
                 progress_callback(
-                    f"Inferring recipes with GPT-5.5 ({completed_items}/{total_items})",
+                    menu_item_inference_progress_message(model_resolution, completed_items, total_items),
                     clean_recipe_text(
                         f"{menu_item.get('menu_section')}: {menu_item.get('item_name')}"
                     ),
@@ -10213,7 +10222,7 @@ def build_menu_extract_result_from_items(
                     record_inference_result(index, menu_item, recipe, inference)
                     if progress_callback:
                         progress_callback(
-                            f"Inferring recipes with GPT-5.5 ({completed_items}/{total_items})",
+                            menu_item_inference_progress_message(model_resolution, completed_items, total_items),
                             clean_recipe_text(
                                 f"{menu_item.get('menu_section')}: {menu_item.get('item_name')}"
                             ),

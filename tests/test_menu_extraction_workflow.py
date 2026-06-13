@@ -1,6 +1,13 @@
+import json
 import time
 
+from PushShoppingList.services import openai_model_service
 from PushShoppingList.services import recipe_extract_service
+
+
+def configure_menu_model_defaults(monkeypatch, tmp_path):
+    monkeypatch.setattr(openai_model_service, "MODEL_OVERRIDES_FILE", tmp_path / "openai_model_overrides.json")
+    monkeypatch.delenv("OPENAI_MENU_MODEL", raising=False)
 
 
 def test_cartana_menu_payload_extracts_sections_items_and_prices():
@@ -43,6 +50,7 @@ def test_cartana_menu_payload_extracts_sections_items_and_prices():
 
 
 def test_menu_item_result_preserves_original_menu_url_and_unique_record_url(monkeypatch, tmp_path):
+    configure_menu_model_defaults(monkeypatch, tmp_path)
     source_url = "https://example.com/menu_home.action?resInput=RES1"
     sections = [
         {
@@ -98,7 +106,7 @@ def test_menu_item_result_preserves_original_menu_url_and_unique_record_url(monk
     assert result["menu_items_found"] == 1
     assert result["recipes_created"] == 1
     assert result["model_used"] == "gpt-5.5"
-    assert result["model_source"] == "forced:menu_item_inference"
+    assert result["model_source"] == "default:gpt-5.5"
     assert result["recipes"][0]["source_url"].startswith(source_url + "&menu_item=")
     assert saved[0][1]["source_url"] == source_url
     assert saved[0][1]["recipe_record_url"].startswith(source_url + "&menu_item=")
@@ -107,6 +115,7 @@ def test_menu_item_result_preserves_original_menu_url_and_unique_record_url(monk
 
 
 def test_menu_item_parallel_inference_preserves_original_menu_order(monkeypatch, tmp_path):
+    configure_menu_model_defaults(monkeypatch, tmp_path)
     source_url = "https://example.com/menu_home.action?resInput=RES1"
     sections = [
         {
@@ -172,3 +181,84 @@ def test_menu_item_parallel_inference_preserves_original_menu_order(monkeypatch,
         "Dish 2",
         "Dish 3",
     ]
+
+
+def test_menu_item_inference_progress_shows_openai_menu_model_env_var(monkeypatch, tmp_path):
+    configure_menu_model_defaults(monkeypatch, tmp_path)
+    monkeypatch.setenv("OPENAI_MENU_MODEL", "gpt-4o-mini")
+    source_url = "https://example.com/menu_home.action?resInput=RES1"
+    sections = [
+        {
+            "section_name": "Entrees",
+            "items": [
+                {
+                    "item_name": "Basil Chicken",
+                    "menu_section": "Entrees",
+                    "description": "Chicken with basil sauce.",
+                    "source_url": source_url,
+                }
+            ],
+        }
+    ]
+    progress_messages = []
+
+    def fake_infer(menu_url, item, index, total, user_id=None):
+        return {
+            "recipe_title": item["item_name"],
+            "ingredients": [
+                {
+                    "quantity": "1",
+                    "unit": "pound",
+                    "ingredient": "chicken",
+                    "original_text": "1 pound chicken",
+                }
+            ],
+            "instructions": [
+                {"step": 1, "instruction": "Stir fry the chicken with basil sauce."}
+            ],
+        }, {
+            "ok": True,
+            "raw_response": "{}",
+        }
+
+    monkeypatch.setattr(recipe_extract_service, "RAW_FOLDER", tmp_path)
+    monkeypatch.setattr(recipe_extract_service, "infer_menu_item_recipe", fake_infer)
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "save_extracted_recipe_json",
+        lambda recipe_url, json_data: tmp_path / "recipe.json",
+    )
+
+    result = recipe_extract_service.build_menu_extract_result_from_items(
+        source_url,
+        sections,
+        diagnostics={"menu_page_fetched": True},
+        progress_callback=lambda message, summary=None: progress_messages.append(message),
+    )
+
+    assert result["ok"] is True
+    assert result["model_used"] == "gpt-4o-mini"
+    assert result["model_source"] == "environment:OPENAI_MENU_MODEL"
+    assert progress_messages[0] == "Inferring recipes with gpt-4o-mini via OPENAI_MENU_MODEL"
+    assert progress_messages[-1] == "Inferring recipes with gpt-4o-mini via OPENAI_MENU_MODEL (1/1)"
+
+
+def test_menu_item_inference_uses_changed_override_file_without_restart(monkeypatch, tmp_path):
+    configure_menu_model_defaults(monkeypatch, tmp_path)
+
+    initial = recipe_extract_service.menu_item_recipe_model_resolution()
+    assert initial.model == "gpt-5.5"
+    assert initial.source == "default:gpt-5.5"
+
+    openai_model_service.MODEL_OVERRIDES_FILE.write_text(
+        json.dumps({"models": {"OPENAI_MENU_MODEL": "gpt-4o-mini"}}),
+        encoding="utf-8",
+    )
+
+    changed = recipe_extract_service.menu_item_recipe_model_resolution()
+
+    assert changed.model == "gpt-4o-mini"
+    assert changed.source == "environment:OPENAI_MENU_MODEL"
+    assert recipe_extract_service.menu_item_inference_progress_message(changed) == (
+        "Inferring recipes with gpt-4o-mini via OPENAI_MENU_MODEL"
+    )

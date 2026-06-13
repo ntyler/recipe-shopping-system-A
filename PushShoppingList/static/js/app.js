@@ -358,6 +358,41 @@ function renderJobModelDetails(job) {
     return parts.length ? `<div class="job-activity-model">${parts.join("")}</div>` : "";
 }
 
+function formatJobModelReference(job) {
+    const model = String((job && job.model_used) || "").trim();
+    const envVar = String((job && job.model_env_var) || "").trim();
+    const source = String((job && job.model_source) || "").trim();
+    const sourceAlreadyNamed = source && envVar && source.includes(envVar);
+    const pieces = [];
+
+    if (model) {
+        pieces.push(model);
+    }
+    if (envVar) {
+        pieces.push(`${model ? "via " : "env "}${envVar}`);
+    }
+    if (source && !sourceAlreadyNamed) {
+        pieces.push(source);
+    }
+
+    return pieces.join(" ");
+}
+
+function appendJobModelReference(message, job) {
+    const text = String(message || "").trim();
+    const modelReference = formatJobModelReference(job);
+    const envVar = String((job && job.model_env_var) || "").trim();
+
+    if (!text || !modelReference) {
+        return text;
+    }
+    if (envVar && text.includes(envVar)) {
+        return text;
+    }
+
+    return `${text} (${modelReference})`;
+}
+
 function jobActivitySort(jobs) {
     return [...(jobs || [])].sort((left, right) => {
         const leftActive = jobIsActive(left) ? 0 : 1;
@@ -24169,6 +24204,9 @@ function importJobToExtractionProgress(job, urls, isMenuExtract) {
             state = "running";
             message = job && job.current_step ? job.current_step : "Running";
         }
+        if (isMenuExtract && active && state === "running") {
+            message = appendJobModelReference(message, job);
+        }
 
         return {
             url,
@@ -24179,11 +24217,14 @@ function importJobToExtractionProgress(job, urls, isMenuExtract) {
 
     const result = jobResultPayload(job || {});
     const createdCount = Number(result.created_count || completedItems || 0);
+    const runningSummary = job && job.current_step
+        ? appendJobModelReference(job.current_step, job)
+        : "Import is running in the background.";
     const summary = completed
         ? `Imported ${createdCount} recipe${createdCount === 1 ? "" : "s"}.`
         : failed
             ? ((job && job.error_message) || "Import finished with errors.")
-            : ((job && job.current_step) || "Import is running in the background.");
+            : (isMenuExtract && active ? runningSummary : ((job && job.current_step) || "Import is running in the background."));
 
     return {
         active,

@@ -119,6 +119,35 @@ def test_save_models_updates_environment_and_local_env_file(monkeypatch, tmp_pat
     assert rows["OPENAI_MENU_MODEL"]["source"] == "environment"
 
 
+def test_model_value_syncs_changed_override_file_without_restart(monkeypatch, tmp_path):
+    configure_model_files(
+        monkeypatch,
+        tmp_path,
+        ["gpt-5.5", "gpt-5.4-mini", "gpt-4o-mini"],
+    )
+
+    model, source = models.model_value_for_env("OPENAI_MENU_MODEL", "gpt-5.5")
+
+    assert model == "gpt-5.5"
+    assert source == "default"
+    assert "OPENAI_MENU_MODEL" not in os.environ
+
+    models.MODEL_OVERRIDES_FILE.write_text(
+        json.dumps({"models": {"OPENAI_MENU_MODEL": "gpt-4o-mini"}}),
+        encoding="utf-8",
+    )
+
+    model, source = models.model_value_for_env("OPENAI_MENU_MODEL", "gpt-5.5")
+    dashboard = models.chatgpt_models_dashboard_for_user(ADMIN_USER)
+    rows = {row["env_var"]: row for row in dashboard["rows"]}
+
+    assert model == "gpt-4o-mini"
+    assert source == "environment"
+    assert os.environ["OPENAI_MENU_MODEL"] == "gpt-4o-mini"
+    assert rows["OPENAI_MENU_MODEL"]["model"] == "gpt-4o-mini"
+    assert rows["OPENAI_MENU_MODEL"]["source"] == "environment"
+
+
 def test_lowest_viable_model_refresh_updates_recommended_mappings(monkeypatch, tmp_path):
     configure_model_files(
         monkeypatch,

@@ -30,6 +30,7 @@ BAT_IF_NOT_DEFINED_SET_ENV_RE = re.compile(
     r'^\s*if\s+not\s+defined\s+([A-Za-z_][A-Za-z0-9_]*)\s+set\s+"?([A-Za-z_][A-Za-z0-9_]*)=',
     re.IGNORECASE,
 )
+_APPLIED_MODEL_OVERRIDES_SIGNATURE = None
 
 
 OPENAI_MODEL_SETTINGS = (
@@ -504,6 +505,30 @@ def load_openai_model_overrides():
     }
 
 
+def openai_model_overrides_signature():
+    try:
+        stat = MODEL_OVERRIDES_FILE.stat()
+    except OSError:
+        return (str(MODEL_OVERRIDES_FILE), None, None)
+
+    return (str(MODEL_OVERRIDES_FILE), stat.st_mtime_ns, stat.st_size)
+
+
+def sync_openai_model_environment_from_overrides(force=False, clear_missing=False):
+    global _APPLIED_MODEL_OVERRIDES_SIGNATURE
+
+    signature = openai_model_overrides_signature()
+    if not force and signature == _APPLIED_MODEL_OVERRIDES_SIGNATURE:
+        return False
+
+    apply_openai_model_environment(
+        load_openai_model_overrides(),
+        clear_missing=clear_missing,
+    )
+    _APPLIED_MODEL_OVERRIDES_SIGNATURE = signature
+    return True
+
+
 def save_openai_model_overrides(overrides):
     MODEL_OVERRIDES_FILE.parent.mkdir(parents=True, exist_ok=True)
     MODEL_OVERRIDES_FILE.write_text(
@@ -626,7 +651,7 @@ def refresh_openai_model_runtime_bindings():
 
 
 def apply_openai_model_overrides():
-    apply_openai_model_environment(load_openai_model_overrides(), clear_missing=False)
+    sync_openai_model_environment_from_overrides(force=True, clear_missing=False)
 
 
 def default_model_for_env(env_var):
@@ -637,6 +662,7 @@ def default_model_for_env(env_var):
 
 
 def model_value_for_env(env_var, default_model=None):
+    sync_openai_model_environment_from_overrides()
     env_var = str(env_var or "").strip()
     default_model = str(default_model or default_model_for_env(env_var)).strip() or "gpt-4o-mini"
     override = load_openai_model_overrides().get(env_var, "")
@@ -656,6 +682,7 @@ def chatgpt_models_dashboard_for_user(user, show_advanced_models=False, force_re
     from PushShoppingList.services.user_account_service import is_admin_user
 
     is_admin = is_admin_user(user)
+    sync_openai_model_environment_from_overrides()
     overrides = load_openai_model_overrides()
     recommendations = openai_model_recommendations()
     model_list = openai_model_list(force_refresh=force_refresh) if is_admin else {
@@ -776,5 +803,5 @@ def update_openai_model_settings_for_admin(user, form):
 
     save_openai_model_overrides(next_overrides)
     save_openai_model_local_env(next_overrides)
-    apply_openai_model_environment(next_overrides, clear_missing=True)
+    sync_openai_model_environment_from_overrides(force=True, clear_missing=True)
     return {"ok": True, "errors": []}

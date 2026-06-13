@@ -119,6 +119,16 @@ def test_menu_recipe_progress_checklist_static_hooks_are_present():
     assert "menu_recipe_progress_callback" in routes
 
 
+def test_menu_import_progress_overlay_shows_model_env_var_reference():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+
+    assert "function formatJobModelReference(job)" in script
+    assert "function appendJobModelReference(message, job)" in script
+    assert 'pieces.push(`${model ? "via " : "env "}${envVar}`);' in script
+    assert "message = appendJobModelReference(message, job);" in script
+    assert "const runningSummary = job && job.current_step" in script
+
+
 def test_menu_recipe_progress_payload_uses_boolean_checklist_and_skipped_review(monkeypatch):
     monkeypatch.setattr(
         recipe_routes,
