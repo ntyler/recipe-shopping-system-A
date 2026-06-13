@@ -171,13 +171,17 @@ $env:REDIS_URL="redis://localhost:6379/0"
 $env:JOB_RETENTION_HOURS="168"
 $env:GUEST_JOB_RETENTION_HOURS="24"
 $env:JOB_TIMEOUT_MINUTES="180"
-$env:RQ_QUEUE_NAME="ai-pantry"
-$env:JOB_QUEUE_THREAD_FALLBACK="1"
+$env:WORKER_QUEUES="ai-pantry-menu,ai-pantry-recipe,ai-pantry-media,ai-pantry-product,ai-pantry-light"
+$env:JOB_QUEUE_THREAD_FALLBACK="0"
 $env:JOB_QUEUE_MODE=""
 $env:SHOPPING_APP_JOBS_DB="D:\path\to\jobs.sqlite3"
+$env:OPENAI_GLOBAL_MAX_REQUESTS_PER_MINUTE="120"
+$env:OPENAI_GLOBAL_MAX_TOKENS_PER_MINUTE="200000"
+$env:OPENAI_MENU_MAX_CONCURRENT_CALLS="8"
+$env:OPENAI_VISION_MAX_CONCURRENT_CALLS="2"
 ```
 
-Long-running AI Pantry workflows create persistent job records in a local SQLite job table and enqueue the work through RQ when Redis is available. `SHOPPING_APP_JOBS_DB` defaults to `PushShoppingList/user_data/jobs.sqlite3` when unset. `REDIS_URL` is used only by the Flask server and worker process; never expose it to browser code. `JOB_RETENTION_HOURS` controls signed-in user job history, and `GUEST_JOB_RETENTION_HOURS` controls guest demo job history. Guest job records are removed during demo cleanup. If Redis or RQ is unavailable in local development, `JOB_QUEUE_THREAD_FALLBACK=1` lets Flask run jobs in a background thread so the progress UI can still be tested. Set `JOB_QUEUE_MODE=inline` only for targeted debugging or tests where the request should run the job synchronously.
+Long-running AI Pantry workflows create persistent job records in a local SQLite job table and enqueue the work through RQ. `SHOPPING_APP_JOBS_DB` defaults to `PushShoppingList/user_data/jobs.sqlite3` when unset. `REDIS_URL` is used only by the Flask server and worker process; never expose it to browser code. `JOB_RETENTION_HOURS` controls signed-in user job history, and `GUEST_JOB_RETENTION_HOURS` controls guest demo job history. Guest job records are removed during demo cleanup. Set `JOB_QUEUE_THREAD_FALLBACK=0` for production-style runs so Redis/RQ outages fail safely instead of running jobs inside Flask. If Redis or RQ is unavailable in local development, `JOB_QUEUE_THREAD_FALLBACK=1` lets Flask run jobs in a background thread so the progress UI can still be tested. Set `JOB_QUEUE_MODE=inline` only for targeted debugging or tests where the request should run the job synchronously.
 
 Notes:
 
@@ -236,9 +240,27 @@ For production-style background processing, start Redis and run one or more RQ w
 
 ```powershell
 $env:REDIS_URL="redis://localhost:6379/0"
-$env:RQ_QUEUE_NAME="ai-pantry"
-C:\Python39\python.exe worker.py
+$env:JOB_QUEUE_THREAD_FALLBACK="0"
+python app.py
 ```
+
+Menu worker:
+
+```powershell
+$env:REDIS_URL="redis://localhost:6379/0"
+$env:WORKER_QUEUES="ai-pantry-menu"
+python worker.py
+```
+
+General worker:
+
+```powershell
+$env:REDIS_URL="redis://localhost:6379/0"
+$env:WORKER_QUEUES="ai-pantry-recipe,ai-pantry-media,ai-pantry-light"
+python worker.py
+```
+
+Product workers can listen on `ai-pantry-product`, or a single worker can listen to multiple queues with `WORKER_QUEUES="ai-pantry-menu,ai-pantry-recipe,ai-pantry-media,ai-pantry-product,ai-pantry-light"`.
 
 On Windows local development, Redis can run through Docker Desktop, WSL, Memurai, or another Redis-compatible service. In production, run Redis as a private service reachable by the Flask app and worker, set the same `REDIS_URL` in both processes, and keep service credentials out of frontend templates and JavaScript.
 

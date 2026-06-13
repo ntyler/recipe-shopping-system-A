@@ -5,6 +5,7 @@ from fractions import Fraction
 
 from openai import OpenAI
 
+from PushShoppingList.services.openai_throttle_service import throttled_chat_completion
 from PushShoppingList.services.openai_usage_service import record_openai_usage
 from PushShoppingList.services.recipe_extract_service import (
     OUTPUT_FOLDER,
@@ -219,7 +220,12 @@ Output shape:
     }
     if supports_custom_temperature(MODEL):
         request_payload["temperature"] = 0
-    response = get_openai_client().chat.completions.create(**request_payload)
+    response = throttled_chat_completion(
+        get_openai_client(),
+        request_payload,
+        action_name="recipe-quantity-scaling",
+        model=MODEL,
+    )
 
     record_openai_usage(response, "recipe-quantity-scaling", model=MODEL)
     data = json.loads(clean_json_response(response.choices[0].message.content))

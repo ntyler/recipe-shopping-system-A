@@ -1,21 +1,20 @@
 import json
 import os
-import threading
 from pathlib import Path
 from time import perf_counter
+from uuid import uuid4
 
 from flask import Blueprint
 from flask import abort
-from flask import copy_current_request_context
 from flask import current_app
 from flask import flash
-from flask import has_request_context
 from flask import Response
 from flask import jsonify
 from flask import redirect
 from flask import render_template
 from flask import request
 from flask import send_file
+from werkzeug.utils import secure_filename
 
 from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
 from PushShoppingList.services.extraction_progress_service import batch_has_success
@@ -125,9 +124,24 @@ from PushShoppingList.services.guest_session_service import is_guest_session
 from PushShoppingList.services.image_variant_service import ensure_webp_variant
 from PushShoppingList.services.image_variant_service import generated_static_cache_seconds
 from PushShoppingList.services.image_variant_service import image_mimetype_for_path
+from PushShoppingList.services.job_queue_service import enqueue_job
+from PushShoppingList.services.job_queue_service import inline_jobs_enabled
+from PushShoppingList.services.job_queue_service import queue_name_for_job
+from PushShoppingList.services.job_service import active_limit_for_job
+from PushShoppingList.services.job_service import active_limit_wait_message
+from PushShoppingList.services.job_service import create_job
+from PushShoppingList.services.job_service import get_job
+from PushShoppingList.services.job_service import job_for_client
+from PushShoppingList.services.job_service import job_limit_key
+from PushShoppingList.services.job_service import owner_job_count_for_limit_key
+from PushShoppingList.services.job_service import queued_limit_status
+from PushShoppingList.services.job_service import update_job
 from PushShoppingList.services.openai_usage_service import openai_usage_dashboard_for_user
 from PushShoppingList.services.openai_usage_service import record_app_activity
+from PushShoppingList.services.openai_throttle_service import throttled_chat_completion
+from PushShoppingList.services.storage_service import active_guest_session_id
 from PushShoppingList.services.storage_service import active_user_id
+from PushShoppingList.services.storage_service import workspace_data_root
 from PushShoppingList.services.user_account_service import current_user
 from PushShoppingList.services.user_account_service import is_admin_user
 
@@ -507,20 +521,28 @@ def schedule_generated_recipe_pdf_creation(recipe_url, context="import"):
             "error": "Recipe URL is required.",
         }
 
-    def worker():
-        run_generated_recipe_pdf_creation(recipe_url, context=context)
-
-    target = copy_current_request_context(worker) if has_request_context() else worker
-    thread = threading.Thread(
-        target=target,
-        name=f"recipe-generated-pdf-{len(recipe_url)}",
-        daemon=True,
+    payload = {
+        "url": recipe_url,
+        "recipe_url": recipe_url,
+        "context": context,
+        "upload_to_cloudflare": True,
+    }
+    job, queue_result, error_message = start_import_background_job(
+        "create-recipe-pdf",
+        payload,
+        total_items=1,
     )
-    thread.start()
 
     return {
-        "queued": True,
+        "queued": not bool(error_message),
         "url": recipe_url,
+        "job_id": (job or {}).get("id", ""),
+        "queue": {
+            key: value
+            for key, value in (queue_result or {}).items()
+            if key != "details"
+        },
+        "error": error_message,
     }
 
 
@@ -1022,6 +1044,76 @@ def with_openai_usage_dashboard(result):
     }
 
 
+def start_import_background_job(job_type, payload, total_items=0):
+    payload = payload if isinstance(payload, dict) else {}
+    user_id = active_user_id()
+    guest_session_id = active_guest_session_id()
+    queue_name = queue_name_for_job(job_type, payload)
+    queued_status = queued_limit_status(
+        user_id=user_id,
+        guest_session_id=guest_session_id,
+        job_type=job_type,
+        input_payload=payload,
+    )
+    if not queued_status.get("ok"):
+        return None, None, queued_status.get("message") or "Too many queued import jobs."
+
+    limit_key = job_limit_key(job_type, payload)
+    active_limit = active_limit_for_job(job_type, payload)
+    active_count = owner_job_count_for_limit_key(
+        user_id=user_id,
+        guest_session_id=guest_session_id,
+        limit_key=limit_key,
+        statuses=["running"],
+    ) if active_limit else 0
+
+    job = create_job(
+        job_type,
+        input_payload=payload,
+        user_id=user_id,
+        guest_session_id=guest_session_id,
+        total_items=total_items,
+        queue_name=queue_name,
+    )
+    if active_limit and active_count >= active_limit:
+        job = update_job(job["id"], current_step=active_limit_wait_message(limit_key), queue_name=queue_name) or job
+
+    queue_result = enqueue_job(job["id"], queue_name_override=queue_name)
+    job = get_job(job["id"]) or job
+    if not queue_result.get("ok"):
+        return job, queue_result, queue_result.get("error") or "Unable to queue import job."
+    return job, queue_result, ""
+
+
+def import_job_json_response(job, queue_result, error_message="", accepted_status=202):
+    job_payload = job_for_client(job) if job else None
+    body = {
+        "ok": not bool(error_message),
+        "accepted": not bool(error_message),
+        "queued": bool(job and not error_message),
+        "job_id": (job or {}).get("id", ""),
+        "job": job_payload,
+        "queue": {
+            key: value
+            for key, value in (queue_result or {}).items()
+            if key != "details"
+        },
+    }
+    if error_message:
+        body["error"] = error_message
+    return jsonify(with_openai_usage_dashboard(body)), accepted_status if not error_message else 503
+
+
+def save_legacy_job_upload(uploaded_file):
+    filename = secure_filename(uploaded_file.filename or "upload")
+    suffix = Path(filename).suffix
+    staging_dir = workspace_data_root() / "job_uploads"
+    staging_dir.mkdir(parents=True, exist_ok=True)
+    path = staging_dir / f"{uuid4().hex}_{filename or ('upload' + suffix)}"
+    uploaded_file.save(path)
+    return path
+
+
 @recipe_bp.route("/extract_recipe", methods=["POST"])
 def extract_recipe_route():
     account_response = require_account_for_import()
@@ -1037,10 +1129,33 @@ def extract_recipe_route():
         if line.strip()
     ]
 
-    job_id = new_job_id()
-    start_progress(urls, job_id=job_id, extraction_mode="menu_extract" if menu_extract else "recipe")
+    if not urls:
+        flash("Paste at least one recipe or menu URL before importing.")
+        return redirect("/")
+
     cookbook = selected_import_cookbook_from_form(request.form)
     log_selected_import_cookbook("form-url", cookbook)
+    payload = {
+        "urls": urls,
+        "extraction_mode": "menu_extract" if menu_extract else "recipe",
+        "cookbook_id": cookbook.get("id", "") if isinstance(cookbook, dict) else "",
+        "cookbook_name": cookbook.get("name", "") if isinstance(cookbook, dict) else "",
+        "model_used": resolve_menu_model() if menu_extract else MODEL,
+        "model_source": resolve_menu_model_source() if menu_extract else "recipe",
+        "model_env_var": "OPENAI_MENU_MODEL" if menu_extract else "OPENAI_RECIPE_MODEL",
+        "model_env_var_used": "OPENAI_MENU_MODEL" if menu_extract else "OPENAI_RECIPE_MODEL",
+    }
+    job_type = "menu-import" if menu_extract else "recipe-import"
+    job, queue_result, error_message = start_import_background_job(job_type, payload, total_items=len(urls))
+    if error_message:
+        flash(error_message)
+    else:
+        flash(
+            "Menu import queued. Watch Job Activity for progress."
+            if menu_extract
+            else "Recipe import queued. Watch Job Activity for progress."
+        )
+    return redirect("/")
 
     extracted_any = False
 
@@ -1204,6 +1319,52 @@ def upload_recipe_media_route():
 
     cookbook = selected_import_cookbook_from_form(request.form)
     log_selected_import_cookbook("media-menu-upload" if menu_extract else "media-upload", cookbook)
+    source_path = save_legacy_job_upload(uploaded_file)
+    payload = {
+        "source_path": str(source_path),
+        "filename": uploaded_file.filename,
+        "content_type": uploaded_file.content_type or "",
+        "import_mode": "menu_extract" if menu_extract else "recipe",
+        "extraction_mode": "menu_extract" if menu_extract else "recipe",
+        "upload_mode": normalized_upload_mode,
+        "manual_description": manual_description,
+        "cookbook_id": cookbook.get("id", "") if isinstance(cookbook, dict) else "",
+        "cookbook_name": cookbook.get("name", "") if isinstance(cookbook, dict) else "",
+    }
+    if menu_extract:
+        payload.update({
+            "model_used": resolve_menu_model(),
+            "model_source": resolve_menu_model_source(),
+            "model_env_var": "OPENAI_MENU_MODEL",
+            "model_env_var_used": "OPENAI_MENU_MODEL",
+        })
+    elif normalized_upload_mode in {"vision", "manual_description"} or str(uploaded_file.content_type or "").lower().startswith("image/"):
+        payload.update({
+            "model_used": resolve_vision_model(),
+            "model_source": resolve_vision_model_source(),
+            "model_env_var": "OPENAI_VISION_MODEL",
+            "model_env_var_used": "OPENAI_VISION_MODEL",
+        })
+    else:
+        payload.update({
+            "model_used": MODEL,
+            "model_source": "recipe",
+            "model_env_var": "OPENAI_RECIPE_MODEL",
+            "model_env_var_used": "OPENAI_RECIPE_MODEL",
+        })
+
+    job, queue_result, error_message = start_import_background_job("doc-photo-import", payload, total_items=1)
+    if wants_json:
+        return import_job_json_response(job, queue_result, error_message)
+    if error_message:
+        flash(error_message)
+    else:
+        flash(
+            "Menu file import queued. Watch Job Activity for progress."
+            if menu_extract
+            else "Recipe media import queued. Watch Job Activity for progress."
+        )
+    return redirect("/")
 
     if menu_extract:
         result = extract_menu_recipes_from_upload(uploaded_file)
@@ -1877,8 +2038,11 @@ def api_debug_openai_ping():
             f"[OpenAI] action=openai-ping model={model} "
             f"temperature_included={supports_custom_temperature(model)}"
         )
-        response = get_openai_client().chat.completions.create(
-            **payload
+        response = throttled_chat_completion(
+            get_openai_client(),
+            payload,
+            action_name="openai-ping",
+            model=model,
         )
         message = str((response.choices[0].message.content or "").strip())
         message = message.strip('"').strip("'") or "OK"
@@ -2230,6 +2394,28 @@ def api_generate_recipe_from_image_route():
             upload_path=upload_path,
             source_name=upload_path.name,
         )
+
+    if not inline_jobs_enabled():
+        cookbook = selected_import_cookbook_from_json(data)
+        log_selected_import_cookbook("media-upload-vision", cookbook)
+        payload = {
+            "source_path": str(upload_path),
+            "filename": upload_path.name,
+            "content_type": resolved_mime_type or "",
+            "import_mode": "recipe",
+            "extraction_mode": "recipe",
+            "upload_mode": "manual_description" if user_description else "vision",
+            "manual_description": user_description,
+            "cookbook_id": cookbook.get("id", "") if isinstance(cookbook, dict) else "",
+            "cookbook_name": cookbook.get("name", "") if isinstance(cookbook, dict) else "",
+            "model_used": resolve_vision_model(),
+            "model_source": resolve_vision_model_source(),
+            "model_env_var": "OPENAI_VISION_MODEL",
+            "model_env_var_used": "OPENAI_VISION_MODEL",
+            "client_context": client_context,
+        }
+        job, queue_result, error_message = start_import_background_job("doc-photo-import", payload, total_items=1)
+        return import_job_json_response(job, queue_result, error_message)
 
     cookbook = selected_import_cookbook_from_json(data)
     log_selected_import_cookbook("media-upload-vision", cookbook)
@@ -2604,13 +2790,24 @@ def api_extract_recipe_route():
     if not urls:
         urls = [url]
 
-    if is_cancel_requested(job_id):
-        return jsonify({"ok": False, "cancelled": True, "error": "Extraction cancelled."}), 409
+    if not [item for item in urls if item]:
+        return jsonify(with_openai_usage_dashboard({
+            "ok": False,
+            "error": "At least one recipe URL is required.",
+        })), 400
 
-    mark_url_running(job_id, urls, index)
-
-    if not is_current_job(job_id):
-        return jsonify({"ok": False, "cancelled": True, "error": "Extraction superseded."}), 409
+    payload = {
+        **data,
+        "urls": urls,
+        "extraction_mode": "menu_extract" if menu_extract else "recipe",
+        "model_used": resolve_menu_model() if menu_extract else MODEL,
+        "model_source": resolve_menu_model_source() if menu_extract else "recipe",
+        "model_env_var": "OPENAI_MENU_MODEL" if menu_extract else "OPENAI_RECIPE_MODEL",
+        "model_env_var_used": "OPENAI_MENU_MODEL" if menu_extract else "OPENAI_RECIPE_MODEL",
+    }
+    job_type = "menu-import" if menu_extract else "recipe-import"
+    job, queue_result, error_message = start_import_background_job(job_type, payload, total_items=len(urls))
+    return import_job_json_response(job, queue_result, error_message)
 
     try:
         progress_callback = lambda message, summary=None: mark_url_message(

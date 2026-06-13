@@ -6,8 +6,8 @@ from redis import Redis
 from rq import Queue
 from rq import Worker
 
-from PushShoppingList.services.job_queue_service import queue_name
 from PushShoppingList.services.job_queue_service import redis_url
+from PushShoppingList.services.job_queue_service import worker_queue_names
 from PushShoppingList.services.openai_model_service import apply_openai_model_overrides
 
 
@@ -38,7 +38,9 @@ def main():
     enforce_required_python_runtime()
     apply_openai_model_overrides()
     connection = Redis.from_url(redis_url())
-    worker = Worker([Queue(queue_name(), connection=connection)], connection=connection)
+    queue_names = worker_queue_names()
+    print(f"[worker] Listening on queues: {', '.join(queue_names)}")
+    worker = Worker([Queue(name, connection=connection) for name in queue_names], connection=connection)
     worker.work(with_scheduler=os.getenv("RQ_WITH_SCHEDULER", "0").strip() == "1")
 
 

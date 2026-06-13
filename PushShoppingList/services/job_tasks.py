@@ -1,3 +1,4 @@
+import os
 import re
 from pathlib import Path
 
@@ -9,6 +10,7 @@ from PushShoppingList.services.job_service import fail_job
 from PushShoppingList.services.job_service import get_job
 from PushShoppingList.services.job_service import job_cancelled
 from PushShoppingList.services.job_service import update_job_progress
+from PushShoppingList.services.file_lock_service import workspace_write_lock
 
 
 class JobCancelled(Exception):
@@ -68,6 +70,79 @@ def model_metadata(model_used="", model_source="", model_env_var=""):
         "model_used": str(model_used or "").strip(),
         "model_source": str(model_source or "").strip(),
         "model_env_var": str(model_env_var or "").strip(),
+        "model_env_var_used": str(model_env_var or "").strip(),
+    }
+
+
+def job_start_metadata(job):
+    from PushShoppingList.services.recipe_extract_service import MODEL
+    from PushShoppingList.services.recipe_extract_service import resolve_menu_model
+    from PushShoppingList.services.recipe_extract_service import resolve_menu_model_source
+    from PushShoppingList.services.recipe_extract_service import resolve_vision_model
+    from PushShoppingList.services.recipe_extract_service import resolve_vision_model_source
+
+    job = job if isinstance(job, dict) else {}
+    payload = job.get("input_payload") if isinstance(job.get("input_payload"), dict) else {}
+    job_type = str(job.get("job_type") or "").strip().lower()
+    mode = str(payload.get("import_mode") or payload.get("extraction_mode") or payload.get("mode") or "").strip().lower()
+    upload_mode = str(payload.get("upload_mode") or "").strip().lower()
+    content_type = str(payload.get("content_type") or "").strip().lower()
+    filename = str(payload.get("filename") or "").strip().lower()
+    is_image_upload = bool(
+        upload_mode in {"image", "vision", "manual_description"}
+        or content_type.startswith("image/")
+        or filename.endswith((".jpg", ".jpeg", ".png", ".webp", ".gif", ".heic", ".heif"))
+    )
+
+    if job_type == "menu-import" or (job_type == "doc-photo-import" and mode in {"menu", "menu_extract", "menu-extract"}):
+        return model_metadata(resolve_menu_model(), resolve_menu_model_source(), "OPENAI_MENU_MODEL")
+
+    if job_type == "doc-photo-import" and is_image_upload:
+        return model_metadata(resolve_vision_model(), resolve_vision_model_source(), "OPENAI_VISION_MODEL")
+
+    if job_type == "estimate-per-serving":
+        return model_metadata(
+            str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL)),
+            "env:OPENAI_NUTRITION_MODEL" if os.getenv("OPENAI_NUTRITION_MODEL") else "fallback:OPENAI_RECIPE_MODEL",
+            "OPENAI_NUTRITION_MODEL",
+        )
+
+    if job_type == "product-matching":
+        env_var = "OPENAI_PRODUCT_ANALYSIS_MODEL" if os.getenv("OPENAI_PRODUCT_ANALYSIS_MODEL") else "OPENAI_RECIPE_MODEL"
+        return model_metadata(
+            str(os.getenv("OPENAI_PRODUCT_ANALYSIS_MODEL") or os.getenv("OPENAI_RECIPE_MODEL") or "gpt-4o-mini"),
+            f"env:{env_var}",
+            env_var,
+        )
+
+    if job_type == "recipe-category-decision":
+        model = str(os.getenv("OPENAI_RECIPE_CATEGORY_MODEL", MODEL))
+        return model_metadata(
+            model,
+            "env:OPENAI_RECIPE_CATEGORY_MODEL" if os.getenv("OPENAI_RECIPE_CATEGORY_MODEL") else "fallback:OPENAI_RECIPE_MODEL",
+            "OPENAI_RECIPE_CATEGORY_MODEL",
+        )
+
+    if job_type == "recipe-import" or job_type == "doc-photo-import":
+        return model_metadata(MODEL, "recipe", "OPENAI_RECIPE_MODEL")
+
+    return model_metadata("", "", "")
+
+
+def stored_job_model_metadata(job_id, fallback=None):
+    fallback = fallback if isinstance(fallback, dict) else {}
+    job = get_job(job_id) or {}
+    model_used = str(job.get("model_used") or "").strip()
+    model_source = str(job.get("model_source") or "").strip()
+    model_env_var = str(job.get("model_env_var_used") or "").strip()
+    if model_used or model_env_var:
+        return model_metadata(model_used, model_source, model_env_var)
+    return {
+        **model_metadata(
+            fallback.get("model_used") or fallback.get("model") or "",
+            fallback.get("model_source") or "",
+            fallback.get("model_env_var_used") or fallback.get("model_env_var") or "",
+        ),
     }
 
 
@@ -147,11 +222,11 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
     created_urls = []
     failed_items = 0
     context = "job-menu-url" if menu_extract else "job-recipe-url"
-    job_model = model_metadata(
+    job_model = stored_job_model_metadata(job_id, model_metadata(
         resolve_menu_model() if menu_extract else MODEL,
         resolve_menu_model_source() if menu_extract else "recipe",
         "OPENAI_MENU_MODEL" if menu_extract else "OPENAI_RECIPE_MODEL",
-    )
+    ))
 
     update_job_progress(
         job_id,
@@ -218,12 +293,13 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
                 current_step="Creating recipe records",
                 progress_percent=bounded_percent(index, total, 65, 90),
             )
-            committed = commit_menu_import_result(
-                result,
-                cookbook,
-                context=context,
-                progress_callback=progress_callback,
-            )
+            with workspace_write_lock("recipe-imports"):
+                committed = commit_menu_import_result(
+                    result,
+                    cookbook,
+                    context=context,
+                    progress_callback=progress_callback,
+                )
             if committed.get("ok"):
                 committed_urls = committed.get("created_urls") or committed.get("recipe_urls") or []
                 if not committed_urls and isinstance(committed.get("recipes"), list):
@@ -254,25 +330,26 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
             current_step="Inferring ingredients",
             progress_percent=bounded_percent(index, total, 50, 70),
         )
-        add_items(ingredients)
-        save_ingredients_for_recipe(url, ingredients, result)
-        if result.get("display_name") or result.get("recipe_title"):
-            save_recipe_url_name(url, result.get("display_name") or result.get("recipe_title"))
-        add_recipe_urls([url])
-        assignment = save_import_cookbook_assignment(url, result, cookbook)
+        with workspace_write_lock("recipe-imports"):
+            add_items(ingredients)
+            save_ingredients_for_recipe(url, ingredients, result)
+            if result.get("display_name") or result.get("recipe_title"):
+                save_recipe_url_name(url, result.get("display_name") or result.get("recipe_title"))
+            add_recipe_urls([url])
+            assignment = save_import_cookbook_assignment(url, result, cookbook)
 
-        update_job_progress(
-            job_id,
-            current_step=IMPORT_CATEGORY_STATUS_MESSAGE,
-            progress_percent=bounded_percent(index, total, 70, 82),
-        )
-        category_status = apply_imported_recipe_category_routine(url, result, assignment)
-        if not category_status.get("ok"):
-            append_job_warning(job_id, f"{import_recipe_title(result, url)}: {category_status.get('error') or 'Category inference skipped.'}")
+            update_job_progress(
+                job_id,
+                current_step=IMPORT_CATEGORY_STATUS_MESSAGE,
+                progress_percent=bounded_percent(index, total, 70, 82),
+            )
+            category_status = apply_imported_recipe_category_routine(url, result, assignment)
+            if not category_status.get("ok"):
+                append_job_warning(job_id, f"{import_recipe_title(result, url)}: {category_status.get('error') or 'Category inference skipped.'}")
 
-        update_job_progress(job_id, current_step="Generating recipe PDF", progress_percent=bounded_percent(index, total, 82, 92))
-        create_source_url_pdf(url)
-        pdf_job = schedule_generated_recipe_pdf_creation(url, context=context)
+            update_job_progress(job_id, current_step="Generating recipe PDF", progress_percent=bounded_percent(index, total, 82, 92))
+            create_source_url_pdf(url)
+            pdf_job = schedule_generated_recipe_pdf_creation(url, context=context)
         result = {
             **result,
             "generated_recipe_pdf_job": pdf_job,
@@ -284,7 +361,8 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
     ensure_not_cancelled(job_id)
     if created_urls:
         update_job_progress(job_id, current_step="Finalizing results", progress_percent=95)
-        sort_ingredients()
+        with workspace_write_lock("recipe-imports"):
+            sort_ingredients()
 
     final_total = max(total, len(created_urls) + failed_items) if menu_extract else total
     result_payload = {
@@ -329,11 +407,11 @@ def run_doc_photo_import_job(job_id, payload):
     upload_mode = str(payload.get("upload_mode") or "auto").strip().lower()
     manual_description = str(payload.get("manual_description") or "").strip()
     cookbook = selected_cookbook_from_payload(payload)
-    initial_model = model_metadata(
-        resolve_menu_model() if menu_extract else (resolve_vision_model() if upload_mode == "image" else MODEL),
-        resolve_menu_model_source() if menu_extract else (resolve_vision_model_source() if upload_mode == "image" else "recipe"),
-        "OPENAI_MENU_MODEL" if menu_extract else ("OPENAI_VISION_MODEL" if upload_mode == "image" else "OPENAI_RECIPE_MODEL"),
-    )
+    initial_model = stored_job_model_metadata(job_id, model_metadata(
+        resolve_menu_model() if menu_extract else (resolve_vision_model() if upload_mode in {"vision", "manual_description"} else MODEL),
+        resolve_menu_model_source() if menu_extract else (resolve_vision_model_source() if upload_mode in {"vision", "manual_description"} else "recipe"),
+        "OPENAI_MENU_MODEL" if menu_extract else ("OPENAI_VISION_MODEL" if upload_mode in {"vision", "manual_description"} else "OPENAI_RECIPE_MODEL"),
+    ))
 
     update_job_progress(
         job_id,
@@ -362,37 +440,43 @@ def run_doc_photo_import_job(job_id, payload):
 
     ensure_not_cancelled(job_id)
     update_job_progress(job_id, current_step="Creating recipe records", progress_percent=70)
-    if menu_extract:
-        if result.get("ok"):
-            result = commit_menu_import_result(result, cookbook, context="job-menu-media")
-        result.setdefault("success", bool(result.get("ok")))
-        result.setdefault("menu_extract", True)
-        result.setdefault("extraction_method", "menu_extract")
-        result.setdefault("extraction_mode", "menu_extract")
-        result.setdefault("model_used", result.get("model") or resolve_menu_model())
-        result.setdefault("model_source", result.get("model_source") or resolve_menu_model_source())
-        result.setdefault("model_env_var", "OPENAI_MENU_MODEL")
-    else:
-        if not result.get("read_text_only"):
-            result = commit_media_import_result(
-                result,
-                cookbook,
-                recipe_url=str(result.get("source_url") or ""),
-                context="job-media-upload",
+    with workspace_write_lock("recipe-imports"):
+        if menu_extract:
+            if result.get("ok"):
+                result = commit_menu_import_result(result, cookbook, context="job-menu-media")
+            result.setdefault("success", bool(result.get("ok")))
+            result.setdefault("menu_extract", True)
+            result.setdefault("extraction_method", "menu_extract")
+            result.setdefault("extraction_mode", "menu_extract")
+            result.setdefault("model_used", result.get("model") or resolve_menu_model())
+            result.setdefault("model_source", result.get("model_source") or resolve_menu_model_source())
+            result.setdefault("model_env_var", "OPENAI_MENU_MODEL")
+            result.setdefault("model_env_var_used", "OPENAI_MENU_MODEL")
+        else:
+            if not result.get("read_text_only"):
+                result = commit_media_import_result(
+                    result,
+                    cookbook,
+                    recipe_url=str(result.get("source_url") or ""),
+                    context="job-media-upload",
+                )
+            result.setdefault("success", bool(result.get("ok")))
+            result.setdefault(
+                "model_used",
+                resolve_vision_model() if str(result.get("source_type") or "").lower() == "image" else MODEL,
             )
-        result.setdefault("success", bool(result.get("ok")))
-        result.setdefault(
-            "model_used",
-            resolve_vision_model() if str(result.get("source_type") or "").lower() == "image" else MODEL,
-        )
-        result.setdefault(
-            "model_source",
-            resolve_vision_model_source() if str(result.get("source_type") or "").lower() == "image" else "recipe",
-        )
-        result.setdefault(
-            "model_env_var",
-            "OPENAI_VISION_MODEL" if str(result.get("source_type") or "").lower() == "image" else "OPENAI_RECIPE_MODEL",
-        )
+            result.setdefault(
+                "model_source",
+                resolve_vision_model_source() if str(result.get("source_type") or "").lower() == "image" else "recipe",
+            )
+            result.setdefault(
+                "model_env_var",
+                "OPENAI_VISION_MODEL" if str(result.get("source_type") or "").lower() == "image" else "OPENAI_RECIPE_MODEL",
+            )
+            result.setdefault(
+                "model_env_var_used",
+                "OPENAI_VISION_MODEL" if str(result.get("source_type") or "").lower() == "image" else "OPENAI_RECIPE_MODEL",
+            )
 
     recipe_urls = []
     if result.get("source_url"):
@@ -438,11 +522,11 @@ def run_estimate_per_serving_job(job_id, payload):
     recipe = _extract_recipe_payload_for_nutrition(payload)
     saved_recipe = {}
     nutrition_model = str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL))
-    nutrition_model_info = model_metadata(
+    nutrition_model_info = stored_job_model_metadata(job_id, model_metadata(
         nutrition_model,
         "env:OPENAI_NUTRITION_MODEL" if os.getenv("OPENAI_NUTRITION_MODEL") else "fallback:OPENAI_RECIPE_MODEL",
         "OPENAI_NUTRITION_MODEL",
-    )
+    ))
 
     update_job_progress(
         job_id,
@@ -458,7 +542,8 @@ def run_estimate_per_serving_job(job_id, payload):
 
     if saved_recipe and _has_per_serving_estimate(saved_recipe.get("nutrition")):
         saved_recipe = _recipe_with_default_serving_basis(saved_recipe)
-        _mark_uploaded_recipe_nutrition_estimated(recipe_url, True)
+        with workspace_write_lock("recipe-imports"):
+            _mark_uploaded_recipe_nutrition_estimated(recipe_url, True)
         result = _existing_nutrition_success(saved_recipe, recipe_url)
         result.update(nutrition_model_info)
         return complete_job(job_id, result_payload=result)
@@ -472,10 +557,11 @@ def run_estimate_per_serving_job(job_id, payload):
     if _has_per_serving_estimate(recipe.get("nutrition") if isinstance(recipe, dict) else None):
         recipe = _recipe_with_default_serving_basis(recipe)
         if recipe_url:
-            save_result = save_editable_recipe(recipe_url, recipe)
-            if not save_result.get("ok"):
-                return fail_job(job_id, save_result.get("error") or "Unable to save existing nutrition.")
-            _mark_uploaded_recipe_nutrition_estimated(recipe_url, True)
+            with workspace_write_lock("recipe-imports"):
+                save_result = save_editable_recipe(recipe_url, recipe)
+                if not save_result.get("ok"):
+                    return fail_job(job_id, save_result.get("error") or "Unable to save existing nutrition.")
+                _mark_uploaded_recipe_nutrition_estimated(recipe_url, True)
         result = _existing_nutrition_success(recipe, recipe_url)
         result.update(nutrition_model_info)
         return complete_job(job_id, result_payload=result)
@@ -487,13 +573,14 @@ def run_estimate_per_serving_job(job_id, payload):
             **recipe,
             "nutrition": result.get("nutrition", []),
         }
-        save_result = save_editable_recipe(recipe_url, updated_recipe)
-        if not save_result.get("ok"):
-            _mark_uploaded_recipe_nutrition_estimated(recipe_url, False)
-            return fail_job(job_id, save_result.get("error") or "Unable to save estimated nutrition.", result_payload=result)
-        result["recipe_json"] = updated_recipe
-        result["recipe_url"] = recipe_url
-        _mark_uploaded_recipe_nutrition_estimated(recipe_url, True)
+        with workspace_write_lock("recipe-imports"):
+            save_result = save_editable_recipe(recipe_url, updated_recipe)
+            if not save_result.get("ok"):
+                _mark_uploaded_recipe_nutrition_estimated(recipe_url, False)
+                return fail_job(job_id, save_result.get("error") or "Unable to save estimated nutrition.", result_payload=result)
+            result["recipe_json"] = updated_recipe
+            result["recipe_url"] = recipe_url
+            _mark_uploaded_recipe_nutrition_estimated(recipe_url, True)
 
     result["success"] = bool(result.get("ok"))
     result.update(nutrition_model_info)
@@ -512,13 +599,15 @@ def run_create_recipe_pdf_job(job_id, payload):
         return fail_job(job_id, "Recipe URL is required.")
 
     update_job_progress(job_id, current_step="Generating recipe PDF", total_items=1, progress_percent=20)
-    result = create_recipe_pdf_from_url(recipe_url)
+    with workspace_write_lock("recipe-pdfs"):
+        result = create_recipe_pdf_from_url(recipe_url)
     if not result.get("ok"):
         return fail_job(job_id, result.get("error") or "Unable to create recipe PDF.", result_payload=result)
 
     if payload.get("upload_to_cloudflare"):
         update_job_progress(job_id, current_step="Uploading PDF to Cloudflare", progress_percent=75)
-        upload_result = upload_recipe_pdf_to_cloudflare(recipe_url, pdf_kind="generated_recipe")
+        with workspace_write_lock("recipe-pdfs"):
+            upload_result = upload_recipe_pdf_to_cloudflare(recipe_url, pdf_kind="generated_recipe")
         result["cloudflare_upload"] = upload_result
         if upload_result.get("ok"):
             result.update(upload_result)
@@ -547,7 +636,8 @@ def run_upload_pdf_job(job_id, payload):
         return fail_job(job_id, "Recipe URL is required.")
 
     update_job_progress(job_id, current_step="Uploading PDF to Cloudflare", total_items=1, progress_percent=25)
-    result = upload_recipe_pdf_to_cloudflare(recipe_url, pdf_kind=kind)
+    with workspace_write_lock("recipe-pdfs"):
+        result = upload_recipe_pdf_to_cloudflare(recipe_url, pdf_kind=kind)
     if result.get("ok"):
         links = []
         public_url = result.get("pdf_public_url") or result.get("generated_cloudflare_pdf_url") or result.get("source_cloudflare_pdf_url")
@@ -568,11 +658,11 @@ def run_product_matching_job(job_id, payload):
     items = payload.get("items") if isinstance(payload.get("items"), list) else None
     total = len(items) if items else 0
     product_model_env = "OPENAI_PRODUCT_ANALYSIS_MODEL" if os.getenv("OPENAI_PRODUCT_ANALYSIS_MODEL") else "OPENAI_RECIPE_MODEL"
-    product_model_info = model_metadata(
+    product_model_info = stored_job_model_metadata(job_id, model_metadata(
         PRODUCT_ANALYSIS_MODEL,
         f"env:{product_model_env}",
         product_model_env,
-    )
+    ))
     update_job_progress(
         job_id,
         current_step="Matching products",
@@ -605,7 +695,7 @@ def run_recipe_category_decision_job(job_id, payload):
     payload = payload if isinstance(payload, dict) else {}
     recipe = payload.get("recipe", payload)
     mode = payload.get("mode", "missing")
-    category_model_info = model_metadata(MODEL, "recipe", "OPENAI_RECIPE_MODEL")
+    category_model_info = stored_job_model_metadata(job_id, model_metadata(MODEL, "recipe", "OPENAI_RECIPE_MODEL"))
     update_job_progress(
         job_id,
         current_step="Having ChatGPT decide categories",
@@ -613,12 +703,13 @@ def run_recipe_category_decision_job(job_id, payload):
         progress_percent=20,
         result_payload=category_model_info,
     )
-    result = decide_recipe_categories_with_chatgpt(
-        recipe,
-        mode=mode,
-        current_categories=payload.get("current_categories", {}),
-        trigger_source=payload.get("trigger_source") or f"recipe_editor:{mode}",
-    )
+    with workspace_write_lock("recipe-imports"):
+        result = decide_recipe_categories_with_chatgpt(
+            recipe,
+            mode=mode,
+            current_categories=payload.get("current_categories", {}),
+            trigger_source=payload.get("trigger_source") or f"recipe_editor:{mode}",
+        )
     if isinstance(result, dict):
         result.update({key: value for key, value in category_model_info.items() if value and not result.get(key)})
     if result.get("ok"):

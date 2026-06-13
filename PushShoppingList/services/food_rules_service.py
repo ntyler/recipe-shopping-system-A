@@ -6,6 +6,7 @@ from pathlib import Path
 from openai import OpenAI
 
 from PushShoppingList.services.openai_model_service import supports_custom_temperature
+from PushShoppingList.services.openai_throttle_service import throttled_chat_completion
 from PushShoppingList.services.openai_usage_service import record_openai_usage
 from PushShoppingList.services.storage_service import scoped_extractor_data_path
 
@@ -184,8 +185,11 @@ def suggest_food_rules_from_prompt(prompt, current_rules=None, section=None):
         if supports_custom_temperature(MODEL):
             request_payload["temperature"] = 0.1
 
-        response = get_openai_client().chat.completions.create(
-            **request_payload
+        response = throttled_chat_completion(
+            get_openai_client(),
+            request_payload,
+            action_name="food-rules",
+            model=MODEL,
         )
         record_openai_usage(response, "food-rules", model=MODEL)
         data = json.loads(clean_json_response(response.choices[0].message.content))

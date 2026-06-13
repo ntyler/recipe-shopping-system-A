@@ -9259,7 +9259,33 @@ async function submitRecipeMediaVision() {
                 client_context: recipeFileClientContext(),
             }),
         });
-        const data = await response.json();
+        let data = await response.json();
+        let responseOk = response.ok;
+        const queuedJobId = String((data && data.job_id) || (data && data.job && data.job.id) || "").trim();
+        if (queuedJobId) {
+            const finishedJob = await waitForJobCompletion(queuedJobId, {
+                onUpdate(job) {
+                    if (!job) {
+                        return;
+                    }
+                    setRecipeFileLoadingSummary(job.current_step || "Generating recipe estimate from uploaded image...");
+                    const percent = Number(job.progress_percent || 0);
+                    if (percent >= 20) {
+                        updateRecipeFileLoadingStep("estimate", "running", job.current_step || "Processing");
+                    }
+                    if (percent >= 70) {
+                        updateRecipeFileLoadingStep("save", "running", job.current_step || "Saving");
+                    }
+                },
+            });
+            data = finishedJob && finishedJob.result_payload && typeof finishedJob.result_payload === "object"
+                ? finishedJob.result_payload
+                : {};
+            responseOk = Boolean(finishedJob && finishedJob.status === "completed");
+            if (!responseOk && finishedJob && finishedJob.error_message && !data.error) {
+                data.error = finishedJob.error_message;
+            }
+        }
         const responseModelUsed = String((data && data.model_used) || "").trim();
         const responseModelSource = String((data && data.model_source) || (data && data.debug && data.debug.model_source) || "").trim();
         setRecipeFileModelUsed(`${responseModelUsed || "Unknown"}${responseModelSource ? ` (${responseModelSource})` : ""}`);
@@ -9283,7 +9309,7 @@ async function submitRecipeMediaVision() {
         setRecipeFileSourceType((data && data.source_type_label) || sourceTypeLabel);
         setRecipeFileExtractionMode((data && data.extraction_mode_label) || visionModeLabel);
 
-        if (!response.ok || !data.ok) {
+        if (!responseOk || !data.ok) {
             const error = new Error((data && data.error) || "Could not estimate a recipe from this image. Try describing the meal manually.");
             error.data = data;
             throw error;

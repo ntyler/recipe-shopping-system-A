@@ -102,6 +102,7 @@ from PushShoppingList.services.openai_model_service import chatgpt_models_dashbo
 from PushShoppingList.services.openai_model_service import refresh_lowest_viable_openai_model_recommendations
 from PushShoppingList.services.openai_model_service import refresh_openai_model_recommendations
 from PushShoppingList.services.openai_model_service import update_openai_model_settings_for_admin
+from PushShoppingList.services.openai_throttle_service import throttled_chat_completion
 from PushShoppingList.services.openai_usage_service import openai_usage_dashboard_for_user
 from PushShoppingList.services.openai_usage_service import record_openai_usage
 from PushShoppingList.services.menu_store_service import menu_pdf_logs_by_cookbook
@@ -2657,8 +2658,11 @@ Output shape:
         if supports_custom_temperature(address_model):
             request_payload["temperature"] = 0
 
-        response = address_openai_client.chat.completions.create(
-            **request_payload
+        response = throttled_chat_completion(
+            address_openai_client,
+            request_payload,
+            action_name="address-completion",
+            model=address_model,
         )
         record_openai_usage(
             response,

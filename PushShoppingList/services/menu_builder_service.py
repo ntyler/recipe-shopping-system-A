@@ -12,6 +12,7 @@ from PushShoppingList.services.recipe_extract_service import clean_json_response
 from PushShoppingList.services.recipe_extract_service import get_openai_client
 from PushShoppingList.services.recipe_extract_service import resolve_menu_model
 from PushShoppingList.services.recipe_extract_service import resolve_menu_model_source
+from PushShoppingList.services.openai_throttle_service import throttled_chat_completion
 from PushShoppingList.services.openai_usage_service import record_openai_usage
 
 
@@ -424,7 +425,13 @@ def generate_custom_menu(options, cookbook_id="", cookbook_name=""):
         f"[OpenAI] action={action_name} model={resolved_model} "
         f"model_source={model_source} temperature_included={temperature_included}"
     )
-    response = get_openai_client().chat.completions.create(**payload)
+    response = throttled_chat_completion(
+        get_openai_client(),
+        payload,
+        action_name=action_name,
+        model=resolved_model,
+        kind="menu",
+    )
     record_openai_usage(response, action_name, model=resolved_model)
     generated = json.loads(clean_json_response(response.choices[0].message.content))
     validated = validate_generated_menu_payload(generated)

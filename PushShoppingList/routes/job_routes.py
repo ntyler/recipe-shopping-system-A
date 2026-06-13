@@ -9,11 +9,17 @@ from werkzeug.utils import secure_filename
 
 from PushShoppingList.services.job_queue_service import cancel_queued_rq_job
 from PushShoppingList.services.job_queue_service import enqueue_job
+from PushShoppingList.services.job_queue_service import queue_name_for_job
+from PushShoppingList.services.job_service import active_limit_for_job
+from PushShoppingList.services.job_service import active_limit_wait_message
 from PushShoppingList.services.job_service import cancel_job
 from PushShoppingList.services.job_service import create_job
 from PushShoppingList.services.job_service import create_retry_job
 from PushShoppingList.services.job_service import get_job
+from PushShoppingList.services.job_service import job_limit_key
 from PushShoppingList.services.job_service import job_for_client
+from PushShoppingList.services.job_service import owner_job_count_for_limit_key
+from PushShoppingList.services.job_service import queued_limit_status
 from PushShoppingList.services.job_service import recent_jobs
 from PushShoppingList.services.job_service import retryable_job_type
 from PushShoppingList.services.job_service import update_job
@@ -86,19 +92,50 @@ def with_model_metadata(payload, model_used="", model_source="", model_env_var="
         "model_used": str(model_used or "").strip(),
         "model_source": str(model_source or "").strip(),
         "model_env_var": str(model_env_var or "").strip(),
+        "model_env_var_used": str(model_env_var or "").strip(),
     }
 
 
 def create_and_enqueue(job_type, payload, total_items=0):
     actor = actor_context()
+    queue_name = queue_name_for_job(job_type, payload)
+    queued_status = queued_limit_status(
+        user_id=actor["user_id"],
+        guest_session_id=actor["guest_session_id"],
+        job_type=job_type,
+        input_payload=payload,
+    )
+    if not queued_status.get("ok"):
+        return jsonify({
+            "ok": False,
+            "error": queued_status.get("message") or "Too many queued jobs for this import type.",
+            "limit": queued_status.get("limit"),
+            "queued_count": queued_status.get("queued_count"),
+            "job_type": job_type,
+            "queue_name": queue_name,
+        }), 429
+
+    limit_key = job_limit_key(job_type, payload)
+    active_limit = active_limit_for_job(job_type, payload)
+    active_count = owner_job_count_for_limit_key(
+        user_id=actor["user_id"],
+        guest_session_id=actor["guest_session_id"],
+        limit_key=limit_key,
+        statuses=["running"],
+    ) if active_limit else 0
+
     job = create_job(
         job_type,
         input_payload=payload,
         user_id=actor["user_id"],
         guest_session_id=actor["guest_session_id"],
         total_items=total_items,
+        queue_name=queue_name,
     )
-    queue_result = enqueue_job(job["id"])
+    if active_limit and active_count >= active_limit:
+        job = update_job(job["id"], current_step=active_limit_wait_message(limit_key), queue_name=queue_name) or job
+
+    queue_result = enqueue_job(job["id"], queue_name_override=queue_name)
     job = get_job(job["id"]) or job
 
     response = {
@@ -110,6 +147,7 @@ def create_and_enqueue(job_type, payload, total_items=0):
             for key, value in queue_result.items()
             if key not in {"details"}
         },
+        "message": job.get("current_step") if active_limit and active_count >= active_limit else "",
     }
     status = 202 if queue_result.get("ok") else 503
     return jsonify(response), status

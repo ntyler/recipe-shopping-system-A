@@ -7,6 +7,7 @@ from openai import OpenAI
 from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.food_rules_service import term_matches
 from PushShoppingList.services.openai_model_service import supports_custom_temperature
+from PushShoppingList.services.openai_throttle_service import throttled_chat_completion
 from PushShoppingList.services.openai_usage_service import record_openai_usage
 
 
@@ -64,8 +65,11 @@ def suggest_food_review_alternatives(payload):
         if supports_custom_temperature(MODEL):
             request_payload["temperature"] = 0.2
 
-        response = get_openai_client().chat.completions.create(
-            **request_payload
+        response = throttled_chat_completion(
+            get_openai_client(),
+            request_payload,
+            action_name="food-review-alternatives",
+            model=MODEL,
         )
         record_openai_usage(response, "food-review-alternatives", model=MODEL)
         data = json.loads(clean_json_response(response.choices[0].message.content))

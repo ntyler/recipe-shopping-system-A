@@ -8,6 +8,8 @@ from PushShoppingList.app import create_app
 from PushShoppingList.routes import recipe_routes
 from PushShoppingList.services import recipe_edit_service
 from PushShoppingList.services import recipe_extract_service
+from PushShoppingList.services import job_service
+from PushShoppingList.services import openai_model_service
 from PushShoppingList.services import recipe_url_service
 from PushShoppingList.services import shopping_list_service
 from PushShoppingList.services import storage_service
@@ -76,7 +78,12 @@ def test_gpt5_models_do_not_support_custom_temperature():
     assert recipe_extract_service.supports_custom_temperature("gpt-4o-mini") is True
 
 
-def test_default_models_use_menu_and_vision_gpt55_only(monkeypatch):
+def test_default_models_use_menu_and_vision_gpt55_only(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        openai_model_service,
+        "MODEL_OVERRIDES_FILE",
+        tmp_path / "openai_model_overrides.json",
+    )
     monkeypatch.delenv("OPENAI_RECIPE_MODEL", raising=False)
     monkeypatch.delenv("OPENAI_MENU_MODEL", raising=False)
     monkeypatch.delenv("OPENAI_VISION_MODEL", raising=False)
@@ -103,6 +110,7 @@ def write_uploaded_image(user_data_dir, user_id, filename="meal.png", data=None)
 
 def test_generate_recipe_from_image_commits_estimate(monkeypatch, tmp_path):
     user_id, user_data_dir = configure_image_user(monkeypatch, tmp_path)
+    monkeypatch.setenv("JOB_QUEUE_MODE", "inline")
 
     upload_path = write_uploaded_image(user_data_dir, user_id)
 
@@ -199,6 +207,7 @@ def test_generate_recipe_from_image_commits_estimate(monkeypatch, tmp_path):
 
 def test_generate_recipe_from_image_passes_description_hint(monkeypatch, tmp_path):
     user_id, user_data_dir = configure_image_user(monkeypatch, tmp_path)
+    monkeypatch.setenv("JOB_QUEUE_MODE", "inline")
     upload_path = write_uploaded_image(user_data_dir, user_id, filename="hinted-meal.png")
     captured = {}
 
@@ -291,8 +300,48 @@ def test_generate_recipe_from_image_reports_unreadable_image(monkeypatch, tmp_pa
     assert payload["debug"]["vision_request_sent"] is False
 
 
+def test_generate_recipe_from_image_queues_media_job_by_default(monkeypatch, tmp_path):
+    user_id, user_data_dir = configure_image_user(monkeypatch, tmp_path)
+    upload_path = write_uploaded_image(user_data_dir, user_id)
+    monkeypatch.setattr(job_service, "JOBS_DB_PATH", tmp_path / "jobs.sqlite3")
+    monkeypatch.delenv("JOB_QUEUE_MODE", raising=False)
+
+    enqueued = {}
+
+    def fake_enqueue(job_id, queue_name_override=""):
+        enqueued["job_id"] = job_id
+        enqueued["queue_name"] = queue_name_override
+        return {"ok": True, "mode": "rq", "rq_job_id": "rq-vision", "queue_name": queue_name_override}
+
+    monkeypatch.setattr(recipe_routes, "enqueue_job", fake_enqueue)
+    app = create_app()
+
+    with app.test_client() as client:
+        seed_signed_in_user(client, user_id)
+        response = client.post(
+            "/api/generate-recipe-from-image",
+            json={
+                "uploaded_file_path": str(upload_path),
+                "source_type": "image",
+                "extraction_mode": "vision",
+            },
+        )
+
+    assert response.status_code == 202
+    payload = response.get_json()
+    assert payload["queued"] is True
+    assert payload["job_id"] == enqueued["job_id"]
+    assert enqueued["queue_name"] == "ai-pantry-media"
+    job = job_service.get_job(payload["job_id"])
+    assert job["job_type"] == "doc-photo-import"
+    assert job["queue_name"] == "ai-pantry-media"
+    assert job["input_payload"]["upload_mode"] == "vision"
+    assert job["input_payload"]["model_env_var_used"] == "OPENAI_VISION_MODEL"
+
+
 def test_generate_recipe_from_image_reports_json_parse_failure(monkeypatch, tmp_path):
     user_id, user_data_dir = configure_image_user(monkeypatch, tmp_path)
+    monkeypatch.setenv("JOB_QUEUE_MODE", "inline")
     upload_path = write_uploaded_image(user_data_dir, user_id)
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setattr(

@@ -5,6 +5,7 @@ import re
 from openai import OpenAI
 
 from PushShoppingList.services.openai_model_service import supports_custom_temperature
+from PushShoppingList.services.openai_throttle_service import throttled_chat_completion
 from PushShoppingList.services.openai_usage_service import record_openai_usage
 from PushShoppingList.services.storage_service import active_user_id
 
@@ -167,8 +168,11 @@ def request_chatgpt_ingredient_reviews(candidates):
     if supports_custom_temperature(MODEL):
         request_payload["temperature"] = 0
 
-    response = get_openai_client().chat.completions.create(
-        **request_payload
+    response = throttled_chat_completion(
+        get_openai_client(),
+        request_payload,
+        action_name="ingredient-text-review",
+        model=MODEL,
     )
     record_openai_usage(response, "ingredient-text-review", model=MODEL)
     data = json.loads(clean_json_response(response.choices[0].message.content))

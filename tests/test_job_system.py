@@ -3,6 +3,7 @@ import pytest
 from PushShoppingList.app import create_app
 from PushShoppingList.routes import job_routes
 from PushShoppingList.services import guest_session_service
+from PushShoppingList.services import job_queue_service
 from PushShoppingList.services import job_service
 from PushShoppingList.services import recipe_extract_service
 from PushShoppingList.services import storage_service
@@ -20,7 +21,7 @@ def test_job_routes_create_and_scope_jobs_to_owner(monkeypatch, tmp_path):
     monkeypatch.setattr(
         job_routes,
         "enqueue_job",
-        lambda job_id: {"ok": True, "mode": "test", "job_id": job_id},
+        lambda job_id, **kwargs: {"ok": True, "mode": "test", "job_id": job_id, **kwargs},
     )
     app = create_app()
     app.config.update(TESTING=True)
@@ -40,6 +41,7 @@ def test_job_routes_create_and_scope_jobs_to_owner(monkeypatch, tmp_path):
         assert data["job_id"]
         assert data["job"]["job_type"] == "recipe-import"
         assert data["job"]["status"] == "queued"
+        assert data["job"]["queue_name"] == "ai-pantry-recipe"
         assert data["job"]["model_env_var"] == "OPENAI_RECIPE_MODEL"
         assert data["job"]["source_items"][0]["label"] == "https://example.com/recipe"
 
@@ -77,6 +79,7 @@ def test_job_for_client_shows_safe_sources_and_model_metadata(monkeypatch, tmp_p
         },
         user_id="owner",
         total_items=1,
+        queue_name="ai-pantry-menu",
     )
 
     payload = job_service.job_for_client(job)
@@ -84,6 +87,8 @@ def test_job_for_client_shows_safe_sources_and_model_metadata(monkeypatch, tmp_p
     assert payload["model_used"] == "gpt-5.5"
     assert payload["model_source"] == "env:OPENAI_MENU_MODEL"
     assert payload["model_env_var"] == "OPENAI_MENU_MODEL"
+    assert payload["model_env_var_used"] == "OPENAI_MENU_MODEL"
+    assert payload["queue_name"] == "ai-pantry-menu"
     assert payload["source_items"] == [
         {
             "type": "file",
@@ -162,3 +167,122 @@ def test_guest_cleanup_deletes_guest_jobs(monkeypatch, tmp_path):
 
     assert job_service.get_job(job["id"]) is None
     assert not guest_root.exists()
+
+
+def test_queue_routing_by_job_type_and_payload():
+    assert job_queue_service.queue_name_for_job("menu-import", {}) == "ai-pantry-menu"
+    assert job_queue_service.queue_name_for_job("recipe-import", {}) == "ai-pantry-recipe"
+    assert job_queue_service.queue_name_for_job("product-matching", {}) == "ai-pantry-product"
+    assert job_queue_service.queue_name_for_job("recipe-category-decision", {}) == "ai-pantry-light"
+    assert job_queue_service.queue_name_for_job(
+        "doc-photo-import",
+        {"import_mode": "menu_extract"},
+    ) == "ai-pantry-menu"
+    assert job_queue_service.queue_name_for_job(
+        "doc-photo-import",
+        {"upload_mode": "image"},
+    ) == "ai-pantry-media"
+
+
+def test_thread_fallback_disabled_fails_job_when_redis_unavailable(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    monkeypatch.setenv("JOB_QUEUE_THREAD_FALLBACK", "0")
+    monkeypatch.setenv("REDIS_URL", "redis://127.0.0.1:1/0")
+
+    job = job_service.create_job(
+        "recipe-import",
+        input_payload={"urls": ["https://example.com/recipe"]},
+        user_id="owner",
+        queue_name="ai-pantry-recipe",
+    )
+
+    result = job_queue_service.enqueue_job(job["id"])
+    failed = job_service.get_job(job["id"])
+
+    assert result["ok"] is False
+    assert result["queue_name"] == "ai-pantry-recipe"
+    assert "Job queue is unavailable" in result["error"]
+    assert failed["status"] == "failed"
+    assert failed["current_step"] == "Queue unavailable"
+
+
+def test_queued_limit_blocks_sixth_user_job(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    for index in range(5):
+        job_service.create_job(
+            "recipe-import",
+            input_payload={"urls": [f"https://example.com/recipe-{index}"]},
+            user_id="owner",
+            queue_name="ai-pantry-recipe",
+        )
+
+    status = job_service.queued_limit_status(
+        user_id="owner",
+        job_type="recipe-import",
+        input_payload={"urls": ["https://example.com/recipe-6"]},
+    )
+
+    assert status["ok"] is False
+    assert status["limit"] == 5
+    assert status["queued_count"] == 5
+
+
+def test_worker_start_defers_when_user_active_limit_is_reached(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    running = job_service.create_job(
+        "menu-import",
+        input_payload={"urls": ["https://example.com/menu-a"], "extraction_mode": "menu_extract"},
+        user_id="owner",
+        queue_name="ai-pantry-menu",
+    )
+    job_service.update_job(running["id"], status="running", started_at=job_service.now_iso())
+    queued = job_service.create_job(
+        "menu-import",
+        input_payload={"urls": ["https://example.com/menu-b"], "extraction_mode": "menu_extract"},
+        user_id="owner",
+        queue_name="ai-pantry-menu",
+    )
+
+    result = job_service.try_start_job(
+        queued["id"],
+        queue_name="ai-pantry-menu",
+        model_used="gpt-5.5",
+        model_source="env:OPENAI_MENU_MODEL",
+        model_env_var_used="OPENAI_MENU_MODEL",
+        worker_id="test-worker",
+    )
+    deferred = job_service.get_job(queued["id"])
+
+    assert result["deferred"] is True
+    assert result["started"] is False
+    assert deferred["status"] == "queued"
+    assert "Queued behind your active menu import" in deferred["current_step"]
+    assert deferred["attempts"] == 1
+
+
+def test_worker_start_records_queue_model_and_worker(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    job = job_service.create_job(
+        "recipe-import",
+        input_payload={"urls": ["https://example.com/recipe"]},
+        user_id="owner",
+        queue_name="ai-pantry-recipe",
+    )
+
+    result = job_service.try_start_job(
+        job["id"],
+        queue_name="ai-pantry-recipe",
+        model_used="gpt-5.5-mini",
+        model_source="env:OPENAI_RECIPE_MODEL",
+        model_env_var_used="OPENAI_RECIPE_MODEL",
+        worker_id="test-worker",
+    )
+    started = job_service.job_for_client(job_service.get_job(job["id"]))
+
+    assert result["started"] is True
+    assert started["status"] == "running"
+    assert started["queue_name"] == "ai-pantry-recipe"
+    assert started["model_used"] == "gpt-5.5-mini"
+    assert started["model_env_var_used"] == "OPENAI_RECIPE_MODEL"
+    assert started["worker_id"] == "test-worker"
+    assert started["retry_count"] == 1

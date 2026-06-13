@@ -110,7 +110,7 @@ def test_menu_recipe_progress_checklist_static_hooks_are_present():
     assert "menu-recipe-completion-check" in script
     assert "checkbox.readOnly = true" in script
     assert 'checkbox.disabled = true' in script
-    assert "/api/menu_recipe_estimate_per_serving" in script
+    assert "/api/jobs/estimate-per-serving" in script
     assert "runMenuRecipeServingBasisEstimate" in script
     assert ".menu-recipe-progress-card" in css
     assert ".menu-recipe-check-badge" in css

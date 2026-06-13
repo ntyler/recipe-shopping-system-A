@@ -5,6 +5,7 @@ from pathlib import Path
 
 from openai import OpenAI
 
+from PushShoppingList.services.openai_throttle_service import throttled_chat_completion
 from PushShoppingList.services.recipe_extract_service import (
     LOG_FOLDER,
     OUTPUT_FOLDER,
@@ -406,7 +407,12 @@ def send_prompt_to_openai(prompt_text):
         f"[OpenAI] action=sort-ingredients model={MODEL} "
         f"temperature_included={include_temperature}"
     )
-    response = get_openai_client().chat.completions.create(**request_payload)
+    response = throttled_chat_completion(
+        get_openai_client(),
+        request_payload,
+        action_name="sort-ingredients",
+        model=MODEL,
+    )
 
     return response.choices[0].message.content
 

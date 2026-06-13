@@ -37,6 +37,7 @@ from PushShoppingList.services.recipe_extract_service import upload_file_suffix
 from PushShoppingList.services.recipe_extract_service import upload_import_source_type
 from PushShoppingList.services.recipe_extract_service import upload_is_word_document
 from PushShoppingList.services.recipe_extract_service import upload_source_type_label
+from PushShoppingList.services.openai_throttle_service import throttled_chat_completion
 from PushShoppingList.services.openai_usage_service import record_openai_usage
 
 
@@ -158,7 +159,13 @@ def send_menu_fact_prompt_to_openai(prompt_text, action_name="menu-fact-extracti
         f"[OpenAI] action={action_name} model={resolved_model} "
         f"model_source={model_source} temperature_included={temperature_included}"
     )
-    response = get_openai_client().chat.completions.create(**payload)
+    response = throttled_chat_completion(
+        get_openai_client(),
+        payload,
+        action_name=action_name,
+        model=resolved_model,
+        kind="menu",
+    )
     record_openai_usage(response, action_name, model=resolved_model)
     return response.choices[0].message.content
 

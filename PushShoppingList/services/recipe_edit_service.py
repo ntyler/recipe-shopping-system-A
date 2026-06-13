@@ -62,6 +62,9 @@ from PushShoppingList.services.recipe_extract_service import recipe_cover_image_
 from PushShoppingList.services.recipe_extract_service import recipe_pdf_path
 from PushShoppingList.services.recipe_extract_service import safe_filename
 from PushShoppingList.services.recipe_extract_service import write_recipe_page_pdf
+from PushShoppingList.services.job_runtime_context import model_value_for_env as job_model_value_for_env
+from PushShoppingList.services.openai_throttle_service import throttled_chat_completion
+from PushShoppingList.services.openai_throttle_service import throttled_image_generation
 from PushShoppingList.services.purchase_mapping_service import apply_purchase_mapping_to_ingredient
 from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
 from PushShoppingList.services.recipe_ingredient_service import recipe_ingredients_for_key
@@ -2676,7 +2679,11 @@ def decide_recipe_categories_with_chatgpt(
         }
 
     prompt = build_recipe_category_decision_prompt(payload)
-    model = os.getenv("OPENAI_RECIPE_CATEGORY_MODEL", MODEL)
+    model, _model_source = job_model_value_for_env(
+        "OPENAI_RECIPE_CATEGORY_MODEL",
+        os.getenv("OPENAI_RECIPE_CATEGORY_MODEL", MODEL),
+        "env:OPENAI_RECIPE_CATEGORY_MODEL" if os.getenv("OPENAI_RECIPE_CATEGORY_MODEL") else "fallback:OPENAI_RECIPE_MODEL",
+    )
     include_temperature = supports_custom_temperature(model)
 
     try:
@@ -2700,7 +2707,12 @@ def decide_recipe_categories_with_chatgpt(
         }
         if include_temperature:
             request_payload["temperature"] = 0
-        response = get_openai_client().chat.completions.create(**request_payload)
+        response = throttled_chat_completion(
+            get_openai_client(),
+            request_payload,
+            action_name="recipe-category-decision",
+            model=model,
+        )
         record_openai_usage(
             response,
             "recipe-category-decision",
@@ -2766,7 +2778,11 @@ def estimate_recipe_nutrition(payload):
 
     serving_basis = recipe_nutrition_serving_basis(payload.get("nutrition"))
     prompt = build_nutrition_estimate_prompt(payload, serving_basis)
-    model = os.getenv("OPENAI_NUTRITION_MODEL", MODEL)
+    model, _model_source = job_model_value_for_env(
+        "OPENAI_NUTRITION_MODEL",
+        os.getenv("OPENAI_NUTRITION_MODEL", MODEL),
+        "env:OPENAI_NUTRITION_MODEL" if os.getenv("OPENAI_NUTRITION_MODEL") else "fallback:OPENAI_RECIPE_MODEL",
+    )
     include_temperature = supports_custom_temperature(model)
 
     try:
@@ -2790,11 +2806,16 @@ def estimate_recipe_nutrition(payload):
         }
         if include_temperature:
             request_payload["temperature"] = 0
-        response = get_openai_client().chat.completions.create(**request_payload)
+        response = throttled_chat_completion(
+            get_openai_client(),
+            request_payload,
+            action_name="nutrition-estimate",
+            model=model,
+        )
         record_openai_usage(
             response,
             "nutrition-estimate",
-            model=os.getenv("OPENAI_NUTRITION_MODEL", MODEL),
+            model=model,
         )
         content = response.choices[0].message.content
         data = json.loads(clean_json_response(content))
@@ -2846,7 +2867,11 @@ def recipe_note_feedback(payload):
         }
 
     prompt = build_recipe_note_feedback_prompt(payload, note_text)
-    model = os.getenv("OPENAI_RECIPE_NOTE_MODEL", MODEL)
+    model, _model_source = job_model_value_for_env(
+        "OPENAI_RECIPE_NOTE_MODEL",
+        os.getenv("OPENAI_RECIPE_NOTE_MODEL", MODEL),
+        "env:OPENAI_RECIPE_NOTE_MODEL" if os.getenv("OPENAI_RECIPE_NOTE_MODEL") else "fallback:OPENAI_RECIPE_MODEL",
+    )
     include_temperature = supports_custom_temperature(model)
 
     try:
@@ -2869,7 +2894,12 @@ def recipe_note_feedback(payload):
         }
         if include_temperature:
             request_payload["temperature"] = 0.2
-        response = get_openai_client().chat.completions.create(**request_payload)
+        response = throttled_chat_completion(
+            get_openai_client(),
+            request_payload,
+            action_name="recipe-note-feedback",
+            model=model,
+        )
         record_openai_usage(
             response,
             "recipe-note-feedback",
@@ -3288,12 +3318,17 @@ def request_recipe_step_image_bytes(prompt):
             f"[OpenAI] action=recipe-step-image model={model} "
             "temperature_included=False"
         )
-        response = client.images.generate(
+        response = throttled_image_generation(
+            client,
+            {
+                "model": model,
+                "prompt": prompt,
+                "size": size,
+                "quality": quality,
+                "n": 1,
+            },
+            action_name="recipe-step-image",
             model=model,
-            prompt=prompt,
-            size=size,
-            quality=quality,
-            n=1,
         )
         record_openai_usage(
             response,

@@ -18,11 +18,28 @@ TERMINAL_JOB_STATUSES = {"completed", "failed", "cancelled"}
 DEFAULT_JOB_RETENTION_HOURS = 168
 DEFAULT_GUEST_JOB_RETENTION_HOURS = 24
 DEFAULT_JOB_TIMEOUT_MINUTES = 180
+DEFAULT_QUEUED_LIMIT_PER_OWNER_TYPE = 5
+ACTIVE_LIMITS_BY_KEY = {
+    "menu-import": 1,
+    "recipe-import": 2,
+    "media-import": 1,
+}
 
 JOBS_DB_PATH = Path(
     os.getenv("SHOPPING_APP_JOBS_DB", PACKAGE_DIR / "user_data" / "jobs.sqlite3")
 )
 JOBS_DB_LOCK = threading.RLock()
+
+
+JOB_SCHEMA_ADDITIONAL_COLUMNS = {
+    "queue_name": "TEXT NOT NULL DEFAULT ''",
+    "attempts": "INTEGER NOT NULL DEFAULT 0",
+    "model_used": "TEXT NOT NULL DEFAULT ''",
+    "model_source": "TEXT NOT NULL DEFAULT ''",
+    "model_env_var_used": "TEXT NOT NULL DEFAULT ''",
+    "worker_id": "TEXT NOT NULL DEFAULT ''",
+    "finished_at": "TEXT",
+}
 
 
 def utc_now():
@@ -113,11 +130,22 @@ def ensure_jobs_schema(connection):
         )
         """
     )
+    existing_columns = {
+        row["name"]
+        for row in connection.execute("PRAGMA table_info(jobs)").fetchall()
+    }
+    for column_name, column_sql in JOB_SCHEMA_ADDITIONAL_COLUMNS.items():
+        if column_name in existing_columns:
+            continue
+        connection.execute(f"ALTER TABLE jobs ADD COLUMN {column_name} {column_sql}")
+
     connection.execute("CREATE INDEX IF NOT EXISTS idx_jobs_owner_user ON jobs(user_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_jobs_owner_guest ON jobs(guest_session_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_jobs_updated_at ON jobs(updated_at)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_jobs_expires_at ON jobs(expires_at)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_jobs_queue_status ON jobs(queue_name, status)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_jobs_owner_type_status ON jobs(user_id, guest_session_id, job_type, status)")
 
 
 def normalize_job_type(job_type):
@@ -127,6 +155,153 @@ def normalize_job_type(job_type):
 def normalize_status(status):
     status = str(status or "").strip().lower()
     return status if status in JOB_STATUSES else "queued"
+
+
+def import_payload_is_menu(payload):
+    payload = payload if isinstance(payload, dict) else {}
+    mode = str(
+        payload.get("import_mode")
+        or payload.get("extraction_mode")
+        or payload.get("mode")
+        or ""
+    ).strip().lower()
+    return mode in {"menu", "menu_extract", "menu-extract"}
+
+
+def upload_payload_is_image(payload):
+    payload = payload if isinstance(payload, dict) else {}
+    upload_mode = str(payload.get("upload_mode") or "").strip().lower()
+    source_type = str(payload.get("source_type") or payload.get("import_source_type") or "").strip().lower()
+    content_type = str(payload.get("content_type") or "").strip().lower()
+    filename = str(payload.get("filename") or "").strip().lower()
+    return bool(
+        upload_mode == "image"
+        or source_type == "image"
+        or content_type.startswith("image/")
+        or filename.endswith((".jpg", ".jpeg", ".png", ".webp", ".gif", ".heic", ".heif"))
+    )
+
+
+def job_limit_key(job_type, input_payload=None):
+    job_type = normalize_job_type(job_type)
+    payload = input_payload if isinstance(input_payload, dict) else {}
+    if job_type == "menu-import":
+        return "menu-import"
+    if job_type == "recipe-import":
+        return "recipe-import"
+    if job_type == "doc-photo-import":
+        return "menu-import" if import_payload_is_menu(payload) else "media-import"
+    return job_type
+
+
+def active_limit_for_job(job_type, input_payload=None):
+    return ACTIVE_LIMITS_BY_KEY.get(job_limit_key(job_type, input_payload), 0)
+
+
+def queued_limit_per_owner_type():
+    return env_int(
+        "JOB_QUEUE_MAX_QUEUED_PER_USER_TYPE",
+        DEFAULT_QUEUED_LIMIT_PER_OWNER_TYPE,
+        minimum=1,
+    )
+
+
+def owner_identity(user_id="", guest_session_id=""):
+    user_id = str(user_id or "").strip()
+    guest_session_id = str(guest_session_id or "").strip()
+    if guest_session_id:
+        return "guest", guest_session_id
+    return "user", user_id
+
+
+def owner_where_clause(user_id="", guest_session_id=""):
+    owner_type, owner_value = owner_identity(user_id, guest_session_id)
+    if owner_type == "guest":
+        return "guest_session_id = ?", (owner_value,)
+    return "COALESCE(user_id, '') = ?", (owner_value,)
+
+
+def _row_limit_key(row):
+    payload = json_loads(row["input_payload"], {}) if row else {}
+    return job_limit_key(row["job_type"], payload)
+
+
+def _owner_jobs_by_status(connection, user_id="", guest_session_id="", statuses=None):
+    statuses = [normalize_status(status) for status in (statuses or []) if str(status or "").strip()]
+    if not statuses:
+        statuses = ["queued", "running"]
+    owner_clause, owner_args = owner_where_clause(user_id, guest_session_id)
+    placeholders = ", ".join("?" for _ in statuses)
+    return connection.execute(
+        f"""
+        SELECT *
+          FROM jobs
+         WHERE {owner_clause}
+           AND status IN ({placeholders})
+         ORDER BY created_at ASC
+        """,
+        (*owner_args, *statuses),
+    ).fetchall()
+
+
+def owner_job_count_for_limit_key(
+    user_id="",
+    guest_session_id="",
+    limit_key="",
+    statuses=None,
+    exclude_job_id="",
+    connection=None,
+):
+    limit_key = str(limit_key or "").strip()
+    exclude_job_id = str(exclude_job_id or "").strip()
+
+    def count_rows(active_connection):
+        rows = _owner_jobs_by_status(
+            active_connection,
+            user_id=user_id,
+            guest_session_id=guest_session_id,
+            statuses=statuses,
+        )
+        return sum(
+            1
+            for row in rows
+            if str(row["id"] or "") != exclude_job_id and _row_limit_key(row) == limit_key
+        )
+
+    if connection is not None:
+        return count_rows(connection)
+
+    with jobs_connection() as active_connection:
+        return count_rows(active_connection)
+
+
+def queued_limit_status(user_id="", guest_session_id="", job_type="", input_payload=None):
+    limit_key = job_limit_key(job_type, input_payload)
+    queued_count = owner_job_count_for_limit_key(
+        user_id=user_id,
+        guest_session_id=guest_session_id,
+        limit_key=limit_key,
+        statuses=["queued"],
+    )
+    limit = queued_limit_per_owner_type()
+    if queued_count >= limit:
+        return {
+            "ok": False,
+            "limit_key": limit_key,
+            "limit": limit,
+            "queued_count": queued_count,
+            "message": (
+                "You already have several jobs queued for this import type. "
+                "Let one finish or cancel an older queued job before starting another."
+            ),
+        }
+    return {
+        "ok": True,
+        "limit_key": limit_key,
+        "limit": limit,
+        "queued_count": queued_count,
+        "message": "",
+    }
 
 
 def new_job_id():
@@ -211,11 +386,53 @@ def job_source_items(job):
 def job_model_details(job):
     input_payload = job.get("input_payload") if isinstance(job.get("input_payload"), dict) else {}
     result_payload = job.get("result_payload") if isinstance(job.get("result_payload"), dict) else {}
+    model_env_var = _first_text(
+        job.get("model_env_var_used"),
+        result_payload.get("model_env_var_used"),
+        result_payload.get("model_env_var"),
+        input_payload.get("model_env_var_used"),
+        input_payload.get("model_env_var"),
+    )
     return {
-        "model_used": _first_text(result_payload.get("model_used"), result_payload.get("model"), input_payload.get("model_used"), input_payload.get("model")),
-        "model_source": _first_text(result_payload.get("model_source"), input_payload.get("model_source")),
-        "model_env_var": _first_text(result_payload.get("model_env_var"), input_payload.get("model_env_var")),
+        "model_used": _first_text(
+            job.get("model_used"),
+            result_payload.get("model_used"),
+            result_payload.get("model"),
+            input_payload.get("model_used"),
+            input_payload.get("model"),
+        ),
+        "model_source": _first_text(
+            job.get("model_source"),
+            result_payload.get("model_source"),
+            input_payload.get("model_source"),
+        ),
+        "model_env_var": model_env_var,
+        "model_env_var_used": model_env_var,
     }
+
+
+def queued_position(job):
+    if not job or job.get("status") != "queued":
+        return None
+
+    queue_name = str(job.get("queue_name") or "").strip()
+    if not queue_name:
+        return None
+
+    with jobs_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT COUNT(*) AS position
+              FROM jobs
+             WHERE queue_name = ?
+               AND status = 'queued'
+               AND created_at <= ?
+            """,
+            (queue_name, job.get("created_at") or ""),
+        ).fetchone()
+
+    position = int(row["position"] or 0) if row else 0
+    return position or None
 
 
 def job_for_client(job, include_input=False):
@@ -242,7 +459,13 @@ def job_for_client(job, include_input=False):
         "started_at": job.get("started_at") or "",
         "updated_at": job.get("updated_at") or "",
         "completed_at": job.get("completed_at") or "",
+        "finished_at": job.get("finished_at") or job.get("completed_at") or "",
         "expires_at": job.get("expires_at") or "",
+        "queue_name": job.get("queue_name") or "",
+        "attempts": int(job.get("attempts") or 0),
+        "retry_count": int(job.get("attempts") or 0),
+        "worker_id": job.get("worker_id") or "",
+        "queued_position": queued_position(job),
         "retry_of": job.get("retry_of") or "",
         "source_items": job_source_items(job),
         **model_details,
@@ -261,13 +484,16 @@ def create_job(
     guest_session_id="",
     total_items=0,
     retry_of="",
+    queue_name="",
+    job_id="",
 ):
     job_type = normalize_job_type(job_type)
     user_id = str(user_id or "").strip()
     guest_session_id = str(guest_session_id or "").strip()
+    queue_name = str(queue_name or "").strip()
     created_at = now_iso()
     expires_at = (utc_now() + timedelta(hours=job_retention_hours(bool(guest_session_id)))).isoformat() + "Z"
-    job_id = new_job_id()
+    job_id = str(job_id or "").strip() or new_job_id()
 
     with jobs_connection() as connection:
         connection.execute(
@@ -277,8 +503,8 @@ def create_job(
                 progress_percent, total_items, completed_items, failed_items,
                 input_payload, result_payload, error_message, warning_messages,
                 created_at, started_at, updated_at, completed_at, expires_at,
-                rq_job_id, retry_of
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                rq_job_id, retry_of, queue_name
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 job_id,
@@ -302,6 +528,7 @@ def create_job(
                 expires_at,
                 None,
                 str(retry_of or "").strip() or None,
+                queue_name,
             ),
         )
 
@@ -336,9 +563,16 @@ def update_job(job_id, **fields):
         "warning_messages",
         "started_at",
         "completed_at",
+        "finished_at",
         "expires_at",
         "rq_job_id",
         "retry_of",
+        "queue_name",
+        "attempts",
+        "model_used",
+        "model_source",
+        "model_env_var_used",
+        "worker_id",
     }
     updates = {}
 
@@ -351,6 +585,8 @@ def update_job(job_id, **fields):
             value = json_dumps(value or {})
         if key == "warning_messages":
             value = json_dumps(value or [])
+        if key == "attempts":
+            value = max(0, int(value or 0))
         updates[key] = value
 
     updates["updated_at"] = now_iso()
@@ -382,13 +618,135 @@ def start_job(job_id, current_step="Starting"):
     if job_cancelled(job_id):
         return get_job(job_id)
 
+    job = get_job(job_id) or {}
     return update_job(
         job_id,
         status="running",
         current_step=current_step,
-        started_at=now_iso(),
+        started_at=job.get("started_at") or now_iso(),
         progress_percent=1,
+        attempts=int(job.get("attempts") or 0) + 1,
     )
+
+
+def active_limit_wait_message(limit_key):
+    labels = {
+        "menu-import": "menu import",
+        "recipe-import": "recipe import",
+        "media-import": "media or vision import",
+    }
+    label = labels.get(limit_key, "job")
+    return f"Queued behind your active {label}. This job will start automatically."
+
+
+def retry_delay_for_attempts(attempts):
+    attempts = max(0, int(attempts or 0))
+    return min(60, 5 + (attempts * 5))
+
+
+def try_start_job(
+    job_id,
+    current_step="Starting",
+    queue_name="",
+    model_used="",
+    model_source="",
+    model_env_var_used="",
+    worker_id="",
+):
+    job_id = str(job_id or "").strip()
+    if not job_id:
+        return {"started": False, "ok": False, "error": "Job id is required."}
+
+    with jobs_connection() as connection:
+        row = connection.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        if not row:
+            return {"started": False, "ok": False, "error": "Job not found."}
+
+        if row["status"] == "cancelled":
+            return {"started": False, "ok": True, "cancelled": True, "job": row_to_job(row)}
+        if row["status"] in TERMINAL_JOB_STATUSES:
+            return {"started": False, "ok": True, "terminal": True, "job": row_to_job(row)}
+        if row["status"] == "running":
+            return {"started": False, "ok": True, "already_running": True, "job": row_to_job(row)}
+
+        payload = json_loads(row["input_payload"], {})
+        limit_key = job_limit_key(row["job_type"], payload)
+        active_limit = active_limit_for_job(row["job_type"], payload)
+        attempts = int(row["attempts"] or 0) + 1
+        now = now_iso()
+
+        if active_limit > 0:
+            running_count = owner_job_count_for_limit_key(
+                user_id=row["user_id"] or "",
+                guest_session_id=row["guest_session_id"] or "",
+                limit_key=limit_key,
+                statuses=["running"],
+                exclude_job_id=job_id,
+                connection=connection,
+            )
+            if running_count >= active_limit:
+                message = active_limit_wait_message(limit_key)
+                connection.execute(
+                    """
+                    UPDATE jobs
+                       SET current_step = ?,
+                           attempts = ?,
+                           queue_name = COALESCE(NULLIF(?, ''), queue_name),
+                           updated_at = ?
+                     WHERE id = ?
+                    """,
+                    (message, attempts, queue_name, now, job_id),
+                )
+                updated = connection.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
+                return {
+                    "started": False,
+                    "ok": True,
+                    "deferred": True,
+                    "limit_key": limit_key,
+                    "delay_seconds": retry_delay_for_attempts(attempts),
+                    "message": message,
+                    "job": row_to_job(updated),
+                }
+
+        connection.execute(
+            """
+            UPDATE jobs
+               SET status = 'running',
+                   current_step = ?,
+                   started_at = COALESCE(started_at, ?),
+                   progress_percent = CASE WHEN progress_percent < 1 THEN 1 ELSE progress_percent END,
+                   attempts = ?,
+                   queue_name = COALESCE(NULLIF(?, ''), queue_name),
+                   model_used = ?,
+                   model_source = ?,
+                   model_env_var_used = ?,
+                   worker_id = ?,
+                   updated_at = ?
+             WHERE id = ?
+               AND status = 'queued'
+            """,
+            (
+                current_step,
+                now,
+                attempts,
+                queue_name,
+                str(model_used or "").strip(),
+                str(model_source or "").strip(),
+                str(model_env_var_used or "").strip(),
+                str(worker_id or "").strip(),
+                now,
+                job_id,
+            ),
+        )
+        updated = connection.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
+
+    job = row_to_job(updated)
+    return {
+        "started": bool(job and job.get("status") == "running"),
+        "ok": True,
+        "job": job,
+        "limit_key": job_limit_key(job.get("job_type"), job.get("input_payload") if job else {}),
+    }
 
 
 def update_job_progress(
@@ -433,6 +791,7 @@ def complete_job(job_id, result_payload=None, current_step="Completed"):
     if job_cancelled(job_id):
         return get_job(job_id)
 
+    finished_at = now_iso()
     return update_job(
         job_id,
         status="completed",
@@ -440,7 +799,8 @@ def complete_job(job_id, result_payload=None, current_step="Completed"):
         progress_percent=100,
         result_payload=result_payload or {},
         error_message="",
-        completed_at=now_iso(),
+        completed_at=finished_at,
+        finished_at=finished_at,
     )
 
 
@@ -448,22 +808,26 @@ def fail_job(job_id, error_message, result_payload=None, current_step="Failed"):
     if job_cancelled(job_id):
         return get_job(job_id)
 
+    finished_at = now_iso()
     return update_job(
         job_id,
         status="failed",
         current_step=current_step,
         result_payload=result_payload or {},
         error_message=str(error_message or "Job failed.").strip(),
-        completed_at=now_iso(),
+        completed_at=finished_at,
+        finished_at=finished_at,
     )
 
 
 def cancel_job(job_id, message="Cancelled"):
+    finished_at = now_iso()
     return update_job(
         job_id,
         status="cancelled",
         current_step=message,
-        completed_at=now_iso(),
+        completed_at=finished_at,
+        finished_at=finished_at,
     )
 
 
@@ -502,11 +866,12 @@ def mark_stuck_jobs():
                    current_step = 'Timed out',
                    error_message = 'This job stopped updating and timed out.',
                    completed_at = ?,
+                   finished_at = ?,
                    updated_at = ?
              WHERE status IN ('queued', 'running')
                AND updated_at <= ?
             """,
-            (now_iso(), now_iso(), cutoff_iso),
+            (now_iso(), now_iso(), now_iso(), cutoff_iso),
         )
 
 
@@ -571,4 +936,5 @@ def create_retry_job(job):
         guest_session_id=job.get("guest_session_id") or "",
         total_items=job.get("total_items") or 0,
         retry_of=job.get("id") or "",
+        queue_name=job.get("queue_name") or "",
     )

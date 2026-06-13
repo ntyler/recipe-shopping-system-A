@@ -31,6 +31,8 @@ from PushShoppingList.services.food_rules_service import load_food_rules
 from PushShoppingList.services.home_address_service import load_home_address
 from PushShoppingList.services.item_state_service import load_item_state
 from PushShoppingList.services.item_state_service import save_item_store
+from PushShoppingList.services.job_runtime_context import model_value_for_env as job_model_value_for_env
+from PushShoppingList.services.openai_throttle_service import throttled_chat_completion
 from PushShoppingList.services.openai_usage_service import record_openai_usage
 from PushShoppingList.services.purchase_mapping_service import display_quantity_for_purchase_group
 from PushShoppingList.services.purchase_mapping_service import purchase_group_records_for_items
@@ -751,6 +753,16 @@ def get_product_analysis_client():
         PRODUCT_ANALYSIS_CLIENT = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), timeout=45)
 
     return PRODUCT_ANALYSIS_CLIENT
+
+
+def resolved_product_analysis_model():
+    env_var = "OPENAI_PRODUCT_ANALYSIS_MODEL" if os.getenv("OPENAI_PRODUCT_ANALYSIS_MODEL") else "OPENAI_RECIPE_MODEL"
+    model, _source = job_model_value_for_env(
+        env_var,
+        os.getenv("OPENAI_PRODUCT_ANALYSIS_MODEL") or os.getenv("OPENAI_RECIPE_MODEL") or PRODUCT_ANALYSIS_MODEL,
+        f"env:{env_var}",
+    )
+    return model or PRODUCT_ANALYSIS_MODEL
 
 
 def new_product_job_id():
@@ -3634,9 +3646,10 @@ def analyze_product_page_with_chatgpt(candidate, html_text, ingredient, usage_us
         rules_payload,
         page_payload,
     )
+    model = resolved_product_analysis_model()
     prompt_payload = chatgpt_prompt_payload(
         "product-page-analysis",
-        PRODUCT_ANALYSIS_MODEL,
+        model,
         [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
@@ -3646,17 +3659,22 @@ def analyze_product_page_with_chatgpt(candidate, html_text, ingredient, usage_us
 
     try:
         with PRODUCT_AI_ANALYSIS_LOCK:
-            response = client.chat.completions.create(
-                **chatgpt_completion_payload(
-                    PRODUCT_ANALYSIS_MODEL,
-                    prompt_payload["messages"],
-                    temperature=0.1,
-                )
+            request_payload = chatgpt_completion_payload(
+                model,
+                prompt_payload["messages"],
+                temperature=0.1,
+            )
+            response = throttled_chat_completion(
+                client,
+                request_payload,
+                action_name="product-page-analysis",
+                model=model,
+                kind="product",
             )
         record_openai_usage(
             response,
             "product-page-analysis",
-            model=PRODUCT_ANALYSIS_MODEL,
+            model=model,
             user_id=usage_user_id,
         )
         data = json.loads(clean_json_response(response.choices[0].message.content))
@@ -3669,7 +3687,7 @@ def analyze_product_page_with_chatgpt(candidate, html_text, ingredient, usage_us
 
     analysis = normalize_chatgpt_product_analysis(data)
     analysis["status"] = "done"
-    analysis["model"] = PRODUCT_ANALYSIS_MODEL
+    analysis["model"] = model
     analysis["prompt"] = prompt_payload
     analysis["html_chars_sent"] = len(page_payload.get("html", ""))
     analysis["visible_text_chars_sent"] = len(page_payload.get("visible_text", ""))
@@ -5397,9 +5415,10 @@ def identify_rendered_html_products_with_chatgpt(
         rendered_page,
         visible_cards,
     )
+    model = resolved_product_analysis_model()
     prompt_payload = chatgpt_prompt_payload(
         "rendered-html-product-reasoning",
-        PRODUCT_ANALYSIS_MODEL,
+        model,
         [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
@@ -5409,17 +5428,22 @@ def identify_rendered_html_products_with_chatgpt(
 
     try:
         with PRODUCT_AI_ANALYSIS_LOCK:
-            response = client.chat.completions.create(
-                **chatgpt_completion_payload(
-                    PRODUCT_ANALYSIS_MODEL,
-                    prompt_payload["messages"],
-                    temperature=0,
-                )
+            request_payload = chatgpt_completion_payload(
+                model,
+                prompt_payload["messages"],
+                temperature=0,
+            )
+            response = throttled_chat_completion(
+                client,
+                request_payload,
+                action_name="rendered-html-product-reasoning",
+                model=model,
+                kind="product",
             )
         record_openai_usage(
             response,
             "rendered-html-product-reasoning",
-            model=PRODUCT_ANALYSIS_MODEL,
+            model=model,
             user_id=usage_user_id,
         )
         data = json.loads(clean_json_response(response.choices[0].message.content))
@@ -7767,9 +7791,10 @@ def choose_store_products_with_chatgpt(
         full_address,
         quantity_context=quantity_context,
     )
+    model = resolved_product_analysis_model()
     prompt_payload = chatgpt_prompt_payload(
         "store-product-ranking",
-        PRODUCT_ANALYSIS_MODEL,
+        model,
         [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
@@ -7779,17 +7804,22 @@ def choose_store_products_with_chatgpt(
 
     try:
         with PRODUCT_AI_ANALYSIS_LOCK:
-            response = client.chat.completions.create(
-                **chatgpt_completion_payload(
-                    PRODUCT_ANALYSIS_MODEL,
-                    prompt_payload["messages"],
-                    temperature=0,
-                )
+            request_payload = chatgpt_completion_payload(
+                model,
+                prompt_payload["messages"],
+                temperature=0,
+            )
+            response = throttled_chat_completion(
+                client,
+                request_payload,
+                action_name="store-product-ranking",
+                model=model,
+                kind="product",
             )
         record_openai_usage(
             response,
             "store-product-ranking",
-            model=PRODUCT_ANALYSIS_MODEL,
+            model=model,
             user_id=usage_user_id,
         )
         data = json.loads(clean_json_response(response.choices[0].message.content))
@@ -7802,7 +7832,7 @@ def choose_store_products_with_chatgpt(
 
     selection = normalize_store_product_ranking_response(data, allowed_ids)
     selection["status"] = "done"
-    selection["model"] = PRODUCT_ANALYSIS_MODEL
+    selection["model"] = model
     selection["prompt"] = prompt_payload
     selection["candidate_count_sent"] = len(candidates)
     return selection
@@ -8192,9 +8222,10 @@ def choose_best_product_with_chatgpt(
         full_address,
         quantity_context=quantity_context,
     )
+    model = resolved_product_analysis_model()
     prompt_payload = chatgpt_prompt_payload(
         "final-product-selection",
-        PRODUCT_ANALYSIS_MODEL,
+        model,
         [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
@@ -8204,17 +8235,22 @@ def choose_best_product_with_chatgpt(
 
     try:
         with PRODUCT_AI_ANALYSIS_LOCK:
-            response = client.chat.completions.create(
-                **chatgpt_completion_payload(
-                    PRODUCT_ANALYSIS_MODEL,
-                    prompt_payload["messages"],
-                    temperature=0,
-                )
+            request_payload = chatgpt_completion_payload(
+                model,
+                prompt_payload["messages"],
+                temperature=0,
+            )
+            response = throttled_chat_completion(
+                client,
+                request_payload,
+                action_name="final-product-selection",
+                model=model,
+                kind="product",
             )
         record_openai_usage(
             response,
             "final-product-selection",
-            model=PRODUCT_ANALYSIS_MODEL,
+            model=model,
             user_id=usage_user_id,
         )
         data = json.loads(clean_json_response(response.choices[0].message.content))
@@ -8227,7 +8263,7 @@ def choose_best_product_with_chatgpt(
 
     selection = normalize_final_product_selection(data, allowed_ids)
     selection["status"] = "done"
-    selection["model"] = PRODUCT_ANALYSIS_MODEL
+    selection["model"] = model
     selection["prompt"] = prompt_payload
     selection["candidate_count_sent"] = len(limited_candidates)
     return selection

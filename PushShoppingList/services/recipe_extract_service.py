@@ -3,6 +3,7 @@ import os
 import re
 import html
 import base64
+import contextvars
 import io
 import mimetypes
 import imghdr
@@ -54,8 +55,12 @@ except Exception:  # pragma: no cover
 
 from PushShoppingList.services import cloudflare_r2_storage
 from PushShoppingList.services.image_variant_service import ensure_webp_variants
+from PushShoppingList.services.job_runtime_context import current_job_id
+from PushShoppingList.services.job_runtime_context import model_snapshot_for_env
 from PushShoppingList.services.openai_model_service import model_value_for_env
 from PushShoppingList.services.openai_model_service import supports_custom_temperature
+from PushShoppingList.services.openai_throttle_service import throttled_audio_transcription
+from PushShoppingList.services.openai_throttle_service import throttled_chat_completion
 from PushShoppingList.services.openai_usage_service import record_openai_usage
 from PushShoppingList.services.purchase_mapping_service import apply_purchase_mapping_to_ingredient
 from PushShoppingList.services.storage_service import active_user_id
@@ -240,6 +245,13 @@ def resolve_openai_model(purpose="recipe", preferred_model=None, fallback=False)
         )
 
     if purpose == "vision":
+        snapshot = model_snapshot_for_env("OPENAI_VISION_MODEL")
+        if snapshot:
+            return OpenAIModelResolution(
+                model=snapshot["model"],
+                source=snapshot["source"],
+                purpose=purpose,
+            )
         env_model, env_source = model_value_for_env("OPENAI_VISION_MODEL", VISION_MODEL_DEFAULT)
         if env_source != "default":
             return OpenAIModelResolution(
@@ -254,6 +266,13 @@ def resolve_openai_model(purpose="recipe", preferred_model=None, fallback=False)
         )
 
     if purpose == "menu":
+        snapshot = model_snapshot_for_env("OPENAI_MENU_MODEL")
+        if snapshot:
+            return OpenAIModelResolution(
+                model=snapshot["model"],
+                source=snapshot["source"],
+                purpose=purpose,
+            )
         env_model, env_source = model_value_for_env("OPENAI_MENU_MODEL", OPENAI_MENU_MODEL_DEFAULT)
         if env_source != "default":
             return OpenAIModelResolution(
@@ -264,6 +283,14 @@ def resolve_openai_model(purpose="recipe", preferred_model=None, fallback=False)
         return OpenAIModelResolution(
             model=OPENAI_MENU_MODEL_DEFAULT,
             source="default:gpt-5.5",
+            purpose=purpose,
+        )
+
+    snapshot = model_snapshot_for_env("OPENAI_RECIPE_MODEL")
+    if snapshot:
+        return OpenAIModelResolution(
+            model=snapshot["model"],
+            source=snapshot["source"],
             purpose=purpose,
         )
 
@@ -3707,15 +3734,21 @@ def download_social_video_audio(recipe_url):
 
 def send_audio_transcription_to_openai(audio_path):
     with audio_path.open("rb") as audio_file:
-        response = get_openai_client().audio.transcriptions.create(
-            model=os.getenv("OPENAI_TRANSCRIPTION_MODEL", "whisper-1"),
-            file=audio_file,
-            response_format="text",
+        model = os.getenv("OPENAI_TRANSCRIPTION_MODEL", "whisper-1")
+        response = throttled_audio_transcription(
+            get_openai_client(),
+            {
+                "model": model,
+                "file": audio_file,
+                "response_format": "text",
+            },
+            action_name="audio-transcription",
+            model=model,
         )
         record_openai_usage(
             response,
             "audio-transcription",
-            model=os.getenv("OPENAI_TRANSCRIPTION_MODEL", "whisper-1"),
+            model=model,
         )
 
     return str(response or "")
@@ -5104,7 +5137,13 @@ def send_video_recipe_pdf_prompt_to_openai(prompt_text):
         f"[OpenAI] action=video-recipe-pdf-extraction "
         f"model={resolved_model} temperature_included={temperature_included}"
     )
-    response = get_openai_client().chat.completions.create(**payload)
+    response = throttled_chat_completion(
+        get_openai_client(),
+        payload,
+        action_name="video-recipe-pdf-extraction",
+        model=resolved_model,
+        kind="menu",
+    )
     record_openai_usage(response, "video-recipe-pdf-extraction", model=resolved_model)
 
     return response.choices[0].message.content
@@ -6364,7 +6403,13 @@ def send_prompt_to_openai(prompt_text):
             f"temperature_included={temperature_included}"
         )
         try:
-            response = get_openai_client().chat.completions.create(**payload)
+            response = throttled_chat_completion(
+                get_openai_client(),
+                payload,
+                action_name="recipe-text-extraction",
+                model=resolved_model,
+                kind="menu",
+            )
             record_openai_usage(response, "recipe-text-extraction", model=resolved_model)
             return response.choices[0].message.content
         except Exception as exc:
@@ -6757,9 +6802,9 @@ def call_openai_vision_image(
         )
         try:
             client = OpenAI()
-            response = client.chat.completions.create(
-                model=model,
-                messages=[{
+            vision_payload = {
+                "model": model,
+                "messages": [{
                     "role": "user",
                     "content": [
                         {"type": "text", "text": str(prompt or "")},
@@ -6772,6 +6817,13 @@ def call_openai_vision_image(
                     ],
                 }],
                 **request_kwargs,
+            }
+            response = throttled_chat_completion(
+                client,
+                vision_payload,
+                action_name=action_name,
+                model=model,
+                kind="vision",
             )
             text = str(response.choices[0].message.content or "")
             if not text.strip():
@@ -6925,7 +6977,13 @@ def send_social_video_audio_image_prompt_to_openai(prompt_text, image_urls):
         f"[OpenAI] action=social-video-audio-image-extraction "
         f"model={resolved_model} temperature_included={temperature_included}"
     )
-    response = get_openai_client().chat.completions.create(**payload)
+    response = throttled_chat_completion(
+        get_openai_client(),
+        payload,
+        action_name="social-video-audio-image-extraction",
+        model=resolved_model,
+        kind="vision",
+    )
     record_openai_usage(response, "social-video-audio-image-extraction", model=resolved_model)
 
     return response.choices[0].message.content
@@ -6964,7 +7022,13 @@ def send_file_prompt_to_openai(prompt_text, file_path, mime_type, filename):
         f"[OpenAI] action=recipe-file-extraction "
         f"model={resolved_model} temperature_included={temperature_included}"
     )
-    response = get_openai_client().chat.completions.create(**payload)
+    response = throttled_chat_completion(
+        get_openai_client(),
+        payload,
+        action_name="recipe-file-extraction",
+        model=resolved_model,
+        kind="menu",
+    )
     record_openai_usage(response, "recipe-file-extraction", model=resolved_model)
 
     return response.choices[0].message.content
@@ -9290,7 +9354,13 @@ def send_menu_extraction_prompt_to_openai(prompt_text, action_name="menu-extract
         f"model={resolved_model} model_source={model_resolution.source} "
         f"temperature_included={temperature_included}"
     )
-    response = get_openai_client().chat.completions.create(**payload)
+    response = throttled_chat_completion(
+        get_openai_client(),
+        payload,
+        action_name=action_name,
+        model=resolved_model,
+        kind="menu",
+    )
     record_openai_usage(response, action_name, model=resolved_model)
     return response.choices[0].message.content
 
@@ -9332,7 +9402,13 @@ def send_menu_file_prompt_to_openai(prompt_text, file_path, mime_type, filename)
         f"model={resolved_model} model_source={model_resolution.source} "
         f"temperature_included={temperature_included}"
     )
-    response = get_openai_client().chat.completions.create(**payload)
+    response = throttled_chat_completion(
+        get_openai_client(),
+        payload,
+        action_name="menu-file-extraction",
+        model=resolved_model,
+        kind="menu",
+    )
     record_openai_usage(response, "menu-file-extraction", model=resolved_model)
     return response.choices[0].message.content
 
@@ -9718,7 +9794,13 @@ def send_menu_item_recipe_prompt_to_openai(prompt_text, action_name="menu-item-r
         f"model={resolved_model} model_source={model_resolution.source} "
         f"temperature_included={temperature_included}"
     )
-    response = get_openai_client().chat.completions.create(**payload)
+    response = throttled_chat_completion(
+        get_openai_client(),
+        payload,
+        action_name=action_name,
+        model=resolved_model,
+        kind="menu",
+    )
     record_openai_usage(response, action_name, model=resolved_model, user_id=user_id)
     return response.choices[0].message.content
 
@@ -10057,7 +10139,11 @@ def build_menu_extract_result_from_items(
     diagnostics = diagnostics if isinstance(diagnostics, dict) else {}
     menu_items = flatten_menu_sections(sections)
     model_resolution = menu_item_recipe_model_resolution()
-    raw_response_path = RAW_FOLDER / f"{safe_filename(source_url)}_MENU_ITEM_API_RESPONSES.jsonl"
+    job_suffix = current_job_id()[:12]
+    raw_response_prefix = safe_filename(source_url)
+    if job_suffix:
+        raw_response_prefix = f"{raw_response_prefix}_{job_suffix}"
+    raw_response_path = RAW_FOLDER / f"{raw_response_prefix}_MENU_ITEM_API_RESPONSES.jsonl"
     failures = []
     recipes = []
     total_items = len(menu_items)
@@ -10175,7 +10261,8 @@ def build_menu_extract_result_from_items(
             while next_index < total_items and len(future_map) < worker_count:
                 check_cancelled()
                 menu_item = menu_items[next_index]
-                future_map[executor.submit(run_inference, next_index, menu_item)] = (next_index, menu_item)
+                job_context = contextvars.copy_context()
+                future_map[executor.submit(job_context.run, run_inference, next_index, menu_item)] = (next_index, menu_item)
                 next_index += 1
 
         try:
