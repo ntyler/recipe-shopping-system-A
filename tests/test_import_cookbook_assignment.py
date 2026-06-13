@@ -139,6 +139,14 @@ def test_job_activity_can_reopen_import_progress_overlay():
     assert "renderExtractionProgress(importJobToExtractionProgress(job, urls, isMenuExtract))" in script
 
 
+def test_import_progress_wait_does_not_timeout_long_menu_jobs():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+
+    assert "const IMPORT_JOB_COMPLETION_TIMEOUT_MS = 0;" in script
+    assert "Object.prototype.hasOwnProperty.call(options, \"timeoutMs\")" in script
+    assert "timeoutMs: IMPORT_JOB_COMPLETION_TIMEOUT_MS" in script
+
+
 def test_menu_recipe_progress_payload_uses_boolean_checklist_and_skipped_review(monkeypatch):
     monkeypatch.setattr(
         recipe_routes,

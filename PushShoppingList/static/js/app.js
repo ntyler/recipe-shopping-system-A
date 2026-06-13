@@ -241,6 +241,8 @@ function safeStorageGet(storage, key) {
 
 let jobActivityPollTimer = null;
 let lastJobActivityJobs = [];
+const JOB_COMPLETION_DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
+const IMPORT_JOB_COMPLETION_TIMEOUT_MS = 0;
 
 function jobActivityPanel() {
     return document.querySelector("[data-job-activity-panel]");
@@ -633,11 +635,16 @@ async function fetchJobStatus(jobId) {
 }
 
 async function waitForJobCompletion(jobId, options = {}) {
-    const timeoutMs = Number(options.timeoutMs || 10 * 60 * 1000);
+    const timeoutMs = Number(
+        Object.prototype.hasOwnProperty.call(options, "timeoutMs")
+            ? options.timeoutMs
+            : JOB_COMPLETION_DEFAULT_TIMEOUT_MS
+    );
+    const hasTimeout = Number.isFinite(timeoutMs) && timeoutMs > 0;
     const pollMs = Number(options.pollMs || 1200);
     const startedAt = Date.now();
 
-    while (Date.now() - startedAt < timeoutMs) {
+    while (!hasTimeout || Date.now() - startedAt < timeoutMs) {
         const job = await fetchJobStatus(jobId);
         if (typeof options.onUpdate === "function") {
             options.onUpdate(job);
@@ -748,6 +755,7 @@ async function reopenImportProgressFromJob(jobId) {
                     renderExtractionProgress(importJobToExtractionProgress(updatedJob, urls, isMenuExtract));
                 },
                 pollMs: 1500,
+                timeoutMs: IMPORT_JOB_COMPLETION_TIMEOUT_MS,
             }).then(finishedJob => {
                 renderExtractionProgress(importJobToExtractionProgress(finishedJob, urls, isMenuExtract));
                 syncOpenAiUsageDashboardFromResponse(jobResultPayload(finishedJob));
@@ -24437,6 +24445,7 @@ async function startRecipeExtractionUrls(urls, options = {}) {
                 renderExtractionProgress(importJobToExtractionProgress(job, urls, isMenuExtract));
             },
             pollMs: 1500,
+            timeoutMs: IMPORT_JOB_COMPLETION_TIMEOUT_MS,
         });
         const finalProgress = importJobToExtractionProgress(finishedJob, urls, isMenuExtract);
         renderExtractionProgress(finalProgress);
