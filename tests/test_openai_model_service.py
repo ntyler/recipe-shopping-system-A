@@ -11,6 +11,23 @@ from PushShoppingList.services import openai_model_service as models
 
 
 ADMIN_USER = {"email": "ntylerbert@gmail.com"}
+EXPECTED_OPENAI_MODEL_ENV_VARS = {
+    "OPENAI_MENU_MODEL",
+    "OPENAI_MENU_CLEANUP_MODEL",
+    "OPENAI_VISION_MODEL",
+    "OPENAI_RECIPE_MODEL",
+    "OPENAI_RECIPE_CATEGORY_MODEL",
+    "OPENAI_NUTRITION_MODEL",
+    "OPENAI_RECIPE_NOTE_MODEL",
+    "OPENAI_PRODUCT_ANALYSIS_MODEL",
+    "OPENAI_INGREDIENT_REVIEW_MODEL",
+    "OPENAI_FOOD_RULES_MODEL",
+    "OPENAI_FOOD_REVIEW_MODEL",
+    "OPENAI_ADDRESS_MODEL",
+    "OPENAI_PING_TEXT_MODEL",
+    "OPENAI_TRANSCRIPTION_MODEL",
+    "OPENAI_STEP_IMAGE_MODEL",
+}
 
 
 def configure_model_files(monkeypatch, tmp_path, available_models):
@@ -58,6 +75,22 @@ def test_dashboard_always_includes_proposed_model_and_reason(monkeypatch, tmp_pa
     assert dashboard["last_mapping_refreshed_display"] != ""
 
 
+def test_dashboard_includes_all_openai_model_environment_variables(monkeypatch, tmp_path):
+    configure_model_files(
+        monkeypatch,
+        tmp_path,
+        ["gpt-5.5", "gpt-5.5-mini", "gpt-4o-mini", "whisper-1", "gpt-image-1"],
+    )
+
+    dashboard = models.chatgpt_models_dashboard_for_user(ADMIN_USER)
+    row_env_vars = {row["env_var"] for row in dashboard["rows"]}
+
+    assert row_env_vars == EXPECTED_OPENAI_MODEL_ENV_VARS
+    assert set(models.DEFAULT_RECOMMENDED_MODEL_BY_ENV) == EXPECTED_OPENAI_MODEL_ENV_VARS
+    assert set(models.LOWEST_VIABLE_MODEL_BY_ENV) == EXPECTED_OPENAI_MODEL_ENV_VARS
+    assert dashboard["recommended_mapping_count"] == len(EXPECTED_OPENAI_MODEL_ENV_VARS)
+
+
 def test_use_proposed_model_persists_recommended_value(monkeypatch, tmp_path):
     configure_model_files(
         monkeypatch,
@@ -99,18 +132,27 @@ def test_save_models_updates_environment_and_local_env_file(monkeypatch, tmp_pat
     form = form_with_default_models()
     form["model_OPENAI_MENU_MODEL"] = "gpt-5.4-mini"
     form["model_OPENAI_RECIPE_MODEL"] = "gpt-5.4-nano"
+    form["model_OPENAI_MENU_CLEANUP_MODEL"] = "gpt-5.4-nano"
+    form["model_OPENAI_TRANSCRIPTION_MODEL"] = "whisper-1"
+    form["model_OPENAI_STEP_IMAGE_MODEL"] = "gpt-image-1"
 
     result = models.update_openai_model_settings_for_admin(ADMIN_USER, form)
 
     assert result == {"ok": True, "errors": []}
     assert os.environ["OPENAI_MENU_MODEL"] == "gpt-5.4-mini"
     assert os.environ["OPENAI_RECIPE_MODEL"] == "gpt-5.4-nano"
+    assert os.environ["OPENAI_MENU_CLEANUP_MODEL"] == "gpt-5.4-nano"
+    assert os.environ["OPENAI_TRANSCRIPTION_MODEL"] == "whisper-1"
+    assert os.environ["OPENAI_STEP_IMAGE_MODEL"] == "gpt-image-1"
     local_env = models.LOCAL_ENV_FILE.read_text(encoding="utf-8")
     assert "set SHOPPING_APP_SMTP_HOST=smtp.gmail.com" in local_env
     assert "old-menu-model" not in local_env
     assert "old-recipe-model" not in local_env
     assert "set OPENAI_MENU_MODEL=gpt-5.4-mini" in local_env
     assert "set OPENAI_RECIPE_MODEL=gpt-5.4-nano" in local_env
+    assert "set OPENAI_MENU_CLEANUP_MODEL=gpt-5.4-nano" in local_env
+    assert "set OPENAI_TRANSCRIPTION_MODEL=whisper-1" in local_env
+    assert "set OPENAI_STEP_IMAGE_MODEL=gpt-image-1" in local_env
     assert local_env.count("OPENAI_MENU_MODEL") == 1
 
     dashboard = models.chatgpt_models_dashboard_for_user(ADMIN_USER)

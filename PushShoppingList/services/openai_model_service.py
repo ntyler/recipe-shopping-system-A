@@ -47,6 +47,12 @@ OPENAI_MODEL_SETTINGS = (
         "description": "Uploaded documents and non-vision menu import extraction.",
     },
     {
+        "env_var": "OPENAI_MENU_CLEANUP_MODEL",
+        "feature": "Menu Cleanup",
+        "default_model": "gpt-4o-mini",
+        "description": "One-call menu item normalization before lightweight menu stubs are saved.",
+    },
+    {
         "env_var": "OPENAI_VISION_MODEL",
         "feature": "Image Vision",
         "default_model": "gpt-5.5",
@@ -106,10 +112,29 @@ OPENAI_MODEL_SETTINGS = (
         "default_model": "gpt-4o-mini",
         "description": "Address completion when local parsing needs help.",
     },
+    {
+        "env_var": "OPENAI_PING_TEXT_MODEL",
+        "feature": "OpenAI Ping",
+        "default_model": "gpt-4o-mini",
+        "description": "Debug ping route used to verify basic text-model connectivity.",
+    },
+    {
+        "env_var": "OPENAI_TRANSCRIPTION_MODEL",
+        "feature": "Audio Transcription",
+        "default_model": "whisper-1",
+        "description": "Audio transcription for social video recipe imports.",
+    },
+    {
+        "env_var": "OPENAI_STEP_IMAGE_MODEL",
+        "feature": "Recipe Step Images",
+        "default_model": "gpt-image-1",
+        "description": "Image generation for recipe step illustrations.",
+    },
 )
 
 DEFAULT_RECOMMENDED_MODEL_BY_ENV = {
     "OPENAI_MENU_MODEL": "gpt-5.5",
+    "OPENAI_MENU_CLEANUP_MODEL": "gpt-5.5-mini",
     "OPENAI_VISION_MODEL": "gpt-5.5",
     "OPENAI_RECIPE_MODEL": "gpt-5.5-mini",
     "OPENAI_RECIPE_CATEGORY_MODEL": "gpt-5.5-mini",
@@ -120,10 +145,14 @@ DEFAULT_RECOMMENDED_MODEL_BY_ENV = {
     "OPENAI_FOOD_RULES_MODEL": "gpt-5.5-mini",
     "OPENAI_FOOD_REVIEW_MODEL": "gpt-5.5-mini",
     "OPENAI_ADDRESS_MODEL": "gpt-5.5-mini",
+    "OPENAI_PING_TEXT_MODEL": "gpt-5.5-mini",
+    "OPENAI_TRANSCRIPTION_MODEL": "whisper-1",
+    "OPENAI_STEP_IMAGE_MODEL": "gpt-image-1",
 }
 
 LOWEST_VIABLE_MODEL_BY_ENV = {
     "OPENAI_MENU_MODEL": "gpt-5.4-mini",
+    "OPENAI_MENU_CLEANUP_MODEL": "gpt-5.4-nano",
     "OPENAI_VISION_MODEL": "gpt-5.4-mini",
     "OPENAI_RECIPE_MODEL": "gpt-5.4-nano",
     "OPENAI_RECIPE_CATEGORY_MODEL": "gpt-5.4-nano",
@@ -134,6 +163,9 @@ LOWEST_VIABLE_MODEL_BY_ENV = {
     "OPENAI_FOOD_RULES_MODEL": "gpt-5.4-nano",
     "OPENAI_FOOD_REVIEW_MODEL": "gpt-5.4-nano",
     "OPENAI_ADDRESS_MODEL": "gpt-5.4-nano",
+    "OPENAI_PING_TEXT_MODEL": "gpt-5.4-nano",
+    "OPENAI_TRANSCRIPTION_MODEL": "whisper-1",
+    "OPENAI_STEP_IMAGE_MODEL": "gpt-image-1",
 }
 
 LEGACY_MODEL_RECOMMENDATIONS = {
@@ -627,14 +659,21 @@ def apply_openai_model_environment(models, clear_missing=True):
 
 def refresh_openai_model_runtime_bindings():
     recipe_model = os.getenv("OPENAI_RECIPE_MODEL", default_model_for_env("OPENAI_RECIPE_MODEL"))
+    ping_text_model = os.getenv("OPENAI_PING_TEXT_MODEL", default_model_for_env("OPENAI_PING_TEXT_MODEL"))
     product_model = os.getenv("OPENAI_PRODUCT_ANALYSIS_MODEL", recipe_model)
     food_rules_model = os.getenv("OPENAI_FOOD_RULES_MODEL", recipe_model)
     food_review_model = os.getenv("OPENAI_FOOD_REVIEW_MODEL", recipe_model)
     ingredient_review_model = os.getenv("OPENAI_INGREDIENT_REVIEW_MODEL", recipe_model)
 
     module_updates = {
-        "PushShoppingList.services.recipe_extract_service": {"MODEL": recipe_model},
-        "PushShoppingList.routes.recipe_routes": {"MODEL": recipe_model},
+        "PushShoppingList.services.recipe_extract_service": {
+            "MODEL": recipe_model,
+            "OPENAI_PING_TEXT_MODEL": ping_text_model,
+        },
+        "PushShoppingList.routes.recipe_routes": {
+            "MODEL": recipe_model,
+            "OPENAI_PING_TEXT_MODEL": ping_text_model,
+        },
         "PushShoppingList.routes.job_routes": {"MODEL": recipe_model},
         "PushShoppingList.services.recipe_edit_service": {"MODEL": recipe_model},
         "PushShoppingList.services.product_selection_service": {"PRODUCT_ANALYSIS_MODEL": product_model},
