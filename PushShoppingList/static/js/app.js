@@ -9403,15 +9403,19 @@ function setShoppingListSiblingRowsCollapsed(headerSelector, stopSelector, colla
 }
 
 function setShoppingListViewRowsCollapsed(collapsed) {
+    if (collapsed) {
+        return;
+    }
+
     setShoppingListSiblingRowsCollapsed(
         "#sectionView .section-header-row",
         ".section-header-row",
-        collapsed
+        false
     );
     setShoppingListSiblingRowsCollapsed(
         "#storeView .store-section-header",
         ".store-section-header, .store-header-row",
-        collapsed
+        false
     );
 }
 
@@ -9577,7 +9581,7 @@ function setShoppingGlobalCollapseStatus(message) {
 function applyShoppingListCollapsedDomState(options = {}) {
     closeShoppingListExpandedPanels();
     setAllCardCollapseContentCollapsed(true, { persist: options.persist !== false });
-    setShoppingListViewRowsCollapsed(true);
+    setShoppingListViewRowsCollapsed(false);
     setAllRecipeViewNestedPanelsCollapsed(true, { persist: options.persist !== false });
     setAllCookbookPanelsCollapsed(true, { persist: options.persist !== false });
     setAllShoppingListRecipeImagesVisible(false, { keepTitleImages: true });
@@ -9896,6 +9900,10 @@ function showView(viewName) {
     const switcher = document.getElementById("viewSwitcherSticky");
     if (switcher) {
         switcher.dataset.activeView = activeView;
+    }
+
+    if (activeView === "section" || activeView === "store") {
+        setShoppingListViewRowsCollapsed(false);
     }
 
     localStorage.setItem("shopping-view", activeView);

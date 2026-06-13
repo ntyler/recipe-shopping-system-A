@@ -51,19 +51,37 @@ def test_global_collapse_action_targets_page_sections_and_nested_panels():
 
     assert "function collapseAllShoppingListPage(options = {})" in script
     assert "function expandAllShoppingListPage()" in script
-    assert "function setAllCardCollapseContentCollapsed(collapsed)" in script
+    assert "function setAllCardCollapseContentCollapsed(collapsed" in script
     assert "function setShoppingListViewRowsCollapsed(collapsed)" in script
-    assert "function setAllRecipeViewNestedPanelsCollapsed(collapsed)" in script
-    assert "function setAllCookbookPanelsCollapsed(collapsed)" in script
+    assert "function setAllRecipeViewNestedPanelsCollapsed(collapsed" in script
+    assert "function setAllCookbookPanelsCollapsed(collapsed" in script
     assert "function closeShoppingListExpandedPanels()" in script
-    assert "setAllCardCollapseContentCollapsed(true)" in script
-    assert "setShoppingListViewRowsCollapsed(true)" in script
-    assert "setAllRecipeViewNestedPanelsCollapsed(true)" in script
-    assert "setAllCookbookPanelsCollapsed(true)" in script
+    assert "setAllCardCollapseContentCollapsed(true," in script
+    assert "setShoppingListViewRowsCollapsed(true)" not in script
+    assert "setShoppingListViewRowsCollapsed(false)" in script
+    assert "setAllRecipeViewNestedPanelsCollapsed(true," in script
+    assert "setAllCookbookPanelsCollapsed(true," in script
     assert 'setAllShoppingListRecipeImagesVisible(false, { keepTitleImages: true })' in script
     assert 'setShoppingGlobalCollapseStatus("Everything collapsed.")' in script
     assert "setAllShoppingListRecipeImagesVisible(recipeImagesShownByDefault())" in script
     assert ".recipe-global-image-hidden" in css
+
+
+def test_shopping_list_section_and_store_ingredients_stay_expanded_after_load():
+    script = read_text("PushShoppingList/static/js/app.js")
+
+    helper_start = script.index("function setShoppingListViewRowsCollapsed(collapsed)")
+    helper_end = script.index("function setAllRecipeViewNestedPanelsCollapsed", helper_start)
+    helper_block = script[helper_start:helper_end]
+    show_view_start = script.index("function showView(viewName)")
+    show_view_end = script.index("function eventStartedInNestedInteractive", show_view_start)
+    show_view_block = script[show_view_start:show_view_end]
+
+    assert "if (collapsed) {\n        return;\n    }" in helper_block
+    assert '"#sectionView .section-header-row"' in helper_block
+    assert '"#storeView .store-section-header"' in helper_block
+    assert "setShoppingListViewRowsCollapsed(false);" in show_view_block
+    assert 'activeView === "section" || activeView === "store"' in show_view_block
 
 
 def test_auth_transition_can_request_collapse_before_lazy_sections_load():
@@ -86,19 +104,17 @@ def test_auth_transition_can_request_collapse_before_lazy_sections_load():
     assert "safeStorageRemove(localStorage, USER_ACCOUNT_OPEN_PANEL_KEY);" in script
 
 
-def test_cookbooks_lazy_section_preloads_early_but_keeps_images_lazy():
+def test_cookbooks_lazy_section_keeps_images_lazy():
     index_template = read_text("PushShoppingList/templates/index.html")
-    script = read_text("PushShoppingList/static/js/app.js")
     cookbooks_template = read_text("PushShoppingList/templates/sections/cookbooks.html")
 
     cookbooks_start = index_template.index('data-lazy-section="cookbooks"')
     cookbooks_end = index_template.index('data-lazy-url="{{ url_for(\'main_bp.cookbooks_section\') }}"', cookbooks_start)
     cookbooks_placeholder = index_template[cookbooks_start:cookbooks_end]
 
-    assert 'data-lazy-eager="idle"' in cookbooks_placeholder
-    assert 'data-lazy-eager-delay="350"' in cookbooks_placeholder
-    assert 'const eagerDelay = Number.parseInt(placeholder.dataset.lazyEagerDelay || "1800", 10);' in script
-    assert "Number.isFinite(eagerDelay) ? eagerDelay : 1800" in script
+    assert 'class="app-card lazy-section-placeholder"' in index_template
+    assert 'data-lazy-section="cookbooks"' in cookbooks_placeholder
+    assert 'onclick="loadLazySection(\'cookbooks\', { focus: true }); return false;"' in index_template
     assert 'data-deferred-src="{{ recipe.cover_image.thumb_url or recipe.cover_image.card_url or recipe.cover_image.src }}"' in cookbooks_template
     assert 'loading="lazy"' in cookbooks_template
 
