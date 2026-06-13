@@ -165,3 +165,74 @@ def test_fetch_purge_cookbook_reuses_recipe_cleanup(monkeypatch, tmp_path):
         ("ingredients", "https://example.com/soup"),
         ("url", "https://example.com/soup"),
     ]
+
+
+def test_fetch_purge_unclassified_recipes_keeps_cookbook_and_reuses_cleanup(monkeypatch, tmp_path):
+    app = create_app()
+    app.config.update(TESTING=True)
+    calls = []
+
+    def fake_purge_unclassified_cookbook_recipe_urls(cookbook_id):
+        calls.append(("cookbook", cookbook_id))
+        return ["https://example.com/chili", "https://example.com/soup"]
+
+    monkeypatch.setattr(
+        main_routes,
+        "purge_unclassified_cookbook_recipe_urls",
+        fake_purge_unclassified_cookbook_recipe_urls,
+    )
+    monkeypatch.setattr(
+        main_routes,
+        "remove_recipe_and_unused_ingredients",
+        lambda url: calls.append(("ingredients", url)),
+    )
+    monkeypatch.setattr(
+        main_routes,
+        "remove_recipe_url",
+        lambda url: calls.append(("url", url)),
+    )
+
+    with app.test_client() as client:
+        configure_signed_in_user(monkeypatch, tmp_path, client)
+        response = client.post(
+            "/api/cookbooks/unclassified/purge_recipes",
+            json={"confirm_purge_recipes": "PURGE"},
+            headers={"X-Requested-With": "fetch"},
+        )
+
+    assert response.status_code == 200
+    assert response.get_json() == {"ok": True, "purged_recipe_count": 2}
+    assert calls == [
+        ("cookbook", "unclassified"),
+        ("ingredients", "https://example.com/chili"),
+        ("url", "https://example.com/chili"),
+        ("ingredients", "https://example.com/soup"),
+        ("url", "https://example.com/soup"),
+    ]
+
+
+def test_fetch_purge_unclassified_recipes_requires_opt_in(monkeypatch, tmp_path):
+    app = create_app()
+    app.config.update(TESTING=True)
+    calls = []
+
+    monkeypatch.setattr(
+        main_routes,
+        "purge_unclassified_cookbook_recipe_urls",
+        lambda cookbook_id: calls.append(("cookbook", cookbook_id)),
+    )
+
+    with app.test_client() as client:
+        configure_signed_in_user(monkeypatch, tmp_path, client)
+        response = client.post(
+            "/api/cookbooks/unclassified/purge_recipes",
+            json={"confirm_purge_recipes": "nope"},
+            headers={"X-Requested-With": "fetch"},
+        )
+
+    assert response.status_code == 400
+    assert response.get_json() == {
+        "ok": False,
+        "error": "Type PURGE to confirm purging unclassified recipes.",
+    }
+    assert calls == []

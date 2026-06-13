@@ -416,6 +416,8 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("data-cookbook-filter-select", cookbook_template)
         self.assertIn("Delete cookbook, keep recipes", cookbook_template)
         self.assertIn("Delete cookbook and purge recipes", cookbook_template)
+        self.assertIn("Purge all recipes", cookbook_template)
+        self.assertIn("purgeUnclassifiedCookbookRecipes(this)", cookbook_template)
         self.assertIn("data-cookbook-card", cookbook_template)
         self.assertIn("resolveCookbookOverwritePrompt(false)", cookbook_template)
         self.assertIn("openRecipeEditor(this)", cookbook_template)
@@ -431,6 +433,8 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn("function applyCookbookRecipeSearch", script)
         self.assertIn("COOKBOOK_FILTER_SESSION_KEY", script)
         self.assertIn("function purgeCookbook", script)
+        self.assertIn("function purgeUnclassifiedCookbookRecipes", script)
+        self.assertIn("/purge_recipes", script)
         self.assertIn("cookbook-card-collapse:", script)
         self.assertIn("cookbook-recipe-search", script)
         self.assertIn('savedState !== "expanded"', script)
@@ -725,6 +729,48 @@ class ProductSelectionServiceTest(unittest.TestCase):
                 for recipe in data["cookbooks"][0]["recipes"]
             ]
             self.assertEqual(remaining_urls, ["https://example.com/pasta"])
+
+    def test_purge_unclassified_cookbook_recipe_urls_keeps_cookbook(self):
+        from PushShoppingList.services import cookbook_service
+
+        with TemporaryDirectory() as temp_dir, patch.object(
+            cookbook_service,
+            "COOKBOOKS_FILE",
+            Path(temp_dir) / "cookbooks.json",
+        ):
+            cookbook_service.save_cookbooks({
+                "cookbooks": [
+                    {
+                        "id": "unclassified",
+                        "name": "unclassified",
+                        "recipes": [
+                            {"name": "Skillet Chili", "url": "https://example.com/chili"},
+                            {"name": "Bean Soup", "url": "https://example.com/soup"},
+                        ],
+                    },
+                    {
+                        "id": "meal-prep",
+                        "name": "Meal Prep",
+                        "recipes": [
+                            {"name": "Skillet Chili", "url": "https://example.com/chili"},
+                            {"name": "Pasta", "url": "https://example.com/pasta"},
+                        ],
+                    },
+                ],
+            })
+
+            purged_urls = cookbook_service.purge_unclassified_cookbook_recipe_urls("unclassified")
+
+            self.assertEqual(purged_urls, ["https://example.com/chili", "https://example.com/soup"])
+            data = cookbook_service.load_cookbooks()
+            self.assertEqual([cookbook["id"] for cookbook in data["cookbooks"]], ["unclassified", "meal-prep"])
+            unclassified = data["cookbooks"][0]
+            meal_prep = data["cookbooks"][1]
+            self.assertEqual(unclassified["recipes"], [])
+            self.assertEqual(
+                [recipe["url"] for recipe in meal_prep["recipes"]],
+                ["https://example.com/pasta"],
+            )
 
     def test_cookbook_restore_adds_recipe_log_and_shopping_items(self):
         from PushShoppingList.routes import main_routes

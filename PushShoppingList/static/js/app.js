@@ -8085,6 +8085,73 @@ function purgeCookbook(button) {
     return deleteCookbook(button, { purge: true });
 }
 
+async function purgeUnclassifiedCookbookRecipes(button) {
+    if (!button) {
+        return false;
+    }
+
+    const cookbookId = button.dataset.cookbookId || "";
+    const cookbookName = button.dataset.cookbookName || "unclassified";
+    const recipeCount = Number(button.dataset.cookbookRecipeCount || 0);
+    const recipeLabel = recipeCount === 1 ? "recipe" : "recipes";
+    const requiredConfirmation = "PURGE";
+    const promptMessage = `Purge ${recipeCount} ${recipeLabel} from ${cookbookName}?\n\nThe cookbook will remain, but those recipes will be removed from current recipes, saved recipe data, every cookbook, and unused shopping-list ingredients.\n\nType ${requiredConfirmation} to continue.`;
+    const confirmation = window.prompt(promptMessage, "");
+
+    if (!cookbookId || String(confirmation || "").trim().toUpperCase() !== requiredConfirmation) {
+        if (confirmation !== null) {
+            setCookbookStatus("Purge canceled.");
+        }
+        return false;
+    }
+
+    const originalText = button.textContent;
+
+    try {
+        button.disabled = true;
+        button.textContent = "Purging...";
+        setCookbookStatus("Purging unclassified recipes...");
+
+        const response = await fetch(`/api/cookbooks/${encodeURIComponent(cookbookId)}/purge_recipes`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "fetch",
+            },
+            body: JSON.stringify({
+                confirm_purge_recipes: requiredConfirmation,
+            }),
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to purge unclassified recipes.");
+        }
+
+        await refreshStoreMarkup({
+            cacheBust: true,
+            requireRecipeLog: true,
+        });
+        const purgedCount = data && Number.isFinite(Number(data.purged_recipe_count))
+            ? Number(data.purged_recipe_count)
+            : recipeCount;
+        showRecipeQuantityUpdatedMessage(
+            "",
+            "",
+            "",
+            `${purgedCount} ${purgedCount === 1 ? "recipe was" : "recipes were"} purged; ${cookbookName} was kept.`
+        );
+    } catch (err) {
+        console.warn("Unable to purge unclassified recipes.", err);
+        setCookbookStatus(err.message || "Unable to purge unclassified recipes.", true);
+    } finally {
+        button.disabled = false;
+        button.textContent = originalText || "Purge all recipes";
+    }
+
+    return false;
+}
+
 let recipeMediaImportMode = "recipe";
 
 function normalizeRecipeImportMode(mode) {

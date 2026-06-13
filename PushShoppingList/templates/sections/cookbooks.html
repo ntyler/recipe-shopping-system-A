@@ -156,6 +156,17 @@
                                                         onclick="closeRecipeEditRowMenus(); openCookbookNameEditor(this); return false;">
                                                     Rename cookbook
                                                 </button>
+                                                {% if cookbook.is_unclassified and cookbook.recipes %}
+                                                    <button type="button"
+                                                            class="delete"
+                                                            data-cookbook-id="{{ cookbook.id }}"
+                                                            data-cookbook-name="{{ cookbook.name }}"
+                                                            data-cookbook-recipe-count="{{ cookbook.recipes | length }}"
+                                                            onclick="closeRecipeEditRowMenus(); purgeUnclassifiedCookbookRecipes(this); return false;"
+                                                            aria-label="Purge all recipes from {{ cookbook.name }}">
+                                                        Purge all recipes
+                                                    </button>
+                                                {% endif %}
                                                 {% if not cookbook.is_unclassified %}
                                                     <button type="button"
                                                             class="delete"
