@@ -70,6 +70,22 @@ def test_recipe_editor_modal_close_does_not_reload_current_page():
     ]
 
 
+def test_recipe_editor_return_scroll_offsets_current_recipe_sticky_header():
+    script = read_text("PushShoppingList/static/js/app.js")
+    jump_block = script[
+        script.index("function scrollRecipeJumpTargetIntoView"):
+        script.index("function updateViewSwitcherStickyOffset")
+    ]
+
+    assert "scrollRecipeJumpTargetBelowStickyHeader(target);" in jump_block
+    assert "function currentRecipesStickyHeaderOffset" in jump_block
+    assert '#currentRecipeUrlLogCard:not(.card-collapsed)' in jump_block
+    assert ":scope > .recipe-url-log-header" in jump_block
+    assert '[data-current-recipe-row]' in jump_block
+    assert "window.scrollBy({" in jump_block
+    assert "top: -offset" in jump_block
+
+
 def test_recipe_editor_cancel_uses_stored_page_return_before_history():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     script = read_text("PushShoppingList/static/js/app.js")
@@ -108,7 +124,8 @@ def test_food_review_badges_open_active_review_flow():
     assert "openRecipeEditPageFallback(button, url, options);" in script
 
     assert recipe_view.count("openRecipeFoodReviewFromRecipeView(this, event)") == 1
-    assert current_recipes.count("openRecipeFoodReviewFromRecipeView(this, event)") == 1
+    assert current_recipes.count("openRecipeFoodReviewFromRecipeView(this, event)") >= 1
+    assert "{% elif recipe_needs_food_review %}" in current_recipes
     assert cookbooks.count("openRecipeFoodReviewFromRecipeView(this, event)") == 1
     assert "openIngredientFoodReviewFromRecipeView(this, event)" in recipe_view
 

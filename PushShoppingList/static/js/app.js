@@ -10837,10 +10837,41 @@ function scrollRecipeJumpTargetIntoView(target) {
         block: "start",
         inline: "nearest",
     });
+    scrollRecipeJumpTargetBelowStickyHeader(target);
 
     window.setTimeout(() => {
         target.classList.remove("recipe-jump-highlight");
     }, 1400);
+}
+
+function currentRecipesStickyHeaderOffset(target) {
+    const currentRecipesCard = target && target.closest
+        ? target.closest("#currentRecipeUrlLogCard:not(.card-collapsed)")
+        : null;
+    const header = currentRecipesCard
+        ? currentRecipesCard.querySelector(":scope > .recipe-url-log-header")
+        : null;
+
+    if (!header || !target.matches || !target.matches("[data-current-recipe-row]")) {
+        return 0;
+    }
+
+    const headerHeight = Math.ceil(header.getBoundingClientRect().height || 0);
+    return headerHeight > 0 ? headerHeight + 12 : 0;
+}
+
+function scrollRecipeJumpTargetBelowStickyHeader(target) {
+    const offset = currentRecipesStickyHeaderOffset(target);
+
+    if (offset <= 0) {
+        return;
+    }
+
+    window.scrollBy({
+        top: -offset,
+        left: 0,
+        behavior: "auto",
+    });
 }
 
 function updateViewSwitcherStickyOffset() {
