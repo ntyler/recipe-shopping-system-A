@@ -17,6 +17,26 @@ from PushShoppingList.services.storage_service import workspace_data_root
 SCHEMA_VERSION = "menu_mega_json_v1"
 SNAPSHOT_DIR_NAME = "menu_mega_json_snapshots"
 SNAPSHOT_INDEX_FILE = "menu_mega_json_snapshots.json"
+NUTRITION_INFERENCE_FIELDS = [
+    "serving_basis",
+    "calories",
+    "carbohydrates",
+    "protein",
+    "fat",
+    "saturated_fat",
+    "polyunsaturated_fat",
+    "monounsaturated_fat",
+    "trans_fat",
+    "cholesterol",
+    "sodium",
+    "potassium",
+    "fiber",
+    "sugar",
+    "vitamin_a",
+    "vitamin_c",
+    "calcium",
+    "iron",
+]
 
 
 def now_iso():
@@ -180,6 +200,8 @@ def default_recipe_inference():
 def default_nutrition_inference():
     return {
         "status": "not_generated",
+        **{field: None for field in NUTRITION_INFERENCE_FIELDS},
+        "other": [],
         "servings": None,
         "calories_per_serving": None,
         "protein_g": None,
