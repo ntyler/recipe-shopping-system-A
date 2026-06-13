@@ -57,6 +57,9 @@ from PushShoppingList.services import cloudflare_r2_storage
 from PushShoppingList.services.image_variant_service import ensure_webp_variants
 from PushShoppingList.services.job_runtime_context import current_job_id
 from PushShoppingList.services.job_runtime_context import model_snapshot_for_env
+from PushShoppingList.services.menu_mega_json_service import build_mega_menu_json
+from PushShoppingList.services.menu_mega_json_service import save_menu_mega_json_snapshot
+from PushShoppingList.services.menu_mega_json_service import unpack_mega_menu_json_to_sections
 from PushShoppingList.services.openai_model_service import model_value_for_env
 from PushShoppingList.services.openai_model_service import supports_custom_temperature
 from PushShoppingList.services.openai_throttle_service import throttled_audio_transcription
@@ -9492,7 +9495,7 @@ def menu_page_request_headers():
     }
 
 
-def fetch_menu_page_html(menu_url, cancellation_check=None):
+def fetch_menu_page_html(menu_url, cancellation_check=None, return_metadata=False):
     run_cancellation_check(cancellation_check)
     response = requests.get(
         menu_url,
@@ -9508,6 +9511,13 @@ def fetch_menu_page_html(menu_url, cancellation_check=None):
             if chunk:
                 chunks.append(chunk)
         response._content = b"".join(chunks)
+        if return_metadata:
+            return response.text, {
+                "final_url": str(response.url or menu_url),
+                "http_status": response.status_code,
+                "content_type": response.headers.get("content-type", ""),
+                "fetched_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+            }
         return response.text
     finally:
         response.close()
@@ -9520,6 +9530,34 @@ def menu_page_visible_text(html_text):
     page_text = soup.get_text(" ", strip=True)
     page_text = re.sub(r"\s+", " ", page_text).strip()
     return page_text[:MAX_PAGE_TEXT_CHARS]
+
+
+def extract_menu_restaurant_metadata_from_html(menu_url, html_text, page_text=""):
+    soup = BeautifulSoup(html_text or "", "html.parser")
+    title_text = clean_recipe_text(soup.title.string if soup.title and soup.title.string else "")
+    title_text = re.split(r"\s+[-|]\s+", title_text)[0] if title_text else ""
+    og_site = soup.find("meta", attrs={"property": "og:site_name"})
+    og_title = soup.find("meta", attrs={"property": "og:title"})
+    visible = page_text or menu_page_visible_text(html_text)
+    phone_match = re.search(r"(\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4})", visible)
+    address_match = re.search(
+        r"(\d{2,6}\s+[^,]{3,80},\s*[A-Za-z .'-]+,\s*[A-Z]{2}\s+\d{5}(?:-\d{4})?)",
+        visible,
+    )
+    parsed = urlparse(str(menu_url or ""))
+    website = f"{parsed.scheme}://{parsed.netloc}" if parsed.scheme and parsed.netloc else ""
+    return {
+        "restaurant_name": clean_recipe_text(
+            (og_site.get("content") if og_site else "")
+            or (og_title.get("content") if og_title else "")
+            or title_text
+            or "Restaurant Menu"
+        ),
+        "restaurant_website_url": website,
+        "source_menu_url": str(menu_url or "").strip(),
+        "phone": clean_recipe_text(phone_match.group(1)) if phone_match else "",
+        "full_address": clean_recipe_text(address_match.group(1)) if address_match else "",
+    }
 
 
 def extract_cartana_restaurant_id(menu_url, html_text=""):
@@ -10015,6 +10053,8 @@ def attach_menu_item_metadata(recipe, menu_item):
         "menu_id": clean_recipe_text(menu_item.get("menu_id") or ""),
         "restaurant_id": clean_recipe_text(menu_item.get("restaurant_id") or ""),
         "menu_section_id": clean_recipe_text(menu_item.get("menu_section_id") or ""),
+        "parent_menu_snapshot_id": clean_recipe_text(menu_item.get("parent_menu_snapshot_id") or ""),
+        "menu_mega_snapshot_id": clean_recipe_text(menu_item.get("parent_menu_snapshot_id") or ""),
     }
 
     if description or price:
@@ -10275,19 +10315,9 @@ def menu_item_raw_text(item):
         clean_recipe_text(item.get("menu_section") or item.get("section_name") or ""),
         clean_recipe_text(item.get("item_name") or ""),
         clean_recipe_text(item.get("description") or item.get("item_description") or ""),
-        clean_recipe_text(item.get("price") or ""),
+        clean_recipe_text(item.get("price_text") or item.get("price") or ""),
     ]
     return " | ".join(part for part in parts if part)
-
-
-def menu_item_dedupe_key(item):
-    item = item if isinstance(item, dict) else {}
-    return "|".join([
-        clean_recipe_text(item.get("menu_section") or item.get("section_name") or "").lower(),
-        clean_recipe_text(item.get("item_name") or "").lower(),
-        clean_recipe_text(item.get("description") or item.get("item_description") or "").lower(),
-        clean_recipe_text(item.get("price") or "").lower(),
-    ])
 
 
 def menu_item_deep_link(menu_url, item):
@@ -10308,10 +10338,19 @@ def normalize_menu_item_stub(menu_url, menu_item, index, source_name=""):
     title = clean_recipe_text(menu_item.get("item_name") or f"Menu Item {index + 1}")
     section_name = clean_recipe_text(menu_item.get("menu_section") or menu_item.get("section_name") or "")
     description = clean_recipe_text(menu_item.get("description") or menu_item.get("item_description") or "")
-    price = clean_recipe_text(menu_item.get("price") or "")
+    price = clean_recipe_text(menu_item.get("price_text") or menu_item.get("price") or "")
     recipe_url = menu_item_source_url(menu_url, title, index)
     deep_link_url = menu_item_deep_link(menu_url, menu_item)
     raw_text = clean_recipe_text(menu_item.get("raw_text") or menu_item_raw_text(menu_item))
+    parent_snapshot_id = clean_recipe_text(
+        menu_item.get("parent_menu_snapshot_id")
+        or menu_item.get("menu_mega_snapshot_id")
+        or menu_item.get("menu_snapshot_id")
+        or ""
+    )
+    section_id = clean_recipe_text(menu_item.get("section_id") or menu_item.get("menu_section_id") or "")
+    section_display_order = menu_item.get("section_display_order")
+    item_display_order = menu_item.get("item_display_order") or menu_item.get("display_order") or index + 1
 
     recipe = {
         "display_name": title,
@@ -10347,9 +10386,19 @@ def normalize_menu_item_stub(menu_url, menu_item, index, source_name=""):
         "menu_price": price,
         "price": price,
         "raw_text": raw_text,
+        "raw_html": str(menu_item.get("raw_html") or ""),
         "display_order": int(menu_item.get("display_order") or index + 1),
+        "section_id": section_id,
+        "section_display_order": section_display_order,
+        "item_display_order": item_display_order,
+        "parent_menu_snapshot_id": parent_snapshot_id,
+        "menu_mega_snapshot_id": parent_snapshot_id,
         "item_type": clean_recipe_text(menu_item.get("item_type") or "unknown").lower(),
         "broad_category": clean_recipe_text(menu_item.get("broad_category") or ""),
+        "tags": menu_item.get("tags") if isinstance(menu_item.get("tags"), list) else [],
+        "options": menu_item.get("options") if isinstance(menu_item.get("options"), list) else [],
+        "modifiers": menu_item.get("modifiers") if isinstance(menu_item.get("modifiers"), list) else [],
+        "image_url": clean_recipe_text(menu_item.get("image_url") or ""),
         "import_source_name": clean_recipe_text(source_name),
         "extraction_method": "menu_stub",
         "extraction_mode": "menu_stub",
@@ -10375,28 +10424,32 @@ def normalize_menu_item_stub(menu_url, menu_item, index, source_name=""):
         "price": price,
         "raw_text": raw_text,
         "display_order": recipe["display_order"],
+        "section_id": section_id,
+        "section_display_order": section_display_order,
+        "item_display_order": item_display_order,
+        "parent_menu_snapshot_id": parent_snapshot_id,
+        "menu_mega_snapshot_id": parent_snapshot_id,
         "menu_item_id": clean_recipe_text(menu_item.get("menu_item_id") or ""),
         "menu_id": clean_recipe_text(menu_item.get("menu_id") or ""),
         "restaurant_id": clean_recipe_text(menu_item.get("restaurant_id") or ""),
         "menu_section_id": clean_recipe_text(menu_item.get("menu_section_id") or ""),
         "item_type": recipe["item_type"],
         "broad_category": recipe["broad_category"],
+        "tags": recipe["tags"],
+        "options": recipe["options"],
+        "modifiers": recipe["modifiers"],
+        "image_url": recipe["image_url"],
     }
     normalize_extracted_recipe_identity(recipe)
     return recipe
 
 
-def menu_item_should_skip_stub(item, seen_keys):
+def menu_item_should_skip_stub(item):
     item = item if isinstance(item, dict) else {}
     if item.get("duplicate_of_index") not in (None, ""):
         return True, "duplicate"
     if item.get("should_create_recipe") is False:
         return True, clean_recipe_text(item.get("skip_reason") or "not_recipe_item") or "not_recipe_item"
-    key = menu_item_dedupe_key(item)
-    if key and key in seen_keys:
-        return True, "duplicate"
-    if key:
-        seen_keys.add(key)
     return False, ""
 
 
@@ -10409,13 +10462,24 @@ def build_menu_stub_extract_result_from_items(
     diagnostics=None,
     progress_callback=None,
     cancellation_check=None,
+    menu_snapshot=None,
 ):
     diagnostics = diagnostics if isinstance(diagnostics, dict) else {}
+    menu_snapshot = menu_snapshot if isinstance(menu_snapshot, dict) else {}
+    menu_snapshot_id = clean_recipe_text(
+        menu_snapshot.get("id")
+        or menu_snapshot.get("snapshot_id")
+        or ""
+    )
     diagnostics.update({
         "menu_sections_found": len(sections or []),
         "menu_items_found": len(flatten_menu_sections(sections)),
         "staged_import": True,
         "recipe_schema_found": False,
+        "menu_mega_json_saved": bool(menu_snapshot_id),
+        "menu_mega_snapshot_id": menu_snapshot_id,
+        "parent_menu_snapshot_id": menu_snapshot_id,
+        "item_records_unpacked": len(flatten_menu_sections(sections)),
     })
 
     if not flatten_menu_sections(sections):
@@ -10436,6 +10500,10 @@ def build_menu_stub_extract_result_from_items(
             "created_count": 0,
             "stubs_created": 0,
             "duplicates_skipped": 0,
+            "menu_mega_json_saved": bool(menu_snapshot_id),
+            "menu_mega_snapshot_id": menu_snapshot_id,
+            "parent_menu_snapshot_id": menu_snapshot_id,
+            "item_records_unpacked": diagnostics["item_records_unpacked"],
             "full_recipes_generated": 0,
             "nutrition_estimates_completed": 0,
             "pdfs_created": 0,
@@ -10465,18 +10533,17 @@ def build_menu_stub_extract_result_from_items(
 
     if progress_callback:
         progress_callback(
-            "Saving menu item stubs",
-            "Creating lightweight recipe records without ingredients, nutrition, or PDFs.",
+            "Unpacking mega menu JSON into item JSON records",
+            f"Preparing {len(flatten_menu_sections(cleaned_sections))} menu item records from the saved snapshot.",
         )
 
-    seen_keys = set()
     skipped = []
     recipes = []
     stubs_created = 0
 
     for index, menu_item in enumerate(flatten_menu_sections(cleaned_sections)):
         run_cancellation_check(cancellation_check)
-        skip, reason = menu_item_should_skip_stub(menu_item, seen_keys)
+        skip, reason = menu_item_should_skip_stub(menu_item)
         if skip:
             skipped.append({
                 "item_name": clean_recipe_text(menu_item.get("item_name") or ""),
@@ -10502,11 +10569,17 @@ def build_menu_stub_extract_result_from_items(
             "menu_description": stub.get("menu_description", ""),
             "menu_price": stub.get("menu_price", ""),
             "raw_text": stub.get("raw_text", ""),
+            "raw_html": stub.get("raw_html", ""),
             "display_order": stub.get("display_order"),
+            "section_id": stub.get("section_id", ""),
+            "section_display_order": stub.get("section_display_order"),
+            "item_display_order": stub.get("item_display_order"),
             "restaurant_id": stub.get("restaurant_id", ""),
             "menu_id": stub.get("menu_id", ""),
             "menu_section_id": stub.get("menu_section_id", ""),
             "menu_item_id": stub.get("menu_item_id", ""),
+            "parent_menu_snapshot_id": stub.get("parent_menu_snapshot_id", ""),
+            "menu_mega_snapshot_id": stub.get("menu_mega_snapshot_id", ""),
             "source_type": "menu_item_stub",
             "ai_inferred": False,
             "needs_ai_recipe": True,
@@ -10518,6 +10591,12 @@ def build_menu_stub_extract_result_from_items(
         })
         recipes.append(result)
         stubs_created += 1
+
+    if progress_callback:
+        progress_callback(
+            "Creating menu stubs",
+            f"Created {stubs_created} lightweight menu item stubs.",
+        )
 
     diagnostics["stubs_created"] = stubs_created
     diagnostics["duplicates_skipped"] = sum(1 for item in skipped if item.get("reason") == "duplicate")
@@ -10546,6 +10625,10 @@ def build_menu_stub_extract_result_from_items(
             "created_count": 0,
             "stubs_created": 0,
             "duplicates_skipped": diagnostics["duplicates_skipped"],
+            "menu_mega_json_saved": bool(menu_snapshot_id),
+            "menu_mega_snapshot_id": menu_snapshot_id,
+            "parent_menu_snapshot_id": menu_snapshot_id,
+            "item_records_unpacked": diagnostics["item_records_unpacked"],
             "full_recipes_generated": 0,
             "nutrition_estimates_completed": 0,
             "pdfs_created": 0,
@@ -10576,6 +10659,10 @@ def build_menu_stub_extract_result_from_items(
         "created_count": len(recipes),
         "stubs_created": stubs_created,
         "duplicates_skipped": diagnostics["duplicates_skipped"],
+        "menu_mega_json_saved": bool(menu_snapshot_id),
+        "menu_mega_snapshot_id": menu_snapshot_id,
+        "parent_menu_snapshot_id": menu_snapshot_id,
+        "item_records_unpacked": diagnostics["item_records_unpacked"],
         "full_recipes_generated": 0,
         "nutrition_estimates_completed": 0,
         "pdfs_created": 0,
@@ -10618,6 +10705,13 @@ def menu_stub_item_from_recipe(stub):
         "item_type": stub.get("item_type") or metadata.get("item_type") or "unknown",
         "broad_category": stub.get("broad_category") or metadata.get("broad_category") or "",
         "raw_text": stub.get("raw_text") or metadata.get("raw_text") or "",
+        "parent_menu_snapshot_id": (
+            stub.get("parent_menu_snapshot_id")
+            or stub.get("menu_mega_snapshot_id")
+            or metadata.get("parent_menu_snapshot_id")
+            or metadata.get("menu_mega_snapshot_id")
+            or ""
+        ),
     }
 
 
@@ -10676,6 +10770,8 @@ def generate_menu_recipe_from_stub(recipe_url, stub, user_id=None):
         "recipe_status": "generated",
         "display_order": stub.get("display_order") or normalized.get("display_order") or 1,
         "raw_text": stub.get("raw_text") or menu_item_raw_text(menu_item),
+        "parent_menu_snapshot_id": menu_item.get("parent_menu_snapshot_id") or "",
+        "menu_mega_snapshot_id": menu_item.get("parent_menu_snapshot_id") or "",
         "model": inference.get("model") or resolve_menu_model(),
         "model_used": inference.get("model") or resolve_menu_model(),
         "model_source": inference.get("model_source") or resolve_menu_model_source(),
@@ -11211,6 +11307,8 @@ def extract_menu_sections_from_url(menu_url, progress_callback=None, cancellatio
         }
         html_text = ""
         page_text = ""
+        html_snapshot_path = ""
+        page_fetch_metadata = {}
         sections = []
 
         report(
@@ -11218,10 +11316,27 @@ def extract_menu_sections_from_url(menu_url, progress_callback=None, cancellatio
             "Opening the restaurant menu page.",
         )
         try:
-            html_text = fetch_menu_page_html(menu_url, cancellation_check=check_cancelled)
+            html_fetch_result = fetch_menu_page_html(
+                menu_url,
+                cancellation_check=check_cancelled,
+                return_metadata=True,
+            )
+            if isinstance(html_fetch_result, tuple):
+                html_text, page_fetch_metadata = html_fetch_result
+            else:
+                html_text = html_fetch_result
+                page_fetch_metadata = {}
             check_cancelled()
             diagnostics["menu_page_fetched"] = True
-            (RAW_FOLDER / f"{safe_filename(menu_url)}_MENU_PAGE_HTML.html").write_text(html_text, encoding="utf-8")
+            diagnostics.update({
+                key: value
+                for key, value in page_fetch_metadata.items()
+                if key in {"final_url", "http_status", "content_type", "fetched_at"}
+            })
+            html_path = RAW_FOLDER / f"{safe_filename(menu_url)}_MENU_PAGE_HTML.html"
+            html_path.write_text(html_text, encoding="utf-8")
+            html_snapshot_path = str(html_path)
+            diagnostics["html_snapshot_path"] = html_snapshot_path
             check_cancelled()
             page_text = menu_page_visible_text(html_text)
             (RAW_FOLDER / f"{safe_filename(menu_url)}_MENU_PAGE_TEXT.txt").write_text(page_text, encoding="utf-8")
@@ -11274,12 +11389,17 @@ def extract_menu_sections_from_url(menu_url, progress_callback=None, cancellatio
                 check_cancelled()
                 diagnostics["rendered_page_used"] = True
                 diagnostics["menu_page_fetched"] = True
-                (RAW_FOLDER / f"{safe_filename(menu_url)}_MENU_RENDERED_HTML.html").write_text(rendered_html, encoding="utf-8")
+                rendered_html_path = RAW_FOLDER / f"{safe_filename(menu_url)}_MENU_RENDERED_HTML.html"
+                rendered_html_path.write_text(rendered_html, encoding="utf-8")
+                html_snapshot_path = str(rendered_html_path)
+                diagnostics["html_snapshot_path"] = html_snapshot_path
                 rendered_text = menu_page_visible_text(rendered_html)
                 if rendered_text:
                     page_text = rendered_text
                 sections, fallback_source = extract_structured_menu_items_from_html(rendered_html, menu_url)
                 diagnostics["menu_extraction_source"] = fallback_source or diagnostics.get("menu_extraction_source", "")
+                if rendered_html:
+                    html_text = rendered_html
             except Exception as exc:
                 if is_job_cancelled_exception(exc):
                     raise
@@ -11287,6 +11407,8 @@ def extract_menu_sections_from_url(menu_url, progress_callback=None, cancellatio
                 print(f"[recipe_import] action=menu_rendered_fetch_failed url={menu_url} error={exc}")
 
         check_cancelled()
+        diagnostics["html_snapshot_path"] = html_snapshot_path
+        diagnostics["restaurant"] = extract_menu_restaurant_metadata_from_html(menu_url, html_text, page_text)
         return {
             "ok": True,
             "success": True,
@@ -11295,6 +11417,8 @@ def extract_menu_sections_from_url(menu_url, progress_callback=None, cancellatio
             "menu_extract": True,
             "sections": sections,
             "extracted_text": page_text,
+            "html_text": html_text,
+            "html_snapshot_path": html_snapshot_path,
             "diagnostics": diagnostics,
         }
     except Exception as exc:
@@ -11400,15 +11524,48 @@ def extract_menu_stubs_from_url(menu_url, progress_callback=None, cancellation_c
                 "estimated_token_usage": {},
             }
 
-        return build_menu_stub_extract_result_from_items(
+        if progress_callback:
+            progress_callback(
+                "Building mega menu JSON",
+                "Creating one canonical menu-level JSON snapshot from the deterministic extraction.",
+            )
+        mega_json = build_mega_menu_json(
             menu_url,
             section_result.get("sections") or [],
+            extracted_text=section_result.get("extracted_text", ""),
+            diagnostics=section_result.get("diagnostics") or {},
+            html_text=section_result.get("html_text", ""),
+            html_snapshot_path=section_result.get("html_snapshot_path", ""),
+        )
+        run_cancellation_check(cancellation_check)
+
+        if progress_callback:
+            progress_callback(
+                "Saving mega menu JSON",
+                "Persisting the full menu snapshot before creating item records.",
+            )
+        menu_snapshot = save_menu_mega_json_snapshot(
+            mega_json,
+            job_id=current_job_id(),
+            extraction_status="saved",
+        )
+        run_cancellation_check(cancellation_check)
+
+        sections = unpack_mega_menu_json_to_sections(
+            menu_snapshot.get("menu_mega_json") or mega_json,
+            snapshot_id=menu_snapshot.get("id") or menu_snapshot.get("snapshot_id") or "",
+        )
+
+        return build_menu_stub_extract_result_from_items(
+            menu_url,
+            sections,
             source_name=menu_url,
             source_type="menu_url",
             extracted_text=section_result.get("extracted_text", ""),
             diagnostics=section_result.get("diagnostics") or {},
             progress_callback=progress_callback,
             cancellation_check=cancellation_check,
+            menu_snapshot=menu_snapshot,
         )
     except Exception as exc:
         if is_job_cancelled_exception(exc):

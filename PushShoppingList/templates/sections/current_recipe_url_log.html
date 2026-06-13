@@ -44,14 +44,9 @@
                 <button type="button" onclick="return setAllCurrentRecipeUrlSummariesCollapsed(true)">
                     Collapse all current recipes
                 </button>
-                <form method="POST"
-                      action="{{ url_for('recipe_bp.api_clear_recipe_urls_route') }}"
-                      class="remove-recipe-form recipe-url-log-menu-form"
-                      data-confirm-message="Clear all current recipes? This removes them from Current Recipes and removes unused shopping-list ingredients. Cookbooks are not purged.">
-                    <button type="submit" class="delete">
-                        Clear current recipes
-                    </button>
-                </form>
+                <button type="button" class="delete" onclick="return clearSelectedCurrentRecipes(this)">
+                    Clear selected recipes
+                </button>
                 <div class="recipe-url-summary-cookbook-menu-label">Menu AI</div>
                 <button type="button" onclick="return generateSelectedMenuStubRecipes(this)">
                     Generate Selected Recipes
@@ -149,10 +144,26 @@
                                                     Generate Section
                                                 </button>
                                             {% endif %}
+                                            {% if recipe.parent_menu_snapshot_id or recipe.menu_mega_snapshot_id %}
+                                                <button type="button"
+                                                        class="menu-recipe-generate-inline"
+                                                        data-menu-snapshot-id="{{ recipe.parent_menu_snapshot_id or recipe.menu_mega_snapshot_id }}"
+                                                        onclick="return viewMegaMenuJson(this, event)">
+                                                    View Mega Menu JSON
+                                                </button>
+                                            {% endif %}
                                         {% elif recipe.source_type == "menu_item_inferred" or recipe.ai_inferred %}
                                             <span class="menu-recipe-status-badge menu-recipe-status-generated">
                                                 AI-Inferred Recipe
                                             </span>
+                                            {% if recipe.parent_menu_snapshot_id or recipe.menu_mega_snapshot_id %}
+                                                <button type="button"
+                                                        class="menu-recipe-generate-inline"
+                                                        data-menu-snapshot-id="{{ recipe.parent_menu_snapshot_id or recipe.menu_mega_snapshot_id }}"
+                                                        onclick="return viewMegaMenuJson(this, event)">
+                                                    View Mega Menu JSON
+                                                </button>
+                                            {% endif %}
                                         {% endif %}
                                     </span>
                                 </div>

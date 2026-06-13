@@ -357,6 +357,21 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
     created_urls = []
     failed_items = 0
     context = "job-menu-url" if menu_extract else "job-recipe-url"
+    menu_job_stats = {
+        "menu_mega_json_saved": False,
+        "menu_mega_json_snapshots_created": 0,
+        "menu_mega_snapshot_ids": [],
+        "item_records_unpacked": 0,
+        "stubs_created": 0,
+        "duplicates_skipped": 0,
+        "full_recipes_generated": 0,
+        "nutrition_estimates_completed": 0,
+        "pdfs_created": 0,
+        "openai_calls_used": 0,
+        "estimated_token_usage": {},
+        "menu_sections_found": 0,
+        "menu_items_found": 0,
+    }
     job_model = stored_job_model_metadata(job_id, model_metadata(
         resolve_menu_cleanup_model() if menu_extract else MODEL,
         resolve_menu_cleanup_model_source() if menu_extract else "recipe",
@@ -373,7 +388,7 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
 
     for index, url in enumerate(urls):
         ensure_not_cancelled(job_id)
-        step = "Extracting menu sections" if menu_extract else "Reading source URL"
+        step = "Fetching menu page" if menu_extract else "Reading source URL"
         update_job_progress(
             job_id,
             current_step=step,
@@ -425,7 +440,7 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
 
             update_job_progress(
                 job_id,
-                current_step="Creating recipe records",
+                current_step="Creating menu stubs",
                 progress_percent=bounded_percent(index, total, 65, 90),
             )
             with workspace_write_lock("recipe-imports"):
@@ -436,6 +451,38 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
                     progress_callback=progress_callback,
                 )
             if committed.get("ok"):
+                snapshot_id = str(
+                    committed.get("menu_mega_snapshot_id")
+                    or committed.get("parent_menu_snapshot_id")
+                    or ""
+                ).strip()
+                if committed.get("menu_mega_json_saved"):
+                    menu_job_stats["menu_mega_json_saved"] = True
+                    menu_job_stats["menu_mega_json_snapshots_created"] += 1
+                if snapshot_id and snapshot_id not in menu_job_stats["menu_mega_snapshot_ids"]:
+                    menu_job_stats["menu_mega_snapshot_ids"].append(snapshot_id)
+                for key in (
+                    "item_records_unpacked",
+                    "stubs_created",
+                    "duplicates_skipped",
+                    "full_recipes_generated",
+                    "nutrition_estimates_completed",
+                    "pdfs_created",
+                    "openai_calls_used",
+                    "menu_sections_found",
+                    "menu_items_found",
+                ):
+                    menu_job_stats[key] += int(committed.get(key) or 0)
+                usage = committed.get("estimated_token_usage") if isinstance(committed.get("estimated_token_usage"), dict) else {}
+                for usage_key, usage_value in usage.items():
+                    try:
+                        menu_job_stats["estimated_token_usage"][usage_key] = (
+                            int(menu_job_stats["estimated_token_usage"].get(usage_key) or 0)
+                            + int(usage_value or 0)
+                        )
+                    except (TypeError, ValueError):
+                        menu_job_stats["estimated_token_usage"][usage_key] = usage_value
+
                 committed_urls = committed.get("created_urls") or committed.get("recipe_urls") or []
                 if not committed_urls and isinstance(committed.get("recipes"), list):
                     committed_urls = [
@@ -508,6 +555,8 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
         "links": recipe_links(created_urls),
         **job_model,
     }
+    if menu_extract:
+        result_payload.update(menu_job_stats)
     update_job_progress(
         job_id,
         total_items=final_total,

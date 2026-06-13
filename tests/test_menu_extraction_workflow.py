@@ -1,7 +1,9 @@
 import json
 import time
+from pathlib import Path
 
 from PushShoppingList.routes import recipe_routes
+from PushShoppingList.services import menu_mega_json_service
 from PushShoppingList.services import openai_model_service
 from PushShoppingList.services import recipe_extract_service
 
@@ -48,6 +50,145 @@ def test_cartana_menu_payload_extracts_sections_items_and_prices():
     assert items[0]["menu_section"] == "Kitchen Appetizers"
     assert items[0]["description"] == "2 veggie golden crispy rolls."
     assert items[0]["price"] == "$5.99"
+
+
+def test_mega_menu_json_snapshot_builds_saves_and_unpacks(tmp_path, monkeypatch):
+    monkeypatch.setattr(menu_mega_json_service, "workspace_data_root", lambda: tmp_path)
+    source_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902"
+    sections = [
+        {
+            "section_name": "Kitchen Appetizers",
+            "description": "Appetizers from the Kitchen",
+            "items": [
+                {
+                    "item_name": "Spring Roll",
+                    "description": "2 veggie golden crispy rolls.",
+                    "price": "$5.99",
+                    "menu_item_id": "MIT1",
+                    "menu_id": "MEN1",
+                    "is_veggie": True,
+                }
+            ],
+        }
+    ]
+
+    mega_json = menu_mega_json_service.build_mega_menu_json(
+        source_url,
+        sections,
+        extracted_text="Vel Asian Cuisine Spring Roll $5.99",
+        diagnostics={
+            "final_url": source_url,
+            "http_status": 200,
+            "content_type": "text/html",
+            "restaurant": {"restaurant_name": "Vel Asian Cuisine"},
+            "menu_extraction_source": "cartana_api",
+        },
+        html_text="<html><title>Vel Asian Cuisine</title><a href='/rs/menu_home.action'>Menu</a></html>",
+        html_snapshot_path=str(tmp_path / "vel.html"),
+    )
+    snapshot = menu_mega_json_service.save_menu_mega_json_snapshot(mega_json, job_id="job-1")
+    loaded = menu_mega_json_service.load_menu_mega_json_snapshot(snapshot["id"])
+    unpacked = menu_mega_json_service.unpack_mega_menu_json_to_sections(
+        loaded["menu_mega_json"],
+        snapshot_id=loaded["id"],
+    )
+
+    assert loaded["item_count"] == 1
+    assert loaded["section_count"] == 1
+    assert loaded["menu_mega_json"]["schema_version"] == "menu_mega_json_v1"
+    assert loaded["menu_mega_json"]["source"]["source_url"] == source_url
+    assert loaded["menu_mega_json"]["restaurant"]["name"] == "Vel Asian Cuisine"
+    assert loaded["menu_mega_json"]["menu"]["sections"][0]["items"][0]["name"] == "Spring Roll"
+    assert loaded["menu_mega_json"]["menu"]["sections"][0]["items"][0]["price"] == 5.99
+    assert loaded["menu_mega_json"]["extraction"]["used_openai"] is False
+    assert unpacked[0]["items"][0]["parent_menu_snapshot_id"] == loaded["id"]
+    assert unpacked[0]["items"][0]["price"] == "$5.99"
+
+
+def test_menu_stub_url_import_saves_mega_snapshot_and_parent_traceability(monkeypatch, tmp_path):
+    monkeypatch.delenv("OPENAI_MENU_CLEANUP_ENABLED", raising=False)
+    monkeypatch.setattr(menu_mega_json_service, "workspace_data_root", lambda: tmp_path)
+    monkeypatch.setattr(recipe_extract_service, "RAW_FOLDER", tmp_path)
+    source_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902"
+    payload = [
+        {
+            "menu": {
+                "menuId": "MEN1",
+                "menuData": {
+                    "enMenuTitle": "Kitchen Appetizers",
+                    "enMenuText": "Appetizers from the Kitchen",
+                },
+            },
+            "itemList": [
+                {
+                    "price": 5.99,
+                    "menuItemId": "MIT1",
+                    "menuItemData": {
+                        "enItemTitle": "Spring Roll",
+                        "enItemText": "2 veggie golden crispy rolls.",
+                    },
+                    "isVeggie": True,
+                }
+            ],
+        }
+    ]
+    saved = []
+    progress_messages = []
+
+    def fake_fetch_menu_page_html(url, cancellation_check=None, return_metadata=False):
+        html = "<html><title>Vel Asian Cuisine</title><script>getRestaurantMenu_home.action</script></html>"
+        metadata = {
+            "final_url": url,
+            "http_status": 200,
+            "content_type": "text/html",
+            "fetched_at": "2026-06-13T00:00:00Z",
+        }
+        return (html, metadata) if return_metadata else html
+
+    def fail_openai(*_args, **_kwargs):
+        raise AssertionError("Default menu URL import should not call OpenAI")
+
+    monkeypatch.setattr(recipe_extract_service, "fetch_menu_page_html", fake_fetch_menu_page_html)
+    monkeypatch.setattr(recipe_extract_service, "fetch_cartana_menu_payload", lambda url, html, cancellation_check=None: (payload, {"ok": True}))
+    monkeypatch.setattr(recipe_extract_service, "send_menu_cleanup_prompt_to_openai", fail_openai)
+    monkeypatch.setattr(recipe_extract_service, "infer_menu_item_recipe", fail_openai)
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "save_extracted_recipe_json",
+        lambda recipe_url, json_data: saved.append((recipe_url, dict(json_data))) or tmp_path / "stub.json",
+    )
+
+    result = recipe_extract_service.extract_menu_stubs_from_url(
+        source_url,
+        progress_callback=lambda message, summary=None: progress_messages.append(message),
+    )
+    snapshot = menu_mega_json_service.load_menu_mega_json_snapshot(result["menu_mega_snapshot_id"])
+
+    assert result["ok"] is True
+    assert result["menu_mega_json_saved"] is True
+    assert result["stubs_created"] == 1
+    assert result["item_records_unpacked"] == 1
+    assert result["openai_calls_used"] == 0
+    assert "Building mega menu JSON" in progress_messages
+    assert "Saving mega menu JSON" in progress_messages
+    assert "Unpacking mega menu JSON into item JSON records" in progress_messages
+    assert snapshot["menu_mega_json"]["source"]["http_status"] == 200
+    assert snapshot["menu_mega_json"]["menu"]["sections"][0]["items"][0]["name"] == "Spring Roll"
+    assert saved[0][1]["source_type"] == "menu_item_stub"
+    assert saved[0][1]["parent_menu_snapshot_id"] == snapshot["id"]
+    assert saved[0][1]["source_metadata"]["parent_menu_snapshot_id"] == snapshot["id"]
+
+
+def test_mega_menu_json_viewer_static_hooks_are_present():
+    template = Path("PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(encoding="utf-8")
+    script = Path("PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    routes = Path("PushShoppingList/routes/recipe_routes.py").read_text(encoding="utf-8")
+
+    assert "View Mega Menu JSON" in template
+    assert "viewMegaMenuJson(this, event)" in template
+    assert "copyMegaMenuJson" in script
+    assert "/api/menu_mega_json_snapshots/" in script
+    assert "api_menu_mega_json_snapshot_route" in routes
 
 
 def test_menu_item_result_preserves_original_menu_url_and_unique_record_url(monkeypatch, tmp_path):

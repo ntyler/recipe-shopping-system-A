@@ -24486,14 +24486,16 @@ function importJobToExtractionProgress(job, urls, isMenuExtract) {
     const result = jobResultPayload(job || {});
     const stubCount = Number(result.stubs_created || 0);
     const createdCount = Number(result.created_count || completedItems || 0);
+    const megaSnapshotCount = Number(result.menu_mega_json_snapshots_created || (result.menu_mega_json_saved ? 1 : 0));
+    const unpackedCount = Number(result.item_records_unpacked || result.menu_items_found || stubCount || 0);
     const displayedCount = isMenuExtract && stubCount ? stubCount : createdCount;
     const runningSummary = job && job.current_step
         ? appendJobModelReference(job.current_step, job)
         : "Import is running in the background.";
     const summary = completed
         ? (
-            isMenuExtract && stubCount
-                ? `Imported ${stubCount} menu item${stubCount === 1 ? "" : "s"} as lightweight stubs.`
+            isMenuExtract && (stubCount || megaSnapshotCount)
+                ? `Menu import complete. Created ${megaSnapshotCount || 1} mega menu JSON snapshot${(megaSnapshotCount || 1) === 1 ? "" : "s"} and unpacked ${unpackedCount || stubCount} menu item${(unpackedCount || stubCount) === 1 ? "" : "s"} into lightweight stubs.`
                 : `Imported ${displayedCount} recipe${displayedCount === 1 ? "" : "s"}.`
         )
         : failed
@@ -24570,7 +24572,7 @@ async function startRecipeExtractionUrls(urls, options = {}) {
         ? `Downloading ${urls.length} menu page${urls.length === 1 ? "" : "s"}...`
         : `Downloading ${urls.length} recipe${urls.length === 1 ? "" : "s"}...`;
     summary.textContent = isMenuExtract
-        ? "Fetching menu pages, extracting menu items without AI, and saving lightweight stubs."
+        ? "Fetching menu pages, building mega menu JSON snapshots, and saving lightweight stubs."
         : "Fetching recipe pages and extracting ingredients.";
     if (bar) {
         bar.style.width = "10%";
@@ -25136,6 +25138,66 @@ function selectedRecipeBatchUrls(options = {}) {
     }));
 }
 
+async function clearSelectedCurrentRecipes(button) {
+    const urls = selectedRecipeBatchUrls();
+    if (!urls.length) {
+        alert("Select at least one recipe to clear.");
+        return false;
+    }
+
+    const recipeLabel = urls.length === 1 ? "recipe" : "recipes";
+    const confirmMessage = `Clear ${urls.length} selected ${recipeLabel}? This removes ${recipeLabel === "recipe" ? "it" : "them"} from Current Recipes and removes unused shopping-list ingredients. Cookbooks are not purged.`;
+    if (!window.confirm(confirmMessage)) {
+        return false;
+    }
+
+    const originalText = button ? (button.textContent || "") : "";
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Clearing...";
+    }
+
+    try {
+        const response = await fetch("/api/recipe_urls/clear", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "fetch",
+            },
+            body: JSON.stringify({ recipe_urls: urls }),
+            redirect: "follow",
+        });
+        let payload = null;
+
+        try {
+            payload = await response.clone().json();
+        } catch (err) {
+            payload = null;
+        }
+
+        if (!response.ok || (payload && payload.ok === false)) {
+            let message = parseFormError(response, "Unable to clear selected recipes.");
+
+            if (payload) {
+                message = String((payload && (payload.error || payload.message)) || message).trim() || message;
+            }
+
+            throw new Error(message);
+        }
+
+        window.location.href = (payload && payload.redirect_url) || "/";
+    } catch (err) {
+        console.warn("Unable to clear selected recipes.", err);
+        alert(err.message || "Unable to clear selected recipes.");
+        if (button) {
+            button.disabled = false;
+            button.textContent = originalText || "Clear selected recipes";
+        }
+    }
+
+    return false;
+}
+
 function allMenuStubRecipeUrls() {
     return uniqueRecipeUrls(menuStubRows().map(row => row.dataset.recipeUrl || ""));
 }
@@ -25199,6 +25261,128 @@ async function startMenuRecipeGeneration(urls, button) {
     }
     await refreshRecipesAfterMenuRoutine();
     return true;
+}
+
+function ensureMegaMenuJsonModal() {
+    let modal = document.getElementById("megaMenuJsonModal");
+
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "megaMenuJsonModal";
+        modal.className = "product-prompt-modal-backdrop";
+        modal.setAttribute("aria-hidden", "true");
+        modal.innerHTML = `
+            <div class="product-prompt-modal" role="dialog" aria-modal="true" aria-labelledby="megaMenuJsonTitle">
+                <div class="bulk-alt-modal-header">
+                    <button type="button" class="bulk-prompt-btn" onclick="copyMegaMenuJson()">Copy</button>
+                    <h2 id="megaMenuJsonTitle" class="bulk-alt-modal-title">Mega Menu JSON</h2>
+                    <button type="button" class="product-close-btn" onclick="closeMegaMenuJsonModal()">Close</button>
+                </div>
+                <p id="megaMenuJsonSubtitle" class="bulk-alt-modal-subtitle"></p>
+                <pre id="megaMenuJsonContent" class="product-prompt-content"></pre>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    return modal;
+}
+
+function closeMegaMenuJsonModal() {
+    const modal = document.getElementById("megaMenuJsonModal");
+
+    if (modal) {
+        modal.classList.remove("open");
+        modal.setAttribute("aria-hidden", "true");
+    }
+
+    document.body.classList.remove("modal-open");
+    return false;
+}
+
+function showMegaMenuJsonSnapshot(snapshot) {
+    const modal = ensureMegaMenuJsonModal();
+    const subtitle = document.getElementById("megaMenuJsonSubtitle");
+    const content = document.getElementById("megaMenuJsonContent");
+    const megaJson = snapshot && snapshot.menu_mega_json ? snapshot.menu_mega_json : snapshot || {};
+    const itemCount = Number((snapshot && snapshot.item_count) || (megaJson.extraction && megaJson.extraction.item_count) || 0);
+    const sectionCount = Number((snapshot && snapshot.section_count) || (megaJson.extraction && megaJson.extraction.section_count) || 0);
+    const sourceUrl = String((snapshot && snapshot.source_url) || (megaJson.source && megaJson.source.source_url) || "").trim();
+
+    if (subtitle) {
+        subtitle.textContent = [
+            sourceUrl,
+            `${sectionCount} sections`,
+            `${itemCount} items`,
+        ].filter(Boolean).join(" | ");
+    }
+
+    if (content) {
+        content.textContent = JSON.stringify(megaJson, null, 2);
+    }
+
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+}
+
+async function copyMegaMenuJson() {
+    const content = document.getElementById("megaMenuJsonContent");
+    const text = content ? content.textContent || "" : "";
+
+    if (!text || !navigator.clipboard) {
+        return false;
+    }
+
+    try {
+        await navigator.clipboard.writeText(text);
+    } catch (err) {
+        console.warn("Unable to copy mega menu JSON.", err);
+    }
+
+    return false;
+}
+
+async function viewMegaMenuJson(button, event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const snapshotId = String(button && button.dataset ? button.dataset.menuSnapshotId || "" : "").trim();
+    if (!snapshotId) {
+        alert("Mega menu JSON snapshot was not found.");
+        return false;
+    }
+
+    const originalText = button ? button.textContent : "";
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Loading...";
+    }
+
+    try {
+        const response = await fetch(`/api/menu_mega_json_snapshots/${encodeURIComponent(snapshotId)}`, {
+            headers: {
+                "Accept": "application/json",
+                "X-Requested-With": "fetch",
+            },
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload || payload.ok === false) {
+            throw new Error((payload && (payload.error || payload.message)) || "Unable to load mega menu JSON.");
+        }
+        showMegaMenuJsonSnapshot(payload.snapshot || {});
+    } catch (err) {
+        alert(err.message || "Unable to load mega menu JSON.");
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = originalText || "View Mega Menu JSON";
+        }
+    }
+
+    return false;
 }
 
 async function generateMenuStubRecipe(button, event) {
@@ -25413,7 +25597,7 @@ function renderExtractionProgress(progress) {
     status.textContent = progressStatusText(progress);
     summary.textContent = progress.summary || (
         isMenuExtract
-            ? "Fetching menu pages, extracting menu items without AI, and saving lightweight stubs."
+            ? "Fetching menu pages, building mega menu JSON snapshots, and saving lightweight stubs."
             : "Fetching recipe pages and extracting ingredients."
     );
     bar.style.width = `${Math.max(0, Math.min(100, progress.percent || 0))}%`;

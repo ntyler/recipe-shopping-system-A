@@ -140,6 +140,7 @@ from PushShoppingList.services.job_service import job_limit_key
 from PushShoppingList.services.job_service import owner_job_count_for_limit_key
 from PushShoppingList.services.job_service import queued_limit_status
 from PushShoppingList.services.job_service import update_job
+from PushShoppingList.services.menu_mega_json_service import load_menu_mega_json_snapshot
 from PushShoppingList.services.openai_usage_service import openai_usage_dashboard_for_user
 from PushShoppingList.services.openai_usage_service import record_app_activity
 from PushShoppingList.services.openai_throttle_service import throttled_chat_completion
@@ -1792,6 +1793,23 @@ def commit_menu_import_result(
         *(result.get("item_failures") if isinstance(result.get("item_failures"), list) else []),
         *commit_failures,
     ]
+    unpacked_item_count = int(result.get("item_records_unpacked") or len(new_stub_entries))
+    if new_stub_entries and not new_recipe_entries and result.get("menu_mega_json_saved"):
+        category_status_message = (
+            "Menu import complete. Created one mega menu JSON snapshot and "
+            f"unpacked {unpacked_item_count} menu item"
+            f"{'' if unpacked_item_count == 1 else 's'} into lightweight stubs."
+        )
+    elif new_stub_entries and not new_recipe_entries:
+        category_status_message = (
+            f"Imported {len(new_stub_entries)} menu item stub"
+            f"{'' if len(new_stub_entries) == 1 else 's'}."
+        )
+    else:
+        category_status_message = (
+            f"Generated categories for {category_success_count} new menu item recipe"
+            f"{'' if category_success_count == 1 else 's'}."
+        )
     result = {
         **result,
         "ok": ok,
@@ -1800,6 +1818,13 @@ def commit_menu_import_result(
         "created_count": len(newly_created),
         "committed_count": len(committed),
         "stubs_created": len(new_stub_entries),
+        "menu_mega_json_saved": bool(result.get("menu_mega_json_saved")),
+        "menu_mega_snapshot_id": result.get("menu_mega_snapshot_id", ""),
+        "parent_menu_snapshot_id": result.get("parent_menu_snapshot_id", ""),
+        "item_records_unpacked": int(result.get("item_records_unpacked") or 0),
+        "duplicates_skipped": int(result.get("duplicates_skipped") or 0),
+        "openai_calls_used": int(result.get("openai_calls_used") or 0),
+        "estimated_token_usage": result.get("estimated_token_usage") if isinstance(result.get("estimated_token_usage"), dict) else {},
         "full_recipes_generated": len(new_recipe_entries),
         "nutrition_estimates_completed": 0,
         "pdfs_created": pdf_success_count,
@@ -1820,17 +1845,7 @@ def commit_menu_import_result(
             "status": "updated",
             "count": category_success_count,
         },
-        "category_status_message": (
-            (
-                f"Imported {len(new_stub_entries)} menu item stub"
-                f"{'' if len(new_stub_entries) == 1 else 's'}."
-            )
-            if new_stub_entries and not new_recipe_entries
-            else (
-                f"Generated categories for {category_success_count} new menu item recipe"
-                f"{'' if category_success_count == 1 else 's'}."
-            )
-        ),
+        "category_status_message": category_status_message,
     }
     if not ok:
         result["error"] = result.get("error") or "No menu item recipes were created."
@@ -2292,6 +2307,28 @@ def api_describe_recipe_image_route():
         "uploaded_file_path": str(upload_path),
         "debug": debug,
     }), 200
+
+
+@recipe_bp.route("/api/menu_mega_json_snapshots/<snapshot_id>", methods=["GET"])
+def api_menu_mega_json_snapshot_route(snapshot_id):
+    account_response = require_account_for_import(wants_json=True)
+    if account_response:
+        return account_response
+
+    snapshot = load_menu_mega_json_snapshot(snapshot_id)
+    if not snapshot:
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "Mega menu JSON snapshot was not found.",
+            "error_code": "MENU_MEGA_JSON_NOT_FOUND",
+        }), 404
+
+    return jsonify({
+        "ok": True,
+        "success": True,
+        "snapshot": snapshot,
+    })
 
 
 @recipe_bp.route("/api/debug-openai-vision", methods=["GET", "POST"])
@@ -3157,13 +3194,83 @@ def api_reorder_recipe_urls_route():
     })
 
 
+def requested_recipe_urls_for_clear():
+    requested_urls = []
+    has_requested_urls = False
+    payload = request.get_json(silent=True) or {}
+
+    if isinstance(payload, dict):
+        for key in ("recipe_urls", "urls", "selected_recipe_urls"):
+            if key not in payload:
+                continue
+
+            has_requested_urls = True
+            value = payload.get(key)
+            if isinstance(value, list):
+                requested_urls.extend(value)
+            else:
+                requested_urls.append(value)
+
+    for key in ("recipe_urls", "urls", "selected_recipe_urls"):
+        if key in request.form:
+            has_requested_urls = True
+            requested_urls.extend(request.form.getlist(key))
+
+    return has_requested_urls, [
+        str(url or "").strip()
+        for url in requested_urls
+        if str(url or "").strip()
+    ]
+
+
+def clear_recipe_urls_error_response(message, status_code, wants_json):
+    if wants_json:
+        return jsonify({"ok": False, "error": message}), status_code
+
+    flash(message, "error")
+    return redirect("/")
+
+
 @recipe_bp.route("/api/recipe_urls/clear", methods=["POST"])
 def api_clear_recipe_urls_route():
     current_urls = load_recipe_urls()
     wants_json = wants_fetch_json_response()
+    has_requested_urls, requested_urls = requested_recipe_urls_for_clear()
+
+    if has_requested_urls:
+        requested_keys = {
+            normalize_recipe_url_key(url)
+            for url in requested_urls
+            if normalize_recipe_url_key(url)
+        }
+
+        if not requested_keys:
+            return clear_recipe_urls_error_response(
+                "Select at least one recipe to clear.",
+                400,
+                wants_json,
+            )
+
+        urls_to_clear = []
+        seen_keys = set()
+
+        for url in current_urls:
+            key = normalize_recipe_url_key(url)
+            if key and key in requested_keys and key not in seen_keys:
+                urls_to_clear.append(url)
+                seen_keys.add(key)
+
+        if not urls_to_clear:
+            return clear_recipe_urls_error_response(
+                "No selected current recipes matched.",
+                400,
+                wants_json,
+            )
+    else:
+        urls_to_clear = current_urls
 
     try:
-        for url in current_urls:
+        for url in urls_to_clear:
             remove_recipe_and_unused_ingredients(url)
             remove_recipe_url(url)
     except Exception as exc:
@@ -3174,7 +3281,7 @@ def api_clear_recipe_urls_route():
     if wants_json:
         return jsonify({
             "ok": True,
-            "cleared_recipe_count": len(current_urls),
+            "cleared_recipe_count": len(urls_to_clear),
             "redirect_url": "/",
         })
 

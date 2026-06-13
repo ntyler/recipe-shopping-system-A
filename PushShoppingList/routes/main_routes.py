@@ -702,6 +702,8 @@ def recipe_view_rows(recipe_urls, food_rules=None, image_variants=None, include_
             "needs_ai_recipe": bool(recipe_data.get("needs_ai_recipe")),
             "recipe_status": recipe_data.get("recipe_status", ""),
             "menu_section": recipe_data.get("menu_section", ""),
+            "parent_menu_snapshot_id": recipe_menu_snapshot_id(recipe_data),
+            "menu_mega_snapshot_id": recipe_menu_snapshot_id(recipe_data),
             "source_href": recipe_source_href(recipe["url"]),
             "source_display_url": recipe_source_display_url(recipe["url"]),
             "pdf_public_url": recipe_pdf_public_url(recipe["url"]),
@@ -762,6 +764,19 @@ def recipe_description_for_view(recipe_data):
     return ""
 
 
+def recipe_menu_snapshot_id(recipe_data):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    metadata = recipe_data.get("source_metadata") if isinstance(recipe_data.get("source_metadata"), dict) else {}
+    return clean_display_text(
+        recipe_data.get("parent_menu_snapshot_id")
+        or recipe_data.get("menu_mega_snapshot_id")
+        or recipe_data.get("menu_snapshot_id")
+        or metadata.get("parent_menu_snapshot_id")
+        or metadata.get("menu_mega_snapshot_id")
+        or metadata.get("menu_snapshot_id")
+    )
+
+
 def recipe_rating_for_view(recipe_data):
     try:
         rating = int((recipe_data or {}).get("rating") or 0)
@@ -813,6 +828,8 @@ def recipe_url_log_rows(recipe_urls, cookbook_assignments=None, food_rules=None,
             "needs_ai_recipe": bool(recipe_data.get("needs_ai_recipe")),
             "recipe_status": recipe_data.get("recipe_status", ""),
             "menu_section": recipe_data.get("menu_section", ""),
+            "parent_menu_snapshot_id": recipe_menu_snapshot_id(recipe_data),
+            "menu_mega_snapshot_id": recipe_menu_snapshot_id(recipe_data),
             "source_href": recipe_source_href(recipe["url"]),
             "source_display_url": recipe_source_display_url(recipe["url"]),
             "pdf_public_url": recipe_pdf_public_url(recipe["url"]),
