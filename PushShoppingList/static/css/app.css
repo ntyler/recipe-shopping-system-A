@@ -647,6 +647,71 @@ body {
             gap: 10px;
         }
 
+        .pdf-orphan-admin {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 10px 12px;
+            align-items: center;
+            margin-bottom: 14px;
+            padding: 12px;
+            border: 1px solid #34424a;
+            border-radius: 8px;
+            background: #101516;
+            box-sizing: border-box;
+        }
+
+        .pdf-orphan-admin-main {
+            min-width: 0;
+        }
+
+        .pdf-orphan-admin h3 {
+            margin: 0 0 6px 0;
+            color: #f3f4f6;
+            font-size: 16px;
+        }
+
+        .pdf-orphan-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .pdf-orphan-list {
+            grid-column: 1 / -1;
+            display: grid;
+            gap: 8px;
+        }
+
+        .pdf-orphan-list[hidden] {
+            display: none;
+        }
+
+        .pdf-orphan-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 8px 12px;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid #28343b;
+            border-radius: 7px;
+            background: #15191a;
+        }
+
+        .pdf-orphan-key {
+            color: #e5edf2;
+            font-size: 13px;
+            font-weight: 800;
+            overflow-wrap: anywhere;
+        }
+
+        .pdf-orphan-link {
+            color: #bfe8ff;
+            font-size: 12px;
+            font-weight: 800;
+            text-decoration: underline;
+        }
+
         .pdf-share-row {
             display: grid;
             grid-template-columns: minmax(0, 1fr) auto;
@@ -779,16 +844,20 @@ body {
         }
 
         @media (max-width: 650px) {
+            .pdf-orphan-admin,
+            .pdf-orphan-row,
             .pdf-share-row,
             .pdf-share-active,
             .pdf-cloudflare-active {
                 grid-template-columns: 1fr;
             }
 
+            .pdf-orphan-actions,
             .pdf-share-actions {
                 justify-content: stretch;
             }
 
+            .pdf-orphan-actions .pdf-share-action-btn,
             .pdf-share-action-btn,
             .pdf-share-action-link {
                 width: 100%;

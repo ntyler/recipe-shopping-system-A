@@ -110,6 +110,8 @@ ADMIN_ENDPOINTS = {
     "pdf_bp.create_pdf_share_route",
     "pdf_bp.revoke_pdf_share_route",
     "pdf_bp.upload_pdf_to_cloudflare_route",
+    "pdf_bp.cloudflare_orphan_pdfs_route",
+    "pdf_bp.delete_cloudflare_orphan_pdfs_route",
     "main_bp.update_chatgpt_models_route",
     "feedback_bp.update_feedback_admin_route",
 }

@@ -1,4 +1,6 @@
 import json
+from datetime import datetime
+from datetime import timezone
 from pathlib import Path
 
 from PushShoppingList.services import cloudflare_r2_storage
@@ -20,6 +22,8 @@ class FakeR2Client:
     def __init__(self):
         self.uploads = []
         self.deletes = []
+        self.list_pages = {}
+        self.list_calls = []
 
     def upload_file(self, filename, bucket, key, ExtraArgs=None):
         self.uploads.append({
@@ -34,6 +38,26 @@ class FakeR2Client:
             "bucket": Bucket,
             "key": Key,
         })
+
+    def list_objects_v2(self, **kwargs):
+        self.list_calls.append(kwargs)
+        prefix = kwargs.get("Prefix", "")
+        token = kwargs.get("ContinuationToken", "")
+        pages = self.list_pages.get(prefix, [])
+        index = int(token or 0)
+        page = pages[index] if index < len(pages) else {"Contents": []}
+
+        if index + 1 < len(pages):
+            return {
+                **page,
+                "IsTruncated": True,
+                "NextContinuationToken": str(index + 1),
+            }
+
+        return {
+            **page,
+            "IsTruncated": False,
+        }
 
 
 def set_r2_env(monkeypatch):
@@ -99,6 +123,61 @@ def test_delete_pdf_uses_configured_bucket(monkeypatch):
         "bucket": "recipe-shopping-pdfs",
         "key": "recipe-pdfs/enchiladas.pdf",
     }]
+
+
+def test_list_pdf_objects_paginates_allowed_prefixes(monkeypatch):
+    set_r2_env(monkeypatch)
+    fake_client = FakeR2Client()
+    fake_client.list_pages = {
+        "recipe-pdfs/": [
+            {
+                "Contents": [
+                    {
+                        "Key": "recipe-pdfs/linked.pdf",
+                        "Size": 1200,
+                        "LastModified": datetime(2026, 6, 1, 12, 30, tzinfo=timezone.utc),
+                        "ETag": '"abc"',
+                    },
+                    {"Key": "recipe-pdfs/not-a-pdf.txt", "Size": 20},
+                ],
+            },
+            {
+                "Contents": [
+                    {
+                        "Key": "recipe-pdfs/orphan.pdf",
+                        "Size": 2400,
+                    },
+                ],
+            },
+        ],
+        "menu-pdfs/": [
+            {
+                "Contents": [
+                    {
+                        "Key": "menu-pdfs/menu.pdf",
+                        "Size": 4800,
+                    },
+                ],
+            },
+        ],
+    }
+    monkeypatch.setattr(cloudflare_r2_storage, "r2_client", lambda: fake_client)
+
+    result = cloudflare_r2_storage.list_pdf_objects()
+
+    assert result["ok"] is True
+    assert [row["object_key"] for row in result["objects"]] == [
+        "menu-pdfs/menu.pdf",
+        "recipe-pdfs/linked.pdf",
+        "recipe-pdfs/orphan.pdf",
+    ]
+    assert result["objects"][1]["public_url"] == "https://public.example.com/recipe-pdfs/linked.pdf"
+    assert result["objects"][1]["last_modified"] == "2026-06-01T12:30:00Z"
+    assert [call["Prefix"] for call in fake_client.list_calls] == [
+        "recipe-pdfs/",
+        "recipe-pdfs/",
+        "menu-pdfs/",
+    ]
 
 
 def test_recipe_pdf_upload_saves_metadata_and_deletes_local(monkeypatch, tmp_path):

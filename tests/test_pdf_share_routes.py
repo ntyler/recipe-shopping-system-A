@@ -1,6 +1,7 @@
 from urllib.parse import urlparse
 
 from app import app
+import PushShoppingList.app as app_module
 from PushShoppingList.routes import pdf_routes
 from PushShoppingList.routes import recipe_routes
 from PushShoppingList.services import pdf_share_service
@@ -28,7 +29,15 @@ def test_pdf_share_routes_create_serve_and_revoke(monkeypatch, tmp_path):
         tmp_path,
         current_user={
             "user_id": "user-1",
-            "email": "cook@example.com",
+            "email": "ntylerbert@gmail.com",
+        },
+    )
+    monkeypatch.setattr(
+        app_module,
+        "current_user",
+        lambda: {
+            "user_id": "user-1",
+            "email": "ntylerbert@gmail.com",
         },
     )
 
@@ -62,9 +71,14 @@ def test_pdf_share_routes_create_serve_and_revoke(monkeypatch, tmp_path):
 
 def test_pdf_share_create_requires_signed_in_user(monkeypatch, tmp_path):
     configure_pdf_share_routes(monkeypatch, tmp_path, current_user=None)
+    monkeypatch.setattr(app_module, "current_user", lambda: None)
 
     with app.test_client() as client:
-        response = client.post("/pdfs/share", json={"pdf_filename": "route-sample.pdf"})
+        response = client.post(
+            "/pdfs/share",
+            json={"pdf_filename": "route-sample.pdf"},
+            headers={"X-Requested-With": "fetch"},
+        )
 
     assert response.status_code == 401
     assert response.get_json()["success"] is False
@@ -76,7 +90,15 @@ def test_authenticated_pdf_view_rejects_traversal(monkeypatch, tmp_path):
         tmp_path,
         current_user={
             "user_id": "user-1",
-            "email": "cook@example.com",
+            "email": "ntylerbert@gmail.com",
+        },
+    )
+    monkeypatch.setattr(
+        app_module,
+        "current_user",
+        lambda: {
+            "user_id": "user-1",
+            "email": "ntylerbert@gmail.com",
         },
     )
 
@@ -92,7 +114,15 @@ def test_pdf_cloudflare_upload_route_returns_public_url(monkeypatch, tmp_path):
         tmp_path,
         current_user={
             "user_id": "user-1",
-            "email": "cook@example.com",
+            "email": "ntylerbert@gmail.com",
+        },
+    )
+    monkeypatch.setattr(
+        app_module,
+        "current_user",
+        lambda: {
+            "user_id": "user-1",
+            "email": "ntylerbert@gmail.com",
         },
     )
     monkeypatch.setattr(pdf_routes, "recipe_url_for_pdf_filename", lambda filename: "manual://recipe/test")
@@ -121,6 +151,74 @@ def test_pdf_cloudflare_upload_route_returns_public_url(monkeypatch, tmp_path):
     assert data["pdf_object_key"] == "recipe-pdfs/route-sample.pdf"
 
 
+def test_cloudflare_orphan_pdf_routes_require_admin(monkeypatch, tmp_path):
+    configure_pdf_share_routes(
+        monkeypatch,
+        tmp_path,
+        current_user={
+            "user_id": "user-1",
+            "email": "cook@example.com",
+        },
+    )
+    monkeypatch.setattr(
+        app_module,
+        "current_user",
+        lambda: {
+            "user_id": "user-1",
+            "email": "cook@example.com",
+        },
+    )
+
+    with app.test_client() as client:
+        response = client.get("/pdfs/cloudflare_orphans", headers={"X-Requested-With": "fetch"})
+
+    assert response.status_code == 403
+    assert response.get_json()["success"] is False
+
+
+def test_cloudflare_orphan_pdf_routes_scan_and_delete_for_admin(monkeypatch, tmp_path):
+    admin_user = {
+        "user_id": "admin-1",
+        "email": "ntylerbert@gmail.com",
+        "is_admin": True,
+    }
+    configure_pdf_share_routes(monkeypatch, tmp_path, current_user=admin_user)
+    monkeypatch.setattr(app_module, "current_user", lambda: admin_user)
+    monkeypatch.setattr(
+        pdf_routes,
+        "scan_orphaned_cloudflare_pdfs",
+        lambda: {
+            "ok": True,
+            "success": True,
+            "orphaned_pdf_count": 1,
+            "orphaned_pdfs": [
+                {"object_key": "recipe-pdfs/orphan.pdf"},
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        pdf_routes,
+        "delete_orphaned_cloudflare_pdfs",
+        lambda: {
+            "ok": True,
+            "success": True,
+            "deleted_count": 1,
+            "failed_count": 0,
+            "orphaned_pdf_count": 0,
+            "orphaned_pdfs": [],
+        },
+    )
+
+    with app.test_client() as client:
+        scan_response = client.get("/pdfs/cloudflare_orphans", headers={"X-Requested-With": "fetch"})
+        delete_response = client.post("/pdfs/cloudflare_orphans/delete", headers={"X-Requested-With": "fetch"})
+
+    assert scan_response.status_code == 200
+    assert scan_response.get_json()["orphaned_pdfs"][0]["object_key"] == "recipe-pdfs/orphan.pdf"
+    assert delete_response.status_code == 200
+    assert delete_response.get_json()["deleted_count"] == 1
+
+
 def test_local_recipe_pdf_download_requires_admin(monkeypatch, tmp_path):
     pdf_path = tmp_path / "local-recipe.pdf"
     pdf_path.write_bytes(b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n")
@@ -137,7 +235,7 @@ def test_local_recipe_pdf_download_requires_admin(monkeypatch, tmp_path):
 def test_admin_can_download_local_recipe_pdf(monkeypatch, tmp_path):
     pdf_path = tmp_path / "local-recipe.pdf"
     pdf_path.write_bytes(b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n")
-    monkeypatch.setattr(recipe_routes, "recipe_archive_pdf_path", lambda url: pdf_path)
+    monkeypatch.setattr(recipe_routes, "recipe_pdf_path", lambda url, kind="": pdf_path)
     monkeypatch.setattr(recipe_routes, "current_user", lambda: {"email": "admin@example.com"})
     monkeypatch.setattr(recipe_routes, "is_admin_user", lambda user: True)
 

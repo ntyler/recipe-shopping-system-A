@@ -127,6 +127,28 @@ def validate_object_key(object_key, allowed_prefixes=ALLOWED_PDF_OBJECT_PREFIXES
     return key
 
 
+def normalize_object_prefixes(prefixes=None):
+    prefixes = prefixes or ALLOWED_PDF_OBJECT_PREFIXES
+    normalized = []
+
+    for prefix in prefixes:
+        normalized_prefix = normalize_object_prefix(prefix)
+        if normalized_prefix not in normalized:
+            normalized.append(normalized_prefix)
+
+    return tuple(normalized)
+
+
+def format_r2_last_modified(value):
+    if not value:
+        return ""
+
+    if hasattr(value, "isoformat"):
+        return value.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+    return str(value)
+
+
 def get_public_url(object_key):
     key = validate_object_key(object_key)
     public_base_url = config_values()["public_base_url"].rstrip("/")
@@ -155,6 +177,80 @@ def object_exists(object_key):
             return False
 
         raise CloudflareR2StorageError(f"Unable to check Cloudflare R2 object: {exc}") from exc
+
+
+def list_pdf_objects(prefixes=ALLOWED_PDF_OBJECT_PREFIXES):
+    try:
+        values = config_values()
+        client = r2_client()
+        allowed_prefixes = normalize_object_prefixes(prefixes)
+        objects_by_key = {}
+
+        for prefix in allowed_prefixes:
+            continuation_token = ""
+
+            while True:
+                request_args = {
+                    "Bucket": values["bucket_name"],
+                    "Prefix": prefix,
+                }
+                if continuation_token:
+                    request_args["ContinuationToken"] = continuation_token
+
+                page = client.list_objects_v2(**request_args) or {}
+
+                for item in page.get("Contents", []) or []:
+                    object_key = str(item.get("Key") or "").strip()
+                    if not object_key.lower().endswith(".pdf"):
+                        continue
+
+                    try:
+                        object_key = validate_object_key(object_key, allowed_prefixes=allowed_prefixes)
+                    except CloudflareR2StorageError:
+                        continue
+
+                    objects_by_key[object_key] = {
+                        "object_key": object_key,
+                        "public_url": get_public_url(object_key),
+                        "size": int(item.get("Size") or 0),
+                        "last_modified": format_r2_last_modified(item.get("LastModified")),
+                        "etag": str(item.get("ETag") or "").strip('"'),
+                    }
+
+                if not page.get("IsTruncated"):
+                    break
+
+                continuation_token = str(page.get("NextContinuationToken") or "").strip()
+                if not continuation_token:
+                    break
+
+        objects = sorted(objects_by_key.values(), key=lambda item: item["object_key"].lower())
+        return {
+            "ok": True,
+            "success": True,
+            "bucket": values["bucket_name"],
+            "objects": objects,
+            "object_count": len(objects),
+        }
+    except CloudflareR2StorageError as exc:
+        code = "missing_env" if missing_env_vars() else "list_failed"
+        return {
+            "ok": False,
+            "success": False,
+            "code": code,
+            "error": str(exc),
+            "objects": [],
+            "object_count": 0,
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "success": False,
+            "code": "list_failed",
+            "error": f"Cloudflare R2 list failed: {exc}",
+            "objects": [],
+            "object_count": 0,
+        }
 
 
 def upload_pdf(local_pdf_path, object_prefix=PDF_OBJECT_PREFIX):

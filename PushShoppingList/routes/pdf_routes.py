@@ -17,10 +17,13 @@ from PushShoppingList.services.pdf_share_service import record_share_access
 from PushShoppingList.services.pdf_share_service import resolve_share_token
 from PushShoppingList.services.pdf_share_service import revoke_share_token
 from PushShoppingList.services.pdf_share_service import safe_resolve_pdf_path
+from PushShoppingList.services.cloudflare_pdf_admin_service import delete_orphaned_cloudflare_pdfs
+from PushShoppingList.services.cloudflare_pdf_admin_service import scan_orphaned_cloudflare_pdfs
 from PushShoppingList.services.recipe_edit_service import recipe_pdf_kind_for_filename
 from PushShoppingList.services.recipe_edit_service import recipe_url_for_pdf_filename
 from PushShoppingList.services.recipe_edit_service import upload_local_pdf_path_to_cloudflare
 from PushShoppingList.services.user_account_service import current_public_user
+from PushShoppingList.services.user_account_service import is_admin_user
 
 
 pdf_bp = Blueprint("pdf_bp", __name__)
@@ -47,6 +50,26 @@ def require_pdf_account(wants_json=False):
         }), 401
 
     return redirect(url_for("main_bp.index", _anchor="userAccountSection"))
+
+
+def require_pdf_admin():
+    user = current_public_user()
+
+    if not user:
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "Sign in to manage PDF storage.",
+        }), 401
+
+    if not is_admin_user(user):
+        return jsonify({
+            "ok": False,
+            "success": False,
+            "error": "Admin access is required.",
+        }), 403
+
+    return user
 
 
 def pdf_share_url(token):
@@ -192,6 +215,28 @@ def upload_pdf_to_cloudflare_route():
     status = 200 if result.get("ok") else 400
 
     return jsonify(result), status
+
+
+@pdf_bp.route("/pdfs/cloudflare_orphans", methods=["GET"])
+def cloudflare_orphan_pdfs_route():
+    account_response = require_pdf_admin()
+
+    if not isinstance(account_response, dict):
+        return account_response
+
+    result = scan_orphaned_cloudflare_pdfs()
+    return jsonify(result), 200 if result.get("ok") else 400
+
+
+@pdf_bp.route("/pdfs/cloudflare_orphans/delete", methods=["POST"])
+def delete_cloudflare_orphan_pdfs_route():
+    account_response = require_pdf_admin()
+
+    if not isinstance(account_response, dict):
+        return account_response
+
+    result = delete_orphaned_cloudflare_pdfs()
+    return jsonify(result), 200 if result.get("ok") else 400
 
 
 @pdf_bp.route("/share/pdf/<token>")

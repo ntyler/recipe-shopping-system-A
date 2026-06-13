@@ -21,7 +21,8 @@ def test_shared_recipe_pdf_section_is_wired_into_user_account_menu():
     assert "RECIPE SHARING" in user_account_template
     assert "data-shared-recipe-pdfs-open" in user_account_template
     assert "openSharedRecipePdfsPanel()" in user_account_template
-    assert '{% include "sections/shared_recipe_pdfs.html" %}' in user_account_template
+    assert 'data-lazy-section="shared-recipe-pdfs"' in user_account_template
+    assert "main_bp.shared_recipe_pdfs_section" in user_account_template
     assert user_account_template.index("COMMUNICATIONS") < user_account_template.index("RECIPE SHARING")
     assert user_account_template.index("RECIPE SHARING") < user_account_template.index("SESSION")
     assert "Shared Recipe PDFs" in section_template
@@ -30,6 +31,10 @@ def test_shared_recipe_pdf_section_is_wired_into_user_account_menu():
     assert "Open PDF" in section_template
     assert "Copy PDF Link" in section_template
     assert "Upload to Cloudflare" in section_template
+    assert "Cloudflare Orphan PDFs" in section_template
+    assert "Check Orphaned PDFs" in section_template
+    assert "Delete All Orphaned PDFs" in section_template
+    assert "data-cloudflare-orphan-pdf-list" in section_template
     assert "Create Share Link" not in section_template
     assert "Copy PDF Link" in section_template
     assert "data-pdf-share-row" in section_template
@@ -39,6 +44,8 @@ def test_shared_recipe_pdf_section_is_wired_into_user_account_menu():
     assert ".user-shared-recipe-pdfs-panel" in css
     assert ".pdf-cloudflare-active" in css
     assert ".pdf-cloudflare-url" in css
+    assert ".pdf-orphan-admin" in css
+    assert ".pdf-orphan-row" in css
     assert "Copy Cloudflare Link" in current_recipe_template
     assert "recipeEditLocalPdfDownloadButton" in current_recipe_template
     assert "Download Local PDF" in current_recipe_template
@@ -49,6 +56,10 @@ def test_shared_recipe_pdf_section_is_wired_into_user_account_menu():
     assert "function revokePdfShareLink" in js
     assert "function uploadPdfToCloudflare" in js
     assert "function copyPdfCloudflareLink" in js
+    assert "function checkCloudflareOrphanPdfs" in js
+    assert "function deleteAllCloudflareOrphanPdfs" in js
+    assert "/pdfs/cloudflare_orphans" in js
+    assert "/pdfs/cloudflare_orphans/delete" in js
     assert "function openSharedRecipePdfsPanel" in js
     assert "function closeSharedRecipePdfsPanel" in js
     assert "function uploadRecipeEditorPdfToCloudflare" in js
