@@ -180,6 +180,13 @@ def delete_guest_temporary_data(guest_session_id):
     if not safe_id:
         return
 
+    try:
+        from PushShoppingList.services.job_service import delete_guest_jobs
+
+        delete_guest_jobs(safe_id)
+    except Exception as exc:
+        print(f"[guest_cleanup] action=delete_guest_jobs_failed guest_session_id={safe_id} error={exc}")
+
     root = GUEST_DATA_DIR / safe_id
     try:
         resolved_root = root.resolve()

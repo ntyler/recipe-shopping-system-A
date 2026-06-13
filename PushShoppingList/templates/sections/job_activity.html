@@ -1,0 +1,31 @@
+<section id="jobActivitySection"
+         class="app-card job-activity-card"
+         data-job-activity-panel
+         data-admin-job-view="{{ '1' if current_user and current_user.is_admin else '0' }}"
+         aria-live="polite">
+    <div class="job-activity-header">
+        <button type="button"
+                class="card-collapse-toggle job-activity-toggle"
+                data-collapse-toggle="job-activity"
+                aria-expanded="true"
+                onclick="toggleCardCollapse('job-activity')">
+            <span>Job Activity / Import Progress</span>
+        </button>
+        <button type="button"
+                class="secondary job-activity-refresh"
+                onclick="return refreshJobActivityPanel({ force: true })">
+            Refresh
+        </button>
+    </div>
+    <div class="card-collapse-content job-activity-content"
+         data-collapse-content="job-activity"
+         data-collapse-default="expanded"
+         data-collapse-mobile-default="expanded">
+        <div class="job-activity-summary" data-job-activity-summary>
+            No active jobs.
+        </div>
+        <div class="job-activity-list" data-job-activity-list>
+            <div class="job-activity-empty">No recent jobs.</div>
+        </div>
+    </div>
+</section>

@@ -18,6 +18,7 @@ const CATEGORY_SOURCE_USER_SELECTED = "user_selected";
 const CATEGORY_SOURCE_AI_INFERRED = "ai_inferred";
 const CATEGORY_SOURCE_BLANK = "blank";
 const RECIPE_EDIT_PAGE_RETURN_STATE_KEY = "recipe-edit-page-return-state";
+const RECIPE_EDIT_PENDING_ACTION_KEY = "recipe-edit-pending-action";
 const LEAFLET_CSS_URL = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
 const LEAFLET_JS_URL = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
 const USER_ACCOUNT_OPEN_PANEL_KEY = "user-account-open-panel";
@@ -50,6 +51,7 @@ const DEVICE_STALE_REVALIDATE_EVENT = "shopping:device-stale-revalidate";
 const DEVICE_STALE_MIN_SEND_INTERVAL_MS = 60 * 1000;
 const AUTH_COLLAPSE_CONTENT_KEYS = [
     "ai-pantry",
+    "job-activity",
     "recipe-url-log",
     "cookbooks",
     "rules",
@@ -235,6 +237,359 @@ function safeStorageGet(storage, key) {
     } catch (err) {
         return null;
     }
+}
+
+let jobActivityPollTimer = null;
+let lastJobActivityJobs = [];
+
+function jobActivityPanel() {
+    return document.querySelector("[data-job-activity-panel]");
+}
+
+function jobActivityListElement() {
+    const panel = jobActivityPanel();
+    return panel ? panel.querySelector("[data-job-activity-list]") : null;
+}
+
+function jobActivitySummaryElement() {
+    const panel = jobActivityPanel();
+    return panel ? panel.querySelector("[data-job-activity-summary]") : null;
+}
+
+function jobIsActive(job) {
+    return job && (job.status === "queued" || job.status === "running");
+}
+
+function jobTypeLabel(jobType) {
+    return ({
+        "menu-import": "Menu Import",
+        "recipe-import": "Recipe Import",
+        "doc-photo-import": "Doc / Photo Import",
+        "estimate-per-serving": "Estimate Per Serving",
+        "create-recipe-pdf": "Create Recipe PDF",
+        "product-matching": "Product Matching",
+        "recipe-category-decision": "ChatGPT Categories",
+        "upload-source-pdf": "Upload Source PDF",
+        "upload-generated-pdf": "Upload Generated PDF",
+    }[String(jobType || "").trim()] || String(jobType || "Job").trim() || "Job");
+}
+
+function jobStatusLabel(status) {
+    const normalized = String(status || "").trim().toLowerCase();
+    return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : "Unknown";
+}
+
+function jobResultPayload(job) {
+    return job && job.result_payload && typeof job.result_payload === "object"
+        ? job.result_payload
+        : {};
+}
+
+function jobResultLinks(job) {
+    const result = jobResultPayload(job);
+    return Array.isArray(result.links) ? result.links : [];
+}
+
+function jobActivitySort(jobs) {
+    return [...(jobs || [])].sort((left, right) => {
+        const leftActive = jobIsActive(left) ? 0 : 1;
+        const rightActive = jobIsActive(right) ? 0 : 1;
+        if (leftActive !== rightActive) {
+            return leftActive - rightActive;
+        }
+        return String(right.updated_at || right.created_at || "").localeCompare(String(left.updated_at || left.created_at || ""));
+    });
+}
+
+function renderJobActivityPanel(jobs) {
+    const list = jobActivityListElement();
+    const summary = jobActivitySummaryElement();
+    const panel = jobActivityPanel();
+
+    if (!list || !panel) {
+        return;
+    }
+
+    const sortedJobs = jobActivitySort(jobs);
+    const activeCount = sortedJobs.filter(jobIsActive).length;
+    lastJobActivityJobs = sortedJobs;
+
+    if (summary) {
+        const completedCount = sortedJobs.filter(job => job.status === "completed").length;
+        const failedCount = sortedJobs.filter(job => job.status === "failed").length;
+        summary.textContent = activeCount
+            ? `${activeCount} active job${activeCount === 1 ? "" : "s"} running.`
+            : `${completedCount} completed, ${failedCount} failed in recent activity.`;
+    }
+
+    if (!sortedJobs.length) {
+        list.innerHTML = '<div class="job-activity-empty">No recent jobs.</div>';
+        return;
+    }
+
+    list.innerHTML = sortedJobs.map(renderJobActivityRow).join("");
+}
+
+function renderJobActivityRow(job) {
+    const percent = Math.max(0, Math.min(100, Number(job.progress_percent || 0)));
+    const total = Number(job.total_items || 0);
+    const completed = Number(job.completed_items || 0);
+    const failed = Number(job.failed_items || 0);
+    const countText = total ? `${completed}/${total}${failed ? `, ${failed} failed` : ""}` : "";
+    const error = String(job.error_message || "").trim();
+    const warnings = Array.isArray(job.warning_messages) ? job.warning_messages.filter(Boolean) : [];
+    const links = jobResultLinks(job);
+    const active = jobIsActive(job);
+    const retryButton = job.status === "failed"
+        ? `<button type="button" class="job-activity-row-action" onclick="return retryJobActivityJob('${escapeAttribute(job.id || job.job_id || "")}')">Retry</button>`
+        : "";
+    const cancelButton = active
+        ? `<button type="button" class="job-activity-row-action danger" onclick="return cancelJobActivityJob('${escapeAttribute(job.id || job.job_id || "")}')">Cancel</button>`
+        : "";
+    const linkHtml = links.length
+        ? `<div class="job-activity-links">${links.map(link => {
+            const href = String(link.url || "").trim();
+            const external = /^https?:\/\//i.test(href);
+            return href
+                ? `<a href="${escapeAttribute(href)}"${external ? ' target="_blank" rel="noopener noreferrer"' : ""}>${escapeHtml(link.label || "Open result")}</a>`
+                : "";
+        }).join("")}</div>`
+        : "";
+    const warningHtml = warnings.length
+        ? `<div class="job-activity-warning">${escapeHtml(warnings.slice(0, 2).join(" "))}</div>`
+        : "";
+
+    return `
+        <article class="job-activity-row job-activity-${escapeAttribute(job.status || "unknown")}" data-job-id="${escapeAttribute(job.id || job.job_id || "")}">
+            <div class="job-activity-row-main">
+                <div class="job-activity-row-title">
+                    <span>${escapeHtml(jobTypeLabel(job.job_type))}</span>
+                    <span class="job-activity-status">${escapeHtml(jobStatusLabel(job.status))}</span>
+                </div>
+                <div class="job-activity-step">${escapeHtml(job.current_step || "Queued")}</div>
+                <div class="job-activity-progress" aria-label="${percent}% complete">
+                    <span style="width: ${percent}%"></span>
+                </div>
+                <div class="job-activity-meta">
+                    <span>${percent}%</span>
+                    ${countText ? `<span>${escapeHtml(countText)}</span>` : ""}
+                </div>
+                ${error ? `<div class="job-activity-error">${escapeHtml(error)}</div>` : ""}
+                ${warningHtml}
+                ${linkHtml}
+            </div>
+            <div class="job-activity-actions">
+                ${cancelButton}
+                ${retryButton}
+            </div>
+        </article>
+    `;
+}
+
+async function refreshJobActivityPanel(options = {}) {
+    const panel = jobActivityPanel();
+    if (!panel) {
+        return false;
+    }
+
+    const includeAdmin = panel.dataset.adminJobView === "1";
+    const url = includeAdmin
+        ? "/api/jobs/recent?limit=40&scope=all"
+        : "/api/jobs/recent?limit=25";
+
+    try {
+        const response = await fetch(url, {
+            headers: {
+                "Accept": "application/json",
+                "X-Requested-With": "fetch",
+            },
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to load job activity.");
+        }
+
+        renderJobActivityPanel(data.jobs || []);
+        scheduleJobActivityPolling((data.jobs || []).some(jobIsActive) ? 1500 : 8000);
+        return true;
+    } catch (err) {
+        if (options.force) {
+            const summary = jobActivitySummaryElement();
+            if (summary) {
+                summary.textContent = err.message || "Unable to load job activity.";
+            }
+        }
+        scheduleJobActivityPolling(12000);
+        return false;
+    }
+}
+
+function scheduleJobActivityPolling(delay = 5000) {
+    window.clearTimeout(jobActivityPollTimer);
+    jobActivityPollTimer = window.setTimeout(() => {
+        refreshJobActivityPanel();
+    }, delay);
+}
+
+function initJobActivityPanel() {
+    if (!jobActivityPanel()) {
+        return;
+    }
+    refreshJobActivityPanel();
+}
+
+async function startBackgroundJob(endpoint, options = {}) {
+    const button = options.button || null;
+    const form = options.form || (button ? button.closest("form") : null);
+    const originalText = button ? button.textContent : "";
+    const creatingText = options.creatingText || "Starting...";
+
+    if (form && form.dataset.jobCreating === "1") {
+        return null;
+    }
+
+    if (form) {
+        form.dataset.jobCreating = "1";
+    }
+    if (button) {
+        button.disabled = true;
+        button.textContent = creatingText;
+    }
+
+    try {
+        const fetchOptions = {
+            method: "POST",
+            headers: {
+                "Accept": "application/json",
+                "X-Requested-With": "fetch",
+            },
+        };
+
+        if (options.formData) {
+            fetchOptions.body = options.formData;
+        } else {
+            fetchOptions.headers["Content-Type"] = "application/json";
+            fetchOptions.body = JSON.stringify(options.payload || {});
+        }
+
+        const response = await fetch(endpoint, fetchOptions);
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to start job.");
+        }
+
+        if (data.job) {
+            renderJobActivityPanel([data.job, ...lastJobActivityJobs.filter(job => job.id !== data.job.id)]);
+        }
+        scheduleJobActivityPolling(500);
+        return data;
+    } finally {
+        if (form) {
+            delete form.dataset.jobCreating;
+        }
+        if (button) {
+            button.disabled = false;
+            button.textContent = originalText;
+        }
+    }
+}
+
+async function fetchJobStatus(jobId) {
+    const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}`, {
+        headers: {
+            "Accept": "application/json",
+            "X-Requested-With": "fetch",
+        },
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+        throw new Error((data && data.error) || "Unable to load job status.");
+    }
+    return data.job;
+}
+
+async function waitForJobCompletion(jobId, options = {}) {
+    const timeoutMs = Number(options.timeoutMs || 10 * 60 * 1000);
+    const pollMs = Number(options.pollMs || 1200);
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < timeoutMs) {
+        const job = await fetchJobStatus(jobId);
+        if (typeof options.onUpdate === "function") {
+            options.onUpdate(job);
+        }
+        renderJobActivityPanel([job, ...lastJobActivityJobs.filter(item => item.id !== job.id)]);
+
+        if (!jobIsActive(job)) {
+            return job;
+        }
+
+        await new Promise(resolve => window.setTimeout(resolve, pollMs));
+    }
+
+    throw new Error("Job timed out while waiting for completion.");
+}
+
+async function cancelJobActivityJob(jobId) {
+    if (!jobId) {
+        return false;
+    }
+
+    try {
+        const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/cancel`, {
+            method: "POST",
+            headers: {
+                "Accept": "application/json",
+                "X-Requested-With": "fetch",
+            },
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to cancel job.");
+        }
+        if (data.job) {
+            renderJobActivityPanel([data.job, ...lastJobActivityJobs.filter(job => job.id !== data.job.id)]);
+        }
+        scheduleJobActivityPolling(500);
+    } catch (err) {
+        const summary = jobActivitySummaryElement();
+        if (summary) {
+            summary.textContent = err.message || "Unable to cancel job.";
+        }
+    }
+    return false;
+}
+
+async function retryJobActivityJob(jobId) {
+    if (!jobId) {
+        return false;
+    }
+
+    try {
+        const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/retry`, {
+            method: "POST",
+            headers: {
+                "Accept": "application/json",
+                "X-Requested-With": "fetch",
+            },
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to retry job.");
+        }
+        if (data.job) {
+            renderJobActivityPanel([data.job, ...lastJobActivityJobs]);
+        }
+        scheduleJobActivityPolling(500);
+    } catch (err) {
+        const summary = jobActivitySummaryElement();
+        if (summary) {
+            summary.textContent = err.message || "Unable to retry job.";
+        }
+    }
+    return false;
 }
 
 function nowForPerformance() {
@@ -3331,8 +3686,6 @@ async function grabBestProducts(event) {
     const form = event.currentTarget;
     const button = form ? form.querySelector("button") : null;
     const originalText = button ? button.textContent : "";
-    const jobId = newProductJobId();
-    activeProductJobId = jobId;
 
     showProductsOverlay();
     setProductsOverlayState(
@@ -3341,7 +3694,6 @@ async function grabBestProducts(event) {
         3,
         []
     );
-    startProductProgressPolling(jobId);
 
     if (button) {
         button.disabled = true;
@@ -3350,20 +3702,38 @@ async function grabBestProducts(event) {
 
     try {
         const formData = new FormData(form);
-        formData.set("ajax", "1");
-        formData.set("job_id", jobId);
-        const response = await fetch(formActionUrl(form), {
-            method: "POST",
-            headers: {
-                "X-Requested-With": "fetch",
-            },
-            body: formData,
+        const payload = {};
+        formData.forEach((value, key) => {
+            if (typeof value === "string") {
+                payload[key] = value;
+            }
         });
-        const data = await response.json();
+        const startData = await startBackgroundJob("/api/jobs/product-matching", {
+            form,
+            payload,
+            creatingText: "Starting...",
+        });
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Grabbing...";
+        }
+        const jobId = String((startData && startData.job_id) || "").trim();
+
+        if (!jobId) {
+            throw new Error("Unable to start product matching.");
+        }
+
+        activeProductJobId = jobId;
+        startProductProgressPolling(jobId);
+
+        const finishedJob = await waitForJobCompletion(jobId);
+        const data = finishedJob && finishedJob.result_payload && typeof finishedJob.result_payload === "object"
+            ? finishedJob.result_payload
+            : {};
         syncOpenAiUsageDashboardFromResponse(data);
 
-        if (!response.ok || !data.ok) {
-            throw new Error((data && data.error) || "Unable to grab best products.");
+        if (!finishedJob || finishedJob.status !== "completed" || !data.ok) {
+            throw new Error((finishedJob && finishedJob.error_message) || (data && data.error) || "Unable to grab best products.");
         }
 
         stopProductProgressPolling();
@@ -7560,15 +7930,44 @@ function submitMenuMediaPreviewUpload(input) {
         return false;
     }
 
-    form.submit();
+    const formData = new FormData(form);
+    formData.set("cookbook_id", destination.cookbookId || "");
+    formData.set("cookbook_name", destination.cookbookName || "");
+    formData.set("import_mode", "menu_extract");
+    formData.set("extraction_mode", "menu_extract");
+
+    startBackgroundJob("/api/jobs/doc-photo-import", {
+        form,
+        formData,
+        creatingText: "Starting...",
+    }).then(data => {
+        const jobId = data && data.job_id;
+        if (!jobId) {
+            return null;
+        }
+        return waitForJobCompletion(jobId, {
+            onUpdate(job) {
+                const status = document.getElementById("recipeMediaUploadStatus");
+                if (status) {
+                    status.textContent = job.current_step || "Importing menu file...";
+                }
+            },
+        });
+    }).then(job => {
+        if (job && job.status === "completed") {
+            window.location.reload();
+        }
+    }).catch(err => {
+        const status = document.getElementById("recipeMediaUploadStatus");
+        if (status) {
+            status.textContent = err.message || "Unable to import menu file.";
+        }
+    });
     return false;
 }
 
 function submitMenuUrlPreviewFromEntry() {
     const textarea = document.getElementById("recipeUrlsTextarea");
-    const form = document.getElementById("menuImportUrlPreviewForm");
-    const field = form ? form.querySelector("[data-menu-import-url-field]") : null;
-    const destination = currentImportCookbookDestination();
     const urls = textarea
         ? textarea.value.split(/\r?\n/).map(url => url.trim()).filter(Boolean)
         : [];
@@ -7578,14 +7977,8 @@ function submitMenuUrlPreviewFromEntry() {
         return false;
     }
 
-    if (!form || !field) {
-        alert("Menu import preview is not available.");
-        return false;
-    }
-
-    syncImportCookbookHiddenInputs(destination);
-    field.value = urls[0];
-    form.submit();
+    const button = document.querySelector(".recipe-import-action-url-menu");
+    startRecipeExtractionUrls(urls, { extractionMode: "menu_extract", button });
     return false;
 }
 
@@ -7842,14 +8235,47 @@ async function submitRecipeMediaUpload(input, manualDescription = "", uploadMode
     }
 
     try {
-        const response = await fetch(formActionUrl(form), {
-            method: "POST",
-            headers: {
-                "X-Requested-With": "fetch",
-            },
-            body: formData,
+        const startData = await startBackgroundJob("/api/jobs/doc-photo-import", {
+            form,
+            formData,
+            creatingText: "Starting...",
         });
-        const data = await response.json();
+        const startedJob = startData && startData.job ? startData.job : {};
+        let data = startedJob.result_payload && typeof startedJob.result_payload === "object"
+            ? startedJob.result_payload
+            : {};
+        const jobId = String((startData && startData.job_id) || "").trim();
+
+        if (!jobId) {
+            throw new Error("Unable to start import job.");
+        }
+
+        const finishedJob = await waitForJobCompletion(jobId, {
+            onUpdate(job) {
+                if (!job) {
+                    return;
+                }
+                setRecipeFileLoadingSummary(job.current_step || "Importing file...");
+                const percent = Number(job.progress_percent || 0);
+                if (percent >= 5) {
+                    updateRecipeFileLoadingStep("upload", "done", "Uploaded");
+                }
+                if (percent >= 20) {
+                    updateRecipeFileLoadingStep("read", "running", job.current_step || "Reading");
+                }
+                if (percent >= 55) {
+                    updateRecipeFileLoadingStep("extract", "running", job.current_step || "Extracting");
+                }
+                if (percent >= 75) {
+                    updateRecipeFileLoadingStep("save", "running", job.current_step || "Saving");
+                }
+            },
+        });
+
+        data = finishedJob && finishedJob.result_payload && typeof finishedJob.result_payload === "object"
+            ? finishedJob.result_payload
+            : {};
+        syncOpenAiUsageDashboardFromResponse(data);
         const uploadedFilePath = String((data && data.uploaded_file_path) || "").trim();
         if (uploadedFilePath) {
             setRecipeMediaUploadPath(uploadedFilePath);
@@ -7871,8 +8297,12 @@ async function submitRecipeMediaUpload(input, manualDescription = "", uploadMode
         setRecipeFileManualDescriptionPanelVisible(false);
         setRecipeFileEstimatedBanner(false);
 
-        if (!response.ok || !data.ok) {
-            const error = new Error((data && data.error) || "Unable to load file.");
+        if (!finishedJob || finishedJob.status !== "completed" || (data && data.ok === false)) {
+            const error = new Error(
+                (finishedJob && finishedJob.error_message)
+                || (data && data.error)
+                || "Unable to load file."
+            );
             error.data = data;
             throw error;
         }
@@ -8314,21 +8744,31 @@ async function submitRecipeMediaEstimatePerServing() {
     try {
         setRecipeFileLoadingSummary("Estimating nutrition per serving basis...");
         updateRecipeFileLoadingStep("save", "running", "Estimating nutrition");
-        const response = await fetch("/api/estimate-per-serving", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
+        const startData = await startBackgroundJob("/api/jobs/estimate-per-serving", {
+            button,
+            creatingText: "Starting...",
+            payload: {
                 recipe_url: recipeUrl,
                 recipe: recipeJson,
                 recipe_json: recipeJson,
-            }),
+            },
         });
-        const data = await response.json();
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Estimating...";
+        }
+        const finishedJob = await waitForJobCompletion(startData.job_id, {
+            onUpdate(job) {
+                setRecipeFileLoadingSummary(job.current_step || "Estimating nutrition per serving basis...");
+            },
+        });
+        const data = finishedJob && finishedJob.result_payload && typeof finishedJob.result_payload === "object"
+            ? finishedJob.result_payload
+            : {};
+        syncOpenAiUsageDashboardFromResponse(data);
 
-        if (!response.ok || !data.ok) {
-            throw new Error((data && data.error) || "Unable to estimate nutrition.");
+        if (!finishedJob || finishedJob.status !== "completed" || !data.ok) {
+            throw new Error((finishedJob && finishedJob.error_message) || (data && data.error) || "Unable to estimate nutrition.");
         }
 
         const updatedRecipe = data && data.recipe_json && typeof data.recipe_json === "object"
@@ -8408,17 +8848,31 @@ async function createRecipePdfFromMediaImport() {
     try {
         setRecipeFileLoadingSummary("Creating recipe PDF...");
         updateRecipeFileLoadingStep("save", "running", "Creating PDF");
-        const response = await fetch("/api/create-recipe-pdf", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
+        const startData = await startBackgroundJob("/api/jobs/create-recipe-pdf", {
+            button,
+            creatingText: "Starting...",
+            payload: {
+                url: recipeUrl,
+                upload_to_cloudflare: true,
             },
-            body: JSON.stringify({ url: recipeUrl }),
         });
-        const data = await response.json();
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Creating PDF...";
+        }
+        const finishedJob = await waitForJobCompletion(startData.job_id, {
+            onUpdate(job) {
+                setRecipeFileLoadingSummary(job.current_step || "Creating recipe PDF...");
+                updateRecipeFileLoadingStep("save", "running", job.current_step || "Creating PDF");
+            },
+        });
+        const data = finishedJob && finishedJob.result_payload && typeof finishedJob.result_payload === "object"
+            ? finishedJob.result_payload
+            : {};
+        syncOpenAiUsageDashboardFromResponse(data);
 
-        if (!response.ok || !data.ok) {
-            throw new Error((data && data.error) || "Unable to create recipe PDF.");
+        if (!finishedJob || finishedJob.status !== "completed" || !data.ok) {
+            throw new Error((finishedJob && finishedJob.error_message) || (data && data.error) || "Unable to create recipe PDF.");
         }
 
         setRecipeFileLoadingSummary("Recipe PDF created. You can open it from the recipe editor.");
@@ -13131,23 +13585,32 @@ async function decideRecipeEditCategoriesWithChatGPT(button, mode = "missing") {
     try {
         setRecipeEditStatus("Asking ChatGPT to choose recipe categories...");
         const payload = collectRecipeEditorPayload();
-        const response = await fetch("/api/recipe_category_decision", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
+        const startData = await startBackgroundJob("/api/jobs/recipe-category-decision", {
+            button,
+            creatingText: "Starting...",
+            payload: {
                 recipe: payload.recipe,
                 mode: decisionMode,
                 trigger_source: `recipe_editor:${decisionMode}`,
                 current_categories: collectRecipeEditorCategoryValues(),
-            }),
+            },
         });
-        const data = await response.json();
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Asking...";
+        }
+        const finishedJob = await waitForJobCompletion(startData.job_id, {
+            onUpdate(job) {
+                setRecipeEditStatus(job.current_step || "Asking ChatGPT to choose recipe categories...");
+            },
+        });
+        const data = finishedJob && finishedJob.result_payload && typeof finishedJob.result_payload === "object"
+            ? finishedJob.result_payload
+            : {};
         syncOpenAiUsageDashboardFromResponse(data);
 
-        if (!response.ok || !data.ok) {
-            throw new Error((data && data.error) || "Unable to choose recipe categories.");
+        if (!finishedJob || finishedJob.status !== "completed" || !data.ok) {
+            throw new Error((finishedJob && finishedJob.error_message) || (data && data.error) || "Unable to choose recipe categories.");
         }
 
         applyRecipeEditCategorySuggestions(data.categories || {}, decisionMode);
@@ -13177,6 +13640,7 @@ async function openRecipeEditor(button, options = {}) {
     const url = button ? button.dataset.recipeUrl || "" : "";
     let modal = document.getElementById("recipeEditModal");
     const shouldScrollToFoodReview = options === true || Boolean(options.scrollToFoodReview);
+    const shouldActivateFoodReview = options && typeof options === "object" && Boolean(options.activateFoodReview);
     const targetIngredient = options && typeof options === "object"
         ? String(options.ingredient || options.scrollToIngredient || "").trim()
         : "";
@@ -13200,6 +13664,7 @@ async function openRecipeEditor(button, options = {}) {
 
     if (!modal) {
         console.warn("Unable to open recipe editor: modal markup is not loaded.");
+        openRecipeEditPageFallback(button, url, options);
         return;
     }
 
@@ -13219,10 +13684,25 @@ async function openRecipeEditor(button, options = {}) {
         setRecipeEditStatus("");
         if (shouldScrollToFoodReview) {
             await waitForNextPaint();
-            scrollRecipeEditorToFoodReview();
+            const marker = scrollRecipeEditorToFoodReview({ focus: !shouldActivateFoodReview });
+            if (shouldActivateFoodReview) {
+                if (marker) {
+                    await activateRecipeEditorFoodReviewMarker(marker);
+                } else {
+                    setRecipeEditStatus("No food review item found in this recipe.", true);
+                }
+            }
         } else if (targetIngredient) {
             await waitForNextPaint();
-            scrollRecipeEditorToIngredient(targetIngredient);
+            const row = scrollRecipeEditorToIngredient(targetIngredient, { focus: !shouldActivateFoodReview });
+            if (shouldActivateFoodReview) {
+                const marker = recipeEditorFoodReviewMarkerForRow(row);
+                if (marker) {
+                    await activateRecipeEditorFoodReviewMarker(marker);
+                } else {
+                    setRecipeEditStatus(`Food review not found for: ${targetIngredient}`, true);
+                }
+            }
         } else if (targetSection) {
             await waitForNextPaint();
             scrollRecipeEditorToSection(targetSection);
@@ -13284,6 +13764,118 @@ function shouldLetRecipeEditorLinkNavigate(event) {
 
 function recipeEditorStandalonePageIsActive() {
     return Boolean(document.body && document.body.dataset.recipeEditPage === "true");
+}
+
+function recipeEditPageUrl(recipeUrl) {
+    const normalizedUrl = String(recipeUrl || "").trim();
+
+    if (!normalizedUrl) {
+        return "";
+    }
+
+    return `/recipe/edit?url=${encodeURIComponent(normalizedUrl)}`;
+}
+
+function recipeEditPendingActionFromOptions(recipeUrl, options = {}) {
+    const normalizedUrl = String(recipeUrl || "").trim();
+
+    if (!normalizedUrl) {
+        return null;
+    }
+
+    const action = {
+        recipeUrl: normalizedUrl,
+        createdAt: Date.now(),
+    };
+    const optionObject = options && typeof options === "object" ? options : {};
+    const targetIngredient = String(optionObject.ingredient || optionObject.scrollToIngredient || "").trim();
+    const targetSection = String(optionObject.section || optionObject.scrollToSection || "").trim();
+
+    if (options === true || Boolean(optionObject.scrollToFoodReview)) {
+        action.scrollToFoodReview = true;
+    }
+
+    if (targetIngredient) {
+        action.scrollToIngredient = targetIngredient;
+    }
+
+    if (targetSection) {
+        action.scrollToSection = targetSection;
+    }
+
+    if (Boolean(optionObject.activateFoodReview)) {
+        action.activateFoodReview = true;
+    }
+
+    return action;
+}
+
+function rememberRecipeEditPendingAction(recipeUrl, options = {}) {
+    if (recipeEditorStandalonePageIsActive() || !window.sessionStorage) {
+        return;
+    }
+
+    const action = recipeEditPendingActionFromOptions(recipeUrl, options);
+
+    if (!action) {
+        return;
+    }
+
+    safeStorageSet(sessionStorage, RECIPE_EDIT_PENDING_ACTION_KEY, JSON.stringify(action));
+}
+
+function consumeRecipeEditPendingAction(recipeUrl) {
+    if (!window.sessionStorage) {
+        return {};
+    }
+
+    let action = null;
+
+    try {
+        action = JSON.parse(safeStorageGet(sessionStorage, RECIPE_EDIT_PENDING_ACTION_KEY) || "null");
+    } catch (err) {
+        action = null;
+    }
+
+    if (!action || !action.recipeUrl) {
+        return {};
+    }
+
+    const normalizedUrl = String(recipeUrl || "").trim();
+    const actionUrl = String(action.recipeUrl || "").trim();
+    const isStale = action.createdAt && Date.now() - Number(action.createdAt) > 10 * 60 * 1000;
+
+    if (isStale || actionUrl === normalizedUrl) {
+        safeStorageRemove(sessionStorage, RECIPE_EDIT_PENDING_ACTION_KEY);
+    }
+
+    if (isStale || actionUrl !== normalizedUrl) {
+        return {};
+    }
+
+    return {
+        scrollToFoodReview: Boolean(action.scrollToFoodReview),
+        scrollToIngredient: String(action.scrollToIngredient || "").trim(),
+        scrollToSection: String(action.scrollToSection || "").trim(),
+        activateFoodReview: Boolean(action.activateFoodReview),
+    };
+}
+
+function openRecipeEditPageFallback(button, recipeUrl, options = {}) {
+    if (recipeEditorStandalonePageIsActive()) {
+        return false;
+    }
+
+    const pageUrl = recipeEditPageUrl(recipeUrl);
+
+    if (!pageUrl) {
+        return false;
+    }
+
+    rememberRecipeEditPageReturnState(button);
+    rememberRecipeEditPendingAction(recipeUrl, options);
+    window.location.assign(pageUrl);
+    return true;
 }
 
 function recipeEditorSourceCardFromTrigger(triggerElement) {
@@ -13570,12 +14162,32 @@ function openRecipeEditorSection(button, sectionKey) {
     return false;
 }
 
-function openIngredientFoodReviewFromRecipeView(button) {
+function openRecipeFoodReviewFromRecipeView(button, event = null) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    closeRecipeEditRowMenus();
+    openRecipeEditor(button, {
+        scrollToFoodReview: true,
+        activateFoodReview: true,
+    });
+    return false;
+}
+
+function openIngredientFoodReviewFromRecipeView(button, event = null) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
     const ingredientName = button ? button.dataset.ingredientName || "" : "";
 
     closeRecipeEditRowMenus();
     openRecipeEditor(button, {
         scrollToIngredient: ingredientName,
+        activateFoodReview: true,
     });
     return false;
 }
@@ -14868,11 +15480,28 @@ function collectRecipeScalingPayload() {
     };
 }
 
-function scrollRecipeEditorToFoodReview() {
-    const marker = document.querySelector("#recipeEditIngredients .recipe-edit-food-warning:not([hidden])");
+function firstRecipeEditorFoodReviewMarker() {
+    return document.querySelector("#recipeEditIngredients .recipe-edit-food-warning:not([hidden])");
+}
+
+function recipeEditorFoodReviewMarkerForRow(row) {
+    return row ? row.querySelector(".recipe-edit-food-warning:not([hidden])") : null;
+}
+
+async function activateRecipeEditorFoodReviewMarker(marker) {
+    if (!marker || !marker.isConnected || marker.hidden) {
+        return false;
+    }
+
+    await waitForNextPaint();
+    return openFoodReviewAlternatives(marker);
+}
+
+function scrollRecipeEditorToFoodReview(options = {}) {
+    const marker = firstRecipeEditorFoodReviewMarker();
 
     if (!marker) {
-        return false;
+        return null;
     }
 
     const row = marker.closest(".recipe-edit-ingredient-row") || marker;
@@ -14887,7 +15516,7 @@ function scrollRecipeEditorToFoodReview() {
     });
 
     const ingredientInput = row.querySelector('[data-field="ingredient"]');
-    if (ingredientInput) {
+    if (ingredientInput && options.focus !== false) {
         setTimeout(() => {
             try {
                 ingredientInput.focus({ preventScroll: true });
@@ -14898,14 +15527,14 @@ function scrollRecipeEditorToFoodReview() {
     }
 
     setTimeout(() => row.classList.remove("recipe-edit-review-target"), 2400);
-    return true;
+    return marker;
 }
 
-function scrollRecipeEditorToIngredient(ingredientName) {
+function recipeEditorIngredientRowForName(ingredientName) {
     const targetKey = normalizeIngredientJumpKey(ingredientName);
 
     if (!targetKey) {
-        return false;
+        return null;
     }
 
     const rows = [...document.querySelectorAll("#recipeEditIngredients .recipe-edit-ingredient-row")];
@@ -14918,11 +15547,16 @@ function scrollRecipeEditorToIngredient(ingredientName) {
 
         return score > best.score ? { row: candidate, score } : best;
     }, { row: null, score: 0 });
-    const row = match.row;
+
+    return match.row;
+}
+
+function scrollRecipeEditorToIngredient(ingredientName, options = {}) {
+    const row = recipeEditorIngredientRowForName(ingredientName);
 
     if (!row) {
         setRecipeEditStatus(`Ingredient not found: ${ingredientName}`, true);
-        return false;
+        return null;
     }
 
     document.querySelectorAll(".recipe-edit-review-target").forEach(element => {
@@ -14936,7 +15570,7 @@ function scrollRecipeEditorToIngredient(ingredientName) {
     });
 
     const ingredientInput = row.querySelector('[data-field="ingredient"]');
-    if (ingredientInput) {
+    if (ingredientInput && options.focus !== false) {
         setTimeout(() => {
             try {
                 ingredientInput.focus({ preventScroll: true });
@@ -14948,7 +15582,7 @@ function scrollRecipeEditorToIngredient(ingredientName) {
     }
 
     setTimeout(() => row.classList.remove("recipe-edit-review-target"), 3000);
-    return true;
+    return row;
 }
 
 function ingredientJumpMatchScore(targetKey, ingredientKey, originalTextKey) {
@@ -18176,21 +18810,25 @@ async function createRecipePdfFromSourceUrl(sourceUrl) {
 }
 
 async function createRecipePdfFromSavedRecipe(sourceUrl) {
-    const requestBody = JSON.stringify({ url: sourceUrl });
-    const isUploadedSource = isUploadedRecipeSourceUrl(String(sourceUrl || ""));
-    const endpoint = isUploadedSource ? "/api/create-recipe-pdf" : "/api/recipe_pdf";
-
-    const pdfResponse = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
+    const startData = await startBackgroundJob("/api/jobs/create-recipe-pdf", {
+        payload: {
+            url: sourceUrl,
         },
-        body: requestBody,
     });
-    const pdfData = await pdfResponse.json();
+    const finishedJob = await waitForJobCompletion(startData.job_id, {
+        onUpdate(job) {
+            if (typeof setRecipeEditStatus === "function") {
+                setRecipeEditStatus(job.current_step || "Generating PDF...");
+            }
+        },
+    });
+    const pdfData = finishedJob && finishedJob.result_payload && typeof finishedJob.result_payload === "object"
+        ? finishedJob.result_payload
+        : {};
+    syncOpenAiUsageDashboardFromResponse(pdfData);
 
-    if (!pdfResponse.ok || !pdfData.ok) {
-        throw new Error((pdfData && pdfData.error) || "Unable to create PDF.");
+    if (!finishedJob || finishedJob.status !== "completed" || !pdfData.ok) {
+        throw new Error((finishedJob && finishedJob.error_message) || (pdfData && pdfData.error) || "Unable to create PDF.");
     }
 
     return pdfData;
@@ -18203,17 +18841,26 @@ async function uploadRecipeEditorPdfToCloudflareWithSource(sourceUrl) {
         throw new Error("Recipe URL is required before uploading the PDF.");
     }
 
-    const response = await fetch("/api/recipe_pdf/cloudflare_upload", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
+    const startData = await startBackgroundJob("/api/jobs/upload-generated-pdf", {
+        payload: {
+            url: sourceUrlValue,
+            kind: "generated_recipe",
         },
-        body: JSON.stringify({ url: sourceUrlValue, kind: "generated_recipe" }),
     });
-    const data = await response.json();
+    const finishedJob = await waitForJobCompletion(startData.job_id, {
+        onUpdate(job) {
+            if (typeof setRecipeEditStatus === "function") {
+                setRecipeEditStatus(job.current_step || "Uploading PDF to Cloudflare...");
+            }
+        },
+    });
+    const data = finishedJob && finishedJob.result_payload && typeof finishedJob.result_payload === "object"
+        ? finishedJob.result_payload
+        : {};
+    syncOpenAiUsageDashboardFromResponse(data);
 
-    if (!response.ok || !data.ok) {
-        throw new Error((data && data.error) || "Unable to upload PDF to Cloudflare.");
+    if (!finishedJob || finishedJob.status !== "completed" || !data.ok) {
+        throw new Error((finishedJob && finishedJob.error_message) || (data && data.error) || "Unable to upload PDF to Cloudflare.");
     }
 
     updateRecipeEditorPdfControls({
@@ -23326,6 +23973,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ["bindImportCookbookSelector", bindImportCookbookSelector],
         ["bindStoreButtons", bindStoreButtons],
         ["bindSectionHeaderToggles", bindSectionHeaderToggles],
+        ["initJobActivityPanel", initJobActivityPanel],
         ["initLazySections", initLazySections],
         ["restoreRecipeEditPageReturnState", restoreRecipeEditPageReturnState],
     ].forEach(([name, callback]) => runStartupTask(name, callback));
@@ -23400,21 +24048,82 @@ async function startRecipeExtraction(event) {
         return;
     }
 
-    await startRecipeExtractionUrls(urls, { extractionMode });
+    await startRecipeExtractionUrls(urls, { extractionMode, button: event.submitter || null });
+}
+
+function importJobToExtractionProgress(job, urls, isMenuExtract) {
+    const jobStatus = String((job && job.status) || "queued").toLowerCase();
+    const active = jobStatus === "queued" || jobStatus === "running";
+    const failed = jobStatus === "failed";
+    const cancelled = jobStatus === "cancelled";
+    const completed = jobStatus === "completed";
+    const completedItems = Math.max(0, Number((job && job.completed_items) || 0));
+    const failedItems = Math.max(0, Number((job && job.failed_items) || 0));
+    const sourceUrls = Array.isArray(urls) ? urls : [];
+    const sourceRows = sourceUrls.map((url, index) => {
+        let state = "waiting";
+        let message = job && job.current_step ? job.current_step : "Queued";
+
+        if (completed) {
+            state = "done";
+            message = "Completed";
+        } else if (failed) {
+            state = "failed";
+            message = (job && job.error_message) || "Import failed.";
+        } else if (cancelled) {
+            state = "cancelled";
+            message = "Cancelled";
+        } else if (!isMenuExtract && index < completedItems) {
+            state = "done";
+            message = "Completed";
+        } else if (!isMenuExtract && index < completedItems + failedItems) {
+            state = "failed";
+            message = "Failed";
+        } else if (active && index === Math.min(sourceUrls.length - 1, completedItems + failedItems)) {
+            state = "running";
+            message = job && job.current_step ? job.current_step : "Running";
+        }
+
+        return {
+            url,
+            state,
+            message,
+        };
+    });
+
+    const result = jobResultPayload(job || {});
+    const createdCount = Number(result.created_count || completedItems || 0);
+    const summary = completed
+        ? `Imported ${createdCount} recipe${createdCount === 1 ? "" : "s"}.`
+        : failed
+            ? ((job && job.error_message) || "Import finished with errors.")
+            : ((job && job.current_step) || "Import is running in the background.");
+
+    return {
+        active,
+        job_id: (job && (job.id || job.job_id)) || lastRenderedExtractJobId || "",
+        status: completed ? "complete" : failed ? "failed" : cancelled ? "cancelled" : "running",
+        extraction_mode: isMenuExtract ? "menu_extract" : "recipe",
+        total: sourceUrls.length,
+        percent: Math.max(0, Math.min(100, Number((job && job.progress_percent) || 0))),
+        summary,
+        urls: sourceRows,
+    };
 }
 
 async function startRecipeExtractionUrls(urls, options = {}) {
     const extractionMode = normalizeRecipeImportMode(options.extractionMode || lastRecipeUrlExtractionMode);
     const isMenuExtract = extractionMode === "menu_extract";
+    const endpoint = isMenuExtract ? "/api/jobs/menu-import" : "/api/jobs/recipe-import";
+    const button = options.button || null;
     lastRecipeUrlExtractionMode = extractionMode;
     const destination = currentImportCookbookDestination();
     syncImportCookbookHiddenInputs(destination);
     console.log("[recipe_import] selected import cookbook", destination);
 
     showExtractionOverlay();
-    const jobId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     hiddenExtractJobId = null;
-    lastRenderedExtractJobId = jobId;
+    lastRenderedExtractJobId = null;
     lastRenderedExtractProgress = null;
     cancelExtractRequested = false;
 
@@ -23466,33 +24175,42 @@ async function startRecipeExtractionUrls(urls, options = {}) {
         bar.style.width = "10%";
     }
 
-    const startResponse = await fetch("/api/start_extract_progress", {
-        method: "POST",
-        headers: {
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-            "X-Requested-With": "fetch",
-        },
-        body: JSON.stringify({
-            urls: urls,
-            job_id: jobId,
-            cookbook_id: destination.cookbookId || "",
-            cookbook_name: destination.cookbookName || "",
-            extraction_mode: extractionMode,
-        }),
-    });
-    let startData = {};
     try {
-        startData = await startResponse.json();
+        const startData = await startBackgroundJob(endpoint, {
+            button,
+            payload: {
+                urls,
+                cookbook_id: destination.cookbookId || "",
+                cookbook_name: destination.cookbookName || "",
+                extraction_mode: extractionMode,
+            },
+            creatingText: "Starting...",
+        });
+        const jobId = String((startData && startData.job_id) || "").trim();
+
+        if (!jobId) {
+            throw new Error("Unable to start import job.");
+        }
+
+        lastRenderedExtractJobId = jobId;
+        renderExtractionProgress(importJobToExtractionProgress(startData.job, urls, isMenuExtract));
+
+        if (button) {
+            button.disabled = true;
+            button.textContent = isMenuExtract ? "Importing Menu..." : "Importing...";
+        }
+
+        const finishedJob = await waitForJobCompletion(jobId, {
+            onUpdate(job) {
+                renderExtractionProgress(importJobToExtractionProgress(job, urls, isMenuExtract));
+            },
+            pollMs: 1500,
+        });
+        const finalProgress = importJobToExtractionProgress(finishedJob, urls, isMenuExtract);
+        renderExtractionProgress(finalProgress);
+        syncOpenAiUsageDashboardFromResponse(jobResultPayload(finishedJob));
     } catch (err) {
-        startData = {};
-    }
-    syncOpenAiUsageDashboardFromResponse(startData);
-    if (!startResponse.ok || (startData && startData.ok === false)) {
-        const message = String(
-            (startData && (startData.error || startData.message))
-            || "Unable to start recipe import."
-        ).trim();
+        const message = String((err && err.message) || "Unable to start recipe import.").trim();
         status.textContent = "Import could not start.";
         summary.textContent = message;
         if (bar) {
@@ -23513,79 +24231,13 @@ async function startRecipeExtractionUrls(urls, options = {}) {
                 reason.textContent = message;
             });
         }
-        return;
-    }
-    scheduleExtractionProgressPoll(250);
-
-    currentExtractAbortControllers = [];
-
-    const extractionRequests = urls.map((url, index) => {
-        const row = document.getElementById(`extract-url-${index}`);
-        const text = row ? row.querySelector(".extract-url-progress-link") : null;
-        const reason = row ? row.querySelector(".bulk-skip-reason") : null;
-
-        if (reason) {
-            reason.textContent = isMenuExtract
-                ? "extracting - Running menu extractor..."
-                : "extracting - Running recipe extractor...";
-        }
-
-        if (text) {
-            text.classList.add("active");
-        }
-
-        const controller = new AbortController();
-        currentExtractAbortControllers.push(controller);
-        currentExtractAbortController = controller;
-
-        return fetch("/api/extract_recipe", {
-            method: "POST",
-            headers: {
-                "Accept": "application/json",
-                "Content-Type": "application/json",
-                "X-Requested-With": "fetch",
-            },
-            signal: controller.signal,
-            body: JSON.stringify({
-                url: url,
-                urls: urls,
-                index: index,
-                job_id: jobId,
-                cookbook_id: destination.cookbookId || "",
-                cookbook_name: destination.cookbookName || "",
-                extraction_mode: extractionMode,
-            }),
-        }).then(async response => {
-            let data = {};
-            try {
-                data = await response.json();
-            } catch (err) {
-                data = {};
-            }
-            syncOpenAiUsageDashboardFromResponse(data);
-            if (!isMenuExtract && response.ok && data && data.ok !== false) {
-                scheduleOpenRecipeEditorPdfRefresh({
-                    recipeUrl: url,
-                    waitForGeneratedCloudflare: true,
-                    waitForSourceCloudflare: true,
-                    initialDelay: 500,
-                    timeoutMs: 60000,
-                });
-            }
-            return response;
-        }).catch(err => {
-            if (!cancelExtractRequested) {
-                throw err;
-            }
-        });
-    });
-
-    try {
-        await Promise.allSettled(extractionRequests);
     } finally {
         currentExtractAbortController = null;
         currentExtractAbortControllers = [];
-        await pollExtractionProgress();
+        if (button) {
+            button.disabled = false;
+            button.textContent = isMenuExtract ? "Import Menu URL" : "Import Recipe URLs";
+        }
     }
 }
 
@@ -23607,16 +24259,24 @@ async function cancelRecipeExtraction() {
     }
 
     try {
-        await fetch("/api/cancel_extract", {
+        const response = await fetch(`/api/jobs/${encodeURIComponent(lastRenderedExtractJobId)}/cancel`, {
             method: "POST",
             headers: {
-                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "X-Requested-With": "fetch",
             },
-            body: JSON.stringify({
-                job_id: lastRenderedExtractJobId,
-            }),
         });
-        await pollExtractionProgress();
+        const data = await response.json();
+        if (data && data.job) {
+            const urls = lastRenderedExtractProgress && Array.isArray(lastRenderedExtractProgress.urls)
+                ? lastRenderedExtractProgress.urls.map(item => item.url).filter(Boolean)
+                : [];
+            renderExtractionProgress(importJobToExtractionProgress(
+                data.job,
+                urls,
+                lastRenderedExtractProgress && lastRenderedExtractProgress.extraction_mode === "menu_extract"
+            ));
+        }
     } catch (err) {
         // Cancel is best-effort; polling will catch the final state.
     }
@@ -23638,7 +24298,9 @@ async function redoMissingRecipeExtraction() {
         return;
     }
 
-    await startRecipeExtractionUrls(missingUrls);
+    await startRecipeExtractionUrls(missingUrls, {
+        extractionMode: progress.extraction_mode || lastRecipeUrlExtractionMode,
+    });
 }
 
 function waitForNextPaint() {

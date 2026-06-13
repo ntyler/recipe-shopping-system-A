@@ -164,6 +164,21 @@ $env:PRODUCT_FINAL_SELECTION_CANDIDATES="96"
 $env:PRODUCT_AI_BROWSER_WAIT_SECONDS="4"
 ```
 
+Optional background job and progress controls:
+
+```powershell
+$env:REDIS_URL="redis://localhost:6379/0"
+$env:JOB_RETENTION_HOURS="168"
+$env:GUEST_JOB_RETENTION_HOURS="24"
+$env:JOB_TIMEOUT_MINUTES="180"
+$env:RQ_QUEUE_NAME="ai-pantry"
+$env:JOB_QUEUE_THREAD_FALLBACK="1"
+$env:JOB_QUEUE_MODE=""
+$env:SHOPPING_APP_JOBS_DB="D:\path\to\jobs.sqlite3"
+```
+
+Long-running AI Pantry workflows create persistent job records in a local SQLite job table and enqueue the work through RQ when Redis is available. `SHOPPING_APP_JOBS_DB` defaults to `PushShoppingList/user_data/jobs.sqlite3` when unset. `REDIS_URL` is used only by the Flask server and worker process; never expose it to browser code. `JOB_RETENTION_HOURS` controls signed-in user job history, and `GUEST_JOB_RETENTION_HOURS` controls guest demo job history. Guest job records are removed during demo cleanup. If Redis or RQ is unavailable in local development, `JOB_QUEUE_THREAD_FALLBACK=1` lets Flask run jobs in a background thread so the progress UI can still be tested. Set `JOB_QUEUE_MODE=inline` only for targeted debugging or tests where the request should run the job synchronously.
+
 Notes:
 
 - Leave `DISABLE_BROWSER_RECIPE_FETCH` unset unless you do not want Selenium/Chrome fallback.
@@ -216,6 +231,16 @@ The included launcher currently sets `SHOPPING_APP_PORT=5083`, so it opens:
 ```text
 http://127.0.0.1:5083
 ```
+
+For production-style background processing, start Redis and run one or more RQ workers alongside the Flask app:
+
+```powershell
+$env:REDIS_URL="redis://localhost:6379/0"
+$env:RQ_QUEUE_NAME="ai-pantry"
+C:\Python39\python.exe worker.py
+```
+
+On Windows local development, Redis can run through Docker Desktop, WSL, Memurai, or another Redis-compatible service. In production, run Redis as a private service reachable by the Flask app and worker, set the same `REDIS_URL` in both processes, and keep service credentials out of frontend templates and JavaScript.
 
 The app also listens on your LAN address, so another device on the same Wi-Fi can open:
 

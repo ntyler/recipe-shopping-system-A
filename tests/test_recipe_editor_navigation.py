@@ -82,3 +82,39 @@ def test_recipe_editor_cancel_uses_stored_page_return_before_history():
     assert "function recipeEditPageReturnUrlFromState" in script
     assert "const returnUrl = recipeEditPageReturnUrlFromState();" in close_block
     assert close_block.index("window.location.assign(returnUrl);") < close_block.index("window.history.back();")
+
+
+def test_food_review_badges_open_active_review_flow():
+    script = read_text("PushShoppingList/static/js/app.js")
+    recipe_view = read_text("PushShoppingList/templates/sections/items.html")
+    current_recipes = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    cookbooks = read_text("PushShoppingList/templates/sections/cookbooks.html")
+
+    assert "function openRecipeFoodReviewFromRecipeView" in script
+    assert "activateFoodReview: true" in script[
+        script.index("function openRecipeFoodReviewFromRecipeView"):
+        script.index("function openIngredientFoodReviewFromRecipeView")
+    ]
+    assert "activateFoodReview: true" in script[
+        script.index("function openIngredientFoodReviewFromRecipeView"):
+        script.index("function closeRecipeEditor")
+    ]
+    assert "await activateRecipeEditorFoodReviewMarker(marker);" in script
+    assert "function recipeEditorFoodReviewMarkerForRow" in script
+    assert "function recipeEditorIngredientRowForName" in script
+    assert 'const RECIPE_EDIT_PENDING_ACTION_KEY = "recipe-edit-pending-action";' in script
+    assert "function openRecipeEditPageFallback" in script
+    assert "rememberRecipeEditPendingAction(recipeUrl, options);" in script
+    assert "openRecipeEditPageFallback(button, url, options);" in script
+
+    assert recipe_view.count("openRecipeFoodReviewFromRecipeView(this, event)") == 1
+    assert current_recipes.count("openRecipeFoodReviewFromRecipeView(this, event)") == 1
+    assert cookbooks.count("openRecipeFoodReviewFromRecipeView(this, event)") == 1
+    assert "openIngredientFoodReviewFromRecipeView(this, event)" in recipe_view
+
+
+def test_recipe_edit_page_consumes_pending_editor_action():
+    template = read_text("PushShoppingList/templates/recipe_edit_page.html")
+
+    assert "consumeRecipeEditPendingAction(recipeUrl)" in template
+    assert "openRecipeEditor({ dataset: { recipeUrl } }, pendingOptions);" in template

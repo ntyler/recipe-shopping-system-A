@@ -20,7 +20,10 @@ window.addEventListener("DOMContentLoaded", () => {
     const recipeUrl = document.body ? document.body.dataset.recipeEditUrl || "" : "";
 
     if (recipeUrl && typeof openRecipeEditor === "function") {
-        openRecipeEditor({ dataset: { recipeUrl } });
+        const pendingOptions = typeof consumeRecipeEditPendingAction === "function"
+            ? consumeRecipeEditPendingAction(recipeUrl)
+            : {};
+        openRecipeEditor({ dataset: { recipeUrl } }, pendingOptions);
     }
 });
 </script>

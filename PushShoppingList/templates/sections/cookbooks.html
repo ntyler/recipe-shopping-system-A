@@ -361,7 +361,7 @@
                                                                             data-recipe-url="{{ recipe.url }}"
                                                                             title="{{ recipe.food_rule_status.marker }}"
                                                                             aria-label="Food Review: {{ recipe.food_rule_status.count }} item{% if recipe.food_rule_status.count != 1 %}s{% endif %} need review"
-                                                                            onclick="event.stopPropagation(); openRecipeEditor(this, { scrollToFoodReview: true }); return false;">
+                                                                            onclick="return openRecipeFoodReviewFromRecipeView(this, event)">
                                                                         Food Review ({{ recipe.food_rule_status.count }})
                                                                     </button>
                                                                 {% endif %}

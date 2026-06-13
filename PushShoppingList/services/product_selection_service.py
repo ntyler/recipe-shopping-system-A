@@ -812,7 +812,35 @@ def save_product_progress(progress):
             json.dumps(progress, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
+        sync_product_progress_to_job(progress)
         return progress
+
+
+def sync_product_progress_to_job(progress):
+    job_id = str((progress or {}).get("job_id") or "").strip()
+    if not job_id:
+        return
+
+    try:
+        from PushShoppingList.services.job_service import get_job
+        from PushShoppingList.services.job_service import update_job_progress
+
+        job = get_job(job_id)
+        if not job or job.get("job_type") != "product-matching":
+            return
+
+        downloads = progress.get("downloads", []) if isinstance(progress, dict) else []
+        failed = sum(1 for item in downloads if item.get("state") == "failed")
+        update_job_progress(
+            job_id,
+            current_step=progress.get("summary") or "Matching products",
+            progress_percent=progress.get("percent"),
+            total_items=progress.get("total"),
+            completed_items=progress.get("completed"),
+            failed_items=failed,
+        )
+    except Exception as exc:
+        print(f"[product_progress] unable to sync job progress: {exc}")
 
 
 def start_product_progress(downloads, job_id=None, home_address="", enabled_stores=None, max_workers=None):

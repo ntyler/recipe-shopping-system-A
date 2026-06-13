@@ -20283,3 +20283,183 @@ img[data-deferred-src] {
         linear-gradient(90deg, rgba(148, 163, 184, 0.16), rgba(148, 163, 184, 0.28), rgba(148, 163, 184, 0.16));
     background-size: 220% 100%;
 }
+        .job-activity-card {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .job-activity-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .job-activity-toggle {
+            flex: 1;
+            text-align: left;
+        }
+
+        .job-activity-refresh,
+        .job-activity-row-action {
+            border: 1px solid #334155;
+            background: #111827;
+            color: #e5e7eb;
+            border-radius: 6px;
+            padding: 7px 10px;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+
+        .job-activity-row-action.danger {
+            border-color: #7f1d1d;
+            color: #fecaca;
+        }
+
+        .job-activity-content {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .job-activity-summary,
+        .job-activity-empty {
+            color: #cbd5e1;
+            font-size: 0.9rem;
+        }
+
+        .job-activity-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .job-activity-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 10px;
+            padding: 10px;
+            border: 1px solid #283241;
+            border-radius: 8px;
+            background: #111827;
+        }
+
+        .job-activity-row-main {
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .job-activity-row-title,
+        .job-activity-meta,
+        .job-activity-links {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .job-activity-row-title {
+            color: #f8fafc;
+            font-weight: 700;
+        }
+
+        .job-activity-status {
+            border: 1px solid #334155;
+            border-radius: 999px;
+            padding: 2px 7px;
+            color: #cbd5e1;
+            font-size: 0.78rem;
+            font-weight: 600;
+        }
+
+        .job-activity-running .job-activity-status,
+        .job-activity-queued .job-activity-status {
+            border-color: #2563eb;
+            color: #bfdbfe;
+        }
+
+        .job-activity-completed .job-activity-status {
+            border-color: #047857;
+            color: #a7f3d0;
+        }
+
+        .job-activity-failed .job-activity-status,
+        .job-activity-cancelled .job-activity-status {
+            border-color: #7f1d1d;
+            color: #fecaca;
+        }
+
+        .job-activity-step,
+        .job-activity-meta {
+            color: #cbd5e1;
+            font-size: 0.86rem;
+        }
+
+        .job-activity-progress {
+            height: 8px;
+            overflow: hidden;
+            border-radius: 999px;
+            background: #1f2937;
+        }
+
+        .job-activity-progress span {
+            display: block;
+            height: 100%;
+            min-width: 2px;
+            background: #22c55e;
+            transition: width 180ms ease;
+        }
+
+        .job-activity-running .job-activity-progress span,
+        .job-activity-queued .job-activity-progress span {
+            background: #3b82f6;
+        }
+
+        .job-activity-failed .job-activity-progress span,
+        .job-activity-cancelled .job-activity-progress span {
+            background: #ef4444;
+        }
+
+        .job-activity-error,
+        .job-activity-warning {
+            font-size: 0.84rem;
+            line-height: 1.35;
+        }
+
+        .job-activity-error {
+            color: #fecaca;
+        }
+
+        .job-activity-warning {
+            color: #fde68a;
+        }
+
+        .job-activity-links a {
+            color: #93c5fd;
+            font-size: 0.84rem;
+        }
+
+        .job-activity-actions {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+        }
+
+        @media (max-width: 640px) {
+            .job-activity-header,
+            .job-activity-row {
+                grid-template-columns: 1fr;
+            }
+
+            .job-activity-header {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .job-activity-actions {
+                justify-content: flex-start;
+            }
+        }

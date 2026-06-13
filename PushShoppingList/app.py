@@ -14,6 +14,7 @@ from flask import url_for
 
 from PushShoppingList.routes.account_routes import account_bp
 from PushShoppingList.routes.feedback_routes import feedback_bp
+from PushShoppingList.routes.job_routes import job_bp
 from PushShoppingList.routes.main_routes import main_bp
 from PushShoppingList.routes.menu_routes import menu_bp
 from PushShoppingList.routes.pantry_routes import pantry_bp
@@ -99,6 +100,7 @@ PROTECTED_BLUEPRINTS = {
     "pdf_bp",
     "product_bp",
     "recipe_bp",
+    "job_bp",
     "menu_bp",
     "store_bp",
     "feedback_bp",
@@ -216,6 +218,7 @@ def create_app():
 
     app.register_blueprint(account_bp)
     app.register_blueprint(feedback_bp)
+    app.register_blueprint(job_bp)
     app.register_blueprint(main_bp)
     app.register_blueprint(menu_bp)
     app.register_blueprint(pantry_bp)
