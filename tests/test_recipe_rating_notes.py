@@ -128,3 +128,17 @@ def test_current_recipe_food_review_badge_sits_with_menu_status_badges():
     assert stub_block.index("menu-recipe-status-stub") < stub_block.index("recipe-url-summary-food-review")
     assert stub_block.index("recipe-url-summary-food-review") < stub_block.index("Generate Recipe")
     assert "justify-self: start;" in css
+
+
+def test_current_recipe_menu_can_hide_ai_inferred_badges():
+    current_recipes = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    css = read_text("PushShoppingList/static/css/app.css")
+    script = read_text("PushShoppingList/static/js/app.js")
+
+    assert "data-current-recipes-ai-inferred-toggle" in current_recipes
+    assert "Hide AI-Inferred Recipe" in current_recipes
+    assert "toggleCurrentRecipesAiInferredBadges(this, event)" in current_recipes
+    assert "#currentRecipeUrlLogCard.current-recipes-hide-ai-inferred .menu-recipe-status-generated" in css
+    assert "CURRENT_RECIPES_HIDE_AI_INFERRED_BADGE_KEY" in script
+    assert "function restoreCurrentRecipesAiInferredBadgeSetting" in script
+    assert "restoreCurrentRecipesAiInferredBadgeSetting()" in script

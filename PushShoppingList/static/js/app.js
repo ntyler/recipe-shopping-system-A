@@ -44,6 +44,7 @@ const AUTH_COLLAPSE_ACTIVE_KEY = "shopping-auth-collapse-all-active";
 const GLOBAL_COLLAPSE_STATE_KEY = "shopping-global-collapse-state";
 const PERFORMANCE_STARTUP_LAST_OPENED_KEY = "shopping-list-lastPageOpenedAt";
 const PERFORMANCE_STARTUP_STALE_MS = 60 * 60 * 1000;
+const CURRENT_RECIPES_HIDE_AI_INFERRED_BADGE_KEY = "current-recipes-hide-ai-inferred-badge";
 const DEVICE_ID_STORAGE_KEY = "shopping-device-id";
 const DEVICE_STALE_LAST_ACTIVITY_KEY = "shopping-device-last-activity-at";
 const DEVICE_STALE_LAST_SENT_KEY = "shopping-device-stale-last-sent";
@@ -1274,6 +1275,7 @@ function afterDynamicMarkupLoaded(options = {}) {
     bindRecipeUrlLogDragAndDrop();
     bindRecipeViewDragAndDrop();
     bindCurrentRecipeUrlSummaryToggles();
+    restoreCurrentRecipesAiInferredBadgeSetting();
     bindRecipeRemovalForms();
     bindRecipeQuantityInputs();
     bindRecipeNameInputs();
@@ -12831,6 +12833,38 @@ function updateCurrentRecipeUrlSummaryCollapseMenuToggle(row) {
     button.textContent = row.classList.contains("recipe-url-summary-collapsed") ? "Expand this recipe" : "Collapse this recipe";
 }
 
+function setCurrentRecipesAiInferredBadgeHidden(hidden, options = {}) {
+    const shouldHide = Boolean(hidden);
+
+    document.querySelectorAll("#currentRecipeUrlLogCard").forEach(card => {
+        card.classList.toggle("current-recipes-hide-ai-inferred", shouldHide);
+    });
+    document.querySelectorAll("[data-current-recipes-ai-inferred-toggle]").forEach(toggle => {
+        toggle.checked = shouldHide;
+    });
+
+    if (options.persist !== false) {
+        safeStorageSet(localStorage, CURRENT_RECIPES_HIDE_AI_INFERRED_BADGE_KEY, shouldHide ? "1" : "0");
+    }
+
+    return false;
+}
+
+function restoreCurrentRecipesAiInferredBadgeSetting() {
+    return setCurrentRecipesAiInferredBadgeHidden(
+        safeStorageGet(localStorage, CURRENT_RECIPES_HIDE_AI_INFERRED_BADGE_KEY) === "1",
+        { persist: false }
+    );
+}
+
+function toggleCurrentRecipesAiInferredBadges(input, event = null) {
+    if (event) {
+        event.stopPropagation();
+    }
+
+    return setCurrentRecipesAiInferredBadgeHidden(Boolean(input && input.checked));
+}
+
 function bindCurrentRecipeUrlSummaryToggles() {
     document.querySelectorAll("[data-current-recipe-row]").forEach(row => {
         const titleToggle = row.querySelector("[data-recipe-url-summary-toggle]");
@@ -24356,6 +24390,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ["bindFeedbackTickets", bindFeedbackTickets],
         ["initPhoneCountryInputs", initPhoneCountryInputs],
         ["bindCurrentRecipeUrlSummaryToggles", bindCurrentRecipeUrlSummaryToggles],
+        ["restoreCurrentRecipesAiInferredBadgeSetting", restoreCurrentRecipesAiInferredBadgeSetting],
         ["bindRecipeRemovalForms", bindRecipeRemovalForms],
         ["bindRecipeQuantityInputs", bindRecipeQuantityInputs],
         ["bindRecipeNameInputs", bindRecipeNameInputs],

@@ -4383,7 +4383,11 @@ body {
         }
 
         .recipe-url-log-menu {
-            min-width: 172px;
+            min-width: 220px;
+        }
+
+        #currentRecipeUrlLogCard.current-recipes-hide-ai-inferred .menu-recipe-status-generated {
+            display: none;
         }
 
         #currentRecipeUrlLogCard,
@@ -17189,6 +17193,44 @@ body {
     font-weight: 700;
     line-height: 1.2;
     box-sizing: border-box;
+}
+
+.recipe-edit-row-menu .recipe-menu-check-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 36px;
+    margin: 0;
+    padding: 9px 14px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--submenu-text);
+    text-align: left;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.2;
+    cursor: pointer;
+    box-sizing: border-box;
+}
+
+.recipe-edit-row-menu .recipe-menu-check-toggle:hover,
+.recipe-edit-row-menu .recipe-menu-check-toggle:focus-within {
+    background: var(--submenu-hover);
+    outline: none;
+}
+
+.recipe-edit-row-menu .recipe-menu-check-toggle input[type="checkbox"] {
+    flex: 0 0 auto;
+    width: 15px;
+    height: 15px;
+    margin: 0;
+    accent-color: #2f855a;
+}
+
+.recipe-edit-row-menu .recipe-menu-check-toggle span {
+    min-width: 0;
 }
 
 .recipe-edit-row-menu a.recipe-edit-menu-link {

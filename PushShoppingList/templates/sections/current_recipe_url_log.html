@@ -47,6 +47,13 @@
                 <button type="button" class="delete" onclick="return clearSelectedCurrentRecipes(this)">
                     Clear selected recipes
                 </button>
+                <label class="recipe-menu-check-toggle recipe-url-log-ai-inferred-toggle"
+                       onclick="event.stopPropagation()">
+                    <input type="checkbox"
+                           data-current-recipes-ai-inferred-toggle
+                           onchange="return toggleCurrentRecipesAiInferredBadges(this, event)">
+                    <span>Hide AI-Inferred Recipe</span>
+                </label>
                 <div class="recipe-url-summary-cookbook-menu-label">Menu AI</div>
                 <button type="button" onclick="return generateSelectedMenuStubRecipes(this)">
                     Generate Selected Recipes
