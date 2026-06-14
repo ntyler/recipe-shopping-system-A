@@ -183,6 +183,43 @@ def normalize_list(value):
     return value if isinstance(value, list) else []
 
 
+def normalize_equipment_prediction_records(value):
+    records = []
+    for item in normalize_list(value):
+        if isinstance(item, dict):
+            name = clean_text(
+                item.get("name")
+                or item.get("equipment")
+                or item.get("text")
+                or item.get("item")
+            )
+            if not name:
+                continue
+            record = {"name": name}
+            category = clean_text(item.get("category") or item.get("equipment_category") or "")
+            if category:
+                record["category"] = category
+            reason = clean_text(item.get("reason") or item.get("note") or "")
+            if reason:
+                record["reason"] = reason
+            try:
+                confidence = float(item.get("confidence"))
+            except (TypeError, ValueError):
+                confidence = None
+            if confidence is not None:
+                record["confidence"] = max(0.0, min(1.0, confidence))
+        else:
+            name = clean_text(item)
+            if not name:
+                continue
+            record = {"name": name}
+
+        if record not in records:
+            records.append(record)
+
+    return records
+
+
 def default_recipe_inference():
     return {
         "status": "not_generated",
@@ -238,6 +275,9 @@ def normalize_menu_item_placeholders(item):
     item["recipe_inference"] = normalize_placeholder(
         item.get("recipe_inference"),
         default_recipe_inference,
+    )
+    item["recipe_inference"]["equipment"] = normalize_equipment_prediction_records(
+        item["recipe_inference"].get("equipment")
     )
     item["nutrition_inference"] = normalize_placeholder(
         item.get("nutrition_inference"),
@@ -642,12 +682,35 @@ def update_mega_menu_json_with_cleanup(mega_json, cleaned_sections, cleanup_debu
                 item["should_create_recipe_stub"] = bool(cleaned_item.get("should_create_recipe"))
             if cleaned_item.get("skip_reason"):
                 item["cleanup_notes"] = [clean_text(cleaned_item.get("skip_reason"))]
+            predicted_equipment = normalize_equipment_prediction_records(
+                cleaned_item.get("predicted_equipment")
+                or cleaned_item.get("equipment")
+            )
+            if predicted_equipment:
+                item["predicted_equipment"] = predicted_equipment
+                recipe_inference = normalize_placeholder(
+                    item.get("recipe_inference"),
+                    default_recipe_inference,
+                )
+                recipe_inference["equipment"] = predicted_equipment
+                if recipe_inference.get("status") == "not_generated":
+                    recipe_inference["status"] = "equipment_predicted"
+                recipe_inference["model"] = cleanup_debug.get("model") or recipe_inference.get("model")
+                recipe_inference["generated_at"] = recipe_inference.get("generated_at") or now_iso()
+                notes = normalize_list(recipe_inference.get("notes"))
+                note = "Equipment predicted from menu item metadata during cleanup."
+                if note not in notes:
+                    notes.append(note)
+                recipe_inference["notes"] = notes
+                item["recipe_inference"] = recipe_inference
             metadata = item.setdefault("metadata", {})
             if isinstance(metadata, dict):
                 metadata["item_type"] = item["item_type"]
                 metadata["broad_category"] = item["broad_category"]
                 metadata["normalized_name"] = normalized_name
                 metadata["normalized_section_name"] = normalized_section
+                if predicted_equipment:
+                    metadata["predicted_equipment_count"] = len(predicted_equipment)
             item_index += 1
 
     extraction = mega_json.setdefault("extraction", {})
@@ -715,6 +778,16 @@ def unpack_mega_menu_json_to_sections(mega_json, snapshot_id=""):
             )
             duplicate_group_id = clean_text(item.get("duplicate_group_id") or "")
             cleanup_notes = normalize_list(item.get("cleanup_notes"))
+            recipe_inference = normalize_placeholder(
+                item.get("recipe_inference"),
+                default_recipe_inference,
+            )
+            predicted_equipment = normalize_equipment_prediction_records(
+                item.get("predicted_equipment")
+                or recipe_inference.get("equipment")
+            )
+            if predicted_equipment:
+                recipe_inference["equipment"] = predicted_equipment
             item_display_order = safe_int(item.get("display_order"), item_index + 1)
             unpacked_item = {
                 "item_name": item_name,
@@ -748,6 +821,8 @@ def unpack_mega_menu_json_to_sections(mega_json, snapshot_id=""):
                 "broad_category": clean_text(item.get("broad_category") or metadata.get("broad_category") or ""),
                 "duplicate_group_id": duplicate_group_id,
                 "cleanup_notes": cleanup_notes,
+                "predicted_equipment": predicted_equipment,
+                "recipe_inference": recipe_inference,
                 "parent_menu_snapshot_id": snapshot_id,
                 "menu_mega_snapshot_id": snapshot_id,
             }

@@ -61,6 +61,7 @@ from PushShoppingList.services.menu_mega_json_service import build_mega_menu_jso
 from PushShoppingList.services.menu_mega_json_service import default_nutrition_inference
 from PushShoppingList.services.menu_mega_json_service import default_pdf_generation
 from PushShoppingList.services.menu_mega_json_service import default_recipe_inference
+from PushShoppingList.services.menu_mega_json_service import normalize_equipment_prediction_records
 from PushShoppingList.services.menu_mega_json_service import save_menu_mega_json_snapshot
 from PushShoppingList.services.menu_mega_json_service import unpack_mega_menu_json_to_sections
 from PushShoppingList.services.menu_mega_json_service import update_mega_menu_json_with_cleanup
@@ -9777,6 +9778,16 @@ def extract_structured_menu_items_from_html(html_text, source_url):
 
 def build_menu_item_recipe_prompt(menu_url, item, index, total):
     item = item if isinstance(item, dict) else {}
+    predicted_equipment = normalize_equipment_prediction_records(item.get("predicted_equipment"))
+    predicted_equipment_text = (
+        ", ".join(
+            clean_recipe_text(equipment.get("name") if isinstance(equipment, dict) else equipment)
+            for equipment in predicted_equipment
+            if clean_recipe_text(equipment.get("name") if isinstance(equipment, dict) else equipment)
+        )
+        if predicted_equipment
+        else "None"
+    )
     return f"""
 Infer a practical home-cooking recipe from one restaurant menu item.
 
@@ -9791,6 +9802,7 @@ Menu description: {item.get("description") or ""}
 Price: {item.get("price") or ""}
 Spicy flag: {item.get("is_spicy")}
 Vegetarian flag: {item.get("is_veggie")}
+Predicted equipment hint: {predicted_equipment_text}
 
 Infer:
 - servings
@@ -9801,6 +9813,7 @@ Infer:
 - prep time and cook time when reasonable
 - nutrition estimate if reasonable
 - confidence notes when uncertain
+- Use the predicted equipment hint only when it fits the inferred home-cooking recipe; revise or omit it when better equipment is implied.
 
 Return ONLY valid JSON using this shape:
 {{
@@ -10133,7 +10146,10 @@ Return only valid JSON with this shape:
       "broad_category": "noodles",
       "duplicate_of_index": null,
       "should_create_recipe": true,
-      "skip_reason": ""
+      "skip_reason": "",
+      "predicted_equipment": [
+        {{"name": "wok", "category": "cookware", "confidence": 0.7}}
+      ]
     }}
   ]
 }}
@@ -10141,7 +10157,10 @@ Return only valid JSON with this shape:
 Rules:
 - Classify item_type as food, drink, modifier, add-on, or unknown.
 - Set should_create_recipe false for modifiers, add-ons, duplicated variants, policies, and non-menu text.
-- Do not infer ingredients, equipment, instructions, nutrition, PDFs, or cooking steps.
+- For real food items, predict 1-6 likely home-cooking equipment records from only the item name, section, and menu description.
+- Keep predicted_equipment broad and practical, such as skillet, wok, saucepan, mixing bowl, chef knife, baking sheet, blender, grill, or tongs.
+- Return predicted_equipment [] for duplicate, modifier, add-on, policy, or non-menu items.
+- Do not infer ingredients, instructions, nutrition, PDFs, or cooking steps.
 
 Menu items:
 {json.dumps({"items": compact_items}, ensure_ascii=False)}
@@ -10157,7 +10176,7 @@ def send_menu_cleanup_prompt_to_openai(prompt_text, action_name="menu-cleanup"):
             {
                 "role": "system",
                 "content": (
-                    "You normalize restaurant menu item metadata. "
+                    "You normalize restaurant menu item metadata and predict likely equipment. "
                     "Return only compact valid JSON and never generate recipes."
                 ),
             },
@@ -10241,6 +10260,23 @@ def apply_menu_cleanup_to_sections(sections, cleanup_payload):
                 or item.get("item_name")
                 or ""
             )
+            predicted_equipment = normalize_equipment_prediction_records(
+                cleanup.get("predicted_equipment")
+                or cleanup.get("equipment")
+            )
+            recipe_inference = {
+                **default_recipe_inference(),
+                **(item.get("recipe_inference") if isinstance(item.get("recipe_inference"), dict) else {}),
+            }
+            if predicted_equipment:
+                if recipe_inference.get("status") in (None, "", "not_generated"):
+                    recipe_inference["status"] = "equipment_predicted"
+                recipe_inference["equipment"] = predicted_equipment
+                notes = recipe_inference.get("notes") if isinstance(recipe_inference.get("notes"), list) else []
+                note = "Equipment predicted from menu item metadata during cleanup."
+                if note not in notes:
+                    notes.append(note)
+                recipe_inference["notes"] = notes
             next_item = {
                 **item,
                 "display_order": display_order + 1,
@@ -10253,6 +10289,8 @@ def apply_menu_cleanup_to_sections(sections, cleanup_payload):
                 "broad_category": clean_recipe_text(cleanup.get("broad_category") or item.get("broad_category") or ""),
                 "should_create_recipe": bool(cleanup.get("should_create_recipe", True)),
                 "skip_reason": clean_recipe_text(cleanup.get("skip_reason") or ""),
+                "predicted_equipment": predicted_equipment,
+                "recipe_inference": recipe_inference,
             }
             if cleanup.get("duplicate_of_index") not in (None, ""):
                 next_item["duplicate_of_index"] = cleanup.get("duplicate_of_index")
@@ -10291,7 +10329,10 @@ def maybe_cleanup_menu_sections(sections, progress_callback=None, cancellation_c
     if progress_callback:
         progress_callback(
             "Optional AI cleanup",
-            f"Normalizing menu item names with {model_resolution.model} via {OPENAI_MENU_CLEANUP_MODEL_ENV_VAR}.",
+            (
+                "Normalizing menu item names and predicting equipment with "
+                f"{model_resolution.model} via {OPENAI_MENU_CLEANUP_MODEL_ENV_VAR}."
+            ),
         )
 
     try:
@@ -10356,6 +10397,28 @@ def normalize_menu_item_stub(menu_url, menu_item, index, source_name=""):
     section_id = clean_recipe_text(menu_item.get("section_id") or menu_item.get("menu_section_id") or "")
     section_display_order = menu_item.get("section_display_order")
     item_display_order = menu_item.get("item_display_order") or menu_item.get("display_order") or index + 1
+    source_recipe_inference = (
+        menu_item.get("recipe_inference")
+        if isinstance(menu_item.get("recipe_inference"), dict)
+        else {}
+    )
+    predicted_equipment = normalize_equipment_prediction_records(
+        menu_item.get("predicted_equipment")
+        or source_recipe_inference.get("equipment")
+    )
+    recipe_inference = {
+        **default_recipe_inference(),
+        **source_recipe_inference,
+    }
+    if predicted_equipment:
+        recipe_inference["equipment"] = predicted_equipment
+        if recipe_inference.get("status") in (None, "", "not_generated"):
+            recipe_inference["status"] = "equipment_predicted"
+        notes = recipe_inference.get("notes") if isinstance(recipe_inference.get("notes"), list) else []
+        note = "Equipment predicted from menu item metadata during cleanup."
+        if note not in notes:
+            notes.append(note)
+        recipe_inference["notes"] = notes
 
     recipe = {
         "display_name": title,
@@ -10372,10 +10435,10 @@ def normalize_menu_item_stub(menu_url, menu_item, index, source_name=""):
         "needs_ai_recipe": True,
         "recipe_status": "stub",
         "ingredients": [],
-        "equipment": [],
+        "equipment": predicted_equipment,
         "instructions": [],
         "nutrition": {},
-        "recipe_inference": default_recipe_inference(),
+        "recipe_inference": recipe_inference,
         "nutrition_inference": default_nutrition_inference(),
         "pdf_generation": default_pdf_generation(),
         "source_url": recipe_url,
@@ -10457,6 +10520,7 @@ def normalize_menu_item_stub(menu_url, menu_item, index, source_name=""):
         "duplicate_group_id": recipe["duplicate_group_id"],
         "cleanup_confidence": recipe["cleanup_confidence"],
         "cleanup_notes": recipe["cleanup_notes"],
+        "predicted_equipment": predicted_equipment,
         "tags": recipe["tags"],
         "options": recipe["options"],
         "modifiers": recipe["modifiers"],
@@ -10728,6 +10792,13 @@ def build_menu_stub_extract_result_from_items(
 def menu_stub_item_from_recipe(stub):
     stub = stub if isinstance(stub, dict) else {}
     metadata = stub.get("source_metadata") if isinstance(stub.get("source_metadata"), dict) else {}
+    recipe_inference = stub.get("recipe_inference") if isinstance(stub.get("recipe_inference"), dict) else {}
+    predicted_equipment = normalize_equipment_prediction_records(
+        stub.get("equipment")
+        or stub.get("predicted_equipment")
+        or metadata.get("predicted_equipment")
+        or recipe_inference.get("equipment")
+    )
     return {
         "item_name": stub.get("menu_item_name") or stub.get("item_name") or stub.get("recipe_title") or "",
         "menu_section": stub.get("menu_section") or stub.get("section_name") or metadata.get("menu_section") or "",
@@ -10743,6 +10814,7 @@ def menu_stub_item_from_recipe(stub):
         "item_type": stub.get("item_type") or metadata.get("item_type") or "unknown",
         "broad_category": stub.get("broad_category") or metadata.get("broad_category") or "",
         "raw_text": stub.get("raw_text") or metadata.get("raw_text") or "",
+        "predicted_equipment": predicted_equipment,
         "parent_menu_snapshot_id": (
             stub.get("parent_menu_snapshot_id")
             or stub.get("menu_mega_snapshot_id")

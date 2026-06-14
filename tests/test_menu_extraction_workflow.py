@@ -604,6 +604,10 @@ def test_menu_stub_optional_cleanup_is_one_batch_call_and_skips_duplicate(monkey
                     "broad_category": "stir fry",
                     "duplicate_of_index": None,
                     "should_create_recipe": True,
+                    "predicted_equipment": [
+                        {"name": "wok", "category": "cookware", "confidence": 0.8},
+                        {"name": "chef knife", "category": "prep"},
+                    ],
                 },
                 {
                     "index": 1,
@@ -644,6 +648,12 @@ def test_menu_stub_optional_cleanup_is_one_batch_call_and_skips_duplicate(monkey
     assert result["openai_calls_used"] == 1
     assert result["estimated_token_usage"]["total_tokens"] == 123
     assert result["recipes"][0]["recipe_title"] == "Thai Basil Chicken"
+    assert result["recipes"][0]["equipment"] == [
+        {"name": "wok", "category": "cookware", "confidence": 0.8},
+        {"name": "chef knife", "category": "prep"},
+    ]
+    assert result["recipes"][0]["recipe_inference"]["status"] == "equipment_predicted"
+    assert result["recipes"][0]["recipe_inference"]["equipment"] == result["recipes"][0]["equipment"]
 
 
 def test_menu_stub_url_import_updates_snapshot_with_cookbook_and_cleanup(monkeypatch, tmp_path):
@@ -682,6 +692,10 @@ def test_menu_stub_url_import_updates_snapshot_with_cookbook_and_cleanup(monkeyp
                     "item_type": "food",
                     "broad_category": "appetizer",
                     "should_create_recipe": True,
+                    "predicted_equipment": [
+                        {"name": "deep skillet", "category": "cookware"},
+                        {"name": "tongs", "category": "utensil"},
+                    ],
                 }
             ]
         }), {
@@ -714,7 +728,44 @@ def test_menu_stub_url_import_updates_snapshot_with_cookbook_and_cleanup(monkeyp
     assert item["normalized_name"] == "Crispy Spring Roll"
     assert item["normalized_section_name"] == "Appetizers"
     assert item["item_type"] == "food"
-    assert item["recipe_inference"]["status"] == "not_generated"
+    assert item["recipe_inference"]["status"] == "equipment_predicted"
+    assert item["recipe_inference"]["equipment"] == [
+        {"name": "deep skillet", "category": "cookware"},
+        {"name": "tongs", "category": "utensil"},
+    ]
+    assert item["metadata"]["predicted_equipment_count"] == 2
+
+
+def test_menu_stub_predicted_equipment_is_passed_to_full_recipe_prompt():
+    stub = {
+        "recipe_title": "Thai Basil Chicken",
+        "menu_section": "Entrees",
+        "menu_description": "Chicken with basil sauce.",
+        "source_menu_url": "https://example.com/menu",
+        "equipment": [
+            {"name": "wok", "category": "cookware"},
+            {"name": "chef knife", "category": "prep"},
+        ],
+        "recipe_inference": {
+            "status": "equipment_predicted",
+            "equipment": [{"name": "wok"}],
+        },
+    }
+
+    menu_item = recipe_extract_service.menu_stub_item_from_recipe(stub)
+    prompt = recipe_extract_service.build_menu_item_recipe_prompt(
+        "https://example.com/menu",
+        menu_item,
+        0,
+        1,
+    )
+
+    assert menu_item["predicted_equipment"] == [
+        {"name": "wok", "category": "cookware"},
+        {"name": "chef knife", "category": "prep"},
+    ]
+    assert "Predicted equipment hint: wok, chef knife" in prompt
+    assert "Use the predicted equipment hint only when it fits" in prompt
 
 
 def test_commit_menu_import_stubs_skips_full_routine(monkeypatch, tmp_path):

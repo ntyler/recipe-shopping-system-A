@@ -48,9 +48,9 @@ OPENAI_MODEL_SETTINGS = (
     },
     {
         "env_var": "OPENAI_MENU_CLEANUP_MODEL",
-        "feature": "Menu Cleanup",
+        "feature": "Menu Cleanup / Equipment",
         "default_model": "gpt-4o-mini",
-        "description": "One-call menu item normalization before lightweight menu stubs are saved.",
+        "description": "One-call menu item normalization plus likely equipment prediction before lightweight menu stubs are saved.",
     },
     {
         "env_var": "OPENAI_VISION_MODEL",
