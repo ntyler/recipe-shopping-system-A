@@ -1396,9 +1396,14 @@ function afterDynamicMarkupLoaded(options = {}) {
 
 async function loadLazySection(sectionName, options = {}) {
     const placeholder = lazySectionElement(sectionName);
+    const userRequestedLoad = options.userInitiated === true || options.focus === true;
 
     if (!placeholder) {
         return document.getElementById(options.targetId || "") || null;
+    }
+
+    if (authCollapseAllIsActive() && userRequestedLoad) {
+        clearAuthCollapseAllMode();
     }
 
     if (authCollapseAllIsActive() && options.allowDuringAuthCollapse !== true) {
@@ -1463,8 +1468,11 @@ async function loadLazySection(sectionName, options = {}) {
             nextElement.dataset.lazyUrl = placeholder.dataset.lazyUrl || requestUrl.pathname;
             nextElement.dataset.lazyLoaded = "1";
             placeholder.replaceWith(nextElement);
+            if (userRequestedLoad && options.persistExpanded !== false) {
+                setLazySectionSavedState(sectionName, true);
+            }
             afterDynamicMarkupLoaded({ root: nextElement });
-            if (options.persistExpanded !== false) {
+            if (options.persistExpanded !== false && !userRequestedLoad) {
                 setLazySectionSavedState(sectionName, true);
             }
 
@@ -2886,7 +2894,7 @@ async function openAiPantryPanel() {
     hideRememberedAccountPanels(panel);
 
     if (panel.dataset.lazySection === "pantry" && panel.dataset.lazyLoaded !== "1") {
-        await loadLazySection("pantry", { focus: false });
+        await loadLazySection("pantry", { focus: false, userInitiated: true });
     }
 
     const activePanel = document.querySelector("[data-ai-pantry-panel]") || panel;
@@ -2944,7 +2952,7 @@ async function openAdminSupportPanel() {
     hideRememberedAccountPanels(panel);
 
     if (panel.dataset.lazySection === "admin-support" && panel.dataset.lazyLoaded !== "1") {
-        await loadLazySection("admin-support", { focus: false });
+        await loadLazySection("admin-support", { focus: false, userInitiated: true });
     }
 
     const activePanel = document.querySelector("[data-admin-support-panel]") || panel;
@@ -3000,7 +3008,7 @@ async function openSharedRecipePdfsPanel() {
     hideRememberedAccountPanels(panel);
 
     if (panel.dataset.lazySection === "shared-recipe-pdfs" && panel.dataset.lazyLoaded !== "1") {
-        await loadLazySection("shared-recipe-pdfs", { focus: false });
+        await loadLazySection("shared-recipe-pdfs", { focus: false, userInitiated: true });
     }
 
     const activePanel = document.querySelector("[data-shared-recipe-pdfs-panel]") || panel;

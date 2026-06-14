@@ -99,9 +99,47 @@ def test_auth_transition_can_request_collapse_before_lazy_sections_load():
     assert "window.clearShoppingListAuthCollapseAllRequest = clearShoppingListAuthCollapseAllRequest;" in script
     assert '["consumeAuthCollapseAllRequest", consumeAuthCollapseAllRequest]' in script
     assert "if (authCollapseAllIsActive())" in script
+    assert "const userRequestedLoad = options.userInitiated === true || options.focus === true;" in script
+    assert "if (authCollapseAllIsActive() && userRequestedLoad)" in script
+    assert "clearAuthCollapseAllMode();" in script
     assert "if (authCollapseAllIsActive() && options.allowDuringAuthCollapse !== true)" in script
     assert 'safeStorageSet(localStorage, `card-collapse:${key}`, "collapsed");' in script
     assert "safeStorageRemove(localStorage, USER_ACCOUNT_OPEN_PANEL_KEY);" in script
+
+
+def test_auth_collapse_still_allows_manual_lazy_section_open():
+    script = read_text("PushShoppingList/static/js/app.js")
+    index_template = read_text("PushShoppingList/templates/index.html")
+
+    lazy_load_start = script.index("async function loadLazySection(sectionName, options = {})")
+    lazy_load_end = script.index("async function refreshLazySection", lazy_load_start)
+    lazy_load_block = script[lazy_load_start:lazy_load_end]
+
+    assert "const userRequestedLoad = options.userInitiated === true || options.focus === true;" in lazy_load_block
+    assert (
+        "if (authCollapseAllIsActive() && userRequestedLoad) {\n"
+        "        clearAuthCollapseAllMode();\n"
+        "    }"
+    ) in lazy_load_block
+    assert (
+        "if (authCollapseAllIsActive() && options.allowDuringAuthCollapse !== true) {\n"
+        "        placeholder.dataset.lazyQueued = \"\";"
+    ) in lazy_load_block
+    assert lazy_load_block.index(
+        "if (userRequestedLoad && options.persistExpanded !== false) {\n"
+        "                setLazySectionSavedState(sectionName, true);\n"
+        "            }"
+    ) < lazy_load_block.index("afterDynamicMarkupLoaded({ root: nextElement });")
+    assert (
+        "if (options.persistExpanded !== false && !userRequestedLoad) {\n"
+        "                setLazySectionSavedState(sectionName, true);\n"
+        "            }"
+    ) in lazy_load_block
+    assert 'onclick="loadLazySection(\'current-recipes\', { focus: true }); return false;"' in index_template
+    assert 'onclick="loadLazySection(\'cookbooks\', { focus: true }); return false;"' in index_template
+    assert 'await loadLazySection("pantry", { focus: false, userInitiated: true });' in script
+    assert 'await loadLazySection("admin-support", { focus: false, userInitiated: true });' in script
+    assert 'await loadLazySection("shared-recipe-pdfs", { focus: false, userInitiated: true });' in script
 
 
 def test_cookbooks_lazy_section_keeps_images_lazy():
