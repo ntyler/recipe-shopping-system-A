@@ -110,11 +110,14 @@ def enqueue_job(job_id, queue_name_override=""):
 
     target_queue_name = queue_name_for_existing_job(job_id, queue_name_override)
     update_job(job_id, queue_name=target_queue_name)
+    print(f"[Job Queue] action=enqueue_requested job_id={job_id} queue={target_queue_name}")
 
     if inline_jobs_enabled():
         from PushShoppingList.workers.job_worker import run_job
 
+        print(f"[Job Queue] action=inline_start job_id={job_id} queue={target_queue_name}")
         run_job(job_id)
+        print(f"[Job Queue] action=inline_done job_id={job_id} queue={target_queue_name}")
         return {"ok": True, "mode": "inline", "queue_name": target_queue_name}
 
     try:
@@ -132,9 +135,14 @@ def enqueue_job(job_id, queue_name_override=""):
             failure_ttl=int(os.getenv("RQ_FAILURE_TTL_SECONDS", "86400")),
         )
         update_job(job_id, rq_job_id=rq_job.id, queue_name=target_queue_name)
+        print(f"[Job Queue] action=rq_enqueued job_id={job_id} queue={target_queue_name} rq_job_id={rq_job.id}")
         return {"ok": True, "mode": "rq", "rq_job_id": rq_job.id, "queue_name": target_queue_name}
     except Exception as exc:
         if not thread_fallback_enabled():
+            print(
+                f"[Job Queue] action=enqueue_failed job_id={job_id} queue={target_queue_name} "
+                f"thread_fallback=false error={exc}"
+            )
             fail_job(
                 job_id,
                 QUEUE_UNAVAILABLE_MESSAGE,
@@ -154,6 +162,10 @@ def enqueue_job(job_id, queue_name_override=""):
             daemon=True,
         )
         thread.start()
+        print(
+            f"[Job Queue] action=thread_fallback_started job_id={job_id} "
+            f"queue={target_queue_name} thread_name={thread.name} reason={exc}"
+        )
         return {
             "ok": True,
             "mode": "thread",

@@ -30,6 +30,18 @@ def current_rq_queue_name(job):
     return str((job or {}).get("queue_name") or "").strip()
 
 
+def current_rq_job_id():
+    try:
+        from rq import get_current_job
+
+        rq_job = get_current_job()
+        if rq_job and getattr(rq_job, "id", None):
+            return str(rq_job.id or "").strip()
+    except Exception:
+        pass
+    return ""
+
+
 def run_job(job_id):
     job = get_job(job_id)
     if not job:
@@ -54,6 +66,14 @@ def run_job(job_id):
                 session["user_id"] = job.get("user_id")
 
             queue_name = current_rq_queue_name(job)
+            rq_job_id = current_rq_job_id()
+            worker_label = worker_id()
+            execution = "rq" if rq_job_id else "local/thread"
+            print(
+                f"[Job Worker] action=start job_id={job_id} type={job.get('job_type')} "
+                f"queue={queue_name} worker={worker_label} execution={execution} "
+                f"rq_job_id={rq_job_id or 'none'}"
+            )
             model_snapshot = job_start_metadata(job)
             start_result = try_start_job(
                 job_id,
@@ -62,12 +82,20 @@ def run_job(job_id):
                 model_used=model_snapshot.get("model_used", ""),
                 model_source=model_snapshot.get("model_source", ""),
                 model_env_var_used=model_snapshot.get("model_env_var_used") or model_snapshot.get("model_env_var", ""),
-                worker_id=worker_id(),
+                worker_id=worker_label,
             )
             if start_result.get("cancelled") or start_result.get("terminal"):
+                print(
+                    f"[Job Worker] action=skip job_id={job_id} worker={worker_label} "
+                    f"cancelled={bool(start_result.get('cancelled'))} terminal={bool(start_result.get('terminal'))}"
+                )
                 return {"ok": True, "skipped": True}
             if start_result.get("deferred"):
                 delay = max(1, int(start_result.get("delay_seconds") or 5))
+                print(
+                    f"[Job Worker] action=deferred job_id={job_id} queue={queue_name} "
+                    f"worker={worker_label} delay_seconds={delay}"
+                )
                 time.sleep(delay)
                 queue_result = enqueue_job(job_id, queue_name_override=queue_name)
                 if not queue_result.get("ok"):
@@ -79,6 +107,10 @@ def run_job(job_id):
                     "queue": queue_result,
                 }
             if not start_result.get("started"):
+                print(
+                    f"[Job Worker] action=start_failed job_id={job_id} queue={queue_name} "
+                    f"worker={worker_label} error={start_result.get('error') or 'Unable to start job.'}"
+                )
                 return {"ok": False, "error": start_result.get("error") or "Unable to start job."}
 
             started_job = start_result.get("job") or get_job(job_id) or {}
@@ -88,9 +120,15 @@ def run_job(job_id):
                 model_used=started_job.get("model_used") or model_snapshot.get("model_used"),
                 model_source=started_job.get("model_source") or model_snapshot.get("model_source"),
                 model_env_var_used=started_job.get("model_env_var_used") or model_snapshot.get("model_env_var_used") or model_snapshot.get("model_env_var"),
-                worker_id=started_job.get("worker_id") or worker_id(),
+                worker_id=started_job.get("worker_id") or worker_label,
             ):
-                return run_job_task(job_id)
+                result = run_job_task(job_id)
+                status = (get_job(job_id) or {}).get("status", "")
+                print(
+                    f"[Job Worker] action=done job_id={job_id} type={job.get('job_type')} "
+                    f"queue={queue_name} worker={worker_label} execution={execution} status={status}"
+                )
+                return result
     except Exception as exc:
         print(f"[job_worker] job_id={job_id} failed: {exc}")
         traceback.print_exc()
