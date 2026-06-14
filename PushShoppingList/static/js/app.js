@@ -372,6 +372,27 @@ function renderJobModelDetails(job) {
     return parts.length ? `<div class="job-activity-model">${parts.join("")}</div>` : "";
 }
 
+function renderJobWorkerDetails(job) {
+    const worker = String((job && job.worker_id) || "").trim();
+    const queue = String((job && job.queue_name) || "").trim();
+    const rqJobId = String((job && job.rq_job_id) || "").trim();
+    const parts = [];
+
+    if (worker) {
+        parts.push(`<span>Worker: <strong>${escapeHtml(worker)}</strong></span>`);
+    }
+    if (queue) {
+        parts.push(`<span>Queue: <strong>${escapeHtml(queue)}</strong></span>`);
+    }
+    if (rqJobId) {
+        parts.push(`<span>RQ Job: <strong>${escapeHtml(rqJobId)}</strong></span>`);
+    } else if (worker) {
+        parts.push(`<span>Execution: <strong>local/thread</strong></span>`);
+    }
+
+    return parts.length ? `<div class="job-activity-worker">${parts.join("")}</div>` : "";
+}
+
 function renderJobStageCounts(job) {
     const result = jobResultPayload(job);
     const jobType = String((job && job.job_type) || "").trim();
@@ -507,6 +528,7 @@ function renderJobActivityRow(job) {
     const links = jobResultLinks(job);
     const sourceHtml = renderJobSourceList(job);
     const modelHtml = renderJobModelDetails(job);
+    const workerHtml = renderJobWorkerDetails(job);
     const stageCountsHtml = renderJobStageCounts(job);
     const active = jobIsActive(job);
     const openProgressButton = jobCanOpenImportProgress(job)
@@ -540,6 +562,7 @@ function renderJobActivityRow(job) {
                 </div>
                 <div class="job-activity-step">${escapeHtml(job.current_step || "Queued")}</div>
                 ${modelHtml}
+                ${workerHtml}
                 ${sourceHtml}
                 <div class="job-activity-progress" aria-label="${percent}% complete">
                     <span style="width: ${percent}%"></span>

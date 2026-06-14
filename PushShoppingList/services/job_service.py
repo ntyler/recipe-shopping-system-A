@@ -507,6 +507,7 @@ def job_for_client(job, include_input=False):
         "finished_at": job.get("finished_at") or job.get("completed_at") or "",
         "expires_at": job.get("expires_at") or "",
         "queue_name": job.get("queue_name") or "",
+        "rq_job_id": job.get("rq_job_id") or "",
         "attempts": int(job.get("attempts") or 0),
         "retry_count": int(job.get("attempts") or 0),
         "worker_id": job.get("worker_id") or "",

@@ -20461,6 +20461,7 @@ img[data-deferred-src] {
         }
 
         .job-activity-model,
+        .job-activity-worker,
         .job-activity-stage-counts {
             display: flex;
             flex-wrap: wrap;
@@ -20470,11 +20471,16 @@ img[data-deferred-src] {
             line-height: 1.35;
         }
 
+        .job-activity-worker {
+            color: #bfdbfe;
+        }
+
         .job-activity-stage-counts {
             color: #cbd5e1;
         }
 
         .job-activity-model strong,
+        .job-activity-worker strong,
         .job-activity-stage-counts strong {
             color: #f8fafc;
             font-weight: 800;

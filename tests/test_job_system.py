@@ -137,6 +137,11 @@ def test_job_for_client_shows_safe_sources_and_model_metadata(monkeypatch, tmp_p
         total_items=1,
         queue_name="ai-pantry-menu",
     )
+    job = job_service.update_job(
+        job["id"],
+        worker_id="DESKTOP-IN7S09S:73720",
+        rq_job_id="rq-123",
+    )
 
     payload = job_service.job_for_client(job)
 
@@ -145,6 +150,8 @@ def test_job_for_client_shows_safe_sources_and_model_metadata(monkeypatch, tmp_p
     assert payload["model_env_var"] == "OPENAI_MENU_MODEL"
     assert payload["model_env_var_used"] == "OPENAI_MENU_MODEL"
     assert payload["queue_name"] == "ai-pantry-menu"
+    assert payload["worker_id"] == "DESKTOP-IN7S09S:73720"
+    assert payload["rq_job_id"] == "rq-123"
     assert payload["source_items"] == [
         {
             "type": "file",
