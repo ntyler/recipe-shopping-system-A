@@ -157,7 +157,13 @@ def test_mega_menu_json_snapshot_builds_saves_and_unpacks(tmp_path, monkeypatch)
             "final_url": source_url,
             "http_status": 200,
             "content_type": "text/html",
-            "restaurant": {"restaurant_name": "Vel Asian Cuisine"},
+            "restaurant": {
+                "restaurant_name": "Vel Asian Cuisine",
+                "restaurant_website_url": "https://www.velasiancuisine.com",
+                "full_address": "912 LOVELAND MADEIRA RD, LOVELAND, OH 45140",
+                "current_status": "Open",
+                "delivery_available": True,
+            },
             "menu_extraction_source": "cartana_api",
         },
         html_text="<html><title>Vel Asian Cuisine</title><a href='/rs/menu_home.action'>Menu</a></html>",
@@ -193,6 +199,14 @@ def test_mega_menu_json_snapshot_builds_saves_and_unpacks(tmp_path, monkeypatch)
     assert loaded["duplicate_count"] == 0
     assert unpacked[0]["items"][0]["parent_menu_snapshot_id"] == loaded["id"]
     assert unpacked[0]["items"][0]["price"] == "$5.99"
+    assert unpacked[0]["items"][0]["restaurant_address"] == "912 LOVELAND MADEIRA RD, LOVELAND, OH 45140"
+    assert unpacked[0]["items"][0]["restaurant_website_url"] == "https://www.velasiancuisine.com"
+    assert unpacked[0]["items"][0]["restaurant_delivery_available"] is True
+    stub = recipe_extract_service.normalize_menu_item_stub(source_url, unpacked[0]["items"][0], 0)
+    assert stub["restaurant_address"] == "912 LOVELAND MADEIRA RD, LOVELAND, OH 45140"
+    assert stub["restaurant_website_url"] == "https://www.velasiancuisine.com"
+    assert stub["restaurant_delivery_available"] is True
+    assert stub["source_metadata"]["restaurant_address"] == "912 LOVELAND MADEIRA RD, LOVELAND, OH 45140"
 
     loaded["menu_mega_json"]["menu"]["sections"][0]["items"][0].update({
         "normalized_name": "Crispy Spring Roll",

@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from PushShoppingList.services import menu_store_service
+from PushShoppingList.services import menu_mega_json_service
 from PushShoppingList.services import recipe_edit_service
 from PushShoppingList.services import recipe_extract_service
 
@@ -22,6 +23,7 @@ def configure_editor_recipe_storage(monkeypatch, tmp_path):
     monkeypatch.setattr(recipe_extract_service, "OUTPUT_FOLDER", output_dir)
     monkeypatch.setattr(recipe_extract_service, "PDF_FOLDER", pdf_dir)
     monkeypatch.setattr(menu_store_service, "MENU_STORE_FILE", tmp_path / "restaurant_menus.json")
+    monkeypatch.setattr(menu_mega_json_service, "workspace_data_root", lambda: tmp_path)
     monkeypatch.setattr(recipe_edit_service, "load_recipe_ingredients", lambda: {})
     monkeypatch.setattr(recipe_edit_service, "cookbook_recipe_assignment_for_url", lambda url: {})
     monkeypatch.setattr(recipe_edit_service, "load_food_rules", lambda: {"require": [], "avoid": []})
@@ -273,6 +275,122 @@ def test_menu_metadata_resolves_from_menu_item_url_when_recipe_json_has_only_pdf
     assert loaded["menu_item_name"] == "Spring Roll"
     assert loaded["menu_price"] == "$18.95"
     assert loaded["menu_description"] == "Featuring wheat spring roll wrappers, cellophane noodles, carrot."
+
+
+def test_menu_metadata_loads_restaurant_fields_from_menu_mega_snapshot(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    source_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902"
+    recipe_url = f"{source_url}&menu_item=menu-item-1-Spring_Roll"
+    mega_json = menu_mega_json_service.build_mega_menu_json(
+        source_url,
+        [{
+            "section_name": "Kitchen Appetizers",
+            "items": [{
+                "item_name": "Spring Roll",
+                "description": "Two veggie golden crispy rolls.",
+                "price": "$5.99",
+                "menu_item_id": "MIT354155",
+                "menu_id": "MEN25930",
+            }],
+        }],
+        extracted_text="Vel Asian Cuisine Spring Roll $5.99",
+        diagnostics={
+            "final_url": source_url,
+            "restaurant": {
+                "restaurant_name": "Vel Asian Cuisine",
+                "restaurant_website_url": "https://www.velasiancuisine.com",
+                "full_address": "912 LOVELAND MADEIRA RD, LOVELAND, OH 45140",
+                "phone": "513-555-0100",
+                "hours_text": "Mon-Sat 11-9",
+                "current_status": "Open",
+                "delivery_available": True,
+                "online_payment_available": False,
+                "rewards_text": "Rewards available",
+            },
+        },
+    )
+    menu_mega_json_service.save_menu_mega_json_snapshot(mega_json, job_id="job-1")
+    recipe_edit_service.save_recipe_output(recipe_url, {
+        "source_url": recipe_url,
+        "source_type": "menu_item_inferred",
+        "ai_inferred": True,
+        "source_menu_url": source_url,
+        "restaurant_name": "",
+        "restaurant_website_url": "",
+        "restaurant_address": "",
+        "restaurant_phone": "",
+        "restaurant_hours_text": "",
+        "restaurant_current_status": "",
+        "restaurant_online_payment_available": "",
+        "restaurant_delivery_available": "",
+        "restaurant_promotions": "",
+        "menu_section": "Kitchen Appetizers",
+        "menu_item_name": "Spring Roll",
+        "menu_price": "$5.99",
+        "menu_description": "Two veggie golden crispy rolls.",
+    })
+
+    loaded = recipe_edit_service.load_editable_recipe(recipe_url)["recipe"]
+
+    assert loaded["restaurant_name"] == "Vel Asian Cuisine"
+    assert loaded["restaurant_website_url"] == "https://www.velasiancuisine.com"
+    assert loaded["source_menu_url"] == source_url
+    assert loaded["restaurant_phone"] == "513-555-0100"
+    assert loaded["restaurant_address"] == "912 LOVELAND MADEIRA RD, LOVELAND, OH 45140"
+    assert loaded["restaurant_hours_text"] == "Mon-Sat 11-9"
+    assert loaded["restaurant_current_status"] == "Open"
+    assert loaded["restaurant_promotions"] == "Rewards available"
+    assert loaded["restaurant_online_payment_available"] == "false"
+    assert loaded["restaurant_delivery_available"] == "true"
+
+
+def test_menu_metadata_matches_menu_store_by_base_url_and_preserves_recipe_item_fields(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    source_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902"
+    recipe_url = f"{source_url}&menu_item=menu-item-1-Spring_Roll"
+    menu_store_service.upsert_menu_from_facts({
+        "source_url": "",
+        "restaurant": {
+            "restaurant_name": "Vel Asian Cuisine",
+            "delivery_available": False,
+            "online_payment_available": False,
+        },
+        "menu": {"menu_title": "Vel Asian Cuisine Menu"},
+        "sections": [{
+            "section_name": "Vegetarian",
+            "items": [{
+                "item_name": "Spring Roll",
+                "menu_price": "$18.95",
+                "menu_description": "Featuring wheat spring roll wrappers, cellophane noodles, carrot.",
+                "recipe_url": (
+                    f"{source_url}&menu_item=menu-item-1-"
+                    "AI-Inferred_Crispy_Vegetable_Spring_Rolls"
+                ),
+            }],
+        }],
+    })
+    recipe_edit_service.save_recipe_output(recipe_url, {
+        "source_url": recipe_url,
+        "source_type": "menu_item_inferred",
+        "ai_inferred": True,
+        "source_menu_url": source_url,
+        "restaurant_name": "",
+        "restaurant_online_payment_available": "",
+        "restaurant_delivery_available": "",
+        "menu_section": "Kitchen Appetizers",
+        "menu_item_name": "Spring Roll",
+        "menu_price": "$5.99",
+        "menu_description": "2 veggie golden crispy brown paper wheat wrapped around mixture of carrots.",
+    })
+
+    loaded = recipe_edit_service.load_editable_recipe(recipe_url)["recipe"]
+
+    assert loaded["restaurant_name"] == "Vel Asian Cuisine"
+    assert loaded["restaurant_online_payment_available"] == "false"
+    assert loaded["restaurant_delivery_available"] == "false"
+    assert loaded["menu_section"] == "Kitchen Appetizers"
+    assert loaded["menu_price"] == "$5.99"
+    assert loaded["menu_description"] == "2 veggie golden crispy brown paper wheat wrapped around mixture of carrots."
 
 
 def test_url_matched_menu_metadata_save_updates_menu_store(monkeypatch, tmp_path):

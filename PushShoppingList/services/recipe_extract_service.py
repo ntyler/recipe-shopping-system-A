@@ -10229,6 +10229,48 @@ def menu_item_source_url(menu_url, title, index):
     return f"{base_url}{separator}menu_item={marker}"
 
 
+RESTAURANT_MENU_ITEM_TEXT_METADATA_FIELDS = (
+    "restaurant_name",
+    "restaurant_website_url",
+    "source_menu_url",
+    "restaurant_cuisine_tags",
+    "restaurant_phone",
+    "restaurant_address",
+    "restaurant_hours_text",
+    "restaurant_current_status",
+    "restaurant_promotions",
+)
+RESTAURANT_MENU_ITEM_BOOL_METADATA_FIELDS = (
+    "restaurant_online_payment_available",
+    "restaurant_delivery_available",
+)
+
+
+def menu_item_restaurant_metadata(menu_item):
+    menu_item = menu_item if isinstance(menu_item, dict) else {}
+    metadata = {}
+    for field in RESTAURANT_MENU_ITEM_TEXT_METADATA_FIELDS:
+        value = clean_recipe_text(menu_item.get(field) or "")
+        if value:
+            metadata[field] = value
+    for field in RESTAURANT_MENU_ITEM_BOOL_METADATA_FIELDS:
+        value = menu_item.get(field)
+        if value is not None:
+            metadata[field] = value
+    return metadata
+
+
+def apply_menu_item_restaurant_metadata(recipe, menu_item):
+    recipe = recipe if isinstance(recipe, dict) else {}
+    metadata = menu_item_restaurant_metadata(menu_item)
+    for field, value in metadata.items():
+        if recipe.get(field) in (None, "", []):
+            recipe[field] = value
+    source_metadata = recipe.get("source_metadata") if isinstance(recipe.get("source_metadata"), dict) else {}
+    recipe["source_metadata"] = {**source_metadata, **metadata}
+    return recipe
+
+
 def _iter_menu_recipe_entries(menu_payload):
     payload = menu_payload if isinstance(menu_payload, dict) else {}
     direct_recipes = payload.get("recipes")
@@ -10329,6 +10371,7 @@ def attach_menu_item_metadata(recipe, menu_item):
         "parent_menu_snapshot_id": clean_recipe_text(menu_item.get("parent_menu_snapshot_id") or ""),
         "menu_mega_snapshot_id": clean_recipe_text(menu_item.get("parent_menu_snapshot_id") or ""),
     }
+    apply_menu_item_restaurant_metadata(recipe, menu_item)
 
     if description or price:
         notes = recipe.get("confidence_notes")
@@ -10953,6 +10996,7 @@ def normalize_menu_item_stub(menu_url, menu_item, index, source_name=""):
             "Menu item imported as a lightweight AI-inferred shell. Recipe details not generated yet.",
         ],
     }
+    apply_menu_item_restaurant_metadata(recipe, menu_item)
 
     for metadata_field in ("restaurant_id", "menu_id", "menu_section_id", "menu_item_id"):
         metadata_value = clean_recipe_text(menu_item.get(metadata_field) or "")
@@ -10960,6 +11004,7 @@ def normalize_menu_item_stub(menu_url, menu_item, index, source_name=""):
             recipe[metadata_field] = metadata_value
 
     recipe["source_metadata"] = {
+        **(recipe.get("source_metadata") if isinstance(recipe.get("source_metadata"), dict) else {}),
         "source_type": "restaurant_menu",
         "source_url": recipe_url,
         "source_menu_url": str(menu_url or "").strip(),

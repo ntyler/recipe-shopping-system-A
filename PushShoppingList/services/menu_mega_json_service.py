@@ -183,6 +183,64 @@ def normalize_list(value):
     return value if isinstance(value, list) else []
 
 
+def text_list_for_menu_metadata(value):
+    return ", ".join(clean_text(item) for item in normalize_list(value) if clean_text(item))
+
+
+def restaurant_metadata_from_mega_json(mega_json):
+    mega_json = mega_json if isinstance(mega_json, dict) else {}
+    source = mega_json.get("source") if isinstance(mega_json.get("source"), dict) else {}
+    restaurant = mega_json.get("restaurant") if isinstance(mega_json.get("restaurant"), dict) else {}
+    metadata = restaurant.get("metadata") if isinstance(restaurant.get("metadata"), dict) else {}
+    restaurant_name = clean_text(
+        metadata.get("restaurant_name")
+        or metadata.get("name")
+        or (restaurant.get("name") if clean_text(restaurant.get("name")).lower() != "restaurant menu" else "")
+    )
+    return {
+        "restaurant_name": restaurant_name,
+        "restaurant_website_url": clean_text(
+            restaurant.get("website")
+            or metadata.get("restaurant_website_url")
+            or metadata.get("website_url")
+            or metadata.get("website")
+        ),
+        "source_menu_url": clean_text(
+            metadata.get("source_menu_url")
+            or source.get("source_url")
+            or source.get("final_url")
+        ),
+        "restaurant_cuisine_tags": clean_text(
+            text_list_for_menu_metadata(metadata.get("cuisine_tags"))
+            or text_list_for_menu_metadata(metadata.get("cuisines"))
+        ),
+        "restaurant_phone": clean_text(restaurant.get("phone") or metadata.get("phone")),
+        "restaurant_address": clean_text(
+            restaurant.get("address")
+            or metadata.get("full_address")
+            or metadata.get("address")
+            or metadata.get("address_line")
+        ),
+        "restaurant_hours_text": clean_text(
+            text_list_for_menu_metadata(restaurant.get("hours"))
+            or metadata.get("hours_text")
+            or text_list_for_menu_metadata(metadata.get("hours"))
+        ),
+        "restaurant_current_status": clean_text(metadata.get("current_status") or metadata.get("status")),
+        "restaurant_promotions": clean_text(
+            metadata.get("rewards_text")
+            or text_list_for_menu_metadata(metadata.get("promotions"))
+            or metadata.get("rewards")
+        ),
+        "restaurant_online_payment_available": (
+            metadata.get("online_payment_available") if "online_payment_available" in metadata else None
+        ),
+        "restaurant_delivery_available": (
+            metadata.get("delivery_available") if "delivery_available" in metadata else None
+        ),
+    }
+
+
 def normalize_equipment_prediction_records(value):
     records = []
     for item in normalize_list(value):
@@ -744,6 +802,7 @@ def unpack_mega_menu_json_to_sections(mega_json, snapshot_id=""):
     source = mega_json.get("source") if isinstance(mega_json.get("source"), dict) else {}
     source_url = clean_text(source.get("source_url") or source.get("final_url") or "")
     menu = mega_json.get("menu") if isinstance(mega_json.get("menu"), dict) else {}
+    restaurant_metadata = restaurant_metadata_from_mega_json(mega_json)
     sections = []
 
     for section_index, section in enumerate(menu.get("sections") or []):
@@ -826,6 +885,9 @@ def unpack_mega_menu_json_to_sections(mega_json, snapshot_id=""):
                 "parent_menu_snapshot_id": snapshot_id,
                 "menu_mega_snapshot_id": snapshot_id,
             }
+            for key, value in restaurant_metadata.items():
+                if value not in (None, "", []):
+                    unpacked_item[key] = value
             if item.get("should_create_recipe_stub") is False:
                 unpacked_item["should_create_recipe"] = False
                 unpacked_item["skip_reason"] = clean_text((cleanup_notes or ["not_recipe_item"])[0])

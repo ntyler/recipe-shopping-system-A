@@ -22,6 +22,8 @@ from flask import has_request_context
 from PushShoppingList.services import cloudflare_r2_storage
 from PushShoppingList.services import menu_store_service
 from PushShoppingList.services.food_rules_service import load_food_rules
+from PushShoppingList.services.menu_mega_json_service import load_menu_mega_json_snapshot
+from PushShoppingList.services.menu_mega_json_service import load_snapshot_index
 from PushShoppingList.services.cookbook_service import COOKBOOK_CATEGORY_ALL_FIELDS
 from PushShoppingList.services.cookbook_service import COOKBOOK_CATEGORY_FIELDS
 from PushShoppingList.services.cookbook_service import clean_category_payload
@@ -427,6 +429,193 @@ def recipe_menu_source_url_from_candidates(recipe_data):
     return ""
 
 
+def recipe_menu_source_url_keys(recipe_data):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    metadata = recipe_menu_source_metadata(recipe_data)
+    candidates = [
+        recipe_data.get("source_menu_url"),
+        recipe_data.get("menu_source_url"),
+        metadata.get("source_menu_url"),
+        recipe_menu_source_url_from_candidates(recipe_data),
+    ]
+    keys = {
+        normalize_recipe_url_key(candidate)
+        for candidate in candidates
+        if normalize_recipe_url_key(candidate)
+    }
+    for candidate in recipe_menu_source_url_candidates(recipe_data):
+        source_menu_url = recipe_menu_source_url_from_item_url(candidate)
+        key = normalize_recipe_url_key(source_menu_url)
+        if key:
+            keys.add(key)
+    return keys
+
+
+def recipe_menu_match_text(value):
+    return clean_recipe_menu_text(value).lower()
+
+
+def recipe_menu_item_name_candidates(recipe_data):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    metadata = recipe_menu_source_metadata(recipe_data)
+    return {
+        recipe_menu_match_text(value)
+        for value in (
+            recipe_data.get("menu_item_name"),
+            recipe_data.get("item_name"),
+            recipe_data.get("recipe_title"),
+            recipe_data.get("display_name"),
+            metadata.get("menu_item_name"),
+            metadata.get("item_name"),
+        )
+        if recipe_menu_match_text(value)
+    }
+
+
+def recipe_menu_section_candidates(recipe_data):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    metadata = recipe_menu_source_metadata(recipe_data)
+    return {
+        recipe_menu_match_text(value)
+        for value in (
+            recipe_data.get("menu_section"),
+            recipe_data.get("section_name"),
+            metadata.get("menu_section"),
+            metadata.get("section_name"),
+        )
+        if recipe_menu_match_text(value)
+    }
+
+
+def menu_store_item_source_url_keys(item):
+    item = item if isinstance(item, dict) else {}
+    keys = set()
+    for value in (item.get("recipe_url"), item.get("recipe_id"), item.get("url")):
+        source_menu_url = recipe_menu_source_url_from_item_url(value)
+        key = normalize_recipe_url_key(source_menu_url)
+        if key:
+            keys.add(key)
+    return keys
+
+
+def recipe_menu_snapshot_id(recipe_data):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    metadata = recipe_menu_source_metadata(recipe_data)
+    return first_recipe_menu_text(
+        recipe_data.get("parent_menu_snapshot_id"),
+        recipe_data.get("menu_mega_snapshot_id"),
+        recipe_data.get("menu_snapshot_id"),
+        metadata.get("parent_menu_snapshot_id"),
+        metadata.get("menu_mega_snapshot_id"),
+        metadata.get("menu_snapshot_id"),
+    )
+
+
+def recipe_menu_snapshot_source_url(recipe_data):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    metadata = recipe_menu_source_metadata(recipe_data)
+    return first_recipe_menu_text(
+        recipe_data.get("source_menu_url"),
+        recipe_data.get("menu_source_url"),
+        metadata.get("source_menu_url"),
+        recipe_menu_source_url_from_candidates(recipe_data),
+        recipe_data.get("source_display_url") if recipe_has_menu_metadata(recipe_data) else "",
+    )
+
+
+def load_recipe_menu_snapshot(recipe_data):
+    snapshot_id = recipe_menu_snapshot_id(recipe_data)
+    if snapshot_id:
+        snapshot = load_menu_mega_json_snapshot(snapshot_id)
+        if snapshot:
+            return snapshot
+
+    source_url = recipe_menu_snapshot_source_url(recipe_data)
+    source_key = normalize_recipe_url_key(source_url)
+    if not source_key:
+        return {}
+
+    index = load_snapshot_index()
+    for summary in index.get("snapshots") if isinstance(index.get("snapshots"), list) else []:
+        if not isinstance(summary, dict):
+            continue
+        summary_urls = (
+            summary.get("source_url"),
+            summary.get("final_url"),
+        )
+        if any(normalize_recipe_url_key(url) == source_key for url in summary_urls if url):
+            snapshot = load_menu_mega_json_snapshot(summary.get("id", ""))
+            if snapshot:
+                return snapshot
+
+    return {}
+
+
+def recipe_menu_snapshot_text_list(value):
+    if isinstance(value, list):
+        return ", ".join(clean_recipe_menu_text(item) for item in value if clean_recipe_menu_text(item))
+    return clean_recipe_menu_text(value)
+
+
+def recipe_menu_snapshot_restaurant_fields(recipe_data):
+    snapshot = load_recipe_menu_snapshot(recipe_data)
+    mega_json = snapshot.get("menu_mega_json") if isinstance(snapshot.get("menu_mega_json"), dict) else {}
+    restaurant = mega_json.get("restaurant") if isinstance(mega_json.get("restaurant"), dict) else {}
+    source = mega_json.get("source") if isinstance(mega_json.get("source"), dict) else {}
+    metadata = restaurant.get("metadata") if isinstance(restaurant.get("metadata"), dict) else {}
+
+    if not restaurant and not source:
+        return {}
+
+    restaurant_name = first_recipe_menu_text(
+        metadata.get("restaurant_name"),
+        metadata.get("name"),
+        restaurant.get("name") if clean_recipe_menu_text(restaurant.get("name")).lower() != "restaurant menu" else "",
+    )
+
+    return {
+        "restaurant_name": restaurant_name,
+        "restaurant_website_url": first_recipe_menu_text(
+            restaurant.get("website"),
+            metadata.get("restaurant_website_url"),
+            metadata.get("website_url"),
+            metadata.get("website"),
+        ),
+        "source_menu_url": first_recipe_menu_text(
+            metadata.get("source_menu_url"),
+            source.get("source_url"),
+            source.get("final_url"),
+        ),
+        "restaurant_cuisine_tags": first_recipe_menu_text(
+            recipe_menu_snapshot_text_list(metadata.get("cuisine_tags")),
+            recipe_menu_snapshot_text_list(metadata.get("cuisines")),
+        ),
+        "restaurant_phone": first_recipe_menu_text(restaurant.get("phone"), metadata.get("phone")),
+        "restaurant_address": first_recipe_menu_text(
+            restaurant.get("address"),
+            metadata.get("full_address"),
+            metadata.get("address"),
+            metadata.get("address_line"),
+        ),
+        "restaurant_hours_text": first_recipe_menu_text(
+            recipe_menu_snapshot_text_list(restaurant.get("hours")),
+            metadata.get("hours_text"),
+            recipe_menu_snapshot_text_list(metadata.get("hours")),
+        ),
+        "restaurant_current_status": first_recipe_menu_text(
+            metadata.get("current_status"),
+            metadata.get("status"),
+        ),
+        "restaurant_promotions": first_recipe_menu_text(
+            metadata.get("rewards_text"),
+            recipe_menu_snapshot_text_list(metadata.get("promotions")),
+            metadata.get("rewards"),
+        ),
+        "restaurant_online_payment_available": metadata.get("online_payment_available"),
+        "restaurant_delivery_available": metadata.get("delivery_available"),
+    }
+
+
 def find_recipe_menu_item_by_url(payload, recipe_data):
     payload = payload if isinstance(payload, dict) else {}
     candidates = recipe_menu_source_url_candidates(recipe_data)
@@ -440,10 +629,14 @@ def find_recipe_menu_item_by_url(payload, recipe_data):
         for candidate in candidates
         if recipe_menu_item_token_from_url(candidate)
     }
+    source_menu_keys = recipe_menu_source_url_keys(recipe_data)
+    item_name_candidates = recipe_menu_item_name_candidates(recipe_data)
+    section_candidates = recipe_menu_section_candidates(recipe_data)
 
-    if not candidate_keys and not menu_item_tokens:
+    if not candidate_keys and not menu_item_tokens and not source_menu_keys:
         return {}
 
+    source_name_matches = []
     for item in payload.get("items", []):
         item_urls = [
             item.get("recipe_url"),
@@ -460,6 +653,21 @@ def find_recipe_menu_item_by_url(payload, recipe_data):
                 item.get("menu_item_token"),
             )
             if item_token and item_token in menu_item_tokens:
+                return item
+
+        if source_menu_keys and item_name_candidates:
+            item_source_keys = menu_store_item_source_url_keys(item)
+            item_name = recipe_menu_match_text(item.get("item_name"))
+            if item_source_keys & source_menu_keys and item_name in item_name_candidates:
+                source_name_matches.append(item)
+
+    if len(source_name_matches) == 1:
+        return source_name_matches[0]
+
+    if source_name_matches and section_candidates:
+        for item in source_name_matches:
+            item_section = recipe_menu_match_text(item.get("menu_section"))
+            if item_section in section_candidates:
                 return item
 
     return {}
@@ -616,12 +824,14 @@ def editable_recipe_menu_metadata(recipe_data):
     menu = records.get("menu", {})
     section = records.get("section", {})
     item = records.get("item", {})
+    snapshot_fields = recipe_menu_snapshot_restaurant_fields(recipe_data)
     source_menu_url = first_recipe_menu_text(
         recipe_data.get("source_menu_url"),
         recipe_data.get("menu_source_url"),
         metadata.get("source_menu_url"),
         menu.get("source_url"),
         restaurant.get("source_menu_url"),
+        snapshot_fields.get("source_menu_url"),
         recipe_menu_source_url_from_candidates(recipe_data),
         recipe_data.get("source_display_url") if recipe_has_menu_metadata(recipe_data) else "",
     )
@@ -630,77 +840,87 @@ def editable_recipe_menu_metadata(recipe_data):
             restaurant.get("restaurant_name"),
             recipe_data.get("restaurant_name"),
             metadata.get("restaurant_name"),
+            snapshot_fields.get("restaurant_name"),
         ),
         "restaurant_website_url": first_recipe_menu_text(
             restaurant.get("restaurant_website_url"),
             recipe_data.get("restaurant_website_url"),
             metadata.get("restaurant_website_url"),
+            snapshot_fields.get("restaurant_website_url"),
         ),
         "source_menu_url": source_menu_url,
         "restaurant_cuisine_tags": first_recipe_menu_text(
             recipe_menu_text_list_for_editor(restaurant.get("cuisine_tags")),
             recipe_data.get("restaurant_cuisine_tags"),
             metadata.get("restaurant_cuisine_tags"),
+            snapshot_fields.get("restaurant_cuisine_tags"),
         ),
         "restaurant_phone": first_recipe_menu_text(
             restaurant.get("phone"),
             recipe_data.get("restaurant_phone"),
             metadata.get("restaurant_phone"),
+            snapshot_fields.get("restaurant_phone"),
         ),
         "restaurant_address": first_recipe_menu_text(
             restaurant.get("full_address"),
             restaurant.get("address_line"),
             recipe_data.get("restaurant_address"),
             metadata.get("restaurant_address"),
+            snapshot_fields.get("restaurant_address"),
         ),
         "restaurant_hours_text": first_recipe_menu_text(
             restaurant.get("hours_text"),
             recipe_data.get("restaurant_hours_text"),
             metadata.get("restaurant_hours_text"),
+            snapshot_fields.get("restaurant_hours_text"),
         ),
         "restaurant_current_status": first_recipe_menu_text(
             restaurant.get("current_status"),
             recipe_data.get("restaurant_current_status"),
             metadata.get("restaurant_current_status"),
+            snapshot_fields.get("restaurant_current_status"),
         ),
         "restaurant_promotions": first_recipe_menu_text(
             restaurant.get("rewards_text"),
             recipe_menu_text_list_for_editor(restaurant.get("promotions")),
             recipe_data.get("restaurant_promotions"),
             metadata.get("restaurant_promotions"),
+            snapshot_fields.get("restaurant_promotions"),
         ),
         "restaurant_online_payment_available": recipe_menu_bool_for_editor(
             restaurant.get("online_payment_available") if restaurant else None,
             recipe_data.get("restaurant_online_payment_available"),
             metadata.get("restaurant_online_payment_available"),
+            snapshot_fields.get("restaurant_online_payment_available"),
         ),
         "restaurant_delivery_available": recipe_menu_bool_for_editor(
             restaurant.get("delivery_available") if restaurant else None,
             recipe_data.get("restaurant_delivery_available"),
             metadata.get("restaurant_delivery_available"),
+            snapshot_fields.get("restaurant_delivery_available"),
         ),
         "menu_section": first_recipe_menu_text(
-            section.get("section_name"),
-            item.get("menu_section"),
             recipe_data.get("menu_section"),
             metadata.get("menu_section"),
+            section.get("section_name"),
+            item.get("menu_section"),
         ),
         "menu_item_name": first_recipe_menu_text(
-            item.get("item_name"),
             recipe_data.get("menu_item_name"),
             metadata.get("menu_item_name"),
+            item.get("item_name"),
         ),
         "menu_price": first_recipe_menu_text(
-            item.get("menu_price"),
             recipe_data.get("menu_price"),
             metadata.get("menu_price"),
             metadata.get("price"),
+            item.get("menu_price"),
         ),
         "menu_description": first_recipe_menu_text(
-            item.get("menu_description"),
             recipe_data.get("menu_description"),
             metadata.get("menu_description"),
             metadata.get("description"),
+            item.get("menu_description"),
         ),
     }
     has_metadata = recipe_has_menu_metadata({**recipe_data, **fields})
