@@ -23,6 +23,7 @@ DEFAULT_QUEUED_LIMIT_PER_OWNER_TYPE = 5
 ACTIVE_LIMITS_BY_KEY = {
     "menu-import": 1,
     "menu-ai": 3,
+    "menu-heavy": 1,
     "recipe-import": 2,
     "media-import": 1,
 }
@@ -191,6 +192,8 @@ def job_limit_key(job_type, input_payload=None):
         return "menu-import"
     if job_type == "menu-generate-recipes":
         return "menu-ai"
+    if job_type == "menu-deferred-heavy-tasks":
+        return "menu-heavy"
     if job_type == "recipe-import":
         return "recipe-import"
     if job_type == "doc-photo-import":
@@ -388,7 +391,7 @@ def job_source_items(job):
     seen = set()
     job_type = normalize_job_type(job.get("job_type"))
 
-    if job_type == "menu-generate-recipes":
+    if job_type in {"menu-generate-recipes", "menu-deferred-heavy-tasks"}:
         menu_recipe_urls = []
         for key in ("recipe_urls", "urls"):
             values = input_payload.get(key)
@@ -674,6 +677,8 @@ def start_job(job_id, current_step="Starting"):
 def active_limit_wait_message(limit_key):
     labels = {
         "menu-import": "menu import",
+        "menu-ai": "menu recipe inference",
+        "menu-heavy": "menu PDF/nutrition routine",
         "recipe-import": "recipe import",
         "media-import": "media or vision import",
     }

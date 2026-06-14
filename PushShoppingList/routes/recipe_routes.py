@@ -913,8 +913,8 @@ def menu_stub_recipe_payload(recipe_result, recipe_url, cookbook):
     payload.update({
         "source_url": recipe_url,
         "recipe_record_url": recipe_url,
-        "source_type": "menu_item_stub",
-        "ai_inferred": False,
+        "source_type": "menu_item_inferred",
+        "ai_inferred": True,
         "needs_ai_recipe": True,
         "recipe_status": "stub",
         "cookbook_id": cookbook.get("id", ""),
@@ -1804,8 +1804,8 @@ def commit_menu_import_result(
             recipe_result = {
                 **recipe_result,
                 "raw": recipe_payload,
-                "source_type": "menu_item_stub",
-                "ai_inferred": False,
+                "source_type": "menu_item_inferred",
+                "ai_inferred": True,
                 "needs_ai_recipe": True,
                 "recipe_status": "stub",
                 "ingredients": [],

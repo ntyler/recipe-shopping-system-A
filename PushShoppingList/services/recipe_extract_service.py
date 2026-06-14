@@ -9487,6 +9487,27 @@ def menu_item_inference_worker_count(total_items=None):
     return configured
 
 
+def menu_item_batch_size_limits():
+    try:
+        configured_max = int(os.getenv("MENU_ITEM_BATCH_INFERENCE_MAX_ITEMS", "25"))
+    except (TypeError, ValueError):
+        configured_max = 25
+    try:
+        configured_min = int(os.getenv("MENU_ITEM_BATCH_INFERENCE_MIN_ITEMS", "10"))
+    except (TypeError, ValueError):
+        configured_min = 10
+    max_items = max(1, min(25, configured_max))
+    min_items = max(1, min(max_items, configured_min))
+    return min_items, max_items
+
+
+def menu_item_batch_target_chars():
+    try:
+        return max(4000, int(os.getenv("MENU_ITEM_BATCH_INFERENCE_TARGET_CHARS", "18000")))
+    except (TypeError, ValueError):
+        return 18000
+
+
 def menu_page_request_headers():
     return {
         "User-Agent": (
@@ -9955,6 +9976,240 @@ def infer_menu_item_recipe_for_worker(menu_url, item, index, total, user_id=None
         return infer_menu_item_recipe(menu_url, item, index, total)
 
 
+def menu_item_id_for_batch(recipe_url, stub, fallback_index=0):
+    stub = stub if isinstance(stub, dict) else {}
+    metadata = stub.get("source_metadata") if isinstance(stub.get("source_metadata"), dict) else {}
+    candidates = [
+        stub.get("menu_item_id"),
+        metadata.get("menu_item_id"),
+        stub.get("item_id"),
+        metadata.get("item_id"),
+    ]
+    for candidate in candidates:
+        text = clean_recipe_text(candidate)
+        if text:
+            return text
+
+    try:
+        display_order = int(stub.get("display_order") or metadata.get("display_order") or 0)
+    except (TypeError, ValueError):
+        display_order = 0
+    if display_order > 0:
+        return f"menu-item-{display_order:03d}"
+
+    return f"menu-item-{int(fallback_index or 0) + 1:03d}-{safe_filename(recipe_url or 'recipe')[:24]}"
+
+
+def menu_item_name_is_blank_divider(value):
+    text = clean_recipe_text(value)
+    if not text:
+        return True
+    return bool(re.fullmatch(r"[-\u2010-\u2015_\s]+", text))
+
+
+def menu_batch_item_from_stub(recipe_url, stub, fallback_index=0):
+    stub = stub if isinstance(stub, dict) else {}
+    item = menu_stub_item_from_recipe(stub)
+    item["menu_item_id"] = menu_item_id_for_batch(recipe_url, stub, fallback_index)
+    item["recipe_url"] = str(recipe_url or "").strip()
+    item["source_menu_url"] = (
+        str(stub.get("source_menu_url") or stub.get("menu_source_url") or item.get("source_url") or "").strip()
+    )
+    item["deep_link_url"] = str(stub.get("deep_link_url") or "").strip()
+    return item
+
+
+def compact_menu_batch_item(item):
+    item = item if isinstance(item, dict) else {}
+    return {
+        "menu_item_id": clean_recipe_text(item.get("menu_item_id") or ""),
+        "recipe_url": str(item.get("recipe_url") or "").strip(),
+        "source_menu_url": str(item.get("source_menu_url") or item.get("source_url") or "").strip(),
+        "deep_link_url": str(item.get("deep_link_url") or "").strip(),
+        "section": clean_recipe_text(item.get("menu_section") or ""),
+        "name": clean_recipe_text(item.get("item_name") or ""),
+        "description": clean_recipe_text(item.get("description") or ""),
+        "price": clean_recipe_text(item.get("price") or ""),
+        "item_type": clean_recipe_text(item.get("item_type") or ""),
+        "broad_category": clean_recipe_text(item.get("broad_category") or ""),
+        "raw_text": clean_recipe_text(item.get("raw_text") or ""),
+        "predicted_equipment": normalize_equipment_prediction_records(item.get("predicted_equipment")),
+    }
+
+
+def menu_inference_batches(entries):
+    min_items, max_items = menu_item_batch_size_limits()
+    target_chars = menu_item_batch_target_chars()
+    batches = []
+    current = []
+    current_chars = 0
+
+    for entry in entries or []:
+        item = entry.get("menu_item") if isinstance(entry, dict) else {}
+        item_chars = len(json.dumps(compact_menu_batch_item(item), ensure_ascii=False))
+        should_split = (
+            current
+            and len(current) >= min_items
+            and (
+                len(current) >= max_items
+                or current_chars + item_chars > target_chars
+            )
+        )
+        if should_split:
+            batches.append(current)
+            current = []
+            current_chars = 0
+
+        current.append(entry)
+        current_chars += item_chars
+
+        if len(current) >= max_items:
+            batches.append(current)
+            current = []
+            current_chars = 0
+
+    if current:
+        batches.append(current)
+
+    return batches
+
+
+def build_menu_item_recipe_batch_prompt(entries):
+    compact_items = [
+        compact_menu_batch_item(entry.get("menu_item") if isinstance(entry, dict) else {})
+        for entry in entries or []
+    ]
+    return f"""
+Infer practical home-cooking recipe details from these restaurant menu items.
+
+This is not the restaurant's exact recipe. Mark each result as AI-inferred.
+
+Return ONLY valid JSON. The top-level object must be keyed by menu_item_id.
+
+For each menu_item_id return:
+- predicted_ingredients: array of ingredient objects with quantity, unit, ingredient, preparation, original_text
+- predicted_equipment: array of equipment objects with name
+- predicted_instructions: array of instruction objects with step and instruction
+- servings: number or short string
+- confidence: number from 0 to 1
+- notes: array of short strings explaining uncertainty
+
+Rules:
+- Use the existing predicted_equipment only when it fits the inferred recipe.
+- Do not return nutrition estimates.
+- Do not create PDFs.
+- Skip no items in the response; every provided menu_item_id must have one result.
+- If an item is vague, return conservative plausible ingredients/instructions with lower confidence.
+
+Menu items:
+{json.dumps({"items": compact_items}, ensure_ascii=False)}
+"""
+
+
+def send_menu_item_recipe_batch_prompt_to_openai(prompt_text, action_name="menu-item-recipe-batch-inference", user_id=None):
+    model_resolution = menu_item_recipe_model_resolution()
+    payload, temperature_included, resolved_model = build_openai_chat_payload(
+        model_resolution.model,
+        action_name,
+        [
+            {
+                "role": "system",
+                "content": (
+                    "You infer practical, clearly labeled AI-inferred recipes from restaurant menu items. "
+                    "Return only strict valid JSON keyed by menu_item_id."
+                ),
+            },
+            {
+                "role": "user",
+                "content": prompt_text,
+            },
+        ],
+        response_format={"type": "json_object"},
+        temperature=0,
+    )
+    print(
+        f"[OpenAI] action={action_name} "
+        f"model={resolved_model} model_source={model_resolution.source} "
+        f"temperature_included={temperature_included}"
+    )
+    response = throttled_chat_completion(
+        get_openai_client(),
+        payload,
+        action_name=action_name,
+        model=resolved_model,
+        kind="menu",
+    )
+    record_openai_usage(response, action_name, model=resolved_model, user_id=user_id)
+    return response.choices[0].message.content
+
+
+def _coerce_batch_inference_payload(payload):
+    if not isinstance(payload, dict):
+        return {}
+    candidates = payload.get("items") or payload.get("recipes") or payload.get("recipe_inference") or payload
+    if isinstance(candidates, list):
+        keyed = {}
+        for item in candidates:
+            if not isinstance(item, dict):
+                continue
+            item_id = clean_recipe_text(item.get("menu_item_id") or item.get("id") or "")
+            if item_id:
+                keyed[item_id] = item
+        return keyed
+    if isinstance(candidates, dict):
+        return {
+            clean_recipe_text(key): value
+            for key, value in candidates.items()
+            if clean_recipe_text(key) and isinstance(value, dict)
+        }
+    return {}
+
+
+def infer_menu_item_recipe_batch(entries, user_id=None):
+    model_resolution = menu_item_recipe_model_resolution()
+    action_name = "menu-item-recipe-batch-inference"
+    try:
+        response_text = send_menu_item_recipe_batch_prompt_to_openai(
+            build_menu_item_recipe_batch_prompt(entries),
+            action_name=action_name,
+            user_id=user_id,
+        )
+        payload = json.loads(clean_json_response(response_text))
+        items = _coerce_batch_inference_payload(payload)
+        if not items:
+            raise ValueError("Menu batch inference did not return item results.")
+        return {
+            "ok": True,
+            "items": items,
+            "model": model_resolution.model,
+            "model_source": model_resolution.source,
+            "raw_response": response_text,
+        }
+    except Exception as exc:
+        error_code, error_message = classify_vision_ai_exception(exc)
+        openai_error_code, openai_error_param = get_openai_error_code_and_param(exc)
+        print(
+            "[OpenAI] action=menu-item-recipe-batch-inference_exception "
+            f"batch_size={len(entries or [])} "
+            f"model={model_resolution.model} model_source={model_resolution.source} "
+            f"exception_type={type(exc).__name__} error={exc} "
+            f"openai_error_code={openai_error_code or 'n/a'} "
+            f"openai_error_param={openai_error_param or 'n/a'}"
+        )
+        return {
+            "ok": False,
+            "items": {},
+            "error_code": error_code,
+            "error_message": error_message or str(exc),
+            "technical_message": str(exc),
+            "exception_type": type(exc).__name__,
+            "openai_error_code": openai_error_code,
+            "openai_error_param": openai_error_param,
+            "model": model_resolution.model,
+            "model_source": model_resolution.source,
+        }
+
+
 def menu_item_source_url(menu_url, title, index):
     base_url = str(menu_url or "").split("#", 1)[0].strip() or "menu-item://uploaded-menu"
     slug = quote(safe_filename(title or f"menu item {index + 1}")[:90])
@@ -10091,6 +10346,219 @@ def attach_menu_item_metadata(recipe, menu_item):
         recipe["confidence_notes"] = notes
 
     return recipe
+
+
+def _normalize_predicted_ingredients(value):
+    rows = []
+    source = value if isinstance(value, list) else []
+    for item in source:
+        if isinstance(item, dict):
+            name = clean_recipe_text(item.get("ingredient") or item.get("name") or item.get("text") or item.get("original_text") or "")
+            original_text = clean_recipe_text(item.get("original_text") or item.get("text") or name)
+            if not name and not original_text:
+                continue
+            rows.append({
+                **item,
+                "quantity": clean_recipe_text(item.get("quantity") or ""),
+                "unit": clean_recipe_text(item.get("unit") or ""),
+                "ingredient": name or original_text,
+                "preparation": clean_recipe_text(item.get("preparation") or ""),
+                "original_text": original_text or name,
+            })
+        else:
+            text = clean_recipe_text(item)
+            if text:
+                rows.append({
+                    "quantity": "",
+                    "unit": "",
+                    "ingredient": text,
+                    "preparation": "",
+                    "original_text": text,
+                })
+    return rows
+
+
+def _normalize_predicted_instructions(value):
+    rows = []
+    source = value if isinstance(value, list) else []
+    for index, item in enumerate(source, start=1):
+        if isinstance(item, dict):
+            text = clean_recipe_text(
+                item.get("instruction")
+                or item.get("text")
+                or item.get("step_text")
+                or item.get("description")
+                or ""
+            )
+            if not text:
+                continue
+            row = {**item, "instruction": text}
+            row.setdefault("step", item.get("step_number") or index)
+            rows.append(row)
+        else:
+            text = clean_recipe_text(item)
+            if text:
+                rows.append({"step": index, "instruction": text})
+    return rows
+
+
+def _normalize_inference_notes(value):
+    if isinstance(value, str):
+        value = [value]
+    return [
+        clean_recipe_text(item)
+        for item in (value if isinstance(value, list) else [])
+        if clean_recipe_text(item)
+    ]
+
+
+def _normalize_inference_confidence(value):
+    try:
+        confidence = float(value)
+    except (TypeError, ValueError):
+        return None
+    return max(0.0, min(1.0, confidence))
+
+
+def apply_menu_batch_inference_to_stub(recipe_url, stub, menu_item, inference, model="", model_source=""):
+    recipe_url = str(recipe_url or "").strip()
+    stub = stub if isinstance(stub, dict) else {}
+    menu_item = menu_item if isinstance(menu_item, dict) else {}
+    inference = inference if isinstance(inference, dict) else {}
+    source_menu_url = str(
+        stub.get("source_menu_url")
+        or stub.get("menu_source_url")
+        or menu_item.get("source_menu_url")
+        or menu_item.get("source_url")
+        or ""
+    ).strip()
+    item_name = clean_recipe_text(menu_item.get("item_name") or stub.get("menu_item_name") or stub.get("recipe_title") or "")
+    try:
+        item_index = max(0, int(stub.get("display_order") or menu_item.get("display_order") or 1) - 1)
+    except (TypeError, ValueError):
+        item_index = 0
+
+    ingredients = _normalize_predicted_ingredients(
+        inference.get("predicted_ingredients")
+        or inference.get("ingredients")
+    )
+    equipment = normalize_equipment_prediction_records(
+        inference.get("predicted_equipment")
+        or inference.get("equipment")
+    )
+    instructions = _normalize_predicted_instructions(
+        inference.get("predicted_instructions")
+        or inference.get("instructions")
+    )
+    notes = _normalize_inference_notes(inference.get("notes") or inference.get("confidence_notes"))
+    confidence = _normalize_inference_confidence(inference.get("confidence"))
+
+    recipe = {
+        **stub,
+        "display_name": clean_recipe_text(stub.get("display_name") or item_name or recipe_url),
+        "recipe_title": clean_recipe_text(stub.get("recipe_title") or item_name or recipe_url),
+        "recipe_amount": clean_recipe_text(stub.get("recipe_amount") or "1 batch"),
+        "servings": inference.get("servings") or stub.get("servings") or None,
+        "source_type": "menu_item_inferred",
+        "ai_inferred": True,
+        "needs_ai_recipe": False,
+        "recipe_status": "generated",
+        "ingredients": ingredients,
+        "equipment": equipment,
+        "instructions": instructions,
+        "source_url": recipe_url,
+        "recipe_record_url": recipe_url,
+        "source_menu_url": source_menu_url,
+        "menu_source_url": source_menu_url,
+        "source_display_url": stub.get("source_display_url") or stub.get("deep_link_url") or source_menu_url,
+        "deep_link_url": stub.get("deep_link_url") or menu_item.get("deep_link_url") or "",
+        "menu_section": stub.get("menu_section") or menu_item.get("menu_section") or "",
+        "section_name": stub.get("section_name") or menu_item.get("menu_section") or "",
+        "menu_item_name": stub.get("menu_item_name") or item_name,
+        "item_name": stub.get("item_name") or item_name,
+        "menu_description": stub.get("menu_description") or menu_item.get("description") or "",
+        "item_description": stub.get("item_description") or menu_item.get("description") or "",
+        "description": stub.get("description") or menu_item.get("description") or "",
+        "menu_price": stub.get("menu_price") or menu_item.get("price") or "",
+        "price": stub.get("price") or menu_item.get("price") or "",
+        "menu_item_id": menu_item.get("menu_item_id") or stub.get("menu_item_id") or "",
+        "model": model or resolve_menu_model(),
+        "model_used": model or resolve_menu_model(),
+        "model_source": model_source or resolve_menu_model_source(),
+        "extraction_confidence": confidence if confidence is not None else stub.get("extraction_confidence"),
+        "confidence_notes": notes or [
+            "AI-inferred from a restaurant menu item, not an exact restaurant recipe.",
+        ],
+    }
+    recipe = attach_menu_item_metadata(recipe, menu_item)
+    recipe["recipe_record_url"] = recipe_url
+    recipe["source_url"] = recipe_url
+    recipe["recipe_inference"] = {
+        **default_recipe_inference(),
+        **(stub.get("recipe_inference") if isinstance(stub.get("recipe_inference"), dict) else {}),
+        "status": "generated",
+        "ingredients": ingredients,
+        "equipment": equipment,
+        "instructions": instructions,
+        "servings": recipe.get("servings"),
+        "confidence": confidence,
+        "model": model or resolve_menu_model(),
+        "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "notes": notes,
+    }
+    recipe["nutrition_inference"] = {
+        **default_nutrition_inference(),
+        **(stub.get("nutrition_inference") if isinstance(stub.get("nutrition_inference"), dict) else {}),
+    }
+    recipe["pdf_generation"] = {
+        **default_pdf_generation(),
+        **(stub.get("pdf_generation") if isinstance(stub.get("pdf_generation"), dict) else {}),
+    }
+    normalized = normalize_menu_item_recipe(
+        recipe,
+        source_menu_url,
+        recipe.get("menu_section", ""),
+        recipe.get("menu_item_name", ""),
+        item_index,
+        source_name=stub.get("import_source_name") or source_menu_url,
+    )
+    normalized["source_url"] = recipe_url
+    normalized["recipe_record_url"] = recipe_url
+    normalized["source_display_url"] = recipe.get("source_display_url") or source_menu_url
+    normalized["deep_link_url"] = recipe.get("deep_link_url") or ""
+    normalized["needs_ai_recipe"] = False
+    normalized["recipe_status"] = "generated"
+    normalized["recipe_inference"] = recipe["recipe_inference"]
+    normalized["nutrition_inference"] = recipe["nutrition_inference"]
+    normalized["pdf_generation"] = recipe["pdf_generation"]
+    normalize_extracted_recipe_identity(normalized)
+    normalize_extracted_ingredient_fields(normalized)
+    normalize_extracted_equipment_fields(normalized)
+    save_extracted_recipe_json(recipe_url, normalized)
+    result = build_extract_result(recipe_url, normalized, "menu_batch_inference")
+    result.update({
+        "ok": True,
+        "success": True,
+        "source_url": recipe_url,
+        "recipe_url": recipe_url,
+        "source_menu_url": source_menu_url,
+        "menu_source_url": source_menu_url,
+        "menu_section": normalized.get("menu_section", ""),
+        "menu_item_name": normalized.get("menu_item_name", ""),
+        "menu_description": normalized.get("menu_description", ""),
+        "menu_price": normalized.get("menu_price", ""),
+        "menu_item_id": normalized.get("menu_item_id", ""),
+        "source_type": "menu_item_inferred",
+        "ai_inferred": True,
+        "needs_ai_recipe": False,
+        "recipe_status": "generated",
+        "model": normalized.get("model", ""),
+        "model_used": normalized.get("model_used", ""),
+        "model_source": normalized.get("model_source", ""),
+        "raw": normalized,
+        "inference": inference,
+    })
+    return result
 
 
 def menu_cleanup_enabled():
@@ -10430,8 +10898,8 @@ def normalize_menu_item_stub(menu_url, menu_item, index, source_name=""):
         "prep_time": "",
         "inactive_time": "",
         "cook_time": "",
-        "source_type": "menu_item_stub",
-        "ai_inferred": False,
+        "source_type": "menu_item_inferred",
+        "ai_inferred": True,
         "needs_ai_recipe": True,
         "recipe_status": "stub",
         "ingredients": [],
@@ -10482,7 +10950,7 @@ def normalize_menu_item_stub(menu_url, menu_item, index, source_name=""):
         "extraction_mode": "menu_stub",
         "extraction_confidence": None,
         "confidence_notes": [
-            "Menu item imported as a lightweight stub. AI recipe not generated yet.",
+            "Menu item imported as a lightweight AI-inferred shell. Recipe details not generated yet.",
         ],
     }
 
@@ -10532,6 +11000,8 @@ def normalize_menu_item_stub(menu_url, menu_item, index, source_name=""):
 
 def menu_item_should_skip_stub(item):
     item = item if isinstance(item, dict) else {}
+    if menu_item_name_is_blank_divider(item.get("item_name") or item.get("name") or item.get("title") or ""):
+        return True, "blank_divider"
     if item.get("duplicate_of_index") not in (None, ""):
         return True, "duplicate"
     if item.get("should_create_recipe") is False:
@@ -10678,8 +11148,8 @@ def build_menu_stub_extract_result_from_items(
             "menu_item_id": stub.get("menu_item_id", ""),
             "parent_menu_snapshot_id": stub.get("parent_menu_snapshot_id", ""),
             "menu_mega_snapshot_id": stub.get("menu_mega_snapshot_id", ""),
-            "source_type": "menu_item_stub",
-            "ai_inferred": False,
+            "source_type": "menu_item_inferred",
+            "ai_inferred": True,
             "needs_ai_recipe": True,
             "recipe_status": "stub",
             "recipe_inference": stub.get("recipe_inference", default_recipe_inference()),

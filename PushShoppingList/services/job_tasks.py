@@ -28,6 +28,7 @@ def run_job_task(job_id):
     handlers = {
         "menu-import": run_menu_import_job,
         "menu-generate-recipes": run_menu_generate_recipes_job,
+        "menu-deferred-heavy-tasks": run_menu_deferred_heavy_tasks_job,
         "recipe-import": run_recipe_import_job,
         "doc-photo-import": run_doc_photo_import_job,
         "estimate-per-serving": run_estimate_per_serving_job,
@@ -99,6 +100,13 @@ def job_start_metadata(job):
 
     if job_type == "menu-generate-recipes":
         return model_metadata(resolve_menu_model(), resolve_menu_model_source(), "OPENAI_MENU_MODEL")
+
+    if job_type == "menu-deferred-heavy-tasks":
+        return model_metadata(
+            str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL)),
+            "env:OPENAI_NUTRITION_MODEL" if os.getenv("OPENAI_NUTRITION_MODEL") else "fallback:OPENAI_RECIPE_MODEL",
+            "OPENAI_NUTRITION_MODEL",
+        )
 
     if job_type == "menu-import":
         return model_metadata(resolve_menu_cleanup_model(), resolve_menu_cleanup_model_source(), "OPENAI_MENU_CLEANUP_MODEL")
@@ -188,6 +196,72 @@ def selected_cookbook_from_payload(payload):
     )
 
 
+def payload_bool(payload, key, default=False):
+    value = (payload if isinstance(payload, dict) else {}).get(key, default)
+    if isinstance(value, bool):
+        return value
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def enqueue_followup_job(job_type, payload, total_items=0):
+    from PushShoppingList.services.job_queue_service import enqueue_job
+    from PushShoppingList.services.job_queue_service import queue_name_for_job
+    from PushShoppingList.services.job_service import active_limit_for_job
+    from PushShoppingList.services.job_service import active_limit_wait_message
+    from PushShoppingList.services.job_service import create_job
+    from PushShoppingList.services.job_service import job_limit_key
+    from PushShoppingList.services.job_service import owner_job_count_for_limit_key
+    from PushShoppingList.services.job_service import queued_limit_status
+    from PushShoppingList.services.job_service import update_job
+    from PushShoppingList.services.storage_service import active_guest_session_id
+    from PushShoppingList.services.storage_service import active_user_id
+
+    payload = payload if isinstance(payload, dict) else {}
+    user_id = active_user_id()
+    guest_session_id = active_guest_session_id()
+    queue_name = queue_name_for_job(job_type, payload)
+    queued_status = queued_limit_status(
+        user_id=user_id,
+        guest_session_id=guest_session_id,
+        job_type=job_type,
+        input_payload=payload,
+    )
+    if not queued_status.get("ok"):
+        return {
+            "queued": False,
+            "error": queued_status.get("message") or "Too many queued jobs.",
+            "queue_name": queue_name,
+        }
+
+    limit_key = job_limit_key(job_type, payload)
+    active_limit = active_limit_for_job(job_type, payload)
+    active_count = owner_job_count_for_limit_key(
+        user_id=user_id,
+        guest_session_id=guest_session_id,
+        limit_key=limit_key,
+        statuses=["running"],
+    ) if active_limit else 0
+
+    job = create_job(
+        job_type,
+        input_payload=payload,
+        user_id=user_id,
+        guest_session_id=guest_session_id,
+        total_items=total_items,
+        queue_name=queue_name,
+    )
+    if active_limit and active_count >= active_limit:
+        job = update_job(job["id"], current_step=active_limit_wait_message(limit_key), queue_name=queue_name) or job
+
+    queue_result = enqueue_job(job["id"], queue_name_override=queue_name)
+    return {
+        "queued": bool(queue_result.get("ok")),
+        "job_id": job.get("id", ""),
+        "queue": {key: value for key, value in queue_result.items() if key != "details"},
+        "error": "" if queue_result.get("ok") else queue_result.get("error") or "Unable to queue follow-up job.",
+    }
+
+
 def run_menu_import_job(job_id, payload):
     payload = payload if isinstance(payload, dict) else {}
     payload = {**payload, "extraction_mode": "menu_extract"}
@@ -200,7 +274,6 @@ def run_recipe_import_job(job_id, payload):
 
 def run_menu_generate_recipes_job(job_id, payload):
     from PushShoppingList.routes.recipe_routes import add_items
-    from PushShoppingList.routes.recipe_routes import generate_menu_recipe_from_stub
     from PushShoppingList.routes.recipe_routes import import_recipe_title
     from PushShoppingList.routes.recipe_routes import load_editable_recipe
     from PushShoppingList.routes.recipe_routes import record_recipe_import_activity
@@ -209,10 +282,17 @@ def run_menu_generate_recipes_job(job_id, payload):
     from PushShoppingList.routes.recipe_routes import save_ingredients_for_recipe
     from PushShoppingList.routes.recipe_routes import save_recipe_url_name
     from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
+    from PushShoppingList.services.recipe_extract_service import apply_menu_batch_inference_to_stub
+    from PushShoppingList.services.recipe_extract_service import infer_menu_item_recipe_batch
+    from PushShoppingList.services.recipe_extract_service import menu_batch_item_from_stub
+    from PushShoppingList.services.recipe_extract_service import menu_inference_batches
+    from PushShoppingList.services.recipe_extract_service import menu_item_name_is_blank_divider
     from PushShoppingList.services.recipe_url_service import add_recipe_urls
     from PushShoppingList.services.storage_service import active_user_id
 
     payload = payload if isinstance(payload, dict) else {}
+    force_reprocess = payload_bool(payload, "force_reprocess", False)
+    run_heavy_tasks = payload_bool(payload, "run_deferred_heavy_tasks", True)
     raw_urls = payload.get("recipe_urls") or payload.get("urls")
     if isinstance(raw_urls, str):
         raw_urls = [line.strip() for line in raw_urls.splitlines() if line.strip()]
@@ -231,26 +311,27 @@ def run_menu_generate_recipes_job(job_id, payload):
     created_urls = []
     skipped_urls = []
     failed_items = 0
+    pending_entries = []
 
     update_job_progress(
         job_id,
-        current_step="Generating full recipes",
+        current_step="Predicting recipes",
         total_items=total,
         progress_percent=5,
-        result_payload=model_info,
+        result_payload={
+            **model_info,
+            "stage": "Predicting recipes",
+            "total_items": total,
+            "recipe_shells_created": total,
+            "recipe_inference_completed": 0,
+            "nutrition_completed": 0,
+            "pdfs_completed": 0,
+            "failed_items": 0,
+        },
     )
 
     for index, recipe_url in enumerate(recipe_urls):
         ensure_not_cancelled(job_id)
-        update_job_progress(
-            job_id,
-            current_step=f"Generating full recipe {index + 1}/{total}",
-            progress_percent=bounded_percent(index, total, 5, 80),
-            completed_items=len(created_urls),
-            failed_items=failed_items,
-            result_payload=model_info,
-        )
-
         loaded_recipe = load_editable_recipe(recipe_url) or {}
         stub = loaded_recipe.get("recipe") if isinstance(loaded_recipe, dict) else {}
         stub = stub if isinstance(stub, dict) else {}
@@ -259,51 +340,195 @@ def run_menu_generate_recipes_job(job_id, payload):
             append_job_warning(job_id, f"{recipe_url}: Menu item stub was not found.")
             continue
 
-        if str(stub.get("recipe_status") or "").strip().lower() == "generated" and not stub.get("needs_ai_recipe"):
+        menu_item = menu_batch_item_from_stub(recipe_url, stub, index)
+        if menu_item_name_is_blank_divider(menu_item.get("item_name")):
             skipped_urls.append(recipe_url)
             continue
 
-        result = generate_menu_recipe_from_stub(recipe_url, stub, user_id=active_user_id())
-        if not result.get("ok"):
-            failed_items += 1
-            append_job_warning(job_id, f"{recipe_url}: {result.get('error') or 'Unable to generate full recipe.'}")
+        inference = stub.get("recipe_inference") if isinstance(stub.get("recipe_inference"), dict) else {}
+        already_generated = (
+            str(stub.get("recipe_status") or "").strip().lower() == "generated"
+            and not stub.get("needs_ai_recipe")
+        ) or str(inference.get("status") or "").strip().lower() == "generated"
+        if already_generated and not force_reprocess:
+            skipped_urls.append(recipe_url)
             continue
 
-        ingredients = result.get("ingredients") if isinstance(result.get("ingredients"), list) else []
-        with workspace_write_lock("recipe-imports"):
-            if ingredients:
-                add_items(ingredients)
-                save_ingredients_for_recipe(recipe_url, ingredients, result)
-            if result.get("display_name") or result.get("recipe_title"):
-                save_recipe_url_name(recipe_url, result.get("display_name") or result.get("recipe_title"))
-            add_recipe_urls([recipe_url])
+        pending_entries.append({
+            "recipe_url": recipe_url,
+            "stub": stub,
+            "menu_item": menu_item,
+        })
 
-        record_recipe_import_activity(recipe_url, result, "menu-stub-generation")
-        print(
-            "[recipe_import] action=menu_stub_generated "
-            f"title={import_recipe_title(result, recipe_url)} url={recipe_url}"
+    batches = menu_inference_batches(pending_entries)
+    batch_total = len(batches)
+    completed_batches = 0
+
+    for batch_index, batch in enumerate(batches, start=1):
+        ensure_not_cancelled(job_id)
+        update_job_progress(
+            job_id,
+            current_step=f"Predicting recipes ({batch_index}/{batch_total})",
+            progress_percent=bounded_percent(batch_index - 1, max(1, batch_total), 10, 82),
+            completed_items=len(created_urls) + len(skipped_urls),
+            failed_items=failed_items,
+            result_payload={
+                **model_info,
+                "stage": "Predicting recipes",
+                "total_items": total,
+                "recipe_inference_completed": len(created_urls),
+                "skipped_count": len(skipped_urls),
+                "failed_items": failed_items,
+                "batch_count": batch_total,
+                "batch_index": batch_index,
+            },
         )
-        created_urls.append(recipe_url)
+
+        batch_result = {}
+        for attempt in range(2):
+            ensure_not_cancelled(job_id)
+            batch_result = infer_menu_item_recipe_batch(batch, user_id=active_user_id())
+            result_items = batch_result.get("items") if isinstance(batch_result.get("items"), dict) else {}
+            missing_ids = [
+                str((entry.get("menu_item") or {}).get("menu_item_id") or "").strip()
+                for entry in batch
+                if str((entry.get("menu_item") or {}).get("menu_item_id") or "").strip() not in result_items
+            ]
+            if batch_result.get("ok") and not missing_ids:
+                break
+            if attempt == 0:
+                append_job_warning(
+                    job_id,
+                    (
+                        f"Batch {batch_index}/{batch_total} failed once; retrying. "
+                        f"{batch_result.get('error_message') or ('Missing menu_item_id: ' + ', '.join(missing_ids[:3]) if missing_ids else '')}"
+                    ).strip(),
+                )
+                if batch_result.get("ok") and missing_ids:
+                    batch_result = {**batch_result, "ok": False}
+
+        result_items = batch_result.get("items") if isinstance(batch_result.get("items"), dict) else {}
+        missing_ids = [
+            str((entry.get("menu_item") or {}).get("menu_item_id") or "").strip()
+            for entry in batch
+            if str((entry.get("menu_item") or {}).get("menu_item_id") or "").strip() not in result_items
+        ]
+        if not batch_result.get("ok") or missing_ids:
+            failed_items += len(batch)
+            append_job_warning(
+                job_id,
+                f"Batch {batch_index}/{batch_total}: {batch_result.get('error_message') or ('Missing menu_item_id: ' + ', '.join(missing_ids[:3]) if missing_ids else 'Unable to predict recipes.')}",
+            )
+            continue
+
+        for entry in batch:
+            ensure_not_cancelled(job_id)
+            recipe_url = entry["recipe_url"]
+            menu_item = entry.get("menu_item") if isinstance(entry.get("menu_item"), dict) else {}
+            item_id = str(menu_item.get("menu_item_id") or "").strip()
+            item_result = result_items.get(item_id)
+            if not isinstance(item_result, dict):
+                failed_items += 1
+                append_job_warning(job_id, f"{recipe_url}: Batch response did not include menu_item_id {item_id}.")
+                continue
+
+            result = apply_menu_batch_inference_to_stub(
+                recipe_url,
+                entry.get("stub") or {},
+                menu_item,
+                item_result,
+                model=batch_result.get("model") or model_info.get("model_used"),
+                model_source=batch_result.get("model_source") or model_info.get("model_source"),
+            )
+            if not result.get("ok"):
+                failed_items += 1
+                append_job_warning(job_id, f"{recipe_url}: {result.get('error') or 'Unable to save predicted recipe.'}")
+                continue
+
+            ingredients = result.get("ingredients") if isinstance(result.get("ingredients"), list) else []
+            with workspace_write_lock("recipe-imports"):
+                if ingredients:
+                    add_items(ingredients)
+                    save_ingredients_for_recipe(recipe_url, ingredients, result)
+                if result.get("display_name") or result.get("recipe_title"):
+                    save_recipe_url_name(recipe_url, result.get("display_name") or result.get("recipe_title"))
+                add_recipe_urls([recipe_url])
+
+            record_recipe_import_activity(recipe_url, result, "menu-batch-generation")
+            print(
+                "[recipe_import] action=menu_stub_generated_batch "
+                f"title={import_recipe_title(result, recipe_url)} url={recipe_url}"
+            )
+            created_urls.append(recipe_url)
+
+        completed_batches += 1
 
     ensure_not_cancelled(job_id)
     if created_urls:
-        update_job_progress(job_id, current_step="Finalizing generated recipes", progress_percent=92)
+        update_job_progress(
+            job_id,
+            current_step="Finalizing predicted recipes",
+            progress_percent=88,
+            result_payload={
+                **model_info,
+                "stage": "Predicting recipes",
+                "recipe_inference_completed": len(created_urls),
+                "failed_items": failed_items,
+            },
+        )
         with workspace_write_lock("recipe-imports"):
             sort_ingredients()
+
+    heavy_job = {}
+    if run_heavy_tasks and created_urls:
+        update_job_progress(
+            job_id,
+            current_step="Queueing deferred heavy tasks",
+            progress_percent=93,
+            result_payload={
+                **model_info,
+                "stage": "Estimating nutrition",
+                "recipe_inference_completed": len(created_urls),
+                "nutrition_completed": 0,
+                "pdfs_completed": 0,
+                "failed_items": failed_items,
+            },
+        )
+        heavy_job = enqueue_followup_job(
+            "menu-deferred-heavy-tasks",
+            {
+                "recipe_urls": created_urls,
+                "force_reprocess": force_reprocess,
+                "source_job_id": job_id,
+                "context": "menu-batch-generation",
+            },
+            total_items=len(created_urls),
+        )
+        if not heavy_job.get("queued"):
+            append_job_warning(job_id, heavy_job.get("error") or "Deferred heavy tasks were not queued.")
 
     result_payload = {
         "ok": bool(created_urls or skipped_urls),
         "created_count": len(created_urls),
         "generated_count": len(created_urls),
         "full_recipes_generated": len(created_urls),
+        "recipe_inference_completed": len(created_urls),
         "skipped_count": len(skipped_urls),
         "failed_count": failed_items,
+        "failed_items": failed_items,
         "recipe_urls": created_urls + skipped_urls,
         "generated_recipe_urls": created_urls,
         "skipped_recipe_urls": skipped_urls,
         "links": recipe_links(created_urls + skipped_urls),
         "nutrition_estimates_completed": 0,
+        "nutrition_completed": 0,
         "pdfs_created": 0,
+        "pdfs_completed": 0,
+        "batch_count": batch_total,
+        "batches_completed": completed_batches,
+        "deferred_heavy_tasks_job": heavy_job,
+        "deferred_heavy_tasks_job_id": heavy_job.get("job_id", ""),
+        "stage": "Complete",
         **model_info,
     }
     update_job_progress(
@@ -319,6 +544,230 @@ def run_menu_generate_recipes_job(job_id, payload):
     if created_urls or skipped_urls:
         return complete_job(job_id, result_payload=result_payload)
     return fail_job(job_id, "No menu item stubs were generated.", result_payload=result_payload)
+
+
+def run_menu_deferred_heavy_tasks_job(job_id, payload):
+    from PushShoppingList.routes.recipe_routes import MODEL
+    from PushShoppingList.routes.recipe_routes import _has_per_serving_estimate
+    from PushShoppingList.routes.recipe_routes import _menu_nutrition_inference_from_rows
+    from PushShoppingList.routes.recipe_routes import estimate_recipe_nutrition
+    from PushShoppingList.routes.recipe_routes import load_editable_recipe
+    from PushShoppingList.routes.recipe_routes import save_editable_recipe
+    from PushShoppingList.services.recipe_edit_service import generate_editable_recipe_pdf_file
+    from PushShoppingList.services.recipe_edit_service import upload_recipe_pdf_to_cloudflare
+    import os
+
+    payload = payload if isinstance(payload, dict) else {}
+    raw_urls = payload.get("recipe_urls") or payload.get("urls")
+    if isinstance(raw_urls, str):
+        raw_urls = [line.strip() for line in raw_urls.splitlines() if line.strip()]
+    if not isinstance(raw_urls, list):
+        raw_urls = [payload.get("recipe_url") or payload.get("url") or payload.get("source_url") or ""]
+    recipe_urls = [str(url or "").strip() for url in raw_urls if str(url or "").strip()]
+    recipe_urls = list(dict.fromkeys(recipe_urls))
+    if not recipe_urls:
+        return fail_job(job_id, "At least one recipe URL is required.")
+
+    total = len(recipe_urls)
+    force_reprocess = payload_bool(payload, "force_reprocess", False)
+    nutrition_model = str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL))
+    nutrition_model_info = stored_job_model_metadata(job_id, model_metadata(
+        nutrition_model,
+        "env:OPENAI_NUTRITION_MODEL" if os.getenv("OPENAI_NUTRITION_MODEL") else "fallback:OPENAI_RECIPE_MODEL",
+        "OPENAI_NUTRITION_MODEL",
+    ))
+    nutrition_completed = 0
+    pdfs_completed = 0
+    uploads_completed = 0
+    failed_items = 0
+    nutrition_ready_urls = []
+    pdf_ready_urls = []
+
+    update_job_progress(
+        job_id,
+        current_step="Estimating nutrition",
+        total_items=total,
+        progress_percent=5,
+        result_payload={
+            **nutrition_model_info,
+            "stage": "Estimating nutrition",
+            "total_items": total,
+            "nutrition_completed": 0,
+            "pdfs_completed": 0,
+            "pdf_uploads_completed": 0,
+            "failed_items": 0,
+        },
+    )
+
+    for index, recipe_url in enumerate(recipe_urls):
+        ensure_not_cancelled(job_id)
+        loaded_recipe = load_editable_recipe(recipe_url) or {}
+        recipe = loaded_recipe.get("recipe") if isinstance(loaded_recipe, dict) else {}
+        recipe = recipe if isinstance(recipe, dict) else {}
+        if not recipe:
+            failed_items += 1
+            append_job_warning(job_id, f"{recipe_url}: Recipe was not found for nutrition estimation.")
+            continue
+
+        if not force_reprocess and _has_per_serving_estimate(recipe.get("nutrition")):
+            nutrition_completed += 1
+            nutrition_ready_urls.append(recipe_url)
+        else:
+            estimate_result = estimate_recipe_nutrition(recipe)
+            if not estimate_result.get("ok"):
+                failed_items += 1
+                append_job_warning(job_id, f"{recipe_url}: {estimate_result.get('error') or 'Unable to estimate nutrition.'}")
+                continue
+
+            updated_recipe = {
+                **recipe,
+                "nutrition": estimate_result.get("nutrition", []),
+                "nutrition_inference": _menu_nutrition_inference_from_rows(
+                    estimate_result.get("nutrition", []),
+                    model=nutrition_model,
+                ),
+            }
+            with workspace_write_lock("recipe-imports"):
+                save_result = save_editable_recipe(recipe_url, updated_recipe)
+            if not save_result.get("ok"):
+                failed_items += 1
+                append_job_warning(job_id, f"{recipe_url}: {save_result.get('error') or 'Unable to save nutrition estimate.'}")
+                continue
+            nutrition_completed += 1
+            nutrition_ready_urls.append(recipe_url)
+
+        update_job_progress(
+            job_id,
+            current_step=f"Estimating nutrition ({index + 1}/{total})",
+            progress_percent=bounded_percent(index + 1, total, 5, 38),
+            completed_items=nutrition_completed,
+            failed_items=failed_items,
+            result_payload={
+                **nutrition_model_info,
+                "stage": "Estimating nutrition",
+                "nutrition_completed": nutrition_completed,
+                "failed_items": failed_items,
+            },
+        )
+
+    update_job_progress(
+        job_id,
+        current_step="Generating PDFs",
+        progress_percent=40,
+        completed_items=nutrition_completed,
+        failed_items=failed_items,
+        result_payload={
+            **nutrition_model_info,
+            "stage": "Generating PDFs",
+            "nutrition_completed": nutrition_completed,
+            "pdfs_completed": 0,
+            "failed_items": failed_items,
+        },
+    )
+
+    pdf_total = max(1, len(nutrition_ready_urls))
+    for index, recipe_url in enumerate(nutrition_ready_urls):
+        ensure_not_cancelled(job_id)
+        try:
+            with workspace_write_lock("recipe-pdfs"):
+                pdf_result = generate_editable_recipe_pdf_file(recipe_url)
+        except Exception as exc:
+            pdf_result = {"ok": False, "error": str(exc)}
+        if pdf_result.get("ok"):
+            pdfs_completed += 1
+            pdf_ready_urls.append(recipe_url)
+        else:
+            failed_items += 1
+            append_job_warning(job_id, f"{recipe_url}: {pdf_result.get('error') or 'Unable to create recipe PDF.'}")
+
+        update_job_progress(
+            job_id,
+            current_step=f"Generating PDFs ({index + 1}/{len(nutrition_ready_urls)})",
+            progress_percent=bounded_percent(index + 1, pdf_total, 40, 70),
+            completed_items=pdfs_completed,
+            failed_items=failed_items,
+            result_payload={
+                **nutrition_model_info,
+                "stage": "Generating PDFs",
+                "nutrition_completed": nutrition_completed,
+                "pdfs_completed": pdfs_completed,
+                "failed_items": failed_items,
+            },
+        )
+
+    update_job_progress(
+        job_id,
+        current_step="Uploading PDFs",
+        progress_percent=72,
+        completed_items=pdfs_completed,
+        failed_items=failed_items,
+        result_payload={
+            **nutrition_model_info,
+            "stage": "Uploading PDFs",
+            "nutrition_completed": nutrition_completed,
+            "pdfs_completed": pdfs_completed,
+            "pdf_uploads_completed": 0,
+            "failed_items": failed_items,
+        },
+    )
+
+    upload_total = max(1, len(pdf_ready_urls))
+    for index, recipe_url in enumerate(pdf_ready_urls):
+        ensure_not_cancelled(job_id)
+        try:
+            with workspace_write_lock("recipe-pdfs"):
+                upload_result = upload_recipe_pdf_to_cloudflare(recipe_url, pdf_kind="generated_recipe")
+        except Exception as exc:
+            upload_result = {"ok": False, "error": str(exc)}
+        if upload_result.get("ok"):
+            uploads_completed += 1
+        else:
+            failed_items += 1
+            append_job_warning(job_id, f"{recipe_url}: {upload_result.get('error') or 'Unable to upload generated PDF.'}")
+
+        update_job_progress(
+            job_id,
+            current_step=f"Uploading PDFs ({index + 1}/{len(pdf_ready_urls)})",
+            progress_percent=bounded_percent(index + 1, upload_total, 72, 96),
+            completed_items=uploads_completed,
+            failed_items=failed_items,
+            result_payload={
+                **nutrition_model_info,
+                "stage": "Uploading PDFs",
+                "nutrition_completed": nutrition_completed,
+                "pdfs_completed": pdfs_completed,
+                "pdf_uploads_completed": uploads_completed,
+                "failed_items": failed_items,
+            },
+        )
+
+    result_payload = {
+        "ok": uploads_completed > 0 or pdfs_completed > 0 or nutrition_completed > 0,
+        "created_count": total,
+        "recipe_urls": recipe_urls,
+        "links": recipe_links(recipe_urls),
+        "nutrition_estimates_completed": nutrition_completed,
+        "nutrition_completed": nutrition_completed,
+        "pdfs_created": pdfs_completed,
+        "pdfs_completed": pdfs_completed,
+        "pdf_uploads_completed": uploads_completed,
+        "failed_count": failed_items,
+        "failed_items": failed_items,
+        "stage": "Complete",
+        **nutrition_model_info,
+    }
+    update_job_progress(
+        job_id,
+        current_step="Complete",
+        progress_percent=98,
+        total_items=total,
+        completed_items=max(nutrition_completed, pdfs_completed, uploads_completed),
+        failed_items=failed_items,
+        result_payload=result_payload,
+    )
+    if result_payload["ok"]:
+        return complete_job(job_id, result_payload=result_payload)
+    return fail_job(job_id, "No deferred menu tasks completed.", result_payload=result_payload)
 
 
 def run_import_urls_job(job_id, payload, menu_extract=False):
@@ -380,15 +829,25 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
 
     update_job_progress(
         job_id,
-        current_step="Reading source URL" if total == 1 else "Reading source URLs",
+        current_step="Fetching menu" if menu_extract else ("Reading source URL" if total == 1 else "Reading source URLs"),
         total_items=total,
         progress_percent=5,
-        result_payload=job_model,
+        result_payload={
+            **job_model,
+            **({
+                "stage": "Fetching menu",
+                "recipe_shells_created": 0,
+                "recipe_inference_completed": 0,
+                "nutrition_completed": 0,
+                "pdfs_completed": 0,
+                "failed_items": 0,
+            } if menu_extract else {}),
+        },
     )
 
     for index, url in enumerate(urls):
         ensure_not_cancelled(job_id)
-        step = "Fetching menu page" if menu_extract else "Reading source URL"
+        step = "Fetching menu" if menu_extract else "Reading source URL"
         update_job_progress(
             job_id,
             current_step=step,
@@ -443,8 +902,17 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
 
             update_job_progress(
                 job_id,
-                current_step="Creating menu stubs",
+                current_step="Creating recipe shells",
                 progress_percent=bounded_percent(index, total, 65, 90),
+                result_payload={
+                    **job_model,
+                    "stage": "Creating recipe shells",
+                    "recipe_shells_created": len(created_urls),
+                    "recipe_inference_completed": 0,
+                    "nutrition_completed": 0,
+                    "pdfs_completed": 0,
+                    "failed_items": failed_items,
+                },
             )
             with workspace_write_lock("recipe-imports"):
                 committed = commit_menu_import_result(
@@ -554,12 +1022,36 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
         "ok": bool(created_urls),
         "created_count": len(created_urls),
         "failed_count": failed_items,
+        "failed_items": failed_items,
         "recipe_urls": created_urls,
         "links": recipe_links(created_urls),
         **job_model,
     }
     if menu_extract:
+        inference_job = {}
+        if created_urls and payload_bool(payload, "auto_generate_recipes", True):
+            inference_job = enqueue_followup_job(
+                "menu-generate-recipes",
+                {
+                    "recipe_urls": created_urls,
+                    "source_job_id": job_id,
+                    "run_deferred_heavy_tasks": True,
+                    "force_reprocess": False,
+                },
+                total_items=len(created_urls),
+            )
+            if not inference_job.get("queued"):
+                append_job_warning(job_id, inference_job.get("error") or "Recipe inference was not queued.")
         result_payload.update(menu_job_stats)
+        result_payload.update({
+            "stage": "Complete",
+            "recipe_shells_created": len(created_urls),
+            "recipe_inference_completed": 0,
+            "nutrition_completed": 0,
+            "pdfs_completed": 0,
+            "recipe_inference_job": inference_job,
+            "recipe_inference_job_id": inference_job.get("job_id", ""),
+        })
     update_job_progress(
         job_id,
         total_items=final_total,

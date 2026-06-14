@@ -276,6 +276,7 @@ function jobTypeLabel(jobType) {
     return ({
         "menu-import": "Menu Import",
         "menu-generate-recipes": "Generate Menu Recipes",
+        "menu-deferred-heavy-tasks": "Menu Nutrition / PDFs",
         "recipe-import": "Recipe Import",
         "doc-photo-import": "Doc / Photo Import",
         "estimate-per-serving": "Estimate Per Serving",
@@ -369,6 +370,35 @@ function renderJobModelDetails(job) {
     }
 
     return parts.length ? `<div class="job-activity-model">${parts.join("")}</div>` : "";
+}
+
+function renderJobStageCounts(job) {
+    const result = jobResultPayload(job);
+    const jobType = String((job && job.job_type) || "").trim();
+    if (!["menu-import", "menu-generate-recipes", "menu-deferred-heavy-tasks"].includes(jobType)) {
+        return "";
+    }
+
+    const countItems = [
+        ["total items", result.total_items || (job && job.total_items)],
+        ["shells", result.recipe_shells_created || result.stubs_created],
+        ["inference", result.recipe_inference_completed || result.full_recipes_generated],
+        ["nutrition", result.nutrition_completed || result.nutrition_estimates_completed],
+        ["PDFs", result.pdfs_completed || result.pdfs_created],
+        ["uploads", result.pdf_uploads_completed],
+        ["failed", result.failed_items || result.failed_count || (job && job.failed_items)],
+    ].filter(([_label, value]) => Number(value || 0) > 0);
+
+    if (!countItems.length && !result.stage) {
+        return "";
+    }
+
+    return `
+        <div class="job-activity-stage-counts">
+            ${result.stage ? `<span>Stage: <strong>${escapeHtml(result.stage)}</strong></span>` : ""}
+            ${countItems.map(([label, value]) => `<span>${escapeHtml(label)}: <strong>${escapeHtml(String(Number(value || 0)))}</strong></span>`).join("")}
+        </div>
+    `;
 }
 
 function jobSourceUrls(job) {
@@ -477,6 +507,7 @@ function renderJobActivityRow(job) {
     const links = jobResultLinks(job);
     const sourceHtml = renderJobSourceList(job);
     const modelHtml = renderJobModelDetails(job);
+    const stageCountsHtml = renderJobStageCounts(job);
     const active = jobIsActive(job);
     const openProgressButton = jobCanOpenImportProgress(job)
         ? `<button type="button" class="job-activity-row-action" onclick="return openJobActivityImportProgress('${escapeAttribute(job.id || job.job_id || "")}')">Open Popup</button>`
@@ -517,6 +548,7 @@ function renderJobActivityRow(job) {
                     <span>${percent}%</span>
                     ${countText ? `<span>${escapeHtml(countText)}</span>` : ""}
                 </div>
+                ${stageCountsHtml}
                 ${error ? `<div class="job-activity-error">${escapeHtml(error)}</div>` : ""}
                 ${warningHtml}
                 ${linkHtml}
@@ -24773,7 +24805,7 @@ function importJobToExtractionProgress(job, urls, isMenuExtract) {
     const summary = completed
         ? (
             isMenuExtract && (stubCount || megaSnapshotCount)
-                ? `Menu import complete. Created ${megaSnapshotCount || 1} mega menu JSON snapshot${(megaSnapshotCount || 1) === 1 ? "" : "s"} and unpacked ${unpackedCount || stubCount} menu item${(unpackedCount || stubCount) === 1 ? "" : "s"} into lightweight stubs.`
+                ? `Menu import complete. Created ${megaSnapshotCount || 1} mega menu JSON snapshot${(megaSnapshotCount || 1) === 1 ? "" : "s"} and unpacked ${unpackedCount || stubCount} menu item${(unpackedCount || stubCount) === 1 ? "" : "s"} into lightweight recipe shells.`
                 : `Imported ${displayedCount} recipe${displayedCount === 1 ? "" : "s"}.`
         )
         : failed
@@ -25414,9 +25446,14 @@ function uniqueRecipeUrls(urls) {
 
 function selectedRecipeBatchUrls(options = {}) {
     const stubsOnly = options.stubsOnly === true;
+    const menuOnly = options.menuOnly === true;
+    const menuRows = menuOnly ? new Set(menuRecipeRows()) : null;
     return uniqueRecipeUrls(Array.from(document.querySelectorAll("[data-recipe-batch-select]:checked")).map(input => {
         const row = input.closest("[data-current-recipe-row]");
         if (stubsOnly && (!row || row.dataset.needsAiRecipe !== "1")) {
+            return "";
+        }
+        if (menuOnly && (!row || !menuRows.has(row))) {
             return "";
         }
         return recipeUrlFromElement(input);
@@ -25528,13 +25565,14 @@ async function refreshRecipesAfterMenuRoutine() {
     }
 }
 
-async function startMenuRecipeGeneration(urls, button) {
+async function startMenuRecipeGeneration(urls, button, options = {}) {
     urls = uniqueRecipeUrls(urls);
     if (!urls.length) {
-        alert("Select at least one menu stub recipe.");
+        alert("Select at least one menu recipe.");
         return false;
     }
-    if (urls.length > 25 && !window.confirm(`This will run full AI inference for ${urls.length} menu items and may increase API cost. Continue?`)) {
+    const forceReprocess = Boolean(options.forceReprocess);
+    if (urls.length > 25 && !window.confirm(`This will run batched AI inference for ${urls.length} menu items and may increase API cost. Continue?`)) {
         return false;
     }
 
@@ -25543,6 +25581,8 @@ async function startMenuRecipeGeneration(urls, button) {
         creatingText: "Starting...",
         payload: {
             recipe_urls: urls,
+            force_reprocess: forceReprocess,
+            run_deferred_heavy_tasks: options.runDeferredHeavyTasks !== false,
         },
     });
     if (!startData || !startData.job_id) {
@@ -25557,6 +25597,38 @@ async function startMenuRecipeGeneration(urls, button) {
     syncOpenAiUsageDashboardFromResponse(result);
     if (!finishedJob || finishedJob.status !== "completed") {
         throw new Error((finishedJob && finishedJob.error_message) || "Menu recipe generation failed.");
+    }
+    await refreshRecipesAfterMenuRoutine();
+    return true;
+}
+
+async function startMenuDeferredHeavyTasks(urls, button, options = {}) {
+    urls = uniqueRecipeUrls(urls);
+    if (!urls.length) {
+        alert("Select at least one menu recipe.");
+        return false;
+    }
+
+    const startData = await startBackgroundJob("/api/jobs/menu-deferred-heavy-tasks", {
+        button,
+        creatingText: "Starting...",
+        payload: {
+            recipe_urls: urls,
+            force_reprocess: Boolean(options.forceReprocess),
+        },
+    });
+    if (!startData || !startData.job_id) {
+        throw new Error("Unable to start deferred menu tasks.");
+    }
+
+    const finishedJob = await waitForJobCompletion(startData.job_id, {
+        pollMs: 1500,
+        timeoutMs: IMPORT_JOB_COMPLETION_TIMEOUT_MS,
+    });
+    const result = jobResultPayload(finishedJob);
+    syncOpenAiUsageDashboardFromResponse(result);
+    if (!finishedJob || finishedJob.status !== "completed") {
+        throw new Error((finishedJob && finishedJob.error_message) || "Deferred menu tasks failed.");
     }
     await refreshRecipesAfterMenuRoutine();
     return true;
@@ -25755,6 +25827,15 @@ async function generateAllMenuStubRecipes(button) {
     return false;
 }
 
+async function forceReprocessSelectedMenuRecipes(button) {
+    try {
+        await startMenuRecipeGeneration(selectedRecipeBatchUrls({ menuOnly: true }), button, { forceReprocess: true });
+    } catch (err) {
+        alert(err.message || "Unable to force reprocess selected menu recipes.");
+    }
+    return false;
+}
+
 async function runRecipeUrlJobSequence(urls, endpoint, payloadForUrl, button, emptyMessage) {
     urls = uniqueRecipeUrls(urls);
     if (!urls.length) {
@@ -25840,20 +25921,10 @@ async function runFullRoutineForMenuRecipeUrls(urls, stubUrls, button, emptyMess
         if (selectedStubs.length) {
             await startMenuRecipeGeneration(selectedStubs, button);
         }
-        await runRecipeUrlJobSequence(
-            selectedUrls,
-            "/api/jobs/estimate-per-serving",
-            recipeUrl => ({ recipe_url: recipeUrl }),
-            null,
-            ""
-        );
-        await runRecipeUrlJobSequence(
-            selectedUrls,
-            "/api/jobs/create-recipe-pdf",
-            recipeUrl => ({ recipe_url: recipeUrl, upload_to_cloudflare: true }),
-            null,
-            ""
-        );
+        const generatedOnlyUrls = selectedUrls.filter(url => !selectedStubs.includes(url));
+        if (generatedOnlyUrls.length) {
+            await startMenuDeferredHeavyTasks(generatedOnlyUrls, selectedStubs.length ? null : button);
+        }
     } catch (err) {
         alert(err.message || "Unable to run full routine.");
     }
@@ -25953,7 +26024,7 @@ function renderExtractionProgress(progress) {
     status.textContent = progressStatusText(progress);
     summary.textContent = progress.summary || (
         isMenuExtract
-            ? "Fetching menu pages, building mega menu JSON snapshots, and saving lightweight stubs."
+            ? "Fetching menu pages, building mega menu JSON snapshots, and saving lightweight recipe shells."
             : "Fetching recipe pages and extracting ingredients."
     );
     bar.style.width = `${Math.max(0, Math.min(100, progress.percent || 0))}%`;

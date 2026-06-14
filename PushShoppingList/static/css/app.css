@@ -20460,7 +20460,8 @@ img[data-deferred-src] {
             font-size: 0.86rem;
         }
 
-        .job-activity-model {
+        .job-activity-model,
+        .job-activity-stage-counts {
             display: flex;
             flex-wrap: wrap;
             gap: 6px 12px;
@@ -20469,7 +20470,12 @@ img[data-deferred-src] {
             line-height: 1.35;
         }
 
-        .job-activity-model strong {
+        .job-activity-stage-counts {
+            color: #cbd5e1;
+        }
+
+        .job-activity-model strong,
+        .job-activity-stage-counts strong {
             color: #f8fafc;
             font-weight: 800;
         }

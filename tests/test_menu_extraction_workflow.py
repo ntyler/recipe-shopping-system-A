@@ -283,7 +283,8 @@ def test_menu_stub_url_import_saves_mega_snapshot_and_parent_traceability(monkey
     assert "Unpacking mega menu JSON into item JSON records" in progress_messages
     assert snapshot["menu_mega_json"]["source"]["http_status"] == 200
     assert snapshot["menu_mega_json"]["menu"]["sections"][0]["items"][0]["name"] == "Spring Roll"
-    assert saved[0][1]["source_type"] == "menu_item_stub"
+    assert saved[0][1]["source_type"] == "menu_item_inferred"
+    assert saved[0][1]["ai_inferred"] is True
     assert saved[0][1]["parent_menu_snapshot_id"] == snapshot["id"]
     assert saved[0][1]["source_metadata"]["parent_menu_snapshot_id"] == snapshot["id"]
     assert saved[0][1]["recipe_inference"]["status"] == "not_generated"
@@ -567,7 +568,8 @@ def test_menu_stub_result_is_deterministic_without_openai(monkeypatch, tmp_path)
     assert result["staged_import"] is True
     assert result["stubs_created"] == 1
     assert result["openai_calls_used"] == 0
-    assert result["recipes"][0]["source_type"] == "menu_item_stub"
+    assert result["recipes"][0]["source_type"] == "menu_item_inferred"
+    assert result["recipes"][0]["ai_inferred"] is True
     assert result["recipes"][0]["needs_ai_recipe"] is True
     assert result["recipes"][0]["recipe_status"] == "stub"
     assert result["recipes"][0]["ingredients"] == []
@@ -576,6 +578,56 @@ def test_menu_stub_result_is_deterministic_without_openai(monkeypatch, tmp_path)
     assert result["recipes"][0]["pdf_generation"]["status"] == "not_generated"
     assert saved[0][1]["source_menu_url"] == source_url
     assert saved[0][1]["menu_item_id"] == "MIT1"
+
+
+def test_menu_stub_import_skips_blank_divider_items(monkeypatch, tmp_path):
+    configure_menu_model_defaults(monkeypatch, tmp_path)
+    source_url = "https://example.com/menu"
+    saved = []
+    monkeypatch.setattr(recipe_extract_service, "RAW_FOLDER", tmp_path)
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "save_extracted_recipe_json",
+        lambda recipe_url, json_data: saved.append((recipe_url, dict(json_data))) or tmp_path / "stub.json",
+    )
+
+    result = recipe_extract_service.build_menu_stub_extract_result_from_items(
+        source_url,
+        [
+            {
+                "section_name": "Entrees",
+                "items": [
+                    {"item_name": "--", "menu_section": "Entrees"},
+                    {"item_name": "Basil Chicken", "menu_section": "Entrees"},
+                ],
+            }
+        ],
+        diagnostics={"menu_page_fetched": True},
+    )
+
+    assert result["ok"] is True
+    assert result["stubs_created"] == 1
+    assert result["items_skipped"][0]["reason"] == "blank_divider"
+    assert saved[0][1]["recipe_title"] == "Basil Chicken"
+
+
+def test_menu_inference_batches_cap_batch_size(monkeypatch):
+    monkeypatch.setenv("MENU_ITEM_BATCH_INFERENCE_MAX_ITEMS", "25")
+    entries = [
+        {
+            "recipe_url": f"https://example.com/menu?menu_item={index}",
+            "menu_item": {
+                "menu_item_id": f"item-{index}",
+                "item_name": f"Item {index}",
+                "menu_section": "Entrees",
+            },
+        }
+        for index in range(52)
+    ]
+
+    batches = recipe_extract_service.menu_inference_batches(entries)
+
+    assert [len(batch) for batch in batches] == [25, 25, 2]
 
 
 def test_menu_stub_optional_cleanup_is_one_batch_call_and_skips_duplicate(monkeypatch, tmp_path):
@@ -776,13 +828,13 @@ def test_commit_menu_import_stubs_skips_full_routine(monkeypatch, tmp_path):
         "source_url": recipe_url,
         "display_name": "Basil Chicken",
         "recipe_title": "Basil Chicken",
-        "source_type": "menu_item_stub",
-        "ai_inferred": False,
+        "source_type": "menu_item_inferred",
+        "ai_inferred": True,
         "needs_ai_recipe": True,
         "recipe_status": "stub",
         "ingredients": [],
         "raw": {
-            "source_type": "menu_item_stub",
+            "source_type": "menu_item_inferred",
             "recipe_title": "Basil Chicken",
             "source_url": recipe_url,
             "source_menu_url": source_url,

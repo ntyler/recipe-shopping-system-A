@@ -99,6 +99,13 @@ def with_model_metadata(payload, model_used="", model_source="", model_env_var="
     }
 
 
+def payload_truthy(payload, key, default=False):
+    value = (payload if isinstance(payload, dict) else {}).get(key, default)
+    if isinstance(value, bool):
+        return value
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def create_and_enqueue(job_type, payload, total_items=0):
     actor = actor_context()
     queue_name = queue_name_for_job(job_type, payload)
@@ -208,6 +215,7 @@ def start_menu_generate_recipes_job_route():
     payload = {
         **payload,
         "recipe_urls": urls,
+        "force_reprocess": payload_truthy(payload, "force_reprocess", False),
     }
     payload = with_model_metadata(
         payload,
@@ -216,6 +224,33 @@ def start_menu_generate_recipes_job_route():
         model_env_var="OPENAI_MENU_MODEL",
     )
     return create_and_enqueue("menu-generate-recipes", payload, total_items=len(urls))
+
+
+@job_bp.route("/api/jobs/menu-deferred-heavy-tasks", methods=["POST"])
+def start_menu_deferred_heavy_tasks_job_route():
+    payload = json_payload()
+    urls = urls_from_payload(payload, "recipe_url", "url", "source_url")
+    recipe_urls = payload.get("recipe_urls")
+    if isinstance(recipe_urls, str):
+        urls.extend(line.strip() for line in recipe_urls.splitlines() if line.strip())
+    elif isinstance(recipe_urls, list):
+        urls.extend(str(url or "").strip() for url in recipe_urls if str(url or "").strip())
+    urls = list(dict.fromkeys([url for url in urls if url]))
+    if not urls:
+        return jsonify({"ok": False, "error": "At least one recipe URL is required."}), 400
+
+    payload = {
+        **payload,
+        "recipe_urls": urls,
+        "force_reprocess": payload_truthy(payload, "force_reprocess", False),
+    }
+    payload = with_model_metadata(
+        payload,
+        model_used=str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL)),
+        model_source="env:OPENAI_NUTRITION_MODEL" if os.getenv("OPENAI_NUTRITION_MODEL") else "fallback:OPENAI_RECIPE_MODEL",
+        model_env_var="OPENAI_NUTRITION_MODEL",
+    )
+    return create_and_enqueue("menu-deferred-heavy-tasks", payload, total_items=len(urls))
 
 
 @job_bp.route("/api/jobs/recipe-import", methods=["POST"])

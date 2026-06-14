@@ -209,6 +209,36 @@ def test_menu_generate_route_returns_trigger_item_source_link(monkeypatch, tmp_p
     assert data["job"]["source_items"][0]["recipe_url"] == recipe_url
 
 
+def test_menu_deferred_heavy_task_route_uses_recipe_item_sources(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    recipe_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=spring-roll"
+    monkeypatch.setattr(
+        job_routes,
+        "enqueue_job",
+        lambda job_id, **kwargs: {"ok": True, "mode": "test", "job_id": job_id, **kwargs},
+    )
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["user_id"] = "owner"
+
+        response = client.post(
+            "/api/jobs/menu-deferred-heavy-tasks",
+            json={"recipe_urls": [recipe_url]},
+            headers={"X-Requested-With": "fetch"},
+        )
+        data = response.get_json()
+
+    assert response.status_code == 202
+    assert data["job"]["job_type"] == "menu-deferred-heavy-tasks"
+    assert data["job"]["queue_name"] == "ai-pantry-light"
+    assert data["job"]["model_env_var"] == "OPENAI_NUTRITION_MODEL"
+    assert data["job"]["source_items"][0]["detail"] == "menu item"
+    assert data["job"]["source_items"][0]["recipe_url"] == recipe_url
+
+
 def test_cancelled_job_cannot_be_revived_by_worker_updates(monkeypatch, tmp_path):
     configure_job_paths(monkeypatch, tmp_path)
     job = job_service.create_job(
@@ -283,6 +313,8 @@ def test_queue_routing_by_job_type_and_payload():
     assert job_queue_service.queue_name_for_job("recipe-import", {}) == "ai-pantry-recipe"
     assert job_queue_service.queue_name_for_job("product-matching", {}) == "ai-pantry-product"
     assert job_queue_service.queue_name_for_job("recipe-category-decision", {}) == "ai-pantry-light"
+    assert job_queue_service.queue_name_for_job("menu-deferred-heavy-tasks", {}) == "ai-pantry-light"
+    assert job_service.job_limit_key("menu-deferred-heavy-tasks", {}) == "menu-heavy"
     assert job_queue_service.queue_name_for_job(
         "doc-photo-import",
         {"import_mode": "menu_extract"},
