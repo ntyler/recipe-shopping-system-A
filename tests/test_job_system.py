@@ -2,9 +2,12 @@ import pytest
 
 from PushShoppingList.app import create_app
 from PushShoppingList.routes import job_routes
+from PushShoppingList.routes import recipe_routes
+from PushShoppingList.services import cookbook_service
 from PushShoppingList.services import guest_session_service
 from PushShoppingList.services import job_queue_service
 from PushShoppingList.services import job_service
+from PushShoppingList.services import job_tasks
 from PushShoppingList.services import recipe_extract_service
 from PushShoppingList.services import storage_service
 
@@ -214,6 +217,100 @@ def test_menu_generate_route_returns_trigger_item_source_link(monkeypatch, tmp_p
     assert data["job"]["source_items"][0]["detail"] == "menu item"
     assert data["job"]["source_items"][0]["url"].startswith("/recipe/edit?url=")
     assert data["job"]["source_items"][0]["recipe_url"] == recipe_url
+
+
+def test_menu_generate_job_runs_decide_all_categories_after_generation(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    recipe_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=crab-wonton"
+    stub = {
+        "source_url": recipe_url,
+        "recipe_title": "Crab Wonton",
+        "display_name": "Crab Wonton",
+        "needs_ai_recipe": True,
+        "recipe_status": "stub",
+        "cookbook_id": "cb1",
+        "cookbook_name": "Dinner",
+    }
+    category_calls = []
+
+    monkeypatch.setattr(recipe_routes, "load_editable_recipe", lambda url: {"recipe": stub})
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "menu_batch_item_from_stub",
+        lambda url, loaded_stub, index: {
+            "menu_item_id": "item-1",
+            "item_name": "Crab Wonton",
+            "menu_section": "Appetizers",
+        },
+    )
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "infer_menu_item_recipe_batch",
+        lambda batch, user_id=None: {
+            "ok": True,
+            "items": {"item-1": {"predicted_ingredients": ["cream cheese"]}},
+            "model": "gpt-test",
+            "model_source": "test",
+        },
+    )
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "apply_menu_batch_inference_to_stub",
+        lambda url, loaded_stub, menu_item, inference, model="", model_source="": {
+            "ok": True,
+            "source_url": url,
+            "display_name": "Crab Wonton",
+            "recipe_title": "Crab Wonton",
+            "ingredients": [{"ingredient": "cream cheese"}],
+            "instructions": [{"instruction": "Fill and fry."}],
+            "cookbook_id": loaded_stub.get("cookbook_id"),
+            "cookbook_name": loaded_stub.get("cookbook_name"),
+        },
+    )
+    monkeypatch.setattr(recipe_routes, "add_items", lambda ingredients: None)
+    monkeypatch.setattr(recipe_routes, "save_ingredients_for_recipe", lambda url, ingredients, result: None)
+    monkeypatch.setattr(recipe_routes, "save_recipe_url_name", lambda url, name: None)
+    monkeypatch.setattr(recipe_routes, "record_recipe_import_activity", lambda *args, **kwargs: None)
+    monkeypatch.setattr(recipe_extract_service, "menu_inference_batches", lambda entries: [entries])
+    monkeypatch.setattr(cookbook_service, "cookbook_recipe_assignment_for_url", lambda url: {
+        "cookbook_id": "cb1",
+        "cookbook_name": "Dinner",
+    })
+    monkeypatch.setattr("PushShoppingList.services.recipe_url_service.add_recipe_urls", lambda urls: None)
+    monkeypatch.setattr("PushShoppingList.scripts.sort_ingredients.main", lambda: None)
+
+    def fake_category_routine(url, result, assignment, trigger_source=""):
+        category_calls.append({
+            "url": url,
+            "title": result.get("recipe_title"),
+            "assignment": assignment,
+            "trigger_source": trigger_source,
+        })
+        return {"ok": True, "status": "updated", "categories": {"meal_type": "Dinner"}}
+
+    monkeypatch.setattr(recipe_routes, "apply_imported_recipe_category_routine", fake_category_routine)
+
+    job = job_service.create_job(
+        "menu-generate-recipes",
+        input_payload={
+            "recipe_urls": [recipe_url],
+            "run_deferred_heavy_tasks": False,
+        },
+        user_id="owner",
+        total_items=1,
+    )
+
+    finished = job_tasks.run_menu_generate_recipes_job(job["id"], job["input_payload"])
+
+    assert finished["status"] == "completed"
+    assert category_calls == [{
+        "url": recipe_url,
+        "title": "Crab Wonton",
+        "assignment": {"cookbook_id": "cb1", "cookbook_name": "Dinner"},
+        "trigger_source": "menu_generate:all",
+    }]
+    assert finished["result_payload"]["category_success_count"] == 1
+    assert finished["result_payload"]["category_statuses"][0]["recipe_url"] == recipe_url
 
 
 def test_menu_deferred_heavy_task_route_uses_recipe_item_sources(monkeypatch, tmp_path):

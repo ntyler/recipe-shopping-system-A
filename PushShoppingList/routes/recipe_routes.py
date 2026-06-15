@@ -1151,7 +1151,12 @@ def import_request_is_menu_extract(source):
     return mode in {"menu", "menu_extract", "menu-extract"}
 
 
-def apply_imported_recipe_category_routine(url, recipe_metadata, assignment):
+def apply_imported_recipe_category_routine(
+    url,
+    recipe_metadata,
+    assignment,
+    trigger_source="recipe_import:all",
+):
     url = str(url or "").strip()
     recipe_metadata = recipe_metadata if isinstance(recipe_metadata, dict) else {}
     assignment = assignment if isinstance(assignment, dict) else {}
@@ -1185,7 +1190,7 @@ def apply_imported_recipe_category_routine(url, recipe_metadata, assignment):
         category_input,
         mode="all",
         current_categories={},
-        trigger_source="recipe_import:all",
+        trigger_source=trigger_source or "recipe_import:all",
     )
 
     if not decision.get("ok"):

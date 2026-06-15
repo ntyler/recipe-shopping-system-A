@@ -274,6 +274,7 @@ def run_recipe_import_job(job_id, payload):
 
 def run_menu_generate_recipes_job(job_id, payload):
     from PushShoppingList.routes.recipe_routes import add_items
+    from PushShoppingList.routes.recipe_routes import apply_imported_recipe_category_routine
     from PushShoppingList.routes.recipe_routes import import_recipe_title
     from PushShoppingList.routes.recipe_routes import load_editable_recipe
     from PushShoppingList.routes.recipe_routes import record_recipe_import_activity
@@ -289,6 +290,7 @@ def run_menu_generate_recipes_job(job_id, payload):
     from PushShoppingList.services.recipe_extract_service import menu_item_name_is_blank_divider
     from PushShoppingList.services.recipe_url_service import add_recipe_urls
     from PushShoppingList.services.storage_service import active_user_id
+    from PushShoppingList.services.cookbook_service import cookbook_recipe_assignment_for_url
 
     payload = payload if isinstance(payload, dict) else {}
     force_reprocess = payload_bool(payload, "force_reprocess", False)
@@ -312,6 +314,8 @@ def run_menu_generate_recipes_job(job_id, payload):
     skipped_urls = []
     failed_items = 0
     pending_entries = []
+    category_statuses = []
+    category_success_count = 0
 
     update_job_progress(
         job_id,
@@ -454,6 +458,48 @@ def run_menu_generate_recipes_job(job_id, payload):
                     save_recipe_url_name(recipe_url, result.get("display_name") or result.get("recipe_title"))
                 add_recipe_urls([recipe_url])
 
+            update_job_progress(
+                job_id,
+                current_step=f"Generating ChatGPT categories ({len(created_urls) + 1}/{total})",
+                progress_percent=bounded_percent(len(created_urls), total, 82, 88),
+                completed_items=len(created_urls) + len(skipped_urls),
+                failed_items=failed_items,
+                result_payload={
+                    **model_info,
+                    "stage": "Generating categories",
+                    "recipe_inference_completed": len(created_urls),
+                    "category_success_count": category_success_count,
+                    "failed_items": failed_items,
+                },
+            )
+            assignment = cookbook_recipe_assignment_for_url(recipe_url)
+            if not assignment.get("cookbook_id"):
+                assignment = {
+                    "cookbook_id": result.get("cookbook_id") or (entry.get("stub") or {}).get("cookbook_id", ""),
+                    "cookbook_name": result.get("cookbook_name") or (entry.get("stub") or {}).get("cookbook_name", ""),
+                }
+            category_status = apply_imported_recipe_category_routine(
+                recipe_url,
+                result,
+                assignment,
+                trigger_source="menu_generate:all",
+            )
+            category_statuses.append({
+                **category_status,
+                "recipe_url": recipe_url,
+            })
+            if category_status.get("ok"):
+                category_success_count += 1
+            else:
+                append_job_warning(
+                    job_id,
+                    f"{import_recipe_title(result, recipe_url)}: {category_status.get('error') or 'Category inference skipped.'}",
+                )
+            result = {
+                **result,
+                "import_category_status": category_status,
+                "category_status": category_status,
+            }
             record_recipe_import_activity(recipe_url, result, "menu-batch-generation")
             print(
                 "[recipe_import] action=menu_stub_generated_batch "
@@ -524,6 +570,9 @@ def run_menu_generate_recipes_job(job_id, payload):
         "nutrition_completed": 0,
         "pdfs_created": 0,
         "pdfs_completed": 0,
+        "category_statuses": category_statuses,
+        "category_success_count": category_success_count,
+        "categories_generated": category_success_count,
         "batch_count": batch_total,
         "batches_completed": completed_batches,
         "deferred_heavy_tasks_job": heavy_job,
