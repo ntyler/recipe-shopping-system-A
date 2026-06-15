@@ -25,6 +25,23 @@ COOKBOOK_CATEGORY_FIELDS = (
     "prep_time_group",
 )
 COOKBOOK_CATEGORY_ALL_FIELDS = (*COOKBOOK_CATEGORY_FIELDS, "custom_categories")
+COOKBOOK_RECIPE_METADATA_FIELDS = (
+    "source_type",
+    "recipe_status",
+    "menu_section",
+    "section_name",
+    "menu_item_name",
+    "item_name",
+    "menu_description",
+    "menu_price",
+    "parent_menu_snapshot_id",
+    "menu_mega_snapshot_id",
+    "menu_snapshot_id",
+)
+COOKBOOK_RECIPE_BOOLEAN_METADATA_FIELDS = (
+    "ai_inferred",
+    "needs_ai_recipe",
+)
 CATEGORY_SOURCE_USER_SELECTED = "user_selected"
 CATEGORY_SOURCE_AI_INFERRED = "ai_inferred"
 CATEGORY_SOURCE_BLANK = "blank"
@@ -393,6 +410,12 @@ def clean_recipe_record(value):
         "alphabetical_group": clean_text(value.get("alphabetical_group")),
         "category_metadata_user_set": bool(value.get("category_metadata_user_set")),
     }
+
+    for field in COOKBOOK_RECIPE_METADATA_FIELDS:
+        record[field] = clean_text(value.get(field))
+
+    for field in COOKBOOK_RECIPE_BOOLEAN_METADATA_FIELDS:
+        record[field] = bool(value.get(field))
 
     for field in COOKBOOK_CATEGORY_FIELDS:
         record[field] = clean_text(value.get(field))

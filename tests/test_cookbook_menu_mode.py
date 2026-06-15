@@ -6,6 +6,7 @@ import pytest
 from flask import render_template
 
 from PushShoppingList.app import create_app
+from PushShoppingList.routes import main_routes
 from PushShoppingList.services import cookbook_service
 
 
@@ -72,22 +73,112 @@ def test_cookbook_recipe_rows_match_current_recipe_summary_layout():
         '<span class="recipe-url-summary-title-line">',
         recipe_card_start,
     )
-    food_review_index = template.index(
+    title_food_review_index = template.index(
         'class="food-rule-marker recipe-log-food-review-btn recipe-url-summary-food-review"',
-        title_line_start,
+        recipe_card_start,
     )
     summary_body_index = template.index(
         '<div class="recipe-url-summary-body">',
         title_line_start,
     )
+    meta_index = template.index(
+        '<div class="recipe-url-summary-meta">',
+        summary_body_index,
+    )
+    amount_index = template.index(
+        '<div class="recipe-url-summary-amount">',
+        meta_index,
+    )
+    title_block = template[title_line_start:summary_body_index]
+    menu_status_block = template[meta_index:amount_index]
+    inferred_branch_start = menu_status_block.index('{% elif recipe.source_type == "menu_item_inferred" or recipe.ai_inferred %}')
+    stub_status_block = menu_status_block[:inferred_branch_start]
+    inferred_status_block = menu_status_block[inferred_branch_start:]
 
-    assert food_review_index < summary_body_index
+    assert "menu-recipe-status-stub" not in title_block
+    assert title_line_start < title_food_review_index < summary_body_index
+    assert stub_status_block.index("menu-recipe-status-stub") < stub_status_block.index("recipe-url-summary-food-review")
+    assert stub_status_block.index("recipe-url-summary-food-review") < stub_status_block.index("Generate Recipe")
+    assert stub_status_block.index("menu-recipe-status-stub") < stub_status_block.index("Generate Recipe")
+    assert stub_status_block.index("Generate Recipe") < stub_status_block.index("Generate Section")
+    assert stub_status_block.index("Generate Section") < stub_status_block.index("Run Section Routine")
+    assert stub_status_block.index("Run Section Routine") < stub_status_block.index("View Mega Menu JSON")
+    assert inferred_status_block.index("menu-recipe-status-generated") < inferred_status_block.index("View Mega Menu JSON")
+    assert 'data-menu-snapshot-id="{{ recipe.parent_menu_snapshot_id or recipe.menu_mega_snapshot_id }}"' in menu_status_block
+    assert ".recipe-url-summary-menu-status" in css
     assert "recipe-url-summary-row" in template
     assert 'class="recipe-url-summary-header"' in template
     assert 'class="recipe-batch-select cookbook-restore-checkbox cookbook-recipe-restore-checkbox"' in template
     assert 'class="recipe-url-summary-actions cookbook-recipe-actions"' in template
     assert "display: grid;\n                grid-template-columns: minmax(0, 1fr) auto;" not in css
     assert "justify-content: flex-end;\n                width: 100%;\n                margin-left: auto;" not in css
+
+
+def test_cookbook_recipe_view_renders_menu_stub_actions_above_amount():
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    with TemporaryDirectory() as temp_dir, patch.object(
+        cookbook_service,
+        "COOKBOOKS_FILE",
+        Path(temp_dir) / "cookbooks.json",
+    ):
+        cookbook_service.save_cookbooks({
+            "cookbooks": [
+                {
+                    "id": "vel-asain-cuisine",
+                    "name": "Vel Asain Cuisine",
+                    "recipes": [
+                        {
+                            "url": "menu-item://vel-asain-cuisine/spring-roll",
+                            "source_href": "https://example.com/menu#spring-roll",
+                            "source_display_url": "Vel Asain Cuisine menu",
+                            "name": "Spring Roll",
+                            "number": 5,
+                            "quantity": 1,
+                            "needs_ai_recipe": True,
+                            "source_type": "menu_item_stub",
+                            "menu_section": "Appetizers",
+                            "parent_menu_snapshot_id": "mega-menu-1",
+                        },
+                    ],
+                },
+            ],
+        })
+        view = main_routes.cookbook_view_for_render([])
+        for cookbook in view["cookbooks"]:
+            cookbook.setdefault("menu_pdf_logs", [])
+            cookbook.setdefault("restaurant_menus", [])
+
+        with app.test_request_context("/"):
+            html = render_template(
+                "sections/cookbooks.html",
+                cookbook_view=view,
+                cookbook_count=len(view["cookbooks"]),
+                cookbook_recipe_count=sum(len(cookbook["recipes"]) for cookbook in view["cookbooks"]),
+            )
+
+    recipe_card_start = html.index("data-cookbook-recipe-card")
+    article_start = html.rfind("<article", 0, recipe_card_start)
+    article_end = html.index("</article>", recipe_card_start)
+    card_html = html[article_start:article_end]
+    assert 'data-recipe-url="menu-item://vel-asain-cuisine/spring-roll"' in card_html
+    title_line_start = card_html.index('<span class="recipe-url-summary-title-line">')
+    summary_body_index = card_html.index('<div class="recipe-url-summary-body">')
+    amount_index = card_html.index('<div class="recipe-url-summary-amount">')
+    cookbook_index = card_html.index('<div class="recipe-url-summary-cookbook">')
+    title_block = card_html[title_line_start:summary_body_index]
+    menu_status_block = card_html[summary_body_index:amount_index]
+
+    assert "Spring Roll" in title_block
+    assert "menu-recipe-status-stub" not in title_block
+    assert "Generate Recipe" not in title_block
+    assert menu_status_block.index("menu-recipe-status-stub") < menu_status_block.index("Generate Recipe")
+    assert menu_status_block.index("Generate Recipe") < menu_status_block.index("Generate Section")
+    assert menu_status_block.index("Generate Section") < menu_status_block.index("Run Section Routine")
+    assert menu_status_block.index("Run Section Routine") < menu_status_block.index("View Mega Menu JSON")
+    assert summary_body_index < amount_index < cookbook_index
+    assert "Vel Asain Cuisine" in card_html[cookbook_index:]
 
 
 def test_unclassified_cookbook_menu_keeps_cookbook_management_protected():

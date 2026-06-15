@@ -9154,6 +9154,32 @@ body {
             margin-top: 2px;
         }
 
+        .recipe-url-summary-menu-status {
+            display: grid;
+            grid-template-columns: var(--recipe-meta-label-width) minmax(0, 1fr);
+            align-items: start;
+            justify-items: start;
+            gap: 6px 8px;
+            max-width: min(360px, 100%);
+            margin: 0 0 2px 0;
+        }
+
+        .recipe-url-summary-menu-status .menu-recipe-status-badge,
+        .recipe-url-summary-menu-status .menu-recipe-generate-inline,
+        .recipe-url-summary-menu-status .recipe-url-summary-food-review {
+            width: fit-content;
+            max-width: 100%;
+            justify-self: start;
+            white-space: normal;
+            text-align: center;
+        }
+
+        .recipe-url-summary-menu-status .menu-recipe-status-badge,
+        .recipe-url-summary-menu-status .menu-recipe-generate-inline {
+            justify-content: center;
+            overflow-wrap: anywhere;
+        }
+
         .recipe-url-summary-main {
             min-width: 0;
             display: grid;

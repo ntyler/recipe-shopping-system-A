@@ -394,6 +394,8 @@
                                                                      aria-expanded="true"
                                                                      onclick="return toggleCookbookRecipeDetails(this, event)"
                                                                      onkeydown="return handleCookbookRecipeTitleKeydown(this, event)">
+                                                                    {% set recipe_needs_food_review = recipe.food_rule_status and recipe.food_rule_status.needs_review %}
+                                                                    {% set recipe_has_menu_status = recipe.needs_ai_recipe or recipe.source_type == "menu_item_stub" or recipe.source_type == "menu_item_inferred" or recipe.ai_inferred %}
                                                                     <span class="recipe-url-summary-title-line">
                                                                         <span class="recipe-url-summary-number">Recipe {{ recipe.number or loop.index }}:</span>
                                                                         <a class="recipe-url-summary-name recipe-url-summary-name-link"
@@ -411,7 +413,7 @@
                                                                                 {{ recipe.rating_stars }}
                                                                             </span>
                                                                         {% endif %}
-                                                                        {% if recipe.food_rule_status and recipe.food_rule_status.needs_review %}
+                                                                        {% if recipe_needs_food_review and not recipe_has_menu_status %}
                                                                             <button type="button"
                                                                                     class="food-rule-marker recipe-log-food-review-btn recipe-url-summary-food-review"
                                                                                     data-recipe-url="{{ recipe.url }}"
@@ -440,6 +442,75 @@
                                                                     </div>
                                                                 {% endif %}
                                                                 <div class="recipe-url-summary-meta">
+                                                                    {% if recipe.needs_ai_recipe or recipe.source_type == "menu_item_stub" %}
+                                                                        <div class="recipe-url-summary-menu-status cookbook-recipe-menu-status">
+                                                                            <span class="menu-recipe-status-badge menu-recipe-status-stub">
+                                                                                Menu Stub - AI recipe not generated yet
+                                                                            </span>
+                                                                            {% if recipe_needs_food_review %}
+                                                                                <button type="button"
+                                                                                        class="food-rule-marker recipe-log-food-review-btn recipe-url-summary-food-review"
+                                                                                        data-recipe-url="{{ recipe.url }}"
+                                                                                        title="{{ recipe.food_rule_status.marker }}"
+                                                                                        aria-label="Food Review: {{ recipe.food_rule_status.count }} item{% if recipe.food_rule_status.count != 1 %}s{% endif %} need review"
+                                                                                        onclick="return openRecipeFoodReviewFromRecipeView(this, event)">
+                                                                                    Food Review ({{ recipe.food_rule_status.count }})
+                                                                                </button>
+                                                                            {% endif %}
+                                                                            <button type="button"
+                                                                                    class="menu-recipe-generate-inline"
+                                                                                    data-recipe-url="{{ recipe.url }}"
+                                                                                    onclick="return generateMenuStubRecipe(this, event)">
+                                                                                Generate Recipe
+                                                                            </button>
+                                                                            {% if recipe.menu_section %}
+                                                                                <button type="button"
+                                                                                        class="menu-recipe-generate-inline"
+                                                                                        data-menu-section="{{ recipe.menu_section }}"
+                                                                                        onclick="return generateMenuStubSection(this, event)">
+                                                                                    Generate Section
+                                                                                </button>
+                                                                                <button type="button"
+                                                                                        class="menu-recipe-generate-inline"
+                                                                                        data-menu-section="{{ recipe.menu_section }}"
+                                                                                        onclick="return runFullRoutineForMenuSection(this, event)">
+                                                                                    Run Section Routine
+                                                                                </button>
+                                                                            {% endif %}
+                                                                            {% if recipe.parent_menu_snapshot_id or recipe.menu_mega_snapshot_id %}
+                                                                                <button type="button"
+                                                                                        class="menu-recipe-generate-inline"
+                                                                                        data-menu-snapshot-id="{{ recipe.parent_menu_snapshot_id or recipe.menu_mega_snapshot_id }}"
+                                                                                        onclick="return viewMegaMenuJson(this, event)">
+                                                                                    View Mega Menu JSON
+                                                                                </button>
+                                                                            {% endif %}
+                                                                        </div>
+                                                                    {% elif recipe.source_type == "menu_item_inferred" or recipe.ai_inferred %}
+                                                                        <div class="recipe-url-summary-menu-status cookbook-recipe-menu-status">
+                                                                            <span class="menu-recipe-status-badge menu-recipe-status-generated">
+                                                                                AI-Inferred Recipe
+                                                                            </span>
+                                                                            {% if recipe_needs_food_review %}
+                                                                                <button type="button"
+                                                                                        class="food-rule-marker recipe-log-food-review-btn recipe-url-summary-food-review"
+                                                                                        data-recipe-url="{{ recipe.url }}"
+                                                                                        title="{{ recipe.food_rule_status.marker }}"
+                                                                                        aria-label="Food Review: {{ recipe.food_rule_status.count }} item{% if recipe.food_rule_status.count != 1 %}s{% endif %} need review"
+                                                                                        onclick="return openRecipeFoodReviewFromRecipeView(this, event)">
+                                                                                    Food Review ({{ recipe.food_rule_status.count }})
+                                                                                </button>
+                                                                            {% endif %}
+                                                                            {% if recipe.parent_menu_snapshot_id or recipe.menu_mega_snapshot_id %}
+                                                                                <button type="button"
+                                                                                        class="menu-recipe-generate-inline"
+                                                                                        data-menu-snapshot-id="{{ recipe.parent_menu_snapshot_id or recipe.menu_mega_snapshot_id }}"
+                                                                                        onclick="return viewMegaMenuJson(this, event)">
+                                                                                    View Mega Menu JSON
+                                                                                </button>
+                                                                            {% endif %}
+                                                                        </div>
+                                                                    {% endif %}
                                                                     {% if recipe.base_servings %}
                                                                         <div class="recipe-url-summary-servings">
                                                                             <span class="recipe-url-summary-meta-label">Servings:</span>
