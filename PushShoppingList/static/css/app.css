@@ -592,6 +592,36 @@ body {
             padding: 9px 12px;
         }
 
+        .recipe-import-cookbook-select.recipe-edit-row-menu-btn {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 26px;
+            align-items: center;
+            justify-content: stretch;
+            width: 100%;
+            min-width: 0;
+            height: auto;
+            min-height: 38px;
+            padding: 9px 12px;
+        }
+
+        .recipe-import-cookbook-select.recipe-edit-row-menu-btn::before {
+            left: auto;
+            right: 23px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .recipe-import-cookbook-select.recipe-edit-row-menu-btn span {
+            display: block;
+        }
+
+        .recipe-import-cookbook-select.recipe-edit-row-menu-btn .recipe-url-summary-cookbook-chevron {
+            width: 26px;
+            height: 20px;
+            border: 0;
+            visibility: hidden;
+        }
+
         .recipe-import-cookbook-menu {
             min-width: min(320px, calc(100vw - 24px));
         }

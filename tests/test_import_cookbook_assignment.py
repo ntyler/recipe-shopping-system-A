@@ -70,6 +70,7 @@ def test_import_assignment_saves_recipe_to_selected_cookbook():
 def test_import_cookbook_selector_static_hooks_are_present():
     template = (ROOT / "PushShoppingList/templates/sections/enter_recipe_links.html").read_text(encoding="utf-8")
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
     routes = (ROOT / "PushShoppingList/routes/recipe_routes.py").read_text(encoding="utf-8")
 
     assert "Save extracted recipes to cookbook:" in template
@@ -78,6 +79,8 @@ def test_import_cookbook_selector_static_hooks_are_present():
     assert "Remove cookbook assignment" in template
     assert 'id="customMenuBuilderImportForm"' in template
     assert 'onsubmit="prepareImportCookbookDestination()"' in template
+    assert ".recipe-import-cookbook-select.recipe-edit-row-menu-btn span" in css
+    assert ".recipe-import-cookbook-select.recipe-edit-row-menu-btn::before" in css
     assert 'formData.set("cookbook_id", destination.cookbookId || "")' in script
     assert 'cookbook_id: destination.cookbookId || ""' in script
     assert "bindImportCookbookSelector()" in script
