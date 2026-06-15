@@ -191,6 +191,9 @@ def test_normal_recipe_load_and_save_do_not_add_menu_metadata(monkeypatch, tmp_p
     assert loaded["menu_metadata_available"] is False
     assert loaded["restaurant_name"] == ""
     assert loaded["menu_price"] == ""
+    assert loaded["servings"] == ""
+    assert loaded["level"] == ""
+    assert loaded["total_time"] == ""
 
     result = recipe_edit_service.save_editable_recipe(
         url,
@@ -208,6 +211,95 @@ def test_normal_recipe_load_and_save_do_not_add_menu_metadata(monkeypatch, tmp_p
     assert result["ok"] is True
     for field in recipe_edit_service.RESTAURANT_MENU_METADATA_FIELDS:
         assert field not in saved
+
+
+def test_generated_menu_recipe_load_backfills_blank_recipe_info_defaults(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    url = "https://velasian.example/menu#spring-roll"
+    recipe_edit_service.save_recipe_output(url, {
+        "source_url": url,
+        "source_type": "menu_item_inferred",
+        "ai_inferred": True,
+        "needs_ai_recipe": False,
+        "recipe_status": "generated",
+        "recipe_title": "Spring Roll",
+        "servings": "",
+        "level": "",
+        "total_time": "",
+        "prep_time": "",
+        "inactive_time": "",
+        "cook_time": "",
+        "scaling": {},
+        "ingredients": [{"ingredient": "cabbage", "quantity": "1", "unit": "cup"}],
+        "instructions": [{"instruction": "Roll and fry until golden."}],
+    })
+
+    loaded = recipe_edit_service.load_editable_recipe(url)["recipe"]
+
+    assert loaded["servings"] == "4 servings"
+    assert loaded["level"] == "Easy"
+    assert loaded["total_time"] == "45 min"
+    assert loaded["prep_time"] == "15 min"
+    assert loaded["inactive_time"] == "0 min"
+    assert loaded["cook_time"] == "30 min"
+    assert loaded["scaling"]["base_servings"] == "4 servings"
+
+
+def test_menu_batch_generation_preserves_editor_restaurant_metadata(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    monkeypatch.setattr(recipe_extract_service, "maybe_upload_recipe_archive_pdf_to_cloudflare", lambda *_args, **_kwargs: {})
+    url = "https://velasian.example/menu#spring-roll"
+    stub = editable_payload(
+        url,
+        source_type="menu_item_inferred",
+        ai_inferred=True,
+        needs_ai_recipe=True,
+        recipe_status="stub",
+        source_menu_url="https://velasian.example/menu",
+        restaurant_name="Vel Asian Cuisine",
+        restaurant_website_url="https://velasian.example",
+        restaurant_cuisine_tags="Asian, Thai",
+        restaurant_phone="317-555-0100",
+        restaurant_address="1 Main St, Indianapolis, IN",
+        restaurant_hours_text="Mon-Sat 10-9",
+        restaurant_current_status="Open",
+        restaurant_promotions="Rewards members get lunch specials",
+        restaurant_online_payment_available="false",
+        restaurant_delivery_available="true",
+        menu_section="Kitchen Appetizers",
+        menu_item_name="Spring Roll",
+        menu_price="$5.99",
+        menu_description="Two veggie golden crispy rolls.",
+        ingredients=[],
+        instructions=[],
+    )
+
+    menu_item = recipe_extract_service.menu_batch_item_from_stub(url, stub, 0)
+    result = recipe_extract_service.apply_menu_batch_inference_to_stub(
+        url,
+        stub,
+        menu_item,
+        {
+            "predicted_ingredients": [{"ingredient": "cabbage", "quantity": "1", "unit": "cup"}],
+            "predicted_instructions": [{"instruction": "Roll and fry until golden."}],
+        },
+        model="gpt-test",
+        model_source="test",
+    )
+    saved = recipe_edit_service.load_recipe_output(url)
+
+    assert result["ok"] is True
+    assert menu_item["restaurant_name"] == "Vel Asian Cuisine"
+    assert menu_item["restaurant_address"] == "1 Main St, Indianapolis, IN"
+    assert menu_item["restaurant_online_payment_available"] == "false"
+    assert saved["restaurant_name"] == "Vel Asian Cuisine"
+    assert saved["restaurant_address"] == "1 Main St, Indianapolis, IN"
+    assert saved["restaurant_online_payment_available"] == "false"
+    assert saved["restaurant_delivery_available"] == "true"
+    assert saved["source_metadata"]["restaurant_name"] == "Vel Asian Cuisine"
+    assert saved["source_metadata"]["restaurant_address"] == "1 Main St, Indianapolis, IN"
+    assert saved["servings"]
+    assert saved["scaling"]["base_servings"] == saved["servings"]
 
 
 def test_menu_derived_recipe_loads_restaurant_and_menu_item_metadata(monkeypatch, tmp_path):

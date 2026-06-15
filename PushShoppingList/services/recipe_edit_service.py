@@ -59,6 +59,9 @@ from PushShoppingList.services.recipe_extract_service import normalize_extracted
 from PushShoppingList.services.recipe_extract_service import normalize_recipe_scaling_metadata
 from PushShoppingList.services.recipe_extract_service import PDF_KIND_GENERATED_RECIPE
 from PushShoppingList.services.recipe_extract_service import PDF_KIND_WEBPAGE_BACKUP
+from PushShoppingList.services.recipe_extract_service import RECIPE_INFO_EMPTY_VALUES
+from PushShoppingList.services.recipe_extract_service import RECIPE_INFO_ESTIMATE_ALIASES
+from PushShoppingList.services.recipe_extract_service import RECIPE_INFO_ESTIMATE_DEFAULTS
 from PushShoppingList.services.recipe_extract_service import recipe_archive_pdf_path
 from PushShoppingList.services.recipe_extract_service import recipe_cover_image_file_path
 from PushShoppingList.services.recipe_extract_service import recipe_pdf_path
@@ -1111,16 +1114,21 @@ def load_editable_recipe(url):
     cookbook_assignment = cookbook_recipe_assignment_for_url(url)
     pdf = editable_recipe_pdf_info(url, recipe_data)
     scaling = normalize_recipe_scaling_metadata(recipe_data.get("scaling"))
-    if recipe_data.get("servings") and not scaling.get("base_servings"):
-        scaling["base_servings"] = str(recipe_data.get("servings") or "").strip()
+    recipe_data_servings = recipe_info_clean_value(recipe_data.get("servings"), "servings")
+    if recipe_data_servings and not scaling.get("base_servings"):
+        scaling["base_servings"] = recipe_data_servings
     recipe_info = recipe_information_fields(recipe_data, url)
     for key in recipe_information_keys():
-        recipe_info[key] = recipe_info.get(key) or str(meta.get(key) or "").strip()
+        recipe_info[key] = recipe_info.get(key) or recipe_info_clean_value(meta.get(key), key)
     servings = (
-        str(recipe_data.get("servings") or "").strip()
-        or str(meta.get("servings") or "").strip()
-        or str(meta.get("base_servings") or "").strip()
+        recipe_data_servings
+        or recipe_info_clean_value(meta.get("servings"), "servings")
+        or recipe_info_clean_value(meta.get("base_servings"), "servings")
     )
+    if editor_recipe_info_defaults_available(recipe_data):
+        servings = servings or editor_recipe_info_default_value(recipe_data, "servings")
+        for key in recipe_information_keys():
+            recipe_info[key] = recipe_info.get(key) or editor_recipe_info_default_value(recipe_data, key)
     if servings and not scaling.get("base_servings"):
         scaling["base_servings"] = servings
     cover_image = editable_recipe_cover_image(url, recipe_data, meta)
@@ -1998,20 +2006,51 @@ def recipe_information_keys():
 
 
 def recipe_info_value(recipe_data, key):
-    aliases = {
-        "level": ("level", "difficulty", "recipe_difficulty"),
-        "total_time": ("total_time", "total", "recipe_total_time"),
-        "prep_time": ("prep_time", "prep", "recipe_prep_time"),
-        "inactive_time": ("inactive_time", "inactive", "recipe_inactive_time"),
-        "cook_time": ("cook_time", "cook", "recipe_cook_time"),
-    }
-
-    for alias in aliases.get(key, (key,)):
-        value = str(recipe_data.get(alias) or "").strip()
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    for alias in RECIPE_INFO_ESTIMATE_ALIASES.get(key, (key,)):
+        value = recipe_info_clean_value(recipe_data.get(alias), key)
         if value:
             return value
 
     return ""
+
+
+def recipe_info_clean_value(value, key=""):
+    if isinstance(value, bool) or value in (None, "", [], {}):
+        return ""
+
+    if isinstance(value, (int, float)):
+        if key == "servings":
+            return f"{value:g} servings"
+        if str(key).endswith("_time"):
+            return f"{value:g} min"
+
+    if isinstance(value, (list, dict)):
+        return ""
+
+    text = clean_recipe_menu_text(value)
+    if text.lower() in RECIPE_INFO_EMPTY_VALUES:
+        return ""
+    return text
+
+
+def editor_recipe_info_defaults_available(recipe_data):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    if not recipe_data.get("ingredients") or not recipe_data.get("instructions"):
+        return False
+
+    source_type = clean_recipe_menu_text(recipe_data.get("source_type")).lower()
+    recipe_status = clean_recipe_menu_text(recipe_data.get("recipe_status")).lower()
+    if source_type in {"menu_item_inferred", "menu_item_stub"}:
+        return True
+    if recipe_data.get("ai_inferred"):
+        return True
+    return recipe_status == "generated"
+
+
+def editor_recipe_info_default_value(recipe_data, key):
+    value = recipe_info_value(recipe_data, key)
+    return value or RECIPE_INFO_ESTIMATE_DEFAULTS.get(key, "")
 
 
 def extract_recipe_info_from_saved_text(url):

@@ -11314,7 +11314,7 @@ def menu_stub_item_from_recipe(stub):
         or metadata.get("predicted_equipment")
         or recipe_inference.get("equipment")
     )
-    return {
+    item = {
         "item_name": stub.get("menu_item_name") or stub.get("item_name") or stub.get("recipe_title") or "",
         "menu_section": stub.get("menu_section") or stub.get("section_name") or metadata.get("menu_section") or "",
         "section_description": stub.get("section_description") or "",
@@ -11338,6 +11338,15 @@ def menu_stub_item_from_recipe(stub):
             or ""
         ),
     }
+    for field in RESTAURANT_MENU_ITEM_TEXT_METADATA_FIELDS:
+        item[field] = stub.get(field) or metadata.get(field) or item.get(field) or ""
+    for field in RESTAURANT_MENU_ITEM_BOOL_METADATA_FIELDS:
+        if field in stub and stub.get(field) is not None:
+            item[field] = stub.get(field)
+        else:
+            item[field] = metadata.get(field)
+
+    return item
 
 
 def generate_menu_recipe_from_stub(recipe_url, stub, user_id=None):
