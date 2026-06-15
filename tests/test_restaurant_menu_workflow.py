@@ -192,7 +192,9 @@ def test_menu_workflow_static_hooks_are_present():
     assert "Custom Restaurant Menu Builder" in entry_template
     assert "recipe-import-action-menu-builder" in entry_template
     assert "selected_cookbook_menu_builder_route" in entry_template
-    assert entry_template.count("data-import-cookbook-id-field") == 4
+    assert 'id="customMenuBuilderImportForm"' in entry_template
+    assert 'onsubmit="prepareImportCookbookDestination()"' in entry_template
+    assert entry_template.count("data-import-cookbook-id-field") == 5
     assert ".recipe-import-action-menu-builder" in app_css
     assert "background: #155999" in app_css
     assert "Custom Restaurant Menu Builder" not in cookbooks_template
@@ -307,6 +309,19 @@ def test_cookbook_menu_builder_entry_selects_cookbook_inside_builder(monkeypatch
     assert "Vel Asian Cuisine" in body
     assert "Spring Roll" not in body
     assert "Create Restaurant Menu Page" not in body
+
+
+def test_cookbook_menu_builder_entry_uses_import_cookbook_query(monkeypatch, tmp_path):
+    user_id = configure_menu_builder_test_paths(monkeypatch, tmp_path)
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    with app.test_client() as client:
+        sign_in_menu_user(client, user_id)
+        response = client.get("/cookbooks/menu-builder?cookbook_id=vel-asian-cuisine")
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/cookbooks/vel-asian-cuisine/menu-builder")
 
 
 def test_cookbook_menu_builder_creates_cookbook_linked_menu(monkeypatch, tmp_path):

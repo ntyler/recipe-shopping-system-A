@@ -153,6 +153,7 @@ from PushShoppingList.services.menu_mega_json_service import unpack_mega_menu_js
 from PushShoppingList.services.openai_usage_service import openai_usage_dashboard_for_user
 from PushShoppingList.services.openai_usage_service import record_app_activity
 from PushShoppingList.services.openai_throttle_service import throttled_chat_completion
+from PushShoppingList.services.openai_model_service import model_value_for_env as active_model_value_for_env
 from PushShoppingList.services.storage_service import active_guest_session_id
 from PushShoppingList.services.storage_service import active_user_id
 from PushShoppingList.services.storage_service import workspace_data_root
@@ -166,6 +167,11 @@ IMPORT_LOGIN_ERROR = "Sign in before importing recipes so imported data is saved
 FOOD_REVIEW_LOGIN_ERROR = "Sign in before using food reviews so results stay tied to your account."
 IMPORT_CATEGORY_STATUS_MESSAGE = "Import complete. Generating ChatGPT categories..."
 IMAGE_RECIPE_WORKFLOW_STATES = {}
+
+
+def active_openai_model(env_var, default_model=""):
+    model, _source = active_model_value_for_env(env_var, default_model)
+    return model or default_model
 
 
 def static_asset_version(filename):
@@ -374,7 +380,7 @@ def _menu_nutrition_inference_from_rows(rows, model=""):
         "carbs_g": _nutrition_number(field_values["carbohydrates"]),
         "fat_g": _nutrition_number(field_values["fat"]),
         "sodium_mg": _nutrition_number(field_values["sodium"]),
-        "model": str(model or os.getenv("OPENAI_NUTRITION_MODEL", MODEL)),
+        "model": str(model or active_openai_model("OPENAI_NUTRITION_MODEL", MODEL)),
         "generated_at": _utc_now_iso(),
         "notes": ["Estimated per serving basis was generated lazily."],
     }
@@ -2931,6 +2937,7 @@ def api_estimate_per_serving_route():
         or ""
     ).strip()
     recipe = _extract_recipe_payload_for_nutrition(data)
+    nutrition_model = active_openai_model("OPENAI_NUTRITION_MODEL", MODEL)
 
     saved_recipe = {}
     if recipe_url:
@@ -2942,7 +2949,7 @@ def api_estimate_per_serving_route():
         saved_recipe = _recipe_with_default_serving_basis(saved_recipe)
         _mark_uploaded_recipe_nutrition_estimated(recipe_url, True)
         result = _existing_nutrition_success(saved_recipe, recipe_url)
-        result["model_used"] = str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL))
+        result["model_used"] = nutrition_model
         result["debug"] = {
             "model": result["model_used"],
             "recipe_url": recipe_url,
@@ -2959,9 +2966,9 @@ def api_estimate_per_serving_route():
             "ok": False,
             "success": False,
             "error": "Recipe payload is required.",
-            "model_used": str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL)),
+            "model_used": nutrition_model,
             "debug": {
-                "model": str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL)),
+                "model": nutrition_model,
                 "recipe_url": recipe_url,
             },
         })), 400
@@ -2980,7 +2987,7 @@ def api_estimate_per_serving_route():
                 })), 400
             _mark_uploaded_recipe_nutrition_estimated(recipe_url, True)
         result = _existing_nutrition_success(recipe, recipe_url)
-        result["model_used"] = str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL))
+        result["model_used"] = nutrition_model
         result["debug"] = {
             "model": result["model_used"],
             "recipe_url": recipe_url,
@@ -2988,7 +2995,7 @@ def api_estimate_per_serving_route():
         }
         return jsonify(with_openai_usage_dashboard(result)), 200
 
-    model_used = str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL))
+    model_used = nutrition_model
     result = estimate_recipe_nutrition(recipe)
 
     if result.get("ok") and recipe_url:
@@ -3046,7 +3053,7 @@ def api_create_recipe_pdf_route():
     status = 200 if result.get("ok") else 400
     result["success"] = bool(result.get("ok"))
     if "model_used" not in result:
-        result["model_used"] = str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL))
+        result["model_used"] = active_openai_model("OPENAI_NUTRITION_MODEL", MODEL)
 
     return jsonify(with_openai_usage_dashboard(result)), status
 

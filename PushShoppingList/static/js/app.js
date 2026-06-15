@@ -7491,6 +7491,14 @@ function importCookbookStoredDestination() {
     }
 }
 
+function clearImportCookbookStoredDestination() {
+    try {
+        localStorage.removeItem(IMPORT_COOKBOOK_STORAGE_KEY);
+    } catch (err) {
+        // localStorage can be unavailable in private or restricted contexts.
+    }
+}
+
 function importCookbookOptionMatches(button, destination) {
     if (!button) {
         return false;
@@ -7567,6 +7575,12 @@ function currentImportCookbookDestination() {
         cookbookId: selector.dataset.selectedCookbookId || "",
         cookbookName: selector.dataset.selectedCookbookName || "",
     });
+}
+
+function prepareImportCookbookDestination() {
+    const destination = currentImportCookbookDestination();
+    syncImportCookbookHiddenInputs(destination);
+    return destination;
 }
 
 function selectImportCookbookDestination(button) {
@@ -7671,6 +7685,18 @@ function bindImportCookbookSelector() {
         return;
     }
 
+    selector.querySelectorAll("[data-import-cookbook-option]").forEach(button => {
+        if (button.dataset.importCookbookBound === "1") {
+            return;
+        }
+        button.dataset.importCookbookBound = "1";
+        button.addEventListener("click", event => {
+            event.preventDefault();
+            event.stopPropagation();
+            selectImportCookbookDestination(button);
+        });
+    });
+
     const stored = importCookbookStoredDestination();
     const matchingOption = [...selector.querySelectorAll("[data-import-cookbook-option]")].find(button => {
         return importCookbookOptionMatches(button, stored);
@@ -7682,6 +7708,7 @@ function bindImportCookbookSelector() {
             cookbookName: matchingOption.dataset.cookbookName || stored.cookbookName || "",
         }, { persist: false });
     } else {
+        clearImportCookbookStoredDestination();
         setImportCookbookDestination(importCookbookDefaultDestination(), { persist: false });
     }
 }
@@ -8541,8 +8568,7 @@ function openMenuMediaPreviewUpload() {
 function submitMenuMediaPreviewUpload(input) {
     const form = document.getElementById("menuMediaPreviewForm");
     const fileInput = input && input.files ? input : document.getElementById("menuMediaPreviewInput");
-    const destination = currentImportCookbookDestination();
-    syncImportCookbookHiddenInputs(destination);
+    const destination = prepareImportCookbookDestination();
 
     if (!form || !fileInput || !fileInput.files || !fileInput.files.length) {
         return false;
@@ -8800,8 +8826,7 @@ async function submitRecipeMediaUpload(input, manualDescription = "", uploadMode
     }
 
     const file = fileInput.files[0];
-    const destination = currentImportCookbookDestination();
-    syncImportCookbookHiddenInputs(destination);
+    const destination = prepareImportCookbookDestination();
 
     const sourceTypeLabel = recipeUploadSourceTypeLabel(file);
     const fileLabel = file.name || "uploaded file";
@@ -9715,8 +9740,7 @@ async function submitRecipeMediaVision() {
         return;
     }
 
-    const destination = currentImportCookbookDestination();
-    syncImportCookbookHiddenInputs(destination);
+    const destination = prepareImportCookbookDestination();
 
     recipeMediaVisionInProgress = true;
     recipeMediaUploadPreview = null;
@@ -24972,8 +24996,7 @@ async function startRecipeExtractionUrls(urls, options = {}) {
     const endpoint = isMenuExtract ? "/api/jobs/menu-import" : "/api/jobs/recipe-import";
     const button = options.button || null;
     lastRecipeUrlExtractionMode = extractionMode;
-    const destination = currentImportCookbookDestination();
-    syncImportCookbookHiddenInputs(destination);
+    const destination = prepareImportCookbookDestination();
     console.log("[recipe_import] selected import cookbook", destination);
 
     showExtractionOverlay();

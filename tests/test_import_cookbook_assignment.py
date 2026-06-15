@@ -76,6 +76,8 @@ def test_import_cookbook_selector_static_hooks_are_present():
     assert "data-import-cookbook-selector" in template
     assert "Create New Cookbook" in template
     assert "Remove cookbook assignment" in template
+    assert 'id="customMenuBuilderImportForm"' in template
+    assert 'onsubmit="prepareImportCookbookDestination()"' in template
     assert 'formData.set("cookbook_id", destination.cookbookId || "")' in script
     assert 'cookbook_id: destination.cookbookId || ""' in script
     assert "bindImportCookbookSelector()" in script

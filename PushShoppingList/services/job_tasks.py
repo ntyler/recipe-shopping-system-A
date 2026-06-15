@@ -11,6 +11,7 @@ from PushShoppingList.services.job_service import get_job
 from PushShoppingList.services.job_service import job_cancelled
 from PushShoppingList.services.job_service import update_job_progress
 from PushShoppingList.services.file_lock_service import workspace_write_lock
+from PushShoppingList.services.openai_model_service import model_value_for_env as active_model_value_for_env
 
 
 class JobCancelled(Exception):
@@ -76,6 +77,11 @@ def model_metadata(model_used="", model_source="", model_env_var=""):
     }
 
 
+def active_model_metadata(env_var, default_model="", default_source=""):
+    model, source = active_model_value_for_env(env_var, default_model)
+    return model_metadata(model, source or default_source, env_var)
+
+
 def job_start_metadata(job):
     from PushShoppingList.services.recipe_extract_service import MODEL
     from PushShoppingList.services.recipe_extract_service import resolve_menu_cleanup_model
@@ -102,10 +108,10 @@ def job_start_metadata(job):
         return model_metadata(resolve_menu_model(), resolve_menu_model_source(), "OPENAI_MENU_MODEL")
 
     if job_type == "menu-deferred-heavy-tasks":
-        return model_metadata(
-            str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL)),
-            "env:OPENAI_NUTRITION_MODEL" if os.getenv("OPENAI_NUTRITION_MODEL") else "fallback:OPENAI_RECIPE_MODEL",
+        return active_model_metadata(
             "OPENAI_NUTRITION_MODEL",
+            MODEL,
+            "fallback:OPENAI_RECIPE_MODEL",
         )
 
     if job_type == "menu-import":
@@ -118,30 +124,28 @@ def job_start_metadata(job):
         return model_metadata(resolve_vision_model(), resolve_vision_model_source(), "OPENAI_VISION_MODEL")
 
     if job_type == "estimate-per-serving":
-        return model_metadata(
-            str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL)),
-            "env:OPENAI_NUTRITION_MODEL" if os.getenv("OPENAI_NUTRITION_MODEL") else "fallback:OPENAI_RECIPE_MODEL",
+        return active_model_metadata(
             "OPENAI_NUTRITION_MODEL",
+            MODEL,
+            "fallback:OPENAI_RECIPE_MODEL",
         )
 
     if job_type == "product-matching":
-        env_var = "OPENAI_PRODUCT_ANALYSIS_MODEL" if os.getenv("OPENAI_PRODUCT_ANALYSIS_MODEL") else "OPENAI_RECIPE_MODEL"
-        return model_metadata(
-            str(os.getenv("OPENAI_PRODUCT_ANALYSIS_MODEL") or os.getenv("OPENAI_RECIPE_MODEL") or "gpt-4o-mini"),
-            f"env:{env_var}",
-            env_var,
+        return active_model_metadata(
+            "OPENAI_PRODUCT_ANALYSIS_MODEL",
+            MODEL,
+            "fallback:OPENAI_RECIPE_MODEL",
         )
 
     if job_type == "recipe-category-decision":
-        model = str(os.getenv("OPENAI_RECIPE_CATEGORY_MODEL", MODEL))
-        return model_metadata(
-            model,
-            "env:OPENAI_RECIPE_CATEGORY_MODEL" if os.getenv("OPENAI_RECIPE_CATEGORY_MODEL") else "fallback:OPENAI_RECIPE_MODEL",
+        return active_model_metadata(
             "OPENAI_RECIPE_CATEGORY_MODEL",
+            MODEL,
+            "fallback:OPENAI_RECIPE_MODEL",
         )
 
     if job_type == "recipe-import" or job_type == "doc-photo-import":
-        return model_metadata(MODEL, "recipe", "OPENAI_RECIPE_MODEL")
+        return active_model_metadata("OPENAI_RECIPE_MODEL", MODEL, "recipe")
 
     return model_metadata("", "", "")
 
@@ -619,12 +623,15 @@ def run_menu_deferred_heavy_tasks_job(job_id, payload):
 
     total = len(recipe_urls)
     force_reprocess = payload_bool(payload, "force_reprocess", False)
-    nutrition_model = str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL))
-    nutrition_model_info = stored_job_model_metadata(job_id, model_metadata(
-        nutrition_model,
-        "env:OPENAI_NUTRITION_MODEL" if os.getenv("OPENAI_NUTRITION_MODEL") else "fallback:OPENAI_RECIPE_MODEL",
-        "OPENAI_NUTRITION_MODEL",
-    ))
+    nutrition_model_info = stored_job_model_metadata(
+        job_id,
+        active_model_metadata(
+            "OPENAI_NUTRITION_MODEL",
+            MODEL,
+            "fallback:OPENAI_RECIPE_MODEL",
+        ),
+    )
+    nutrition_model = nutrition_model_info.get("model_used") or MODEL
     nutrition_completed = 0
     pdfs_completed = 0
     uploads_completed = 0
@@ -1250,12 +1257,15 @@ def run_estimate_per_serving_job(job_id, payload):
     recipe_url = str(payload.get("recipe_url") or payload.get("url") or payload.get("source_url") or "").strip()
     recipe = _extract_recipe_payload_for_nutrition(payload)
     saved_recipe = {}
-    nutrition_model = str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL))
-    nutrition_model_info = stored_job_model_metadata(job_id, model_metadata(
-        nutrition_model,
-        "env:OPENAI_NUTRITION_MODEL" if os.getenv("OPENAI_NUTRITION_MODEL") else "fallback:OPENAI_RECIPE_MODEL",
-        "OPENAI_NUTRITION_MODEL",
-    ))
+    nutrition_model_info = stored_job_model_metadata(
+        job_id,
+        active_model_metadata(
+            "OPENAI_NUTRITION_MODEL",
+            MODEL,
+            "fallback:OPENAI_RECIPE_MODEL",
+        ),
+    )
+    nutrition_model = nutrition_model_info.get("model_used") or MODEL
 
     update_job_progress(
         job_id,
@@ -1382,20 +1392,20 @@ def run_upload_pdf_job(job_id, payload):
 
 
 def run_product_matching_job(job_id, payload):
-    import os
-
     from PushShoppingList.services.product_selection_service import grab_best_products
     from PushShoppingList.services.product_selection_service import PRODUCT_ANALYSIS_MODEL
 
     payload = payload if isinstance(payload, dict) else {}
     items = payload.get("items") if isinstance(payload.get("items"), list) else None
     total = len(items) if items else 0
-    product_model_env = "OPENAI_PRODUCT_ANALYSIS_MODEL" if os.getenv("OPENAI_PRODUCT_ANALYSIS_MODEL") else "OPENAI_RECIPE_MODEL"
-    product_model_info = stored_job_model_metadata(job_id, model_metadata(
-        PRODUCT_ANALYSIS_MODEL,
-        f"env:{product_model_env}",
-        product_model_env,
-    ))
+    product_model_info = stored_job_model_metadata(
+        job_id,
+        active_model_metadata(
+            "OPENAI_PRODUCT_ANALYSIS_MODEL",
+            PRODUCT_ANALYSIS_MODEL,
+            "fallback:OPENAI_RECIPE_MODEL",
+        ),
+    )
     update_job_progress(
         job_id,
         current_step="Matching products",
@@ -1428,7 +1438,14 @@ def run_recipe_category_decision_job(job_id, payload):
     payload = payload if isinstance(payload, dict) else {}
     recipe = payload.get("recipe", payload)
     mode = payload.get("mode", "missing")
-    category_model_info = stored_job_model_metadata(job_id, model_metadata(MODEL, "recipe", "OPENAI_RECIPE_MODEL"))
+    category_model_info = stored_job_model_metadata(
+        job_id,
+        active_model_metadata(
+            "OPENAI_RECIPE_CATEGORY_MODEL",
+            MODEL,
+            "fallback:OPENAI_RECIPE_MODEL",
+        ),
+    )
     update_job_progress(
         job_id,
         current_step="Having ChatGPT decide categories",

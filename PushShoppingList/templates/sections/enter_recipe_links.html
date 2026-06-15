@@ -59,7 +59,7 @@
         <span class="recipe-edit-cookbook-label">Save extracted recipes to cookbook:</span>
         <div class="recipe-url-summary-cookbook-value recipe-edit-cookbook-value recipe-import-cookbook-value recipe-url-summary-cookbook-menu-wrap recipe-edit-row-menu-wrap">
             <button type="button"
-                    class="recipe-url-summary-cookbook-select recipe-edit-cookbook-select recipe-import-cookbook-select"
+                    class="recipe-url-summary-cookbook-select recipe-edit-cookbook-select recipe-import-cookbook-select recipe-edit-row-menu-btn"
                     aria-label="Save extracted recipes to cookbook"
                     aria-haspopup="true"
                     aria-expanded="false"
@@ -181,7 +181,16 @@
         <form id="customMenuBuilderImportForm"
               class="recipe-media-upload-form"
               method="GET"
-              action="{{ url_for('menu_bp.selected_cookbook_menu_builder_route') }}">
+              action="{{ url_for('menu_bp.selected_cookbook_menu_builder_route') }}"
+              onsubmit="prepareImportCookbookDestination()">
+            <input type="hidden"
+                   name="cookbook_id"
+                   data-import-cookbook-id-field
+                   value="{{ import_unclassified_cookbook.id }}">
+            <input type="hidden"
+                   name="cookbook_name"
+                   data-import-cookbook-name-field
+                   value="{{ import_unclassified_cookbook.name }}">
             <button class="recipe-media-upload-btn recipe-import-action-menu-builder"
                     type="submit">
                 Custom Restaurant Menu Builder

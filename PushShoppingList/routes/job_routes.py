@@ -32,6 +32,7 @@ from PushShoppingList.services.recipe_extract_service import resolve_menu_model
 from PushShoppingList.services.recipe_extract_service import resolve_menu_model_source
 from PushShoppingList.services.recipe_extract_service import resolve_vision_model
 from PushShoppingList.services.recipe_extract_service import resolve_vision_model_source
+from PushShoppingList.services.openai_model_service import model_value_for_env as active_model_value_for_env
 from PushShoppingList.services.storage_service import active_guest_session_id
 from PushShoppingList.services.storage_service import active_user_id
 from PushShoppingList.services.storage_service import workspace_data_root
@@ -97,6 +98,26 @@ def with_model_metadata(payload, model_used="", model_source="", model_env_var="
         "model_env_var": str(model_env_var or "").strip(),
         "model_env_var_used": str(model_env_var or "").strip(),
     }
+
+
+def active_model_metadata_for_env(env_var, default_model="", default_source=""):
+    model, source = active_model_value_for_env(env_var, default_model)
+    return with_model_metadata(
+        {},
+        model_used=model,
+        model_source=source or default_source,
+        model_env_var=env_var,
+    )
+
+
+def with_active_model_metadata(payload, env_var, default_model="", default_source=""):
+    model, source = active_model_value_for_env(env_var, default_model)
+    return with_model_metadata(
+        payload,
+        model_used=model,
+        model_source=source or default_source,
+        model_env_var=env_var,
+    )
 
 
 def payload_truthy(payload, key, default=False):
@@ -244,11 +265,11 @@ def start_menu_deferred_heavy_tasks_job_route():
         "recipe_urls": urls,
         "force_reprocess": payload_truthy(payload, "force_reprocess", False),
     }
-    payload = with_model_metadata(
+    payload = with_active_model_metadata(
         payload,
-        model_used=str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL)),
-        model_source="env:OPENAI_NUTRITION_MODEL" if os.getenv("OPENAI_NUTRITION_MODEL") else "fallback:OPENAI_RECIPE_MODEL",
-        model_env_var="OPENAI_NUTRITION_MODEL",
+        "OPENAI_NUTRITION_MODEL",
+        MODEL,
+        "fallback:OPENAI_RECIPE_MODEL",
     )
     return create_and_enqueue("menu-deferred-heavy-tasks", payload, total_items=len(urls))
 
@@ -265,11 +286,11 @@ def start_recipe_import_job_route():
         "urls": urls,
         "extraction_mode": "recipe",
     }
-    payload = with_model_metadata(
+    payload = with_active_model_metadata(
         payload,
-        model_used=MODEL,
-        model_source="recipe",
-        model_env_var="OPENAI_RECIPE_MODEL",
+        "OPENAI_RECIPE_MODEL",
+        MODEL,
+        "recipe",
     )
     return create_and_enqueue("recipe-import", payload, total_items=len(urls))
 
@@ -318,7 +339,7 @@ def start_doc_photo_import_job_route():
     elif upload_mode == "image":
         payload = with_model_metadata(payload, resolve_vision_model(), resolve_vision_model_source(), "OPENAI_VISION_MODEL")
     else:
-        payload = with_model_metadata(payload, MODEL, "recipe", "OPENAI_RECIPE_MODEL")
+        payload = with_active_model_metadata(payload, "OPENAI_RECIPE_MODEL", MODEL, "recipe")
     return create_and_enqueue("doc-photo-import", payload, total_items=1)
 
 
@@ -327,11 +348,11 @@ def start_estimate_per_serving_job_route():
     payload = json_payload()
     if not payload.get("recipe") and not (payload.get("url") or payload.get("recipe_url") or payload.get("source_url")):
         return jsonify({"ok": False, "error": "Recipe payload or URL is required."}), 400
-    payload = with_model_metadata(
+    payload = with_active_model_metadata(
         payload,
-        model_used=str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL)),
-        model_source="env:OPENAI_NUTRITION_MODEL" if os.getenv("OPENAI_NUTRITION_MODEL") else "fallback:OPENAI_RECIPE_MODEL",
-        model_env_var="OPENAI_NUTRITION_MODEL",
+        "OPENAI_NUTRITION_MODEL",
+        MODEL,
+        "fallback:OPENAI_RECIPE_MODEL",
     )
     return create_and_enqueue("estimate-per-serving", payload, total_items=1)
 
@@ -372,12 +393,11 @@ def start_upload_generated_pdf_job_route():
 def start_product_matching_job_route():
     payload = json_payload()
     items = payload.get("items") if isinstance(payload.get("items"), list) else []
-    product_model_env = "OPENAI_PRODUCT_ANALYSIS_MODEL" if os.getenv("OPENAI_PRODUCT_ANALYSIS_MODEL") else "OPENAI_RECIPE_MODEL"
-    payload = with_model_metadata(
+    payload = with_active_model_metadata(
         payload,
-        model_used=str(os.getenv("OPENAI_PRODUCT_ANALYSIS_MODEL") or os.getenv("OPENAI_RECIPE_MODEL") or "gpt-4o-mini"),
-        model_source=f"env:{product_model_env}",
-        model_env_var=product_model_env,
+        "OPENAI_PRODUCT_ANALYSIS_MODEL",
+        MODEL,
+        "fallback:OPENAI_RECIPE_MODEL",
     )
     return create_and_enqueue("product-matching", payload, total_items=len(items))
 
@@ -387,7 +407,7 @@ def start_recipe_category_decision_job_route():
     payload = json_payload()
     if not payload:
         return jsonify({"ok": False, "error": "Recipe payload is required."}), 400
-    payload = with_model_metadata(payload, MODEL, "recipe", "OPENAI_RECIPE_MODEL")
+    payload = with_active_model_metadata(payload, "OPENAI_RECIPE_CATEGORY_MODEL", MODEL, "fallback:OPENAI_RECIPE_MODEL")
     return create_and_enqueue("recipe-category-decision", payload, total_items=1)
 
 
