@@ -62,4 +62,14 @@ def model_value_for_env(env_var, default_model="", default_source=""):
     snapshot = model_snapshot_for_env(env_var)
     if snapshot:
         return snapshot["model"], snapshot["source"]
+
+    try:
+        from PushShoppingList.services.openai_model_service import model_value_for_env as active_model_value_for_env
+
+        model, source = active_model_value_for_env(env_var, default_model)
+        if model:
+            return model, source
+    except Exception:
+        pass
+
     return str(default_model or "").strip(), str(default_source or "").strip()

@@ -707,8 +707,10 @@ def model_value_for_env(env_var, default_model=None):
     override = load_openai_model_overrides().get(env_var, "")
     env_model = str(os.getenv(env_var, "")).strip()
     if override:
-        if env_model == override:
-            return env_model, "environment"
+        if env_model != override:
+            os.environ[env_var] = override
+            refresh_openai_model_runtime_bindings()
+            return override, "admin override"
         return override, "admin override"
 
     if env_model:

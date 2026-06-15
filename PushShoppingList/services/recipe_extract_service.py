@@ -3782,7 +3782,7 @@ def download_social_video_audio(recipe_url):
 
 def send_audio_transcription_to_openai(audio_path):
     with audio_path.open("rb") as audio_file:
-        model = os.getenv("OPENAI_TRANSCRIPTION_MODEL", "whisper-1")
+        model, _model_source = model_value_for_env("OPENAI_TRANSCRIPTION_MODEL", "whisper-1")
         response = throttled_audio_transcription(
             get_openai_client(),
             {
