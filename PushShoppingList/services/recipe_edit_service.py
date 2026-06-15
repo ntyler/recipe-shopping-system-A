@@ -1,4 +1,5 @@
 import base64
+from copy import deepcopy
 import json
 import mimetypes
 import os
@@ -1108,11 +1109,13 @@ def load_editable_recipe(url):
     url = str(url or "").strip()
     recipe_data = load_recipe_output(url) or {"source_url": url}
     apply_recipe_pdf_asset_aliases(recipe_data)
+    source_url = str(recipe_data.get("source_url") or url).strip() or url
+    hydrate_source_pdf_assets_from_url(recipe_data, source_url)
     menu_metadata = editable_recipe_menu_metadata(recipe_data)
     log_recipe_pdf_fields("load_editable_recipe", recipe_data)
     meta = load_recipe_ingredients().get(normalize_recipe_url_key(url), {})
     cookbook_assignment = cookbook_recipe_assignment_for_url(url)
-    pdf = editable_recipe_pdf_info(url, recipe_data)
+    pdf = editable_recipe_pdf_info(source_url, recipe_data)
     scaling = normalize_recipe_scaling_metadata(recipe_data.get("scaling"))
     recipe_data_servings = recipe_info_clean_value(recipe_data.get("servings"), "servings")
     if recipe_data_servings and not scaling.get("base_servings"):
@@ -1340,6 +1343,131 @@ def editable_recipe_pdf_info(url, recipe_data=None):
         "generated_recipe": generated,
         "webpage_backup": webpage_backup,
     }
+
+
+def source_pdf_asset_reference_for_url(source_url, fallback_recipe_data=None):
+    source_url = str(source_url or "").strip()
+    fallback_recipe_data = fallback_recipe_data if isinstance(fallback_recipe_data, dict) else {}
+    reference = load_recipe_output(source_url) if source_url else None
+
+    if not isinstance(reference, dict):
+        reference = {}
+
+    apply_recipe_pdf_asset_aliases(reference)
+
+    reference_pdf_info = (
+        editable_recipe_pdf_kind_info(
+            source_url,
+            reference,
+            PDF_KIND_WEBPAGE_BACKUP,
+        )
+        if source_url
+        else {}
+    )
+
+    if not first_pdf_asset_value(
+        reference.get("source_pdf_path"),
+        reference.get("source_cloudflare_pdf_url"),
+        reference_pdf_info.get("path"),
+        reference_pdf_info.get("public_url"),
+    ):
+        fallback_reference = apply_recipe_pdf_asset_aliases(dict(fallback_recipe_data))
+        for field in (
+            "source_pdf_path",
+            "webpage_backup_pdf_path",
+            "pdf_path",
+            "source_cloudflare_pdf_url",
+            "source_cloudflare_pdf_path",
+            "webpage_backup_pdf_url",
+            "cloudflare_pdf_url",
+        ):
+            if clean_pdf_asset_value(reference.get(field)) or not clean_pdf_asset_value(fallback_reference.get(field)):
+                continue
+            reference[field] = fallback_reference.get(field)
+        if not isinstance(reference.get("pdf"), dict) and isinstance(fallback_reference.get("pdf"), dict):
+            reference["pdf"] = deepcopy(fallback_reference["pdf"])
+        apply_recipe_pdf_asset_aliases(reference)
+        reference_pdf_info = (
+            editable_recipe_pdf_kind_info(
+                source_url,
+                reference,
+                PDF_KIND_WEBPAGE_BACKUP,
+            )
+            if source_url
+            else {}
+        )
+
+    if source_url:
+        source_pdf_path = first_pdf_asset_value(
+            reference.get("source_pdf_path"),
+            reference_pdf_info.get("path"),
+        )
+        source_cloudflare_pdf_url = first_pdf_asset_value(
+            reference.get("source_cloudflare_pdf_url"),
+            reference_pdf_info.get("public_url"),
+        )
+        if source_pdf_path:
+            reference["source_pdf_path"] = source_pdf_path
+            reference["webpage_backup_pdf_path"] = source_pdf_path
+            reference["pdf_path"] = source_pdf_path
+        if source_cloudflare_pdf_url:
+            reference["source_cloudflare_pdf_url"] = source_cloudflare_pdf_url
+            reference["source_cloudflare_pdf_path"] = source_cloudflare_pdf_url
+            reference["webpage_backup_pdf_url"] = source_cloudflare_pdf_url
+            reference["cloudflare_pdf_url"] = source_cloudflare_pdf_url
+
+    return apply_recipe_pdf_asset_aliases(reference)
+
+
+def hydrate_source_pdf_assets_from_url(recipe_data, source_url=None):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    source_url = str(source_url or recipe_data.get("source_url") or "").strip()
+
+    if not source_url:
+        return recipe_data
+
+    apply_recipe_pdf_asset_aliases(recipe_data)
+    reference = source_pdf_asset_reference_for_url(source_url, recipe_data)
+    source_pdf_path = first_pdf_asset_value(reference.get("source_pdf_path"))
+    source_cloudflare_pdf_url = first_pdf_asset_value(reference.get("source_cloudflare_pdf_url"))
+
+    if source_pdf_path and not clean_pdf_asset_value(recipe_data.get("source_pdf_path")):
+        recipe_data["source_pdf_path"] = source_pdf_path
+        recipe_data["webpage_backup_pdf_path"] = source_pdf_path
+        recipe_data["pdf_path"] = source_pdf_path
+
+    if source_cloudflare_pdf_url and not clean_pdf_asset_value(recipe_data.get("source_cloudflare_pdf_url")):
+        recipe_data["source_cloudflare_pdf_url"] = source_cloudflare_pdf_url
+        recipe_data["source_cloudflare_pdf_path"] = source_cloudflare_pdf_url
+        recipe_data["webpage_backup_pdf_url"] = source_cloudflare_pdf_url
+        recipe_data["cloudflare_pdf_url"] = source_cloudflare_pdf_url
+
+    reference_pdf = reference.get("pdf") if isinstance(reference.get("pdf"), dict) else {}
+    if reference_pdf:
+        recipe_pdf = deepcopy(recipe_data.get("pdf")) if isinstance(recipe_data.get("pdf"), dict) else {}
+        for field in (
+            PDF_KIND_WEBPAGE_BACKUP,
+            "local_path",
+            "r2_object_key",
+            "r2_public_url",
+            "uploaded_at",
+            "cloud_status",
+            "cloudflare_r2",
+        ):
+            if field not in reference_pdf or recipe_pdf.get(field):
+                continue
+            recipe_pdf[field] = deepcopy(reference_pdf[field])
+        if recipe_pdf:
+            recipe_data["pdf"] = recipe_pdf
+
+    for field in (
+        "webpage_backup_pdf_object_key",
+        "webpage_backup_pdf_uploaded_at",
+    ):
+        if reference.get(field) and not recipe_data.get(field):
+            recipe_data[field] = reference.get(field)
+
+    return apply_recipe_pdf_asset_aliases(recipe_data)
 
 
 def editable_recipe_source_display_url(url):
@@ -2455,6 +2583,7 @@ def save_editable_recipe(original_url, payload):
         ).strip(),
     }
     apply_recipe_pdf_asset_payload(recipe_data, payload)
+    hydrate_source_pdf_assets_from_url(recipe_data, source_url)
     apply_recipe_menu_metadata_payload(recipe_data, payload)
     if cover_image:
         recipe_data["cover_image"] = cover_image

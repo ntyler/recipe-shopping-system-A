@@ -71,6 +71,53 @@ def write_sample_pdf(tmp_path, filename="sample.pdf"):
     return path
 
 
+def configure_recipe_editor_pdf_storage(monkeypatch, tmp_path):
+    output_dir = tmp_path / "output"
+    pdf_dir = tmp_path / "pdf"
+    output_dir.mkdir()
+    pdf_dir.mkdir()
+
+    monkeypatch.setattr(recipe_edit_service, "OUTPUT_FOLDER", output_dir)
+    monkeypatch.setattr(recipe_extract_service, "OUTPUT_FOLDER", output_dir)
+    monkeypatch.setattr(recipe_extract_service, "PDF_FOLDER", pdf_dir)
+    monkeypatch.setattr(recipe_edit_service, "load_recipe_ingredients", lambda: {})
+    monkeypatch.setattr(recipe_edit_service, "cookbook_recipe_assignment_for_url", lambda url: {})
+    monkeypatch.setattr(recipe_edit_service, "load_food_rules", lambda: {})
+    monkeypatch.setattr(recipe_edit_service, "save_recipe_url_quantity", lambda *args, **kwargs: None)
+    monkeypatch.setattr(recipe_edit_service, "save_recipe_url_name", lambda *args, **kwargs: None)
+    monkeypatch.setattr(recipe_edit_service, "update_recipe_ingredient_record", lambda *args, **kwargs: None)
+    monkeypatch.setattr(recipe_edit_service, "update_recipe_quantity", lambda *args, **kwargs: None)
+    monkeypatch.setattr(recipe_edit_service, "sync_saved_recipe_with_shopping_list", lambda *args, **kwargs: None)
+    monkeypatch.setattr(recipe_edit_service, "replace_recipe_url", lambda *args, **kwargs: None)
+    monkeypatch.setattr(recipe_edit_service, "move_recipe_meta", lambda *args, **kwargs: None)
+
+    return output_dir, pdf_dir
+
+
+def editable_recipe_pdf_payload(source_url, **overrides):
+    payload = {
+        "source_url": source_url,
+        "display_name": "Chili",
+        "recipe_title": "Chili",
+        "quantity": 1,
+        "servings": "",
+        "level": "",
+        "total_time": "",
+        "prep_time": "",
+        "inactive_time": "",
+        "cook_time": "",
+        "scaling": {},
+        "ingredients": [{"ingredient": "beans", "quantity": "1", "unit": "can"}],
+        "equipment": [],
+        "instructions": [{"instruction": "Simmer."}],
+        "nutrition": [],
+        "rating": 0,
+        "reflection_notes": [],
+    }
+    payload.update(overrides)
+    return payload
+
+
 def test_upload_pdf_reports_missing_environment(monkeypatch, tmp_path):
     for key in R2_ENV:
         monkeypatch.delenv(key, raising=False)
@@ -470,6 +517,114 @@ def test_legacy_pdf_fields_load_as_source_pdf_fields(monkeypatch, tmp_path):
     assert loaded["generated_pdf_path"] == ""
     assert loaded["generated_cloudflare_pdf_url"] == ""
     assert loaded["generated_cloudflare_pdf_path"] == ""
+
+
+def test_editable_recipe_load_hydrates_source_cloudflare_pdf_path_alias(monkeypatch, tmp_path):
+    configure_recipe_editor_pdf_storage(monkeypatch, tmp_path)
+    source_url = "https://example.com/recipes/chili"
+    source_pdf_path = "D:/recipes/chili-source.pdf"
+    source_cloudflare_url = "https://public.example.com/recipe-pdfs/chili-source.pdf"
+    recipe_edit_service.save_recipe_output(source_url, {
+        "source_url": source_url,
+        "recipe_title": "Chili",
+        "ingredients": [],
+        "instructions": [],
+        "source_pdf_path": source_pdf_path,
+        "source_cloudflare_pdf_path": source_cloudflare_url,
+    })
+
+    loaded = recipe_edit_service.load_editable_recipe(source_url)["recipe"]
+
+    assert loaded["source_url"] == source_url
+    assert loaded["source_pdf_path"] == source_pdf_path
+    assert loaded["source_cloudflare_pdf_url"] == source_cloudflare_url
+    assert loaded["source_cloudflare_pdf_path"] == source_cloudflare_url
+
+
+def test_save_editable_recipe_reuses_existing_source_pdf_when_editor_fields_are_blank(monkeypatch, tmp_path):
+    configure_recipe_editor_pdf_storage(monkeypatch, tmp_path)
+    source_url = "https://example.com/recipes/chili"
+    source_pdf_path = "D:/recipes/chili-source.pdf"
+    source_cloudflare_url = "https://public.example.com/recipe-pdfs/chili-source.pdf"
+    recipe_edit_service.save_recipe_output(source_url, {
+        "source_url": source_url,
+        "recipe_title": "Chili",
+        "ingredients": [],
+        "instructions": [],
+        "source_pdf_path": source_pdf_path,
+        "source_cloudflare_pdf_url": source_cloudflare_url,
+    })
+
+    result = recipe_edit_service.save_editable_recipe(
+        source_url,
+        editable_recipe_pdf_payload(
+            source_url,
+            source_pdf_path="",
+            source_cloudflare_pdf_url="",
+        ),
+    )
+    saved = recipe_edit_service.load_recipe_output(source_url)
+
+    assert result["ok"] is True
+    assert saved["source_pdf_path"] == source_pdf_path
+    assert saved["source_cloudflare_pdf_url"] == source_cloudflare_url
+    assert saved["source_cloudflare_pdf_path"] == source_cloudflare_url
+    assert saved["webpage_backup_pdf_path"] == source_pdf_path
+    assert saved["webpage_backup_pdf_url"] == source_cloudflare_url
+    assert result["recipe"]["source_cloudflare_pdf_url"] == source_cloudflare_url
+
+
+def test_save_editable_recipe_reuses_source_pdf_when_source_url_changes(monkeypatch, tmp_path):
+    configure_recipe_editor_pdf_storage(monkeypatch, tmp_path)
+    draft_url = "manual://recipe/draft-chili"
+    source_url = "https://example.com/recipes/chili"
+    source_pdf_path = "D:/recipes/chili-source.pdf"
+    source_cloudflare_url = "https://public.example.com/recipe-pdfs/chili-source.pdf"
+    recipe_edit_service.save_recipe_output(source_url, {
+        "source_url": source_url,
+        "recipe_title": "Existing Chili",
+        "ingredients": [],
+        "instructions": [],
+        "pdf": {
+            recipe_extract_service.PDF_KIND_WEBPAGE_BACKUP: {
+                "local_path": source_pdf_path,
+                "r2_object_key": "recipe-pdfs/chili-source.pdf",
+                "r2_public_url": source_cloudflare_url,
+                "uploaded_at": "2026-06-15T00:00:00Z",
+                "cloud_status": "uploaded",
+                "cloudflare_r2": {
+                    "object_key": "recipe-pdfs/chili-source.pdf",
+                    "public_url": source_cloudflare_url,
+                    "uploaded_at": "2026-06-15T00:00:00Z",
+                    "cloud_status": "uploaded",
+                },
+            },
+        },
+    })
+    recipe_edit_service.save_recipe_output(draft_url, {
+        "source_url": draft_url,
+        "recipe_title": "Draft Chili",
+        "ingredients": [],
+        "instructions": [],
+    })
+
+    result = recipe_edit_service.save_editable_recipe(
+        draft_url,
+        editable_recipe_pdf_payload(
+            source_url,
+            recipe_title="Draft Chili",
+            source_pdf_path="",
+            source_cloudflare_pdf_url="",
+        ),
+    )
+    saved = recipe_edit_service.load_recipe_output(source_url)
+
+    assert result["ok"] is True
+    assert saved["source_pdf_path"] == source_pdf_path
+    assert saved["source_cloudflare_pdf_url"] == source_cloudflare_url
+    assert saved["source_cloudflare_pdf_path"] == source_cloudflare_url
+    assert saved["pdf"][recipe_extract_service.PDF_KIND_WEBPAGE_BACKUP]["r2_public_url"] == source_cloudflare_url
+    assert result["recipe"]["source_cloudflare_pdf_url"] == source_cloudflare_url
 
 
 def test_split_pdf_payload_can_explicitly_clear_legacy_aliases():
