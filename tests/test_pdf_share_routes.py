@@ -176,7 +176,7 @@ def test_cloudflare_unlinked_pdf_routes_require_admin(monkeypatch, tmp_path):
     assert response.get_json()["success"] is False
 
 
-def test_cloudflare_unlinked_pdf_routes_scan_for_admin_and_disable_delete(monkeypatch, tmp_path):
+def test_cloudflare_unlinked_pdf_routes_scan_for_admin_and_delete_selected(monkeypatch, tmp_path):
     admin_user = {
         "user_id": "admin-1",
         "email": "ntylerbert@gmail.com",
@@ -196,18 +196,44 @@ def test_cloudflare_unlinked_pdf_routes_scan_for_admin_and_disable_delete(monkey
             ],
         },
     )
+    requested_keys = []
+    monkeypatch.setattr(
+        pdf_routes,
+        "delete_unlinked_cloudflare_pdfs",
+        lambda object_keys: requested_keys.extend(object_keys) or {
+            "ok": True,
+            "success": True,
+            "deleted_count": 1,
+            "failed_count": 0,
+            "skipped_count": 0,
+            "unlinked_pdf_count": 0,
+            "unlinked_pdfs": [],
+            "orphaned_pdf_count": 0,
+            "orphaned_pdfs": [],
+        },
+    )
 
     with app.test_client() as client:
         scan_response = client.get("/pdfs/cloudflare_unlinked", headers={"X-Requested-With": "fetch"})
         alias_response = client.get("/pdfs/cloudflare_orphans", headers={"X-Requested-With": "fetch"})
-        delete_response = client.post("/pdfs/cloudflare_orphans/delete", headers={"X-Requested-With": "fetch"})
+        delete_response = client.post(
+            "/pdfs/cloudflare_unlinked/delete",
+            json={"object_keys": ["recipe-pdfs/unlinked.pdf"]},
+            headers={"X-Requested-With": "fetch"},
+        )
+        alias_delete_response = client.post(
+            "/pdfs/cloudflare_orphans/delete",
+            json={"object_keys": ["recipe-pdfs/legacy-alias.pdf"]},
+            headers={"X-Requested-With": "fetch"},
+        )
 
     assert scan_response.status_code == 200
     assert scan_response.get_json()["unlinked_pdfs"][0]["object_key"] == "recipe-pdfs/unlinked.pdf"
     assert alias_response.status_code == 200
-    assert delete_response.status_code == 405
-    assert delete_response.get_json()["code"] == "delete_disabled"
-    assert delete_response.get_json()["deleted_count"] == 0
+    assert delete_response.status_code == 200
+    assert delete_response.get_json()["deleted_count"] == 1
+    assert alias_delete_response.status_code == 200
+    assert requested_keys == ["recipe-pdfs/unlinked.pdf", "recipe-pdfs/legacy-alias.pdf"]
 
 
 def test_local_recipe_pdf_download_requires_admin(monkeypatch, tmp_path):

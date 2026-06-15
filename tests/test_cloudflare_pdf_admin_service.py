@@ -93,19 +93,61 @@ def test_scan_unlinked_cloudflare_pdfs_uses_project_pdf_references(monkeypatch, 
     assert "Cloudflare unlinked PDF scan" in caplog.text
 
 
-def test_delete_orphaned_cloudflare_pdfs_is_disabled(monkeypatch):
+def test_delete_unlinked_cloudflare_pdfs_deletes_only_selected_current_unlinked(monkeypatch):
     deleted_keys = []
     monkeypatch.setattr(
         cloudflare_pdf_admin_service.cloudflare_r2_storage,
-        "delete_pdf",
+        "delete_pdf_object",
         lambda object_key: deleted_keys.append(object_key) or {"ok": True, "object_key": object_key},
     )
+    monkeypatch.setattr(
+        cloudflare_pdf_admin_service,
+        "scan_unlinked_cloudflare_pdfs",
+        lambda: {
+            "ok": True,
+            "success": True,
+            "checked_at": "2026-06-15T12:00:00Z",
+            "bucket": "recipe-shopping-pdfs",
+            "total_cloudflare_pdfs": 3,
+            "referenced_pdf_count": 1,
+            "reference_file_count": 2,
+            "unlinked_pdf_count": 2,
+            "unlinked_pdfs": [
+                {
+                    "object_key": "recipe-pdfs/unlinked.pdf",
+                    "filename": "unlinked.pdf",
+                    "public_url": "https://public.example.com/recipe-pdfs/unlinked.pdf",
+                },
+                {
+                    "object_key": "archive/menu.pdf",
+                    "filename": "menu.pdf",
+                    "public_url": "https://public.example.com/archive/menu.pdf",
+                },
+            ],
+        },
+    )
 
-    result = cloudflare_pdf_admin_service.delete_orphaned_cloudflare_pdfs()
+    result = cloudflare_pdf_admin_service.delete_unlinked_cloudflare_pdfs([
+        "recipe-pdfs/unlinked.pdf",
+        "recipe-pdfs/linked.pdf",
+        "archive/menu.pdf",
+    ])
+
+    assert result["ok"] is True
+    assert result["success"] is True
+    assert result["deleted_count"] == 2
+    assert result["skipped_count"] == 1
+    assert result["failed_count"] == 0
+    assert result["unlinked_pdf_count"] == 0
+    assert result["orphaned_pdf_count"] == 0
+    assert result["skipped_pdfs"][0]["object_key"] == "recipe-pdfs/linked.pdf"
+    assert deleted_keys == ["recipe-pdfs/unlinked.pdf", "archive/menu.pdf"]
+
+
+def test_delete_unlinked_cloudflare_pdfs_requires_selection():
+    result = cloudflare_pdf_admin_service.delete_unlinked_cloudflare_pdfs([])
 
     assert result["ok"] is False
     assert result["success"] is False
-    assert result["code"] == "delete_disabled"
+    assert result["code"] == "no_selection"
     assert result["deleted_count"] == 0
-    assert result["failed_count"] == 0
-    assert deleted_keys == []

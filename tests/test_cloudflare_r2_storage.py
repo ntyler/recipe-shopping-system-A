@@ -125,6 +125,21 @@ def test_delete_pdf_uses_configured_bucket(monkeypatch):
     }]
 
 
+def test_delete_pdf_object_allows_bucket_listed_pdf_paths(monkeypatch):
+    set_r2_env(monkeypatch)
+    fake_client = FakeR2Client()
+    monkeypatch.setattr(cloudflare_r2_storage, "r2_client", lambda: fake_client)
+
+    result = cloudflare_r2_storage.delete_pdf_object("archive/menu.pdf")
+
+    assert result["ok"] is True
+    assert result["public_url"] == "https://public.example.com/archive/menu.pdf"
+    assert fake_client.deletes == [{
+        "bucket": "recipe-shopping-pdfs",
+        "key": "archive/menu.pdf",
+    }]
+
+
 def test_list_pdf_objects_paginates_allowed_prefixes(monkeypatch):
     set_r2_env(monkeypatch)
     fake_client = FakeR2Client()

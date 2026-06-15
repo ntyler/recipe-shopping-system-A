@@ -50,7 +50,8 @@
                     class="pdf-share-action-btn danger"
                     data-cloudflare-orphan-pdf-delete
                     data-cloudflare-unlinked-pdf-delete
-                    title="PDF deletion is intentionally disabled for this read-only audit."
+                    title="Select one or more unlinked PDFs to delete."
+                    onclick="return deleteSelectedCloudflareUnlinkedPdfs(this)"
                     disabled>
                 Delete Selected Unlinked PDFs
             </button>

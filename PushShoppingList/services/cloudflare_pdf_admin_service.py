@@ -321,6 +321,20 @@ def log_unlinked_pdf_scan(result):
     )
 
 
+def log_unlinked_pdf_delete(result):
+    LOGGER.info(
+        "Cloudflare unlinked PDF delete deleted_at=%s bucket=%s requested=%s deleted=%s "
+        "failed=%s skipped=%s deleted_sample=%s",
+        result.get("deleted_at"),
+        result.get("bucket", ""),
+        result.get("requested_count", 0),
+        result.get("deleted_count", 0),
+        result.get("failed_count", 0),
+        result.get("skipped_count", 0),
+        [row.get("object_key", "") for row in result.get("deleted_pdfs", [])[:20]],
+    )
+
+
 def scan_unlinked_cloudflare_pdfs():
     list_result = cloudflare_r2_storage.list_all_pdf_objects()
     if not list_result.get("ok"):
@@ -361,16 +375,151 @@ def scan_orphaned_cloudflare_pdfs():
     return scan_unlinked_cloudflare_pdfs()
 
 
-def delete_orphaned_cloudflare_pdfs():
-    return {
+def normalize_requested_object_keys(object_keys):
+    if object_keys is None:
+        return []
+
+    if isinstance(object_keys, (str, bytes)):
+        object_keys = [object_keys]
+
+    normalized = []
+    seen = set()
+    for item in object_keys:
+        if isinstance(item, dict):
+            item = item.get("object_key")
+
+        key = str(item or "").strip().replace("\\", "/")
+        if not key or key in seen:
+            continue
+
+        seen.add(key)
+        normalized.append(key)
+
+    return normalized
+
+
+def delete_failure_result(code, error, requested_keys=None, scan_result=None):
+    scan_result = scan_result or {}
+    unlinked_pdfs = scan_result.get("unlinked_pdfs", [])
+    result = {
         "ok": False,
         "success": False,
-        "code": "delete_disabled",
-        "error": "Deleting unlinked PDFs is disabled. Use Check Unlinked PDFs for a read-only audit.",
+        "code": code,
+        "error": error,
+        "deleted_at": utc_now_iso(),
+        "checked_at": scan_result.get("checked_at", ""),
+        "bucket": scan_result.get("bucket", ""),
+        "total_cloudflare_pdfs": scan_result.get("total_cloudflare_pdfs", 0),
+        "referenced_pdf_count": scan_result.get("referenced_pdf_count", 0),
+        "reference_file_count": scan_result.get("reference_file_count", 0),
+        "requested_count": len(requested_keys or []),
         "deleted_count": 0,
         "failed_count": 0,
-        "unlinked_pdf_count": 0,
-        "unlinked_pdfs": [],
-        "orphaned_pdf_count": 0,
-        "orphaned_pdfs": [],
+        "skipped_count": 0,
+        "deleted_pdfs": [],
+        "failed_pdfs": [],
+        "skipped_pdfs": [],
+        "unlinked_pdf_count": len(unlinked_pdfs),
+        "unlinked_pdfs": unlinked_pdfs,
     }
+    return with_orphan_aliases(result)
+
+
+def delete_unlinked_cloudflare_pdfs(object_keys):
+    requested_keys = normalize_requested_object_keys(object_keys)
+    if not requested_keys:
+        result = delete_failure_result(
+            "no_selection",
+            "Select at least one unlinked PDF to delete.",
+            requested_keys,
+        )
+        log_unlinked_pdf_delete(result)
+        return result
+
+    scan_result = scan_unlinked_cloudflare_pdfs()
+    if not scan_result.get("ok"):
+        result = delete_failure_result(
+            scan_result.get("code", "scan_failed"),
+            scan_result.get("error", "Unable to check unlinked PDFs before deletion."),
+            requested_keys,
+            scan_result=scan_result,
+        )
+        log_unlinked_pdf_delete(result)
+        return result
+
+    unlinked_pdfs = scan_result.get("unlinked_pdfs", [])
+    unlinked_by_key = {
+        str(row.get("object_key") or "").strip().replace("\\", "/"): row
+        for row in unlinked_pdfs
+        if str(row.get("object_key") or "").strip()
+    }
+    deleted_pdfs = []
+    failed_pdfs = []
+    skipped_pdfs = []
+
+    for object_key in requested_keys:
+        row = unlinked_by_key.get(object_key)
+        if not row:
+            skipped_pdfs.append({
+                "object_key": object_key,
+                "reason": "PDF is no longer unlinked or was not found in the latest scan.",
+            })
+            continue
+
+        delete_result = cloudflare_r2_storage.delete_pdf_object(object_key)
+        if delete_result.get("ok"):
+            deleted_pdfs.append({
+                **row,
+                "public_url": delete_result.get("public_url", row.get("public_url", "")),
+            })
+        else:
+            failed_pdfs.append({
+                **row,
+                "code": delete_result.get("code", "delete_failed"),
+                "error": delete_result.get("error", "Unable to delete PDF from Cloudflare R2."),
+            })
+
+    deleted_keys = {row["object_key"] for row in deleted_pdfs}
+    remaining_unlinked_pdfs = [
+        row for row in unlinked_pdfs
+        if row.get("object_key") not in deleted_keys
+    ]
+    deleted_count = len(deleted_pdfs)
+    total_cloudflare_pdfs = max(int(scan_result.get("total_cloudflare_pdfs") or 0) - deleted_count, 0)
+    failed_count = len(failed_pdfs)
+    skipped_count = len(skipped_pdfs)
+    ok = failed_count == 0
+    message = f"Deleted {deleted_count} selected unlinked PDF{'s' if deleted_count != 1 else ''}."
+    if failed_count:
+        message = f"Deleted {deleted_count} selected unlinked PDFs; {failed_count} failed."
+    elif deleted_count == 0 and skipped_count:
+        message = "No selected PDFs were still unlinked in the latest scan."
+
+    result = with_orphan_aliases({
+        "ok": ok,
+        "success": ok,
+        "code": "" if ok else "delete_failed",
+        "error": "" if ok else message,
+        "message": message,
+        "deleted_at": utc_now_iso(),
+        "checked_at": scan_result.get("checked_at", ""),
+        "bucket": scan_result.get("bucket", ""),
+        "total_cloudflare_pdfs": total_cloudflare_pdfs,
+        "referenced_pdf_count": scan_result.get("referenced_pdf_count", 0),
+        "reference_file_count": scan_result.get("reference_file_count", 0),
+        "requested_count": len(requested_keys),
+        "deleted_count": deleted_count,
+        "failed_count": failed_count,
+        "skipped_count": skipped_count,
+        "deleted_pdfs": deleted_pdfs,
+        "failed_pdfs": failed_pdfs,
+        "skipped_pdfs": skipped_pdfs,
+        "unlinked_pdf_count": len(remaining_unlinked_pdfs),
+        "unlinked_pdfs": remaining_unlinked_pdfs,
+    })
+    log_unlinked_pdf_delete(result)
+    return result
+
+
+def delete_orphaned_cloudflare_pdfs():
+    return delete_unlinked_cloudflare_pdfs(None)

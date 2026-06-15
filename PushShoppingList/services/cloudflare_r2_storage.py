@@ -127,6 +127,18 @@ def validate_object_key(object_key, allowed_prefixes=ALLOWED_PDF_OBJECT_PREFIXES
     return key
 
 
+def validate_pdf_object_key(object_key):
+    key = str(object_key or "").strip().replace("\\", "/")
+
+    if not key or key.startswith("/") or ".." in key.split("/"):
+        raise CloudflareR2StorageError("Invalid Cloudflare R2 object key.")
+
+    if not key.lower().endswith(".pdf"):
+        raise CloudflareR2StorageError("Only PDF objects can be managed.")
+
+    return key
+
+
 def normalize_object_prefixes(prefixes=None):
     prefixes = prefixes or ALLOWED_PDF_OBJECT_PREFIXES
     normalized = []
@@ -400,6 +412,32 @@ def delete_pdf(object_key):
             "ok": True,
             "object_key": key,
             "public_url": get_public_url(key),
+        }
+    except CloudflareR2StorageError as exc:
+        code = "missing_env" if missing_env_vars() else "delete_failed"
+        return {
+            "ok": False,
+            "code": code,
+            "error": str(exc),
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "code": "delete_failed",
+            "error": f"Cloudflare R2 delete failed: {exc}",
+        }
+
+
+def delete_pdf_object(object_key):
+    try:
+        key = validate_pdf_object_key(object_key)
+        values = config_values()
+        r2_client().delete_object(Bucket=values["bucket_name"], Key=key)
+
+        return {
+            "ok": True,
+            "object_key": key,
+            "public_url": get_public_url_for_object_key(key),
         }
     except CloudflareR2StorageError as exc:
         code = "missing_env" if missing_env_vars() else "delete_failed"

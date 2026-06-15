@@ -707,7 +707,7 @@ body {
 
         .pdf-orphan-table {
             width: 100%;
-            min-width: 880px;
+            min-width: 920px;
             border-collapse: collapse;
             color: #e5edf2;
             font-size: 12px;
@@ -731,6 +731,20 @@ body {
 
         .pdf-orphan-table tbody tr:last-child td {
             border-bottom: 0;
+        }
+
+        .pdf-orphan-select {
+            width: 44px;
+            min-width: 44px;
+            text-align: center !important;
+        }
+
+        .pdf-orphan-select input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            margin: 0;
+            accent-color: #3b82f6;
+            cursor: pointer;
         }
 
         .pdf-orphan-row {
@@ -841,7 +855,7 @@ body {
 
         .pdf-share-action-btn:disabled {
             opacity: 0.65;
-            cursor: wait;
+            cursor: not-allowed;
         }
 
         .pdf-share-active,

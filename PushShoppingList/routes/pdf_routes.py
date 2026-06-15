@@ -18,6 +18,7 @@ from PushShoppingList.services.pdf_share_service import resolve_share_token
 from PushShoppingList.services.pdf_share_service import revoke_share_token
 from PushShoppingList.services.pdf_share_service import safe_resolve_pdf_path
 from PushShoppingList.services.cloudflare_pdf_admin_service import scan_unlinked_cloudflare_pdfs
+from PushShoppingList.services.cloudflare_pdf_admin_service import delete_unlinked_cloudflare_pdfs
 from PushShoppingList.services.recipe_edit_service import recipe_pdf_kind_for_filename
 from PushShoppingList.services.recipe_edit_service import recipe_url_for_pdf_filename
 from PushShoppingList.services.recipe_edit_service import upload_local_pdf_path_to_cloudflare
@@ -226,9 +227,42 @@ def cloudflare_unlinked_pdf_scan_response():
     return jsonify(result), 200 if result.get("ok") else 400
 
 
+def selected_cloudflare_pdf_object_keys_from_request():
+    payload = request.get_json(silent=True) or {}
+    object_keys = (
+        payload.get("object_keys")
+        or payload.get("pdf_object_keys")
+        or payload.get("object_key")
+    )
+
+    if object_keys is None:
+        object_keys = (
+            request.form.getlist("object_keys")
+            or request.form.getlist("pdf_object_keys")
+            or request.form.get("object_key")
+        )
+
+    return object_keys
+
+
+def cloudflare_unlinked_pdf_delete_response():
+    account_response = require_pdf_admin()
+
+    if not isinstance(account_response, dict):
+        return account_response
+
+    result = delete_unlinked_cloudflare_pdfs(selected_cloudflare_pdf_object_keys_from_request())
+    return jsonify(result), 200 if result.get("ok") else 400
+
+
 @pdf_bp.route("/pdfs/cloudflare_unlinked", methods=["GET"])
 def cloudflare_unlinked_pdfs_route():
     return cloudflare_unlinked_pdf_scan_response()
+
+
+@pdf_bp.route("/pdfs/cloudflare_unlinked/delete", methods=["POST"])
+def delete_cloudflare_unlinked_pdfs_route():
+    return cloudflare_unlinked_pdf_delete_response()
 
 
 @pdf_bp.route("/pdfs/cloudflare_orphans", methods=["GET"])
@@ -238,23 +272,7 @@ def cloudflare_orphan_pdfs_route():
 
 @pdf_bp.route("/pdfs/cloudflare_orphans/delete", methods=["POST"])
 def delete_cloudflare_orphan_pdfs_route():
-    account_response = require_pdf_admin()
-
-    if not isinstance(account_response, dict):
-        return account_response
-
-    return jsonify({
-        "ok": False,
-        "success": False,
-        "code": "delete_disabled",
-        "error": "Deleting unlinked PDFs is disabled. Use Check Unlinked PDFs for a read-only audit.",
-        "deleted_count": 0,
-        "failed_count": 0,
-        "unlinked_pdf_count": 0,
-        "unlinked_pdfs": [],
-        "orphaned_pdf_count": 0,
-        "orphaned_pdfs": [],
-    }), 405
+    return cloudflare_unlinked_pdf_delete_response()
 
 
 @pdf_bp.route("/share/pdf/<token>")

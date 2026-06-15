@@ -12220,6 +12220,48 @@ function appendCloudflarePdfCell(row, value, className = "") {
     return cell;
 }
 
+function cloudflareUnlinkedPdfCheckboxes(panel = cloudflareOrphanPdfPanel()) {
+    return Array.from(panel ? panel.querySelectorAll("[data-cloudflare-unlinked-pdf-key]") : []);
+}
+
+function selectedCloudflareUnlinkedPdfKeys(panel = cloudflareOrphanPdfPanel()) {
+    return cloudflareUnlinkedPdfCheckboxes(panel)
+        .filter((checkbox) => checkbox.checked && !checkbox.disabled)
+        .map((checkbox) => checkbox.value)
+        .filter(Boolean);
+}
+
+function updateCloudflareUnlinkedDeleteButton() {
+    const panel = cloudflareOrphanPdfPanel();
+    const deleteButton = panel ? panel.querySelector("[data-cloudflare-orphan-pdf-delete]") : null;
+    const checkboxes = cloudflareUnlinkedPdfCheckboxes(panel).filter((checkbox) => !checkbox.disabled);
+    const selectedKeys = selectedCloudflareUnlinkedPdfKeys(panel);
+    const selectAll = panel ? panel.querySelector("[data-cloudflare-unlinked-pdf-select-all]") : null;
+
+    if (deleteButton) {
+        deleteButton.disabled = selectedKeys.length === 0;
+        deleteButton.dataset.selectedPdfCount = String(selectedKeys.length);
+        deleteButton.title = selectedKeys.length > 0
+            ? `Delete ${selectedKeys.length} selected unlinked PDF${selectedKeys.length === 1 ? "" : "s"}.`
+            : "Select one or more unlinked PDFs to delete.";
+    }
+
+    if (selectAll) {
+        selectAll.checked = checkboxes.length > 0 && selectedKeys.length === checkboxes.length;
+        selectAll.indeterminate = selectedKeys.length > 0 && selectedKeys.length < checkboxes.length;
+    }
+}
+
+function toggleAllCloudflareUnlinkedPdfs(checkbox) {
+    const panel = cloudflareOrphanPdfPanel();
+    cloudflareUnlinkedPdfCheckboxes(panel).forEach((item) => {
+        if (!item.disabled) {
+            item.checked = Boolean(checkbox && checkbox.checked);
+        }
+    });
+    updateCloudflareUnlinkedDeleteButton();
+}
+
 function renderCloudflareOrphanPdfs(data) {
     const panel = cloudflareOrphanPdfPanel();
     const list = panel ? panel.querySelector("[data-cloudflare-orphan-pdf-list]") : null;
@@ -12248,6 +12290,7 @@ function renderCloudflareOrphanPdfs(data) {
         deleteButton.hidden = false;
         deleteButton.disabled = true;
         deleteButton.dataset.unlinkedPdfCount = String(unlinkedCount);
+        deleteButton.dataset.selectedPdfCount = "0";
     }
 
     if (!list) {
@@ -12261,6 +12304,7 @@ function renderCloudflareOrphanPdfs(data) {
     }
 
     if (unlinkedPdfs.length === 0) {
+        updateCloudflareUnlinkedDeleteButton();
         return;
     }
 
@@ -12268,6 +12312,16 @@ function renderCloudflareOrphanPdfs(data) {
     table.className = "pdf-orphan-table";
     const head = document.createElement("thead");
     const headRow = document.createElement("tr");
+    const selectHeader = document.createElement("th");
+    const selectAll = document.createElement("input");
+    selectHeader.scope = "col";
+    selectHeader.className = "pdf-orphan-select";
+    selectAll.type = "checkbox";
+    selectAll.setAttribute("aria-label", "Select all unlinked PDFs");
+    selectAll.setAttribute("data-cloudflare-unlinked-pdf-select-all", "true");
+    selectAll.addEventListener("change", () => toggleAllCloudflareUnlinkedPdfs(selectAll));
+    selectHeader.appendChild(selectAll);
+    headRow.appendChild(selectHeader);
     [
         "PDF filename",
         "R2 object key/path",
@@ -12287,6 +12341,18 @@ function renderCloudflareOrphanPdfs(data) {
     const body = document.createElement("tbody");
     unlinkedPdfs.forEach((pdf) => {
         const row = document.createElement("tr");
+        const objectKey = pdf.object_key || "";
+        const selectCell = document.createElement("td");
+        const checkbox = document.createElement("input");
+        selectCell.className = "pdf-orphan-select";
+        checkbox.type = "checkbox";
+        checkbox.value = objectKey;
+        checkbox.disabled = !objectKey;
+        checkbox.setAttribute("data-cloudflare-unlinked-pdf-key", objectKey);
+        checkbox.setAttribute("aria-label", `Select ${pdf.filename || objectKey || "PDF"} for deletion`);
+        checkbox.addEventListener("change", updateCloudflareUnlinkedDeleteButton);
+        selectCell.appendChild(checkbox);
+        row.appendChild(selectCell);
         const filenameCell = document.createElement("td");
         filenameCell.className = "pdf-orphan-filename";
         if (pdf.public_url) {
@@ -12301,7 +12367,7 @@ function renderCloudflareOrphanPdfs(data) {
             filenameCell.textContent = pdf.filename || "Unknown PDF";
         }
         row.appendChild(filenameCell);
-        appendCloudflarePdfCell(row, pdf.object_key || "Unknown key", "pdf-orphan-key");
+        appendCloudflarePdfCell(row, objectKey || "Unknown key", "pdf-orphan-key");
         appendCloudflarePdfCell(row, pdf.size_label || "Unknown size");
         appendCloudflarePdfCell(row, pdf.last_modified_label || "Unknown modified date");
         appendCloudflarePdfCell(row, pdf.suspected_type || "unknown", "pdf-orphan-type");
@@ -12314,6 +12380,7 @@ function renderCloudflareOrphanPdfs(data) {
     });
     table.appendChild(body);
     list.appendChild(table);
+    updateCloudflareUnlinkedDeleteButton();
 }
 
 async function checkCloudflareOrphanPdfs(button) {
@@ -12356,8 +12423,70 @@ async function checkCloudflareOrphanPdfs(button) {
     return false;
 }
 
-function deleteSelectedCloudflareUnlinkedPdfs() {
-    setCloudflareOrphanPdfStatus("Deleting unlinked PDFs is disabled for this read-only audit.", true);
+async function deleteSelectedCloudflareUnlinkedPdfs(button) {
+    const keys = selectedCloudflareUnlinkedPdfKeys();
+    const originalText = button ? button.textContent : "";
+
+    if (keys.length === 0) {
+        setCloudflareOrphanPdfStatus("Select at least one unlinked PDF to delete.", true);
+        updateCloudflareUnlinkedDeleteButton();
+        return false;
+    }
+
+    const selectionLabel = `${keys.length} selected unlinked PDF${keys.length === 1 ? "" : "s"}`;
+    if (!window.confirm(`Delete ${selectionLabel} from Cloudflare R2? This cannot be undone.`)) {
+        return false;
+    }
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Deleting...";
+    }
+    setCloudflareOrphanPdfStatus(`Deleting ${selectionLabel}...`);
+
+    try {
+        const response = await fetch("/pdfs/cloudflare_unlinked/delete", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "fetch",
+            },
+            body: JSON.stringify({
+                object_keys: keys,
+            }),
+        });
+        let data = {};
+        try {
+            data = await response.json();
+        } catch (_err) {
+            data = {};
+        }
+
+        if (Array.isArray(data.unlinked_pdfs) || Array.isArray(data.orphaned_pdfs)) {
+            renderCloudflareOrphanPdfs(data);
+        }
+
+        if (!response.ok || !data.ok) {
+            throw new Error(data.error || data.message || "Unable to delete selected unlinked PDFs.");
+        }
+
+        const deletedCount = Number(data.deleted_count || 0);
+        const skippedCount = Number(data.skipped_count || 0);
+        let message = data.message || `Deleted ${deletedCount} selected unlinked PDF${deletedCount === 1 ? "" : "s"}.`;
+        if (skippedCount > 0 && deletedCount > 0) {
+            message += ` ${skippedCount} skipped because they were no longer unlinked.`;
+        }
+        setCloudflareOrphanPdfStatus(message);
+    } catch (err) {
+        console.warn("Unable to delete selected Cloudflare unlinked PDFs.", err);
+        setCloudflareOrphanPdfStatus(err.message || "Unable to delete selected unlinked PDFs.", true);
+    } finally {
+        if (button && button.isConnected) {
+            button.textContent = originalText || "Delete Selected Unlinked PDFs";
+        }
+        updateCloudflareUnlinkedDeleteButton();
+    }
+
     return false;
 }
 
