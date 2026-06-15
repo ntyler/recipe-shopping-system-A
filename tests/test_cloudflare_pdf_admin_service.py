@@ -9,7 +9,8 @@ def write_json(path, payload):
     return path
 
 
-def test_scan_orphaned_cloudflare_pdfs_uses_recipe_and_menu_references(monkeypatch, tmp_path):
+def test_scan_unlinked_cloudflare_pdfs_uses_project_pdf_references(monkeypatch, tmp_path, caplog):
+    monkeypatch.setenv("R2_BUCKET_NAME", "recipe-shopping-pdfs")
     recipe_path = write_json(
         tmp_path / "user-a" / "recipe-extractor" / "data" / "output" / "recipe.json",
         {
@@ -20,6 +21,7 @@ def test_scan_orphaned_cloudflare_pdfs_uses_recipe_and_menu_references(monkeypat
                 },
             },
             "generated_cloudflare_pdf_url": "https://public.example.com/recipe-pdfs/generated.pdf",
+            "source_cloudflare_pdf_url": "https://public.example.com/recipe-pdfs/source%20with%20spaces.pdf",
         },
     )
     menu_path = write_json(
@@ -33,14 +35,26 @@ def test_scan_orphaned_cloudflare_pdfs_uses_recipe_and_menu_references(monkeypat
             ],
         },
     )
+    cookbook_path = write_json(
+        tmp_path / "user-c" / "cookbooks.json",
+        {
+            "items": [
+                {
+                    "pdf_generation": {
+                        "generated_cloudflare_pdf_path": "recipe-shopping-pdfs/other/generated-from-cookbook.pdf",
+                    },
+                }
+            ],
+        },
+    )
     monkeypatch.setattr(
         cloudflare_pdf_admin_service,
         "reference_json_paths",
-        lambda: [recipe_path, menu_path],
+        lambda: [recipe_path, menu_path, cookbook_path],
     )
     monkeypatch.setattr(
         cloudflare_pdf_admin_service.cloudflare_r2_storage,
-        "list_pdf_objects",
+        "list_all_pdf_objects",
         lambda: {
             "ok": True,
             "success": True,
@@ -48,46 +62,39 @@ def test_scan_orphaned_cloudflare_pdfs_uses_recipe_and_menu_references(monkeypat
             "objects": [
                 {"object_key": "recipe-pdfs/linked.pdf", "public_url": "", "size": 100},
                 {"object_key": "recipe-pdfs/generated.pdf", "public_url": "", "size": 200},
+                {"object_key": "recipe-pdfs/source with spaces.pdf", "public_url": "", "size": 250},
                 {"object_key": "menu-pdfs/menu-linked.pdf", "public_url": "", "size": 300},
-                {"object_key": "recipe-pdfs/orphan.pdf", "public_url": "", "size": 400},
+                {"object_key": "other/generated-from-cookbook.pdf", "public_url": "", "size": 350},
+                {
+                    "object_key": "unclassified/orphan.pdf",
+                    "public_url": "",
+                    "size": 400,
+                    "last_modified": "2026-06-01T12:30:00Z",
+                },
             ],
         },
     )
 
-    result = cloudflare_pdf_admin_service.scan_orphaned_cloudflare_pdfs()
+    with caplog.at_level("INFO"):
+        result = cloudflare_pdf_admin_service.scan_unlinked_cloudflare_pdfs()
 
     assert result["ok"] is True
-    assert result["total_cloudflare_pdfs"] == 4
-    assert result["referenced_pdf_count"] == 3
-    assert result["reference_file_count"] == 2
+    assert result["total_cloudflare_pdfs"] == 6
+    assert result["referenced_pdf_count"] == 5
+    assert result["reference_file_count"] == 3
+    assert result["unlinked_pdf_count"] == 1
     assert result["orphaned_pdf_count"] == 1
-    assert result["orphaned_pdfs"][0]["object_key"] == "recipe-pdfs/orphan.pdf"
-    assert result["orphaned_pdfs"][0]["size_label"] == "400 B"
+    assert result["unlinked_pdfs"][0]["filename"] == "orphan.pdf"
+    assert result["unlinked_pdfs"][0]["object_key"] == "unclassified/orphan.pdf"
+    assert result["unlinked_pdfs"][0]["size_label"] == "400 B"
+    assert result["unlinked_pdfs"][0]["last_modified_label"] == "2026-06-01T12:30:00Z"
+    assert result["unlinked_pdfs"][0]["suspected_type"] == "unknown"
+    assert "No matching normalized Cloudflare/R2 PDF reference" in result["unlinked_pdfs"][0]["reason"]
+    assert "Cloudflare unlinked PDF scan" in caplog.text
 
 
-def test_delete_orphaned_cloudflare_pdfs_deletes_current_orphans(monkeypatch):
+def test_delete_orphaned_cloudflare_pdfs_is_disabled(monkeypatch):
     deleted_keys = []
-    monkeypatch.setattr(
-        cloudflare_pdf_admin_service,
-        "scan_orphaned_cloudflare_pdfs",
-        lambda: {
-            "ok": True,
-            "success": True,
-            "bucket": "recipe-shopping-pdfs",
-            "total_cloudflare_pdfs": 2,
-            "referenced_pdf_count": 1,
-            "reference_file_count": 1,
-            "orphaned_pdf_count": 1,
-            "orphaned_pdfs": [
-                {
-                    "object_key": "recipe-pdfs/orphan.pdf",
-                    "public_url": "https://public.example.com/recipe-pdfs/orphan.pdf",
-                    "size": 400,
-                    "size_label": "400 B",
-                }
-            ],
-        },
-    )
     monkeypatch.setattr(
         cloudflare_pdf_admin_service.cloudflare_r2_storage,
         "delete_pdf",
@@ -96,10 +103,9 @@ def test_delete_orphaned_cloudflare_pdfs_deletes_current_orphans(monkeypatch):
 
     result = cloudflare_pdf_admin_service.delete_orphaned_cloudflare_pdfs()
 
-    assert result["ok"] is True
-    assert result["success"] is True
-    assert result["deleted_count"] == 1
+    assert result["ok"] is False
+    assert result["success"] is False
+    assert result["code"] == "delete_disabled"
+    assert result["deleted_count"] == 0
     assert result["failed_count"] == 0
-    assert result["orphaned_pdf_count"] == 0
-    assert result["orphaned_pdfs"] == []
-    assert deleted_keys == ["recipe-pdfs/orphan.pdf"]
+    assert deleted_keys == []

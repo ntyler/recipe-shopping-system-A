@@ -1,7 +1,9 @@
 import json
+import logging
 from datetime import datetime
 from datetime import timezone
 from pathlib import Path
+from pathlib import PurePosixPath
 from urllib.parse import unquote
 from urllib.parse import urlparse
 
@@ -11,6 +13,10 @@ from PushShoppingList.services.storage_service import GUEST_DATA_DIR
 from PushShoppingList.services.storage_service import LEGACY_EXTRACTOR_DIR
 from PushShoppingList.services.storage_service import PACKAGE_DIR
 from PushShoppingList.services.storage_service import USER_DATA_DIR
+
+
+LOGGER = logging.getLogger(__name__)
+UNLINKED_PDF_REASON = "No matching normalized Cloudflare/R2 PDF reference was found in app JSON records."
 
 
 def utc_now_iso():
@@ -49,28 +55,76 @@ def workspace_roots():
     return roots
 
 
+def reference_json_paths_for_root(root):
+    root = Path(root)
+    paths = list(root.glob("*.json"))
+    data_dir = root / "recipe-extractor" / "data"
+
+    paths.extend(data_dir.glob("*.json"))
+    for subdir in ("output", "menus", "menu_output"):
+        paths.extend((data_dir / subdir).glob("*.json"))
+
+    return paths
+
+
 def reference_json_paths():
-    paths = [
-        PACKAGE_DIR / "restaurant_menus.json",
-        LEGACY_EXTRACTOR_DIR / "data" / "pdf_share_links.json",
-    ]
+    paths = []
+    paths.extend((LEGACY_EXTRACTOR_DIR / "data").glob("*.json"))
     paths.extend((LEGACY_EXTRACTOR_DIR / "data" / "output").glob("*.json"))
 
     for root in workspace_roots():
-        paths.append(root / "restaurant_menus.json")
-        paths.append(root / "recipe-extractor" / "data" / "pdf_share_links.json")
-        paths.extend((root / "recipe-extractor" / "data" / "output").glob("*.json"))
+        paths.extend(reference_json_paths_for_root(root))
 
     return existing_json_paths(paths)
 
 
-def pdf_object_keys_from_string(value):
-    keys = set()
-    text = str(value or "").strip()
+def normalized_reference_path(value):
+    text = str(value or "").replace("\\", "/").strip()
     if not text:
-        return keys
+        return ""
 
-    candidates = set()
+    text = text.split("?", 1)[0].split("#", 1)[0]
+    return unquote(text).lstrip("/")
+
+
+def configured_public_base_paths():
+    paths = []
+    public_base_url = cloudflare_r2_storage.config_values().get("public_base_url", "")
+    parsed = urlparse(public_base_url)
+    base_path = normalized_reference_path(parsed.path)
+
+    if base_path:
+        paths.append(base_path.rstrip("/"))
+
+    return paths
+
+
+def expand_candidate_path(candidate, allow_suffix=False):
+    candidate = normalized_reference_path(candidate)
+    if not candidate:
+        return []
+
+    expanded = [(candidate, allow_suffix)]
+    bucket = str(cloudflare_r2_storage.config_values().get("bucket_name") or "").strip().strip("/")
+
+    if bucket and candidate.startswith(f"{bucket}/"):
+        expanded.append((candidate[len(bucket) + 1:], allow_suffix))
+
+    for base_path in configured_public_base_paths():
+        if candidate == base_path:
+            continue
+        if candidate.startswith(f"{base_path}/"):
+            expanded.append((candidate[len(base_path) + 1:], allow_suffix))
+
+    return expanded
+
+
+def reference_candidate_paths(value):
+    text = str(value or "").strip()
+    if not text or ".pdf" not in text.lower():
+        return []
+
+    candidates = []
     for raw_value in (text, unquote(text)):
         normalized = raw_value.replace("\\", "/").strip()
         if not normalized:
@@ -78,11 +132,63 @@ def pdf_object_keys_from_string(value):
 
         parsed = urlparse(normalized)
         if parsed.scheme in {"http", "https"} and parsed.netloc:
-            candidates.add(unquote(parsed.path).lstrip("/"))
+            candidates.extend(expand_candidate_path(parsed.path, allow_suffix=True))
 
-        candidates.add(normalized.split("?", 1)[0].split("#", 1)[0].lstrip("/"))
+        candidates.extend(expand_candidate_path(normalized, allow_suffix=False))
 
-    for candidate in candidates:
+    deduped = []
+    seen = set()
+    for candidate, allow_suffix in candidates:
+        marker = (candidate, allow_suffix)
+        if marker in seen:
+            continue
+        seen.add(marker)
+        deduped.append(marker)
+
+    return deduped
+
+
+def normalized_object_key(object_key):
+    return normalized_reference_path(object_key)
+
+
+def known_object_key_lookup(known_object_keys):
+    lookup = {}
+
+    for object_key in known_object_keys or []:
+        key = str(object_key or "").strip().replace("\\", "/")
+        if not key:
+            continue
+        normalized = normalized_object_key(key)
+        if not normalized:
+            continue
+        lookup.setdefault(normalized, set()).add(key)
+
+    return lookup
+
+
+def candidate_suffixes(candidate):
+    parts = [part for part in str(candidate or "").split("/") if part]
+    for index in range(len(parts)):
+        yield "/".join(parts[index:])
+
+
+def known_pdf_object_keys_from_string(value, lookup):
+    keys = set()
+
+    for candidate, allow_suffix in reference_candidate_paths(value):
+        keys.update(lookup.get(candidate, set()))
+        if allow_suffix:
+            for suffix in candidate_suffixes(candidate):
+                keys.update(lookup.get(suffix, set()))
+
+    return keys
+
+
+def allowed_prefix_pdf_object_keys_from_string(value):
+    keys = set()
+
+    for candidate, _allow_suffix in reference_candidate_paths(value):
         for prefix in cloudflare_r2_storage.ALLOWED_PDF_OBJECT_PREFIXES:
             start = candidate.find(prefix)
             while start >= 0:
@@ -99,28 +205,36 @@ def pdf_object_keys_from_string(value):
     return keys
 
 
-def pdf_object_keys_from_value(value):
+def pdf_object_keys_from_string(value, known_lookup=None):
+    if known_lookup is not None:
+        return known_pdf_object_keys_from_string(value, known_lookup)
+
+    return allowed_prefix_pdf_object_keys_from_string(value)
+
+
+def pdf_object_keys_from_value(value, known_lookup=None):
     keys = set()
 
     if isinstance(value, dict):
         for child in value.values():
-            keys.update(pdf_object_keys_from_value(child))
+            keys.update(pdf_object_keys_from_value(child, known_lookup=known_lookup))
         return keys
 
     if isinstance(value, list):
         for child in value:
-            keys.update(pdf_object_keys_from_value(child))
+            keys.update(pdf_object_keys_from_value(child, known_lookup=known_lookup))
         return keys
 
     if isinstance(value, str):
-        keys.update(pdf_object_keys_from_string(value))
+        keys.update(pdf_object_keys_from_string(value, known_lookup=known_lookup))
 
     return keys
 
 
-def referenced_pdf_object_keys(paths=None):
+def referenced_pdf_object_keys(paths=None, known_object_keys=None):
     references = {}
     paths = list(paths) if paths is not None else reference_json_paths()
+    lookup = known_object_key_lookup(known_object_keys) if known_object_keys is not None else None
 
     for path in existing_json_paths(paths):
         try:
@@ -128,84 +242,135 @@ def referenced_pdf_object_keys(paths=None):
         except Exception:
             continue
 
-        for object_key in pdf_object_keys_from_value(payload):
+        for object_key in pdf_object_keys_from_value(payload, known_lookup=lookup):
             references.setdefault(object_key, []).append(str(path))
 
     return references
 
 
+def suspected_pdf_type(object_key):
+    key = str(object_key or "").strip().replace("\\", "/")
+    lower_key = key.lower()
+    filename = PurePosixPath(key).name.lower()
+
+    if lower_key.startswith(cloudflare_r2_storage.MENU_PDF_OBJECT_PREFIX):
+        return "menu PDF"
+
+    if "generated" in filename or "generated_recipe" in lower_key:
+        return "generated recipe PDF"
+
+    if any(marker in filename for marker in ("source", "webpage", "backup", "archive")):
+        return "source PDF"
+
+    if lower_key.startswith(cloudflare_r2_storage.PDF_OBJECT_PREFIX):
+        return "source PDF"
+
+    if "menu" in lower_key:
+        return "menu PDF"
+
+    return "unknown"
+
+
 def enrich_r2_pdf_object(row):
     row = dict(row or {})
+    object_key = str(row.get("object_key") or "").strip().replace("\\", "/")
     size = int(row.get("size") or 0)
+    row["object_key"] = object_key
+    row["filename"] = PurePosixPath(object_key).name or object_key
     row["size"] = size
     row["size_label"] = format_file_size(size) if size else "Unknown size"
     row["last_modified_label"] = str(row.get("last_modified") or "").strip() or "Unknown modified date"
+    row["suspected_type"] = suspected_pdf_type(object_key)
+    row["reason"] = UNLINKED_PDF_REASON
     return row
 
 
-def scan_orphaned_cloudflare_pdfs():
-    list_result = cloudflare_r2_storage.list_pdf_objects()
-    if not list_result.get("ok"):
-        return {
-            **list_result,
-            "checked_at": utc_now_iso(),
-            "referenced_pdf_count": 0,
-            "reference_file_count": 0,
-            "orphaned_pdf_count": 0,
-            "orphaned_pdfs": [],
-        }
+def unlinked_failure_result(list_result):
+    return {
+        **list_result,
+        "checked_at": utc_now_iso(),
+        "referenced_pdf_count": 0,
+        "reference_file_count": 0,
+        "total_cloudflare_pdfs": 0,
+        "unlinked_pdf_count": 0,
+        "unlinked_pdfs": [],
+        "orphaned_pdf_count": 0,
+        "orphaned_pdfs": [],
+    }
 
-    references = referenced_pdf_object_keys()
-    orphaned_pdfs = [
+
+def with_orphan_aliases(result):
+    return {
+        **result,
+        "orphaned_pdf_count": result.get("unlinked_pdf_count", 0),
+        "orphaned_pdfs": result.get("unlinked_pdfs", []),
+    }
+
+
+def log_unlinked_pdf_scan(result):
+    LOGGER.info(
+        "Cloudflare unlinked PDF scan checked_at=%s bucket=%s total=%s referenced=%s "
+        "unlinked=%s reference_files=%s unlinked_sample=%s",
+        result.get("checked_at"),
+        result.get("bucket", ""),
+        result.get("total_cloudflare_pdfs", 0),
+        result.get("referenced_pdf_count", 0),
+        result.get("unlinked_pdf_count", 0),
+        result.get("reference_file_count", 0),
+        [row.get("object_key", "") for row in result.get("unlinked_pdfs", [])[:20]],
+    )
+
+
+def scan_unlinked_cloudflare_pdfs():
+    list_result = cloudflare_r2_storage.list_all_pdf_objects()
+    if not list_result.get("ok"):
+        result = with_orphan_aliases(unlinked_failure_result(list_result))
+        log_unlinked_pdf_scan(result)
+        return result
+
+    pdf_objects = list_result.get("objects", [])
+    known_object_keys = [
+        str(row.get("object_key") or "").strip().replace("\\", "/")
+        for row in pdf_objects
+        if str(row.get("object_key") or "").strip()
+    ]
+    reference_paths = reference_json_paths()
+    references = referenced_pdf_object_keys(paths=reference_paths, known_object_keys=known_object_keys)
+    unlinked_pdfs = [
         enrich_r2_pdf_object(row)
-        for row in list_result.get("objects", [])
+        for row in pdf_objects
         if row.get("object_key") not in references
     ]
 
-    return {
+    result = with_orphan_aliases({
         "ok": True,
         "success": True,
         "checked_at": utc_now_iso(),
         "bucket": list_result.get("bucket", ""),
-        "total_cloudflare_pdfs": len(list_result.get("objects", [])),
+        "total_cloudflare_pdfs": len(pdf_objects),
         "referenced_pdf_count": len(references),
-        "reference_file_count": len(reference_json_paths()),
-        "orphaned_pdf_count": len(orphaned_pdfs),
-        "orphaned_pdfs": orphaned_pdfs,
-    }
+        "reference_file_count": len(reference_paths),
+        "unlinked_pdf_count": len(unlinked_pdfs),
+        "unlinked_pdfs": unlinked_pdfs,
+    })
+    log_unlinked_pdf_scan(result)
+    return result
+
+
+def scan_orphaned_cloudflare_pdfs():
+    return scan_unlinked_cloudflare_pdfs()
 
 
 def delete_orphaned_cloudflare_pdfs():
-    scan = scan_orphaned_cloudflare_pdfs()
-    if not scan.get("ok"):
-        return scan
-
-    deleted_pdfs = []
-    failed_pdfs = []
-
-    for row in scan.get("orphaned_pdfs", []):
-        object_key = row.get("object_key", "")
-        delete_result = cloudflare_r2_storage.delete_pdf(object_key)
-        if delete_result.get("ok"):
-            deleted_pdfs.append({
-                **row,
-                "delete_result": delete_result,
-            })
-        else:
-            failed_pdfs.append({
-                **row,
-                "error": delete_result.get("error", "Unable to delete PDF."),
-                "delete_result": delete_result,
-            })
-
     return {
-        **scan,
-        "ok": True,
-        "success": not failed_pdfs,
-        "deleted_count": len(deleted_pdfs),
-        "failed_count": len(failed_pdfs),
-        "deleted_pdfs": deleted_pdfs,
-        "failed_pdfs": failed_pdfs,
-        "orphaned_pdf_count": len(failed_pdfs),
-        "orphaned_pdfs": failed_pdfs,
+        "ok": False,
+        "success": False,
+        "code": "delete_disabled",
+        "error": "Deleting unlinked PDFs is disabled. Use Check Unlinked PDFs for a read-only audit.",
+        "deleted_count": 0,
+        "failed_count": 0,
+        "unlinked_pdf_count": 0,
+        "unlinked_pdfs": [],
+        "orphaned_pdf_count": 0,
+        "orphaned_pdfs": [],
     }

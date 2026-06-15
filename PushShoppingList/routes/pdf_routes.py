@@ -17,8 +17,7 @@ from PushShoppingList.services.pdf_share_service import record_share_access
 from PushShoppingList.services.pdf_share_service import resolve_share_token
 from PushShoppingList.services.pdf_share_service import revoke_share_token
 from PushShoppingList.services.pdf_share_service import safe_resolve_pdf_path
-from PushShoppingList.services.cloudflare_pdf_admin_service import delete_orphaned_cloudflare_pdfs
-from PushShoppingList.services.cloudflare_pdf_admin_service import scan_orphaned_cloudflare_pdfs
+from PushShoppingList.services.cloudflare_pdf_admin_service import scan_unlinked_cloudflare_pdfs
 from PushShoppingList.services.recipe_edit_service import recipe_pdf_kind_for_filename
 from PushShoppingList.services.recipe_edit_service import recipe_url_for_pdf_filename
 from PushShoppingList.services.recipe_edit_service import upload_local_pdf_path_to_cloudflare
@@ -217,15 +216,24 @@ def upload_pdf_to_cloudflare_route():
     return jsonify(result), status
 
 
-@pdf_bp.route("/pdfs/cloudflare_orphans", methods=["GET"])
-def cloudflare_orphan_pdfs_route():
+def cloudflare_unlinked_pdf_scan_response():
     account_response = require_pdf_admin()
 
     if not isinstance(account_response, dict):
         return account_response
 
-    result = scan_orphaned_cloudflare_pdfs()
+    result = scan_unlinked_cloudflare_pdfs()
     return jsonify(result), 200 if result.get("ok") else 400
+
+
+@pdf_bp.route("/pdfs/cloudflare_unlinked", methods=["GET"])
+def cloudflare_unlinked_pdfs_route():
+    return cloudflare_unlinked_pdf_scan_response()
+
+
+@pdf_bp.route("/pdfs/cloudflare_orphans", methods=["GET"])
+def cloudflare_orphan_pdfs_route():
+    return cloudflare_unlinked_pdf_scan_response()
 
 
 @pdf_bp.route("/pdfs/cloudflare_orphans/delete", methods=["POST"])
@@ -235,8 +243,18 @@ def delete_cloudflare_orphan_pdfs_route():
     if not isinstance(account_response, dict):
         return account_response
 
-    result = delete_orphaned_cloudflare_pdfs()
-    return jsonify(result), 200 if result.get("ok") else 400
+    return jsonify({
+        "ok": False,
+        "success": False,
+        "code": "delete_disabled",
+        "error": "Deleting unlinked PDFs is disabled. Use Check Unlinked PDFs for a read-only audit.",
+        "deleted_count": 0,
+        "failed_count": 0,
+        "unlinked_pdf_count": 0,
+        "unlinked_pdfs": [],
+        "orphaned_pdf_count": 0,
+        "orphaned_pdfs": [],
+    }), 405
 
 
 @pdf_bp.route("/share/pdf/<token>")

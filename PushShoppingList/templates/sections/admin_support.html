@@ -33,6 +33,33 @@
         </div>
     {% endif %}
 
+    <div class="admin-support-audit pdf-orphan-admin" data-cloudflare-orphan-pdf-admin>
+        <div class="pdf-orphan-admin-main">
+            <h3>PDF Maintenance</h3>
+            <div class="pdf-share-meta" data-cloudflare-orphan-pdf-summary>
+                <span>Unlinked PDFs found: not checked</span>
+            </div>
+        </div>
+        <div class="pdf-orphan-actions">
+            <button type="button"
+                    class="pdf-share-action-btn"
+                    onclick="return checkCloudflareOrphanPdfs(this)">
+                Check Unlinked PDFs
+            </button>
+            <button type="button"
+                    class="pdf-share-action-btn danger"
+                    data-cloudflare-orphan-pdf-delete
+                    data-cloudflare-unlinked-pdf-delete
+                    title="PDF deletion is intentionally disabled for this read-only audit."
+                    disabled>
+                Delete Selected Unlinked PDFs
+            </button>
+        </div>
+        <div class="pdf-share-status" data-cloudflare-orphan-pdf-status aria-live="polite"></div>
+        <div class="pdf-orphan-empty" data-cloudflare-orphan-pdf-empty hidden>No unlinked PDFs found.</div>
+        <div class="pdf-orphan-list" data-cloudflare-orphan-pdf-list hidden></div>
+    </div>
+
     {% set selected_user = admin_support.selected_user %}
     <form class="admin-support-form"
           method="POST"

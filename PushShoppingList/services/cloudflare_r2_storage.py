@@ -159,6 +159,22 @@ def get_public_url(object_key):
     return f"{public_base_url}/{quote(key, safe='/')}"
 
 
+def get_public_url_for_object_key(object_key):
+    key = str(object_key or "").strip().replace("\\", "/")
+    public_base_url = config_values()["public_base_url"].rstrip("/")
+
+    if not key:
+        raise CloudflareR2StorageError("Invalid Cloudflare R2 object key.")
+
+    if not key.lower().endswith(".pdf"):
+        raise CloudflareR2StorageError("Only PDF objects can be listed.")
+
+    if not public_base_url:
+        raise CloudflareR2StorageError("R2_PUBLIC_BASE_URL is required.")
+
+    return f"{public_base_url}/{quote(key.lstrip('/'), safe='/')}"
+
+
 def object_exists(object_key):
     key = validate_object_key(object_key)
     values = config_values()
@@ -250,6 +266,74 @@ def list_pdf_objects(prefixes=ALLOWED_PDF_OBJECT_PREFIXES):
             "error": f"Cloudflare R2 list failed: {exc}",
             "objects": [],
             "object_count": 0,
+        }
+
+
+def list_all_pdf_objects():
+    try:
+        values = config_values()
+        client = r2_client()
+        objects_by_key = {}
+        continuation_token = ""
+
+        while True:
+            request_args = {
+                "Bucket": values["bucket_name"],
+            }
+            if continuation_token:
+                request_args["ContinuationToken"] = continuation_token
+
+            page = client.list_objects_v2(**request_args) or {}
+
+            for item in page.get("Contents", []) or []:
+                object_key = str(item.get("Key") or "").strip().replace("\\", "/")
+                if not object_key.lower().endswith(".pdf"):
+                    continue
+
+                objects_by_key[object_key] = {
+                    "object_key": object_key,
+                    "public_url": get_public_url_for_object_key(object_key),
+                    "size": int(item.get("Size") or 0),
+                    "last_modified": format_r2_last_modified(item.get("LastModified")),
+                    "etag": str(item.get("ETag") or "").strip('"'),
+                }
+
+            if not page.get("IsTruncated"):
+                break
+
+            continuation_token = str(page.get("NextContinuationToken") or "").strip()
+            if not continuation_token:
+                break
+
+        objects = sorted(objects_by_key.values(), key=lambda item: item["object_key"].lower())
+        return {
+            "ok": True,
+            "success": True,
+            "bucket": values["bucket_name"],
+            "objects": objects,
+            "object_count": len(objects),
+            "scope": "bucket",
+        }
+    except CloudflareR2StorageError as exc:
+        code = "missing_env" if missing_env_vars() else "list_failed"
+        return {
+            "ok": False,
+            "success": False,
+            "code": code,
+            "error": str(exc),
+            "objects": [],
+            "object_count": 0,
+            "scope": "bucket",
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "success": False,
+            "code": "list_failed",
+            "error": f"Cloudflare R2 list failed: {exc}",
+            "objects": [],
+            "object_count": 0,
+            "scope": "bucket",
         }
 
 

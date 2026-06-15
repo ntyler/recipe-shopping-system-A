@@ -679,12 +679,58 @@ body {
 
         .pdf-orphan-list {
             grid-column: 1 / -1;
-            display: grid;
-            gap: 8px;
+            display: block;
+            overflow-x: auto;
+            border: 1px solid #28343b;
+            border-radius: 8px;
+            background: #15191a;
         }
 
         .pdf-orphan-list[hidden] {
             display: none;
+        }
+
+        .pdf-orphan-empty {
+            grid-column: 1 / -1;
+            padding: 10px 12px;
+            border: 1px dashed #3a4850;
+            border-radius: 7px;
+            background: #111819;
+            color: #d7ddd9;
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .pdf-orphan-empty[hidden] {
+            display: none;
+        }
+
+        .pdf-orphan-table {
+            width: 100%;
+            min-width: 880px;
+            border-collapse: collapse;
+            color: #e5edf2;
+            font-size: 12px;
+        }
+
+        .pdf-orphan-table th,
+        .pdf-orphan-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #28343b;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        .pdf-orphan-table th {
+            background: #101516;
+            color: #f3f4f6;
+            font-size: 11px;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+
+        .pdf-orphan-table tbody tr:last-child td {
+            border-bottom: 0;
         }
 
         .pdf-orphan-row {
@@ -703,6 +749,17 @@ body {
             font-size: 13px;
             font-weight: 800;
             overflow-wrap: anywhere;
+        }
+
+        .pdf-orphan-filename,
+        .pdf-orphan-type {
+            font-weight: 900;
+            white-space: nowrap;
+        }
+
+        .pdf-orphan-reason {
+            min-width: 220px;
+            color: #cbd5dd;
         }
 
         .pdf-orphan-link {

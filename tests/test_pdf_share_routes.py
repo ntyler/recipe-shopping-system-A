@@ -151,7 +151,7 @@ def test_pdf_cloudflare_upload_route_returns_public_url(monkeypatch, tmp_path):
     assert data["pdf_object_key"] == "recipe-pdfs/route-sample.pdf"
 
 
-def test_cloudflare_orphan_pdf_routes_require_admin(monkeypatch, tmp_path):
+def test_cloudflare_unlinked_pdf_routes_require_admin(monkeypatch, tmp_path):
     configure_pdf_share_routes(
         monkeypatch,
         tmp_path,
@@ -170,13 +170,13 @@ def test_cloudflare_orphan_pdf_routes_require_admin(monkeypatch, tmp_path):
     )
 
     with app.test_client() as client:
-        response = client.get("/pdfs/cloudflare_orphans", headers={"X-Requested-With": "fetch"})
+        response = client.get("/pdfs/cloudflare_unlinked", headers={"X-Requested-With": "fetch"})
 
     assert response.status_code == 403
     assert response.get_json()["success"] is False
 
 
-def test_cloudflare_orphan_pdf_routes_scan_and_delete_for_admin(monkeypatch, tmp_path):
+def test_cloudflare_unlinked_pdf_routes_scan_for_admin_and_disable_delete(monkeypatch, tmp_path):
     admin_user = {
         "user_id": "admin-1",
         "email": "ntylerbert@gmail.com",
@@ -186,37 +186,28 @@ def test_cloudflare_orphan_pdf_routes_scan_and_delete_for_admin(monkeypatch, tmp
     monkeypatch.setattr(app_module, "current_user", lambda: admin_user)
     monkeypatch.setattr(
         pdf_routes,
-        "scan_orphaned_cloudflare_pdfs",
+        "scan_unlinked_cloudflare_pdfs",
         lambda: {
             "ok": True,
             "success": True,
-            "orphaned_pdf_count": 1,
-            "orphaned_pdfs": [
-                {"object_key": "recipe-pdfs/orphan.pdf"},
+            "unlinked_pdf_count": 1,
+            "unlinked_pdfs": [
+                {"object_key": "recipe-pdfs/unlinked.pdf"},
             ],
-        },
-    )
-    monkeypatch.setattr(
-        pdf_routes,
-        "delete_orphaned_cloudflare_pdfs",
-        lambda: {
-            "ok": True,
-            "success": True,
-            "deleted_count": 1,
-            "failed_count": 0,
-            "orphaned_pdf_count": 0,
-            "orphaned_pdfs": [],
         },
     )
 
     with app.test_client() as client:
-        scan_response = client.get("/pdfs/cloudflare_orphans", headers={"X-Requested-With": "fetch"})
+        scan_response = client.get("/pdfs/cloudflare_unlinked", headers={"X-Requested-With": "fetch"})
+        alias_response = client.get("/pdfs/cloudflare_orphans", headers={"X-Requested-With": "fetch"})
         delete_response = client.post("/pdfs/cloudflare_orphans/delete", headers={"X-Requested-With": "fetch"})
 
     assert scan_response.status_code == 200
-    assert scan_response.get_json()["orphaned_pdfs"][0]["object_key"] == "recipe-pdfs/orphan.pdf"
-    assert delete_response.status_code == 200
-    assert delete_response.get_json()["deleted_count"] == 1
+    assert scan_response.get_json()["unlinked_pdfs"][0]["object_key"] == "recipe-pdfs/unlinked.pdf"
+    assert alias_response.status_code == 200
+    assert delete_response.status_code == 405
+    assert delete_response.get_json()["code"] == "delete_disabled"
+    assert delete_response.get_json()["deleted_count"] == 0
 
 
 def test_local_recipe_pdf_download_requires_admin(monkeypatch, tmp_path):

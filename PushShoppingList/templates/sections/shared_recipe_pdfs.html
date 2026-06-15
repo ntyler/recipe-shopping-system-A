@@ -32,32 +32,6 @@
         {% elif not current_user.is_admin %}
             <div class="pdf-share-empty">Admin access is required to manage cloud-hosted recipe PDFs.</div>
         {% else %}
-            <div class="pdf-orphan-admin" data-cloudflare-orphan-pdf-admin>
-                <div class="pdf-orphan-admin-main">
-                    <h3>Cloudflare Orphan PDFs</h3>
-                    <div class="pdf-share-meta" data-cloudflare-orphan-pdf-summary>
-                        <span>Not checked</span>
-                    </div>
-                </div>
-                <div class="pdf-orphan-actions">
-                    <button type="button"
-                            class="pdf-share-action-btn"
-                            onclick="return checkCloudflareOrphanPdfs(this)">
-                        Check Orphaned PDFs
-                    </button>
-                    <button type="button"
-                            class="pdf-share-action-btn danger"
-                            data-cloudflare-orphan-pdf-delete
-                            onclick="return deleteAllCloudflareOrphanPdfs(this)"
-                            hidden
-                            disabled>
-                        Delete All Orphaned PDFs
-                    </button>
-                </div>
-                <div class="pdf-share-status" data-cloudflare-orphan-pdf-status aria-live="polite"></div>
-                <div class="pdf-orphan-list" data-cloudflare-orphan-pdf-list hidden></div>
-            </div>
-
             {% set pdf_rows = pdf_share_view.pdfs if pdf_share_view and pdf_share_view.pdfs else [] %}
             {% if pdf_rows %}
                 <div class="pdf-share-list">

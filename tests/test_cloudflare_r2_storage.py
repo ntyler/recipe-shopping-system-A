@@ -180,6 +180,53 @@ def test_list_pdf_objects_paginates_allowed_prefixes(monkeypatch):
     ]
 
 
+def test_list_all_pdf_objects_scans_bucket_and_filters_pdfs(monkeypatch):
+    set_r2_env(monkeypatch)
+    fake_client = FakeR2Client()
+    fake_client.list_pages = {
+        "": [
+            {
+                "Contents": [
+                    {
+                        "Key": "recipe-pdfs/source.pdf",
+                        "Size": 100,
+                    },
+                    {
+                        "Key": "other/generated.PDF",
+                        "Size": 200,
+                    },
+                    {
+                        "Key": "other/not-a-pdf.txt",
+                        "Size": 300,
+                    },
+                ],
+            },
+            {
+                "Contents": [
+                    {
+                        "Key": "archive/menu.pdf",
+                        "Size": 400,
+                        "LastModified": datetime(2026, 6, 1, 12, 30, tzinfo=timezone.utc),
+                    },
+                ],
+            },
+        ],
+    }
+    monkeypatch.setattr(cloudflare_r2_storage, "r2_client", lambda: fake_client)
+
+    result = cloudflare_r2_storage.list_all_pdf_objects()
+
+    assert result["ok"] is True
+    assert result["scope"] == "bucket"
+    assert [row["object_key"] for row in result["objects"]] == [
+        "archive/menu.pdf",
+        "other/generated.PDF",
+        "recipe-pdfs/source.pdf",
+    ]
+    assert result["objects"][1]["public_url"] == "https://public.example.com/other/generated.PDF"
+    assert "Prefix" not in fake_client.list_calls[0]
+
+
 def test_recipe_pdf_upload_saves_metadata_and_deletes_local(monkeypatch, tmp_path):
     output_dir = tmp_path / "output"
     pdf_dir = tmp_path / "pdf"

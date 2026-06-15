@@ -12207,21 +12207,34 @@ function setCloudflareOrphanPdfStatus(message, isError = false) {
 }
 
 function cloudflareOrphanPdfLabel(count) {
-    return `${count} orphaned PDF${count === 1 ? "" : "s"}`;
+    return `Unlinked PDFs found: ${count}`;
+}
+
+function appendCloudflarePdfCell(row, value, className = "") {
+    const cell = document.createElement("td");
+    if (className) {
+        cell.className = className;
+    }
+    cell.textContent = value || "";
+    row.appendChild(cell);
+    return cell;
 }
 
 function renderCloudflareOrphanPdfs(data) {
     const panel = cloudflareOrphanPdfPanel();
     const list = panel ? panel.querySelector("[data-cloudflare-orphan-pdf-list]") : null;
+    const empty = panel ? panel.querySelector("[data-cloudflare-orphan-pdf-empty]") : null;
     const deleteButton = panel ? panel.querySelector("[data-cloudflare-orphan-pdf-delete]") : null;
     const summary = panel ? panel.querySelector("[data-cloudflare-orphan-pdf-summary]") : null;
-    const orphanedPdfs = Array.isArray(data.orphaned_pdfs) ? data.orphaned_pdfs : [];
-    const orphanedCount = Number(data.orphaned_pdf_count || orphanedPdfs.length || 0);
+    const unlinkedPdfs = Array.isArray(data.unlinked_pdfs)
+        ? data.unlinked_pdfs
+        : (Array.isArray(data.orphaned_pdfs) ? data.orphaned_pdfs : []);
+    const unlinkedCount = Number(data.unlinked_pdf_count || data.orphaned_pdf_count || unlinkedPdfs.length || 0);
 
     if (summary) {
         summary.innerHTML = "";
         [
-            cloudflareOrphanPdfLabel(orphanedCount),
+            cloudflareOrphanPdfLabel(unlinkedCount),
             `${Number(data.total_cloudflare_pdfs || 0)} checked`,
             `${Number(data.referenced_pdf_count || 0)} linked`,
         ].forEach((label) => {
@@ -12232,9 +12245,9 @@ function renderCloudflareOrphanPdfs(data) {
     }
 
     if (deleteButton) {
-        deleteButton.hidden = orphanedCount <= 0;
-        deleteButton.disabled = orphanedCount <= 0;
-        deleteButton.dataset.orphanedPdfCount = String(orphanedCount);
+        deleteButton.hidden = false;
+        deleteButton.disabled = true;
+        deleteButton.dataset.unlinkedPdfCount = String(unlinkedCount);
     }
 
     if (!list) {
@@ -12242,41 +12255,65 @@ function renderCloudflareOrphanPdfs(data) {
     }
 
     list.innerHTML = "";
-    list.hidden = orphanedPdfs.length === 0;
+    list.hidden = unlinkedPdfs.length === 0;
+    if (empty) {
+        empty.hidden = unlinkedPdfs.length > 0;
+    }
 
-    orphanedPdfs.forEach((pdf) => {
-        const row = document.createElement("div");
-        row.className = "pdf-orphan-row";
+    if (unlinkedPdfs.length === 0) {
+        return;
+    }
 
-        const main = document.createElement("div");
-        const key = document.createElement("div");
-        key.className = "pdf-orphan-key";
-        key.textContent = pdf.object_key || "Unknown PDF";
+    const table = document.createElement("table");
+    table.className = "pdf-orphan-table";
+    const head = document.createElement("thead");
+    const headRow = document.createElement("tr");
+    [
+        "PDF filename",
+        "R2 object key/path",
+        "File size",
+        "Last modified",
+        "Suspected type",
+        "Reason",
+    ].forEach((label) => {
+        const header = document.createElement("th");
+        header.scope = "col";
+        header.textContent = label;
+        headRow.appendChild(header);
+    });
+    head.appendChild(headRow);
+    table.appendChild(head);
 
-        const meta = document.createElement("div");
-        meta.className = "pdf-share-meta";
-        [pdf.size_label, pdf.last_modified_label].filter(Boolean).forEach((label) => {
-            const item = document.createElement("span");
-            item.textContent = label;
-            meta.appendChild(item);
-        });
-
-        main.appendChild(key);
-        main.appendChild(meta);
-        row.appendChild(main);
-
+    const body = document.createElement("tbody");
+    unlinkedPdfs.forEach((pdf) => {
+        const row = document.createElement("tr");
+        const filenameCell = document.createElement("td");
+        filenameCell.className = "pdf-orphan-filename";
         if (pdf.public_url) {
             const link = document.createElement("a");
             link.className = "pdf-orphan-link";
             link.href = pdf.public_url;
             link.target = "_blank";
             link.rel = "noopener noreferrer";
-            link.textContent = "Open";
-            row.appendChild(link);
+            link.textContent = pdf.filename || "Unknown PDF";
+            filenameCell.appendChild(link);
+        } else {
+            filenameCell.textContent = pdf.filename || "Unknown PDF";
         }
-
-        list.appendChild(row);
+        row.appendChild(filenameCell);
+        appendCloudflarePdfCell(row, pdf.object_key || "Unknown key", "pdf-orphan-key");
+        appendCloudflarePdfCell(row, pdf.size_label || "Unknown size");
+        appendCloudflarePdfCell(row, pdf.last_modified_label || "Unknown modified date");
+        appendCloudflarePdfCell(row, pdf.suspected_type || "unknown", "pdf-orphan-type");
+        appendCloudflarePdfCell(
+            row,
+            pdf.reason || "No matching PDF reference was found in app records.",
+            "pdf-orphan-reason"
+        );
+        body.appendChild(row);
     });
+    table.appendChild(body);
+    list.appendChild(table);
 }
 
 async function checkCloudflareOrphanPdfs(button) {
@@ -12289,7 +12326,7 @@ async function checkCloudflareOrphanPdfs(button) {
     setCloudflareOrphanPdfStatus("Checking Cloudflare PDFs...");
 
     try {
-        const response = await fetch("/pdfs/cloudflare_orphans", {
+        const response = await fetch("/pdfs/cloudflare_unlinked", {
             method: "GET",
             headers: {
                 "X-Requested-With": "fetch",
@@ -12302,77 +12339,30 @@ async function checkCloudflareOrphanPdfs(button) {
         }
 
         renderCloudflareOrphanPdfs(data);
-        setCloudflareOrphanPdfStatus(`${cloudflareOrphanPdfLabel(Number(data.orphaned_pdf_count || 0))} found.`);
+        const unlinkedCount = Number(data.unlinked_pdf_count || data.orphaned_pdf_count || 0);
+        setCloudflareOrphanPdfStatus(
+            unlinkedCount > 0 ? cloudflareOrphanPdfLabel(unlinkedCount) : "No unlinked PDFs found."
+        );
     } catch (err) {
-        console.warn("Unable to check Cloudflare orphan PDFs.", err);
+        console.warn("Unable to check Cloudflare unlinked PDFs.", err);
         setCloudflareOrphanPdfStatus(err.message || "Unable to check Cloudflare PDFs.", true);
     } finally {
         if (button && button.isConnected) {
             button.disabled = false;
-            button.textContent = originalText || "Check Orphaned PDFs";
+            button.textContent = originalText || "Check Unlinked PDFs";
         }
     }
 
     return false;
 }
 
-async function deleteAllCloudflareOrphanPdfs(button) {
-    const orphanedCount = Number(button && button.dataset.orphanedPdfCount ? button.dataset.orphanedPdfCount : 0);
-    const confirmed = window.confirm(
-        orphanedCount > 0
-            ? `Delete ${cloudflareOrphanPdfLabel(orphanedCount)} from Cloudflare R2?`
-            : "Delete all currently orphaned PDFs from Cloudflare R2?"
-    );
-
-    if (!confirmed) {
-        return false;
-    }
-
-    const originalText = button ? button.textContent : "";
-
-    if (button) {
-        button.disabled = true;
-        button.textContent = "Deleting...";
-    }
-    setCloudflareOrphanPdfStatus("Deleting orphaned PDFs...");
-
-    try {
-        const response = await fetch("/pdfs/cloudflare_orphans/delete", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-Requested-With": "fetch",
-            },
-            body: JSON.stringify({}),
-        });
-        const data = await response.json();
-
-        if (!response.ok || !data.ok) {
-            throw new Error(data.error || "Unable to delete orphaned PDFs.");
-        }
-
-        renderCloudflareOrphanPdfs(data);
-        if (Number(data.failed_count || 0) > 0) {
-            setCloudflareOrphanPdfStatus(
-                `${Number(data.deleted_count || 0)} deleted. ${Number(data.failed_count || 0)} could not be deleted.`,
-                true
-            );
-        } else {
-            setCloudflareOrphanPdfStatus(`${Number(data.deleted_count || 0)} orphaned PDFs deleted.`);
-        }
-    } catch (err) {
-        console.warn("Unable to delete Cloudflare orphan PDFs.", err);
-        setCloudflareOrphanPdfStatus(err.message || "Unable to delete orphaned PDFs.", true);
-    } finally {
-        if (button && button.isConnected) {
-            if (!button.hidden) {
-                button.disabled = false;
-            }
-            button.textContent = originalText || "Delete All Orphaned PDFs";
-        }
-    }
-
+function deleteSelectedCloudflareUnlinkedPdfs() {
+    setCloudflareOrphanPdfStatus("Deleting unlinked PDFs is disabled for this read-only audit.", true);
     return false;
+}
+
+function deleteAllCloudflareOrphanPdfs(button) {
+    return deleteSelectedCloudflareUnlinkedPdfs(button);
 }
 
 function updatePdfShareRow(row, data) {

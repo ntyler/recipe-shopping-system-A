@@ -12,6 +12,7 @@ def test_shared_recipe_pdf_section_is_wired_into_user_account_menu():
     index_template = read_text("PushShoppingList/templates/index.html")
     user_account_template = read_text("PushShoppingList/templates/sections/user_account.html")
     section_template = read_text("PushShoppingList/templates/sections/shared_recipe_pdfs.html")
+    admin_support_template = read_text("PushShoppingList/templates/sections/admin_support.html")
     current_recipe_template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     css = read_text("PushShoppingList/static/css/app.css")
     js = read_text("PushShoppingList/static/js/app.js")
@@ -31,10 +32,13 @@ def test_shared_recipe_pdf_section_is_wired_into_user_account_menu():
     assert "Open PDF" in section_template
     assert "Copy PDF Link" in section_template
     assert "Upload to Cloudflare" in section_template
-    assert "Cloudflare Orphan PDFs" in section_template
-    assert "Check Orphaned PDFs" in section_template
-    assert "Delete All Orphaned PDFs" in section_template
-    assert "data-cloudflare-orphan-pdf-list" in section_template
+    assert "Cloudflare Orphan PDFs" not in section_template
+    assert "Check Orphaned PDFs" not in section_template
+    assert "PDF Maintenance" in admin_support_template
+    assert "Check Unlinked PDFs" in admin_support_template
+    assert "Delete Selected Unlinked PDFs" in admin_support_template
+    assert "data-cloudflare-orphan-pdf-list" in admin_support_template
+    assert "data-cloudflare-orphan-pdf-empty" in admin_support_template
     assert "Create Share Link" not in section_template
     assert "Copy PDF Link" in section_template
     assert "data-pdf-share-row" in section_template
@@ -45,7 +49,8 @@ def test_shared_recipe_pdf_section_is_wired_into_user_account_menu():
     assert ".pdf-cloudflare-active" in css
     assert ".pdf-cloudflare-url" in css
     assert ".pdf-orphan-admin" in css
-    assert ".pdf-orphan-row" in css
+    assert ".pdf-orphan-table" in css
+    assert ".pdf-orphan-reason" in css
     assert "Copy Cloudflare Link" in current_recipe_template
     assert "recipeEditLocalPdfDownloadButton" in current_recipe_template
     assert "Download Local PDF" in current_recipe_template
@@ -58,8 +63,10 @@ def test_shared_recipe_pdf_section_is_wired_into_user_account_menu():
     assert "function copyPdfCloudflareLink" in js
     assert "function checkCloudflareOrphanPdfs" in js
     assert "function deleteAllCloudflareOrphanPdfs" in js
-    assert "/pdfs/cloudflare_orphans" in js
-    assert "/pdfs/cloudflare_orphans/delete" in js
+    assert "/pdfs/cloudflare_unlinked" in js
+    assert "/pdfs/cloudflare_orphans/delete" not in js
+    assert "PDF filename" in js
+    assert "Suspected type" in js
     assert "function openSharedRecipePdfsPanel" in js
     assert "function closeSharedRecipePdfsPanel" in js
     assert "function uploadRecipeEditorPdfToCloudflare" in js
@@ -100,7 +107,9 @@ def test_recipe_editor_uses_split_source_and_generated_pdf_fields():
     assert template.index("recipeEditGeneratedCloudflarePdfUrl") < template.index("recipeEditServings")
     assert "source_pdf_path" in js
     assert "generated_pdf_path" in js
-    assert 'body: JSON.stringify({ url: sourceUrlValue, kind: "generated_recipe" })' in js
+    assert 'startBackgroundJob("/api/jobs/upload-generated-pdf"' in js
+    assert "url: sourceUrlValue" in js
+    assert 'kind: "generated_recipe"' in js
     assert "This recipe does not have a generated Recipe PDF yet. Do you want to create one now?" in js
     assert "Save and Create PDF" in js
     assert "Save Without PDF" in js
