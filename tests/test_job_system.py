@@ -4,6 +4,7 @@ from PushShoppingList.app import create_app
 from PushShoppingList.routes import job_routes
 from PushShoppingList.routes import recipe_routes
 from PushShoppingList.services import cookbook_service
+from PushShoppingList.services import cookbook_item_inference_service
 from PushShoppingList.services import guest_session_service
 from PushShoppingList.services import job_queue_service
 from PushShoppingList.services import job_service
@@ -341,6 +342,131 @@ def test_menu_deferred_heavy_task_route_uses_recipe_item_sources(monkeypatch, tm
     assert data["job"]["model_env_var"] == "OPENAI_NUTRITION_MODEL"
     assert data["job"]["source_items"][0]["detail"] == "menu item"
     assert data["job"]["source_items"][0]["recipe_url"] == recipe_url
+
+
+def test_cookbook_infer_missing_details_route_queues_full_routine(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    recipe_url = "menu-item://dinner/spring-roll"
+    monkeypatch.setattr(
+        job_routes,
+        "enqueue_job",
+        lambda job_id, **kwargs: {"ok": True, "mode": "test", "job_id": job_id, **kwargs},
+    )
+    monkeypatch.setattr(
+        cookbook_item_inference_service,
+        "recipe_context_from_cookbook",
+        lambda cookbook_id: {
+            "id": cookbook_id,
+            "name": "Dinner",
+            "recipes": [{"url": recipe_url, "name": "Spring Roll"}],
+        },
+    )
+    monkeypatch.setattr(
+        cookbook_item_inference_service,
+        "resolve_cookbook_item_model",
+        lambda: ("gpt-cookbook-test", "test"),
+    )
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["user_id"] = "owner"
+
+        response = client.post(
+            "/api/jobs/cookbook-infer-missing-details",
+            json={"cookbook_id": "dinner", "overwrite_ai_fields": True},
+            headers={"X-Requested-With": "fetch"},
+        )
+        data = response.get_json()
+
+    assert response.status_code == 202
+    assert data["job"]["job_type"] == "cookbook-infer-missing-details"
+    assert data["job"]["queue_name"] == "ai-pantry-light"
+    assert data["job"]["model_env_var"] == "OPENAI_COOKBOOK_ITEM_MODEL"
+    assert data["job"]["source_items"][0]["detail"] == "menu item"
+    assert data["job"]["source_items"][0]["recipe_url"] == recipe_url
+
+
+def test_cookbook_infer_missing_details_job_runs_estimate_and_decide_all(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    recipe_urls = ["menu-item://dinner/spring-roll", "menu-item://dinner/crab-wonton"]
+    events = []
+
+    monkeypatch.setattr(
+        cookbook_item_inference_service,
+        "recipe_context_from_cookbook",
+        lambda cookbook_id: {
+            "id": cookbook_id,
+            "name": "Dinner",
+            "recipes": [{"url": url, "name": url.rsplit("/", 1)[-1]} for url in recipe_urls],
+        },
+    )
+    monkeypatch.setattr(
+        cookbook_item_inference_service,
+        "resolve_cookbook_item_model",
+        lambda: ("gpt-cookbook-test", "test"),
+    )
+
+    def fake_infer(cookbook_id, **kwargs):
+        events.append(("infer", cookbook_id, kwargs.get("overwrite_ai_fields"), kwargs.get("preview_only")))
+        return {
+            "ok": True,
+            "cookbook_id": cookbook_id,
+            "cookbook_name": "Dinner",
+            "total_found": 2,
+            "updated": 2,
+            "skipped": 0,
+            "failed": 0,
+            "results": [],
+        }
+
+    monkeypatch.setattr(cookbook_item_inference_service, "infer_missing_details_for_cookbook", fake_infer)
+    monkeypatch.setattr(
+        recipe_routes,
+        "load_editable_recipe",
+        lambda url: {"recipe": {"source_url": url, "recipe_title": url.rsplit("/", 1)[-1], "ingredients": [{"ingredient": "wrapper"}]}},
+    )
+    monkeypatch.setattr(recipe_routes, "_has_per_serving_estimate", lambda nutrition: False)
+
+    def fake_estimate(recipe):
+        events.append(("estimate", recipe["source_url"]))
+        return {"ok": True, "nutrition": [{"key": "calories", "value": "100"}]}
+
+    monkeypatch.setattr(recipe_routes, "estimate_recipe_nutrition", fake_estimate)
+    monkeypatch.setattr(recipe_routes, "_menu_nutrition_inference_from_rows", lambda rows, model="": {"model": model})
+    monkeypatch.setattr(recipe_routes, "save_editable_recipe", lambda url, recipe: {"ok": True})
+    monkeypatch.setattr(
+        cookbook_service,
+        "cookbook_recipe_assignment_for_url",
+        lambda url: {"cookbook_id": "dinner", "cookbook_name": "Dinner"},
+    )
+
+    def fake_category(url, recipe, assignment, trigger_source=""):
+        events.append(("decide_all", url, trigger_source, assignment["cookbook_id"]))
+        return {"ok": True, "categories": {"meal_type": "Dinner"}}
+
+    monkeypatch.setattr(recipe_routes, "apply_imported_recipe_category_routine", fake_category)
+
+    job = job_service.create_job(
+        "cookbook-infer-missing-details",
+        input_payload={"cookbook_id": "dinner", "overwrite_ai_fields": True},
+        user_id="owner",
+        total_items=2,
+    )
+
+    finished = job_tasks.run_cookbook_infer_missing_details_job(job["id"], job["input_payload"])
+
+    assert finished["status"] == "completed"
+    assert events == [
+        ("infer", "dinner", True, False),
+        ("estimate", recipe_urls[0]),
+        ("estimate", recipe_urls[1]),
+        ("decide_all", recipe_urls[0], "cookbook_infer:all", "dinner"),
+        ("decide_all", recipe_urls[1], "cookbook_infer:all", "dinner"),
+    ]
+    assert finished["result_payload"]["nutrition_completed"] == 2
+    assert finished["result_payload"]["categories_completed"] == 2
 
 
 def test_cancelled_job_cannot_be_revived_by_worker_updates(monkeypatch, tmp_path):

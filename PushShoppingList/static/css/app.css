@@ -10891,6 +10891,32 @@ body {
             text-align: center;
         }
 
+        .recipe-qty-progress-summary.error {
+            border-color: #7f1d1d;
+            background: #2a1010;
+            color: #ffd4d4;
+        }
+
+        .cookbook-routine-loading-card {
+            width: min(760px, 100%);
+        }
+
+        .cookbook-routine-progress-wrap {
+            height: 12px;
+            margin: 0 0 12px;
+            border-radius: 999px;
+            overflow: hidden;
+            background: #2a2f35;
+        }
+
+        .cookbook-routine-progress-bar {
+            width: 0%;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #0078d7, #00b36b);
+            transition: width 0.25s ease;
+        }
+
         .recipe-pdf-save-prompt-card {
             width: min(620px, 100%);
         }

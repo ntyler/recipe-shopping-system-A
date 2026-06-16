@@ -274,6 +274,45 @@ def start_menu_deferred_heavy_tasks_job_route():
     return create_and_enqueue("menu-deferred-heavy-tasks", payload, total_items=len(urls))
 
 
+@job_bp.route("/api/jobs/cookbook-infer-missing-details", methods=["POST"])
+def start_cookbook_infer_missing_details_job_route():
+    from PushShoppingList.services.cookbook_item_inference_service import COOKBOOK_ITEM_MODEL_ENV_VAR
+    from PushShoppingList.services.cookbook_item_inference_service import recipe_context_from_cookbook
+    from PushShoppingList.services.cookbook_item_inference_service import resolve_cookbook_item_model
+
+    payload = json_payload()
+    cookbook_id = str(payload.get("cookbook_id") or "").strip()
+    if not cookbook_id:
+        return jsonify({"ok": False, "error": "Cookbook is required."}), 400
+
+    try:
+        cookbook = recipe_context_from_cookbook(cookbook_id)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc) or "Cookbook was not found."}), 404
+
+    recipe_urls = [
+        str(recipe.get("url") or "").strip()
+        for recipe in cookbook.get("recipes", [])
+        if isinstance(recipe, dict) and str(recipe.get("url") or "").strip()
+    ]
+    recipe_urls = list(dict.fromkeys(recipe_urls))
+    model, model_source = resolve_cookbook_item_model()
+    payload = with_model_metadata(
+        {
+            **payload,
+            "cookbook_id": cookbook_id,
+            "cookbook_name": str(payload.get("cookbook_name") or cookbook.get("name") or "").strip(),
+            "recipe_urls": recipe_urls,
+            "overwrite_ai_fields": payload_truthy(payload, "overwrite_ai_fields", False),
+            "preview_only": payload_truthy(payload, "preview_only", False),
+        },
+        model,
+        model_source,
+        COOKBOOK_ITEM_MODEL_ENV_VAR,
+    )
+    return create_and_enqueue("cookbook-infer-missing-details", payload, total_items=len(recipe_urls))
+
+
 @job_bp.route("/api/jobs/recipe-import", methods=["POST"])
 def start_recipe_import_job_route():
     payload = form_or_json_payload()

@@ -277,6 +277,7 @@ function jobTypeLabel(jobType) {
         "menu-import": "Menu Import",
         "menu-generate-recipes": "Generate Menu Recipes",
         "menu-deferred-heavy-tasks": "Menu Nutrition / PDFs",
+        "cookbook-infer-missing-details": "Cookbook Details Routine",
         "recipe-import": "Recipe Import",
         "doc-photo-import": "Doc / Photo Import",
         "estimate-per-serving": "Estimate Per Serving",
@@ -396,7 +397,7 @@ function renderJobWorkerDetails(job) {
 function renderJobStageCounts(job) {
     const result = jobResultPayload(job);
     const jobType = String((job && job.job_type) || "").trim();
-    if (!["menu-import", "menu-generate-recipes", "menu-deferred-heavy-tasks"].includes(jobType)) {
+    if (!["menu-import", "menu-generate-recipes", "menu-deferred-heavy-tasks", "cookbook-infer-missing-details"].includes(jobType)) {
         return "";
     }
 
@@ -404,7 +405,9 @@ function renderJobStageCounts(job) {
         ["total items", result.total_items || (job && job.total_items)],
         ["shells", result.recipe_shells_created || result.stubs_created],
         ["inference", result.recipe_inference_completed || result.full_recipes_generated],
+        ["details", result.details_completed],
         ["nutrition", result.nutrition_completed || result.nutrition_estimates_completed],
+        ["categories", result.categories_completed],
         ["PDFs", result.pdfs_completed || result.pdfs_created],
         ["uploads", result.pdf_uploads_completed],
         ["failed", result.failed_items || result.failed_count || (job && job.failed_items)],
@@ -6243,6 +6246,215 @@ function cookbookInferenceSummary(data = {}) {
     return `${total} item${total === 1 ? "" : "s"} found. ${updated} ${action}, ${skipped} skipped, ${failed} failed.${suffix}`;
 }
 
+function ensureCookbookRoutineLoadingOverlay() {
+    let overlay = document.getElementById("cookbookRoutineLoadingOverlay");
+
+    if (!overlay) {
+        overlay = document.createElement("div");
+        overlay.id = "cookbookRoutineLoadingOverlay";
+        overlay.className = "recipe-qty-progress-backdrop cookbook-routine-loading-backdrop";
+        overlay.setAttribute("aria-hidden", "true");
+        overlay.innerHTML = `
+            <div class="recipe-qty-progress-card cookbook-routine-loading-card" role="dialog" aria-modal="true" aria-labelledby="cookbookRoutineLoadingTitle">
+                <div class="recipe-qty-progress-header">
+                    <h2 id="cookbookRoutineLoadingTitle">Cookbook Routine</h2>
+                    <button type="button" class="recipe-qty-progress-close" onclick="hideCookbookRoutineLoadingOverlay()">Hide</button>
+                </div>
+                <div id="cookbookRoutineLoadingModel" class="recipe-qty-progress-summary">Model Used: Starting</div>
+                <div id="cookbookRoutineLoadingSummary" class="recipe-qty-progress-summary">Preparing cookbook...</div>
+                <div class="cookbook-routine-progress-wrap">
+                    <div id="cookbookRoutineProgressBar" class="cookbook-routine-progress-bar"></div>
+                </div>
+                <div id="cookbookRoutineLoadingList" class="recipe-qty-progress-list"></div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+    }
+
+    return overlay;
+}
+
+function cookbookRoutineSteps(previewOnly = false) {
+    const steps = [
+        ["details", "Infer Missing Details", "Fill missing recipe info, ingredients, equipment, and instructions"],
+    ];
+
+    if (!previewOnly) {
+        steps.push(
+            ["nutrition", "Estimate per serving basis", "Add per-serving nutrition basis before PDF/category follow-up work"],
+            ["categories", "Have ChatGPT Decide All", "Refresh cookbook category fields for every recipe"]
+        );
+    }
+
+    steps.push(["refresh", "Refresh cookbook view", "Reload saved cookbook data"]);
+    return steps;
+}
+
+function showCookbookRoutineLoadingOverlay(cookbookName, recipeCount, previewOnly = false) {
+    const overlay = ensureCookbookRoutineLoadingOverlay();
+    overlay.dataset.previewOnly = previewOnly ? "1" : "0";
+
+    const title = overlay.querySelector("#cookbookRoutineLoadingTitle");
+    const list = overlay.querySelector("#cookbookRoutineLoadingList");
+    const bar = overlay.querySelector("#cookbookRoutineProgressBar");
+
+    if (title) {
+        title.textContent = previewOnly ? "Previewing Cookbook Details" : "Updating Cookbook Details";
+    }
+
+    if (bar) {
+        bar.style.width = "0%";
+    }
+
+    if (list) {
+        list.innerHTML = cookbookRoutineSteps(previewOnly).map(([key, name, detail]) => `
+            <div class="recipe-qty-progress-row" data-cookbook-routine-step="${escapeAttribute(key)}">
+                <div class="recipe-qty-progress-main">
+                    <div class="recipe-qty-progress-name">${escapeHtml(name)}</div>
+                    <div class="recipe-qty-progress-qty">${escapeHtml(detail)}</div>
+                </div>
+                <div class="recipe-qty-progress-status waiting">Waiting</div>
+            </div>
+        `).join("");
+    }
+
+    setCookbookRoutineModelText("Model Used: Starting");
+    setCookbookRoutineSummary(
+        `${previewOnly ? "Previewing" : "Updating"} ${recipeCount || 0} recipe${Number(recipeCount || 0) === 1 ? "" : "s"} in ${cookbookName || "this cookbook"}...`
+    );
+    overlay.classList.add("open");
+    overlay.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+}
+
+function hideCookbookRoutineLoadingOverlay() {
+    const overlay = document.getElementById("cookbookRoutineLoadingOverlay");
+
+    if (overlay) {
+        overlay.classList.remove("open");
+        overlay.setAttribute("aria-hidden", "true");
+    }
+
+    document.body.classList.remove("modal-open");
+    return false;
+}
+
+function setCookbookRoutineSummary(message, isError = false) {
+    const summary = document.getElementById("cookbookRoutineLoadingSummary");
+
+    if (summary) {
+        summary.textContent = message || "";
+        summary.classList.toggle("error", Boolean(isError));
+    }
+}
+
+function setCookbookRoutineModelText(message) {
+    const model = document.getElementById("cookbookRoutineLoadingModel");
+
+    if (model) {
+        model.textContent = message || "Model Used: Unknown";
+    }
+}
+
+function setCookbookRoutineProgress(percent) {
+    const bar = document.getElementById("cookbookRoutineProgressBar");
+
+    if (bar) {
+        bar.style.width = `${Math.max(0, Math.min(100, Number(percent || 0)))}%`;
+    }
+}
+
+function updateCookbookRoutineStep(key, mode, message) {
+    const row = document.querySelector(`[data-cookbook-routine-step="${cssEscape(key)}"]`);
+    if (!row) {
+        return;
+    }
+
+    const status = row.querySelector(".recipe-qty-progress-status");
+    if (!status) {
+        return;
+    }
+
+    status.classList.remove("waiting", "running", "done", "failed");
+    status.classList.add(mode || "waiting");
+    status.textContent = message || (
+        mode === "running" ? "Running" :
+        mode === "done" ? "Complete" :
+        mode === "failed" ? "Failed" :
+        "Waiting"
+    );
+}
+
+function updateCookbookRoutineOverlayFromJob(job) {
+    const result = jobResultPayload(job);
+    const status = String((job && job.status) || "").trim().toLowerCase();
+    const stage = String((result && result.stage) || (job && job.current_step) || "").trim();
+    const stageLower = stage.toLowerCase();
+    const active = jobIsActive(job);
+    const failed = status === "failed";
+    const overlay = document.getElementById("cookbookRoutineLoadingOverlay");
+    const previewOnly = Boolean(result.preview_only) || Boolean(overlay && overlay.dataset && overlay.dataset.previewOnly === "1");
+    const inferenceResult = result.inference_result && typeof result.inference_result === "object"
+        ? result.inference_result
+        : result;
+    const updated = Number(inferenceResult.updated || 0);
+    const skipped = Number(inferenceResult.skipped || 0);
+    const detailsFailed = Number(inferenceResult.failed || 0);
+    const nutritionCompleted = Number(result.nutrition_completed || result.nutrition_estimates_completed || 0);
+    const nutritionFailed = Number(result.nutrition_failed || 0);
+    const categoriesCompleted = Number(result.categories_completed || 0);
+    const categoriesFailed = Number(result.categories_failed || 0);
+    const progressPercent = Number((job && job.progress_percent) || 0);
+
+    setCookbookRoutineProgress(progressPercent);
+    setCookbookRoutineModelText(formatJobModelReference(job) ? `Model Used: ${formatJobModelReference(job)}` : "Model Used: Unknown");
+
+    const summary = String(result.summary_message || (job && job.current_step) || "").trim();
+    if (summary) {
+        setCookbookRoutineSummary(appendJobModelReference(summary, job), failed);
+    }
+
+    const detailsDone = Boolean(result.inference_result) || (!active && Object.prototype.hasOwnProperty.call(inferenceResult, "updated"));
+    const nutritionStage = stageLower.includes("serving");
+    const categoryStage = stageLower.includes("chatgpt") || stageLower.includes("categor");
+    const completeStage = stageLower === "complete" || status === "completed";
+
+    if (failed && !detailsDone) {
+        updateCookbookRoutineStep("details", "failed", "Failed");
+    } else if (detailsDone || previewOnly || nutritionStage || categoryStage || completeStage) {
+        updateCookbookRoutineStep("details", detailsFailed ? "failed" : "done", `${updated} updated, ${skipped} skipped${detailsFailed ? `, ${detailsFailed} failed` : ""}`);
+    } else {
+        updateCookbookRoutineStep("details", active ? "running" : "waiting", active ? "Running" : "Waiting");
+    }
+
+    if (previewOnly) {
+        updateCookbookRoutineStep("refresh", completeStage ? "done" : "waiting", completeStage ? "Complete" : "Waiting");
+        return;
+    }
+
+    if (failed && nutritionStage) {
+        updateCookbookRoutineStep("nutrition", "failed", "Failed");
+    } else if (categoryStage || completeStage) {
+        updateCookbookRoutineStep("nutrition", nutritionFailed ? "failed" : "done", `${nutritionCompleted} complete${nutritionFailed ? `, ${nutritionFailed} failed` : ""}`);
+    } else if (nutritionStage) {
+        updateCookbookRoutineStep("nutrition", "running", nutritionCompleted ? `${nutritionCompleted} complete` : "Running");
+    } else {
+        updateCookbookRoutineStep("nutrition", "waiting", "Waiting");
+    }
+
+    if (failed && categoryStage) {
+        updateCookbookRoutineStep("categories", "failed", "Failed");
+    } else if (completeStage) {
+        updateCookbookRoutineStep("categories", categoriesFailed ? "failed" : "done", `${categoriesCompleted} complete${categoriesFailed ? `, ${categoriesFailed} failed` : ""}`);
+    } else if (categoryStage) {
+        updateCookbookRoutineStep("categories", "running", categoriesCompleted ? `${categoriesCompleted} complete` : "Running");
+    } else {
+        updateCookbookRoutineStep("categories", "waiting", "Waiting");
+    }
+
+    updateCookbookRoutineStep("refresh", completeStage ? "done" : "waiting", completeStage ? "Complete" : "Waiting");
+}
+
 async function inferMissingCookbookDetails(button, event = null) {
     if (event) {
         event.preventDefault();
@@ -6266,39 +6478,72 @@ async function inferMissingCookbookDetails(button, event = null) {
 
     try {
         closeRecipeEditRowMenus();
+        showCookbookRoutineLoadingOverlay(cookbookName, recipeCount, previewOnly);
+        updateCookbookRoutineStep("details", "running", "Starting");
         if (button) {
             button.disabled = true;
-            button.textContent = previewOnly ? "Previewing..." : "Inferring...";
+            button.textContent = previewOnly ? "Previewing..." : "Running...";
         }
-        setCookbookStatus(`${previewOnly ? "Previewing" : "Inferring"} missing details for ${cookbookName}...`);
+        setCookbookStatus(
+            previewOnly
+                ? `Previewing missing details for ${cookbookName}...`
+                : `Running missing details, per-serving estimates, and ChatGPT category decisions for ${cookbookName}...`
+        );
 
-        const response = await fetch(`/api/cookbooks/${encodeURIComponent(cookbookId)}/infer_missing_details`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-Requested-With": "fetch",
-            },
-            body: JSON.stringify({
+        const startData = await startBackgroundJob("/api/jobs/cookbook-infer-missing-details", {
+            button,
+            creatingText: "Starting...",
+            payload: {
+                cookbook_id: cookbookId,
+                cookbook_name: cookbookName,
                 overwrite_ai_fields: overwriteAiFields,
                 preview_only: previewOnly,
-            }),
+            },
         });
-        const data = await response.json();
-
-        if (!response.ok || !data.ok) {
-            throw new Error((data && data.error) || "Unable to infer cookbook item details.");
+        if (!startData || !startData.job_id) {
+            throw new Error("Unable to start cookbook routine.");
         }
+        if (startData.job) {
+            updateCookbookRoutineOverlayFromJob(startData.job);
+        }
+        if (button) {
+            button.disabled = true;
+            button.textContent = previewOnly ? "Previewing..." : "Running...";
+        }
+
+        const finishedJob = await waitForJobCompletion(startData.job_id, {
+            pollMs: 1500,
+            timeoutMs: IMPORT_JOB_COMPLETION_TIMEOUT_MS,
+            onUpdate(job) {
+                updateCookbookRoutineOverlayFromJob(job);
+            },
+        });
+        updateCookbookRoutineOverlayFromJob(finishedJob);
+
+        const data = jobResultPayload(finishedJob);
 
         syncOpenAiUsageDashboardFromResponse(data);
-        if (!previewOnly) {
-            await refreshStoreMarkup({ cacheBust: true });
+        if (!finishedJob || finishedJob.status !== "completed" || !data.ok) {
+            throw new Error((finishedJob && finishedJob.error_message) || (data && data.error) || "Unable to infer cookbook item details.");
         }
-        const message = cookbookInferenceSummary(data);
+
+        if (!previewOnly) {
+            updateCookbookRoutineStep("refresh", "running", "Refreshing");
+            setCookbookRoutineSummary("Refreshing cookbook view...");
+            await refreshStoreMarkup({ cacheBust: true });
+            updateCookbookRoutineStep("refresh", "done", "Complete");
+        } else {
+            updateCookbookRoutineStep("refresh", "done", "Complete");
+        }
+        setCookbookRoutineProgress(100);
+        const message = data.summary_message || cookbookInferenceSummary(data.inference_result || data);
+        setCookbookRoutineSummary(message);
         setCookbookStatus(message);
         showRecipeQuantityUpdatedMessage("", "", "", message);
     } catch (err) {
         console.warn("Unable to infer cookbook item details.", err);
         setCookbookStatus(err.message || "Unable to infer cookbook item details.", true);
+        setCookbookRoutineSummary(err.message || "Unable to infer cookbook item details.", true);
         window.alert(err.message || "Unable to infer cookbook item details.");
     } finally {
         if (button && button.isConnected) {

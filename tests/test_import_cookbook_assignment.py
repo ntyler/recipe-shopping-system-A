@@ -124,6 +124,21 @@ def test_menu_recipe_progress_checklist_static_hooks_are_present():
     assert "menu_recipe_progress_callback" in routes
 
 
+def test_cookbook_infer_button_runs_full_loading_routine():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    routes = (ROOT / "PushShoppingList/routes/job_routes.py").read_text(encoding="utf-8")
+    worker = (ROOT / "PushShoppingList/services/job_tasks.py").read_text(encoding="utf-8")
+
+    assert "/api/jobs/cookbook-infer-missing-details" in script
+    assert "showCookbookRoutineLoadingOverlay" in script
+    assert "Estimate per serving basis" in script
+    assert "Have ChatGPT Decide All" in script
+    assert "start_cookbook_infer_missing_details_job_route" in routes
+    assert "run_cookbook_infer_missing_details_job" in worker
+    assert "estimate_recipe_nutrition(recipe)" in worker
+    assert 'trigger_source="cookbook_infer:all"' in worker
+
+
 def test_menu_import_progress_overlay_shows_model_env_var_reference():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
 

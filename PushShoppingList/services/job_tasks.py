@@ -30,6 +30,7 @@ def run_job_task(job_id):
         "menu-import": run_menu_import_job,
         "menu-generate-recipes": run_menu_generate_recipes_job,
         "menu-deferred-heavy-tasks": run_menu_deferred_heavy_tasks_job,
+        "cookbook-infer-missing-details": run_cookbook_infer_missing_details_job,
         "recipe-import": run_recipe_import_job,
         "doc-photo-import": run_doc_photo_import_job,
         "estimate-per-serving": run_estimate_per_serving_job,
@@ -113,6 +114,13 @@ def job_start_metadata(job):
             MODEL,
             "fallback:OPENAI_RECIPE_MODEL",
         )
+
+    if job_type == "cookbook-infer-missing-details":
+        from PushShoppingList.services.cookbook_item_inference_service import COOKBOOK_ITEM_MODEL_ENV_VAR
+        from PushShoppingList.services.cookbook_item_inference_service import resolve_cookbook_item_model
+
+        model, source = resolve_cookbook_item_model()
+        return model_metadata(model, source, COOKBOOK_ITEM_MODEL_ENV_VAR)
 
     if job_type == "menu-import":
         return model_metadata(resolve_menu_cleanup_model(), resolve_menu_cleanup_model_source(), "OPENAI_MENU_CLEANUP_MODEL")
@@ -824,6 +832,330 @@ def run_menu_deferred_heavy_tasks_job(job_id, payload):
     if result_payload["ok"]:
         return complete_job(job_id, result_payload=result_payload)
     return fail_job(job_id, "No deferred menu tasks completed.", result_payload=result_payload)
+
+
+def cookbook_infer_urls_from_payload(payload, cookbook):
+    raw_urls = (payload if isinstance(payload, dict) else {}).get("recipe_urls")
+    if isinstance(raw_urls, str):
+        raw_urls = [line.strip() for line in raw_urls.splitlines() if line.strip()]
+    if not isinstance(raw_urls, list):
+        raw_urls = []
+
+    urls = [str(url or "").strip() for url in raw_urls if str(url or "").strip()]
+    if not urls:
+        urls = [
+            str(recipe.get("url") or "").strip()
+            for recipe in (cookbook.get("recipes", []) if isinstance(cookbook, dict) else [])
+            if isinstance(recipe, dict) and str(recipe.get("url") or "").strip()
+        ]
+    return list(dict.fromkeys(urls))
+
+
+def run_cookbook_infer_missing_details_job(job_id, payload):
+    from PushShoppingList.routes.recipe_routes import MODEL
+    from PushShoppingList.routes.recipe_routes import _has_per_serving_estimate
+    from PushShoppingList.routes.recipe_routes import _menu_nutrition_inference_from_rows
+    from PushShoppingList.routes.recipe_routes import apply_imported_recipe_category_routine
+    from PushShoppingList.routes.recipe_routes import estimate_recipe_nutrition
+    from PushShoppingList.routes.recipe_routes import load_editable_recipe
+    from PushShoppingList.routes.recipe_routes import save_editable_recipe
+    from PushShoppingList.services import cookbook_service
+    from PushShoppingList.services.cookbook_item_inference_service import COOKBOOK_ITEM_MODEL_ENV_VAR
+    from PushShoppingList.services.cookbook_item_inference_service import infer_missing_details_for_cookbook
+    from PushShoppingList.services.cookbook_item_inference_service import recipe_context_from_cookbook
+    from PushShoppingList.services.cookbook_item_inference_service import resolve_cookbook_item_model
+
+    payload = payload if isinstance(payload, dict) else {}
+    cookbook_id = str(payload.get("cookbook_id") or "").strip()
+    if not cookbook_id:
+        return fail_job(job_id, "Cookbook is required.")
+
+    overwrite_ai_fields = payload_bool(payload, "overwrite_ai_fields", False)
+    preview_only = payload_bool(payload, "preview_only", False)
+    try:
+        cookbook = recipe_context_from_cookbook(cookbook_id)
+    except ValueError as exc:
+        return fail_job(job_id, str(exc) or "Cookbook was not found.")
+
+    cookbook_name = str(payload.get("cookbook_name") or cookbook.get("name") or cookbook_id).strip()
+    recipe_urls = cookbook_infer_urls_from_payload(payload, cookbook)
+    total = len(recipe_urls)
+    if not recipe_urls:
+        result_payload = {
+            "ok": True,
+            "cookbook_id": cookbook_id,
+            "cookbook_name": cookbook_name,
+            "total_items": 0,
+            "total_found": 0,
+            "updated": 0,
+            "skipped": 0,
+            "failed": 0,
+            "stage": "Complete",
+            "summary_message": f"{cookbook_name}: no recipes found.",
+        }
+        return complete_job(job_id, result_payload=result_payload)
+
+    cookbook_model, cookbook_model_source = resolve_cookbook_item_model()
+    cookbook_model_info = stored_job_model_metadata(
+        job_id,
+        model_metadata(cookbook_model, cookbook_model_source, COOKBOOK_ITEM_MODEL_ENV_VAR),
+    )
+    nutrition_model_info = active_model_metadata(
+        "OPENAI_NUTRITION_MODEL",
+        MODEL,
+        "fallback:OPENAI_RECIPE_MODEL",
+    )
+    nutrition_model = nutrition_model_info.get("model_used") or MODEL
+
+    base_payload = {
+        **cookbook_model_info,
+        "cookbook_id": cookbook_id,
+        "cookbook_name": cookbook_name,
+        "total_items": total,
+        "stage": "Inferring missing details",
+        "details_completed": 0,
+        "nutrition_completed": 0,
+        "categories_completed": 0,
+        "failed_items": 0,
+    }
+    update_job_progress(
+        job_id,
+        current_step=f"Inferring missing details for {cookbook_name}",
+        total_items=total,
+        progress_percent=5,
+        result_payload=base_payload,
+    )
+
+    inference_result = infer_missing_details_for_cookbook(
+        cookbook_id,
+        overwrite_ai_fields=overwrite_ai_fields,
+        preview_only=preview_only,
+    )
+    inference_failed = int(inference_result.get("failed") or 0)
+    details_completed = int(inference_result.get("updated") or 0) + int(inference_result.get("skipped") or 0)
+
+    if not inference_result.get("ok"):
+        result_payload = {
+            **base_payload,
+            **inference_result,
+            "ok": False,
+            "stage": "Failed",
+            "failed_items": inference_failed or total,
+            "summary_message": inference_result.get("error") or "Unable to infer cookbook details.",
+        }
+        return fail_job(job_id, result_payload["summary_message"], result_payload=result_payload)
+
+    update_job_progress(
+        job_id,
+        current_step="Missing details complete" if preview_only else "Estimating per serving basis",
+        progress_percent=35 if not preview_only else 95,
+        completed_items=details_completed,
+        failed_items=inference_failed,
+        result_payload={
+            **base_payload,
+            **inference_result,
+            "stage": "Preview complete" if preview_only else "Estimating per serving basis",
+            "details_completed": details_completed,
+            "failed_items": inference_failed,
+            "inference_result": inference_result,
+        },
+    )
+
+    if preview_only:
+        result_payload = {
+            **base_payload,
+            **inference_result,
+            "ok": True,
+            "stage": "Complete",
+            "details_completed": details_completed,
+            "failed_items": inference_failed,
+            "summary_message": (
+                f"Preview complete for {cookbook_name}: "
+                f"{inference_result.get('updated', 0)} would update, "
+                f"{inference_result.get('skipped', 0)} skipped, "
+                f"{inference_result.get('failed', 0)} failed."
+            ),
+            "links": recipe_links(recipe_urls),
+        }
+        return complete_job(job_id, result_payload=result_payload)
+
+    failed_items = inference_failed
+    nutrition_completed = 0
+    nutrition_failed = 0
+    category_completed = 0
+    category_failed = 0
+    category_statuses = []
+
+    for index, recipe_url in enumerate(recipe_urls):
+        ensure_not_cancelled(job_id)
+        loaded_recipe = load_editable_recipe(recipe_url) or {}
+        recipe = loaded_recipe.get("recipe") if isinstance(loaded_recipe, dict) else {}
+        recipe = recipe if isinstance(recipe, dict) else {}
+        if not recipe:
+            failed_items += 1
+            nutrition_failed += 1
+            append_job_warning(job_id, f"{recipe_url}: Recipe was not found for serving basis estimation.")
+        elif _has_per_serving_estimate(recipe.get("nutrition")):
+            nutrition_completed += 1
+        else:
+            estimate_result = estimate_recipe_nutrition(recipe)
+            if not estimate_result.get("ok"):
+                failed_items += 1
+                nutrition_failed += 1
+                append_job_warning(job_id, f"{recipe_url}: {estimate_result.get('error') or 'Unable to estimate serving basis.'}")
+            else:
+                updated_recipe = {
+                    **recipe,
+                    "nutrition": estimate_result.get("nutrition", []),
+                    "nutrition_inference": _menu_nutrition_inference_from_rows(
+                        estimate_result.get("nutrition", []),
+                        model=nutrition_model,
+                    ),
+                }
+                with workspace_write_lock("recipe-imports"):
+                    save_result = save_editable_recipe(recipe_url, updated_recipe)
+                if not save_result.get("ok"):
+                    failed_items += 1
+                    nutrition_failed += 1
+                    append_job_warning(job_id, f"{recipe_url}: {save_result.get('error') or 'Unable to save serving basis estimate.'}")
+                else:
+                    nutrition_completed += 1
+
+        update_job_progress(
+            job_id,
+            current_step=f"Estimating per serving basis ({index + 1}/{total})",
+            progress_percent=bounded_percent(index + 1, total, 36, 62),
+            completed_items=max(details_completed, nutrition_completed),
+            failed_items=failed_items,
+            result_payload={
+                **cookbook_model_info,
+                "stage": "Estimating per serving basis",
+                "cookbook_id": cookbook_id,
+                "cookbook_name": cookbook_name,
+                "total_items": total,
+                "details_completed": details_completed,
+                "nutrition_completed": nutrition_completed,
+                "nutrition_failed": nutrition_failed,
+                "categories_completed": 0,
+                "failed_items": failed_items,
+                "inference_result": inference_result,
+                "nutrition_model_used": nutrition_model_info.get("model_used", ""),
+                "nutrition_model_source": nutrition_model_info.get("model_source", ""),
+                "nutrition_model_env_var": nutrition_model_info.get("model_env_var", ""),
+            },
+        )
+
+    update_job_progress(
+        job_id,
+        current_step="Having ChatGPT decide all categories",
+        progress_percent=64,
+        completed_items=max(details_completed, nutrition_completed),
+        failed_items=failed_items,
+        result_payload={
+            **cookbook_model_info,
+            "stage": "Having ChatGPT decide all categories",
+            "cookbook_id": cookbook_id,
+            "cookbook_name": cookbook_name,
+            "total_items": total,
+            "details_completed": details_completed,
+            "nutrition_completed": nutrition_completed,
+            "nutrition_failed": nutrition_failed,
+            "categories_completed": 0,
+            "failed_items": failed_items,
+            "inference_result": inference_result,
+        },
+    )
+
+    for index, recipe_url in enumerate(recipe_urls):
+        ensure_not_cancelled(job_id)
+        loaded_recipe = load_editable_recipe(recipe_url) or {}
+        recipe = loaded_recipe.get("recipe") if isinstance(loaded_recipe, dict) else {}
+        recipe = recipe if isinstance(recipe, dict) else {}
+        if not recipe:
+            failed_items += 1
+            category_failed += 1
+            status = {"ok": False, "recipe_url": recipe_url, "error": "Recipe was not found for category decision."}
+            append_job_warning(job_id, f"{recipe_url}: Recipe was not found for category decision.")
+        else:
+            assignment = cookbook_service.cookbook_recipe_assignment_for_url(recipe_url) or {}
+            assignment = {
+                **assignment,
+                "cookbook_id": assignment.get("cookbook_id") or cookbook_id,
+                "cookbook_name": assignment.get("cookbook_name") or cookbook_name,
+            }
+            status = apply_imported_recipe_category_routine(
+                recipe_url,
+                recipe,
+                assignment,
+                trigger_source="cookbook_infer:all",
+            )
+            status = status if isinstance(status, dict) else {"ok": False, "error": "Invalid category result."}
+            status["recipe_url"] = recipe_url
+            if status.get("ok"):
+                category_completed += 1
+            else:
+                failed_items += 1
+                category_failed += 1
+                append_job_warning(job_id, f"{recipe_url}: {status.get('error') or 'Unable to decide categories.'}")
+        category_statuses.append(status)
+
+        update_job_progress(
+            job_id,
+            current_step=f"Having ChatGPT decide all categories ({index + 1}/{total})",
+            progress_percent=bounded_percent(index + 1, total, 65, 94),
+            completed_items=max(details_completed, nutrition_completed, category_completed),
+            failed_items=failed_items,
+            result_payload={
+                **cookbook_model_info,
+                "stage": "Having ChatGPT decide all categories",
+                "cookbook_id": cookbook_id,
+                "cookbook_name": cookbook_name,
+                "total_items": total,
+                "details_completed": details_completed,
+                "nutrition_completed": nutrition_completed,
+                "nutrition_failed": nutrition_failed,
+                "categories_completed": category_completed,
+                "categories_failed": category_failed,
+                "failed_items": failed_items,
+                "inference_result": inference_result,
+            },
+        )
+
+    result_payload = {
+        **cookbook_model_info,
+        **inference_result,
+        "ok": bool(inference_result.get("ok")),
+        "cookbook_id": cookbook_id,
+        "cookbook_name": cookbook_name,
+        "recipe_urls": recipe_urls,
+        "links": recipe_links(recipe_urls),
+        "stage": "Complete",
+        "total_items": total,
+        "details_completed": details_completed,
+        "nutrition_completed": nutrition_completed,
+        "nutrition_failed": nutrition_failed,
+        "categories_completed": category_completed,
+        "categories_failed": category_failed,
+        "failed_items": failed_items,
+        "inference_result": inference_result,
+        "category_statuses": category_statuses,
+        "summary_message": (
+            f"{cookbook_name}: inferred {inference_result.get('updated', 0)}, "
+            f"estimated serving basis for {nutrition_completed}, "
+            f"ran ChatGPT category decisions for {category_completed}, "
+            f"{failed_items} failed."
+        ),
+    }
+    update_job_progress(
+        job_id,
+        current_step="Complete",
+        progress_percent=98,
+        total_items=total,
+        completed_items=max(details_completed, nutrition_completed, category_completed),
+        failed_items=failed_items,
+        result_payload=result_payload,
+    )
+    return complete_job(job_id, result_payload=result_payload)
 
 
 def run_import_urls_job(job_id, payload, menu_extract=False):
