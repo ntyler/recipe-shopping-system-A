@@ -65,6 +65,12 @@ OPENAI_MODEL_SETTINGS = (
         "description": "General recipe helper fallback used outside the menu and vision import paths.",
     },
     {
+        "env_var": "OPENAI_COOKBOOK_ITEM_MODEL",
+        "feature": "Cookbook Item Details",
+        "default_model": "gpt-5.5-mini",
+        "description": "Fill missing cookbook/menu-item recipe details such as ingredients, equipment, instructions, servings, and time estimates.",
+    },
+    {
         "env_var": "OPENAI_RECIPE_CATEGORY_MODEL",
         "feature": "Recipe Categories",
         "default_model": "gpt-4o-mini",
@@ -137,6 +143,7 @@ DEFAULT_RECOMMENDED_MODEL_BY_ENV = {
     "OPENAI_MENU_CLEANUP_MODEL": "gpt-5.5-mini",
     "OPENAI_VISION_MODEL": "gpt-5.5",
     "OPENAI_RECIPE_MODEL": "gpt-5.5-mini",
+    "OPENAI_COOKBOOK_ITEM_MODEL": "gpt-5.5-mini",
     "OPENAI_RECIPE_CATEGORY_MODEL": "gpt-5.5-mini",
     "OPENAI_NUTRITION_MODEL": "gpt-5.5-mini",
     "OPENAI_RECIPE_NOTE_MODEL": "gpt-5.5-mini",
@@ -155,6 +162,7 @@ LOWEST_VIABLE_MODEL_BY_ENV = {
     "OPENAI_MENU_CLEANUP_MODEL": "gpt-5.4-nano",
     "OPENAI_VISION_MODEL": "gpt-5.4-mini",
     "OPENAI_RECIPE_MODEL": "gpt-5.4-nano",
+    "OPENAI_COOKBOOK_ITEM_MODEL": "gpt-5.4-nano",
     "OPENAI_RECIPE_CATEGORY_MODEL": "gpt-5.4-nano",
     "OPENAI_NUTRITION_MODEL": "gpt-5.4-nano",
     "OPENAI_RECIPE_NOTE_MODEL": "gpt-5.4-nano",

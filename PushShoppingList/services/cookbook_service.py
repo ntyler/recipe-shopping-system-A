@@ -37,6 +37,11 @@ COOKBOOK_RECIPE_METADATA_FIELDS = (
     "parent_menu_snapshot_id",
     "menu_mega_snapshot_id",
     "menu_snapshot_id",
+    "recipe_amount",
+    "yield",
+    "inferred_by_model",
+    "inferred_at",
+    "inference_confidence",
 )
 COOKBOOK_RECIPE_BOOLEAN_METADATA_FIELDS = (
     "ai_inferred",

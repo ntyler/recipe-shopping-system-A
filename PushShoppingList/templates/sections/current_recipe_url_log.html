@@ -1473,6 +1473,20 @@
             </section>
 
             <div class="recipe-edit-actions">
+                <label class="recipe-edit-ai-overwrite-toggle">
+                    <input type="checkbox" id="recipeEditInferOverwriteAiFields">
+                    <span>Overwrite existing AI-inferred fields</span>
+                </label>
+                <label class="recipe-edit-ai-overwrite-toggle">
+                    <input type="checkbox" id="recipeEditInferPreviewOnly">
+                    <span>Preview Only</span>
+                </label>
+                <button type="button"
+                        class="recipe-edit-ai-infer"
+                        onclick="return inferMissingRecipeDetails(this)">
+                    <span class="recipe-edit-button-icon" aria-hidden="true">?</span>
+                    <span>Infer Missing Details</span>
+                </button>
                 <button type="submit" class="recipe-edit-save">
                     <span class="recipe-edit-button-icon" aria-hidden="true">▣</span>
                     <span>Save Recipe</span>

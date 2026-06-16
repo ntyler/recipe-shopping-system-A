@@ -6214,6 +6214,170 @@ function selectedCookbookRestoreCount() {
     return document.querySelectorAll("[data-cookbook-restore-checkbox]:checked").length;
 }
 
+function cookbookInferOverwriteEnabled(button) {
+    const card = button ? button.closest("[data-cookbook-card]") : null;
+    const checkbox = card ? card.querySelector("[data-cookbook-infer-overwrite]") : null;
+    return Boolean(checkbox && checkbox.checked);
+}
+
+function cookbookInferPreviewEnabled(button) {
+    const card = button ? button.closest("[data-cookbook-card]") : null;
+    const checkbox = card ? card.querySelector("[data-cookbook-infer-preview]") : null;
+    return Boolean(checkbox && checkbox.checked);
+}
+
+function cookbookInferenceSummary(data = {}) {
+    const total = Number(data.total_found || 0);
+    const updated = Number(data.updated || 0);
+    const skipped = Number(data.skipped || 0);
+    const failed = Number(data.failed || 0);
+    const action = data.preview_only ? "would update" : "updated";
+    const previewDetails = data.preview_only && Array.isArray(data.results)
+        ? data.results
+            .filter(item => Array.isArray(item.would_update_fields) && item.would_update_fields.length)
+            .slice(0, 6)
+            .map(item => `${item.recipe_name || item.recipe_url}: ${item.would_update_fields.join(", ")}`)
+            .join(" | ")
+        : "";
+    const suffix = previewDetails ? ` Preview: ${previewDetails}` : "";
+    return `${total} item${total === 1 ? "" : "s"} found. ${updated} ${action}, ${skipped} skipped, ${failed} failed.${suffix}`;
+}
+
+async function inferMissingCookbookDetails(button, event = null) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const cookbookId = button && button.dataset ? button.dataset.cookbookId || "" : "";
+    const cookbookName = button && button.dataset ? button.dataset.cookbookName || "this cookbook" : "this cookbook";
+    const recipeCount = Number(button && button.dataset ? button.dataset.cookbookRecipeCount || 0 : 0);
+    const overwriteAiFields = cookbookInferOverwriteEnabled(button);
+    const previewOnly = cookbookInferPreviewEnabled(button);
+    const originalText = button ? button.textContent : "";
+
+    if (!cookbookId) {
+        return false;
+    }
+
+    if (recipeCount > 25 && !window.confirm(`Infer missing details for ${recipeCount} cookbook items in ${cookbookName}? This uses OpenAI and may take a little while.`)) {
+        return false;
+    }
+
+    try {
+        closeRecipeEditRowMenus();
+        if (button) {
+            button.disabled = true;
+            button.textContent = previewOnly ? "Previewing..." : "Inferring...";
+        }
+        setCookbookStatus(`${previewOnly ? "Previewing" : "Inferring"} missing details for ${cookbookName}...`);
+
+        const response = await fetch(`/api/cookbooks/${encodeURIComponent(cookbookId)}/infer_missing_details`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "fetch",
+            },
+            body: JSON.stringify({
+                overwrite_ai_fields: overwriteAiFields,
+                preview_only: previewOnly,
+            }),
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to infer cookbook item details.");
+        }
+
+        syncOpenAiUsageDashboardFromResponse(data);
+        if (!previewOnly) {
+            await refreshStoreMarkup({ cacheBust: true });
+        }
+        const message = cookbookInferenceSummary(data);
+        setCookbookStatus(message);
+        showRecipeQuantityUpdatedMessage("", "", "", message);
+    } catch (err) {
+        console.warn("Unable to infer cookbook item details.", err);
+        setCookbookStatus(err.message || "Unable to infer cookbook item details.", true);
+        window.alert(err.message || "Unable to infer cookbook item details.");
+    } finally {
+        if (button && button.isConnected) {
+            button.disabled = false;
+            button.textContent = originalText || "Infer Missing Details for Cookbook";
+        }
+    }
+
+    return false;
+}
+
+async function inferMissingCookbookRecipeDetails(button, event = null) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const recipeUrl = button && button.dataset ? button.dataset.recipeUrl || "" : "";
+    const recipeName = button && button.dataset ? button.dataset.recipeName || "this recipe" : "this recipe";
+    const cookbookId = button && button.dataset ? button.dataset.cookbookId || "" : "";
+    const cookbookName = button && button.dataset ? button.dataset.cookbookName || "" : "";
+    const overwriteAiFields = cookbookInferOverwriteEnabled(button);
+    const previewOnly = cookbookInferPreviewEnabled(button);
+    const originalText = button ? button.textContent : "";
+
+    if (!recipeUrl) {
+        setCookbookStatus("Recipe URL is required before inference.", true);
+        return false;
+    }
+
+    try {
+        closeRecipeEditRowMenus();
+        if (button) {
+            button.disabled = true;
+            button.textContent = previewOnly ? "Previewing..." : "Inferring...";
+        }
+        setCookbookStatus(`${previewOnly ? "Previewing" : "Inferring"} missing details for ${recipeName}...`);
+
+        const response = await fetch("/api/recipe/infer_missing_details", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "fetch",
+            },
+            body: JSON.stringify({
+                url: recipeUrl,
+                cookbook_id: cookbookId,
+                cookbook_name: cookbookName,
+                overwrite_ai_fields: overwriteAiFields,
+                preview_only: previewOnly,
+            }),
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to infer recipe details.");
+        }
+
+        syncOpenAiUsageDashboardFromResponse(data);
+        if (!previewOnly) {
+            await refreshStoreMarkup({ cacheBust: true });
+        }
+        const message = `${recipeName}: ${recipeInferenceSummary(data)}`;
+        setCookbookStatus(message);
+        showRecipeQuantityUpdatedMessage("", "", "", message);
+    } catch (err) {
+        console.warn("Unable to infer recipe details.", err);
+        setCookbookStatus(err.message || "Unable to infer recipe details.", true);
+        window.alert(err.message || "Unable to infer recipe details.");
+    } finally {
+        if (button && button.isConnected) {
+            button.disabled = false;
+            button.textContent = originalText || "Infer Details for This Recipe";
+        }
+    }
+
+    return false;
+}
+
 function updateCookbookMoveButton() {
     const button = document.getElementById("cookbookMoveButton");
     const select = document.getElementById("cookbookMoveTarget");
@@ -19453,6 +19617,91 @@ async function saveRecipeEditor(event) {
         if (saveButton) {
             saveButton.disabled = false;
             saveButton.textContent = "Save Recipe";
+        }
+    }
+
+    return false;
+}
+
+function recipeInferOverwriteEnabled() {
+    const checkbox = document.getElementById("recipeEditInferOverwriteAiFields");
+    return Boolean(checkbox && checkbox.checked);
+}
+
+function recipeInferPreviewEnabled() {
+    const checkbox = document.getElementById("recipeEditInferPreviewOnly");
+    return Boolean(checkbox && checkbox.checked);
+}
+
+function recipeInferenceSummary(data = {}) {
+    if (data.skipped) {
+        return "No missing recipe details were found.";
+    }
+    const fields = Array.isArray(data.preview_only ? data.would_update_fields : data.updated_fields)
+        ? (data.preview_only ? data.would_update_fields : data.updated_fields)
+        : [];
+    if (!fields.length) {
+        return "Recipe details checked.";
+    }
+    const action = data.preview_only ? "Would infer" : "Inferred";
+    return `${action} ${fields.length} field${fields.length === 1 ? "" : "s"}: ${fields.join(", ")}.`;
+}
+
+async function inferMissingRecipeDetails(button) {
+    const recipeUrl = recipeEditorCurrentUrl();
+    const originalText = button ? button.textContent : "";
+    const previewOnly = recipeInferPreviewEnabled();
+
+    if (!recipeUrl) {
+        setRecipeEditStatus("Recipe URL is required before inference.", true);
+        return false;
+    }
+
+    try {
+        if (button) {
+            button.disabled = true;
+            button.textContent = previewOnly ? "Previewing..." : "Inferring...";
+        }
+        setRecipeEditStatus(`${previewOnly ? "Previewing" : "Inferring"} missing recipe details...`);
+
+        const response = await fetch("/api/recipe/infer_missing_details", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "fetch",
+            },
+            body: JSON.stringify({
+                url: recipeUrl,
+                overwrite_ai_fields: recipeInferOverwriteEnabled(),
+                preview_only: previewOnly,
+            }),
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to infer missing recipe details.");
+        }
+
+        syncOpenAiUsageDashboardFromResponse(data);
+        if (!previewOnly) {
+            await refreshStoreMarkup({ cacheBust: true });
+        }
+        if (!previewOnly && data.recipe) {
+            populateRecipeEditor(data.recipe, data.recipe.source_url || data.recipe_url || recipeUrl);
+        } else if (!previewOnly) {
+            const refreshed = await fetchRecipeEditorData(data.recipe_url || recipeUrl);
+            populateRecipeEditor(refreshed, refreshed.source_url || data.recipe_url || recipeUrl);
+        }
+        const message = recipeInferenceSummary(data);
+        setRecipeEditStatus(message);
+        showRecipeQuantityUpdatedMessage("", "", "", message);
+    } catch (err) {
+        console.warn("Unable to infer missing recipe details.", err);
+        setRecipeEditStatus(err.message || "Unable to infer missing recipe details.", true);
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = originalText || "Infer Missing Details";
         }
     }
 

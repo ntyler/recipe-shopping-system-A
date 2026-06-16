@@ -57,7 +57,9 @@ def test_cookbook_menu_mode_static_hooks_are_present():
     assert "function applyCookbookViewMode" in script
     assert "COOKBOOK_VIEW_MODE_SESSION_KEY" in script
     assert "function saveCookbookCategories" in script
+    assert "function inferMissingCookbookRecipeDetails" in script
     assert "cookbook_category_overwrite" in script
+    assert "Infer Details for This Recipe" in template
     assert "data-cookbook-search-text" in template
     assert ".cookbook-menu-recipe-card" in css
     assert ".cookbook-recipe-log-view" in css

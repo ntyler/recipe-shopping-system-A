@@ -44,6 +44,7 @@ from PushShoppingList.services.cookbook_service import remove_recipes_from_cookb
 from PushShoppingList.services.cookbook_service import rename_cookbook
 from PushShoppingList.services.cookbook_service import reorder_cookbooks
 from PushShoppingList.services.cookbook_service import update_cookbook_recipe_categories
+from PushShoppingList.services.cookbook_item_inference_service import infer_missing_details_for_cookbook
 from PushShoppingList.services.home_address_service import load_home_address
 from PushShoppingList.services.home_address_service import load_home_address_history
 from PushShoppingList.services.home_address_service import save_home_address
@@ -2262,6 +2263,33 @@ def update_cookbook_recipe_categories_route(cookbook_id):
         return jsonify({"ok": False, "error": str(err)}), 400
 
     return jsonify({"ok": True})
+
+
+@main_bp.route("/api/cookbooks/<cookbook_id>/infer_missing_details", methods=["POST"])
+def infer_cookbook_missing_details_route(cookbook_id):
+    data = request.get_json(silent=True) or {}
+    overwrite_ai_fields = False
+    preview_only = False
+    if isinstance(data, dict):
+        overwrite_ai_fields = bool(data.get("overwrite_ai_fields"))
+        preview_only = bool(data.get("preview_only"))
+    if request.form:
+        overwrite_ai_fields = overwrite_ai_fields or request.form.get("overwrite_ai_fields") == "1"
+        preview_only = preview_only or request.form.get("preview_only") == "1"
+
+    try:
+        result = infer_missing_details_for_cookbook(
+            cookbook_id,
+            overwrite_ai_fields=overwrite_ai_fields,
+            preview_only=preview_only,
+        )
+    except ValueError as err:
+        return jsonify({"ok": False, "error": str(err)}), 404
+
+    return jsonify({
+        **result,
+        "openai_usage_dashboard": openai_usage_dashboard_for_user(current_public_user()),
+    }), 200 if result.get("ok") else 400
 
 
 @main_bp.route("/api/cookbooks/restore_recipes", methods=["POST"])

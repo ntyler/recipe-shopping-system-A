@@ -20774,3 +20774,75 @@ img[data-deferred-src] {
             cursor: wait;
             opacity: 0.65;
         }
+
+        .cookbook-card-actions {
+            flex-wrap: wrap;
+        }
+
+        .cookbook-infer-toggle,
+        .recipe-edit-ai-overwrite-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 32px;
+            margin: 0;
+            color: #cbd5e1;
+            font-size: 12px;
+            font-weight: 750;
+            line-height: 1.15;
+            white-space: nowrap;
+        }
+
+        .cookbook-infer-toggle input,
+        .recipe-edit-ai-overwrite-toggle input {
+            width: 16px;
+            min-width: 16px;
+            height: 16px;
+            margin: 0;
+            accent-color: #16a34a;
+        }
+
+        .cookbook-infer-details-btn {
+            min-width: 202px;
+            border: 1px solid #1d4ed8;
+            background: linear-gradient(180deg, #2563eb, #1d4ed8);
+            color: #eff6ff;
+        }
+
+        .recipe-edit-ai-overwrite-toggle {
+            flex: 0 0 auto;
+            padding: 0 4px;
+        }
+
+        .recipe-edit-ai-infer {
+            order: 0;
+            flex: 1 1 170px;
+            border: 1px solid #1d4ed8;
+            background: linear-gradient(180deg, #2563eb, #1d4ed8);
+            color: #eff6ff;
+        }
+
+        @media (max-width: 760px) {
+            .cookbook-card-actions {
+                justify-content: flex-start;
+            }
+
+            .cookbook-infer-toggle,
+            .recipe-edit-ai-overwrite-toggle {
+                width: 100%;
+                justify-content: center;
+                white-space: normal;
+            }
+
+            .cookbook-infer-details-btn {
+                width: 100%;
+            }
+
+            .recipe-edit-actions {
+                flex-wrap: wrap;
+            }
+
+            .recipe-edit-ai-infer {
+                flex-basis: 100%;
+            }
+        }
