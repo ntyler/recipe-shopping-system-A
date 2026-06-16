@@ -14836,18 +14836,21 @@ function applyRecipeEditCategorySuggestions(categories = {}, mode = "missing") {
     }
 }
 
-async function decideRecipeEditCategoriesWithChatGPT(button, mode = "missing") {
+async function decideRecipeEditCategoriesWithChatGPT(button, mode = "missing", options = {}) {
     const decisionMode = mode === "all" ? "all" : "missing";
     const originalText = button ? button.textContent : "";
+    const returnResult = Boolean(options.returnResult);
+    const setStatusMessages = options.setStatus !== false;
 
     closeRecipeEditRowMenus();
 
     if (
         decisionMode === "all"
         && recipeEditCategoryValuesHaveAny(collectRecipeEditorCategoryValues())
+        && options.confirmOverwrite !== false
         && !window.confirm("ChatGPT will replace the current category selections. Continue?")
     ) {
-        return false;
+        return returnResult ? { ok: false, canceled: true } : false;
     }
 
     if (button) {
@@ -14856,7 +14859,9 @@ async function decideRecipeEditCategoriesWithChatGPT(button, mode = "missing") {
     }
 
     try {
-        setRecipeEditStatus("Asking ChatGPT to choose recipe categories...");
+        if (setStatusMessages) {
+            setRecipeEditStatus("Asking ChatGPT to choose recipe categories...");
+        }
         const payload = collectRecipeEditorPayload();
         const startData = await startBackgroundJob("/api/jobs/recipe-category-decision", {
             button,
@@ -14874,7 +14879,9 @@ async function decideRecipeEditCategoriesWithChatGPT(button, mode = "missing") {
         }
         const finishedJob = await waitForJobCompletion(startData.job_id, {
             onUpdate(job) {
-                setRecipeEditStatus(job.current_step || "Asking ChatGPT to choose recipe categories...");
+                if (setStatusMessages) {
+                    setRecipeEditStatus(job.current_step || "Asking ChatGPT to choose recipe categories...");
+                }
             },
         });
         const data = finishedJob && finishedJob.result_payload && typeof finishedJob.result_payload === "object"
@@ -14887,14 +14894,23 @@ async function decideRecipeEditCategoriesWithChatGPT(button, mode = "missing") {
         }
 
         applyRecipeEditCategorySuggestions(data.categories || {}, decisionMode);
-        setRecipeEditStatus(
-            decisionMode === "all"
-                ? "ChatGPT filled recipe categories. Save Recipe to keep them."
-                : "ChatGPT filled missing recipe categories. Save Recipe to keep them."
-        );
+        if (setStatusMessages) {
+            setRecipeEditStatus(
+                decisionMode === "all"
+                    ? "ChatGPT filled recipe categories. Save Recipe to keep them."
+                    : "ChatGPT filled missing recipe categories. Save Recipe to keep them."
+            );
+        }
+        return returnResult ? { ok: true, data, categories: data.categories || {} } : false;
     } catch (err) {
         console.warn("Unable to choose recipe categories.", err);
-        setRecipeEditStatus(err.message || "Unable to choose recipe categories.", true);
+        if (setStatusMessages) {
+            setRecipeEditStatus(err.message || "Unable to choose recipe categories.", true);
+        }
+        if (options.throwOnError) {
+            throw err;
+        }
+        return returnResult ? { ok: false, error: err } : false;
     } finally {
         if (button && button.isConnected) {
             button.disabled = false;
@@ -14905,8 +14921,6 @@ async function decideRecipeEditCategoriesWithChatGPT(button, mode = "missing") {
             );
         }
     }
-
-    return false;
 }
 
 async function openRecipeEditor(button, options = {}) {
@@ -19327,17 +19341,21 @@ function recipeNutritionHeaderHtml() {
     `;
 }
 
-async function estimateRecipeNutrition(button) {
+async function estimateRecipeNutrition(button, options = {}) {
     const originalText = button ? button.textContent : "";
     const payload = collectRecipeEditorPayload();
+    const returnResult = Boolean(options.returnResult);
+    const setStatusMessages = options.setStatus !== false;
 
     if (payload && payload.recipe && recipeHasPerServingEstimate(payload.recipe)) {
         updateRecipeEditorPdfControls(payload.recipe, {
             updateInputValues: false,
             useCurrentForMissing: true,
         });
-        setRecipeEditStatus("Per-serving nutrition is already available.");
-        return false;
+        if (setStatusMessages) {
+            setRecipeEditStatus("Per-serving nutrition is already available.");
+        }
+        return returnResult ? { ok: true, already_available: true } : false;
     }
 
     if (button) {
@@ -19346,7 +19364,9 @@ async function estimateRecipeNutrition(button) {
     }
 
     try {
-        setRecipeEditStatus("Estimating nutrition with ChatGPT...");
+        if (setStatusMessages) {
+            setRecipeEditStatus("Estimating nutrition with ChatGPT...");
+        }
         const response = await fetch("/api/recipe_nutrition_estimate", {
             method: "POST",
             headers: {
@@ -19369,18 +19389,25 @@ async function estimateRecipeNutrition(button) {
                 useCurrentForMissing: true,
             });
         }
-        setRecipeEditStatus("Nutrition estimate added. Review values, then Save Recipe.");
+        if (setStatusMessages) {
+            setRecipeEditStatus("Nutrition estimate added. Review values, then Save Recipe.");
+        }
+        return returnResult ? { ok: true, data, nutrition: data.nutrition || [] } : false;
     } catch (err) {
         console.warn("Unable to estimate nutrition.", err);
-        setRecipeEditStatus(err.message || "Unable to estimate nutrition.", true);
+        if (setStatusMessages) {
+            setRecipeEditStatus(err.message || "Unable to estimate nutrition.", true);
+        }
+        if (options.throwOnError) {
+            throw err;
+        }
+        return returnResult ? { ok: false, error: err } : false;
     } finally {
         if (button) {
             button.disabled = false;
             button.textContent = originalText || "Estimate per serving basis";
         }
     }
-
-    return false;
 }
 
 function applyEstimatedNutritionRows(rows) {
@@ -19892,6 +19919,67 @@ function recipeInferenceSummary(data = {}) {
     return `${action} ${fields.length} field${fields.length === 1 ? "" : "s"}: ${fields.join(", ")}.`;
 }
 
+function recipeEditorFollowupErrorMessage(err, fallback) {
+    return String((err && err.message) || fallback || "Unable to complete follow-up.").trim();
+}
+
+function recipeEditorInferenceFollowupSummary(result = {}) {
+    const messages = [];
+    const nutrition = result.nutrition || {};
+    const categories = result.categories || {};
+
+    if (nutrition.ok) {
+        messages.push(nutrition.already_available ? "Per-serving nutrition was already available." : "Estimated per-serving nutrition.");
+    } else if (nutrition.error) {
+        messages.push(`Nutrition estimate failed: ${recipeEditorFollowupErrorMessage(nutrition.error, "Unable to estimate nutrition.")}`);
+    }
+
+    if (categories.ok) {
+        messages.push("ChatGPT decided all categories.");
+    } else if (categories.canceled) {
+        messages.push("ChatGPT category decision was canceled.");
+    } else if (categories.error) {
+        messages.push(`Category decision failed: ${recipeEditorFollowupErrorMessage(categories.error, "Unable to choose recipe categories.")}`);
+    }
+
+    if (messages.some(message => /Estimated|decided|available/i.test(message))) {
+        messages.push("Save Recipe to keep nutrition/categories.");
+    }
+
+    return messages.join(" ");
+}
+
+async function runRecipeEditorInferenceFollowups() {
+    const result = {
+        nutrition: null,
+        categories: null,
+    };
+
+    try {
+        setRecipeEditStatus("Estimating per-serving nutrition...");
+        result.nutrition = await estimateRecipeNutrition(null, {
+            returnResult: true,
+            throwOnError: true,
+        });
+    } catch (err) {
+        console.warn("Unable to estimate nutrition after inference.", err);
+        result.nutrition = { ok: false, error: err };
+    }
+
+    try {
+        setRecipeEditStatus("Having ChatGPT decide all categories...");
+        result.categories = await decideRecipeEditCategoriesWithChatGPT(null, "all", {
+            returnResult: true,
+            throwOnError: true,
+        });
+    } catch (err) {
+        console.warn("Unable to decide all categories after inference.", err);
+        result.categories = { ok: false, error: err };
+    }
+
+    return result;
+}
+
 async function inferMissingRecipeDetails(button) {
     const recipeUrl = recipeEditorCurrentUrl();
     const originalText = button ? button.textContent : "";
@@ -19937,7 +20025,11 @@ async function inferMissingRecipeDetails(button) {
             const refreshed = await fetchRecipeEditorData(data.recipe_url || recipeUrl);
             populateRecipeEditor(refreshed, refreshed.source_url || data.recipe_url || recipeUrl);
         }
-        const message = recipeInferenceSummary(data);
+        const followupResult = previewOnly ? null : await runRecipeEditorInferenceFollowups();
+        const message = [
+            recipeInferenceSummary(data),
+            followupResult ? recipeEditorInferenceFollowupSummary(followupResult) : "",
+        ].filter(Boolean).join(" ");
         setRecipeEditStatus(message);
         showRecipeQuantityUpdatedMessage("", "", "", message);
     } catch (err) {

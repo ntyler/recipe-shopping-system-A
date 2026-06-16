@@ -43,6 +43,18 @@ def test_recipe_editor_includes_inline_category_controls_above_ingredients():
     assert "cookbook_category_overwrite" in script
 
 
+def test_recipe_editor_infer_missing_details_runs_full_ai_followups():
+    script = read_text("PushShoppingList/static/js/app.js")
+
+    assert "async function estimateRecipeNutrition(button, options = {})" in script
+    assert "async function decideRecipeEditCategoriesWithChatGPT(button, mode = \"missing\", options = {})" in script
+    assert "async function runRecipeEditorInferenceFollowups()" in script
+    assert "await estimateRecipeNutrition(null, {" in script
+    assert "await decideRecipeEditCategoriesWithChatGPT(null, \"all\", {" in script
+    assert "const followupResult = previewOnly ? null : await runRecipeEditorInferenceFollowups();" in script
+    assert "Save Recipe to keep nutrition/categories." in script
+
+
 def test_recipe_editor_category_metadata_preserves_saved_values_without_live_inference():
     with TemporaryDirectory() as temp_dir, patch.object(
         cookbook_service,
