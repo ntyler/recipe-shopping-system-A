@@ -1,0 +1,251 @@
+{
+  "source_url": "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-227-Extra_Sauce_S",
+  "recipe_amount": "1 cup",
+  "yield": "1 cup of sauce",
+  "servings": "1 appetizer serving",
+  "level": "Easy",
+  "total_time": "10 minutes",
+  "prep_time": "5 minutes",
+  "inactive_time": "0 minutes",
+  "cook_time": "5 minutes",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "1/2 cup soy sauce",
+      "quantity": "1/2",
+      "recipe_qty": "1/2",
+      "unit": "cup",
+      "base_quantity": "1/2",
+      "base_unit": "cup",
+      "ingredient": "soy sauce",
+      "preparation": "low sodium preferred",
+      "optional": false,
+      "store_section": "SAUCES & CONDIMENTS",
+      "store_section_order": 9,
+      "purchasable_item": "soy sauce",
+      "purchase_group": "soy sauce"
+    },
+    {
+      "section": null,
+      "original_text": "1/4 cup rice vinegar",
+      "quantity": "1/4",
+      "recipe_qty": "1/4",
+      "unit": "cup",
+      "base_quantity": "1/4",
+      "base_unit": "cup",
+      "ingredient": "rice vinegar",
+      "preparation": null,
+      "optional": false,
+      "store_section": "OILS & VINEGARS",
+      "store_section_order": 13,
+      "purchasable_item": "rice vinegar",
+      "purchase_group": "rice vinegar"
+    },
+    {
+      "section": null,
+      "original_text": "2 tablespoons sesame oil",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "tablespoons",
+      "base_quantity": "2",
+      "base_unit": "tablespoons",
+      "ingredient": "sesame oil",
+      "preparation": null,
+      "optional": false,
+      "store_section": "OILS & VINEGARS",
+      "store_section_order": 13,
+      "purchasable_item": "sesame oil",
+      "purchase_group": "sesame oil"
+    },
+    {
+      "section": null,
+      "original_text": "2 tablespoons honey",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "tablespoons",
+      "base_quantity": "2",
+      "base_unit": "tablespoons",
+      "ingredient": "honey",
+      "preparation": "or sugar for a vegan option",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "honey",
+      "purchase_group": "honey"
+    },
+    {
+      "section": null,
+      "original_text": "2 cloves garlic",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "cloves",
+      "base_quantity": "2",
+      "base_unit": "cloves",
+      "ingredient": "garlic",
+      "preparation": "minced",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1,
+      "purchasable_item": "garlic",
+      "purchase_group": "garlic"
+    },
+    {
+      "section": null,
+      "original_text": "1 teaspoon ginger",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "teaspoon",
+      "base_quantity": "1",
+      "base_unit": "teaspoon",
+      "ingredient": "ginger",
+      "preparation": "grated",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "ginger",
+      "purchase_group": "ginger"
+    },
+    {
+      "section": null,
+      "original_text": "1/2 teaspoon red pepper flakes",
+      "quantity": "1/2",
+      "recipe_qty": "1/2",
+      "unit": "teaspoon",
+      "base_quantity": "1/2",
+      "base_unit": "teaspoon",
+      "ingredient": "red pepper flakes",
+      "preparation": "optional for heat",
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12,
+      "purchasable_item": "red pepper flakes",
+      "purchase_group": "red pepper flakes"
+    }
+  ],
+  "equipment": [
+    {
+      "equipment": "mixing bowl",
+      "text": "mixing bowl",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "whisk",
+      "text": "whisk",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "measuring cups",
+      "text": "measuring cups",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "measuring spoons",
+      "text": "measuring spoons",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    }
+  ],
+  "instructions": [
+    {
+      "section": null,
+      "step_number": 1,
+      "instruction": "In a mixing bowl, combine soy sauce, rice vinegar, sesame oil, and honey.",
+      "text": "In a mixing bowl, combine soy sauce, rice vinegar, sesame oil, and honey.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "Add minced garlic, grated ginger, and red pepper flakes if using.",
+      "text": "Add minced garlic, grated ginger, and red pepper flakes if using.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "Whisk until well combined.",
+      "text": "Whisk until well combined.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "Serve immediately or store in the refrigerator for up to a week.",
+      "text": "Serve immediately or store in the refrigerator for up to a week.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    }
+  ],
+  "scaling": {
+    "selected_multiplier": 1,
+    "base_multiplier": 1,
+    "base_servings": "1 appetizer serving",
+    "available_multipliers": [
+      {
+        "label": "1/2x",
+        "value": 0.5
+      },
+      {
+        "label": "1x",
+        "value": 1
+      },
+      {
+        "label": "2x",
+        "value": 2
+      },
+      {
+        "label": "3x",
+        "value": 3
+      }
+    ]
+  },
+  "ai_inferred": true,
+  "inferred_by_model": "gpt-4o-mini",
+  "inferred_at": "2026-06-16T02:33:10Z",
+  "inference_confidence": "high",
+  "source_type": "cookbook_item_inferred",
+  "cookbook_item_inferred_fields": [
+    "cook_time",
+    "equipment",
+    "inactive_time",
+    "ingredients",
+    "instructions",
+    "level",
+    "prep_time",
+    "recipe_amount",
+    "servings",
+    "total_time",
+    "yield"
+  ],
+  "cookbook_item_inference_field_sources": {
+    "recipe_amount": "ai_inferred",
+    "yield": "ai_inferred",
+    "servings": "ai_inferred",
+    "level": "ai_inferred",
+    "total_time": "ai_inferred",
+    "prep_time": "ai_inferred",
+    "inactive_time": "ai_inferred",
+    "cook_time": "ai_inferred",
+    "ingredients": "ai_inferred",
+    "equipment": "ai_inferred",
+    "instructions": "ai_inferred"
+  }
+}

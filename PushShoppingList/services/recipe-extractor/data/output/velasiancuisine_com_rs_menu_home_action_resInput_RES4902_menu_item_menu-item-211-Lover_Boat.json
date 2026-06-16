@@ -1,0 +1,284 @@
+{
+  "source_url": "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-211-Lover_Boat",
+  "recipe_amount": "1",
+  "yield": "1 platter",
+  "servings": "1 appetizer serving",
+  "level": "Medium",
+  "total_time": "30 minutes",
+  "prep_time": "15 minutes",
+  "inactive_time": "0 minutes",
+  "cook_time": "15 minutes",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "8 pieces shrimp",
+      "quantity": "8",
+      "recipe_qty": "8",
+      "unit": "pieces",
+      "base_quantity": "8",
+      "base_unit": "pieces",
+      "ingredient": "shrimp",
+      "preparation": "peeled and deveined",
+      "optional": false,
+      "store_section": "MEAT & SEAFOOD",
+      "store_section_order": 2,
+      "purchasable_item": "shrimp",
+      "purchase_group": "shrimp"
+    },
+    {
+      "section": null,
+      "original_text": "4 pieces scallops",
+      "quantity": "4",
+      "recipe_qty": "4",
+      "unit": "pieces",
+      "base_quantity": "4",
+      "base_unit": "pieces",
+      "ingredient": "scallops",
+      "preparation": "fresh",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "scallops",
+      "purchase_group": "scallops"
+    },
+    {
+      "section": null,
+      "original_text": "1/2 cup crab meat",
+      "quantity": "1/2",
+      "recipe_qty": "1/2",
+      "unit": "cup",
+      "base_quantity": "1/2",
+      "base_unit": "cup",
+      "ingredient": "crab meat",
+      "preparation": "cooked",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "crab meat",
+      "purchase_group": "crab meat"
+    },
+    {
+      "section": null,
+      "original_text": "1 cup vegetables",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "cup",
+      "base_quantity": "1",
+      "base_unit": "cup",
+      "ingredient": "vegetables",
+      "preparation": "mixed (carrots, bell peppers, and snap peas)",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "vegetables",
+      "purchase_group": "vegetables"
+    },
+    {
+      "section": null,
+      "original_text": "2 tablespoons soy sauce",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "tablespoons",
+      "base_quantity": "2",
+      "base_unit": "tablespoons",
+      "ingredient": "soy sauce",
+      "preparation": "for seasoning",
+      "optional": false,
+      "store_section": "SAUCES & CONDIMENTS",
+      "store_section_order": 9,
+      "purchasable_item": "soy sauce",
+      "purchase_group": "soy sauce"
+    },
+    {
+      "section": null,
+      "original_text": "1 teaspoon ginger",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "teaspoon",
+      "base_quantity": "1",
+      "base_unit": "teaspoon",
+      "ingredient": "ginger",
+      "preparation": "grated",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "ginger",
+      "purchase_group": "ginger"
+    },
+    {
+      "section": null,
+      "original_text": "2 cloves garlic",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "cloves",
+      "base_quantity": "2",
+      "base_unit": "cloves",
+      "ingredient": "garlic",
+      "preparation": "minced",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1,
+      "purchasable_item": "garlic",
+      "purchase_group": "garlic"
+    },
+    {
+      "section": null,
+      "original_text": "2 tablespoons oil",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "tablespoons",
+      "base_quantity": "2",
+      "base_unit": "tablespoons",
+      "ingredient": "oil",
+      "preparation": "for frying",
+      "optional": false,
+      "store_section": "OILS & VINEGARS",
+      "store_section_order": 13,
+      "purchasable_item": "oil",
+      "purchase_group": "oil"
+    }
+  ],
+  "equipment": [
+    {
+      "equipment": "skillet",
+      "text": "skillet",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "mixing bowl",
+      "text": "mixing bowl",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "spatula",
+      "text": "spatula",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "knife",
+      "text": "knife",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "cutting board",
+      "text": "cutting board",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    }
+  ],
+  "instructions": [
+    {
+      "section": null,
+      "step_number": 1,
+      "instruction": "In a mixing bowl, combine shrimp, scallops, crab meat, mixed vegetables, soy sauce, ginger, and garlic.",
+      "text": "In a mixing bowl, combine shrimp, scallops, crab meat, mixed vegetables, soy sauce, ginger, and garlic.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "Heat oil in a skillet over medium heat.",
+      "text": "Heat oil in a skillet over medium heat.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "Add the seafood and vegetable mixture to the skillet.",
+      "text": "Add the seafood and vegetable mixture to the skillet.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "Cook for about 5-7 minutes, stirring occasionally, until shrimp are pink and scallops are opaque.",
+      "text": "Cook for about 5-7 minutes, stirring occasionally, until shrimp are pink and scallops are opaque.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 5,
+      "instruction": "Serve hot as an appetizer.",
+      "text": "Serve hot as an appetizer.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    }
+  ],
+  "scaling": {
+    "selected_multiplier": 1,
+    "base_multiplier": 1,
+    "base_servings": "1 appetizer serving",
+    "available_multipliers": [
+      {
+        "label": "1/2x",
+        "value": 0.5
+      },
+      {
+        "label": "1x",
+        "value": 1
+      },
+      {
+        "label": "2x",
+        "value": 2
+      },
+      {
+        "label": "3x",
+        "value": 3
+      }
+    ]
+  },
+  "ai_inferred": true,
+  "inferred_by_model": "gpt-4o-mini",
+  "inferred_at": "2026-06-16T02:32:09Z",
+  "inference_confidence": "medium",
+  "source_type": "cookbook_item_inferred",
+  "cookbook_item_inferred_fields": [
+    "cook_time",
+    "equipment",
+    "inactive_time",
+    "ingredients",
+    "instructions",
+    "level",
+    "prep_time",
+    "recipe_amount",
+    "servings",
+    "total_time",
+    "yield"
+  ],
+  "cookbook_item_inference_field_sources": {
+    "recipe_amount": "ai_inferred",
+    "yield": "ai_inferred",
+    "servings": "ai_inferred",
+    "level": "ai_inferred",
+    "total_time": "ai_inferred",
+    "prep_time": "ai_inferred",
+    "inactive_time": "ai_inferred",
+    "cook_time": "ai_inferred",
+    "ingredients": "ai_inferred",
+    "equipment": "ai_inferred",
+    "instructions": "ai_inferred"
+  }
+}

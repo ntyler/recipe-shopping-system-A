@@ -1,0 +1,273 @@
+{
+  "source_url": "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-174-Yummy_Roll",
+  "recipe_amount": "8 rolls",
+  "yield": "8 pieces",
+  "servings": "1 appetizer serving",
+  "level": "Easy",
+  "total_time": "30 minutes",
+  "prep_time": "15 minutes",
+  "inactive_time": "0 minutes",
+  "cook_time": "15 minutes",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "8 pieces rice paper wrappers",
+      "quantity": "8",
+      "recipe_qty": "8",
+      "unit": "pieces",
+      "base_quantity": "8",
+      "base_unit": "pieces",
+      "ingredient": "rice paper wrappers",
+      "preparation": "for wrapping",
+      "optional": false,
+      "store_section": "PASTA, RICE & GRAINS",
+      "store_section_order": 6,
+      "purchasable_item": "rice paper wrappers",
+      "purchase_group": "rice paper wrappers"
+    },
+    {
+      "section": null,
+      "original_text": "1 cup cooked shrimp",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "cup",
+      "base_quantity": "1",
+      "base_unit": "cup",
+      "ingredient": "cooked shrimp",
+      "preparation": "chopped",
+      "optional": false,
+      "store_section": "MEAT & SEAFOOD",
+      "store_section_order": 2,
+      "purchasable_item": "cooked shrimp",
+      "purchase_group": "cooked shrimp"
+    },
+    {
+      "section": null,
+      "original_text": "1/2 cup vermicelli noodles",
+      "quantity": "1/2",
+      "recipe_qty": "1/2",
+      "unit": "cup",
+      "base_quantity": "1/2",
+      "base_unit": "cup",
+      "ingredient": "vermicelli noodles",
+      "preparation": "cooked",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "vermicelli noodles",
+      "purchase_group": "vermicelli noodles"
+    },
+    {
+      "section": null,
+      "original_text": "1/4 cup fresh mint leaves",
+      "quantity": "1/4",
+      "recipe_qty": "1/4",
+      "unit": "cup",
+      "base_quantity": "1/4",
+      "base_unit": "cup",
+      "ingredient": "fresh mint leaves",
+      "preparation": "chopped",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "fresh mint leaves",
+      "purchase_group": "fresh mint leaves"
+    },
+    {
+      "section": null,
+      "original_text": "1/4 cup fresh cilantro",
+      "quantity": "1/4",
+      "recipe_qty": "1/4",
+      "unit": "cup",
+      "base_quantity": "1/4",
+      "base_unit": "cup",
+      "ingredient": "fresh cilantro",
+      "preparation": "chopped",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1,
+      "purchasable_item": "fresh cilantro",
+      "purchase_group": "fresh cilantro"
+    },
+    {
+      "section": null,
+      "original_text": "4 leaves lettuce leaves",
+      "quantity": "4",
+      "recipe_qty": "4",
+      "unit": "leaves",
+      "base_quantity": "4",
+      "base_unit": "leaves",
+      "ingredient": "lettuce leaves",
+      "preparation": "for filling",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "lettuce leaves",
+      "purchase_group": "lettuce leaves"
+    },
+    {
+      "section": null,
+      "original_text": "1/4 cup hoisin sauce",
+      "quantity": "1/4",
+      "recipe_qty": "1/4",
+      "unit": "cup",
+      "base_quantity": "1/4",
+      "base_unit": "cup",
+      "ingredient": "hoisin sauce",
+      "preparation": "for dipping",
+      "optional": false,
+      "store_section": "SAUCES & CONDIMENTS",
+      "store_section_order": 9,
+      "purchasable_item": "hoisin sauce",
+      "purchase_group": "hoisin sauce"
+    }
+  ],
+  "equipment": [
+    {
+      "equipment": "large bowl",
+      "text": "large bowl",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "cutting board",
+      "text": "cutting board",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "sharp knife",
+      "text": "sharp knife",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "serving platter",
+      "text": "serving platter",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    }
+  ],
+  "instructions": [
+    {
+      "section": null,
+      "step_number": 1,
+      "instruction": "Soak rice paper wrappers in warm water until soft, about 10 seconds.",
+      "text": "Soak rice paper wrappers in warm water until soft, about 10 seconds.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "Lay the softened wrapper on a cutting board.",
+      "text": "Lay the softened wrapper on a cutting board.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "Place a lettuce leaf, a few shrimp pieces, vermicelli noodles, mint, and cilantro in the center.",
+      "text": "Place a lettuce leaf, a few shrimp pieces, vermicelli noodles, mint, and cilantro in the center.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "Fold the sides over the filling and roll tightly from the bottom up.",
+      "text": "Fold the sides over the filling and roll tightly from the bottom up.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 5,
+      "instruction": "Repeat with remaining wrappers and filling.",
+      "text": "Repeat with remaining wrappers and filling.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 6,
+      "instruction": "Serve with hoisin sauce for dipping.",
+      "text": "Serve with hoisin sauce for dipping.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    }
+  ],
+  "scaling": {
+    "selected_multiplier": 1,
+    "base_multiplier": 1,
+    "base_servings": "1 appetizer serving",
+    "available_multipliers": [
+      {
+        "label": "1/2x",
+        "value": 0.5
+      },
+      {
+        "label": "1x",
+        "value": 1
+      },
+      {
+        "label": "2x",
+        "value": 2
+      },
+      {
+        "label": "3x",
+        "value": 3
+      }
+    ]
+  },
+  "ai_inferred": true,
+  "inferred_by_model": "gpt-4o-mini",
+  "inferred_at": "2026-06-16T02:29:31Z",
+  "inference_confidence": "high",
+  "source_type": "cookbook_item_inferred",
+  "cookbook_item_inferred_fields": [
+    "cook_time",
+    "equipment",
+    "inactive_time",
+    "ingredients",
+    "instructions",
+    "level",
+    "prep_time",
+    "recipe_amount",
+    "servings",
+    "total_time",
+    "yield"
+  ],
+  "cookbook_item_inference_field_sources": {
+    "recipe_amount": "ai_inferred",
+    "yield": "ai_inferred",
+    "servings": "ai_inferred",
+    "level": "ai_inferred",
+    "total_time": "ai_inferred",
+    "prep_time": "ai_inferred",
+    "inactive_time": "ai_inferred",
+    "cook_time": "ai_inferred",
+    "ingredients": "ai_inferred",
+    "equipment": "ai_inferred",
+    "instructions": "ai_inferred"
+  }
+}

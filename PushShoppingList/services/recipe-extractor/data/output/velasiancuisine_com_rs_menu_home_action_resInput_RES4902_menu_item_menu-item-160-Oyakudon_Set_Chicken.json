@@ -1,0 +1,290 @@
+{
+  "source_url": "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-160-Oyakudon_Set_Chicken",
+  "recipe_amount": "1",
+  "yield": "1 bowl",
+  "servings": "1 appetizer serving",
+  "level": "Medium",
+  "total_time": "30 minutes",
+  "prep_time": "10 minutes",
+  "inactive_time": "0 minutes",
+  "cook_time": "20 minutes",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "200 grams chicken thighs",
+      "quantity": "200",
+      "recipe_qty": "200",
+      "unit": "grams",
+      "base_quantity": "200",
+      "base_unit": "grams",
+      "ingredient": "chicken thighs",
+      "preparation": "boneless, skinless",
+      "optional": false,
+      "store_section": "MEAT & SEAFOOD",
+      "store_section_order": 2,
+      "purchasable_item": "chicken thighs",
+      "purchase_group": "chicken thighs"
+    },
+    {
+      "section": null,
+      "original_text": "100 grams rice",
+      "quantity": "100",
+      "recipe_qty": "100",
+      "unit": "grams",
+      "base_quantity": "100",
+      "base_unit": "grams",
+      "ingredient": "rice",
+      "preparation": "short-grain, uncooked",
+      "optional": false,
+      "store_section": "PASTA, RICE & GRAINS",
+      "store_section_order": 6,
+      "purchasable_item": "rice",
+      "purchase_group": "rice"
+    },
+    {
+      "section": null,
+      "original_text": "300 ml dashi stock",
+      "quantity": "300",
+      "recipe_qty": "300",
+      "unit": "ml",
+      "base_quantity": "300",
+      "base_unit": "ml",
+      "ingredient": "dashi stock",
+      "preparation": "or chicken broth",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "dashi stock",
+      "purchase_group": "dashi stock"
+    },
+    {
+      "section": null,
+      "original_text": "2 tablespoons soy sauce",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "tablespoons",
+      "base_quantity": "2",
+      "base_unit": "tablespoons",
+      "ingredient": "soy sauce",
+      "preparation": null,
+      "optional": false,
+      "store_section": "SAUCES & CONDIMENTS",
+      "store_section_order": 9,
+      "purchasable_item": "soy sauce",
+      "purchase_group": "soy sauce"
+    },
+    {
+      "section": null,
+      "original_text": "1 tablespoon mirin",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "tablespoon",
+      "base_quantity": "1",
+      "base_unit": "tablespoon",
+      "ingredient": "mirin",
+      "preparation": null,
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "mirin",
+      "purchase_group": "mirin"
+    },
+    {
+      "section": null,
+      "original_text": "1 large egg",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "large",
+      "base_quantity": "1",
+      "base_unit": "large",
+      "ingredient": "egg",
+      "preparation": "beaten",
+      "optional": false,
+      "store_section": "DAIRY & EGGS",
+      "store_section_order": 3,
+      "purchasable_item": "eggs",
+      "purchase_group": "eggs"
+    },
+    {
+      "section": null,
+      "original_text": "1 stalk green onions",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "stalk",
+      "base_quantity": "1",
+      "base_unit": "stalk",
+      "ingredient": "green onions",
+      "preparation": "sliced",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1,
+      "purchasable_item": "green onions",
+      "purchase_group": "green onions"
+    },
+    {
+      "section": null,
+      "original_text": "1 sheet nori",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "sheet",
+      "base_quantity": "1",
+      "base_unit": "sheet",
+      "ingredient": "nori",
+      "preparation": "cut into strips for garnish",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "nori",
+      "purchase_group": "nori"
+    }
+  ],
+  "equipment": [
+    {
+      "equipment": "rice cooker",
+      "text": "rice cooker",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "saucepan",
+      "text": "saucepan",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "whisk",
+      "text": "whisk",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "bowl",
+      "text": "bowl",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "knife",
+      "text": "knife",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "cutting board",
+      "text": "cutting board",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    }
+  ],
+  "instructions": [
+    {
+      "section": null,
+      "step_number": 1,
+      "instruction": "Cook rice according to rice cooker instructions.",
+      "text": "Cook rice according to rice cooker instructions.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "In a saucepan, combine dashi stock, soy sauce, and mirin; bring to a simmer.",
+      "text": "In a saucepan, combine dashi stock, soy sauce, and mirin; bring to a simmer.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "Add chicken thighs to the saucepan and cook until fully cooked, about 10 minutes.",
+      "text": "Add chicken thighs to the saucepan and cook until fully cooked, about 10 minutes.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "Stir in the beaten egg and let it cook until just set.",
+      "text": "Stir in the beaten egg and let it cook until just set.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 5,
+      "instruction": "Serve the chicken and egg mixture over the cooked rice, garnished with green onions and nori.",
+      "text": "Serve the chicken and egg mixture over the cooked rice, garnished with green onions and nori.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    }
+  ],
+  "scaling": {
+    "selected_multiplier": 1,
+    "base_multiplier": 1,
+    "base_servings": "1 appetizer serving",
+    "available_multipliers": [
+      {
+        "label": "1/2x",
+        "value": 0.5
+      },
+      {
+        "label": "1x",
+        "value": 1
+      },
+      {
+        "label": "2x",
+        "value": 2
+      },
+      {
+        "label": "3x",
+        "value": 3
+      }
+    ]
+  },
+  "ai_inferred": true,
+  "inferred_by_model": "gpt-4o-mini",
+  "inferred_at": "2026-06-16T02:28:40Z",
+  "inference_confidence": "high",
+  "source_type": "cookbook_item_inferred",
+  "cookbook_item_inferred_fields": [
+    "cook_time",
+    "equipment",
+    "inactive_time",
+    "ingredients",
+    "instructions",
+    "level",
+    "prep_time",
+    "recipe_amount",
+    "servings",
+    "total_time",
+    "yield"
+  ],
+  "cookbook_item_inference_field_sources": {
+    "recipe_amount": "ai_inferred",
+    "yield": "ai_inferred",
+    "servings": "ai_inferred",
+    "level": "ai_inferred",
+    "total_time": "ai_inferred",
+    "prep_time": "ai_inferred",
+    "inactive_time": "ai_inferred",
+    "cook_time": "ai_inferred",
+    "ingredients": "ai_inferred",
+    "equipment": "ai_inferred",
+    "instructions": "ai_inferred"
+  }
+}

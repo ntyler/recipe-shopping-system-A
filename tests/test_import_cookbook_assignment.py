@@ -133,9 +133,17 @@ def test_cookbook_infer_button_runs_full_loading_routine():
     assert "showCookbookRoutineLoadingOverlay" in script
     assert "Estimate per serving basis" in script
     assert "Have ChatGPT Decide All" in script
+    assert "cookbookRoutineJobsPanel" in script
+    assert "cookbookRoutineJobsList" in script
+    assert "function refreshCookbookRoutineJobs" in script
+    assert "fetch(\"/api/jobs/recent?limit=25\"" in script
+    assert "function renderCookbookRoutineJobRow" in script
+    assert "Current recipe:" in script
+    assert "renderJobCurrentRecipe(job)" in script
     assert "function cookbookRoutineCurrentRecipeDetail" in script
     assert "current_recipe_detail" in script
     assert "updateCookbookRoutineStep(\"details\", active ? \"running\" : \"waiting\", active ? \"Running\" : \"Waiting\", active ? detailsCurrentDetail : \"\")" in script
+    assert "refreshCookbookRoutineJobs({ currentJobId: startData.job_id, currentJob: job });" in script
     assert "start_cookbook_infer_missing_details_job_route" in routes
     assert "\"recipe_names\": recipe_names" in routes
     assert "run_cookbook_infer_missing_details_job" in worker
@@ -189,6 +197,9 @@ def test_job_activity_section_has_clear_collapse_control():
     assert 'method: "DELETE"' in script
     assert ".job-activity-toolbar" in css
     assert ".job-activity-clear" in css
+    assert ".job-activity-current-recipe" in css
+    assert ".cookbook-routine-jobs-panel" in css
+    assert ".cookbook-routine-job-recipe" in css
     assert "#jobActivitySection:not(.card-collapsed) > .job-activity-header" in css
 
 

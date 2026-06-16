@@ -1,0 +1,275 @@
+{
+  "source_url": "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-142-Crispy_Pork_Belly",
+  "recipe_amount": "1 lb",
+  "yield": "4 pieces",
+  "servings": "4 servings",
+  "level": "Medium",
+  "total_time": "2 hours",
+  "prep_time": "30 minutes",
+  "inactive_time": "1 hour",
+  "cook_time": "30 minutes",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "1 lb pork belly",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "lb",
+      "base_quantity": "1",
+      "base_unit": "lb",
+      "ingredient": "pork belly",
+      "preparation": "skin-on",
+      "optional": false,
+      "store_section": "MEAT & SEAFOOD",
+      "store_section_order": 2,
+      "purchasable_item": "pork belly",
+      "purchase_group": "pork belly"
+    },
+    {
+      "section": null,
+      "original_text": "1 tbsp salt",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "tbsp",
+      "base_quantity": "1",
+      "base_unit": "tbsp",
+      "ingredient": "salt",
+      "preparation": "for seasoning",
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12,
+      "purchasable_item": "salt",
+      "purchase_group": "salt"
+    },
+    {
+      "section": null,
+      "original_text": "1 tsp black pepper",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "tsp",
+      "base_quantity": "1",
+      "base_unit": "tsp",
+      "ingredient": "black pepper",
+      "preparation": "freshly ground",
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12,
+      "purchasable_item": "black pepper",
+      "purchase_group": "black pepper"
+    },
+    {
+      "section": null,
+      "original_text": "1 tsp five-spice powder",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "tsp",
+      "base_quantity": "1",
+      "base_unit": "tsp",
+      "ingredient": "five-spice powder",
+      "preparation": "for flavor",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "five-spice powder",
+      "purchase_group": "five-spice powder"
+    },
+    {
+      "section": null,
+      "original_text": "2 tbsp vegetable oil",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "tbsp",
+      "base_quantity": "2",
+      "base_unit": "tbsp",
+      "ingredient": "vegetable oil",
+      "preparation": "for frying",
+      "optional": false,
+      "store_section": "OILS & VINEGARS",
+      "store_section_order": 13,
+      "purchasable_item": "vegetable oil",
+      "purchase_group": "vegetable oil"
+    }
+  ],
+  "equipment": [
+    {
+      "equipment": "sharp knife",
+      "text": "sharp knife",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "cutting board",
+      "text": "cutting board",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "mixing bowl",
+      "text": "mixing bowl",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "baking dish",
+      "text": "baking dish",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "frying pan",
+      "text": "frying pan",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "oven",
+      "text": "oven",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    }
+  ],
+  "instructions": [
+    {
+      "section": null,
+      "step_number": 1,
+      "instruction": "Preheat the oven to 300°F (150°C).",
+      "text": "Preheat the oven to 300°F (150°C).",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "Score the skin of the pork belly in a crosshatch pattern.",
+      "text": "Score the skin of the pork belly in a crosshatch pattern.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "Rub the pork belly with salt, black pepper, and five-spice powder.",
+      "text": "Rub the pork belly with salt, black pepper, and five-spice powder.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "Place the pork belly in a baking dish and cover with foil.",
+      "text": "Place the pork belly in a baking dish and cover with foil.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 5,
+      "instruction": "Bake for 1 hour, then remove the foil and increase the temperature to 400°F (200°C).",
+      "text": "Bake for 1 hour, then remove the foil and increase the temperature to 400°F (200°C).",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 6,
+      "instruction": "Bake for an additional 30 minutes until the skin is crispy.",
+      "text": "Bake for an additional 30 minutes until the skin is crispy.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 7,
+      "instruction": "Heat vegetable oil in a frying pan over medium heat.",
+      "text": "Heat vegetable oil in a frying pan over medium heat.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 8,
+      "instruction": "Sear the pork belly skin-side down until crispy, then slice and serve.",
+      "text": "Sear the pork belly skin-side down until crispy, then slice and serve.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    }
+  ],
+  "scaling": {
+    "selected_multiplier": 1,
+    "base_multiplier": 1,
+    "base_servings": "4 servings",
+    "available_multipliers": [
+      {
+        "label": "1/2x",
+        "value": 0.5
+      },
+      {
+        "label": "1x",
+        "value": 1
+      },
+      {
+        "label": "2x",
+        "value": 2
+      },
+      {
+        "label": "3x",
+        "value": 3
+      }
+    ]
+  },
+  "ai_inferred": true,
+  "inferred_by_model": "gpt-4o-mini",
+  "inferred_at": "2026-06-16T02:27:19Z",
+  "inference_confidence": "high",
+  "source_type": "cookbook_item_inferred",
+  "cookbook_item_inferred_fields": [
+    "cook_time",
+    "equipment",
+    "inactive_time",
+    "ingredients",
+    "instructions",
+    "level",
+    "prep_time",
+    "recipe_amount",
+    "servings",
+    "total_time",
+    "yield"
+  ],
+  "cookbook_item_inference_field_sources": {
+    "recipe_amount": "ai_inferred",
+    "yield": "ai_inferred",
+    "servings": "ai_inferred",
+    "level": "ai_inferred",
+    "total_time": "ai_inferred",
+    "prep_time": "ai_inferred",
+    "inactive_time": "ai_inferred",
+    "cook_time": "ai_inferred",
+    "ingredients": "ai_inferred",
+    "equipment": "ai_inferred",
+    "instructions": "ai_inferred"
+  }
+}

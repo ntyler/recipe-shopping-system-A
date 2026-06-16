@@ -1,0 +1,300 @@
+{
+  "source_url": "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-161-Gyudon_Set",
+  "recipe_amount": "2 bowls",
+  "yield": "2 bowls of Gyudon",
+  "servings": "2 appetizer servings",
+  "level": "Medium",
+  "total_time": "30 minutes",
+  "prep_time": "10 minutes",
+  "inactive_time": "0 minutes",
+  "cook_time": "20 minutes",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "300 grams beef sirloin",
+      "quantity": "300",
+      "recipe_qty": "300",
+      "unit": "grams",
+      "base_quantity": "300",
+      "base_unit": "grams",
+      "ingredient": "beef sirloin",
+      "preparation": "thinly sliced",
+      "optional": false,
+      "store_section": "MEAT & SEAFOOD",
+      "store_section_order": 2,
+      "purchasable_item": "beef sirloin",
+      "purchase_group": "beef sirloin"
+    },
+    {
+      "section": null,
+      "original_text": "1 medium onion",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "medium",
+      "base_quantity": "1",
+      "base_unit": "medium",
+      "ingredient": "onion",
+      "preparation": "sliced",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1,
+      "purchasable_item": "onion",
+      "purchase_group": "onion"
+    },
+    {
+      "section": null,
+      "original_text": "4 tablespoons soy sauce",
+      "quantity": "4",
+      "recipe_qty": "4",
+      "unit": "tablespoons",
+      "base_quantity": "4",
+      "base_unit": "tablespoons",
+      "ingredient": "soy sauce",
+      "preparation": null,
+      "optional": false,
+      "store_section": "SAUCES & CONDIMENTS",
+      "store_section_order": 9,
+      "purchasable_item": "soy sauce",
+      "purchase_group": "soy sauce"
+    },
+    {
+      "section": null,
+      "original_text": "2 tablespoons mirin",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "tablespoons",
+      "base_quantity": "2",
+      "base_unit": "tablespoons",
+      "ingredient": "mirin",
+      "preparation": null,
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "mirin",
+      "purchase_group": "mirin"
+    },
+    {
+      "section": null,
+      "original_text": "1 teaspoon sugar",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "teaspoon",
+      "base_quantity": "1",
+      "base_unit": "teaspoon",
+      "ingredient": "sugar",
+      "preparation": null,
+      "optional": false,
+      "store_section": "BAKING",
+      "store_section_order": 7,
+      "purchasable_item": "sugar",
+      "purchase_group": "sugar"
+    },
+    {
+      "section": null,
+      "original_text": "1 cup dashi stock",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "cup",
+      "base_quantity": "1",
+      "base_unit": "cup",
+      "ingredient": "dashi stock",
+      "preparation": null,
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "dashi stock",
+      "purchase_group": "dashi stock"
+    },
+    {
+      "section": null,
+      "original_text": "2 cups cooked rice",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "cups",
+      "base_quantity": "2",
+      "base_unit": "cups",
+      "ingredient": "cooked rice",
+      "preparation": "for serving",
+      "optional": false,
+      "store_section": "PASTA, RICE & GRAINS",
+      "store_section_order": 6,
+      "purchasable_item": "cooked rice",
+      "purchase_group": "cooked rice"
+    },
+    {
+      "section": null,
+      "original_text": "2 tablespoons green onions",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "tablespoons",
+      "base_quantity": "2",
+      "base_unit": "tablespoons",
+      "ingredient": "green onions",
+      "preparation": "chopped, for garnish",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1,
+      "purchasable_item": "green onions",
+      "purchase_group": "green onions"
+    },
+    {
+      "section": null,
+      "original_text": "1 teaspoon sesame seeds",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "teaspoon",
+      "base_quantity": "1",
+      "base_unit": "teaspoon",
+      "ingredient": "sesame seeds",
+      "preparation": "for garnish",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "sesame seeds",
+      "purchase_group": "sesame seeds"
+    }
+  ],
+  "equipment": [
+    {
+      "equipment": "skillet",
+      "text": "skillet",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "spatula",
+      "text": "spatula",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "measuring cups",
+      "text": "measuring cups",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "measuring spoons",
+      "text": "measuring spoons",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "serving bowls",
+      "text": "serving bowls",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    }
+  ],
+  "instructions": [
+    {
+      "section": null,
+      "step_number": 1,
+      "instruction": "Heat the skillet over medium heat and add the sliced onion, cooking until translucent.",
+      "text": "Heat the skillet over medium heat and add the sliced onion, cooking until translucent.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "Add the beef sirloin to the skillet and cook until browned.",
+      "text": "Add the beef sirloin to the skillet and cook until browned.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "Stir in the soy sauce, mirin, sugar, and dashi stock, and simmer for 10 minutes.",
+      "text": "Stir in the soy sauce, mirin, sugar, and dashi stock, and simmer for 10 minutes.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "Serve the beef mixture over cooked rice in bowls.",
+      "text": "Serve the beef mixture over cooked rice in bowls.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 5,
+      "instruction": "Garnish with chopped green onions and sesame seeds.",
+      "text": "Garnish with chopped green onions and sesame seeds.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    }
+  ],
+  "scaling": {
+    "selected_multiplier": 1,
+    "base_multiplier": 1,
+    "base_servings": "2 appetizer servings",
+    "available_multipliers": [
+      {
+        "label": "1/2x",
+        "value": 0.5
+      },
+      {
+        "label": "1x",
+        "value": 1
+      },
+      {
+        "label": "2x",
+        "value": 2
+      },
+      {
+        "label": "3x",
+        "value": 3
+      }
+    ]
+  },
+  "ai_inferred": true,
+  "inferred_by_model": "gpt-4o-mini",
+  "inferred_at": "2026-06-16T02:28:43Z",
+  "inference_confidence": "high",
+  "source_type": "cookbook_item_inferred",
+  "cookbook_item_inferred_fields": [
+    "cook_time",
+    "equipment",
+    "inactive_time",
+    "ingredients",
+    "instructions",
+    "level",
+    "prep_time",
+    "recipe_amount",
+    "servings",
+    "total_time",
+    "yield"
+  ],
+  "cookbook_item_inference_field_sources": {
+    "recipe_amount": "ai_inferred",
+    "yield": "ai_inferred",
+    "servings": "ai_inferred",
+    "level": "ai_inferred",
+    "total_time": "ai_inferred",
+    "prep_time": "ai_inferred",
+    "inactive_time": "ai_inferred",
+    "cook_time": "ai_inferred",
+    "ingredients": "ai_inferred",
+    "equipment": "ai_inferred",
+    "instructions": "ai_inferred"
+  }
+}

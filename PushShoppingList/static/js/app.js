@@ -425,6 +425,36 @@ function renderJobStageCounts(job) {
     `;
 }
 
+function jobCurrentRecipeDetail(job) {
+    const result = jobResultPayload(job);
+    const detail = String(result.current_recipe_detail || "").trim();
+    const recipeName = String(result.current_recipe_name || "").trim();
+
+    if (detail) {
+        return detail;
+    }
+    if (recipeName) {
+        return recipeName;
+    }
+    return "";
+}
+
+function renderJobCurrentRecipe(job) {
+    const detail = jobCurrentRecipeDetail(job);
+    if (!detail) {
+        return "";
+    }
+
+    const result = jobResultPayload(job);
+    const recipeUrl = String(result.current_recipe_url || "").trim();
+    const editUrl = recipeUrl ? `/recipe/edit?url=${encodeURIComponent(recipeUrl)}` : "";
+    const detailHtml = editUrl
+        ? `<a href="${escapeAttribute(editUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(detail)}</a>`
+        : escapeHtml(detail);
+
+    return `<div class="job-activity-current-recipe">Current recipe: ${detailHtml}</div>`;
+}
+
 function jobSourceUrls(job) {
     return jobSourceItems(job)
         .map(source => String(source.url || "").trim())
@@ -533,6 +563,7 @@ function renderJobActivityRow(job) {
     const modelHtml = renderJobModelDetails(job);
     const workerHtml = renderJobWorkerDetails(job);
     const stageCountsHtml = renderJobStageCounts(job);
+    const currentRecipeHtml = renderJobCurrentRecipe(job);
     const active = jobIsActive(job);
     const openProgressButton = jobCanOpenImportProgress(job)
         ? `<button type="button" class="job-activity-row-action" onclick="return openJobActivityImportProgress('${escapeAttribute(job.id || job.job_id || "")}')">Open Popup</button>`
@@ -564,6 +595,7 @@ function renderJobActivityRow(job) {
                     <span class="job-activity-status">${escapeHtml(jobStatusLabel(job.status))}</span>
                 </div>
                 <div class="job-activity-step">${escapeHtml(job.current_step || "Queued")}</div>
+                ${currentRecipeHtml}
                 ${modelHtml}
                 ${workerHtml}
                 ${sourceHtml}
@@ -6262,6 +6294,13 @@ function ensureCookbookRoutineLoadingOverlay() {
                 </div>
                 <div id="cookbookRoutineLoadingModel" class="recipe-qty-progress-summary">Model Used: Starting</div>
                 <div id="cookbookRoutineLoadingSummary" class="recipe-qty-progress-summary">Preparing cookbook...</div>
+                <section id="cookbookRoutineJobsPanel" class="cookbook-routine-jobs-panel" aria-label="Cookbook routine jobs">
+                    <div class="cookbook-routine-jobs-header">
+                        <span>Jobs</span>
+                        <span id="cookbookRoutineJobsSummary">Loading jobs...</span>
+                    </div>
+                    <div id="cookbookRoutineJobsList" class="cookbook-routine-jobs-list"></div>
+                </section>
                 <div class="cookbook-routine-progress-wrap">
                     <div id="cookbookRoutineProgressBar" class="cookbook-routine-progress-bar"></div>
                 </div>
@@ -6297,6 +6336,8 @@ function showCookbookRoutineLoadingOverlay(cookbookName, recipeCount, previewOnl
     const title = overlay.querySelector("#cookbookRoutineLoadingTitle");
     const list = overlay.querySelector("#cookbookRoutineLoadingList");
     const bar = overlay.querySelector("#cookbookRoutineProgressBar");
+    const jobsList = overlay.querySelector("#cookbookRoutineJobsList");
+    const jobsSummary = overlay.querySelector("#cookbookRoutineJobsSummary");
 
     if (title) {
         title.textContent = previewOnly ? "Previewing Cookbook Details" : "Updating Cookbook Details";
@@ -6304,6 +6345,13 @@ function showCookbookRoutineLoadingOverlay(cookbookName, recipeCount, previewOnl
 
     if (bar) {
         bar.style.width = "0%";
+    }
+
+    if (jobsSummary) {
+        jobsSummary.textContent = "Loading jobs...";
+    }
+    if (jobsList) {
+        jobsList.innerHTML = '<div class="cookbook-routine-jobs-empty">Waiting for job details...</div>';
     }
 
     if (list) {
@@ -6361,6 +6409,149 @@ function setCookbookRoutineProgress(percent) {
 
     if (bar) {
         bar.style.width = `${Math.max(0, Math.min(100, Number(percent || 0)))}%`;
+    }
+}
+
+function cookbookRoutineJobsPanel() {
+    return document.getElementById("cookbookRoutineJobsPanel");
+}
+
+function cookbookRoutineJobsListElement() {
+    return document.getElementById("cookbookRoutineJobsList");
+}
+
+function cookbookRoutineJobsSummaryElement() {
+    return document.getElementById("cookbookRoutineJobsSummary");
+}
+
+function cookbookRoutineRelevantJobs(jobs, currentJobId = "") {
+    const currentId = String(currentJobId || "").trim();
+    const filtered = (Array.isArray(jobs) ? jobs : []).filter(job => {
+        if (!job) {
+            return false;
+        }
+        const jobType = String(job.job_type || "").trim();
+        const jobId = String(job.id || job.job_id || "").trim();
+        if (currentId && jobId === currentId) {
+            return true;
+        }
+        return jobType === "cookbook-infer-missing-details" && jobIsActive(job);
+    });
+    return jobActivitySort(filtered).slice(0, 6);
+}
+
+function cookbookRoutineJobRole(job, currentJobId = "") {
+    const jobId = String(job && (job.id || job.job_id) || "").trim();
+    const status = String(job && job.status || "").trim().toLowerCase();
+    if (currentJobId && jobId === currentJobId) {
+        return status === "queued" ? "This queued job" : "This job";
+    }
+    if (status === "running") {
+        return "Active job";
+    }
+    if (status === "queued") {
+        return "Queued job";
+    }
+    return "Recent job";
+}
+
+function renderCookbookRoutineJobRow(job, currentJobId = "") {
+    const percent = Math.max(0, Math.min(100, Number(job && job.progress_percent || 0)));
+    const total = Number(job && job.total_items || 0);
+    const completed = Number(job && job.completed_items || 0);
+    const failed = Number(job && job.failed_items || 0);
+    const countText = total ? `${completed}/${total}${failed ? `, ${failed} failed` : ""}` : "";
+    const modelReference = formatJobModelReference(job);
+    const currentRecipe = jobCurrentRecipeDetail(job);
+    const step = String(job && job.current_step || "Queued").trim();
+    const status = String(job && job.status || "unknown").trim().toLowerCase();
+    const jobId = String(job && (job.id || job.job_id) || "").trim();
+    const recipeLine = currentRecipe
+        ? `<div class="cookbook-routine-job-recipe">Current recipe: ${escapeHtml(currentRecipe)}</div>`
+        : `<div class="cookbook-routine-job-recipe muted">${status === "queued" ? "Waiting for the active job to finish." : "Waiting for recipe detail..."}</div>`;
+
+    return `
+        <article class="cookbook-routine-job-row cookbook-routine-job-${escapeAttribute(status || "unknown")}" data-cookbook-routine-job-id="${escapeAttribute(jobId)}">
+            <div class="cookbook-routine-job-main">
+                <div class="cookbook-routine-job-title">
+                    <span>${escapeHtml(cookbookRoutineJobRole(job, currentJobId))}</span>
+                    <span class="cookbook-routine-job-status">${escapeHtml(jobStatusLabel(status))}</span>
+                </div>
+                <div class="cookbook-routine-job-step">${escapeHtml(step)}</div>
+                ${recipeLine}
+                ${modelReference ? `<div class="cookbook-routine-job-model">${escapeHtml(modelReference)}</div>` : ""}
+                <div class="job-activity-progress" aria-label="${percent}% complete">
+                    <span style="width: ${percent}%"></span>
+                </div>
+                <div class="cookbook-routine-job-meta">
+                    <span>${percent}%</span>
+                    ${countText ? `<span>${escapeHtml(countText)}</span>` : ""}
+                </div>
+            </div>
+        </article>
+    `;
+}
+
+function updateCookbookRoutineJobsFromJobs(jobs, currentJobId = "") {
+    const panel = cookbookRoutineJobsPanel();
+    const list = cookbookRoutineJobsListElement();
+    const summary = cookbookRoutineJobsSummaryElement();
+    if (!panel || !list) {
+        return;
+    }
+
+    const relevantJobs = cookbookRoutineRelevantJobs(jobs, currentJobId);
+    const activeCount = relevantJobs.filter(job => String(job.status || "").trim().toLowerCase() === "running").length;
+    const queuedCount = relevantJobs.filter(job => String(job.status || "").trim().toLowerCase() === "queued").length;
+
+    panel.hidden = false;
+    if (summary) {
+        summary.textContent = relevantJobs.length
+            ? `${activeCount} running, ${queuedCount} queued`
+            : "No active cookbook jobs found";
+    }
+    list.innerHTML = relevantJobs.length
+        ? relevantJobs.map(job => renderCookbookRoutineJobRow(job, currentJobId)).join("")
+        : '<div class="cookbook-routine-jobs-empty">No active cookbook jobs found yet.</div>';
+}
+
+async function refreshCookbookRoutineJobs(options = {}) {
+    const panel = cookbookRoutineJobsPanel();
+    if (!panel || panel.hidden) {
+        return false;
+    }
+
+    const currentJobId = String(options.currentJobId || "").trim();
+    const currentJob = options.currentJob || null;
+    try {
+        const response = await fetch("/api/jobs/recent?limit=25", {
+            headers: {
+                "Accept": "application/json",
+                "X-Requested-With": "fetch",
+            },
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to load jobs.");
+        }
+
+        const jobs = currentJob
+            ? [currentJob, ...(data.jobs || []).filter(job => String(job && (job.id || job.job_id) || "") !== String(currentJob.id || currentJob.job_id || ""))]
+            : (data.jobs || []);
+        if (jobActivityPanel()) {
+            renderJobActivityPanel(jobs);
+        } else {
+            lastJobActivityJobs = jobActivitySort(jobs);
+        }
+        updateCookbookRoutineJobsFromJobs(jobs, currentJobId);
+        return true;
+    } catch (err) {
+        const summary = cookbookRoutineJobsSummaryElement();
+        if (summary) {
+            summary.textContent = err.message || "Unable to load jobs.";
+        }
+        return false;
     }
 }
 
@@ -6554,7 +6745,9 @@ async function inferMissingCookbookDetails(button, event = null) {
         }
         if (startData.job) {
             updateCookbookRoutineOverlayFromJob(startData.job);
+            updateCookbookRoutineJobsFromJobs([startData.job, ...lastJobActivityJobs], startData.job_id);
         }
+        refreshCookbookRoutineJobs({ currentJobId: startData.job_id, currentJob: startData.job });
         if (button) {
             button.disabled = true;
             button.textContent = previewOnly ? "Previewing..." : "Running...";
@@ -6565,9 +6758,11 @@ async function inferMissingCookbookDetails(button, event = null) {
             timeoutMs: IMPORT_JOB_COMPLETION_TIMEOUT_MS,
             onUpdate(job) {
                 updateCookbookRoutineOverlayFromJob(job);
+                refreshCookbookRoutineJobs({ currentJobId: startData.job_id, currentJob: job });
             },
         });
         updateCookbookRoutineOverlayFromJob(finishedJob);
+        refreshCookbookRoutineJobs({ currentJobId: startData.job_id, currentJob: finishedJob });
 
         const data = jobResultPayload(finishedJob);
 

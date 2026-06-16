@@ -1,0 +1,279 @@
+{
+  "source_url": "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-165-Salmon_Spaghetti",
+  "recipe_amount": "2 servings",
+  "yield": "2 pieces",
+  "servings": "1 appetizer serving",
+  "level": "Easy",
+  "total_time": "30 minutes",
+  "prep_time": "10 minutes",
+  "inactive_time": "0 minutes",
+  "cook_time": "20 minutes",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "200 grams spaghetti",
+      "quantity": "200",
+      "recipe_qty": "200",
+      "unit": "grams",
+      "base_quantity": "200",
+      "base_unit": "grams",
+      "ingredient": "spaghetti",
+      "preparation": "cooked al dente",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "spaghetti",
+      "purchase_group": "spaghetti"
+    },
+    {
+      "section": null,
+      "original_text": "150 grams salmon fillet",
+      "quantity": "150",
+      "recipe_qty": "150",
+      "unit": "grams",
+      "base_quantity": "150",
+      "base_unit": "grams",
+      "ingredient": "salmon fillet",
+      "preparation": "skinless, boneless",
+      "optional": false,
+      "store_section": "MEAT & SEAFOOD",
+      "store_section_order": 2,
+      "purchasable_item": "salmon fillet",
+      "purchase_group": "salmon fillet"
+    },
+    {
+      "section": null,
+      "original_text": "2 tablespoons olive oil",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "tablespoons",
+      "base_quantity": "2",
+      "base_unit": "tablespoons",
+      "ingredient": "olive oil",
+      "preparation": "for cooking",
+      "optional": false,
+      "store_section": "OILS & VINEGARS",
+      "store_section_order": 13,
+      "purchasable_item": "olive oil",
+      "purchase_group": "olive oil"
+    },
+    {
+      "section": null,
+      "original_text": "2 cloves garlic",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "cloves",
+      "base_quantity": "2",
+      "base_unit": "cloves",
+      "ingredient": "garlic",
+      "preparation": "minced",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1,
+      "purchasable_item": "garlic",
+      "purchase_group": "garlic"
+    },
+    {
+      "section": null,
+      "original_text": "1 tablespoon soy sauce",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "tablespoon",
+      "base_quantity": "1",
+      "base_unit": "tablespoon",
+      "ingredient": "soy sauce",
+      "preparation": "for flavor",
+      "optional": false,
+      "store_section": "SAUCES & CONDIMENTS",
+      "store_section_order": 9,
+      "purchasable_item": "soy sauce",
+      "purchase_group": "soy sauce"
+    },
+    {
+      "section": null,
+      "original_text": "2 stalks green onions",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "stalks",
+      "base_quantity": "2",
+      "base_unit": "stalks",
+      "ingredient": "green onions",
+      "preparation": "chopped for garnish",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1,
+      "purchasable_item": "green onions",
+      "purchase_group": "green onions"
+    },
+    {
+      "section": null,
+      "original_text": "to taste black pepper",
+      "quantity": "to taste",
+      "recipe_qty": "to taste",
+      "unit": null,
+      "base_quantity": "to taste",
+      "base_unit": null,
+      "ingredient": "black pepper",
+      "preparation": "to taste",
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12,
+      "purchasable_item": "black pepper",
+      "purchase_group": "black pepper"
+    }
+  ],
+  "equipment": [
+    {
+      "equipment": "pot",
+      "text": "pot",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "pan",
+      "text": "pan",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "spatula",
+      "text": "spatula",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "knife",
+      "text": "knife",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "cutting board",
+      "text": "cutting board",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    }
+  ],
+  "instructions": [
+    {
+      "section": null,
+      "step_number": 1,
+      "instruction": "Cook spaghetti in boiling salted water until al dente, then drain.",
+      "text": "Cook spaghetti in boiling salted water until al dente, then drain.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "In a pan, heat olive oil over medium heat and add minced garlic.",
+      "text": "In a pan, heat olive oil over medium heat and add minced garlic.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "Add salmon fillet to the pan and cook for about 5-7 minutes on each side until cooked through.",
+      "text": "Add salmon fillet to the pan and cook for about 5-7 minutes on each side until cooked through.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "Flake the salmon and mix it with the cooked spaghetti.",
+      "text": "Flake the salmon and mix it with the cooked spaghetti.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 5,
+      "instruction": "Add soy sauce and black pepper, stirring to combine.",
+      "text": "Add soy sauce and black pepper, stirring to combine.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 6,
+      "instruction": "Serve garnished with chopped green onions.",
+      "text": "Serve garnished with chopped green onions.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    }
+  ],
+  "scaling": {
+    "selected_multiplier": 1,
+    "base_multiplier": 1,
+    "base_servings": "1 appetizer serving",
+    "available_multipliers": [
+      {
+        "label": "1/2x",
+        "value": 0.5
+      },
+      {
+        "label": "1x",
+        "value": 1
+      },
+      {
+        "label": "2x",
+        "value": 2
+      },
+      {
+        "label": "3x",
+        "value": 3
+      }
+    ]
+  },
+  "ai_inferred": true,
+  "inferred_by_model": "gpt-4o-mini",
+  "inferred_at": "2026-06-16T02:28:53Z",
+  "inference_confidence": "high",
+  "source_type": "cookbook_item_inferred",
+  "cookbook_item_inferred_fields": [
+    "cook_time",
+    "equipment",
+    "inactive_time",
+    "ingredients",
+    "instructions",
+    "level",
+    "prep_time",
+    "recipe_amount",
+    "servings",
+    "total_time",
+    "yield"
+  ],
+  "cookbook_item_inference_field_sources": {
+    "recipe_amount": "ai_inferred",
+    "yield": "ai_inferred",
+    "servings": "ai_inferred",
+    "level": "ai_inferred",
+    "total_time": "ai_inferred",
+    "prep_time": "ai_inferred",
+    "inactive_time": "ai_inferred",
+    "cook_time": "ai_inferred",
+    "ingredients": "ai_inferred",
+    "equipment": "ai_inferred",
+    "instructions": "ai_inferred"
+  }
+}

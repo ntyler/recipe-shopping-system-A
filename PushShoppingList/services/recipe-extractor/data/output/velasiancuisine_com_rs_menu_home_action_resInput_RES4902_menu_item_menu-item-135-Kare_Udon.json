@@ -1,0 +1,296 @@
+{
+  "source_url": "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-135-Kare_Udon",
+  "recipe_amount": "2 servings",
+  "yield": "2 bowls",
+  "servings": "1 appetizer serving",
+  "level": "Medium",
+  "total_time": "30 minutes",
+  "prep_time": "10 minutes",
+  "inactive_time": "0 minutes",
+  "cook_time": "20 minutes",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "200 grams Udon noodles",
+      "quantity": "200",
+      "recipe_qty": "200",
+      "unit": "grams",
+      "base_quantity": "200",
+      "base_unit": "grams",
+      "ingredient": "Udon noodles",
+      "preparation": "fresh or dried",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "Udon noodles",
+      "purchase_group": "Udon noodles"
+    },
+    {
+      "section": null,
+      "original_text": "2 tablespoons Curry paste",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "tablespoons",
+      "base_quantity": "2",
+      "base_unit": "tablespoons",
+      "ingredient": "Curry paste",
+      "preparation": "Japanese curry paste recommended",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "Curry paste",
+      "purchase_group": "Curry paste"
+    },
+    {
+      "section": null,
+      "original_text": "500 ml Vegetable broth",
+      "quantity": "500",
+      "recipe_qty": "500",
+      "unit": "ml",
+      "base_quantity": "500",
+      "base_unit": "ml",
+      "ingredient": "Vegetable broth",
+      "preparation": "or chicken broth",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "Vegetable broth",
+      "purchase_group": "Vegetable broth"
+    },
+    {
+      "section": null,
+      "original_text": "1 tablespoon Soy sauce",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "tablespoon",
+      "base_quantity": "1",
+      "base_unit": "tablespoon",
+      "ingredient": "Soy sauce",
+      "preparation": "for seasoning",
+      "optional": false,
+      "store_section": "SAUCES & CONDIMENTS",
+      "store_section_order": 9,
+      "purchasable_item": "Soy sauce",
+      "purchase_group": "Soy sauce"
+    },
+    {
+      "section": null,
+      "original_text": "150 grams Vegetables",
+      "quantity": "150",
+      "recipe_qty": "150",
+      "unit": "grams",
+      "base_quantity": "150",
+      "base_unit": "grams",
+      "ingredient": "Vegetables",
+      "preparation": "carrots, bell peppers, and green onions, sliced",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "Vegetables",
+      "purchase_group": "Vegetables"
+    },
+    {
+      "section": null,
+      "original_text": "100 grams Tofu",
+      "quantity": "100",
+      "recipe_qty": "100",
+      "unit": "grams",
+      "base_quantity": "100",
+      "base_unit": "grams",
+      "ingredient": "Tofu",
+      "preparation": "cubed, optional",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "Tofu",
+      "purchase_group": "Tofu"
+    },
+    {
+      "section": null,
+      "original_text": "1 teaspoon Sesame oil",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "teaspoon",
+      "base_quantity": "1",
+      "base_unit": "teaspoon",
+      "ingredient": "Sesame oil",
+      "preparation": "for drizzling",
+      "optional": false,
+      "store_section": "OILS & VINEGARS",
+      "store_section_order": 13,
+      "purchasable_item": "Sesame oil",
+      "purchase_group": "Sesame oil"
+    }
+  ],
+  "equipment": [
+    {
+      "equipment": "large pot",
+      "text": "large pot",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "stirring spoon",
+      "text": "stirring spoon",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "knife",
+      "text": "knife",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "cutting board",
+      "text": "cutting board",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "measuring cups",
+      "text": "measuring cups",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "measuring spoons",
+      "text": "measuring spoons",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    }
+  ],
+  "instructions": [
+    {
+      "section": null,
+      "step_number": 1,
+      "instruction": "Cook udon noodles according to package instructions, then drain and set aside.",
+      "text": "Cook udon noodles according to package instructions, then drain and set aside.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "In a large pot, heat a little oil and sauté the vegetables until tender.",
+      "text": "In a large pot, heat a little oil and sauté the vegetables until tender.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "Add curry paste and stir for 1 minute until fragrant.",
+      "text": "Add curry paste and stir for 1 minute until fragrant.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "Pour in vegetable broth and bring to a simmer.",
+      "text": "Pour in vegetable broth and bring to a simmer.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 5,
+      "instruction": "Add cooked udon noodles and tofu, stirring to combine.",
+      "text": "Add cooked udon noodles and tofu, stirring to combine.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 6,
+      "instruction": "Season with soy sauce and simmer for another 5 minutes.",
+      "text": "Season with soy sauce and simmer for another 5 minutes.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 7,
+      "instruction": "Serve hot, drizzled with sesame oil.",
+      "text": "Serve hot, drizzled with sesame oil.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    }
+  ],
+  "scaling": {
+    "selected_multiplier": 1,
+    "base_multiplier": 1,
+    "base_servings": "1 appetizer serving",
+    "available_multipliers": [
+      {
+        "label": "1/2x",
+        "value": 0.5
+      },
+      {
+        "label": "1x",
+        "value": 1
+      },
+      {
+        "label": "2x",
+        "value": 2
+      },
+      {
+        "label": "3x",
+        "value": 3
+      }
+    ]
+  },
+  "ai_inferred": true,
+  "inferred_by_model": "gpt-4o-mini",
+  "inferred_at": "2026-06-16T02:26:53Z",
+  "inference_confidence": "high",
+  "source_type": "cookbook_item_inferred",
+  "cookbook_item_inferred_fields": [
+    "cook_time",
+    "equipment",
+    "inactive_time",
+    "ingredients",
+    "instructions",
+    "level",
+    "prep_time",
+    "recipe_amount",
+    "servings",
+    "total_time",
+    "yield"
+  ],
+  "cookbook_item_inference_field_sources": {
+    "recipe_amount": "ai_inferred",
+    "yield": "ai_inferred",
+    "servings": "ai_inferred",
+    "level": "ai_inferred",
+    "total_time": "ai_inferred",
+    "prep_time": "ai_inferred",
+    "inactive_time": "ai_inferred",
+    "cook_time": "ai_inferred",
+    "ingredients": "ai_inferred",
+    "equipment": "ai_inferred",
+    "instructions": "ai_inferred"
+  }
+}

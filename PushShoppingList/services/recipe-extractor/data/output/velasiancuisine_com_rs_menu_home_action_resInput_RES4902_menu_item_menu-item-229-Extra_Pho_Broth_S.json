@@ -1,0 +1,289 @@
+{
+  "source_url": "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-229-Extra_Pho_Broth_S",
+  "recipe_amount": "1 liter",
+  "yield": "1 liter of broth",
+  "servings": "4 servings",
+  "level": "Easy",
+  "total_time": "60 minutes",
+  "prep_time": "10 minutes",
+  "inactive_time": "0 minutes",
+  "cook_time": "50 minutes",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "1 liter water",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "liter",
+      "base_quantity": "1",
+      "base_unit": "liter",
+      "ingredient": "water",
+      "preparation": "for the broth base",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "water",
+      "purchase_group": "water"
+    },
+    {
+      "section": null,
+      "original_text": "500 grams beef bones",
+      "quantity": "500",
+      "recipe_qty": "500",
+      "unit": "grams",
+      "base_quantity": "500",
+      "base_unit": "grams",
+      "ingredient": "beef bones",
+      "preparation": "for flavor",
+      "optional": false,
+      "store_section": "MEAT & SEAFOOD",
+      "store_section_order": 2,
+      "purchasable_item": "beef bones",
+      "purchase_group": "beef bones"
+    },
+    {
+      "section": null,
+      "original_text": "1 medium onion",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "medium",
+      "base_quantity": "1",
+      "base_unit": "medium",
+      "ingredient": "onion",
+      "preparation": "halved",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1,
+      "purchasable_item": "onion",
+      "purchase_group": "onion"
+    },
+    {
+      "section": null,
+      "original_text": "50 grams ginger",
+      "quantity": "50",
+      "recipe_qty": "50",
+      "unit": "grams",
+      "base_quantity": "50",
+      "base_unit": "grams",
+      "ingredient": "ginger",
+      "preparation": "sliced",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "ginger",
+      "purchase_group": "ginger"
+    },
+    {
+      "section": null,
+      "original_text": "2 pieces star anise",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "pieces",
+      "base_quantity": "2",
+      "base_unit": "pieces",
+      "ingredient": "star anise",
+      "preparation": "for seasoning",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "star anise",
+      "purchase_group": "star anise"
+    },
+    {
+      "section": null,
+      "original_text": "1 piece cinnamon stick",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "piece",
+      "base_quantity": "1",
+      "base_unit": "piece",
+      "ingredient": "cinnamon stick",
+      "preparation": "for seasoning",
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12,
+      "purchasable_item": "cinnamon stick",
+      "purchase_group": "cinnamon stick"
+    },
+    {
+      "section": null,
+      "original_text": "2 tablespoons fish sauce",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "tablespoons",
+      "base_quantity": "2",
+      "base_unit": "tablespoons",
+      "ingredient": "fish sauce",
+      "preparation": "for seasoning",
+      "optional": false,
+      "store_section": "MEAT & SEAFOOD",
+      "store_section_order": 2,
+      "purchasable_item": "fish sauce",
+      "purchase_group": "fish sauce"
+    },
+    {
+      "section": null,
+      "original_text": "to taste salt",
+      "quantity": "to taste",
+      "recipe_qty": "to taste",
+      "unit": null,
+      "base_quantity": "to taste",
+      "base_unit": null,
+      "ingredient": "salt",
+      "preparation": "for seasoning",
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12,
+      "purchasable_item": "salt",
+      "purchase_group": "salt"
+    }
+  ],
+  "equipment": [
+    {
+      "equipment": "large pot",
+      "text": "large pot",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "strainer",
+      "text": "strainer",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "knife",
+      "text": "knife",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "cutting board",
+      "text": "cutting board",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    }
+  ],
+  "instructions": [
+    {
+      "section": null,
+      "step_number": 1,
+      "instruction": "In a large pot, combine water and beef bones. Bring to a boil.",
+      "text": "In a large pot, combine water and beef bones. Bring to a boil.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "Add halved onion and sliced ginger to the pot.",
+      "text": "Add halved onion and sliced ginger to the pot.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "Add star anise, cinnamon stick, and fish sauce.",
+      "text": "Add star anise, cinnamon stick, and fish sauce.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "Reduce heat and simmer for 50 minutes, skimming off any foam.",
+      "text": "Reduce heat and simmer for 50 minutes, skimming off any foam.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 5,
+      "instruction": "Strain the broth through a strainer into another pot.",
+      "text": "Strain the broth through a strainer into another pot.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 6,
+      "instruction": "Season with salt to taste before serving.",
+      "text": "Season with salt to taste before serving.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    }
+  ],
+  "scaling": {
+    "selected_multiplier": 1,
+    "base_multiplier": 1,
+    "base_servings": "4 servings",
+    "available_multipliers": [
+      {
+        "label": "1/2x",
+        "value": 0.5
+      },
+      {
+        "label": "1x",
+        "value": 1
+      },
+      {
+        "label": "2x",
+        "value": 2
+      },
+      {
+        "label": "3x",
+        "value": 3
+      }
+    ]
+  },
+  "ai_inferred": true,
+  "inferred_by_model": "gpt-4o-mini",
+  "inferred_at": "2026-06-16T02:33:21Z",
+  "inference_confidence": "high",
+  "source_type": "cookbook_item_inferred",
+  "cookbook_item_inferred_fields": [
+    "cook_time",
+    "equipment",
+    "inactive_time",
+    "ingredients",
+    "instructions",
+    "level",
+    "prep_time",
+    "recipe_amount",
+    "servings",
+    "total_time",
+    "yield"
+  ],
+  "cookbook_item_inference_field_sources": {
+    "recipe_amount": "ai_inferred",
+    "yield": "ai_inferred",
+    "servings": "ai_inferred",
+    "level": "ai_inferred",
+    "total_time": "ai_inferred",
+    "prep_time": "ai_inferred",
+    "inactive_time": "ai_inferred",
+    "cook_time": "ai_inferred",
+    "ingredients": "ai_inferred",
+    "equipment": "ai_inferred",
+    "instructions": "ai_inferred"
+  }
+}

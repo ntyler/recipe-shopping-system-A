@@ -1,0 +1,290 @@
+{
+  "source_url": "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-215-California_Sushi_Burrito",
+  "recipe_amount": "1",
+  "yield": "1 burrito",
+  "servings": "1 burrito",
+  "level": "Medium",
+  "total_time": "30 minutes",
+  "prep_time": "15 minutes",
+  "inactive_time": "0 minutes",
+  "cook_time": "15 minutes",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "1 cup sushi rice",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "cup",
+      "base_quantity": "1",
+      "base_unit": "cup",
+      "ingredient": "sushi rice",
+      "preparation": "cooked and seasoned",
+      "optional": false,
+      "store_section": "PASTA, RICE & GRAINS",
+      "store_section_order": 6,
+      "purchasable_item": "sushi rice",
+      "purchase_group": "sushi rice"
+    },
+    {
+      "section": null,
+      "original_text": "1 sheet nori sheets",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "sheet",
+      "base_quantity": "1",
+      "base_unit": "sheet",
+      "ingredient": "nori sheets",
+      "preparation": "for wrapping",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "nori sheets",
+      "purchase_group": "nori sheets"
+    },
+    {
+      "section": null,
+      "original_text": "1/2 piece cucumber",
+      "quantity": "1/2",
+      "recipe_qty": "1/2",
+      "unit": "piece",
+      "base_quantity": "1/2",
+      "base_unit": "piece",
+      "ingredient": "cucumber",
+      "preparation": "julienned",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "cucumber",
+      "purchase_group": "cucumber"
+    },
+    {
+      "section": null,
+      "original_text": "1/2 piece avocado",
+      "quantity": "1/2",
+      "recipe_qty": "1/2",
+      "unit": "piece",
+      "base_quantity": "1/2",
+      "base_unit": "piece",
+      "ingredient": "avocado",
+      "preparation": "sliced",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "avocado",
+      "purchase_group": "avocado"
+    },
+    {
+      "section": null,
+      "original_text": "1/2 cup crab meat or imitation crab",
+      "quantity": "1/2",
+      "recipe_qty": "1/2",
+      "unit": "cup",
+      "base_quantity": "1/2",
+      "base_unit": "cup",
+      "ingredient": "crab meat OR imitation crab",
+      "preparation": "shredded",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "crab meat OR imitation crab",
+      "purchase_group": "crab meat OR imitation crab"
+    },
+    {
+      "section": null,
+      "original_text": "to taste soy sauce",
+      "quantity": "to taste",
+      "recipe_qty": "to taste",
+      "unit": null,
+      "base_quantity": "to taste",
+      "base_unit": null,
+      "ingredient": "soy sauce",
+      "preparation": "for dipping",
+      "optional": false,
+      "store_section": "SAUCES & CONDIMENTS",
+      "store_section_order": 9,
+      "purchasable_item": "soy sauce",
+      "purchase_group": "soy sauce"
+    },
+    {
+      "section": null,
+      "original_text": "1 tablespoon sesame seeds",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "tablespoon",
+      "base_quantity": "1",
+      "base_unit": "tablespoon",
+      "ingredient": "sesame seeds",
+      "preparation": "for garnish",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "sesame seeds",
+      "purchase_group": "sesame seeds"
+    }
+  ],
+  "equipment": [
+    {
+      "equipment": "rice cooker",
+      "text": "rice cooker",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "bowl",
+      "text": "bowl",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "knife",
+      "text": "knife",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "cutting board",
+      "text": "cutting board",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "sushi mat",
+      "text": "sushi mat",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    }
+  ],
+  "instructions": [
+    {
+      "section": null,
+      "step_number": 1,
+      "instruction": "Cook sushi rice according to package instructions and let it cool.",
+      "text": "Cook sushi rice according to package instructions and let it cool.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "Place a nori sheet on a sushi mat, shiny side down.",
+      "text": "Place a nori sheet on a sushi mat, shiny side down.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "Spread a layer of sushi rice over the nori, leaving a small border at the top.",
+      "text": "Spread a layer of sushi rice over the nori, leaving a small border at the top.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "Layer cucumber, avocado, and crab meat on top of the rice.",
+      "text": "Layer cucumber, avocado, and crab meat on top of the rice.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 5,
+      "instruction": "Roll the sushi tightly using the mat, sealing the edge with a little water.",
+      "text": "Roll the sushi tightly using the mat, sealing the edge with a little water.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 6,
+      "instruction": "Slice the burrito into pieces and sprinkle with sesame seeds.",
+      "text": "Slice the burrito into pieces and sprinkle with sesame seeds.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 7,
+      "instruction": "Serve with soy sauce for dipping.",
+      "text": "Serve with soy sauce for dipping.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    }
+  ],
+  "scaling": {
+    "selected_multiplier": 1,
+    "base_multiplier": 1,
+    "base_servings": "1 burrito",
+    "available_multipliers": [
+      {
+        "label": "1/2x",
+        "value": 0.5
+      },
+      {
+        "label": "1x",
+        "value": 1
+      },
+      {
+        "label": "2x",
+        "value": 2
+      },
+      {
+        "label": "3x",
+        "value": 3
+      }
+    ]
+  },
+  "ai_inferred": true,
+  "inferred_by_model": "gpt-4o-mini",
+  "inferred_at": "2026-06-16T02:32:23Z",
+  "inference_confidence": "high",
+  "source_type": "cookbook_item_inferred",
+  "cookbook_item_inferred_fields": [
+    "cook_time",
+    "equipment",
+    "inactive_time",
+    "ingredients",
+    "instructions",
+    "level",
+    "prep_time",
+    "recipe_amount",
+    "servings",
+    "total_time",
+    "yield"
+  ],
+  "cookbook_item_inference_field_sources": {
+    "recipe_amount": "ai_inferred",
+    "yield": "ai_inferred",
+    "servings": "ai_inferred",
+    "level": "ai_inferred",
+    "total_time": "ai_inferred",
+    "prep_time": "ai_inferred",
+    "inactive_time": "ai_inferred",
+    "cook_time": "ai_inferred",
+    "ingredients": "ai_inferred",
+    "equipment": "ai_inferred",
+    "instructions": "ai_inferred"
+  }
+}

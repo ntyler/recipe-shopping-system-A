@@ -1,0 +1,278 @@
+{
+  "source_url": "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-171-Spicy_Tuna",
+  "recipe_amount": "1",
+  "yield": "1 plate",
+  "servings": "1 appetizer serving",
+  "level": "Medium",
+  "total_time": "30 minutes",
+  "prep_time": "15 minutes",
+  "inactive_time": "0 minutes",
+  "cook_time": "15 minutes",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "8 oz sushi-grade tuna",
+      "quantity": "8",
+      "recipe_qty": "8",
+      "unit": "oz",
+      "base_quantity": "8",
+      "base_unit": "oz",
+      "ingredient": "sushi-grade tuna",
+      "preparation": "finely diced",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "sushi-grade tuna",
+      "purchase_group": "sushi-grade tuna"
+    },
+    {
+      "section": null,
+      "original_text": "2 tbsp soy sauce",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "tbsp",
+      "base_quantity": "2",
+      "base_unit": "tbsp",
+      "ingredient": "soy sauce",
+      "preparation": "for marinating",
+      "optional": false,
+      "store_section": "SAUCES & CONDIMENTS",
+      "store_section_order": 9,
+      "purchasable_item": "soy sauce",
+      "purchase_group": "soy sauce"
+    },
+    {
+      "section": null,
+      "original_text": "1 tbsp sesame oil",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "tbsp",
+      "base_quantity": "1",
+      "base_unit": "tbsp",
+      "ingredient": "sesame oil",
+      "preparation": "for flavor",
+      "optional": false,
+      "store_section": "OILS & VINEGARS",
+      "store_section_order": 13,
+      "purchasable_item": "sesame oil",
+      "purchase_group": "sesame oil"
+    },
+    {
+      "section": null,
+      "original_text": "2 stalks green onions",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "stalks",
+      "base_quantity": "2",
+      "base_unit": "stalks",
+      "ingredient": "green onions",
+      "preparation": "chopped",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1,
+      "purchasable_item": "green onions",
+      "purchase_group": "green onions"
+    },
+    {
+      "section": null,
+      "original_text": "1 medium avocado",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "medium",
+      "base_quantity": "1",
+      "base_unit": "medium",
+      "ingredient": "avocado",
+      "preparation": "sliced",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "avocado",
+      "purchase_group": "avocado"
+    },
+    {
+      "section": null,
+      "original_text": "4 sheets seaweed sheets",
+      "quantity": "4",
+      "recipe_qty": "4",
+      "unit": "sheets",
+      "base_quantity": "4",
+      "base_unit": "sheets",
+      "ingredient": "seaweed sheets",
+      "preparation": "for wrapping",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "seaweed sheets",
+      "purchase_group": "seaweed sheets"
+    },
+    {
+      "section": null,
+      "original_text": "to taste wasabi",
+      "quantity": "to taste",
+      "recipe_qty": "to taste",
+      "unit": null,
+      "base_quantity": "to taste",
+      "base_unit": null,
+      "ingredient": "wasabi",
+      "preparation": "for serving",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "wasabi",
+      "purchase_group": "wasabi"
+    },
+    {
+      "section": null,
+      "original_text": "to taste pickled ginger",
+      "quantity": "to taste",
+      "recipe_qty": "to taste",
+      "unit": null,
+      "base_quantity": "to taste",
+      "base_unit": null,
+      "ingredient": "pickled ginger",
+      "preparation": "for serving",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "pickled ginger",
+      "purchase_group": "pickled ginger"
+    }
+  ],
+  "equipment": [
+    {
+      "equipment": "mixing bowl",
+      "text": "mixing bowl",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "knife",
+      "text": "knife",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "cutting board",
+      "text": "cutting board",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "serving plate",
+      "text": "serving plate",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    }
+  ],
+  "instructions": [
+    {
+      "section": null,
+      "step_number": 1,
+      "instruction": "In a mixing bowl, combine diced tuna, soy sauce, sesame oil, and chopped green onions.",
+      "text": "In a mixing bowl, combine diced tuna, soy sauce, sesame oil, and chopped green onions.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "Mix well and let marinate for 10 minutes.",
+      "text": "Mix well and let marinate for 10 minutes.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "On a seaweed sheet, place a layer of the tuna mixture and a few slices of avocado.",
+      "text": "On a seaweed sheet, place a layer of the tuna mixture and a few slices of avocado.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "Roll tightly and slice into bite-sized pieces.",
+      "text": "Roll tightly and slice into bite-sized pieces.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 5,
+      "instruction": "Serve with wasabi and pickled ginger on the side.",
+      "text": "Serve with wasabi and pickled ginger on the side.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    }
+  ],
+  "scaling": {
+    "selected_multiplier": 1,
+    "base_multiplier": 1,
+    "base_servings": "1 appetizer serving",
+    "available_multipliers": [
+      {
+        "label": "1/2x",
+        "value": 0.5
+      },
+      {
+        "label": "1x",
+        "value": 1
+      },
+      {
+        "label": "2x",
+        "value": 2
+      },
+      {
+        "label": "3x",
+        "value": 3
+      }
+    ]
+  },
+  "ai_inferred": true,
+  "inferred_by_model": "gpt-4o-mini",
+  "inferred_at": "2026-06-16T02:29:19Z",
+  "inference_confidence": "high",
+  "source_type": "cookbook_item_inferred",
+  "cookbook_item_inferred_fields": [
+    "cook_time",
+    "equipment",
+    "inactive_time",
+    "ingredients",
+    "instructions",
+    "level",
+    "prep_time",
+    "recipe_amount",
+    "servings",
+    "total_time",
+    "yield"
+  ],
+  "cookbook_item_inference_field_sources": {
+    "recipe_amount": "ai_inferred",
+    "yield": "ai_inferred",
+    "servings": "ai_inferred",
+    "level": "ai_inferred",
+    "total_time": "ai_inferred",
+    "prep_time": "ai_inferred",
+    "inactive_time": "ai_inferred",
+    "cook_time": "ai_inferred",
+    "ingredients": "ai_inferred",
+    "equipment": "ai_inferred",
+    "instructions": "ai_inferred"
+  }
+}

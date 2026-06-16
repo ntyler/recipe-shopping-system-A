@@ -10917,6 +10917,110 @@ body {
             transition: width 0.25s ease;
         }
 
+        .cookbook-routine-jobs-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin: 0 0 12px;
+            padding: 10px;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            background: #111827;
+        }
+
+        .cookbook-routine-jobs-header,
+        .cookbook-routine-job-title,
+        .cookbook-routine-job-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .cookbook-routine-jobs-header {
+            color: #f8fafc;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+        }
+
+        #cookbookRoutineJobsSummary {
+            color: #93c5fd;
+            font-size: 12px;
+            font-weight: 800;
+            text-align: right;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+
+        .cookbook-routine-jobs-list {
+            display: grid;
+            gap: 8px;
+        }
+
+        .cookbook-routine-job-row,
+        .cookbook-routine-jobs-empty {
+            padding: 9px;
+            border: 1px solid #283241;
+            border-radius: 8px;
+            background: #0f1720;
+        }
+
+        .cookbook-routine-job-main {
+            display: grid;
+            gap: 5px;
+            min-width: 0;
+        }
+
+        .cookbook-routine-job-title {
+            color: #f8fafc;
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .cookbook-routine-job-status {
+            flex: 0 0 auto;
+            border: 1px solid #334155;
+            border-radius: 999px;
+            padding: 2px 7px;
+            color: #bfdbfe;
+            font-size: 11px;
+            font-weight: 800;
+        }
+
+        .cookbook-routine-job-step,
+        .cookbook-routine-job-recipe,
+        .cookbook-routine-job-model,
+        .cookbook-routine-job-meta,
+        .cookbook-routine-jobs-empty {
+            color: #cbd5e1;
+            font-size: 12px;
+            line-height: 1.35;
+            overflow-wrap: anywhere;
+        }
+
+        .cookbook-routine-job-recipe {
+            color: #86efac;
+            font-weight: 800;
+        }
+
+        .cookbook-routine-job-recipe.muted {
+            color: #94a3b8;
+            font-weight: 700;
+        }
+
+        .cookbook-routine-job-model {
+            color: #dbeafe;
+        }
+
+        .cookbook-routine-job-meta {
+            justify-content: flex-start;
+            gap: 8px;
+            color: #94a3b8;
+        }
+
         .recipe-pdf-save-prompt-card {
             width: min(620px, 100%);
         }
@@ -20608,9 +20712,20 @@ img[data-deferred-src] {
         }
 
         .job-activity-step,
+        .job-activity-current-recipe,
         .job-activity-meta {
             color: #cbd5e1;
             font-size: 0.86rem;
+        }
+
+        .job-activity-current-recipe {
+            color: #86efac;
+            font-weight: 700;
+            overflow-wrap: anywhere;
+        }
+
+        .job-activity-current-recipe a {
+            color: inherit;
         }
 
         .job-activity-model,

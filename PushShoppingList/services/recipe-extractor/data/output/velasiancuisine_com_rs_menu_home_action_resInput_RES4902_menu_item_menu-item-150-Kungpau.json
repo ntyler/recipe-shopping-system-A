@@ -1,0 +1,360 @@
+{
+  "source_url": "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-150-Kungpau",
+  "recipe_amount": "4 servings",
+  "yield": "4 bowls",
+  "servings": "4",
+  "level": "Medium",
+  "total_time": "30 minutes",
+  "prep_time": "15 minutes",
+  "inactive_time": "0 minutes",
+  "cook_time": "15 minutes",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "1 pound chicken breast",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "pound",
+      "base_quantity": "1",
+      "base_unit": "pound",
+      "ingredient": "chicken breast",
+      "preparation": "diced",
+      "optional": false,
+      "store_section": "MEAT & SEAFOOD",
+      "store_section_order": 2,
+      "purchasable_item": "chicken breast",
+      "purchase_group": "chicken breast"
+    },
+    {
+      "section": null,
+      "original_text": "1/2 cup peanuts",
+      "quantity": "1/2",
+      "recipe_qty": "1/2",
+      "unit": "cup",
+      "base_quantity": "1/2",
+      "base_unit": "cup",
+      "ingredient": "peanuts",
+      "preparation": "roasted",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "peanuts",
+      "purchase_group": "peanuts"
+    },
+    {
+      "section": null,
+      "original_text": "1 medium bell pepper",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "medium",
+      "base_quantity": "1",
+      "base_unit": "medium",
+      "ingredient": "bell pepper",
+      "preparation": "diced",
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12,
+      "purchasable_item": "bell pepper",
+      "purchase_group": "bell pepper"
+    },
+    {
+      "section": null,
+      "original_text": "2 stalks green onions",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "stalks",
+      "base_quantity": "2",
+      "base_unit": "stalks",
+      "ingredient": "green onions",
+      "preparation": "sliced",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1,
+      "purchasable_item": "green onions",
+      "purchase_group": "green onions"
+    },
+    {
+      "section": null,
+      "original_text": "3 tablespoons soy sauce",
+      "quantity": "3",
+      "recipe_qty": "3",
+      "unit": "tablespoons",
+      "base_quantity": "3",
+      "base_unit": "tablespoons",
+      "ingredient": "soy sauce",
+      "preparation": null,
+      "optional": false,
+      "store_section": "SAUCES & CONDIMENTS",
+      "store_section_order": 9,
+      "purchasable_item": "soy sauce",
+      "purchase_group": "soy sauce"
+    },
+    {
+      "section": null,
+      "original_text": "2 tablespoons hoisin sauce",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "tablespoons",
+      "base_quantity": "2",
+      "base_unit": "tablespoons",
+      "ingredient": "hoisin sauce",
+      "preparation": null,
+      "optional": false,
+      "store_section": "SAUCES & CONDIMENTS",
+      "store_section_order": 9,
+      "purchasable_item": "hoisin sauce",
+      "purchase_group": "hoisin sauce"
+    },
+    {
+      "section": null,
+      "original_text": "1 tablespoon rice vinegar",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "tablespoon",
+      "base_quantity": "1",
+      "base_unit": "tablespoon",
+      "ingredient": "rice vinegar",
+      "preparation": null,
+      "optional": false,
+      "store_section": "OILS & VINEGARS",
+      "store_section_order": 13,
+      "purchasable_item": "rice vinegar",
+      "purchase_group": "rice vinegar"
+    },
+    {
+      "section": null,
+      "original_text": "2 cloves garlic",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "cloves",
+      "base_quantity": "2",
+      "base_unit": "cloves",
+      "ingredient": "garlic",
+      "preparation": "minced",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1,
+      "purchasable_item": "garlic",
+      "purchase_group": "garlic"
+    },
+    {
+      "section": null,
+      "original_text": "1 teaspoon ginger",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "teaspoon",
+      "base_quantity": "1",
+      "base_unit": "teaspoon",
+      "ingredient": "ginger",
+      "preparation": "grated",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "ginger",
+      "purchase_group": "ginger"
+    },
+    {
+      "section": null,
+      "original_text": "1/2 teaspoon red pepper flakes",
+      "quantity": "1/2",
+      "recipe_qty": "1/2",
+      "unit": "teaspoon",
+      "base_quantity": "1/2",
+      "base_unit": "teaspoon",
+      "ingredient": "red pepper flakes",
+      "preparation": "optional for heat",
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12,
+      "purchasable_item": "red pepper flakes",
+      "purchase_group": "red pepper flakes"
+    },
+    {
+      "section": null,
+      "original_text": "4 cups cooked rice",
+      "quantity": "4",
+      "recipe_qty": "4",
+      "unit": "cups",
+      "base_quantity": "4",
+      "base_unit": "cups",
+      "ingredient": "cooked rice",
+      "preparation": "for serving",
+      "optional": false,
+      "store_section": "PASTA, RICE & GRAINS",
+      "store_section_order": 6,
+      "purchasable_item": "cooked rice",
+      "purchase_group": "cooked rice"
+    }
+  ],
+  "equipment": [
+    {
+      "equipment": "skillet",
+      "text": "skillet",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "spatula",
+      "text": "spatula",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "measuring cups",
+      "text": "measuring cups",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "measuring spoons",
+      "text": "measuring spoons",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "knife",
+      "text": "knife",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "cutting board",
+      "text": "cutting board",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    }
+  ],
+  "instructions": [
+    {
+      "section": null,
+      "step_number": 1,
+      "instruction": "Heat the skillet over medium heat and add a tablespoon of oil.",
+      "text": "Heat the skillet over medium heat and add a tablespoon of oil.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "Add the diced chicken and cook until browned and cooked through, about 5-7 minutes.",
+      "text": "Add the diced chicken and cook until browned and cooked through, about 5-7 minutes.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "Stir in the garlic, ginger, and red pepper flakes, cooking for another minute.",
+      "text": "Stir in the garlic, ginger, and red pepper flakes, cooking for another minute.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "Add the bell pepper and peanuts, stirring to combine.",
+      "text": "Add the bell pepper and peanuts, stirring to combine.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 5,
+      "instruction": "In a small bowl, mix the soy sauce, hoisin sauce, and rice vinegar, then pour over the chicken mixture.",
+      "text": "In a small bowl, mix the soy sauce, hoisin sauce, and rice vinegar, then pour over the chicken mixture.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 6,
+      "instruction": "Cook for an additional 2-3 minutes until everything is well coated and heated through.",
+      "text": "Cook for an additional 2-3 minutes until everything is well coated and heated through.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 7,
+      "instruction": "Serve over cooked rice and garnish with sliced green onions.",
+      "text": "Serve over cooked rice and garnish with sliced green onions.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    }
+  ],
+  "scaling": {
+    "selected_multiplier": 1,
+    "base_multiplier": 1,
+    "base_servings": "4",
+    "available_multipliers": [
+      {
+        "label": "1/2x",
+        "value": 0.5
+      },
+      {
+        "label": "1x",
+        "value": 1
+      },
+      {
+        "label": "2x",
+        "value": 2
+      },
+      {
+        "label": "3x",
+        "value": 3
+      }
+    ]
+  },
+  "ai_inferred": true,
+  "inferred_by_model": "gpt-4o-mini",
+  "inferred_at": "2026-06-16T02:27:57Z",
+  "inference_confidence": "high",
+  "source_type": "cookbook_item_inferred",
+  "cookbook_item_inferred_fields": [
+    "cook_time",
+    "equipment",
+    "inactive_time",
+    "ingredients",
+    "instructions",
+    "level",
+    "prep_time",
+    "recipe_amount",
+    "servings",
+    "total_time",
+    "yield"
+  ],
+  "cookbook_item_inference_field_sources": {
+    "recipe_amount": "ai_inferred",
+    "yield": "ai_inferred",
+    "servings": "ai_inferred",
+    "level": "ai_inferred",
+    "total_time": "ai_inferred",
+    "prep_time": "ai_inferred",
+    "inactive_time": "ai_inferred",
+    "cook_time": "ai_inferred",
+    "ingredients": "ai_inferred",
+    "equipment": "ai_inferred",
+    "instructions": "ai_inferred"
+  }
+}
