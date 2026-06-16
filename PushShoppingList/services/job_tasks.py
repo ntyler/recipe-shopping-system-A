@@ -851,6 +851,77 @@ def cookbook_infer_urls_from_payload(payload, cookbook):
     return list(dict.fromkeys(urls))
 
 
+def cookbook_recipe_names_by_url(cookbook):
+    recipes = cookbook.get("recipes", []) if isinstance(cookbook, dict) else []
+    names = {}
+    for recipe in recipes:
+        if not isinstance(recipe, dict):
+            continue
+        url = str(recipe.get("url") or "").strip()
+        if not url:
+            continue
+        name = str(
+            recipe.get("name")
+            or recipe.get("display_name")
+            or recipe.get("recipe_title")
+            or recipe.get("menu_item_name")
+            or ""
+        ).strip()
+        if name:
+            names[url] = name
+    return names
+
+
+def cookbook_recipe_display_name(recipe_url, recipe=None, recipe_names=None):
+    recipe = recipe if isinstance(recipe, dict) else {}
+    recipe_names = recipe_names if isinstance(recipe_names, dict) else {}
+    for value in (
+        recipe.get("display_name"),
+        recipe.get("recipe_title"),
+        recipe.get("menu_item_name"),
+        recipe.get("name"),
+        recipe_names.get(recipe_url),
+        recipe_url,
+    ):
+        text = str(value or "").strip()
+        if text:
+            return text
+    return "this recipe"
+
+
+def cookbook_recipe_progress_payload(stage, action, recipe_url, recipe_name, index, total, event="running"):
+    index = max(0, int(index or 0))
+    total = max(0, int(total or 0))
+    label = str(recipe_name or recipe_url or "this recipe").strip()
+    if index and total:
+        detail = f"{action} recipe {index} of {total}: {label}"
+    else:
+        detail = f"{action}: {label}"
+    return {
+        "current_recipe_stage": str(stage or "").strip(),
+        "current_recipe_event": str(event or "").strip(),
+        "current_recipe_index": index,
+        "current_recipe_total": total,
+        "current_recipe_name": label,
+        "current_recipe_url": str(recipe_url or "").strip(),
+        "current_recipe_action": str(action or "").strip(),
+        "current_recipe_detail": detail,
+    }
+
+
+def clear_cookbook_recipe_progress_payload():
+    return {
+        "current_recipe_stage": "",
+        "current_recipe_event": "",
+        "current_recipe_index": 0,
+        "current_recipe_total": 0,
+        "current_recipe_name": "",
+        "current_recipe_url": "",
+        "current_recipe_action": "",
+        "current_recipe_detail": "",
+    }
+
+
 def run_cookbook_infer_missing_details_job(job_id, payload):
     from PushShoppingList.routes.recipe_routes import MODEL
     from PushShoppingList.routes.recipe_routes import _has_per_serving_estimate
@@ -879,6 +950,11 @@ def run_cookbook_infer_missing_details_job(job_id, payload):
 
     cookbook_name = str(payload.get("cookbook_name") or cookbook.get("name") or cookbook_id).strip()
     recipe_urls = cookbook_infer_urls_from_payload(payload, cookbook)
+    payload_recipe_names = payload.get("recipe_names") if isinstance(payload.get("recipe_names"), dict) else {}
+    recipe_names = {
+        **cookbook_recipe_names_by_url(cookbook),
+        **{str(key or "").strip(): str(value or "").strip() for key, value in payload_recipe_names.items() if str(key or "").strip() and str(value or "").strip()},
+    }
     total = len(recipe_urls)
     if not recipe_urls:
         result_payload = {
@@ -917,6 +993,7 @@ def run_cookbook_infer_missing_details_job(job_id, payload):
         "nutrition_completed": 0,
         "categories_completed": 0,
         "failed_items": 0,
+        **clear_cookbook_recipe_progress_payload(),
     }
     update_job_progress(
         job_id,
@@ -926,10 +1003,53 @@ def run_cookbook_infer_missing_details_job(job_id, payload):
         result_payload=base_payload,
     )
 
+    def update_inference_recipe_progress(event):
+        event = event if isinstance(event, dict) else {}
+        recipe_url = str(event.get("recipe_url") or "").strip()
+        recipe_name = cookbook_recipe_display_name(
+            recipe_url,
+            {"name": event.get("recipe_name")},
+            recipe_names,
+        )
+        item_index = int(event.get("index") or 0)
+        completed = int(event.get("completed") or 0)
+        item_total = int(event.get("total") or total or 0)
+        event_name = str(event.get("event") or "").strip().lower()
+        is_completed = event_name == "completed"
+        action = "Finished inferring details for" if is_completed else "Inferring details for"
+        current_step = f"{action} {recipe_name}"
+        if item_index and item_total:
+            current_step = f"{current_step} ({item_index}/{item_total})"
+        progress_index = completed if is_completed else max(0, item_index - 1)
+        update_job_progress(
+            job_id,
+            current_step=current_step,
+            progress_percent=bounded_percent(progress_index, item_total or total, 6, 34),
+            completed_items=completed if completed else None,
+            failed_items=None,
+            result_payload={
+                "stage": "Inferring missing details",
+                "cookbook_id": cookbook_id,
+                "cookbook_name": cookbook_name,
+                "total_items": total,
+                "details_completed": completed,
+                **cookbook_recipe_progress_payload(
+                    "details",
+                    action,
+                    recipe_url,
+                    recipe_name,
+                    item_index,
+                    item_total,
+                    event=event_name or "running",
+                ),
+            },
+        )
+
     inference_result = infer_missing_details_for_cookbook(
         cookbook_id,
         overwrite_ai_fields=overwrite_ai_fields,
         preview_only=preview_only,
+        progress_callback=update_inference_recipe_progress,
     )
     inference_failed = int(inference_result.get("failed") or 0)
     details_completed = int(inference_result.get("updated") or 0) + int(inference_result.get("skipped") or 0)
@@ -988,9 +1108,43 @@ def run_cookbook_infer_missing_details_job(job_id, payload):
 
     for index, recipe_url in enumerate(recipe_urls):
         ensure_not_cancelled(job_id)
+        recipe_name = cookbook_recipe_display_name(recipe_url, recipe_names=recipe_names)
+        update_job_progress(
+            job_id,
+            current_step=f"Estimating per serving basis for {recipe_name} ({index + 1}/{total})",
+            progress_percent=bounded_percent(index, total, 36, 62),
+            completed_items=max(details_completed, nutrition_completed),
+            failed_items=failed_items,
+            result_payload={
+                **cookbook_model_info,
+                "stage": "Estimating per serving basis",
+                "cookbook_id": cookbook_id,
+                "cookbook_name": cookbook_name,
+                "total_items": total,
+                "details_completed": details_completed,
+                "nutrition_completed": nutrition_completed,
+                "nutrition_failed": nutrition_failed,
+                "categories_completed": 0,
+                "failed_items": failed_items,
+                "inference_result": inference_result,
+                "nutrition_model_used": nutrition_model_info.get("model_used", ""),
+                "nutrition_model_source": nutrition_model_info.get("model_source", ""),
+                "nutrition_model_env_var": nutrition_model_info.get("model_env_var", ""),
+                **cookbook_recipe_progress_payload(
+                    "nutrition",
+                    "Estimating nutrition for",
+                    recipe_url,
+                    recipe_name,
+                    index + 1,
+                    total,
+                    event="started",
+                ),
+            },
+        )
         loaded_recipe = load_editable_recipe(recipe_url) or {}
         recipe = loaded_recipe.get("recipe") if isinstance(loaded_recipe, dict) else {}
         recipe = recipe if isinstance(recipe, dict) else {}
+        recipe_name = cookbook_recipe_display_name(recipe_url, recipe, recipe_names)
         if not recipe:
             failed_items += 1
             nutrition_failed += 1
@@ -1042,6 +1196,15 @@ def run_cookbook_infer_missing_details_job(job_id, payload):
                 "nutrition_model_used": nutrition_model_info.get("model_used", ""),
                 "nutrition_model_source": nutrition_model_info.get("model_source", ""),
                 "nutrition_model_env_var": nutrition_model_info.get("model_env_var", ""),
+                **cookbook_recipe_progress_payload(
+                    "nutrition",
+                    "Finished nutrition for",
+                    recipe_url,
+                    recipe_name,
+                    index + 1,
+                    total,
+                    event="completed",
+                ),
             },
         )
 
@@ -1068,9 +1231,41 @@ def run_cookbook_infer_missing_details_job(job_id, payload):
 
     for index, recipe_url in enumerate(recipe_urls):
         ensure_not_cancelled(job_id)
+        recipe_name = cookbook_recipe_display_name(recipe_url, recipe_names=recipe_names)
+        update_job_progress(
+            job_id,
+            current_step=f"Having ChatGPT decide all categories for {recipe_name} ({index + 1}/{total})",
+            progress_percent=bounded_percent(index, total, 65, 94),
+            completed_items=max(details_completed, nutrition_completed, category_completed),
+            failed_items=failed_items,
+            result_payload={
+                **cookbook_model_info,
+                "stage": "Having ChatGPT decide all categories",
+                "cookbook_id": cookbook_id,
+                "cookbook_name": cookbook_name,
+                "total_items": total,
+                "details_completed": details_completed,
+                "nutrition_completed": nutrition_completed,
+                "nutrition_failed": nutrition_failed,
+                "categories_completed": category_completed,
+                "categories_failed": category_failed,
+                "failed_items": failed_items,
+                "inference_result": inference_result,
+                **cookbook_recipe_progress_payload(
+                    "categories",
+                    "Deciding categories for",
+                    recipe_url,
+                    recipe_name,
+                    index + 1,
+                    total,
+                    event="started",
+                ),
+            },
+        )
         loaded_recipe = load_editable_recipe(recipe_url) or {}
         recipe = loaded_recipe.get("recipe") if isinstance(loaded_recipe, dict) else {}
         recipe = recipe if isinstance(recipe, dict) else {}
+        recipe_name = cookbook_recipe_display_name(recipe_url, recipe, recipe_names)
         if not recipe:
             failed_items += 1
             category_failed += 1
@@ -1118,6 +1313,15 @@ def run_cookbook_infer_missing_details_job(job_id, payload):
                 "categories_failed": category_failed,
                 "failed_items": failed_items,
                 "inference_result": inference_result,
+                **cookbook_recipe_progress_payload(
+                    "categories",
+                    "Finished category decision for",
+                    recipe_url,
+                    recipe_name,
+                    index + 1,
+                    total,
+                    event="completed",
+                ),
             },
         )
 
@@ -1139,6 +1343,7 @@ def run_cookbook_infer_missing_details_job(job_id, payload):
         "failed_items": failed_items,
         "inference_result": inference_result,
         "category_statuses": category_statuses,
+        **clear_cookbook_recipe_progress_payload(),
         "summary_message": (
             f"{cookbook_name}: inferred {inference_result.get('updated', 0)}, "
             f"estimated serving basis for {nutrition_completed}, "

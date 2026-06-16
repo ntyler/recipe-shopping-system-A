@@ -369,12 +369,13 @@ def _append_source_item(items, seen, source_type, value, detail=""):
     items.append(item)
 
 
-def _append_recipe_source_item(items, seen, value, detail="menu item"):
-    label = _safe_source_label(value)
+def _append_recipe_source_item(items, seen, value, detail="menu item", label=None):
+    label = _safe_source_label(label) or _safe_source_label(value)
     if not label:
         return
 
-    key = ("recipe", label)
+    recipe_url = str(value or "").strip()
+    key = ("recipe", recipe_url or label)
     if key in seen:
         return
 
@@ -383,8 +384,8 @@ def _append_recipe_source_item(items, seen, value, detail="menu item"):
         "type": "recipe",
         "label": label,
         "detail": str(detail or "").strip(),
-        "url": f"/recipe/edit?url={quote(str(value or '').strip(), safe='')}",
-        "recipe_url": str(value or "").strip(),
+        "url": f"/recipe/edit?url={quote(recipe_url, safe='')}",
+        "recipe_url": recipe_url,
     })
 
 
@@ -396,6 +397,7 @@ def job_source_items(job):
 
     if job_type in {"menu-generate-recipes", "menu-deferred-heavy-tasks", "cookbook-infer-missing-details"}:
         menu_recipe_urls = []
+        recipe_names = input_payload.get("recipe_names") if isinstance(input_payload.get("recipe_names"), dict) else {}
         for key in ("recipe_urls", "urls"):
             values = input_payload.get(key)
             if isinstance(values, str):
@@ -407,7 +409,7 @@ def job_source_items(job):
             if value:
                 menu_recipe_urls.append(value)
         for recipe_url in menu_recipe_urls:
-            _append_recipe_source_item(items, seen, recipe_url)
+            _append_recipe_source_item(items, seen, recipe_url, label=recipe_names.get(recipe_url))
         return items
 
     urls = input_payload.get("urls")

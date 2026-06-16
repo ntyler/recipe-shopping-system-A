@@ -6364,13 +6364,39 @@ function setCookbookRoutineProgress(percent) {
     }
 }
 
-function updateCookbookRoutineStep(key, mode, message) {
+function cookbookRoutineDefaultStepDetail(key) {
+    const overlay = document.getElementById("cookbookRoutineLoadingOverlay");
+    const previewOnly = Boolean(overlay && overlay.dataset && overlay.dataset.previewOnly === "1");
+    const step = cookbookRoutineSteps(previewOnly).find(([candidateKey]) => candidateKey === key);
+    return step ? step[2] : "";
+}
+
+function cookbookRoutineCheckedDetail(label, completed, failed, total) {
+    const count = Math.max(0, Number(completed || 0) + Number(failed || 0));
+    const totalCount = Number(total || 0);
+    if (!count && !totalCount) {
+        return "";
+    }
+    const base = totalCount
+        ? `${count} of ${totalCount} recipes ${label}.`
+        : `${count} recipes ${label}.`;
+    return failed ? `${base} ${failed} failed.` : base;
+}
+
+function cookbookRoutineCurrentRecipeDetail(result, stageKey) {
+    const currentStage = String(result && result.current_recipe_stage || "").trim();
+    const detail = String(result && result.current_recipe_detail || "").trim();
+    return currentStage === stageKey ? detail : "";
+}
+
+function updateCookbookRoutineStep(key, mode, message, detailMessage = null) {
     const row = document.querySelector(`[data-cookbook-routine-step="${cssEscape(key)}"]`);
     if (!row) {
         return;
     }
 
     const status = row.querySelector(".recipe-qty-progress-status");
+    const detail = row.querySelector(".recipe-qty-progress-qty");
     if (!status) {
         return;
     }
@@ -6383,6 +6409,10 @@ function updateCookbookRoutineStep(key, mode, message) {
         mode === "failed" ? "Failed" :
         "Waiting"
     );
+
+    if (detail && detailMessage !== null) {
+        detail.textContent = detailMessage || cookbookRoutineDefaultStepDetail(key);
+    }
 }
 
 function updateCookbookRoutineOverlayFromJob(job) {
@@ -6405,6 +6435,10 @@ function updateCookbookRoutineOverlayFromJob(job) {
     const categoriesCompleted = Number(result.categories_completed || 0);
     const categoriesFailed = Number(result.categories_failed || 0);
     const progressPercent = Number((job && job.progress_percent) || 0);
+    const totalItems = Number(result.total_items || (job && job.total_items) || 0);
+    const detailsCurrentDetail = cookbookRoutineCurrentRecipeDetail(result, "details");
+    const nutritionCurrentDetail = cookbookRoutineCurrentRecipeDetail(result, "nutrition");
+    const categoriesCurrentDetail = cookbookRoutineCurrentRecipeDetail(result, "categories");
 
     setCookbookRoutineProgress(progressPercent);
     setCookbookRoutineModelText(formatJobModelReference(job) ? `Model Used: ${formatJobModelReference(job)}` : "Model Used: Unknown");
@@ -6420,11 +6454,16 @@ function updateCookbookRoutineOverlayFromJob(job) {
     const completeStage = stageLower === "complete" || status === "completed";
 
     if (failed && !detailsDone) {
-        updateCookbookRoutineStep("details", "failed", "Failed");
+        updateCookbookRoutineStep("details", "failed", "Failed", detailsCurrentDetail);
     } else if (detailsDone || previewOnly || nutritionStage || categoryStage || completeStage) {
-        updateCookbookRoutineStep("details", detailsFailed ? "failed" : "done", `${updated} updated, ${skipped} skipped${detailsFailed ? `, ${detailsFailed} failed` : ""}`);
+        updateCookbookRoutineStep(
+            "details",
+            detailsFailed ? "failed" : "done",
+            `${updated} updated, ${skipped} skipped${detailsFailed ? `, ${detailsFailed} failed` : ""}`,
+            cookbookRoutineCheckedDetail("checked for missing details", updated + skipped, detailsFailed, totalItems)
+        );
     } else {
-        updateCookbookRoutineStep("details", active ? "running" : "waiting", active ? "Running" : "Waiting");
+        updateCookbookRoutineStep("details", active ? "running" : "waiting", active ? "Running" : "Waiting", active ? detailsCurrentDetail : "");
     }
 
     if (previewOnly) {
@@ -6433,23 +6472,33 @@ function updateCookbookRoutineOverlayFromJob(job) {
     }
 
     if (failed && nutritionStage) {
-        updateCookbookRoutineStep("nutrition", "failed", "Failed");
+        updateCookbookRoutineStep("nutrition", "failed", "Failed", nutritionCurrentDetail);
     } else if (categoryStage || completeStage) {
-        updateCookbookRoutineStep("nutrition", nutritionFailed ? "failed" : "done", `${nutritionCompleted} complete${nutritionFailed ? `, ${nutritionFailed} failed` : ""}`);
+        updateCookbookRoutineStep(
+            "nutrition",
+            nutritionFailed ? "failed" : "done",
+            `${nutritionCompleted} complete${nutritionFailed ? `, ${nutritionFailed} failed` : ""}`,
+            cookbookRoutineCheckedDetail("checked for nutrition", nutritionCompleted, nutritionFailed, totalItems)
+        );
     } else if (nutritionStage) {
-        updateCookbookRoutineStep("nutrition", "running", nutritionCompleted ? `${nutritionCompleted} complete` : "Running");
+        updateCookbookRoutineStep("nutrition", "running", nutritionCompleted ? `${nutritionCompleted} complete` : "Running", nutritionCurrentDetail);
     } else {
-        updateCookbookRoutineStep("nutrition", "waiting", "Waiting");
+        updateCookbookRoutineStep("nutrition", "waiting", "Waiting", "");
     }
 
     if (failed && categoryStage) {
-        updateCookbookRoutineStep("categories", "failed", "Failed");
+        updateCookbookRoutineStep("categories", "failed", "Failed", categoriesCurrentDetail);
     } else if (completeStage) {
-        updateCookbookRoutineStep("categories", categoriesFailed ? "failed" : "done", `${categoriesCompleted} complete${categoriesFailed ? `, ${categoriesFailed} failed` : ""}`);
+        updateCookbookRoutineStep(
+            "categories",
+            categoriesFailed ? "failed" : "done",
+            `${categoriesCompleted} complete${categoriesFailed ? `, ${categoriesFailed} failed` : ""}`,
+            cookbookRoutineCheckedDetail("checked for categories", categoriesCompleted, categoriesFailed, totalItems)
+        );
     } else if (categoryStage) {
-        updateCookbookRoutineStep("categories", "running", categoriesCompleted ? `${categoriesCompleted} complete` : "Running");
+        updateCookbookRoutineStep("categories", "running", categoriesCompleted ? `${categoriesCompleted} complete` : "Running", categoriesCurrentDetail);
     } else {
-        updateCookbookRoutineStep("categories", "waiting", "Waiting");
+        updateCookbookRoutineStep("categories", "waiting", "Waiting", "");
     }
 
     updateCookbookRoutineStep("refresh", completeStage ? "done" : "waiting", completeStage ? "Complete" : "Waiting");

@@ -1,0 +1,284 @@
+{
+  "source_url": "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-70-Combo_Miso_Ramen",
+  "recipe_amount": "1 bowl",
+  "yield": "1 bowl of ramen",
+  "servings": "1 appetizer serving",
+  "level": "Medium",
+  "total_time": "30 minutes",
+  "prep_time": "10 minutes",
+  "inactive_time": "0 minutes",
+  "cook_time": "20 minutes",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "2 tablespoons Miso paste",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "tablespoons",
+      "base_quantity": "2",
+      "base_unit": "tablespoons",
+      "ingredient": "Miso paste",
+      "preparation": "for broth flavor",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "Miso paste",
+      "purchase_group": "Miso paste"
+    },
+    {
+      "section": null,
+      "original_text": "100 grams Ramen noodles",
+      "quantity": "100",
+      "recipe_qty": "100",
+      "unit": "grams",
+      "base_quantity": "100",
+      "base_unit": "grams",
+      "ingredient": "Ramen noodles",
+      "preparation": "fresh or dried",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "Ramen noodles",
+      "purchase_group": "Ramen noodles"
+    },
+    {
+      "section": null,
+      "original_text": "2 cups Vegetable broth",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "cups",
+      "base_quantity": "2",
+      "base_unit": "cups",
+      "ingredient": "Vegetable broth",
+      "preparation": "or chicken broth",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "Vegetable broth",
+      "purchase_group": "Vegetable broth"
+    },
+    {
+      "section": null,
+      "original_text": "2 stalks Green onions",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "stalks",
+      "base_quantity": "2",
+      "base_unit": "stalks",
+      "ingredient": "Green onions",
+      "preparation": "sliced for garnish",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1,
+      "purchasable_item": "Green onions",
+      "purchase_group": "Green onions"
+    },
+    {
+      "section": null,
+      "original_text": "100 grams Tofu",
+      "quantity": "100",
+      "recipe_qty": "100",
+      "unit": "grams",
+      "base_quantity": "100",
+      "base_unit": "grams",
+      "ingredient": "Tofu",
+      "preparation": "cubed, optional protein",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "Tofu",
+      "purchase_group": "Tofu"
+    },
+    {
+      "section": null,
+      "original_text": "1 tablespoon Soy sauce",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "tablespoon",
+      "base_quantity": "1",
+      "base_unit": "tablespoon",
+      "ingredient": "Soy sauce",
+      "preparation": "for seasoning",
+      "optional": false,
+      "store_section": "SAUCES & CONDIMENTS",
+      "store_section_order": 9,
+      "purchasable_item": "Soy sauce",
+      "purchase_group": "Soy sauce"
+    },
+    {
+      "section": null,
+      "original_text": "1 teaspoon Sesame oil",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "teaspoon",
+      "base_quantity": "1",
+      "base_unit": "teaspoon",
+      "ingredient": "Sesame oil",
+      "preparation": "for flavor",
+      "optional": false,
+      "store_section": "OILS & VINEGARS",
+      "store_section_order": 13,
+      "purchasable_item": "Sesame oil",
+      "purchase_group": "Sesame oil"
+    },
+    {
+      "section": null,
+      "original_text": "1 piece Nori sheets",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "piece",
+      "base_quantity": "1",
+      "base_unit": "piece",
+      "ingredient": "Nori sheets",
+      "preparation": "for garnish",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "Nori sheets",
+      "purchase_group": "Nori sheets"
+    }
+  ],
+  "equipment": [
+    {
+      "equipment": "pot",
+      "text": "pot",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "stirring spoon",
+      "text": "stirring spoon",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "knife",
+      "text": "knife",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "cutting board",
+      "text": "cutting board",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "bowl",
+      "text": "bowl",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    }
+  ],
+  "instructions": [
+    {
+      "section": null,
+      "step_number": 1,
+      "instruction": "In a pot, bring vegetable broth to a simmer.",
+      "text": "In a pot, bring vegetable broth to a simmer.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "Add miso paste and soy sauce, stirring until dissolved.",
+      "text": "Add miso paste and soy sauce, stirring until dissolved.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "Cook ramen noodles according to package instructions, then add to the broth.",
+      "text": "Cook ramen noodles according to package instructions, then add to the broth.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "In the last 5 minutes, add cubed tofu to heat through.",
+      "text": "In the last 5 minutes, add cubed tofu to heat through.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 5,
+      "instruction": "Serve in a bowl, garnished with sliced green onions, a drizzle of sesame oil, and a piece of nori.",
+      "text": "Serve in a bowl, garnished with sliced green onions, a drizzle of sesame oil, and a piece of nori.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    }
+  ],
+  "scaling": {
+    "selected_multiplier": 1,
+    "base_multiplier": 1,
+    "base_servings": "1 appetizer serving",
+    "available_multipliers": [
+      {
+        "label": "1/2x",
+        "value": 0.5
+      },
+      {
+        "label": "1x",
+        "value": 1
+      },
+      {
+        "label": "2x",
+        "value": 2
+      },
+      {
+        "label": "3x",
+        "value": 3
+      }
+    ]
+  },
+  "ai_inferred": true,
+  "inferred_by_model": "gpt-4o-mini",
+  "inferred_at": "2026-06-16T02:21:58Z",
+  "inference_confidence": "high",
+  "source_type": "cookbook_item_inferred",
+  "cookbook_item_inferred_fields": [
+    "cook_time",
+    "equipment",
+    "inactive_time",
+    "ingredients",
+    "instructions",
+    "level",
+    "prep_time",
+    "recipe_amount",
+    "servings",
+    "total_time",
+    "yield"
+  ],
+  "cookbook_item_inference_field_sources": {
+    "recipe_amount": "ai_inferred",
+    "yield": "ai_inferred",
+    "servings": "ai_inferred",
+    "level": "ai_inferred",
+    "total_time": "ai_inferred",
+    "prep_time": "ai_inferred",
+    "inactive_time": "ai_inferred",
+    "cook_time": "ai_inferred",
+    "ingredients": "ai_inferred",
+    "equipment": "ai_inferred",
+    "instructions": "ai_inferred"
+  }
+}

@@ -1,0 +1,306 @@
+{
+  "source_url": "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-101-Tonkotsu_Ramen",
+  "recipe_amount": "4 servings",
+  "yield": "4 bowls",
+  "servings": "4",
+  "level": "Medium",
+  "total_time": "2 hours",
+  "prep_time": "30 minutes",
+  "inactive_time": "1 hour",
+  "cook_time": "30 minutes",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "2 pounds pork bones",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "pounds",
+      "base_quantity": "2",
+      "base_unit": "pounds",
+      "ingredient": "pork bones",
+      "preparation": "preferably a mix of trotters and neck bones",
+      "optional": false,
+      "store_section": "MEAT & SEAFOOD",
+      "store_section_order": 2,
+      "purchasable_item": "pork bones",
+      "purchase_group": "pork bones"
+    },
+    {
+      "section": null,
+      "original_text": "10 cups water",
+      "quantity": "10",
+      "recipe_qty": "10",
+      "unit": "cups",
+      "base_quantity": "10",
+      "base_unit": "cups",
+      "ingredient": "water",
+      "preparation": "for broth",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "water",
+      "purchase_group": "water"
+    },
+    {
+      "section": null,
+      "original_text": "1/4 cup soy sauce",
+      "quantity": "1/4",
+      "recipe_qty": "1/4",
+      "unit": "cup",
+      "base_quantity": "1/4",
+      "base_unit": "cup",
+      "ingredient": "soy sauce",
+      "preparation": "for seasoning",
+      "optional": false,
+      "store_section": "SAUCES & CONDIMENTS",
+      "store_section_order": 9,
+      "purchasable_item": "soy sauce",
+      "purchase_group": "soy sauce"
+    },
+    {
+      "section": null,
+      "original_text": "2 tablespoons miso paste",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "tablespoons",
+      "base_quantity": "2",
+      "base_unit": "tablespoons",
+      "ingredient": "miso paste",
+      "preparation": "for flavor",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "miso paste",
+      "purchase_group": "miso paste"
+    },
+    {
+      "section": null,
+      "original_text": "4 servings ramen noodles",
+      "quantity": "4",
+      "recipe_qty": "4",
+      "unit": "servings",
+      "base_quantity": "4",
+      "base_unit": "servings",
+      "ingredient": "ramen noodles",
+      "preparation": "fresh or dried",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "ramen noodles",
+      "purchase_group": "ramen noodles"
+    },
+    {
+      "section": null,
+      "original_text": "2 stalks green onions",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "stalks",
+      "base_quantity": "2",
+      "base_unit": "stalks",
+      "ingredient": "green onions",
+      "preparation": "sliced for garnish",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1,
+      "purchasable_item": "green onions",
+      "purchase_group": "green onions"
+    },
+    {
+      "section": null,
+      "original_text": "4 pieces soft-boiled eggs",
+      "quantity": "4",
+      "recipe_qty": "4",
+      "unit": "pieces",
+      "base_quantity": "4",
+      "base_unit": "pieces",
+      "ingredient": "soft-boiled eggs",
+      "preparation": "for topping",
+      "optional": false,
+      "store_section": "DAIRY & EGGS",
+      "store_section_order": 3,
+      "purchasable_item": "soft-boiled eggs",
+      "purchase_group": "soft-boiled eggs"
+    },
+    {
+      "section": null,
+      "original_text": "4 sheets nori sheets",
+      "quantity": "4",
+      "recipe_qty": "4",
+      "unit": "sheets",
+      "base_quantity": "4",
+      "base_unit": "sheets",
+      "ingredient": "nori sheets",
+      "preparation": "for garnish",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "nori sheets",
+      "purchase_group": "nori sheets"
+    }
+  ],
+  "equipment": [
+    {
+      "equipment": "large pot",
+      "text": "large pot",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "strainer",
+      "text": "strainer",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "bowl",
+      "text": "bowl",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "saucepan",
+      "text": "saucepan",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "whisk",
+      "text": "whisk",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    }
+  ],
+  "instructions": [
+    {
+      "section": null,
+      "step_number": 1,
+      "instruction": "In a large pot, add pork bones and water, bring to a boil, then reduce to a simmer for 1 hour.",
+      "text": "In a large pot, add pork bones and water, bring to a boil, then reduce to a simmer for 1 hour.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "Skim off any foam that rises to the surface.",
+      "text": "Skim off any foam that rises to the surface.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "Add soy sauce and miso paste, stirring until dissolved.",
+      "text": "Add soy sauce and miso paste, stirring until dissolved.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "Simmer for an additional 30 minutes.",
+      "text": "Simmer for an additional 30 minutes.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 5,
+      "instruction": "Cook ramen noodles according to package instructions.",
+      "text": "Cook ramen noodles according to package instructions.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 6,
+      "instruction": "In a separate pot, soft-boil the eggs for 6-7 minutes, then cool in ice water and peel.",
+      "text": "In a separate pot, soft-boil the eggs for 6-7 minutes, then cool in ice water and peel.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 7,
+      "instruction": "To serve, place noodles in bowls, ladle broth over, and top with green onions, soft-boiled eggs, and nori.",
+      "text": "To serve, place noodles in bowls, ladle broth over, and top with green onions, soft-boiled eggs, and nori.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    }
+  ],
+  "scaling": {
+    "selected_multiplier": 1,
+    "base_multiplier": 1,
+    "base_servings": "4",
+    "available_multipliers": [
+      {
+        "label": "1/2x",
+        "value": 0.5
+      },
+      {
+        "label": "1x",
+        "value": 1
+      },
+      {
+        "label": "2x",
+        "value": 2
+      },
+      {
+        "label": "3x",
+        "value": 3
+      }
+    ]
+  },
+  "ai_inferred": true,
+  "inferred_by_model": "gpt-4o-mini",
+  "inferred_at": "2026-06-16T02:24:16Z",
+  "inference_confidence": "high",
+  "source_type": "cookbook_item_inferred",
+  "cookbook_item_inferred_fields": [
+    "cook_time",
+    "equipment",
+    "inactive_time",
+    "ingredients",
+    "instructions",
+    "level",
+    "prep_time",
+    "recipe_amount",
+    "servings",
+    "total_time",
+    "yield"
+  ],
+  "cookbook_item_inference_field_sources": {
+    "recipe_amount": "ai_inferred",
+    "yield": "ai_inferred",
+    "servings": "ai_inferred",
+    "level": "ai_inferred",
+    "total_time": "ai_inferred",
+    "prep_time": "ai_inferred",
+    "inactive_time": "ai_inferred",
+    "cook_time": "ai_inferred",
+    "ingredients": "ai_inferred",
+    "equipment": "ai_inferred",
+    "instructions": "ai_inferred"
+  }
+}

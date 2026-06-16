@@ -1,0 +1,284 @@
+{
+  "source_url": "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-59-Miso_Ramen",
+  "recipe_amount": "4 servings",
+  "yield": "4 bowls",
+  "servings": "4",
+  "level": "Medium",
+  "total_time": "45 minutes",
+  "prep_time": "15 minutes",
+  "inactive_time": "0 minutes",
+  "cook_time": "30 minutes",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "4 tablespoons Miso paste",
+      "quantity": "4",
+      "recipe_qty": "4",
+      "unit": "tablespoons",
+      "base_quantity": "4",
+      "base_unit": "tablespoons",
+      "ingredient": "Miso paste",
+      "preparation": "white or red miso",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "Miso paste",
+      "purchase_group": "Miso paste"
+    },
+    {
+      "section": null,
+      "original_text": "4 packs Ramen noodles",
+      "quantity": "4",
+      "recipe_qty": "4",
+      "unit": "packs",
+      "base_quantity": "4",
+      "base_unit": "packs",
+      "ingredient": "Ramen noodles",
+      "preparation": "fresh or dried",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "Ramen noodles",
+      "purchase_group": "Ramen noodles"
+    },
+    {
+      "section": null,
+      "original_text": "6 cups Vegetable broth",
+      "quantity": "6",
+      "recipe_qty": "6",
+      "unit": "cups",
+      "base_quantity": "6",
+      "base_unit": "cups",
+      "ingredient": "Vegetable broth",
+      "preparation": "or chicken broth",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "Vegetable broth",
+      "purchase_group": "Vegetable broth"
+    },
+    {
+      "section": null,
+      "original_text": "2 tablespoons Soy sauce",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "tablespoons",
+      "base_quantity": "2",
+      "base_unit": "tablespoons",
+      "ingredient": "Soy sauce",
+      "preparation": null,
+      "optional": false,
+      "store_section": "SAUCES & CONDIMENTS",
+      "store_section_order": 9,
+      "purchasable_item": "Soy sauce",
+      "purchase_group": "Soy sauce"
+    },
+    {
+      "section": null,
+      "original_text": "2 stalks Green onions",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "stalks",
+      "base_quantity": "2",
+      "base_unit": "stalks",
+      "ingredient": "Green onions",
+      "preparation": "sliced",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1,
+      "purchasable_item": "Green onions",
+      "purchase_group": "Green onions"
+    },
+    {
+      "section": null,
+      "original_text": "1 block Tofu",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "block",
+      "base_quantity": "1",
+      "base_unit": "block",
+      "ingredient": "Tofu",
+      "preparation": "cubed, optional",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "Tofu",
+      "purchase_group": "Tofu"
+    },
+    {
+      "section": null,
+      "original_text": "2 cups Spinach",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "cups",
+      "base_quantity": "2",
+      "base_unit": "cups",
+      "ingredient": "Spinach",
+      "preparation": "fresh",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1,
+      "purchasable_item": "Spinach",
+      "purchase_group": "Spinach"
+    },
+    {
+      "section": null,
+      "original_text": "1 teaspoon Sesame oil",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "teaspoon",
+      "base_quantity": "1",
+      "base_unit": "teaspoon",
+      "ingredient": "Sesame oil",
+      "preparation": "for garnish",
+      "optional": false,
+      "store_section": "OILS & VINEGARS",
+      "store_section_order": 13,
+      "purchasable_item": "Sesame oil",
+      "purchase_group": "Sesame oil"
+    }
+  ],
+  "equipment": [
+    {
+      "equipment": "large pot",
+      "text": "large pot",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "whisk",
+      "text": "whisk",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "ladle",
+      "text": "ladle",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "cutting board",
+      "text": "cutting board",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "knife",
+      "text": "knife",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    }
+  ],
+  "instructions": [
+    {
+      "section": null,
+      "step_number": 1,
+      "instruction": "In a large pot, bring vegetable broth to a simmer.",
+      "text": "In a large pot, bring vegetable broth to a simmer.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "Whisk in miso paste and soy sauce until dissolved.",
+      "text": "Whisk in miso paste and soy sauce until dissolved.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "Add ramen noodles and cook according to package instructions.",
+      "text": "Add ramen noodles and cook according to package instructions.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "In the last 2 minutes of cooking, add spinach and tofu.",
+      "text": "In the last 2 minutes of cooking, add spinach and tofu.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 5,
+      "instruction": "Serve hot, garnished with sliced green onions and a drizzle of sesame oil.",
+      "text": "Serve hot, garnished with sliced green onions and a drizzle of sesame oil.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    }
+  ],
+  "scaling": {
+    "selected_multiplier": 1,
+    "base_multiplier": 1,
+    "base_servings": "4",
+    "available_multipliers": [
+      {
+        "label": "1/2x",
+        "value": 0.5
+      },
+      {
+        "label": "1x",
+        "value": 1
+      },
+      {
+        "label": "2x",
+        "value": 2
+      },
+      {
+        "label": "3x",
+        "value": 3
+      }
+    ]
+  },
+  "ai_inferred": true,
+  "inferred_by_model": "gpt-4o-mini",
+  "inferred_at": "2026-06-16T02:21:04Z",
+  "inference_confidence": "high",
+  "source_type": "cookbook_item_inferred",
+  "cookbook_item_inferred_fields": [
+    "cook_time",
+    "equipment",
+    "inactive_time",
+    "ingredients",
+    "instructions",
+    "level",
+    "prep_time",
+    "recipe_amount",
+    "servings",
+    "total_time",
+    "yield"
+  ],
+  "cookbook_item_inference_field_sources": {
+    "recipe_amount": "ai_inferred",
+    "yield": "ai_inferred",
+    "servings": "ai_inferred",
+    "level": "ai_inferred",
+    "total_time": "ai_inferred",
+    "prep_time": "ai_inferred",
+    "inactive_time": "ai_inferred",
+    "cook_time": "ai_inferred",
+    "ingredients": "ai_inferred",
+    "equipment": "ai_inferred",
+    "instructions": "ai_inferred"
+  }
+}

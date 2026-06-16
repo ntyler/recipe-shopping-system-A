@@ -384,6 +384,7 @@ def test_cookbook_infer_missing_details_route_queues_full_routine(monkeypatch, t
     assert data["job"]["job_type"] == "cookbook-infer-missing-details"
     assert data["job"]["queue_name"] == "ai-pantry-light"
     assert data["job"]["model_env_var"] == "OPENAI_COOKBOOK_ITEM_MODEL"
+    assert data["job"]["source_items"][0]["label"] == "Spring Roll"
     assert data["job"]["source_items"][0]["detail"] == "menu item"
     assert data["job"]["source_items"][0]["recipe_url"] == recipe_url
 
@@ -407,9 +408,27 @@ def test_cookbook_infer_missing_details_job_runs_estimate_and_decide_all(monkeyp
         "resolve_cookbook_item_model",
         lambda: ("gpt-cookbook-test", "test"),
     )
+    progress_updates = []
+    real_update_progress = job_tasks.update_job_progress
+
+    def recording_update_progress(*args, **kwargs):
+        progress_updates.append(kwargs)
+        return real_update_progress(*args, **kwargs)
+
+    monkeypatch.setattr(job_tasks, "update_job_progress", recording_update_progress)
 
     def fake_infer(cookbook_id, **kwargs):
         events.append(("infer", cookbook_id, kwargs.get("overwrite_ai_fields"), kwargs.get("preview_only")))
+        progress_callback = kwargs.get("progress_callback")
+        assert callable(progress_callback)
+        progress_callback({
+            "phase": "details",
+            "event": "started",
+            "recipe_url": recipe_urls[0],
+            "recipe_name": "spring-roll",
+            "index": 1,
+            "total": 2,
+        })
         return {
             "ok": True,
             "cookbook_id": cookbook_id,
@@ -467,6 +486,26 @@ def test_cookbook_infer_missing_details_job_runs_estimate_and_decide_all(monkeyp
     ]
     assert finished["result_payload"]["nutrition_completed"] == 2
     assert finished["result_payload"]["categories_completed"] == 2
+    detail_payloads = [
+        update.get("result_payload", {})
+        for update in progress_updates
+        if isinstance(update.get("result_payload"), dict)
+    ]
+    assert any(
+        payload.get("current_recipe_stage") == "details"
+        and "spring-roll" in payload.get("current_recipe_detail", "")
+        for payload in detail_payloads
+    )
+    assert any(
+        payload.get("current_recipe_stage") == "nutrition"
+        and "crab-wonton" in payload.get("current_recipe_detail", "")
+        for payload in detail_payloads
+    )
+    assert any(
+        payload.get("current_recipe_stage") == "categories"
+        and "crab-wonton" in payload.get("current_recipe_detail", "")
+        for payload in detail_payloads
+    )
 
 
 def test_cancelled_job_cannot_be_revived_by_worker_updates(monkeypatch, tmp_path):

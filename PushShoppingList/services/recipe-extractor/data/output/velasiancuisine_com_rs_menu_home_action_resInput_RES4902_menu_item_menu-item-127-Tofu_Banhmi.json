@@ -1,0 +1,295 @@
+{
+  "source_url": "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-127-Tofu_Banhmi",
+  "recipe_amount": "2",
+  "yield": "2 sandwiches",
+  "servings": "1 appetizer serving",
+  "level": "Medium",
+  "total_time": "30 minutes",
+  "prep_time": "15 minutes",
+  "inactive_time": "0 minutes",
+  "cook_time": "15 minutes",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "200 grams tofu",
+      "quantity": "200",
+      "recipe_qty": "200",
+      "unit": "grams",
+      "base_quantity": "200",
+      "base_unit": "grams",
+      "ingredient": "tofu",
+      "preparation": "firm, sliced",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "tofu",
+      "purchase_group": "tofu"
+    },
+    {
+      "section": null,
+      "original_text": "1 piece baguette",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "piece",
+      "base_quantity": "1",
+      "base_unit": "piece",
+      "ingredient": "baguette",
+      "preparation": "crusty",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "baguette",
+      "purchase_group": "baguette"
+    },
+    {
+      "section": null,
+      "original_text": "1/2 piece cucumber",
+      "quantity": "1/2",
+      "recipe_qty": "1/2",
+      "unit": "piece",
+      "base_quantity": "1/2",
+      "base_unit": "piece",
+      "ingredient": "cucumber",
+      "preparation": "thinly sliced",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "cucumber",
+      "purchase_group": "cucumber"
+    },
+    {
+      "section": null,
+      "original_text": "1/2 piece carrot",
+      "quantity": "1/2",
+      "recipe_qty": "1/2",
+      "unit": "piece",
+      "base_quantity": "1/2",
+      "base_unit": "piece",
+      "ingredient": "carrot",
+      "preparation": "julienned",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "carrot",
+      "purchase_group": "carrot"
+    },
+    {
+      "section": null,
+      "original_text": "1/4 cup cilantro",
+      "quantity": "1/4",
+      "recipe_qty": "1/4",
+      "unit": "cup",
+      "base_quantity": "1/4",
+      "base_unit": "cup",
+      "ingredient": "cilantro",
+      "preparation": "fresh, chopped",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1,
+      "purchasable_item": "cilantro",
+      "purchase_group": "cilantro"
+    },
+    {
+      "section": null,
+      "original_text": "2 tablespoons mayonnaise",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "tablespoons",
+      "base_quantity": "2",
+      "base_unit": "tablespoons",
+      "ingredient": "mayonnaise",
+      "preparation": "optional",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "mayonnaise",
+      "purchase_group": "mayonnaise"
+    },
+    {
+      "section": null,
+      "original_text": "1 tablespoon soy sauce",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "tablespoon",
+      "base_quantity": "1",
+      "base_unit": "tablespoon",
+      "ingredient": "soy sauce",
+      "preparation": "for marinating",
+      "optional": false,
+      "store_section": "SAUCES & CONDIMENTS",
+      "store_section_order": 9,
+      "purchasable_item": "soy sauce",
+      "purchase_group": "soy sauce"
+    },
+    {
+      "section": null,
+      "original_text": "1 teaspoon sriracha",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "teaspoon",
+      "base_quantity": "1",
+      "base_unit": "teaspoon",
+      "ingredient": "sriracha",
+      "preparation": "optional, for spice",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "sriracha",
+      "purchase_group": "sriracha"
+    }
+  ],
+  "equipment": [
+    {
+      "equipment": "frying pan",
+      "text": "frying pan",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "knife",
+      "text": "knife",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "cutting board",
+      "text": "cutting board",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "spatula",
+      "text": "spatula",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "serving plate",
+      "text": "serving plate",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    }
+  ],
+  "instructions": [
+    {
+      "section": null,
+      "step_number": 1,
+      "instruction": "Press tofu to remove excess moisture, then slice into strips.",
+      "text": "Press tofu to remove excess moisture, then slice into strips.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "Marinate tofu in soy sauce for 10 minutes.",
+      "text": "Marinate tofu in soy sauce for 10 minutes.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "Heat frying pan over medium heat and cook tofu until golden brown, about 5-7 minutes.",
+      "text": "Heat frying pan over medium heat and cook tofu until golden brown, about 5-7 minutes.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "Slice baguette in half and spread mayonnaise if using.",
+      "text": "Slice baguette in half and spread mayonnaise if using.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 5,
+      "instruction": "Layer cooked tofu, cucumber, carrot, and cilantro inside the baguette.",
+      "text": "Layer cooked tofu, cucumber, carrot, and cilantro inside the baguette.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 6,
+      "instruction": "Drizzle with sriracha if desired, then close the sandwich and serve.",
+      "text": "Drizzle with sriracha if desired, then close the sandwich and serve.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    }
+  ],
+  "scaling": {
+    "selected_multiplier": 1,
+    "base_multiplier": 1,
+    "base_servings": "1 appetizer serving",
+    "available_multipliers": [
+      {
+        "label": "1/2x",
+        "value": 0.5
+      },
+      {
+        "label": "1x",
+        "value": 1
+      },
+      {
+        "label": "2x",
+        "value": 2
+      },
+      {
+        "label": "3x",
+        "value": 3
+      }
+    ]
+  },
+  "ai_inferred": true,
+  "inferred_by_model": "gpt-4o-mini",
+  "inferred_at": "2026-06-16T02:26:27Z",
+  "inference_confidence": "high",
+  "source_type": "cookbook_item_inferred",
+  "cookbook_item_inferred_fields": [
+    "cook_time",
+    "equipment",
+    "inactive_time",
+    "ingredients",
+    "instructions",
+    "level",
+    "prep_time",
+    "recipe_amount",
+    "servings",
+    "total_time",
+    "yield"
+  ],
+  "cookbook_item_inference_field_sources": {
+    "recipe_amount": "ai_inferred",
+    "yield": "ai_inferred",
+    "servings": "ai_inferred",
+    "level": "ai_inferred",
+    "total_time": "ai_inferred",
+    "prep_time": "ai_inferred",
+    "inactive_time": "ai_inferred",
+    "cook_time": "ai_inferred",
+    "ingredients": "ai_inferred",
+    "equipment": "ai_inferred",
+    "instructions": "ai_inferred"
+  }
+}

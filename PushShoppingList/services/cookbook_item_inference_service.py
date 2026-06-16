@@ -784,7 +784,13 @@ def infer_missing_details_for_recipe(
     }
 
 
-def infer_missing_details_for_cookbook(cookbook_id, overwrite_ai_fields=False, preview_only=False, user_id=None):
+def infer_missing_details_for_cookbook(
+    cookbook_id,
+    overwrite_ai_fields=False,
+    preview_only=False,
+    user_id=None,
+    progress_callback=None,
+):
     cookbook = recipe_context_from_cookbook(cookbook_id)
     recipes = [
         recipe
@@ -816,9 +822,27 @@ def infer_missing_details_for_cookbook(cookbook_id, overwrite_ai_fields=False, p
         preview_only=preview_only,
     )
 
-    def run_one(recipe):
+    def emit_progress(event):
+        if not callable(progress_callback):
+            return
+        try:
+            progress_callback(event)
+        except Exception as exc:
+            log_inference_event("progress_callback_failed", error=str(exc))
+
+    def run_one(index, recipe):
+        recipe_url = recipe.get("url", "")
+        recipe_name = recipe.get("name", "") or recipe_url
+        emit_progress({
+            "phase": "details",
+            "event": "started",
+            "recipe_url": recipe_url,
+            "recipe_name": recipe_name,
+            "index": index,
+            "total": total,
+        })
         return infer_missing_details_for_recipe(
-            recipe.get("url", ""),
+            recipe_url,
             cookbook_id=cookbook.get("id", ""),
             cookbook_name=cookbook.get("name", ""),
             overwrite_ai_fields=overwrite_ai_fields,
@@ -828,11 +852,12 @@ def infer_missing_details_for_cookbook(cookbook_id, overwrite_ai_fields=False, p
 
     with ThreadPoolExecutor(max_workers=worker_count) as executor:
         future_to_recipe = {
-            executor.submit(run_one, recipe): recipe
-            for recipe in recipes
+            executor.submit(run_one, index, recipe): (index, recipe)
+            for index, recipe in enumerate(recipes, start=1)
         }
+        completed = 0
         for future in as_completed(future_to_recipe):
-            recipe = future_to_recipe[future]
+            index, recipe = future_to_recipe[future]
             try:
                 result = future.result()
             except Exception as exc:
@@ -849,6 +874,18 @@ def infer_missing_details_for_cookbook(cookbook_id, overwrite_ai_fields=False, p
                     error=result["error"],
                 )
             results.append(result)
+            completed += 1
+            emit_progress({
+                "phase": "details",
+                "event": "completed",
+                "recipe_url": result.get("recipe_url") or recipe.get("url", ""),
+                "recipe_name": result.get("recipe_name") or recipe.get("name", "") or recipe.get("url", ""),
+                "index": index,
+                "completed": completed,
+                "total": total,
+                "ok": bool(result.get("ok")),
+                "skipped": bool(result.get("skipped")),
+            })
 
     updated = sum(1 for result in results if result.get("ok") and not result.get("skipped"))
     skipped = sum(1 for result in results if result.get("ok") and result.get("skipped"))

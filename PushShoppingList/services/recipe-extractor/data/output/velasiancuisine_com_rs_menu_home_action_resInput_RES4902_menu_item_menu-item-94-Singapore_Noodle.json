@@ -1,0 +1,301 @@
+{
+  "source_url": "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-94-Singapore_Noodle",
+  "recipe_amount": "4 servings",
+  "yield": "4 bowls",
+  "servings": "4",
+  "level": "Medium",
+  "total_time": "30 minutes",
+  "prep_time": "10 minutes",
+  "inactive_time": "0 minutes",
+  "cook_time": "20 minutes",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "8 oz rice vermicelli noodles",
+      "quantity": "8",
+      "recipe_qty": "8",
+      "unit": "oz",
+      "base_quantity": "8",
+      "base_unit": "oz",
+      "ingredient": "rice vermicelli noodles",
+      "preparation": "soaked in hot water until soft",
+      "optional": false,
+      "store_section": "PASTA, RICE & GRAINS",
+      "store_section_order": 6,
+      "purchasable_item": "rice vermicelli noodles",
+      "purchase_group": "rice vermicelli noodles"
+    },
+    {
+      "section": null,
+      "original_text": "1 cup cooked shrimp",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "cup",
+      "base_quantity": "1",
+      "base_unit": "cup",
+      "ingredient": "cooked shrimp",
+      "preparation": "peeled and deveined",
+      "optional": false,
+      "store_section": "MEAT & SEAFOOD",
+      "store_section_order": 2,
+      "purchasable_item": "cooked shrimp",
+      "purchase_group": "cooked shrimp"
+    },
+    {
+      "section": null,
+      "original_text": "1 medium bell pepper",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "medium",
+      "base_quantity": "1",
+      "base_unit": "medium",
+      "ingredient": "bell pepper",
+      "preparation": "sliced",
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12,
+      "purchasable_item": "bell pepper",
+      "purchase_group": "bell pepper"
+    },
+    {
+      "section": null,
+      "original_text": "1 medium carrot",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "medium",
+      "base_quantity": "1",
+      "base_unit": "medium",
+      "ingredient": "carrot",
+      "preparation": "julienned",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "carrot",
+      "purchase_group": "carrot"
+    },
+    {
+      "section": null,
+      "original_text": "2 stalks green onion",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "stalks",
+      "base_quantity": "2",
+      "base_unit": "stalks",
+      "ingredient": "green onion",
+      "preparation": "chopped",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1,
+      "purchasable_item": "green onion",
+      "purchase_group": "green onion"
+    },
+    {
+      "section": null,
+      "original_text": "3 tbsp soy sauce",
+      "quantity": "3",
+      "recipe_qty": "3",
+      "unit": "tbsp",
+      "base_quantity": "3",
+      "base_unit": "tbsp",
+      "ingredient": "soy sauce",
+      "preparation": null,
+      "optional": false,
+      "store_section": "SAUCES & CONDIMENTS",
+      "store_section_order": 9,
+      "purchasable_item": "soy sauce",
+      "purchase_group": "soy sauce"
+    },
+    {
+      "section": null,
+      "original_text": "1 tbsp curry powder",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "tbsp",
+      "base_quantity": "1",
+      "base_unit": "tbsp",
+      "ingredient": "curry powder",
+      "preparation": null,
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "curry powder",
+      "purchase_group": "curry powder"
+    },
+    {
+      "section": null,
+      "original_text": "2 tbsp vegetable oil",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "tbsp",
+      "base_quantity": "2",
+      "base_unit": "tbsp",
+      "ingredient": "vegetable oil",
+      "preparation": "for cooking",
+      "optional": false,
+      "store_section": "OILS & VINEGARS",
+      "store_section_order": 13,
+      "purchasable_item": "vegetable oil",
+      "purchase_group": "vegetable oil"
+    }
+  ],
+  "equipment": [
+    {
+      "equipment": "large pot",
+      "text": "large pot",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "skillet",
+      "text": "skillet",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "colander",
+      "text": "colander",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "spatula",
+      "text": "spatula",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "knife",
+      "text": "knife",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "cutting board",
+      "text": "cutting board",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    }
+  ],
+  "instructions": [
+    {
+      "section": null,
+      "step_number": 1,
+      "instruction": "Soak rice vermicelli noodles in hot water for 10 minutes until soft, then drain.",
+      "text": "Soak rice vermicelli noodles in hot water for 10 minutes until soft, then drain.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "Heat vegetable oil in a skillet over medium heat.",
+      "text": "Heat vegetable oil in a skillet over medium heat.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "Add bell pepper, carrot, and green onion; sauté for 3-4 minutes until tender.",
+      "text": "Add bell pepper, carrot, and green onion; sauté for 3-4 minutes until tender.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "Stir in cooked shrimp and curry powder; cook for another 2 minutes.",
+      "text": "Stir in cooked shrimp and curry powder; cook for another 2 minutes.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 5,
+      "instruction": "Add the soaked noodles and soy sauce; toss everything together and cook for 3-4 minutes until heated through.",
+      "text": "Add the soaked noodles and soy sauce; toss everything together and cook for 3-4 minutes until heated through.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 6,
+      "instruction": "Serve hot in bowls.",
+      "text": "Serve hot in bowls.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    }
+  ],
+  "scaling": {
+    "selected_multiplier": 1,
+    "base_multiplier": 1,
+    "base_servings": "4",
+    "available_multipliers": [
+      {
+        "label": "1/2x",
+        "value": 0.5
+      },
+      {
+        "label": "1x",
+        "value": 1
+      },
+      {
+        "label": "2x",
+        "value": 2
+      },
+      {
+        "label": "3x",
+        "value": 3
+      }
+    ]
+  },
+  "ai_inferred": true,
+  "inferred_by_model": "gpt-4o-mini",
+  "inferred_at": "2026-06-16T02:23:45Z",
+  "inference_confidence": "high",
+  "source_type": "cookbook_item_inferred",
+  "cookbook_item_inferred_fields": [
+    "cook_time",
+    "equipment",
+    "inactive_time",
+    "ingredients",
+    "instructions",
+    "level",
+    "prep_time",
+    "recipe_amount",
+    "servings",
+    "total_time",
+    "yield"
+  ],
+  "cookbook_item_inference_field_sources": {
+    "recipe_amount": "ai_inferred",
+    "yield": "ai_inferred",
+    "servings": "ai_inferred",
+    "level": "ai_inferred",
+    "total_time": "ai_inferred",
+    "prep_time": "ai_inferred",
+    "inactive_time": "ai_inferred",
+    "cook_time": "ai_inferred",
+    "ingredients": "ai_inferred",
+    "equipment": "ai_inferred",
+    "instructions": "ai_inferred"
+  }
+}

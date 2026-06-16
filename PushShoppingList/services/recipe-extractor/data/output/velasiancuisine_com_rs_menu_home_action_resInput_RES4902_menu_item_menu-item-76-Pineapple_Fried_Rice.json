@@ -1,59 +1,61 @@
 {
-  "source_url": "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-13-House_Salad",
-  "recipe_amount": "1 bowl",
-  "yield": "1 bowl of salad",
-  "servings": "1 appetizer serving",
+  "source_url": "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-76-Pineapple_Fried_Rice",
+  "recipe_amount": "4 cups",
+  "yield": "2 servings",
+  "servings": "2 appetizer servings",
   "level": "Easy",
-  "total_time": "15 minutes",
-  "prep_time": "15 minutes",
+  "total_time": "30 minutes",
+  "prep_time": "10 minutes",
+  "inactive_time": "0 minutes",
+  "cook_time": "20 minutes",
   "ingredients": [
     {
       "section": null,
-      "original_text": "2 cups mixed greens",
+      "original_text": "2 cups cooked rice",
       "quantity": "2",
       "recipe_qty": "2",
       "unit": "cups",
       "base_quantity": "2",
       "base_unit": "cups",
-      "ingredient": "mixed greens",
-      "preparation": "such as romaine, spinach, and arugula",
+      "ingredient": "cooked rice",
+      "preparation": "preferably day-old",
       "optional": false,
-      "store_section": "MISC",
-      "store_section_order": 19,
-      "purchasable_item": "mixed greens",
-      "purchase_group": "mixed greens"
+      "store_section": "PASTA, RICE & GRAINS",
+      "store_section_order": 6,
+      "purchasable_item": "cooked rice",
+      "purchase_group": "cooked rice"
     },
     {
       "section": null,
-      "original_text": "1/2 cup cherry tomatoes",
+      "original_text": "1 cup pineapple chunks",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "cup",
+      "base_quantity": "1",
+      "base_unit": "cup",
+      "ingredient": "pineapple chunks",
+      "preparation": "fresh or canned",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "pineapple chunks",
+      "purchase_group": "pineapple chunks"
+    },
+    {
+      "section": null,
+      "original_text": "1/2 cup peas",
       "quantity": "1/2",
       "recipe_qty": "1/2",
       "unit": "cup",
       "base_quantity": "1/2",
       "base_unit": "cup",
-      "ingredient": "cherry tomatoes",
-      "preparation": "halved",
-      "optional": false,
-      "store_section": "PRODUCE",
-      "store_section_order": 1,
-      "purchasable_item": "cherry tomatoes",
-      "purchase_group": "cherry tomatoes"
-    },
-    {
-      "section": null,
-      "original_text": "1/2 medium cucumber",
-      "quantity": "1/2",
-      "recipe_qty": "1/2",
-      "unit": "medium",
-      "base_quantity": "1/2",
-      "base_unit": "medium",
-      "ingredient": "cucumber",
-      "preparation": "sliced",
+      "ingredient": "peas",
+      "preparation": "frozen or fresh",
       "optional": false,
       "store_section": "MISC",
       "store_section_order": 19,
-      "purchasable_item": "cucumber",
-      "purchase_group": "cucumber"
+      "purchasable_item": "peas",
+      "purchase_group": "peas"
     },
     {
       "section": null,
@@ -64,7 +66,7 @@
       "base_quantity": "1",
       "base_unit": "medium",
       "ingredient": "carrot",
-      "preparation": "shredded",
+      "preparation": "diced",
       "optional": false,
       "store_section": "MISC",
       "store_section_order": 19,
@@ -73,51 +75,51 @@
     },
     {
       "section": null,
-      "original_text": "1/4 medium red onion",
-      "quantity": "1/4",
-      "recipe_qty": "1/4",
-      "unit": "medium",
-      "base_quantity": "1/4",
-      "base_unit": "medium",
-      "ingredient": "red onion",
-      "preparation": "thinly sliced",
+      "original_text": "2 stalks green onions",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "stalks",
+      "base_quantity": "2",
+      "base_unit": "stalks",
+      "ingredient": "green onions",
+      "preparation": "sliced",
       "optional": false,
       "store_section": "PRODUCE",
       "store_section_order": 1,
-      "purchasable_item": "red onion",
-      "purchase_group": "red onion"
+      "purchasable_item": "green onions",
+      "purchase_group": "green onions"
     },
     {
       "section": null,
-      "original_text": "2 tablespoons olive oil",
+      "original_text": "2 tablespoons soy sauce",
       "quantity": "2",
       "recipe_qty": "2",
       "unit": "tablespoons",
       "base_quantity": "2",
       "base_unit": "tablespoons",
-      "ingredient": "olive oil",
-      "preparation": "for dressing",
+      "ingredient": "soy sauce",
+      "preparation": null,
       "optional": false,
-      "store_section": "OILS & VINEGARS",
-      "store_section_order": 13,
-      "purchasable_item": "olive oil",
-      "purchase_group": "olive oil"
+      "store_section": "SAUCES & CONDIMENTS",
+      "store_section_order": 9,
+      "purchasable_item": "soy sauce",
+      "purchase_group": "soy sauce"
     },
     {
       "section": null,
-      "original_text": "1 tablespoon balsamic vinegar",
-      "quantity": "1",
-      "recipe_qty": "1",
-      "unit": "tablespoon",
-      "base_quantity": "1",
-      "base_unit": "tablespoon",
-      "ingredient": "balsamic vinegar",
-      "preparation": "for dressing",
+      "original_text": "2 tablespoons vegetable oil",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "tablespoons",
+      "base_quantity": "2",
+      "base_unit": "tablespoons",
+      "ingredient": "vegetable oil",
+      "preparation": "for frying",
       "optional": false,
       "store_section": "OILS & VINEGARS",
       "store_section_order": 13,
-      "purchasable_item": "balsamic vinegar",
-      "purchase_group": "balsamic vinegar"
+      "purchasable_item": "vegetable oil",
+      "purchase_group": "vegetable oil"
     },
     {
       "section": null,
@@ -154,26 +156,26 @@
   ],
   "equipment": [
     {
-      "equipment": "mixing bowl",
-      "text": "mixing bowl",
+      "equipment": "large skillet",
+      "text": "large skillet",
       "equipment_image_url": "",
       "equipment_image_generated_at": ""
     },
     {
-      "equipment": "whisk",
-      "text": "whisk",
+      "equipment": "spatula",
+      "text": "spatula",
       "equipment_image_url": "",
       "equipment_image_generated_at": ""
     },
     {
-      "equipment": "knife",
-      "text": "knife",
+      "equipment": "measuring cups",
+      "text": "measuring cups",
       "equipment_image_url": "",
       "equipment_image_generated_at": ""
     },
     {
-      "equipment": "cutting board",
-      "text": "cutting board",
+      "equipment": "measuring spoons",
+      "text": "measuring spoons",
       "equipment_image_url": "",
       "equipment_image_generated_at": ""
     }
@@ -182,8 +184,8 @@
     {
       "section": null,
       "step_number": 1,
-      "instruction": "In a mixing bowl, combine mixed greens, cherry tomatoes, cucumber, carrot, and red onion.",
-      "text": "In a mixing bowl, combine mixed greens, cherry tomatoes, cucumber, carrot, and red onion.",
+      "instruction": "Heat vegetable oil in a large skillet over medium heat.",
+      "text": "Heat vegetable oil in a large skillet over medium heat.",
       "temperature": null,
       "time": null,
       "equipment_used": [],
@@ -193,8 +195,8 @@
     {
       "section": null,
       "step_number": 2,
-      "instruction": "In a small bowl, whisk together olive oil, balsamic vinegar, salt, and pepper.",
-      "text": "In a small bowl, whisk together olive oil, balsamic vinegar, salt, and pepper.",
+      "instruction": "Add diced carrot and cook for 2-3 minutes until slightly softened.",
+      "text": "Add diced carrot and cook for 2-3 minutes until slightly softened.",
       "temperature": null,
       "time": null,
       "equipment_used": [],
@@ -204,8 +206,8 @@
     {
       "section": null,
       "step_number": 3,
-      "instruction": "Drizzle the dressing over the salad and toss to combine.",
-      "text": "Drizzle the dressing over the salad and toss to combine.",
+      "instruction": "Stir in peas and pineapple chunks, cooking for another 2 minutes.",
+      "text": "Stir in peas and pineapple chunks, cooking for another 2 minutes.",
       "temperature": null,
       "time": null,
       "equipment_used": [],
@@ -215,8 +217,30 @@
     {
       "section": null,
       "step_number": 4,
-      "instruction": "Serve immediately.",
-      "text": "Serve immediately.",
+      "instruction": "Add the cooked rice, soy sauce, salt, and pepper, mixing well.",
+      "text": "Add the cooked rice, soy sauce, salt, and pepper, mixing well.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 5,
+      "instruction": "Cook for 5-7 minutes, stirring occasionally until heated through.",
+      "text": "Cook for 5-7 minutes, stirring occasionally until heated through.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 6,
+      "instruction": "Garnish with sliced green onions before serving.",
+      "text": "Garnish with sliced green onions before serving.",
       "temperature": null,
       "time": null,
       "equipment_used": [],
@@ -225,9 +249,9 @@
     }
   ],
   "scaling": {
-    "selected_multiplier": 1.0,
-    "base_multiplier": 1.0,
-    "base_servings": "1 appetizer serving",
+    "selected_multiplier": 1,
+    "base_multiplier": 1,
+    "base_servings": "2 appetizer servings",
     "available_multipliers": [
       {
         "label": "1/2x",
@@ -235,21 +259,21 @@
       },
       {
         "label": "1x",
-        "value": 1.0
+        "value": 1
       },
       {
         "label": "2x",
-        "value": 2.0
+        "value": 2
       },
       {
         "label": "3x",
-        "value": 3.0
+        "value": 3
       }
     ]
   },
   "ai_inferred": true,
   "inferred_by_model": "gpt-4o-mini",
-  "inferred_at": "2026-06-16T02:20:20Z",
+  "inferred_at": "2026-06-16T02:22:24Z",
   "inference_confidence": "high",
   "source_type": "cookbook_item_inferred",
   "cookbook_item_inferred_fields": [
@@ -272,12 +296,10 @@
     "level": "ai_inferred",
     "total_time": "ai_inferred",
     "prep_time": "ai_inferred",
+    "inactive_time": "ai_inferred",
+    "cook_time": "ai_inferred",
     "ingredients": "ai_inferred",
     "equipment": "ai_inferred",
-    "instructions": "ai_inferred",
-    "inactive_time": "ai_inferred",
-    "cook_time": "ai_inferred"
-  },
-  "inactive_time": "0 minutes",
-  "cook_time": "0 minutes"
+    "instructions": "ai_inferred"
+  }
 }

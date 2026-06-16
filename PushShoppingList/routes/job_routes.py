@@ -290,11 +290,24 @@ def start_cookbook_infer_missing_details_job_route():
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc) or "Cookbook was not found."}), 404
 
-    recipe_urls = [
-        str(recipe.get("url") or "").strip()
-        for recipe in cookbook.get("recipes", [])
-        if isinstance(recipe, dict) and str(recipe.get("url") or "").strip()
-    ]
+    recipe_names = {}
+    recipe_urls = []
+    for recipe in cookbook.get("recipes", []):
+        if not isinstance(recipe, dict):
+            continue
+        recipe_url = str(recipe.get("url") or "").strip()
+        if not recipe_url:
+            continue
+        recipe_urls.append(recipe_url)
+        recipe_name = str(
+            recipe.get("name")
+            or recipe.get("display_name")
+            or recipe.get("recipe_title")
+            or recipe.get("menu_item_name")
+            or ""
+        ).strip()
+        if recipe_name:
+            recipe_names[recipe_url] = recipe_name
     recipe_urls = list(dict.fromkeys(recipe_urls))
     model, model_source = resolve_cookbook_item_model()
     payload = with_model_metadata(
@@ -303,6 +316,7 @@ def start_cookbook_infer_missing_details_job_route():
             "cookbook_id": cookbook_id,
             "cookbook_name": str(payload.get("cookbook_name") or cookbook.get("name") or "").strip(),
             "recipe_urls": recipe_urls,
+            "recipe_names": recipe_names,
             "overwrite_ai_fields": payload_truthy(payload, "overwrite_ai_fields", False),
             "preview_only": payload_truthy(payload, "preview_only", False),
         },

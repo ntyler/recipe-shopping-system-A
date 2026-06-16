@@ -133,8 +133,14 @@ def test_cookbook_infer_button_runs_full_loading_routine():
     assert "showCookbookRoutineLoadingOverlay" in script
     assert "Estimate per serving basis" in script
     assert "Have ChatGPT Decide All" in script
+    assert "function cookbookRoutineCurrentRecipeDetail" in script
+    assert "current_recipe_detail" in script
+    assert "updateCookbookRoutineStep(\"details\", active ? \"running\" : \"waiting\", active ? \"Running\" : \"Waiting\", active ? detailsCurrentDetail : \"\")" in script
     assert "start_cookbook_infer_missing_details_job_route" in routes
+    assert "\"recipe_names\": recipe_names" in routes
     assert "run_cookbook_infer_missing_details_job" in worker
+    assert "progress_callback=update_inference_recipe_progress" in worker
+    assert "cookbook_recipe_progress_payload(" in worker
     assert "estimate_recipe_nutrition(recipe)" in worker
     assert 'trigger_source="cookbook_infer:all"' in worker
 
