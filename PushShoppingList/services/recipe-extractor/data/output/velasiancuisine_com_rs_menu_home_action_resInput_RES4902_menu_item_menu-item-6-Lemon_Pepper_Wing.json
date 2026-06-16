@@ -1,0 +1,354 @@
+{
+  "source_url": "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-6-Lemon_Pepper_Wing",
+  "recipe_amount": "8 wings",
+  "yield": "8 wings",
+  "servings": "1 appetizer serving",
+  "level": "Easy",
+  "total_time": "30 minutes",
+  "prep_time": "10 minutes",
+  "inactive_time": "0 minutes",
+  "cook_time": "20 minutes",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "8 pieces chicken wings",
+      "quantity": "8",
+      "recipe_qty": "8",
+      "unit": "pieces",
+      "base_quantity": "8",
+      "base_unit": "pieces",
+      "ingredient": "chicken wings",
+      "preparation": "split wings, patted dry",
+      "optional": false,
+      "store_section": "MEAT & SEAFOOD",
+      "store_section_order": 2,
+      "purchasable_item": "chicken wings",
+      "purchase_group": "chicken wings"
+    },
+    {
+      "section": null,
+      "original_text": "1 tsp salt",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "tsp",
+      "base_quantity": "1",
+      "base_unit": "tsp",
+      "ingredient": "salt",
+      "preparation": "to season wings",
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12,
+      "purchasable_item": "salt",
+      "purchase_group": "salt"
+    },
+    {
+      "section": null,
+      "original_text": "1/2 tsp black pepper",
+      "quantity": "1/2",
+      "recipe_qty": "1/2",
+      "unit": "tsp",
+      "base_quantity": "1/2",
+      "base_unit": "tsp",
+      "ingredient": "black pepper",
+      "preparation": "to season wings",
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12,
+      "purchasable_item": "black pepper",
+      "purchase_group": "black pepper"
+    },
+    {
+      "section": null,
+      "original_text": "1 tsp garlic powder",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "tsp",
+      "base_quantity": "1",
+      "base_unit": "tsp",
+      "ingredient": "garlic powder",
+      "preparation": "optional seasoning",
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12,
+      "purchasable_item": "garlic powder",
+      "purchase_group": "garlic powder"
+    },
+    {
+      "section": null,
+      "original_text": "1/2 cup all-purpose flour",
+      "quantity": "1/2",
+      "recipe_qty": "1/2",
+      "unit": "cup",
+      "base_quantity": "1/2",
+      "base_unit": "cup",
+      "ingredient": "all-purpose flour",
+      "preparation": "for light coating",
+      "optional": false,
+      "store_section": "BAKING",
+      "store_section_order": 7,
+      "purchasable_item": "all-purpose flour",
+      "purchase_group": "all-purpose flour"
+    },
+    {
+      "section": null,
+      "original_text": "2 tbsp cornstarch",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "tbsp",
+      "base_quantity": "2",
+      "base_unit": "tbsp",
+      "ingredient": "cornstarch",
+      "preparation": "helps wings crisp",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "cornstarch",
+      "purchase_group": "cornstarch"
+    },
+    {
+      "section": null,
+      "original_text": "2 cups vegetable oil",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "cups",
+      "base_quantity": "2",
+      "base_unit": "cups",
+      "ingredient": "vegetable oil",
+      "preparation": "for frying, or enough for shallow frying",
+      "optional": false,
+      "store_section": "OILS & VINEGARS",
+      "store_section_order": 13,
+      "purchasable_item": "vegetable oil",
+      "purchase_group": "vegetable oil"
+    },
+    {
+      "section": null,
+      "original_text": "2 tbsp butter",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "tbsp",
+      "base_quantity": "2",
+      "base_unit": "tbsp",
+      "ingredient": "butter",
+      "preparation": "for lemon pepper sauce",
+      "optional": false,
+      "store_section": "DAIRY & EGGS",
+      "store_section_order": 3,
+      "purchasable_item": "butter",
+      "purchase_group": "butter"
+    },
+    {
+      "section": null,
+      "original_text": "2 tbsp lemon juice",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "tbsp",
+      "base_quantity": "2",
+      "base_unit": "tbsp",
+      "ingredient": "lemon juice",
+      "preparation": "freshly squeezed",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1,
+      "purchasable_item": "lemons",
+      "purchase_group": "lemons"
+    },
+    {
+      "section": null,
+      "original_text": "1 tsp lemon zest",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "tsp",
+      "base_quantity": "1",
+      "base_unit": "tsp",
+      "ingredient": "lemon zest",
+      "preparation": "optional but recommended",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1,
+      "purchasable_item": "lemons",
+      "purchase_group": "lemons"
+    },
+    {
+      "section": null,
+      "original_text": "1 tsp black pepper",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "tsp",
+      "base_quantity": "1",
+      "base_unit": "tsp",
+      "ingredient": "black pepper",
+      "preparation": "lemon pepper flavor",
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12,
+      "purchasable_item": "black pepper",
+      "purchase_group": "black pepper"
+    },
+    {
+      "section": null,
+      "original_text": "1 tbsp honey",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "tbsp",
+      "base_quantity": "1",
+      "base_unit": "tbsp",
+      "ingredient": "honey",
+      "preparation": "optional, for slight sweetness",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "honey",
+      "purchase_group": "honey"
+    }
+  ],
+  "equipment": [
+    {
+      "equipment": "mixing bowl",
+      "text": "mixing bowl",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "paper towels",
+      "text": "paper towels",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "tongs",
+      "text": "tongs",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "large skillet or deep fryer",
+      "text": "large skillet or deep fryer",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "small saucepan",
+      "text": "small saucepan",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "wire rack or plate",
+      "text": "wire rack or plate",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    }
+  ],
+  "instructions": [
+    {
+      "section": null,
+      "step_number": 1,
+      "instruction": "Pat the wings dry and season with salt, black pepper, and garlic powder.",
+      "text": "Pat the wings dry and season with salt, black pepper, and garlic powder.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "Toss the wings with flour and cornstarch until lightly coated.",
+      "text": "Toss the wings with flour and cornstarch until lightly coated.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "Heat oil in a skillet or fryer to 350°F and fry the wings until golden and cooked through, about 15 to 20 minutes. Drain on a rack.",
+      "text": "Heat oil in a skillet or fryer to 350°F and fry the wings until golden and cooked through, about 15 to 20 minutes. Drain on a rack.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "In a small saucepan, melt the butter with lemon juice, lemon zest, black pepper, and honey if using.",
+      "text": "In a small saucepan, melt the butter with lemon juice, lemon zest, black pepper, and honey if using.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 5,
+      "instruction": "Toss the hot wings with the lemon pepper sauce and serve immediately.",
+      "text": "Toss the hot wings with the lemon pepper sauce and serve immediately.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    }
+  ],
+  "scaling": {
+    "selected_multiplier": 1,
+    "base_multiplier": 1,
+    "base_servings": "1 appetizer serving",
+    "available_multipliers": [
+      {
+        "label": "1/2x",
+        "value": 0.5
+      },
+      {
+        "label": "1x",
+        "value": 1
+      },
+      {
+        "label": "2x",
+        "value": 2
+      },
+      {
+        "label": "3x",
+        "value": 3
+      }
+    ]
+  },
+  "ai_inferred": true,
+  "inferred_by_model": "gpt-5.4-mini",
+  "inferred_at": "2026-06-16T00:49:16Z",
+  "inference_confidence": "medium",
+  "source_type": "cookbook_item_inferred",
+  "cookbook_item_inferred_fields": [
+    "cook_time",
+    "equipment",
+    "inactive_time",
+    "ingredients",
+    "instructions",
+    "level",
+    "prep_time",
+    "recipe_amount",
+    "servings",
+    "total_time",
+    "yield"
+  ],
+  "cookbook_item_inference_field_sources": {
+    "recipe_amount": "ai_inferred",
+    "yield": "ai_inferred",
+    "servings": "ai_inferred",
+    "level": "ai_inferred",
+    "total_time": "ai_inferred",
+    "prep_time": "ai_inferred",
+    "inactive_time": "ai_inferred",
+    "cook_time": "ai_inferred",
+    "ingredients": "ai_inferred",
+    "equipment": "ai_inferred",
+    "instructions": "ai_inferred"
+  }
+}

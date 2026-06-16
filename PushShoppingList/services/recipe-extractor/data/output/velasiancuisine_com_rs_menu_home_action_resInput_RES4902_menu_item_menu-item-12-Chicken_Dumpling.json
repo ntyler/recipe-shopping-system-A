@@ -1,0 +1,360 @@
+{
+  "source_url": "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-12-Chicken_Dumpling",
+  "recipe_amount": "12 dumplings",
+  "yield": "12 chicken dumplings",
+  "servings": "4 appetizer servings",
+  "level": "Medium",
+  "total_time": "45 minutes",
+  "prep_time": "25 minutes",
+  "inactive_time": "10 minutes",
+  "cook_time": "10 minutes",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "8 oz ground chicken",
+      "quantity": "8",
+      "recipe_qty": "8",
+      "unit": "oz",
+      "base_quantity": "8",
+      "base_unit": "oz",
+      "ingredient": "ground chicken",
+      "preparation": "raw",
+      "optional": false,
+      "store_section": "MEAT & SEAFOOD",
+      "store_section_order": 2,
+      "purchasable_item": "ground chicken",
+      "purchase_group": "ground chicken"
+    },
+    {
+      "section": null,
+      "original_text": "12 pieces dumpling wrappers",
+      "quantity": "12",
+      "recipe_qty": "12",
+      "unit": "pieces",
+      "base_quantity": "12",
+      "base_unit": "pieces",
+      "ingredient": "dumpling wrappers",
+      "preparation": "round gyoza or wonton wrappers",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "dumpling wrappers",
+      "purchase_group": "dumpling wrappers"
+    },
+    {
+      "section": null,
+      "original_text": "2 stalks green onions",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "stalks",
+      "base_quantity": "2",
+      "base_unit": "stalks",
+      "ingredient": "green onions",
+      "preparation": "finely chopped",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1,
+      "purchasable_item": "green onions",
+      "purchase_group": "green onions"
+    },
+    {
+      "section": null,
+      "original_text": "2 cloves garlic",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "cloves",
+      "base_quantity": "2",
+      "base_unit": "cloves",
+      "ingredient": "garlic",
+      "preparation": "minced",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1,
+      "purchasable_item": "garlic",
+      "purchase_group": "garlic"
+    },
+    {
+      "section": null,
+      "original_text": "1 teaspoon fresh ginger",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "teaspoon",
+      "base_quantity": "1",
+      "base_unit": "teaspoon",
+      "ingredient": "fresh ginger",
+      "preparation": "grated",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "fresh ginger",
+      "purchase_group": "fresh ginger"
+    },
+    {
+      "section": null,
+      "original_text": "1 tablespoon soy sauce",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "tablespoon",
+      "base_quantity": "1",
+      "base_unit": "tablespoon",
+      "ingredient": "soy sauce",
+      "preparation": "for filling",
+      "optional": false,
+      "store_section": "SAUCES & CONDIMENTS",
+      "store_section_order": 9,
+      "purchasable_item": "soy sauce",
+      "purchase_group": "soy sauce"
+    },
+    {
+      "section": null,
+      "original_text": "1 teaspoon sesame oil",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "teaspoon",
+      "base_quantity": "1",
+      "base_unit": "teaspoon",
+      "ingredient": "sesame oil",
+      "preparation": "for filling",
+      "optional": false,
+      "store_section": "OILS & VINEGARS",
+      "store_section_order": 13,
+      "purchasable_item": "sesame oil",
+      "purchase_group": "sesame oil"
+    },
+    {
+      "section": null,
+      "original_text": "1/4 teaspoon salt",
+      "quantity": "1/4",
+      "recipe_qty": "1/4",
+      "unit": "teaspoon",
+      "base_quantity": "1/4",
+      "base_unit": "teaspoon",
+      "ingredient": "salt",
+      "preparation": "to taste",
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12,
+      "purchasable_item": "salt",
+      "purchase_group": "salt"
+    },
+    {
+      "section": null,
+      "original_text": "1/4 teaspoon black pepper",
+      "quantity": "1/4",
+      "recipe_qty": "1/4",
+      "unit": "teaspoon",
+      "base_quantity": "1/4",
+      "base_unit": "teaspoon",
+      "ingredient": "black pepper",
+      "preparation": "to taste",
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12,
+      "purchasable_item": "black pepper",
+      "purchase_group": "black pepper"
+    },
+    {
+      "section": null,
+      "original_text": "2 tablespoons water",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "tablespoons",
+      "base_quantity": "2",
+      "base_unit": "tablespoons",
+      "ingredient": "water",
+      "preparation": "for sealing and pan-steaming",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "water",
+      "purchase_group": "water"
+    },
+    {
+      "section": null,
+      "original_text": "1 tablespoon neutral oil",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "tablespoon",
+      "base_quantity": "1",
+      "base_unit": "tablespoon",
+      "ingredient": "neutral oil",
+      "preparation": "for pan-frying",
+      "optional": false,
+      "store_section": "OILS & VINEGARS",
+      "store_section_order": 13,
+      "purchasable_item": "neutral oil",
+      "purchase_group": "neutral oil"
+    },
+    {
+      "section": null,
+      "original_text": "1/4 cup dumpling dipping sauce",
+      "quantity": "1/4",
+      "recipe_qty": "1/4",
+      "unit": "cup",
+      "base_quantity": "1/4",
+      "base_unit": "cup",
+      "ingredient": "dumpling dipping sauce",
+      "preparation": "optional, for serving",
+      "optional": false,
+      "store_section": "SAUCES & CONDIMENTS",
+      "store_section_order": 9,
+      "purchasable_item": "dumpling dipping sauce",
+      "purchase_group": "dumpling dipping sauce"
+    }
+  ],
+  "equipment": [
+    {
+      "equipment": "mixing bowl",
+      "text": "mixing bowl",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "knife",
+      "text": "knife",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "cutting board",
+      "text": "cutting board",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "measuring spoons",
+      "text": "measuring spoons",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "skillet with lid",
+      "text": "skillet with lid",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "spatula",
+      "text": "spatula",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "plate or tray",
+      "text": "plate or tray",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    }
+  ],
+  "instructions": [
+    {
+      "section": null,
+      "step_number": 1,
+      "instruction": "Mix ground chicken, green onions, garlic, ginger, soy sauce, sesame oil, salt, and pepper in a bowl.",
+      "text": "Mix ground chicken, green onions, garlic, ginger, soy sauce, sesame oil, salt, and pepper in a bowl.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "Place about 1 tablespoon filling in the center of each wrapper; moisten edges with water and seal tightly.",
+      "text": "Place about 1 tablespoon filling in the center of each wrapper; moisten edges with water and seal tightly.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "Heat oil in a skillet over medium heat and arrange dumplings in a single layer.",
+      "text": "Heat oil in a skillet over medium heat and arrange dumplings in a single layer.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "Cook until bottoms are golden, 2 to 3 minutes, then add a few tablespoons of water and cover to steam until chicken is cooked through, 5 to 6 minutes.",
+      "text": "Cook until bottoms are golden, 2 to 3 minutes, then add a few tablespoons of water and cover to steam until chicken is cooked through, 5 to 6 minutes.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 5,
+      "instruction": "Uncover and cook off any remaining water for 1 minute. Serve hot with dipping sauce.",
+      "text": "Uncover and cook off any remaining water for 1 minute. Serve hot with dipping sauce.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    }
+  ],
+  "scaling": {
+    "selected_multiplier": 1,
+    "base_multiplier": 1,
+    "base_servings": "4 appetizer servings",
+    "available_multipliers": [
+      {
+        "label": "1/2x",
+        "value": 0.5
+      },
+      {
+        "label": "1x",
+        "value": 1
+      },
+      {
+        "label": "2x",
+        "value": 2
+      },
+      {
+        "label": "3x",
+        "value": 3
+      }
+    ]
+  },
+  "ai_inferred": true,
+  "inferred_by_model": "gpt-5.4-mini",
+  "inferred_at": "2026-06-16T00:49:39Z",
+  "inference_confidence": "medium",
+  "source_type": "cookbook_item_inferred",
+  "cookbook_item_inferred_fields": [
+    "cook_time",
+    "equipment",
+    "inactive_time",
+    "ingredients",
+    "instructions",
+    "level",
+    "prep_time",
+    "recipe_amount",
+    "servings",
+    "total_time",
+    "yield"
+  ],
+  "cookbook_item_inference_field_sources": {
+    "recipe_amount": "ai_inferred",
+    "yield": "ai_inferred",
+    "servings": "ai_inferred",
+    "level": "ai_inferred",
+    "total_time": "ai_inferred",
+    "prep_time": "ai_inferred",
+    "inactive_time": "ai_inferred",
+    "cook_time": "ai_inferred",
+    "ingredients": "ai_inferred",
+    "equipment": "ai_inferred",
+    "instructions": "ai_inferred"
+  }
+}

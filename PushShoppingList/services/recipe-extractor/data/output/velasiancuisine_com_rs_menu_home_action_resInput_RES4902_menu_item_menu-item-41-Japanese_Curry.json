@@ -1,0 +1,306 @@
+{
+  "source_url": "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-41-Japanese_Curry",
+  "recipe_amount": "4 servings",
+  "yield": "4 bowls",
+  "servings": "4",
+  "level": "Medium",
+  "total_time": "45 minutes",
+  "prep_time": "15 minutes",
+  "inactive_time": "0 minutes",
+  "cook_time": "30 minutes",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "1 box Japanese curry roux",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "box",
+      "base_quantity": "1",
+      "base_unit": "box",
+      "ingredient": "Japanese curry roux",
+      "preparation": "available in various spice levels",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "Japanese curry roux",
+      "purchase_group": "Japanese curry roux"
+    },
+    {
+      "section": null,
+      "original_text": "1 pound Chicken thighs",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "pound",
+      "base_quantity": "1",
+      "base_unit": "pound",
+      "ingredient": "Chicken thighs",
+      "preparation": "cut into bite-sized pieces",
+      "optional": false,
+      "store_section": "MEAT & SEAFOOD",
+      "store_section_order": 2,
+      "purchasable_item": "Chicken thighs",
+      "purchase_group": "Chicken thighs"
+    },
+    {
+      "section": null,
+      "original_text": "2 medium Carrots",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "medium",
+      "base_quantity": "2",
+      "base_unit": "medium",
+      "ingredient": "Carrots",
+      "preparation": "peeled and sliced",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "Carrots",
+      "purchase_group": "Carrots"
+    },
+    {
+      "section": null,
+      "original_text": "2 medium Potatoes",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "medium",
+      "base_quantity": "2",
+      "base_unit": "medium",
+      "ingredient": "Potatoes",
+      "preparation": "peeled and cubed",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "Potatoes",
+      "purchase_group": "Potatoes"
+    },
+    {
+      "section": null,
+      "original_text": "1 large Onion",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "large",
+      "base_quantity": "1",
+      "base_unit": "large",
+      "ingredient": "Onion",
+      "preparation": "chopped",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1,
+      "purchasable_item": "Onion",
+      "purchase_group": "Onion"
+    },
+    {
+      "section": null,
+      "original_text": "4 cups Water",
+      "quantity": "4",
+      "recipe_qty": "4",
+      "unit": "cups",
+      "base_quantity": "4",
+      "base_unit": "cups",
+      "ingredient": "Water",
+      "preparation": "for cooking",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "Water",
+      "purchase_group": "Water"
+    },
+    {
+      "section": null,
+      "original_text": "1 tablespoon Soy sauce",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "tablespoon",
+      "base_quantity": "1",
+      "base_unit": "tablespoon",
+      "ingredient": "Soy sauce",
+      "preparation": "optional for added flavor",
+      "optional": false,
+      "store_section": "SAUCES & CONDIMENTS",
+      "store_section_order": 9,
+      "purchasable_item": "Soy sauce",
+      "purchase_group": "Soy sauce"
+    }
+  ],
+  "equipment": [
+    {
+      "equipment": "Large pot",
+      "text": "Large pot",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "Cutting board",
+      "text": "Cutting board",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "Knife",
+      "text": "Knife",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "Stirring spoon",
+      "text": "Stirring spoon",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    }
+  ],
+  "instructions": [
+    {
+      "section": null,
+      "step_number": 1,
+      "instruction": "Heat the large pot over medium heat and add a little oil.",
+      "text": "Heat the large pot over medium heat and add a little oil.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "Sauté the chopped onion until translucent.",
+      "text": "Sauté the chopped onion until translucent.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "Add the chicken pieces and cook until browned.",
+      "text": "Add the chicken pieces and cook until browned.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "Stir in the carrots and potatoes, cooking for a few minutes.",
+      "text": "Stir in the carrots and potatoes, cooking for a few minutes.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 5,
+      "instruction": "Pour in the water and bring to a boil.",
+      "text": "Pour in the water and bring to a boil.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 6,
+      "instruction": "Reduce heat and simmer for 20 minutes until vegetables are tender.",
+      "text": "Reduce heat and simmer for 20 minutes until vegetables are tender.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 7,
+      "instruction": "Add the curry roux and stir until dissolved.",
+      "text": "Add the curry roux and stir until dissolved.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 8,
+      "instruction": "Simmer for an additional 5 minutes, stirring occasionally.",
+      "text": "Simmer for an additional 5 minutes, stirring occasionally.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 9,
+      "instruction": "Serve hot over rice.",
+      "text": "Serve hot over rice.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    }
+  ],
+  "scaling": {
+    "selected_multiplier": 1,
+    "base_multiplier": 1,
+    "base_servings": "4",
+    "available_multipliers": [
+      {
+        "label": "1/2x",
+        "value": 0.5
+      },
+      {
+        "label": "1x",
+        "value": 1
+      },
+      {
+        "label": "2x",
+        "value": 2
+      },
+      {
+        "label": "3x",
+        "value": 3
+      }
+    ]
+  },
+  "ai_inferred": true,
+  "inferred_by_model": "gpt-4o-mini",
+  "inferred_at": "2026-06-16T00:57:13Z",
+  "inference_confidence": "high",
+  "source_type": "cookbook_item_inferred",
+  "cookbook_item_inferred_fields": [
+    "cook_time",
+    "equipment",
+    "inactive_time",
+    "ingredients",
+    "instructions",
+    "level",
+    "prep_time",
+    "recipe_amount",
+    "servings",
+    "total_time",
+    "yield"
+  ],
+  "cookbook_item_inference_field_sources": {
+    "recipe_amount": "ai_inferred",
+    "yield": "ai_inferred",
+    "servings": "ai_inferred",
+    "level": "ai_inferred",
+    "total_time": "ai_inferred",
+    "prep_time": "ai_inferred",
+    "inactive_time": "ai_inferred",
+    "cook_time": "ai_inferred",
+    "ingredients": "ai_inferred",
+    "equipment": "ai_inferred",
+    "instructions": "ai_inferred"
+  }
+}

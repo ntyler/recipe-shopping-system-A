@@ -1,0 +1,295 @@
+{
+  "source_url": "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-46-House_Special_Pho_Dat_Biet",
+  "recipe_amount": "1 bowl",
+  "yield": "1 bowl of pho",
+  "servings": "1 appetizer serving",
+  "level": "Medium",
+  "total_time": "60 minutes",
+  "prep_time": "20 minutes",
+  "inactive_time": "30 minutes",
+  "cook_time": "10 minutes",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "4 cups beef broth",
+      "quantity": "4",
+      "recipe_qty": "4",
+      "unit": "cups",
+      "base_quantity": "4",
+      "base_unit": "cups",
+      "ingredient": "beef broth",
+      "preparation": "homemade or store-bought",
+      "optional": false,
+      "store_section": "MEAT & SEAFOOD",
+      "store_section_order": 2,
+      "purchasable_item": "beef broth",
+      "purchase_group": "beef broth"
+    },
+    {
+      "section": null,
+      "original_text": "100 grams rice noodles",
+      "quantity": "100",
+      "recipe_qty": "100",
+      "unit": "grams",
+      "base_quantity": "100",
+      "base_unit": "grams",
+      "ingredient": "rice noodles",
+      "preparation": "pho noodles",
+      "optional": false,
+      "store_section": "PASTA, RICE & GRAINS",
+      "store_section_order": 6,
+      "purchasable_item": "rice noodles",
+      "purchase_group": "rice noodles"
+    },
+    {
+      "section": null,
+      "original_text": "100 grams sliced beef",
+      "quantity": "100",
+      "recipe_qty": "100",
+      "unit": "grams",
+      "base_quantity": "100",
+      "base_unit": "grams",
+      "ingredient": "beef",
+      "preparation": "thinly sliced sirloin or brisket",
+      "optional": false,
+      "store_section": "MEAT & SEAFOOD",
+      "store_section_order": 2,
+      "purchasable_item": "beef",
+      "purchase_group": "beef"
+    },
+    {
+      "section": null,
+      "original_text": "1 cup bean sprouts",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "cup",
+      "base_quantity": "1",
+      "base_unit": "cup",
+      "ingredient": "bean sprouts",
+      "preparation": "fresh",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "bean sprouts",
+      "purchase_group": "bean sprouts"
+    },
+    {
+      "section": null,
+      "original_text": "1 bunch fresh herbs",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "bunch",
+      "base_quantity": "1",
+      "base_unit": "bunch",
+      "ingredient": "fresh herbs",
+      "preparation": "basil, cilantro, and mint",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "fresh herbs",
+      "purchase_group": "fresh herbs"
+    },
+    {
+      "section": null,
+      "original_text": "1 piece lime",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "piece",
+      "base_quantity": "1",
+      "base_unit": "piece",
+      "ingredient": "lime",
+      "preparation": "cut into wedges",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "lime",
+      "purchase_group": "lime"
+    },
+    {
+      "section": null,
+      "original_text": "2 tablespoons hoisin sauce",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "tablespoons",
+      "base_quantity": "2",
+      "base_unit": "tablespoons",
+      "ingredient": "hoisin sauce",
+      "preparation": "for serving",
+      "optional": false,
+      "store_section": "SAUCES & CONDIMENTS",
+      "store_section_order": 9,
+      "purchasable_item": "hoisin sauce",
+      "purchase_group": "hoisin sauce"
+    },
+    {
+      "section": null,
+      "original_text": "1 tablespoon sriracha",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "tablespoon",
+      "base_quantity": "1",
+      "base_unit": "tablespoon",
+      "ingredient": "sriracha",
+      "preparation": "for serving",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "sriracha",
+      "purchase_group": "sriracha"
+    }
+  ],
+  "equipment": [
+    {
+      "equipment": "large pot",
+      "text": "large pot",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "strainer",
+      "text": "strainer",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "serving bowls",
+      "text": "serving bowls",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "knife",
+      "text": "knife",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "cutting board",
+      "text": "cutting board",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    }
+  ],
+  "instructions": [
+    {
+      "section": null,
+      "step_number": 1,
+      "instruction": "In a large pot, bring the beef broth to a simmer.",
+      "text": "In a large pot, bring the beef broth to a simmer.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "Cook the rice noodles according to package instructions, then drain and set aside.",
+      "text": "Cook the rice noodles according to package instructions, then drain and set aside.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "Once the broth is simmering, add the sliced beef and cook for about 1-2 minutes until just cooked.",
+      "text": "Once the broth is simmering, add the sliced beef and cook for about 1-2 minutes until just cooked.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "In serving bowls, place a portion of the cooked noodles, then ladle the hot broth and beef over the top.",
+      "text": "In serving bowls, place a portion of the cooked noodles, then ladle the hot broth and beef over the top.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 5,
+      "instruction": "Top with bean sprouts, fresh herbs, and lime wedges.",
+      "text": "Top with bean sprouts, fresh herbs, and lime wedges.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 6,
+      "instruction": "Serve with hoisin sauce and sriracha on the side.",
+      "text": "Serve with hoisin sauce and sriracha on the side.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    }
+  ],
+  "scaling": {
+    "selected_multiplier": 1,
+    "base_multiplier": 1,
+    "base_servings": "1 appetizer serving",
+    "available_multipliers": [
+      {
+        "label": "1/2x",
+        "value": 0.5
+      },
+      {
+        "label": "1x",
+        "value": 1
+      },
+      {
+        "label": "2x",
+        "value": 2
+      },
+      {
+        "label": "3x",
+        "value": 3
+      }
+    ]
+  },
+  "ai_inferred": true,
+  "inferred_by_model": "gpt-4o-mini",
+  "inferred_at": "2026-06-16T00:57:34Z",
+  "inference_confidence": "high",
+  "source_type": "cookbook_item_inferred",
+  "cookbook_item_inferred_fields": [
+    "cook_time",
+    "equipment",
+    "inactive_time",
+    "ingredients",
+    "instructions",
+    "level",
+    "prep_time",
+    "recipe_amount",
+    "servings",
+    "total_time",
+    "yield"
+  ],
+  "cookbook_item_inference_field_sources": {
+    "recipe_amount": "ai_inferred",
+    "yield": "ai_inferred",
+    "servings": "ai_inferred",
+    "level": "ai_inferred",
+    "total_time": "ai_inferred",
+    "prep_time": "ai_inferred",
+    "inactive_time": "ai_inferred",
+    "cook_time": "ai_inferred",
+    "ingredients": "ai_inferred",
+    "equipment": "ai_inferred",
+    "instructions": "ai_inferred"
+  }
+}

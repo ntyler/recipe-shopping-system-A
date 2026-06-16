@@ -1,0 +1,289 @@
+{
+  "source_url": "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-31-Summer_Roll",
+  "recipe_amount": "8 spring rolls",
+  "yield": "8 pieces",
+  "servings": "1 appetizer serving",
+  "level": "Easy",
+  "total_time": "30 minutes",
+  "prep_time": "15 minutes",
+  "inactive_time": "10 minutes",
+  "cook_time": "5 minutes",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "8 pieces rice paper wrappers",
+      "quantity": "8",
+      "recipe_qty": "8",
+      "unit": "pieces",
+      "base_quantity": "8",
+      "base_unit": "pieces",
+      "ingredient": "rice paper wrappers",
+      "preparation": "for wrapping",
+      "optional": false,
+      "store_section": "PASTA, RICE & GRAINS",
+      "store_section_order": 6,
+      "purchasable_item": "rice paper wrappers",
+      "purchase_group": "rice paper wrappers"
+    },
+    {
+      "section": null,
+      "original_text": "8 pieces cooked shrimp",
+      "quantity": "8",
+      "recipe_qty": "8",
+      "unit": "pieces",
+      "base_quantity": "8",
+      "base_unit": "pieces",
+      "ingredient": "cooked shrimp",
+      "preparation": "sliced in half lengthwise",
+      "optional": false,
+      "store_section": "MEAT & SEAFOOD",
+      "store_section_order": 2,
+      "purchasable_item": "cooked shrimp",
+      "purchase_group": "cooked shrimp"
+    },
+    {
+      "section": null,
+      "original_text": "1 cup fresh mint leaves",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "cup",
+      "base_quantity": "1",
+      "base_unit": "cup",
+      "ingredient": "fresh mint leaves",
+      "preparation": "for flavor",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "fresh mint leaves",
+      "purchase_group": "fresh mint leaves"
+    },
+    {
+      "section": null,
+      "original_text": "1 cup fresh basil leaves",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "cup",
+      "base_quantity": "1",
+      "base_unit": "cup",
+      "ingredient": "fresh basil leaves",
+      "preparation": "for flavor",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1,
+      "purchasable_item": "fresh basil leaves",
+      "purchase_group": "fresh basil leaves"
+    },
+    {
+      "section": null,
+      "original_text": "1 cup vermicelli noodles",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "cup",
+      "base_quantity": "1",
+      "base_unit": "cup",
+      "ingredient": "vermicelli noodles",
+      "preparation": "cooked and cooled",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "vermicelli noodles",
+      "purchase_group": "vermicelli noodles"
+    },
+    {
+      "section": null,
+      "original_text": "1 cup shredded lettuce",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "cup",
+      "base_quantity": "1",
+      "base_unit": "cup",
+      "ingredient": "shredded lettuce",
+      "preparation": "for crunch",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "lettuce cheese",
+      "purchase_group": "lettuce cheese"
+    },
+    {
+      "section": null,
+      "original_text": "1 medium carrot",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "medium",
+      "base_quantity": "1",
+      "base_unit": "medium",
+      "ingredient": "carrot",
+      "preparation": "julienned",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "carrot",
+      "purchase_group": "carrot"
+    },
+    {
+      "section": null,
+      "original_text": "to taste dipping sauce",
+      "quantity": "to taste",
+      "recipe_qty": "to taste",
+      "unit": null,
+      "base_quantity": "to taste",
+      "base_unit": null,
+      "ingredient": "dipping sauce",
+      "preparation": "such as hoisin or peanut sauce",
+      "optional": false,
+      "store_section": "SAUCES & CONDIMENTS",
+      "store_section_order": 9,
+      "purchasable_item": "dipping sauce",
+      "purchase_group": "dipping sauce"
+    }
+  ],
+  "equipment": [
+    {
+      "equipment": "large bowl",
+      "text": "large bowl",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "cutting board",
+      "text": "cutting board",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "knife",
+      "text": "knife",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "plate",
+      "text": "plate",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    }
+  ],
+  "instructions": [
+    {
+      "section": null,
+      "step_number": 1,
+      "instruction": "Soak rice paper wrappers in warm water until soft, about 10 seconds.",
+      "text": "Soak rice paper wrappers in warm water until soft, about 10 seconds.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "Lay the softened wrapper on a plate.",
+      "text": "Lay the softened wrapper on a plate.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "Place shrimp, mint, basil, vermicelli noodles, lettuce, and carrot in the center.",
+      "text": "Place shrimp, mint, basil, vermicelli noodles, lettuce, and carrot in the center.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "Fold the sides over the filling and roll tightly from the bottom up.",
+      "text": "Fold the sides over the filling and roll tightly from the bottom up.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 5,
+      "instruction": "Repeat with remaining wrappers and filling.",
+      "text": "Repeat with remaining wrappers and filling.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 6,
+      "instruction": "Serve with dipping sauce.",
+      "text": "Serve with dipping sauce.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    }
+  ],
+  "scaling": {
+    "selected_multiplier": 1,
+    "base_multiplier": 1,
+    "base_servings": "1 appetizer serving",
+    "available_multipliers": [
+      {
+        "label": "1/2x",
+        "value": 0.5
+      },
+      {
+        "label": "1x",
+        "value": 1
+      },
+      {
+        "label": "2x",
+        "value": 2
+      },
+      {
+        "label": "3x",
+        "value": 3
+      }
+    ]
+  },
+  "ai_inferred": true,
+  "inferred_by_model": "gpt-4o-mini",
+  "inferred_at": "2026-06-16T00:56:27Z",
+  "inference_confidence": "high",
+  "source_type": "cookbook_item_inferred",
+  "cookbook_item_inferred_fields": [
+    "cook_time",
+    "equipment",
+    "inactive_time",
+    "ingredients",
+    "instructions",
+    "level",
+    "prep_time",
+    "recipe_amount",
+    "servings",
+    "total_time",
+    "yield"
+  ],
+  "cookbook_item_inference_field_sources": {
+    "recipe_amount": "ai_inferred",
+    "yield": "ai_inferred",
+    "servings": "ai_inferred",
+    "level": "ai_inferred",
+    "total_time": "ai_inferred",
+    "prep_time": "ai_inferred",
+    "inactive_time": "ai_inferred",
+    "cook_time": "ai_inferred",
+    "ingredients": "ai_inferred",
+    "equipment": "ai_inferred",
+    "instructions": "ai_inferred"
+  }
+}

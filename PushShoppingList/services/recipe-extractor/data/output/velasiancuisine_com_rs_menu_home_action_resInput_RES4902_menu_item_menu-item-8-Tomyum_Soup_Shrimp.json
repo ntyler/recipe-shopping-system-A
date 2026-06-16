@@ -1,0 +1,354 @@
+{
+  "source_url": "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-8-Tomyum_Soup_Shrimp",
+  "recipe_amount": "1 bowl",
+  "yield": "1 bowl",
+  "servings": "1 appetizer serving",
+  "level": "Easy",
+  "total_time": "25 minutes",
+  "prep_time": "10 minutes",
+  "inactive_time": "0 minutes",
+  "cook_time": "15 minutes",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "8 pieces shrimp",
+      "quantity": "8",
+      "recipe_qty": "8",
+      "unit": "pieces",
+      "base_quantity": "8",
+      "base_unit": "pieces",
+      "ingredient": "shrimp",
+      "preparation": "peeled and deveined",
+      "optional": false,
+      "store_section": "MEAT & SEAFOOD",
+      "store_section_order": 2,
+      "purchasable_item": "shrimp",
+      "purchase_group": "shrimp"
+    },
+    {
+      "section": null,
+      "original_text": "4 cups chicken or vegetable broth",
+      "quantity": "4",
+      "recipe_qty": "4",
+      "unit": "cups",
+      "base_quantity": "4",
+      "base_unit": "cups",
+      "ingredient": "chicken OR vegetable broth",
+      "preparation": "for the soup base",
+      "optional": false,
+      "store_section": "MEAT & SEAFOOD",
+      "store_section_order": 2,
+      "purchasable_item": "chicken OR vegetable broth",
+      "purchase_group": "chicken OR vegetable broth"
+    },
+    {
+      "section": null,
+      "original_text": "2 stalks lemongrass",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "stalks",
+      "base_quantity": "2",
+      "base_unit": "stalks",
+      "ingredient": "lemongrass",
+      "preparation": "bruised and cut into pieces",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1,
+      "purchasable_item": "lemongrass",
+      "purchase_group": "lemongrass"
+    },
+    {
+      "section": null,
+      "original_text": "4 slices galangal or ginger",
+      "quantity": "4",
+      "recipe_qty": "4",
+      "unit": "slices",
+      "base_quantity": "4",
+      "base_unit": "slices",
+      "ingredient": "galangal or ginger",
+      "preparation": "fresh",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "galangal or ginger",
+      "purchase_group": "galangal or ginger"
+    },
+    {
+      "section": null,
+      "original_text": "3 leaves kaffir lime leaves",
+      "quantity": "3",
+      "recipe_qty": "3",
+      "unit": "leaves",
+      "base_quantity": "3",
+      "base_unit": "leaves",
+      "ingredient": "kaffir lime leaves",
+      "preparation": "torn",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "kaffir lime leaves",
+      "purchase_group": "kaffir lime leaves"
+    },
+    {
+      "section": null,
+      "original_text": "1 cup mushrooms",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "cup",
+      "base_quantity": "1",
+      "base_unit": "cup",
+      "ingredient": "mushrooms",
+      "preparation": "sliced",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "mushrooms",
+      "purchase_group": "mushrooms"
+    },
+    {
+      "section": null,
+      "original_text": "1 medium tomatoes",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "medium",
+      "base_quantity": "1",
+      "base_unit": "medium",
+      "ingredient": "tomatoes",
+      "preparation": "wedged",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1,
+      "purchasable_item": "tomatoes",
+      "purchase_group": "tomatoes"
+    },
+    {
+      "section": null,
+      "original_text": "1 to 2 pieces Thai chili",
+      "quantity": "1 to 2",
+      "recipe_qty": "1 to 2",
+      "unit": "pieces",
+      "base_quantity": "1 to 2",
+      "base_unit": "pieces",
+      "ingredient": "Thai chili",
+      "preparation": "smashed, optional for heat",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "Thai chili",
+      "purchase_group": "Thai chili"
+    },
+    {
+      "section": null,
+      "original_text": "1 1/2 tablespoons fish sauce",
+      "quantity": "1 1/2",
+      "recipe_qty": "1 1/2",
+      "unit": "tablespoons",
+      "base_quantity": "1 1/2",
+      "base_unit": "tablespoons",
+      "ingredient": "fish sauce",
+      "preparation": "or to taste",
+      "optional": false,
+      "store_section": "MEAT & SEAFOOD",
+      "store_section_order": 2,
+      "purchasable_item": "fish sauce",
+      "purchase_group": "fish sauce"
+    },
+    {
+      "section": null,
+      "original_text": "2 tablespoons lime juice",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "tablespoons",
+      "base_quantity": "2",
+      "base_unit": "tablespoons",
+      "ingredient": "lime juice",
+      "preparation": "freshly squeezed",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "lime juice",
+      "purchase_group": "lime juice"
+    },
+    {
+      "section": null,
+      "original_text": "1 teaspoon sugar",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "teaspoon",
+      "base_quantity": "1",
+      "base_unit": "teaspoon",
+      "ingredient": "sugar",
+      "preparation": "to balance flavor",
+      "optional": false,
+      "store_section": "BAKING",
+      "store_section_order": 7,
+      "purchasable_item": "sugar",
+      "purchase_group": "sugar"
+    },
+    {
+      "section": null,
+      "original_text": "2 tablespoons cilantro",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "tablespoons",
+      "base_quantity": "2",
+      "base_unit": "tablespoons",
+      "ingredient": "cilantro",
+      "preparation": "chopped, for garnish",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1,
+      "purchasable_item": "cilantro",
+      "purchase_group": "cilantro"
+    }
+  ],
+  "equipment": [
+    {
+      "equipment": "medium saucepan",
+      "text": "medium saucepan",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "cutting board",
+      "text": "cutting board",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "chef's knife",
+      "text": "chef's knife",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "measuring cups and spoons",
+      "text": "measuring cups and spoons",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "ladle",
+      "text": "ladle",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "fine strainer or spoon for removing aromatics",
+      "text": "fine strainer or spoon for removing aromatics",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    }
+  ],
+  "instructions": [
+    {
+      "section": null,
+      "step_number": 1,
+      "instruction": "Bring the broth to a simmer with lemongrass, galangal, and kaffir lime leaves; cook 5 minutes to infuse.",
+      "text": "Bring the broth to a simmer with lemongrass, galangal, and kaffir lime leaves; cook 5 minutes to infuse.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "Add mushrooms, tomatoes, and chili if using; simmer 3 to 4 minutes until just tender.",
+      "text": "Add mushrooms, tomatoes, and chili if using; simmer 3 to 4 minutes until just tender.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "Add the shrimp and cook until pink and opaque, about 2 to 3 minutes.",
+      "text": "Add the shrimp and cook until pink and opaque, about 2 to 3 minutes.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "Season with fish sauce, lime juice, and sugar. Taste and adjust to make it hot, sour, and salty.",
+      "text": "Season with fish sauce, lime juice, and sugar. Taste and adjust to make it hot, sour, and salty.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 5,
+      "instruction": "Serve hot garnished with cilantro.",
+      "text": "Serve hot garnished with cilantro.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    }
+  ],
+  "scaling": {
+    "selected_multiplier": 1,
+    "base_multiplier": 1,
+    "base_servings": "1 appetizer serving",
+    "available_multipliers": [
+      {
+        "label": "1/2x",
+        "value": 0.5
+      },
+      {
+        "label": "1x",
+        "value": 1
+      },
+      {
+        "label": "2x",
+        "value": 2
+      },
+      {
+        "label": "3x",
+        "value": 3
+      }
+    ]
+  },
+  "ai_inferred": true,
+  "inferred_by_model": "gpt-5.4-mini",
+  "inferred_at": "2026-06-16T00:49:26Z",
+  "inference_confidence": "medium",
+  "source_type": "cookbook_item_inferred",
+  "cookbook_item_inferred_fields": [
+    "cook_time",
+    "equipment",
+    "inactive_time",
+    "ingredients",
+    "instructions",
+    "level",
+    "prep_time",
+    "recipe_amount",
+    "servings",
+    "total_time",
+    "yield"
+  ],
+  "cookbook_item_inference_field_sources": {
+    "recipe_amount": "ai_inferred",
+    "yield": "ai_inferred",
+    "servings": "ai_inferred",
+    "level": "ai_inferred",
+    "total_time": "ai_inferred",
+    "prep_time": "ai_inferred",
+    "inactive_time": "ai_inferred",
+    "cook_time": "ai_inferred",
+    "ingredients": "ai_inferred",
+    "equipment": "ai_inferred",
+    "instructions": "ai_inferred"
+  }
+}
