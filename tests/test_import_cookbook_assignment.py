@@ -151,16 +151,29 @@ def test_cookbook_infer_button_runs_full_loading_routine():
     assert "cookbook_recipe_progress_payload(" in worker
     assert "estimate_recipe_nutrition(recipe)" in worker
     assert 'trigger_source="cookbook_infer:all"' in worker
+    assert "Saving predicted recipe for" in worker
+    assert "Loading recipe fields for PDF" in worker
 
 
 def test_menu_import_progress_overlay_shows_model_env_var_reference():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    template = (ROOT / "PushShoppingList/templates/sections/extraction_overlay.html").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
     assert "function formatJobModelReference(job)" in script
     assert "function appendJobModelReference(message, job)" in script
     assert 'pieces.push(`${model ? "via " : "env "}${envVar}`);' in script
     assert "message = appendJobModelReference(message, job);" in script
     assert "const runningSummary = job && job.current_step" in script
+    assert "function menuImportActivityFromJob(job, isMenuExtract)" in script
+    assert "function renderMenuImportActivityPanel(progress)" in script
+    assert "progress_source: \"job\"" in script
+    assert "defer_refresh: Boolean(options.deferRefresh)" in script
+    assert "renderMenuImportActivityPanel(progress)" in script
+    assert "function followMenuImportJobChain(startingJob, fallbackUrls = [])" in script
+    assert "menuImportActivityPanel" in template
+    assert "Live Menu Activity" in template
+    assert ".menu-import-activity-panel" in css
 
 
 def test_job_activity_can_reopen_import_progress_overlay():
@@ -170,7 +183,9 @@ def test_job_activity_can_reopen_import_progress_overlay():
     assert "function reopenImportProgressFromJob(jobId)" in script
     assert "Open Popup" in script
     assert "hiddenExtractJobId = null" in script
-    assert "renderExtractionProgress(importJobToExtractionProgress(job, urls, isMenuExtract))" in script
+    assert "renderExtractionProgress(importJobToExtractionProgress(job, urls, isMenuExtract, {" in script
+    assert "followMenuImportJobChain(finishedJob, urls)" in script
+    assert "\"menu-import\", \"recipe-import\", \"menu-generate-recipes\", \"menu-deferred-heavy-tasks\"" in script
 
 
 def test_job_activity_section_has_clear_collapse_control():

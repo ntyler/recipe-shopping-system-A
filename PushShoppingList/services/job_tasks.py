@@ -441,12 +441,43 @@ def run_menu_generate_recipes_job(job_id, payload):
             ensure_not_cancelled(job_id)
             recipe_url = entry["recipe_url"]
             menu_item = entry.get("menu_item") if isinstance(entry.get("menu_item"), dict) else {}
+            recipe_name = cookbook_recipe_display_name(
+                recipe_url,
+                {"name": menu_item.get("item_name")},
+            )
+            recipe_position = min(total, len(created_urls) + len(skipped_urls) + failed_items + 1)
             item_id = str(menu_item.get("menu_item_id") or "").strip()
             item_result = result_items.get(item_id)
             if not isinstance(item_result, dict):
                 failed_items += 1
                 append_job_warning(job_id, f"{recipe_url}: Batch response did not include menu_item_id {item_id}.")
                 continue
+
+            update_job_progress(
+                job_id,
+                current_step=f"Saving predicted recipe for {recipe_name} ({recipe_position}/{total})",
+                progress_percent=bounded_percent(len(created_urls), total, 82, 88),
+                completed_items=len(created_urls) + len(skipped_urls),
+                failed_items=failed_items,
+                result_payload={
+                    **model_info,
+                    "stage": "Saving predicted recipes",
+                    "total_items": total,
+                    "recipe_inference_completed": len(created_urls),
+                    "skipped_count": len(skipped_urls),
+                    "category_success_count": category_success_count,
+                    "failed_items": failed_items,
+                    **cookbook_recipe_progress_payload(
+                        "recipe_generation",
+                        "Saving predicted recipe for",
+                        recipe_url,
+                        recipe_name,
+                        recipe_position,
+                        total,
+                        event="started",
+                    ),
+                },
+            )
 
             result = apply_menu_batch_inference_to_stub(
                 recipe_url,
@@ -472,16 +503,26 @@ def run_menu_generate_recipes_job(job_id, payload):
 
             update_job_progress(
                 job_id,
-                current_step=f"Generating ChatGPT categories ({len(created_urls) + 1}/{total})",
+                current_step=f"Generating ChatGPT categories for {recipe_name} ({recipe_position}/{total})",
                 progress_percent=bounded_percent(len(created_urls), total, 82, 88),
                 completed_items=len(created_urls) + len(skipped_urls),
                 failed_items=failed_items,
                 result_payload={
                     **model_info,
                     "stage": "Generating categories",
+                    "total_items": total,
                     "recipe_inference_completed": len(created_urls),
                     "category_success_count": category_success_count,
                     "failed_items": failed_items,
+                    **cookbook_recipe_progress_payload(
+                        "categories",
+                        "Deciding categories for",
+                        recipe_url,
+                        recipe_name,
+                        recipe_position,
+                        total,
+                        event="started",
+                    ),
                 },
             )
             assignment = cookbook_recipe_assignment_for_url(recipe_url)
@@ -665,9 +706,34 @@ def run_menu_deferred_heavy_tasks_job(job_id, payload):
 
     for index, recipe_url in enumerate(recipe_urls):
         ensure_not_cancelled(job_id)
+        recipe_name = cookbook_recipe_display_name(recipe_url)
+        update_job_progress(
+            job_id,
+            current_step=f"Loading recipe for nutrition ({index + 1}/{total})",
+            progress_percent=bounded_percent(index, total, 5, 38),
+            completed_items=nutrition_completed,
+            failed_items=failed_items,
+            result_payload={
+                **nutrition_model_info,
+                "stage": "Estimating nutrition",
+                "total_items": total,
+                "nutrition_completed": nutrition_completed,
+                "failed_items": failed_items,
+                **cookbook_recipe_progress_payload(
+                    "nutrition",
+                    "Loading recipe for nutrition",
+                    recipe_url,
+                    recipe_name,
+                    index + 1,
+                    total,
+                    event="started",
+                ),
+            },
+        )
         loaded_recipe = load_editable_recipe(recipe_url) or {}
         recipe = loaded_recipe.get("recipe") if isinstance(loaded_recipe, dict) else {}
         recipe = recipe if isinstance(recipe, dict) else {}
+        recipe_name = cookbook_recipe_display_name(recipe_url, recipe)
         if not recipe:
             failed_items += 1
             append_job_warning(job_id, f"{recipe_url}: Recipe was not found for nutrition estimation.")
@@ -709,8 +775,18 @@ def run_menu_deferred_heavy_tasks_job(job_id, payload):
             result_payload={
                 **nutrition_model_info,
                 "stage": "Estimating nutrition",
+                "total_items": total,
                 "nutrition_completed": nutrition_completed,
                 "failed_items": failed_items,
+                **cookbook_recipe_progress_payload(
+                    "nutrition",
+                    "Finished nutrition for",
+                    recipe_url,
+                    recipe_name,
+                    index + 1,
+                    total,
+                    event="completed",
+                ),
             },
         )
 
@@ -732,6 +808,31 @@ def run_menu_deferred_heavy_tasks_job(job_id, payload):
     pdf_total = max(1, len(nutrition_ready_urls))
     for index, recipe_url in enumerate(nutrition_ready_urls):
         ensure_not_cancelled(job_id)
+        recipe_name = cookbook_recipe_display_name(recipe_url)
+        update_job_progress(
+            job_id,
+            current_step=f"Loading recipe fields for PDF ({index + 1}/{len(nutrition_ready_urls)})",
+            progress_percent=bounded_percent(index, pdf_total, 40, 70),
+            completed_items=pdfs_completed,
+            failed_items=failed_items,
+            result_payload={
+                **nutrition_model_info,
+                "stage": "Generating PDFs",
+                "total_items": total,
+                "nutrition_completed": nutrition_completed,
+                "pdfs_completed": pdfs_completed,
+                "failed_items": failed_items,
+                **cookbook_recipe_progress_payload(
+                    "pdf",
+                    "Loading recipe fields for PDF",
+                    recipe_url,
+                    recipe_name,
+                    index + 1,
+                    len(nutrition_ready_urls),
+                    event="started",
+                ),
+            },
+        )
         try:
             with workspace_write_lock("recipe-pdfs"):
                 pdf_result = generate_editable_recipe_pdf_file(recipe_url)
@@ -753,9 +854,19 @@ def run_menu_deferred_heavy_tasks_job(job_id, payload):
             result_payload={
                 **nutrition_model_info,
                 "stage": "Generating PDFs",
+                "total_items": total,
                 "nutrition_completed": nutrition_completed,
                 "pdfs_completed": pdfs_completed,
                 "failed_items": failed_items,
+                **cookbook_recipe_progress_payload(
+                    "pdf",
+                    "Finished PDF for",
+                    recipe_url,
+                    recipe_name,
+                    index + 1,
+                    len(nutrition_ready_urls),
+                    event="completed",
+                ),
             },
         )
 
@@ -778,6 +889,32 @@ def run_menu_deferred_heavy_tasks_job(job_id, payload):
     upload_total = max(1, len(pdf_ready_urls))
     for index, recipe_url in enumerate(pdf_ready_urls):
         ensure_not_cancelled(job_id)
+        recipe_name = cookbook_recipe_display_name(recipe_url)
+        update_job_progress(
+            job_id,
+            current_step=f"Uploading PDF for {recipe_name} ({index + 1}/{len(pdf_ready_urls)})",
+            progress_percent=bounded_percent(index, upload_total, 72, 96),
+            completed_items=uploads_completed,
+            failed_items=failed_items,
+            result_payload={
+                **nutrition_model_info,
+                "stage": "Uploading PDFs",
+                "total_items": total,
+                "nutrition_completed": nutrition_completed,
+                "pdfs_completed": pdfs_completed,
+                "pdf_uploads_completed": uploads_completed,
+                "failed_items": failed_items,
+                **cookbook_recipe_progress_payload(
+                    "upload",
+                    "Uploading PDF for",
+                    recipe_url,
+                    recipe_name,
+                    index + 1,
+                    len(pdf_ready_urls),
+                    event="started",
+                ),
+            },
+        )
         try:
             with workspace_write_lock("recipe-pdfs"):
                 upload_result = upload_recipe_pdf_to_cloudflare(recipe_url, pdf_kind="generated_recipe")
@@ -798,10 +935,20 @@ def run_menu_deferred_heavy_tasks_job(job_id, payload):
             result_payload={
                 **nutrition_model_info,
                 "stage": "Uploading PDFs",
+                "total_items": total,
                 "nutrition_completed": nutrition_completed,
                 "pdfs_completed": pdfs_completed,
                 "pdf_uploads_completed": uploads_completed,
                 "failed_items": failed_items,
+                **cookbook_recipe_progress_payload(
+                    "upload",
+                    "Finished PDF upload for",
+                    recipe_url,
+                    recipe_name,
+                    index + 1,
+                    len(pdf_ready_urls),
+                    event="completed",
+                ),
             },
         )
 

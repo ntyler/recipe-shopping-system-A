@@ -463,7 +463,95 @@ function jobSourceUrls(job) {
 
 function jobCanOpenImportProgress(job) {
     const jobType = String((job && job.job_type) || "").trim();
-    return ["menu-import", "recipe-import"].includes(jobType) && jobSourceUrls(job).length > 0;
+    return ["menu-import", "recipe-import", "menu-generate-recipes", "menu-deferred-heavy-tasks"].includes(jobType) && jobSourceUrls(job).length > 0;
+}
+
+function jobIsMenuProgressJob(job) {
+    const jobType = String((job && job.job_type) || "").trim();
+    return ["menu-import", "menu-generate-recipes", "menu-deferred-heavy-tasks"].includes(jobType);
+}
+
+function menuImportFollowupJobId(job) {
+    const result = jobResultPayload(job);
+    const candidates = [
+        result.recipe_inference_job_id,
+        result.recipe_inference_job && result.recipe_inference_job.job_id,
+        result.deferred_heavy_tasks_job_id,
+        result.deferred_heavy_tasks_job && result.deferred_heavy_tasks_job.job_id,
+    ];
+
+    return String(candidates.find(value => String(value || "").trim()) || "").trim();
+}
+
+function menuImportFollowupLabel(job) {
+    const result = jobResultPayload(job);
+    if (result.recipe_inference_job_id || (result.recipe_inference_job && result.recipe_inference_job.job_id)) {
+        return "recipe generation";
+    }
+    if (result.deferred_heavy_tasks_job_id || (result.deferred_heavy_tasks_job && result.deferred_heavy_tasks_job.job_id)) {
+        return "nutrition and PDFs";
+    }
+    return "";
+}
+
+function menuJobCountItems(job) {
+    const result = jobResultPayload(job);
+    const countItems = [
+        ["menus", job && String(job.job_type || "") === "menu-import" ? jobSourceUrls(job).length : 0],
+        ["items", result.item_records_unpacked || result.menu_items_found || result.total_items || (job && job.total_items)],
+        ["shells", result.recipe_shells_created || result.stubs_created],
+        ["generated", result.recipe_inference_completed || result.full_recipes_generated || result.generated_count],
+        ["nutrition", result.nutrition_completed || result.nutrition_estimates_completed],
+        ["categories", result.categories_completed || result.category_success_count || result.categories_generated],
+        ["PDFs", result.pdfs_completed || result.pdfs_created],
+        ["uploads", result.pdf_uploads_completed],
+        ["failed", result.failed_items || result.failed_count || (job && job.failed_items)],
+    ];
+    const batchIndex = Number(result.batch_index || 0);
+    const batchCount = Number(result.batch_count || 0);
+
+    if (batchIndex && batchCount) {
+        countItems.push(["batch", `${batchIndex}/${batchCount}`]);
+    } else if (result.batches_completed || result.batch_count) {
+        countItems.push(["batches", `${Number(result.batches_completed || 0)}/${Number(result.batch_count || 0)}`]);
+    }
+
+    return countItems
+        .map(([label, value]) => {
+            const text = typeof value === "string" ? value : String(Number(value || 0));
+            return text && text !== "0" && text !== "0/0" ? { label, value: text } : null;
+        })
+        .filter(Boolean);
+}
+
+function menuImportActivityFromJob(job, isMenuExtract) {
+    if (!isMenuExtract || !job) {
+        return null;
+    }
+
+    const result = jobResultPayload(job);
+    const followupLabel = menuImportFollowupLabel(job);
+    const stage = String(result.stage || job.current_step || jobTypeLabel(job.job_type)).trim();
+    const currentRecipe = jobCurrentRecipeDetail(job);
+    const currentStep = String((job && job.current_step) || "").trim();
+    const status = String((job && job.status) || "").trim().toLowerCase();
+    const detail = currentRecipe || currentStep || (
+        status === "queued"
+            ? "Queued behind the active menu job."
+            : "Preparing menu import activity."
+    );
+
+    return {
+        job_label: jobTypeLabel(job.job_type),
+        stage: followupLabel && status === "completed"
+            ? `${stage}. Waiting for ${followupLabel}.`
+            : stage,
+        detail,
+        counts: menuJobCountItems(job),
+        model: formatJobModelReference(job),
+        followup_job_id: menuImportFollowupJobId(job),
+        followup_label: followupLabel,
+    };
 }
 
 function formatJobModelReference(job) {
@@ -925,21 +1013,31 @@ async function reopenImportProgressFromJob(jobId) {
             return;
         }
 
-        const isMenuExtract = String(job.job_type || "") === "menu-import";
+        const isMenuExtract = jobIsMenuProgressJob(job);
         hiddenExtractJobId = null;
         cancelExtractRequested = false;
-        renderExtractionProgress(importJobToExtractionProgress(job, urls, isMenuExtract));
+        renderExtractionProgress(importJobToExtractionProgress(job, urls, isMenuExtract, {
+            deferRefresh: isMenuExtract,
+        }));
         showExtractionOverlay();
 
         if (jobIsActive(job)) {
             waitForJobCompletion(jobId, {
                 onUpdate(updatedJob) {
-                    renderExtractionProgress(importJobToExtractionProgress(updatedJob, urls, isMenuExtract));
+                    renderExtractionProgress(importJobToExtractionProgress(updatedJob, urls, isMenuExtract, {
+                        deferRefresh: isMenuExtract,
+                    }));
                 },
                 pollMs: 1500,
                 timeoutMs: IMPORT_JOB_COMPLETION_TIMEOUT_MS,
             }).then(finishedJob => {
-                renderExtractionProgress(importJobToExtractionProgress(finishedJob, urls, isMenuExtract));
+                if (isMenuExtract) {
+                    return followMenuImportJobChain(finishedJob, urls).then(chainedJob => chainedJob || finishedJob);
+                }
+                return finishedJob;
+            }).then(finishedJob => {
+                const finalUrls = jobSourceUrls(finishedJob).length ? jobSourceUrls(finishedJob) : urls;
+                renderExtractionProgress(importJobToExtractionProgress(finishedJob, finalUrls, isMenuExtract));
                 syncOpenAiUsageDashboardFromResponse(jobResultPayload(finishedJob));
             }).catch(err => {
                 const progress = lastRenderedExtractProgress || {
@@ -959,6 +1057,13 @@ async function reopenImportProgressFromJob(jobId) {
                     summary: err.message || "Unable to refresh import progress.",
                 });
             });
+        } else if (isMenuExtract) {
+            const chainedJob = await followMenuImportJobChain(job, urls);
+            if (chainedJob) {
+                renderExtractionProgress(importJobToExtractionProgress(chainedJob, jobSourceUrls(chainedJob), true));
+            } else {
+                renderExtractionProgress(importJobToExtractionProgress(job, urls, true));
+            }
         }
     } catch (err) {
         const summary = jobActivitySummaryElement();
@@ -3661,6 +3766,7 @@ let extractProgressPollInFlight = false;
 let extractRefreshTimer = null;
 let extractAutoCloseTimer = null;
 let lastRenderedExtractProgress = null;
+let activeExtractProgressDriver = "";
 let currentExtractAbortController = null;
 let currentExtractAbortControllers = [];
 let cancelExtractRequested = false;
@@ -25749,7 +25855,7 @@ async function startRecipeExtraction(event) {
     await startRecipeExtractionUrls(urls, { extractionMode, button: event.submitter || null });
 }
 
-function importJobToExtractionProgress(job, urls, isMenuExtract) {
+function importJobToExtractionProgress(job, urls, isMenuExtract, options = {}) {
     const jobStatus = String((job && job.status) || "queued").toLowerCase();
     const active = jobStatus === "queued" || jobStatus === "running";
     const failed = jobStatus === "failed";
@@ -25801,8 +25907,13 @@ function importJobToExtractionProgress(job, urls, isMenuExtract) {
     const runningSummary = job && job.current_step
         ? appendJobModelReference(job.current_step, job)
         : "Import is running in the background.";
+    const menuActivity = menuImportActivityFromJob(job, isMenuExtract);
+    const followupLabel = menuActivity && menuActivity.followup_label ? menuActivity.followup_label : "";
     const summary = completed
         ? (
+            followupLabel
+                ? `Menu shell import complete. Waiting for ${followupLabel} to start.`
+                :
             isMenuExtract && (stubCount || megaSnapshotCount)
                 ? `Menu import complete. Created ${megaSnapshotCount || 1} mega menu JSON snapshot${(megaSnapshotCount || 1) === 1 ? "" : "s"} and unpacked ${unpackedCount || stubCount} menu item${(unpackedCount || stubCount) === 1 ? "" : "s"} into lightweight recipe shells.`
                 : `Imported ${displayedCount} recipe${displayedCount === 1 ? "" : "s"}.`
@@ -25814,11 +25925,14 @@ function importJobToExtractionProgress(job, urls, isMenuExtract) {
     return {
         active,
         job_id: (job && (job.id || job.job_id)) || lastRenderedExtractJobId || "",
+        progress_source: "job",
+        defer_refresh: Boolean(options.deferRefresh),
         status: completed ? "complete" : failed ? "failed" : cancelled ? "cancelled" : "running",
         extraction_mode: isMenuExtract ? "menu_extract" : "recipe",
         total: sourceUrls.length,
         percent: Math.max(0, Math.min(100, Number((job && job.progress_percent) || 0))),
         summary,
+        menu_activity: menuActivity,
         urls: sourceRows,
     };
 }
@@ -25833,6 +25947,7 @@ async function startRecipeExtractionUrls(urls, options = {}) {
     console.log("[recipe_import] selected import cookbook", destination);
 
     showExtractionOverlay();
+    activeExtractProgressDriver = "job";
     hiddenExtractJobId = null;
     lastRenderedExtractJobId = null;
     lastRenderedExtractProgress = null;
@@ -25904,7 +26019,9 @@ async function startRecipeExtractionUrls(urls, options = {}) {
         }
 
         lastRenderedExtractJobId = jobId;
-        renderExtractionProgress(importJobToExtractionProgress(startData.job, urls, isMenuExtract));
+        renderExtractionProgress(importJobToExtractionProgress(startData.job, urls, isMenuExtract, {
+            deferRefresh: isMenuExtract,
+        }));
 
         if (button) {
             button.disabled = true;
@@ -25913,14 +26030,21 @@ async function startRecipeExtractionUrls(urls, options = {}) {
 
         const finishedJob = await waitForJobCompletion(jobId, {
             onUpdate(job) {
-                renderExtractionProgress(importJobToExtractionProgress(job, urls, isMenuExtract));
+                renderExtractionProgress(importJobToExtractionProgress(job, urls, isMenuExtract, {
+                    deferRefresh: isMenuExtract,
+                }));
             },
             pollMs: 1500,
             timeoutMs: IMPORT_JOB_COMPLETION_TIMEOUT_MS,
         });
-        const finalProgress = importJobToExtractionProgress(finishedJob, urls, isMenuExtract);
+        const chainedJob = isMenuExtract
+            ? await followMenuImportJobChain(finishedJob, urls)
+            : null;
+        const finalJob = chainedJob || finishedJob;
+        const finalUrls = jobSourceUrls(finalJob).length ? jobSourceUrls(finalJob) : urls;
+        const finalProgress = importJobToExtractionProgress(finalJob, finalUrls, isMenuExtract);
         renderExtractionProgress(finalProgress);
-        syncOpenAiUsageDashboardFromResponse(jobResultPayload(finishedJob));
+        syncOpenAiUsageDashboardFromResponse(jobResultPayload(finalJob));
     } catch (err) {
         const message = String((err && err.message) || "Unable to start recipe import.").trim();
         status.textContent = "Import could not start.";
@@ -25951,6 +26075,50 @@ async function startRecipeExtractionUrls(urls, options = {}) {
             button.textContent = isMenuExtract ? "Import Menu URL" : "Import Recipe URLs";
         }
     }
+}
+
+async function followMenuImportJobChain(startingJob, fallbackUrls = []) {
+    let currentJob = startingJob;
+    let nextJobId = menuImportFollowupJobId(currentJob);
+    let lastFollowedJob = null;
+    const seenJobIds = new Set();
+
+    while (nextJobId && !seenJobIds.has(nextJobId)) {
+        seenJobIds.add(nextJobId);
+
+        let nextJob = await fetchJobStatus(nextJobId);
+        let nextUrls = jobSourceUrls(nextJob);
+        if (!nextUrls.length) {
+            nextUrls = Array.isArray(fallbackUrls) ? fallbackUrls : [];
+        }
+
+        renderExtractionProgress(importJobToExtractionProgress(nextJob, nextUrls, true, {
+            deferRefresh: true,
+        }));
+
+        if (jobIsActive(nextJob)) {
+            nextJob = await waitForJobCompletion(nextJobId, {
+                onUpdate(job) {
+                    const updateUrls = jobSourceUrls(job);
+                    renderExtractionProgress(importJobToExtractionProgress(
+                        job,
+                        updateUrls.length ? updateUrls : nextUrls,
+                        true,
+                        { deferRefresh: true }
+                    ));
+                },
+                pollMs: 1500,
+                timeoutMs: IMPORT_JOB_COMPLETION_TIMEOUT_MS,
+            });
+        }
+
+        syncOpenAiUsageDashboardFromResponse(jobResultPayload(nextJob));
+        lastFollowedJob = nextJob;
+        currentJob = nextJob;
+        nextJobId = menuImportFollowupJobId(currentJob);
+    }
+
+    return lastFollowedJob;
 }
 
 async function cancelRecipeExtraction() {
@@ -26975,7 +27143,7 @@ async function pollExtractionProgress() {
         }
 
         const progress = await response.json();
-        renderExtractionProgress(progress);
+        renderExtractionProgress(progress, { source: "legacy" });
         if (shouldContinueExtractionProgressPolling(progress)) {
             nextDelay = 2000;
         }
@@ -26991,9 +27159,65 @@ async function pollExtractionProgress() {
     }
 }
 
-function renderExtractionProgress(progress) {
+function renderMenuImportActivityPanel(progress) {
+    const panel = document.getElementById("menuImportActivityPanel");
+    if (!panel) {
+        return;
+    }
+
+    const activity = progress && progress.menu_activity ? progress.menu_activity : null;
+    const isMenuExtract = progress && progress.extraction_mode === "menu_extract";
+    if (!isMenuExtract || !activity) {
+        panel.hidden = true;
+        return;
+    }
+
+    const stage = document.getElementById("menuImportActivityStage");
+    const detail = document.getElementById("menuImportActivityDetail");
+    const counts = document.getElementById("menuImportActivityCounts");
+    const model = document.getElementById("menuImportActivityModel");
+
+    panel.hidden = false;
+    if (stage) {
+        stage.textContent = [activity.job_label, activity.stage].filter(Boolean).join(": ");
+    }
+    if (detail) {
+        detail.textContent = activity.detail || "Waiting for menu activity...";
+    }
+    if (counts) {
+        const items = Array.isArray(activity.counts) ? activity.counts : [];
+        counts.innerHTML = items.map(item => (
+            `<span>${escapeHtml(item.label)}: ${escapeHtml(item.value)}</span>`
+        )).join("");
+    }
+    if (model) {
+        model.textContent = activity.model ? `Model: ${activity.model}` : "";
+        model.hidden = !activity.model;
+    }
+}
+
+function renderExtractionProgress(progress, options = {}) {
     if (!progress || !progress.job_id) {
         return;
+    }
+
+    const progressSource = options.source || progress.progress_source || "legacy";
+    if (
+        progressSource === "legacy" &&
+        activeExtractProgressDriver === "job" &&
+        lastRenderedExtractProgress &&
+        lastRenderedExtractProgress.progress_source === "job" &&
+        progress.job_id !== lastRenderedExtractJobId
+    ) {
+        return;
+    }
+
+    progress = {
+        ...progress,
+        progress_source: progressSource,
+    };
+    if (progressSource === "job") {
+        activeExtractProgressDriver = "job";
     }
 
     lastRenderedExtractJobId = progress.job_id;
@@ -27026,6 +27250,7 @@ function renderExtractionProgress(progress) {
             : "Fetching recipe pages and extracting ingredients."
     );
     bar.style.width = `${Math.max(0, Math.min(100, progress.percent || 0))}%`;
+    renderMenuImportActivityPanel(progress);
     updateExtractionActionButtons(progress);
 
     list.innerHTML = "";
@@ -27038,30 +27263,36 @@ function renderExtractionProgress(progress) {
         }
     });
 
-    if (!progress.active && progress.status === "complete") {
+    if (!progress.active && progress.status === "complete" && !progress.defer_refresh) {
         scheduleExtractionAutoClose(progress.job_id);
         scheduleExtractionRefresh(progress.job_id);
     }
 }
 
 function progressStatusText(progress) {
+    const isMenuExtract = progress.extraction_mode === "menu_extract";
+    const activity = isMenuExtract && progress.menu_activity ? progress.menu_activity : null;
+
     if (!progress.active && progress.status === "complete") {
-        return "Extraction complete.";
+        return isMenuExtract ? "Menu import complete." : "Extraction complete.";
     }
 
     if (!progress.active && progress.status === "failed") {
-        return "Extraction finished with errors.";
+        return isMenuExtract ? "Menu import finished with errors." : "Extraction finished with errors.";
     }
 
     if (!progress.active && progress.status === "cancelled") {
-        return "Extraction cancelled.";
+        return isMenuExtract ? "Menu import cancelled." : "Extraction cancelled.";
     }
 
     const total = progress.total || 0;
-    const isMenuExtract = progress.extraction_mode === "menu_extract";
 
     if (!total) {
         return "Starting...";
+    }
+
+    if (activity && (activity.stage || activity.job_label)) {
+        return [activity.job_label, activity.stage].filter(Boolean).join(": ");
     }
 
     const completed = (progress.urls || []).filter(item => {
