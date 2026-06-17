@@ -421,7 +421,7 @@ class ProductSelectionServiceTest(unittest.TestCase):
         self.assertIn('data-cookbook-view-panel="recipes"', cookbook_template)
         self.assertIn('data-cookbook-view-panel="menu"', cookbook_template)
         self.assertIn("Delete cookbook, keep recipes", cookbook_template)
-        self.assertIn("Delete cookbook and purge recipes", cookbook_template)
+        self.assertIn("Delete and purge all recipes in cookbook", cookbook_template)
         self.assertIn("Purge all unclassified recipes", cookbook_template)
         self.assertIn("purgeUnclassifiedCookbookRecipes(this)", cookbook_template)
         self.assertIn("data-cookbook-card", cookbook_template)

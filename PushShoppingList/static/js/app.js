@@ -9111,7 +9111,7 @@ async function deleteCookbook(button, options = {}) {
         setCookbookStatus(err.message || (purgeRecipes ? "Unable to purge cookbook." : "Unable to delete cookbook."), true);
     } finally {
         button.disabled = false;
-        button.textContent = originalText || "X";
+        button.textContent = originalText || (purgeRecipes ? "Delete and purge all recipes in cookbook" : "Delete cookbook, keep recipes");
     }
 
     return false;
