@@ -117,7 +117,7 @@ def test_cartana_menu_payload_extracts_sections_items_and_prices():
 
     sections = recipe_extract_service.parse_cartana_menu_sections(
         payload,
-        "https://example.com/menu_home.action?resInput=RES1",
+        "https://example.com/rs/menu_home.action?resInput=RES1",
     )
     items = recipe_extract_service.flatten_menu_sections(sections)
 
@@ -127,6 +127,11 @@ def test_cartana_menu_payload_extracts_sections_items_and_prices():
     assert items[0]["menu_section"] == "Kitchen Appetizers"
     assert items[0]["description"] == "2 veggie golden crispy rolls."
     assert items[0]["price"] == "$5.99"
+    assert items[0]["menu_order_url"] == (
+        "https://example.com/rs/menuItem_home.action?"
+        "resInput=RES1&menuIdInput=MEN1&menuItemIdInput=MIT1&orderType=null"
+    )
+    assert items[0]["deep_link_url"] == items[0]["menu_order_url"]
 
 
 def test_mega_menu_json_snapshot_builds_saves_and_unpacks(tmp_path, monkeypatch):
@@ -143,6 +148,10 @@ def test_mega_menu_json_snapshot_builds_saves_and_unpacks(tmp_path, monkeypatch)
                     "price": "$5.99",
                     "menu_item_id": "MIT1",
                     "menu_id": "MEN1",
+                    "menu_order_url": (
+                        "https://www.velasiancuisine.com/rs/menuItem_home.action?"
+                        "resInput=RES4902&menuIdInput=MEN1&menuItemIdInput=MIT1&orderType=null"
+                    ),
                     "is_veggie": True,
                 }
             ],
@@ -199,6 +208,10 @@ def test_mega_menu_json_snapshot_builds_saves_and_unpacks(tmp_path, monkeypatch)
     assert loaded["duplicate_count"] == 0
     assert unpacked[0]["items"][0]["parent_menu_snapshot_id"] == loaded["id"]
     assert unpacked[0]["items"][0]["price"] == "$5.99"
+    assert unpacked[0]["items"][0]["menu_order_url"] == (
+        "https://www.velasiancuisine.com/rs/menuItem_home.action?"
+        "resInput=RES4902&menuIdInput=MEN1&menuItemIdInput=MIT1&orderType=null"
+    )
     assert unpacked[0]["items"][0]["restaurant_address"] == "912 LOVELAND MADEIRA RD, LOVELAND, OH 45140"
     assert unpacked[0]["items"][0]["restaurant_website_url"] == "https://www.velasiancuisine.com"
     assert unpacked[0]["items"][0]["restaurant_delivery_available"] is True
@@ -206,6 +219,7 @@ def test_mega_menu_json_snapshot_builds_saves_and_unpacks(tmp_path, monkeypatch)
     assert stub["restaurant_address"] == "912 LOVELAND MADEIRA RD, LOVELAND, OH 45140"
     assert stub["restaurant_website_url"] == "https://www.velasiancuisine.com"
     assert stub["restaurant_delivery_available"] is True
+    assert stub["menu_order_url"] == unpacked[0]["items"][0]["menu_order_url"]
     assert stub["source_metadata"]["restaurant_address"] == "912 LOVELAND MADEIRA RD, LOVELAND, OH 45140"
 
     loaded["menu_mega_json"]["menu"]["sections"][0]["items"][0].update({
@@ -338,6 +352,8 @@ def test_menu_item_result_preserves_original_menu_url_and_unique_record_url(monk
                     "description": "Chicken with basil sauce.",
                     "price": "$13.99",
                     "source_url": source_url,
+                    "menu_id": "MEN1",
+                    "menu_item_id": "MIT1",
                 }
             ],
         }
@@ -388,6 +404,11 @@ def test_menu_item_result_preserves_original_menu_url_and_unique_record_url(monk
     assert saved[0][1]["recipe_record_url"].startswith(source_url + "&menu_item=")
     assert saved[0][1]["menu_description"] == "Chicken with basil sauce."
     assert saved[0][1]["menu_price"] == "$13.99"
+    assert saved[0][1]["menu_order_url"] == (
+        "https://example.com/menuItem_home.action?"
+        "resInput=RES1&menuIdInput=MEN1&menuItemIdInput=MIT1&orderType=null"
+    )
+    assert result["recipes"][0]["menu_order_url"] == saved[0][1]["menu_order_url"]
 
 
 def test_menu_item_parallel_inference_preserves_original_menu_order(monkeypatch, tmp_path):
@@ -553,6 +574,7 @@ def test_menu_stub_result_is_deterministic_without_openai(monkeypatch, tmp_path)
                     "description": "Chicken with basil sauce.",
                     "price": "$13.99",
                     "source_url": source_url,
+                    "menu_id": "MEN1",
                     "menu_item_id": "MIT1",
                 }
             ],
@@ -592,6 +614,10 @@ def test_menu_stub_result_is_deterministic_without_openai(monkeypatch, tmp_path)
     assert result["recipes"][0]["pdf_generation"]["status"] == "not_generated"
     assert saved[0][1]["source_menu_url"] == source_url
     assert saved[0][1]["menu_item_id"] == "MIT1"
+    assert saved[0][1]["menu_order_url"] == (
+        "https://example.com/menuItem_home.action?"
+        "resInput=RES1&menuIdInput=MEN1&menuItemIdInput=MIT1&orderType=null"
+    )
 
 
 def test_menu_stub_import_skips_blank_divider_items(monkeypatch, tmp_path):

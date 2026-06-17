@@ -82,8 +82,10 @@ Rules:
 - Extract menu sections and menu item names.
 - Preserve source menu descriptions only when present.
 - Preserve source menu prices only when present.
+- Preserve item order URLs only when present.
 - Do not invent missing descriptions.
 - Do not invent missing prices.
+- Do not invent item order URLs.
 - Use null for missing prices and descriptions.
 
 Return this JSON shape:
@@ -118,6 +120,7 @@ Return this JSON shape:
           "item_name": "string",
           "menu_price": "$9.99 or null",
           "menu_description": "string or null",
+          "menu_order_url": "https://example.com/order-item or null",
           "dietary_tags": [],
           "spice_level": "none",
           "chef_recommended": false,
@@ -210,6 +213,12 @@ def parse_menu_fact_response(response_text):
                 "menu_description": clean_recipe_text(
                     item.get("menu_description")
                     or item.get("description")
+                    or ""
+                ) or None,
+                "menu_order_url": clean_recipe_text(
+                    item.get("menu_order_url")
+                    or item.get("deep_link_url")
+                    or item.get("item_url")
                     or ""
                 ) or None,
                 "dietary_tags": item.get("dietary_tags") if isinstance(item.get("dietary_tags"), list) else [],
@@ -332,6 +341,12 @@ def sections_to_fact_payload(sections):
                 "chef_recommended": bool(item.get("chef_recommended")),
                 "display_order": display_order,
                 "source_type": "imported",
+                "menu_order_url": clean_recipe_text(
+                    item.get("menu_order_url")
+                    or item.get("deep_link_url")
+                    or item.get("item_url")
+                    or ""
+                ) or None,
                 "is_spicy": bool(item.get("is_spicy")),
                 "is_veggie": bool(item.get("is_veggie")),
             })

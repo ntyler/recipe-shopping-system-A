@@ -36,6 +36,7 @@ def sample_menu_facts(source_url="https://example.com/menu"):
                         "item_name": "Spring Roll",
                         "menu_price": "$5.99",
                         "menu_description": "2 veggie golden crispy rolls.",
+                        "menu_order_url": "https://example.com/order/spring-roll",
                         "dietary_tags": ["Vegetarian"],
                     },
                     {
@@ -68,6 +69,7 @@ def test_menu_store_persists_preview_entities_without_recipes(monkeypatch, tmp_p
     assert "recipes" not in store
     assert store["items"][1]["menu_price"] is None
     assert store["items"][1]["menu_description"] is None
+    assert store["items"][0]["menu_order_url"] == "https://example.com/order/spring-roll"
 
 
 def test_menu_reimport_same_source_updates_without_duplicate_records(monkeypatch, tmp_path):
@@ -104,6 +106,7 @@ def test_selected_menu_items_keep_restaurant_menu_section_and_item_ids(monkeypat
     assert item["menu_item_id"] == selected_item["id"]
     assert item["description"] == "2 veggie golden crispy rolls."
     assert item["price"] == "$5.99"
+    assert item["menu_order_url"] == "https://example.com/order/spring-roll"
 
 
 def test_menu_fact_url_extraction_uses_cartana_payload_without_recipe_generation(monkeypatch):
@@ -141,6 +144,10 @@ def test_menu_fact_url_extraction_uses_cartana_payload_without_recipe_generation
     assert result["menu_items_found"] == 1
     assert result["sections"][0]["items"][0]["item_name"] == "Spring Roll"
     assert result["sections"][0]["items"][0]["menu_price"] == "$5.99"
+    assert result["sections"][0]["items"][0]["menu_order_url"] == (
+        "https://example.com/rs/menuItem_home.action?"
+        "resInput=RES1&menuIdInput=MEN1&menuItemIdInput=MIT1&orderType=null"
+    )
     assert "recipes" not in result
 
 

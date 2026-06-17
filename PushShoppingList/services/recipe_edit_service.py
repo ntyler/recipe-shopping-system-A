@@ -183,6 +183,7 @@ RESTAURANT_MENU_METADATA_FIELDS = (
     "restaurant_delivery_available",
     "menu_section",
     "menu_item_name",
+    "menu_order_url",
     "menu_price",
     "menu_description",
 )
@@ -384,9 +385,13 @@ def recipe_menu_source_url_candidates(recipe_data):
         recipe_data.get("recipe_record_url"),
         recipe_data.get("url"),
         recipe_data.get("source_display_url"),
+        recipe_data.get("menu_order_url"),
+        recipe_data.get("deep_link_url"),
         metadata.get("recipe_record_url"),
         metadata.get("source_url"),
         metadata.get("source_display_url"),
+        metadata.get("menu_order_url"),
+        metadata.get("deep_link_url"),
     ]
     return [clean_recipe_menu_text(value) for value in candidates if clean_recipe_menu_text(value)]
 
@@ -397,7 +402,8 @@ def recipe_menu_item_token_from_url(url):
     except ValueError:
         return ""
 
-    values = parse_qs(parsed.query or "").get("menu_item") or []
+    query = parse_qs(parsed.query or "")
+    values = query.get("menu_item") or query.get("menuItemIdInput") or []
     return clean_recipe_menu_text(values[0]) if values else ""
 
 
@@ -408,6 +414,21 @@ def recipe_menu_source_url_from_item_url(url):
         return ""
 
     query_pairs = parse_qsl(parsed.query or "", keep_blank_values=True)
+    if parsed.path.endswith("menuItem_home.action"):
+        query = dict(query_pairs)
+        res_input = clean_recipe_menu_text(query.get("resInput"))
+        if not res_input:
+            return ""
+        base_path = parsed.path.rsplit("/", 1)[0] + "/menu_home.action"
+        return urlunparse((
+            parsed.scheme,
+            parsed.netloc,
+            base_path,
+            "",
+            urlencode({"resInput": res_input}),
+            "",
+        ))
+
     if not any(key == "menu_item" for key, _value in query_pairs):
         return ""
 
@@ -495,6 +516,11 @@ def menu_store_item_source_url_keys(item):
     item = item if isinstance(item, dict) else {}
     keys = set()
     for value in (item.get("recipe_url"), item.get("recipe_id"), item.get("url")):
+        source_menu_url = recipe_menu_source_url_from_item_url(value)
+        key = normalize_recipe_url_key(source_menu_url)
+        if key:
+            keys.add(key)
+    for value in (item.get("menu_order_url"), item.get("deep_link_url")):
         source_menu_url = recipe_menu_source_url_from_item_url(value)
         key = normalize_recipe_url_key(source_menu_url)
         if key:
@@ -620,6 +646,52 @@ def recipe_menu_snapshot_restaurant_fields(recipe_data):
     }
 
 
+def recipe_menu_snapshot_item_fields(recipe_data):
+    snapshot = load_recipe_menu_snapshot(recipe_data)
+    mega_json = snapshot.get("menu_mega_json") if isinstance(snapshot.get("menu_mega_json"), dict) else {}
+    menu = mega_json.get("menu") if isinstance(mega_json.get("menu"), dict) else {}
+    sections = menu.get("sections") if isinstance(menu.get("sections"), list) else []
+    item_id = recipe_menu_relation_value(recipe_data, "menu_item_id")
+    item_name_candidates = recipe_menu_item_name_candidates(recipe_data)
+    section_candidates = recipe_menu_section_candidates(recipe_data)
+    name_matches = []
+
+    for section in sections:
+        if not isinstance(section, dict):
+            continue
+        section_name = clean_recipe_menu_text(section.get("section_name") or "")
+        for item in (section.get("items") if isinstance(section.get("items"), list) else []):
+            if not isinstance(item, dict):
+                continue
+            metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+            current_item_id = first_recipe_menu_text(item.get("menu_item_id"), metadata.get("menu_item_id"))
+            item_name = recipe_menu_match_text(item.get("name") or item.get("item_name"))
+            item_section = recipe_menu_match_text(section_name)
+            item_fields = {
+                "menu_section": section_name,
+                "menu_item_name": first_recipe_menu_text(item.get("name"), item.get("item_name")),
+                "menu_order_url": first_recipe_menu_text(item.get("menu_order_url"), item.get("deep_link_url")),
+                "menu_price": first_recipe_menu_text(item.get("price_text"), item.get("price")),
+                "menu_description": first_recipe_menu_text(item.get("description"), item.get("menu_description")),
+            }
+
+            if item_id and current_item_id == item_id:
+                return item_fields
+
+            if item_name_candidates and item_name in item_name_candidates:
+                name_matches.append((item_section, item_fields))
+
+    if len(name_matches) == 1:
+        return name_matches[0][1]
+
+    if name_matches and section_candidates:
+        for item_section, item_fields in name_matches:
+            if item_section in section_candidates:
+                return item_fields
+
+    return {}
+
+
 def find_recipe_menu_item_by_url(payload, recipe_data):
     payload = payload if isinstance(payload, dict) else {}
     candidates = recipe_menu_source_url_candidates(recipe_data)
@@ -646,6 +718,8 @@ def find_recipe_menu_item_by_url(payload, recipe_data):
             item.get("recipe_url"),
             item.get("recipe_id"),
             item.get("url"),
+            item.get("menu_order_url"),
+            item.get("deep_link_url"),
         ]
         if any(normalize_recipe_url_key(value) in candidate_keys for value in item_urls if value):
             return item
@@ -829,6 +903,7 @@ def editable_recipe_menu_metadata(recipe_data):
     section = records.get("section", {})
     item = records.get("item", {})
     snapshot_fields = recipe_menu_snapshot_restaurant_fields(recipe_data)
+    snapshot_item_fields = recipe_menu_snapshot_item_fields(recipe_data)
     source_menu_url = first_recipe_menu_text(
         recipe_data.get("source_menu_url"),
         recipe_data.get("menu_source_url"),
@@ -908,23 +983,36 @@ def editable_recipe_menu_metadata(recipe_data):
             metadata.get("menu_section"),
             section.get("section_name"),
             item.get("menu_section"),
+            snapshot_item_fields.get("menu_section"),
         ),
         "menu_item_name": first_recipe_menu_text(
             recipe_data.get("menu_item_name"),
             metadata.get("menu_item_name"),
             item.get("item_name"),
+            snapshot_item_fields.get("menu_item_name"),
+        ),
+        "menu_order_url": first_recipe_menu_text(
+            recipe_data.get("menu_order_url"),
+            recipe_data.get("deep_link_url"),
+            metadata.get("menu_order_url"),
+            metadata.get("deep_link_url"),
+            item.get("menu_order_url"),
+            item.get("deep_link_url"),
+            snapshot_item_fields.get("menu_order_url"),
         ),
         "menu_price": first_recipe_menu_text(
             recipe_data.get("menu_price"),
             metadata.get("menu_price"),
             metadata.get("price"),
             item.get("menu_price"),
+            snapshot_item_fields.get("menu_price"),
         ),
         "menu_description": first_recipe_menu_text(
             recipe_data.get("menu_description"),
             metadata.get("menu_description"),
             metadata.get("description"),
             item.get("menu_description"),
+            snapshot_item_fields.get("menu_description"),
         ),
     }
     has_metadata = recipe_has_menu_metadata({**recipe_data, **fields})
@@ -1033,6 +1121,7 @@ def apply_recipe_menu_metadata_to_store(recipe_data, payload):
             item_field_map = {
                 "menu_section": "menu_section",
                 "menu_item_name": "item_name",
+                "menu_order_url": "menu_order_url",
                 "menu_price": "menu_price",
                 "menu_description": "menu_description",
             }
@@ -1085,7 +1174,7 @@ def apply_recipe_menu_metadata_payload(recipe_data, payload):
     if has_normalized_link:
         apply_recipe_menu_metadata_to_store(recipe_data, payload)
 
-    for field in ("menu_section", "menu_item_name", "menu_price", "menu_description", "source_menu_url"):
+    for field in ("menu_section", "menu_item_name", "menu_order_url", "menu_price", "menu_description", "source_menu_url"):
         if field in payload:
             recipe_data[field] = clean_recipe_menu_text(payload.get(field))
 
@@ -1101,6 +1190,8 @@ def apply_recipe_menu_metadata_payload(recipe_data, payload):
 
     if recipe_data.get("source_menu_url") and not recipe_data.get("menu_source_url"):
         recipe_data["menu_source_url"] = recipe_data["source_menu_url"]
+    if recipe_data.get("menu_order_url") and not recipe_data.get("deep_link_url"):
+        recipe_data["deep_link_url"] = recipe_data["menu_order_url"]
 
     return recipe_data
 

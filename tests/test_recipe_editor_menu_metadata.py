@@ -60,6 +60,7 @@ def seed_menu_derived_recipe():
                 "item_name": "Spring Roll",
                 "menu_price": "$5.99",
                 "menu_description": "Two veggie golden crispy rolls.",
+                "menu_order_url": "https://velasian.example/order/spring-roll",
             }],
         }],
     })
@@ -73,6 +74,7 @@ def seed_menu_derived_recipe():
         "source_url": url,
         "source_type": "menu_item_inferred",
         "ai_inferred": True,
+        "menu_order_url": "https://velasian.example/order/spring-roll",
         "restaurant_id": restaurant["id"],
         "menu_id": menu["id"],
         "menu_section_id": section["id"],
@@ -101,6 +103,7 @@ def seed_menu_recipe_url_match():
                 "item_name": "Spring Roll",
                 "menu_price": "$18.95",
                 "menu_description": "Featuring wheat spring roll wrappers, cellophane noodles, carrot.",
+                "menu_order_url": "https://velasian.example/order/spring-roll",
                 "recipe_url": url,
             }],
         }],
@@ -147,6 +150,7 @@ def empty_menu_metadata_payload():
         "restaurant_delivery_available": "",
         "menu_section": "",
         "menu_item_name": "",
+        "menu_order_url": "",
         "menu_price": "",
         "menu_description": "",
     }
@@ -167,6 +171,8 @@ def test_recipe_editor_menu_metadata_panels_are_wired_before_amount():
     assert "Menu Item Details" in template
     assert 'id="recipeEditRestaurantWebsiteUrlLink"' in template
     assert 'id="recipeEditSourceMenuUrlLink"' in template
+    assert 'id="recipeEditMenuOrderUrlLink"' in template
+    assert 'id="recipeEditMenuOrderUrl"' in template
     assert '<textarea id="recipeEditMenuDescription" rows="3">' in template
     assert "panel.hidden = !showPanels;" in js
     assert "function recipeMenuMetadataPanelsVisible()" in js
@@ -322,6 +328,7 @@ def test_menu_derived_recipe_loads_restaurant_and_menu_item_metadata(monkeypatch
     assert loaded["restaurant_delivery_available"] == "true"
     assert loaded["menu_section"] == "Kitchen Appetizers"
     assert loaded["menu_item_name"] == "Spring Roll"
+    assert loaded["menu_order_url"] == "https://velasian.example/order/spring-roll"
     assert loaded["menu_price"] == "$5.99"
     assert loaded["menu_description"] == "Two veggie golden crispy rolls."
 
@@ -365,6 +372,7 @@ def test_menu_metadata_resolves_from_menu_item_url_when_recipe_json_has_only_pdf
     assert loaded["source_menu_url"] == "https://velasian.example/menu?resInput=RES4902"
     assert loaded["menu_section"] == "Vegetarian"
     assert loaded["menu_item_name"] == "Spring Roll"
+    assert loaded["menu_order_url"] == "https://velasian.example/order/spring-roll"
     assert loaded["menu_price"] == "$18.95"
     assert loaded["menu_description"] == "Featuring wheat spring roll wrappers, cellophane noodles, carrot."
 
@@ -383,6 +391,10 @@ def test_menu_metadata_loads_restaurant_fields_from_menu_mega_snapshot(monkeypat
                 "price": "$5.99",
                 "menu_item_id": "MIT354155",
                 "menu_id": "MEN25930",
+                "menu_order_url": (
+                    "https://www.velasiancuisine.com/rs/menuItem_home.action?"
+                    "resInput=RES4902&menuIdInput=MEN25930&menuItemIdInput=MIT354155&orderType=null"
+                ),
             }],
         }],
         extracted_text="Vel Asian Cuisine Spring Roll $5.99",
@@ -418,6 +430,7 @@ def test_menu_metadata_loads_restaurant_fields_from_menu_mega_snapshot(monkeypat
         "restaurant_promotions": "",
         "menu_section": "Kitchen Appetizers",
         "menu_item_name": "Spring Roll",
+        "menu_order_url": "",
         "menu_price": "$5.99",
         "menu_description": "Two veggie golden crispy rolls.",
     })
@@ -434,6 +447,10 @@ def test_menu_metadata_loads_restaurant_fields_from_menu_mega_snapshot(monkeypat
     assert loaded["restaurant_promotions"] == "Rewards available"
     assert loaded["restaurant_online_payment_available"] == "false"
     assert loaded["restaurant_delivery_available"] == "true"
+    assert loaded["menu_order_url"] == (
+        "https://www.velasiancuisine.com/rs/menuItem_home.action?"
+        "resInput=RES4902&menuIdInput=MEN25930&menuItemIdInput=MIT354155&orderType=null"
+    )
 
 
 def test_menu_metadata_matches_menu_store_by_base_url_and_preserves_recipe_item_fields(monkeypatch, tmp_path):
@@ -454,6 +471,10 @@ def test_menu_metadata_matches_menu_store_by_base_url_and_preserves_recipe_item_
                 "item_name": "Spring Roll",
                 "menu_price": "$18.95",
                 "menu_description": "Featuring wheat spring roll wrappers, cellophane noodles, carrot.",
+                "menu_order_url": (
+                    "https://www.velasiancuisine.com/rs/menuItem_home.action?"
+                    "resInput=RES4902&menuIdInput=MEN25930&menuItemIdInput=MIT354155&orderType=null"
+                ),
                 "recipe_url": (
                     f"{source_url}&menu_item=menu-item-1-"
                     "AI-Inferred_Crispy_Vegetable_Spring_Rolls"
@@ -500,6 +521,7 @@ def test_url_matched_menu_metadata_save_updates_menu_store(monkeypatch, tmp_path
             url,
             menu_section="Small Plates",
             menu_item_name="Spring Roll",
+            menu_order_url="https://velasian.example/order/spring-roll-updated",
             menu_price="$19.49",
             menu_description="Updated spring roll description.",
         ),
@@ -509,9 +531,11 @@ def test_url_matched_menu_metadata_save_updates_menu_store(monkeypatch, tmp_path
 
     assert result["ok"] is True
     assert item["menu_section"] == "Small Plates"
+    assert item["menu_order_url"] == "https://velasian.example/order/spring-roll-updated"
     assert item["menu_price"] == "$19.49"
     assert item["menu_description"] == "Updated spring roll description."
     assert saved["menu_price"] == "$19.49"
+    assert saved["menu_order_url"] == "https://velasian.example/order/spring-roll-updated"
     assert saved["menu_description"] == "Updated spring roll description."
 
 
@@ -539,6 +563,7 @@ def test_saving_menu_derived_recipe_persists_metadata_updates(monkeypatch, tmp_p
             restaurant_delivery_available="true",
             menu_section="Starters",
             menu_item_name="Spring Roll",
+            menu_order_url="https://velasian.example/order/spring-roll-updated",
             menu_price="$6.49",
             menu_description="Updated crispy veggie rolls.",
         ),
@@ -561,12 +586,15 @@ def test_saving_menu_derived_recipe_persists_metadata_updates(monkeypatch, tmp_p
     assert restaurant["delivery_available"] is True
     assert menu["source_url"] == "https://velasian.example/current-menu"
     assert item["menu_section"] == "Starters"
+    assert item["menu_order_url"] == "https://velasian.example/order/spring-roll-updated"
     assert item["menu_price"] == "$6.49"
     assert item["menu_description"] == "Updated crispy veggie rolls."
     assert saved["source_menu_url"] == "https://velasian.example/current-menu"
+    assert saved["menu_order_url"] == "https://velasian.example/order/spring-roll-updated"
     assert saved["menu_price"] == "$6.49"
     assert saved["menu_description"] == "Updated crispy veggie rolls."
     assert loaded["restaurant_name"] == "Vel Asian Kitchen"
+    assert loaded["menu_order_url"] == "https://velasian.example/order/spring-roll-updated"
     assert loaded["menu_price"] == "$6.49"
 
 
@@ -593,6 +621,7 @@ def test_generated_recipe_pdf_includes_menu_metadata_for_menu_recipes(monkeypatc
     assert "Vel Asian Cuisine" in html
     assert "https://velasian.example" in html
     assert "https://velasian.example/menu" in html
+    assert "https://velasian.example/order/spring-roll" in html
     assert "Kitchen Appetizers" in html
     assert "$5.99" in html
     assert "Two veggie golden crispy rolls." in html

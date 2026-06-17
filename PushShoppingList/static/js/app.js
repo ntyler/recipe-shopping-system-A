@@ -14729,12 +14729,14 @@ const RECIPE_EDIT_MENU_METADATA_INPUT_IDS = {
     restaurant_delivery_available: "recipeEditRestaurantDeliveryAvailable",
     menu_section: "recipeEditMenuSection",
     menu_item_name: "recipeEditMenuItemName",
+    menu_order_url: "recipeEditMenuOrderUrl",
     menu_price: "recipeEditMenuPrice",
     menu_description: "recipeEditMenuDescription",
 };
 const RECIPE_EDIT_MENU_METADATA_URL_LINKS = [
     ["recipeEditRestaurantWebsiteUrl", "recipeEditRestaurantWebsiteUrlLink"],
     ["recipeEditSourceMenuUrl", "recipeEditSourceMenuUrlLink"],
+    ["recipeEditMenuOrderUrl", "recipeEditMenuOrderUrlLink"],
 ];
 
 async function fetchRecipeEditorData(url) {
@@ -20824,6 +20826,7 @@ function buildRecipeSaveProgressItems(recipe) {
         ["Source menu URL", "source_menu_url"],
         ["Menu section", "menu_section"],
         ["Menu item name", "menu_item_name"],
+        ["Menu order URL", "menu_order_url"],
         ["Menu price", "menu_price"],
         ["Menu description", "menu_description"],
     ].forEach(([label, key]) => {

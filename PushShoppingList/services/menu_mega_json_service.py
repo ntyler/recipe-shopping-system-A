@@ -89,14 +89,47 @@ def absolute_url(base_url, value):
     return urljoin(str(base_url or ""), text)
 
 
+def cartana_menu_item_order_url(source_url, menu_id="", menu_item_id=""):
+    menu_id = clean_text(menu_id)
+    menu_item_id = clean_text(menu_item_id)
+    if not menu_id or not menu_item_id:
+        return ""
+
+    parsed = urlparse(str(source_url or ""))
+    if not parsed.scheme or not parsed.netloc or not parsed.path.endswith("menu_home.action"):
+        return ""
+
+    res_input = ""
+    for key, value in parse_qsl(parsed.query, keep_blank_values=True):
+        if key == "resInput" and value:
+            res_input = value
+            break
+    if not res_input:
+        return ""
+
+    base_path = parsed.path.rsplit("/", 1)[0] + "/"
+    item_path = urljoin(base_path, "menuItem_home.action")
+    query = urlencode({
+        "resInput": res_input,
+        "menuIdInput": menu_id,
+        "menuItemIdInput": menu_item_id,
+        "orderType": "null",
+    })
+    return urlunparse((parsed.scheme, parsed.netloc, item_path, "", query, ""))
+
+
 def item_deep_link(source_url, item, menu_item_id):
     item = item if isinstance(item, dict) else {}
-    explicit = clean_text(item.get("deep_link_url") or item.get("item_url") or item.get("url"))
+    explicit = clean_text(item.get("menu_order_url") or item.get("deep_link_url") or item.get("item_url") or item.get("url"))
     if explicit:
         return absolute_url(source_url, explicit)
 
     if not menu_item_id:
         return ""
+
+    order_url = cartana_menu_item_order_url(source_url, item.get("menu_id"), menu_item_id)
+    if order_url:
+        return order_url
 
     parsed = urlparse(str(source_url or ""))
     if not parsed.scheme or not parsed.netloc:
@@ -415,6 +448,7 @@ def build_mega_menu_json(
             elif duplicate_key.strip("|"):
                 duplicate_keys.add(duplicate_key)
             item_count += 1
+            deep_link_url = item_deep_link(source_url, item, menu_item_id)
 
             canonical_item = {
                 "menu_item_id": menu_item_id,
@@ -426,7 +460,8 @@ def build_mega_menu_json(
                 "price": price_number(price_text),
                 "price_text": price_text,
                 "currency": clean_text(item.get("currency") or "USD") or "USD",
-                "deep_link_url": item_deep_link(source_url, item, menu_item_id),
+                "deep_link_url": deep_link_url,
+                "menu_order_url": deep_link_url,
                 "image_url": absolute_url(source_url, item.get("image_url") or item.get("image") or ""),
                 "tags": normalize_tags(item),
                 "options": normalize_list(item.get("options")),
@@ -866,6 +901,7 @@ def unpack_mega_menu_json_to_sections(mega_json, snapshot_id=""):
                 "currency": clean_text(item.get("currency") or "USD") or "USD",
                 "source_url": source_url,
                 "deep_link_url": clean_text(item.get("deep_link_url") or ""),
+                "menu_order_url": clean_text(item.get("menu_order_url") or item.get("deep_link_url") or ""),
                 "image_url": clean_text(item.get("image_url") or ""),
                 "menu_item_id": clean_text(item.get("menu_item_id") or ""),
                 "menu_id": clean_text(menu.get("menu_id") or metadata.get("menu_id") or ""),

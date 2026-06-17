@@ -26,6 +26,7 @@ from typing import Optional
 from urllib.parse import quote
 from urllib.parse import parse_qs
 from urllib.parse import unquote
+from urllib.parse import urlencode
 from urllib.parse import urljoin
 from urllib.parse import urlparse
 from urllib.parse import urlunparse
@@ -5528,6 +5529,7 @@ def recipe_has_menu_metadata_for_pdf(recipe_data):
         "restaurant_promotions",
         "menu_section",
         "menu_item_name",
+        "menu_order_url",
         "menu_price",
         "menu_description",
     )
@@ -5586,6 +5588,10 @@ def format_recipe_menu_metadata_for_pdf(recipe_data):
     menu_item_rows = [
         ("Menu Section", recipe_data.get("menu_section")),
         ("Menu Item Name", recipe_data.get("menu_item_name")),
+        ("Menu Order URL", first_recipe_pdf_metadata_text(
+            recipe_data.get("menu_order_url"),
+            recipe_data.get("deep_link_url"),
+        )),
         ("Menu Price", recipe_data.get("menu_price")),
         ("Menu Description", recipe_data.get("menu_description")),
     ]
@@ -9621,6 +9627,35 @@ def cartana_menu_api_url(menu_url):
     ))
 
 
+def cartana_menu_item_order_url(menu_url, menu_id="", menu_item_id=""):
+    menu_id = clean_recipe_text(menu_id)
+    menu_item_id = clean_recipe_text(menu_item_id)
+    restaurant_id = extract_cartana_restaurant_id(menu_url)
+    if not restaurant_id or not menu_id or not menu_item_id:
+        return ""
+
+    parsed = urlparse(str(menu_url or ""))
+    if not parsed.scheme or not parsed.netloc or not parsed.path.endswith("menu_home.action"):
+        return ""
+
+    base_path = parsed.path.rsplit("/", 1)[0] + "/"
+    item_path = urljoin(base_path, "menuItem_home.action")
+    query = urlencode({
+        "resInput": restaurant_id,
+        "menuIdInput": menu_id,
+        "menuItemIdInput": menu_item_id,
+        "orderType": "null",
+    })
+    return urlunparse((
+        parsed.scheme,
+        parsed.netloc,
+        item_path,
+        "",
+        query,
+        "",
+    ))
+
+
 def fetch_cartana_menu_payload(menu_url, html_text="", cancellation_check=None):
     run_cancellation_check(cancellation_check)
     restaurant_id = extract_cartana_restaurant_id(menu_url, html_text)
@@ -9695,6 +9730,11 @@ def parse_cartana_menu_sections(payload, source_url):
             or menu_data.get("menuText")
             or ""
         )
+        menu_id = clean_recipe_text(
+            section.get("menu", {}).get("menuId")
+            if isinstance(section.get("menu"), dict)
+            else ""
+        )
         items = []
 
         for item_index, item in enumerate(section.get("itemList") or []):
@@ -9719,6 +9759,8 @@ def parse_cartana_menu_sections(payload, source_url):
                 or ""
             )
             price = clean_menu_price(item.get("price") or item_data.get("price"))
+            menu_item_id = clean_recipe_text(item.get("menuItemId") or "")
+            menu_order_url = cartana_menu_item_order_url(source_url, menu_id, menu_item_id)
             items.append({
                 "item_name": item_name,
                 "menu_section": section_name,
@@ -9726,8 +9768,10 @@ def parse_cartana_menu_sections(payload, source_url):
                 "description": description,
                 "price": price,
                 "source_url": source_url,
-                "menu_item_id": clean_recipe_text(item.get("menuItemId") or ""),
-                "menu_id": clean_recipe_text(section.get("menu", {}).get("menuId") if isinstance(section.get("menu"), dict) else ""),
+                "menu_item_id": menu_item_id,
+                "menu_id": menu_id,
+                "menu_order_url": menu_order_url,
+                "deep_link_url": menu_order_url,
                 "is_spicy": bool(item.get("isSpicy")),
                 "is_veggie": bool(item.get("isVeggie")),
                 "index": item_index,
@@ -10015,7 +10059,8 @@ def menu_batch_item_from_stub(recipe_url, stub, fallback_index=0):
     item["source_menu_url"] = (
         str(stub.get("source_menu_url") or stub.get("menu_source_url") or item.get("source_url") or "").strip()
     )
-    item["deep_link_url"] = str(stub.get("deep_link_url") or "").strip()
+    item["menu_order_url"] = str(stub.get("menu_order_url") or item.get("menu_order_url") or "").strip()
+    item["deep_link_url"] = str(stub.get("deep_link_url") or item.get("deep_link_url") or item["menu_order_url"] or "").strip()
     return item
 
 
@@ -10025,6 +10070,7 @@ def compact_menu_batch_item(item):
         "menu_item_id": clean_recipe_text(item.get("menu_item_id") or ""),
         "recipe_url": str(item.get("recipe_url") or "").strip(),
         "source_menu_url": str(item.get("source_menu_url") or item.get("source_url") or "").strip(),
+        "menu_order_url": str(item.get("menu_order_url") or item.get("deep_link_url") or "").strip(),
         "deep_link_url": str(item.get("deep_link_url") or "").strip(),
         "section": clean_recipe_text(item.get("menu_section") or ""),
         "name": clean_recipe_text(item.get("item_name") or ""),
@@ -10321,7 +10367,15 @@ def normalize_menu_item_recipe(recipe, menu_url, section_name, item_name, index,
     recipe["source_type"] = "menu_item_inferred"
     recipe["ai_inferred"] = True
     recipe["menu_source_url"] = str(menu_url or "").strip()
-    recipe["source_display_url"] = str(menu_url or "").strip()
+    menu_order_url = clean_recipe_text(recipe.get("menu_order_url") or recipe.get("deep_link_url") or "")
+    recipe["menu_order_url"] = menu_order_url
+    if menu_order_url and not recipe.get("deep_link_url"):
+        recipe["deep_link_url"] = menu_order_url
+    recipe["source_display_url"] = (
+        recipe.get("source_display_url")
+        or menu_order_url
+        or str(menu_url or "").strip()
+    )
     recipe["menu_section"] = clean_recipe_text(section_name)
     recipe["menu_item_name"] = clean_recipe_text(item_name or title)
     recipe["import_source_name"] = clean_recipe_text(source_name)
@@ -10348,11 +10402,29 @@ def attach_menu_item_metadata(recipe, menu_item):
     description = clean_recipe_text(menu_item.get("description") or "")
     price = clean_recipe_text(menu_item.get("price") or "")
     section = clean_recipe_text(menu_item.get("menu_section") or "")
+    menu_order_url = clean_recipe_text(
+        menu_item.get("menu_order_url")
+        or menu_item.get("deep_link_url")
+        or menu_item.get("item_url")
+        or ""
+    )
+    if not menu_order_url:
+        menu_order_url = menu_item_deep_link(
+            menu_item.get("source_url")
+            or menu_item.get("source_menu_url")
+            or recipe.get("source_menu_url")
+            or recipe.get("menu_source_url")
+            or "",
+            menu_item,
+        )
 
     recipe["menu_section"] = recipe.get("menu_section") or section
     recipe["menu_item_name"] = recipe.get("menu_item_name") or clean_recipe_text(menu_item.get("item_name") or "")
     recipe["menu_description"] = description
     recipe["menu_price"] = price
+    if menu_order_url:
+        recipe["menu_order_url"] = recipe.get("menu_order_url") or menu_order_url
+        recipe["deep_link_url"] = recipe.get("deep_link_url") or menu_order_url
     for metadata_field in ("restaurant_id", "menu_id", "menu_section_id", "menu_item_id"):
         metadata_value = clean_recipe_text(menu_item.get(metadata_field) or "")
         if metadata_value:
@@ -10364,6 +10436,8 @@ def attach_menu_item_metadata(recipe, menu_item):
         "menu_item_name": clean_recipe_text(menu_item.get("item_name") or ""),
         "description": description,
         "price": price,
+        "menu_order_url": menu_order_url,
+        "deep_link_url": menu_order_url,
         "menu_item_id": clean_recipe_text(menu_item.get("menu_item_id") or ""),
         "menu_id": clean_recipe_text(menu_item.get("menu_id") or ""),
         "restaurant_id": clean_recipe_text(menu_item.get("restaurant_id") or ""),
@@ -10476,6 +10550,13 @@ def apply_menu_batch_inference_to_stub(recipe_url, stub, menu_item, inference, m
         or ""
     ).strip()
     item_name = clean_recipe_text(menu_item.get("item_name") or stub.get("menu_item_name") or stub.get("recipe_title") or "")
+    menu_order_url = clean_recipe_text(
+        stub.get("menu_order_url")
+        or stub.get("deep_link_url")
+        or menu_item.get("menu_order_url")
+        or menu_item.get("deep_link_url")
+        or ""
+    )
     try:
         item_index = max(0, int(stub.get("display_order") or menu_item.get("display_order") or 1) - 1)
     except (TypeError, ValueError):
@@ -10513,8 +10594,9 @@ def apply_menu_batch_inference_to_stub(recipe_url, stub, menu_item, inference, m
         "recipe_record_url": recipe_url,
         "source_menu_url": source_menu_url,
         "menu_source_url": source_menu_url,
-        "source_display_url": stub.get("source_display_url") or stub.get("deep_link_url") or source_menu_url,
-        "deep_link_url": stub.get("deep_link_url") or menu_item.get("deep_link_url") or "",
+        "source_display_url": stub.get("source_display_url") or menu_order_url or source_menu_url,
+        "menu_order_url": menu_order_url,
+        "deep_link_url": menu_order_url,
         "menu_section": stub.get("menu_section") or menu_item.get("menu_section") or "",
         "section_name": stub.get("section_name") or menu_item.get("menu_section") or "",
         "menu_item_name": stub.get("menu_item_name") or item_name,
@@ -10568,7 +10650,8 @@ def apply_menu_batch_inference_to_stub(recipe_url, stub, menu_item, inference, m
     normalized["source_url"] = recipe_url
     normalized["recipe_record_url"] = recipe_url
     normalized["source_display_url"] = recipe.get("source_display_url") or source_menu_url
-    normalized["deep_link_url"] = recipe.get("deep_link_url") or ""
+    normalized["menu_order_url"] = recipe.get("menu_order_url") or ""
+    normalized["deep_link_url"] = recipe.get("deep_link_url") or recipe.get("menu_order_url") or ""
     normalized["needs_ai_recipe"] = False
     normalized["recipe_status"] = "generated"
     normalized["recipe_inference"] = recipe["recipe_inference"]
@@ -10586,6 +10669,8 @@ def apply_menu_batch_inference_to_stub(recipe_url, stub, menu_item, inference, m
         "recipe_url": recipe_url,
         "source_menu_url": source_menu_url,
         "menu_source_url": source_menu_url,
+        "menu_order_url": normalized.get("menu_order_url", ""),
+        "deep_link_url": normalized.get("deep_link_url", ""),
         "menu_section": normalized.get("menu_section", ""),
         "menu_item_name": normalized.get("menu_item_name", ""),
         "menu_description": normalized.get("menu_description", ""),
@@ -10879,12 +10964,15 @@ def menu_item_raw_text(item):
 
 def menu_item_deep_link(menu_url, item):
     item = item if isinstance(item, dict) else {}
-    explicit = clean_recipe_text(item.get("deep_link_url") or item.get("item_url") or "")
+    explicit = clean_recipe_text(item.get("menu_order_url") or item.get("deep_link_url") or item.get("item_url") or "")
     if explicit:
         return explicit
     item_id = clean_recipe_text(item.get("menu_item_id") or "")
     if not item_id:
         return ""
+    cartana_order_url = cartana_menu_item_order_url(menu_url, item.get("menu_id"), item_id)
+    if cartana_order_url:
+        return cartana_order_url
     base_url = str(menu_url or "").split("#", 1)[0].strip()
     separator = "&" if "?" in base_url else "?"
     return f"{base_url}{separator}menu_item_id={quote(item_id)}"
@@ -10898,6 +10986,7 @@ def normalize_menu_item_stub(menu_url, menu_item, index, source_name=""):
     price = clean_recipe_text(menu_item.get("price_text") or menu_item.get("price") or "")
     recipe_url = menu_item_source_url(menu_url, title, index)
     deep_link_url = menu_item_deep_link(menu_url, menu_item)
+    menu_order_url = clean_recipe_text(menu_item.get("menu_order_url") or deep_link_url)
     raw_text = clean_recipe_text(menu_item.get("raw_text") or menu_item_raw_text(menu_item))
     parent_snapshot_id = clean_recipe_text(
         menu_item.get("parent_menu_snapshot_id")
@@ -10956,7 +11045,8 @@ def normalize_menu_item_stub(menu_url, menu_item, index, source_name=""):
         "recipe_record_url": recipe_url,
         "source_menu_url": str(menu_url or "").strip(),
         "menu_source_url": str(menu_url or "").strip(),
-        "source_display_url": deep_link_url or str(menu_url or "").strip(),
+        "source_display_url": menu_order_url or str(menu_url or "").strip(),
+        "menu_order_url": menu_order_url,
         "deep_link_url": deep_link_url,
         "menu_section": section_name,
         "section_name": section_name,
@@ -11008,6 +11098,7 @@ def normalize_menu_item_stub(menu_url, menu_item, index, source_name=""):
         "source_type": "restaurant_menu",
         "source_url": recipe_url,
         "source_menu_url": str(menu_url or "").strip(),
+        "menu_order_url": menu_order_url,
         "deep_link_url": deep_link_url,
         "menu_section": section_name,
         "menu_item_name": title,
@@ -11176,6 +11267,7 @@ def build_menu_stub_extract_result_from_items(
             "source_menu_url": source_url,
             "menu_source_url": source_url,
             "source_display_url": stub.get("source_display_url") or source_url,
+            "menu_order_url": stub.get("menu_order_url", ""),
             "deep_link_url": stub.get("deep_link_url", ""),
             "menu_section": stub.get("menu_section", ""),
             "menu_item_name": stub.get("menu_item_name", ""),
@@ -11321,6 +11413,8 @@ def menu_stub_item_from_recipe(stub):
         "description": stub.get("menu_description") or stub.get("item_description") or stub.get("description") or metadata.get("description") or "",
         "price": stub.get("menu_price") or stub.get("price") or metadata.get("price") or "",
         "source_url": stub.get("source_menu_url") or stub.get("menu_source_url") or "",
+        "menu_order_url": stub.get("menu_order_url") or stub.get("deep_link_url") or metadata.get("menu_order_url") or metadata.get("deep_link_url") or "",
+        "deep_link_url": stub.get("deep_link_url") or stub.get("menu_order_url") or metadata.get("deep_link_url") or metadata.get("menu_order_url") or "",
         "menu_item_id": stub.get("menu_item_id") or metadata.get("menu_item_id") or "",
         "menu_id": stub.get("menu_id") or metadata.get("menu_id") or "",
         "restaurant_id": stub.get("restaurant_id") or metadata.get("restaurant_id") or "",
@@ -11383,6 +11477,15 @@ def generate_menu_recipe_from_stub(recipe_url, stub, user_id=None):
         }
 
     recipe = attach_menu_item_metadata(recipe, menu_item)
+    menu_order_url = clean_recipe_text(
+        stub.get("menu_order_url")
+        or stub.get("deep_link_url")
+        or menu_item.get("menu_order_url")
+        or menu_item.get("deep_link_url")
+        or recipe.get("menu_order_url")
+        or recipe.get("deep_link_url")
+        or ""
+    )
     normalized = normalize_menu_item_recipe(
         recipe,
         source_menu_url,
@@ -11396,8 +11499,9 @@ def generate_menu_recipe_from_stub(recipe_url, stub, user_id=None):
         "recipe_record_url": recipe_url,
         "source_menu_url": source_menu_url,
         "menu_source_url": source_menu_url,
-        "source_display_url": stub.get("source_display_url") or source_menu_url,
-        "deep_link_url": stub.get("deep_link_url") or "",
+        "source_display_url": stub.get("source_display_url") or menu_order_url or source_menu_url,
+        "menu_order_url": menu_order_url,
+        "deep_link_url": menu_order_url,
         "source_type": "menu_item_inferred",
         "ai_inferred": True,
         "needs_ai_recipe": False,
@@ -11450,6 +11554,8 @@ def generate_menu_recipe_from_stub(recipe_url, stub, user_id=None):
         "recipe_url": recipe_url,
         "source_menu_url": source_menu_url,
         "menu_source_url": source_menu_url,
+        "menu_order_url": normalized.get("menu_order_url", ""),
+        "deep_link_url": normalized.get("deep_link_url", ""),
         "menu_section": normalized.get("menu_section", ""),
         "menu_item_name": normalized.get("menu_item_name", ""),
         "menu_description": normalized.get("menu_description", ""),
@@ -11845,7 +11951,9 @@ def build_menu_extract_result_from_items(
         result.update({
             "source_url": recipe_url,
             "menu_source_url": source_url,
-            "source_display_url": source_url,
+            "source_display_url": normalized.get("source_display_url") or source_url,
+            "menu_order_url": normalized.get("menu_order_url", ""),
+            "deep_link_url": normalized.get("deep_link_url", ""),
             "menu_section": normalized.get("menu_section", ""),
             "menu_item_name": normalized.get("menu_item_name", ""),
             "menu_description": normalized.get("menu_description", ""),

@@ -274,6 +274,11 @@ def normalize_item(raw_item, section_name, index):
         "source_type": clean_text(raw_item.get("source_type") or "imported"),
         "recipe_id": clean_nullable_text(raw_item.get("recipe_id")),
         "recipe_url": clean_nullable_text(raw_item.get("recipe_url") or raw_item.get("url")),
+        "menu_order_url": clean_nullable_text(
+            raw_item.get("menu_order_url")
+            or raw_item.get("deep_link_url")
+            or raw_item.get("item_url")
+        ),
         "menu_section": section_name,
         "is_spicy": clean_bool(raw_item.get("is_spicy")) or str(raw_item.get("spice_level") or "").lower() in {"medium", "hot"},
         "is_veggie": clean_bool(raw_item.get("is_veggie")) or any(
@@ -485,6 +490,8 @@ def selected_items_as_sections(menu_id, item_ids):
                 "description": item.get("menu_description") or "",
                 "price": item.get("menu_price") or "",
                 "source_url": source_url,
+                "menu_order_url": item.get("menu_order_url") or "",
+                "deep_link_url": item.get("menu_order_url") or "",
                 "restaurant_id": item.get("restaurant_id", ""),
                 "menu_id": item.get("menu_id", ""),
                 "menu_section_id": item.get("menu_section_id", ""),
