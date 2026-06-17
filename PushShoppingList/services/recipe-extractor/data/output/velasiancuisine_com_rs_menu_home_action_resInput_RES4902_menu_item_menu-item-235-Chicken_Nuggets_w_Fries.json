@@ -1,0 +1,312 @@
+{
+  "source_url": "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-235-Chicken_Nuggets_w_Fries",
+  "recipe_amount": "1 pound",
+  "yield": "12 chicken nuggets with fries",
+  "servings": "2 appetizer servings",
+  "level": "Easy",
+  "total_time": "30 minutes",
+  "prep_time": "10 minutes",
+  "inactive_time": "0 minutes",
+  "cook_time": "20 minutes",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "1 pound chicken breast",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "pound",
+      "base_quantity": "1",
+      "base_unit": "pound",
+      "ingredient": "chicken breast",
+      "preparation": "cut into bite-sized pieces",
+      "optional": false,
+      "store_section": "MEAT & SEAFOOD",
+      "store_section_order": 2,
+      "purchasable_item": "chicken breast",
+      "purchase_group": "chicken breast"
+    },
+    {
+      "section": null,
+      "original_text": "1 cup all-purpose flour",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "cup",
+      "base_quantity": "1",
+      "base_unit": "cup",
+      "ingredient": "all-purpose flour",
+      "preparation": "for coating",
+      "optional": false,
+      "store_section": "BAKING",
+      "store_section_order": 7,
+      "purchasable_item": "all-purpose flour",
+      "purchase_group": "all-purpose flour"
+    },
+    {
+      "section": null,
+      "original_text": "1 large egg",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "large",
+      "base_quantity": "1",
+      "base_unit": "large",
+      "ingredient": "egg",
+      "preparation": "beaten",
+      "optional": false,
+      "store_section": "DAIRY & EGGS",
+      "store_section_order": 3,
+      "purchasable_item": "eggs",
+      "purchase_group": "eggs"
+    },
+    {
+      "section": null,
+      "original_text": "1 cup bread crumbs",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "cup",
+      "base_quantity": "1",
+      "base_unit": "cup",
+      "ingredient": "bread crumbs",
+      "preparation": "for coating",
+      "optional": false,
+      "store_section": "PASTA, RICE & GRAINS",
+      "store_section_order": 6,
+      "purchasable_item": "bread crumbs",
+      "purchase_group": "bread crumbs"
+    },
+    {
+      "section": null,
+      "original_text": "1 teaspoon salt",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "teaspoon",
+      "base_quantity": "1",
+      "base_unit": "teaspoon",
+      "ingredient": "salt",
+      "preparation": null,
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12,
+      "purchasable_item": "salt",
+      "purchase_group": "salt"
+    },
+    {
+      "section": null,
+      "original_text": "1/2 teaspoon pepper",
+      "quantity": "1/2",
+      "recipe_qty": "1/2",
+      "unit": "teaspoon",
+      "base_quantity": "1/2",
+      "base_unit": "teaspoon",
+      "ingredient": "pepper",
+      "preparation": null,
+      "optional": false,
+      "store_section": "SPICES & SEASONINGS",
+      "store_section_order": 12,
+      "purchasable_item": "pepper",
+      "purchase_group": "pepper"
+    },
+    {
+      "section": null,
+      "original_text": "2 medium potatoes",
+      "quantity": "2",
+      "recipe_qty": "2",
+      "unit": "medium",
+      "base_quantity": "2",
+      "base_unit": "medium",
+      "ingredient": "potatoes",
+      "preparation": "for fries",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "potatoes",
+      "purchase_group": "potatoes"
+    },
+    {
+      "section": null,
+      "original_text": "for frying oil",
+      "quantity": "for frying",
+      "recipe_qty": "for frying",
+      "unit": null,
+      "base_quantity": "for frying",
+      "base_unit": null,
+      "ingredient": "oil",
+      "preparation": "vegetable or canola oil",
+      "optional": false,
+      "store_section": "OILS & VINEGARS",
+      "store_section_order": 13,
+      "purchasable_item": "oil",
+      "purchase_group": "oil"
+    }
+  ],
+  "equipment": [
+    {
+      "equipment": "cutting board",
+      "text": "cutting board",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "knife",
+      "text": "knife",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "mixing bowls",
+      "text": "mixing bowls",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "frying pan",
+      "text": "frying pan",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "tongs",
+      "text": "tongs",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "paper towels",
+      "text": "paper towels",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    }
+  ],
+  "instructions": [
+    {
+      "section": null,
+      "step_number": 1,
+      "instruction": "Cut chicken breast into bite-sized pieces and season with salt and pepper.",
+      "text": "Cut chicken breast into bite-sized pieces and season with salt and pepper.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "Set up a breading station with flour, beaten egg, and bread crumbs in separate bowls.",
+      "text": "Set up a breading station with flour, beaten egg, and bread crumbs in separate bowls.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "Dredge chicken pieces in flour, dip in egg, and coat with bread crumbs.",
+      "text": "Dredge chicken pieces in flour, dip in egg, and coat with bread crumbs.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "Heat oil in a frying pan over medium heat.",
+      "text": "Heat oil in a frying pan over medium heat.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 5,
+      "instruction": "Fry chicken nuggets until golden brown and cooked through, about 5-7 minutes per side.",
+      "text": "Fry chicken nuggets until golden brown and cooked through, about 5-7 minutes per side.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 6,
+      "instruction": "While nuggets are cooking, cut potatoes into fries and fry in the same oil until golden and crispy.",
+      "text": "While nuggets are cooking, cut potatoes into fries and fry in the same oil until golden and crispy.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 7,
+      "instruction": "Drain on paper towels and serve with chicken nuggets.",
+      "text": "Drain on paper towels and serve with chicken nuggets.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    }
+  ],
+  "scaling": {
+    "selected_multiplier": 1,
+    "base_multiplier": 1,
+    "base_servings": "2 appetizer servings",
+    "available_multipliers": [
+      {
+        "label": "1/2x",
+        "value": 0.5
+      },
+      {
+        "label": "1x",
+        "value": 1
+      },
+      {
+        "label": "2x",
+        "value": 2
+      },
+      {
+        "label": "3x",
+        "value": 3
+      }
+    ]
+  },
+  "ai_inferred": true,
+  "inferred_by_model": "gpt-4o-mini",
+  "inferred_at": "2026-06-16T02:33:48Z",
+  "inference_confidence": "high",
+  "source_type": "cookbook_item_inferred",
+  "cookbook_item_inferred_fields": [
+    "cook_time",
+    "equipment",
+    "inactive_time",
+    "ingredients",
+    "instructions",
+    "level",
+    "prep_time",
+    "recipe_amount",
+    "servings",
+    "total_time",
+    "yield"
+  ],
+  "cookbook_item_inference_field_sources": {
+    "recipe_amount": "ai_inferred",
+    "yield": "ai_inferred",
+    "servings": "ai_inferred",
+    "level": "ai_inferred",
+    "total_time": "ai_inferred",
+    "prep_time": "ai_inferred",
+    "inactive_time": "ai_inferred",
+    "cook_time": "ai_inferred",
+    "ingredients": "ai_inferred",
+    "equipment": "ai_inferred",
+    "instructions": "ai_inferred"
+  }
+}

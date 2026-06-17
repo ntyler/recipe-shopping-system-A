@@ -1,0 +1,214 @@
+{
+  "source_url": "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-260-Sweet_Tea",
+  "recipe_amount": "1 pitcher",
+  "yield": "1 pitcher of sweet tea",
+  "servings": "4 servings",
+  "level": "Easy",
+  "total_time": "15 minutes",
+  "prep_time": "5 minutes",
+  "inactive_time": "10 minutes",
+  "cook_time": "0 minutes",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "4 cups water",
+      "quantity": "4",
+      "recipe_qty": "4",
+      "unit": "cups",
+      "base_quantity": "4",
+      "base_unit": "cups",
+      "ingredient": "water",
+      "preparation": "for brewing tea",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "water",
+      "purchase_group": "water"
+    },
+    {
+      "section": null,
+      "original_text": "4 bags black tea bags",
+      "quantity": "4",
+      "recipe_qty": "4",
+      "unit": "bags",
+      "base_quantity": "4",
+      "base_unit": "bags",
+      "ingredient": "black tea bags",
+      "preparation": "or loose tea equivalent",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "black tea bags",
+      "purchase_group": "black tea bags"
+    },
+    {
+      "section": null,
+      "original_text": "1 cup sugar",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "cup",
+      "base_quantity": "1",
+      "base_unit": "cup",
+      "ingredient": "sugar",
+      "preparation": "adjust to taste",
+      "optional": false,
+      "store_section": "BAKING",
+      "store_section_order": 7,
+      "purchasable_item": "sugar",
+      "purchase_group": "sugar"
+    },
+    {
+      "section": null,
+      "original_text": "1 whole lemon slices",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "whole",
+      "base_quantity": "1",
+      "base_unit": "whole",
+      "ingredient": "lemon slices",
+      "preparation": "for garnish",
+      "optional": false,
+      "store_section": "PRODUCE",
+      "store_section_order": 1,
+      "purchasable_item": "lemon slices",
+      "purchase_group": "lemon slices"
+    }
+  ],
+  "equipment": [
+    {
+      "equipment": "pitcher",
+      "text": "pitcher",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "kettle",
+      "text": "kettle",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "measuring cups",
+      "text": "measuring cups",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "spoon",
+      "text": "spoon",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    }
+  ],
+  "instructions": [
+    {
+      "section": null,
+      "step_number": 1,
+      "instruction": "Boil 4 cups of water in a kettle.",
+      "text": "Boil 4 cups of water in a kettle.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "Remove from heat and add 4 tea bags, steep for 5 minutes.",
+      "text": "Remove from heat and add 4 tea bags, steep for 5 minutes.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "Remove tea bags and stir in 1 cup of sugar until dissolved.",
+      "text": "Remove tea bags and stir in 1 cup of sugar until dissolved.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "Let the tea cool to room temperature, then refrigerate for 10 minutes.",
+      "text": "Let the tea cool to room temperature, then refrigerate for 10 minutes.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 5,
+      "instruction": "Serve over ice with lemon slices.",
+      "text": "Serve over ice with lemon slices.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    }
+  ],
+  "scaling": {
+    "selected_multiplier": 1,
+    "base_multiplier": 1,
+    "base_servings": "4 servings",
+    "available_multipliers": [
+      {
+        "label": "1/2x",
+        "value": 0.5
+      },
+      {
+        "label": "1x",
+        "value": 1
+      },
+      {
+        "label": "2x",
+        "value": 2
+      },
+      {
+        "label": "3x",
+        "value": 3
+      }
+    ]
+  },
+  "ai_inferred": true,
+  "inferred_by_model": "gpt-4o-mini",
+  "inferred_at": "2026-06-16T02:35:24Z",
+  "inference_confidence": "high",
+  "source_type": "cookbook_item_inferred",
+  "cookbook_item_inferred_fields": [
+    "cook_time",
+    "equipment",
+    "inactive_time",
+    "ingredients",
+    "instructions",
+    "level",
+    "prep_time",
+    "recipe_amount",
+    "servings",
+    "total_time",
+    "yield"
+  ],
+  "cookbook_item_inference_field_sources": {
+    "recipe_amount": "ai_inferred",
+    "yield": "ai_inferred",
+    "servings": "ai_inferred",
+    "level": "ai_inferred",
+    "total_time": "ai_inferred",
+    "prep_time": "ai_inferred",
+    "inactive_time": "ai_inferred",
+    "cook_time": "ai_inferred",
+    "ingredients": "ai_inferred",
+    "equipment": "ai_inferred",
+    "instructions": "ai_inferred"
+  }
+}

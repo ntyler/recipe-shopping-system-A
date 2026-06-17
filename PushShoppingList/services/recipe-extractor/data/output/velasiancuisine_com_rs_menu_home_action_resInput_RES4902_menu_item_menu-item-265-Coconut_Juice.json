@@ -1,0 +1,187 @@
+{
+  "source_url": "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-265-Coconut_Juice",
+  "recipe_amount": "1",
+  "yield": "1 drink",
+  "servings": "1 appetizer serving",
+  "level": "Easy",
+  "total_time": "5 minutes",
+  "prep_time": "5 minutes",
+  "inactive_time": "0 minutes",
+  "cook_time": "0 minutes",
+  "ingredients": [
+    {
+      "section": null,
+      "original_text": "1 cup Coconut water",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "cup",
+      "base_quantity": "1",
+      "base_unit": "cup",
+      "ingredient": "Coconut water",
+      "preparation": "fresh or bottled",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "Coconut water",
+      "purchase_group": "Coconut water"
+    },
+    {
+      "section": null,
+      "original_text": "1 tablespoon Lime juice",
+      "quantity": "1",
+      "recipe_qty": "1",
+      "unit": "tablespoon",
+      "base_quantity": "1",
+      "base_unit": "tablespoon",
+      "ingredient": "Lime juice",
+      "preparation": "freshly squeezed",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "Lime juice",
+      "purchase_group": "Lime juice"
+    },
+    {
+      "section": null,
+      "original_text": "5 leaves Mint leaves",
+      "quantity": "5",
+      "recipe_qty": "5",
+      "unit": "leaves",
+      "base_quantity": "5",
+      "base_unit": "leaves",
+      "ingredient": "Mint leaves",
+      "preparation": "for garnish",
+      "optional": false,
+      "store_section": "MISC",
+      "store_section_order": 19,
+      "purchasable_item": "Mint leaves",
+      "purchase_group": "Mint leaves"
+    }
+  ],
+  "equipment": [
+    {
+      "equipment": "measuring cup",
+      "text": "measuring cup",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "tablespoon",
+      "text": "tablespoon",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "stirring spoon",
+      "text": "stirring spoon",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    },
+    {
+      "equipment": "glass",
+      "text": "glass",
+      "equipment_image_url": "",
+      "equipment_image_generated_at": ""
+    }
+  ],
+  "instructions": [
+    {
+      "section": null,
+      "step_number": 1,
+      "instruction": "Measure 1 cup of coconut water and pour it into a glass.",
+      "text": "Measure 1 cup of coconut water and pour it into a glass.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 2,
+      "instruction": "Add 1 tablespoon of freshly squeezed lime juice.",
+      "text": "Add 1 tablespoon of freshly squeezed lime juice.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 3,
+      "instruction": "Stir gently to combine.",
+      "text": "Stir gently to combine.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    },
+    {
+      "section": null,
+      "step_number": 4,
+      "instruction": "Garnish with 5 mint leaves.",
+      "text": "Garnish with 5 mint leaves.",
+      "temperature": null,
+      "time": null,
+      "equipment_used": [],
+      "step_image_url": "",
+      "step_image_generated_at": ""
+    }
+  ],
+  "scaling": {
+    "selected_multiplier": 1,
+    "base_multiplier": 1,
+    "base_servings": "1 appetizer serving",
+    "available_multipliers": [
+      {
+        "label": "1/2x",
+        "value": 0.5
+      },
+      {
+        "label": "1x",
+        "value": 1
+      },
+      {
+        "label": "2x",
+        "value": 2
+      },
+      {
+        "label": "3x",
+        "value": 3
+      }
+    ]
+  },
+  "ai_inferred": true,
+  "inferred_by_model": "gpt-4o-mini",
+  "inferred_at": "2026-06-16T02:35:36Z",
+  "inference_confidence": "high",
+  "source_type": "cookbook_item_inferred",
+  "cookbook_item_inferred_fields": [
+    "cook_time",
+    "equipment",
+    "inactive_time",
+    "ingredients",
+    "instructions",
+    "level",
+    "prep_time",
+    "recipe_amount",
+    "servings",
+    "total_time",
+    "yield"
+  ],
+  "cookbook_item_inference_field_sources": {
+    "recipe_amount": "ai_inferred",
+    "yield": "ai_inferred",
+    "servings": "ai_inferred",
+    "level": "ai_inferred",
+    "total_time": "ai_inferred",
+    "prep_time": "ai_inferred",
+    "inactive_time": "ai_inferred",
+    "cook_time": "ai_inferred",
+    "ingredients": "ai_inferred",
+    "equipment": "ai_inferred",
+    "instructions": "ai_inferred"
+  }
+}
