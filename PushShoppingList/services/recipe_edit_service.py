@@ -403,7 +403,7 @@ def recipe_menu_item_token_from_url(url):
         return ""
 
     query = parse_qs(parsed.query or "")
-    values = query.get("menu_item") or query.get("menuItemIdInput") or []
+    values = query.get("menu_item") or query.get("menuItemIdInput") or query.get("menu_item_id") or []
     return clean_recipe_menu_text(values[0]) if values else ""
 
 
@@ -429,11 +429,12 @@ def recipe_menu_source_url_from_item_url(url):
             "",
         ))
 
-    if not any(key == "menu_item" for key, _value in query_pairs):
+    item_query_keys = {"menu_item", "menu_item_id"}
+    if not any(key in item_query_keys for key, _value in query_pairs):
         return ""
 
     filtered_query = urlencode(
-        [(key, value) for key, value in query_pairs if key != "menu_item"],
+        [(key, value) for key, value in query_pairs if key not in item_query_keys],
         doseq=True,
     )
     return urlunparse((
@@ -444,6 +445,55 @@ def recipe_menu_source_url_from_item_url(url):
         filtered_query,
         "",
     ))
+
+
+def recipe_cartana_id_from_candidates(prefix, *values):
+    for value in values:
+        text = clean_recipe_menu_text(value)
+        if text and text.upper().startswith(prefix):
+            return text
+    return ""
+
+
+def recipe_cartana_menu_item_order_url(candidate_url="", source_menu_url="", menu_id="", menu_item_id=""):
+    for value in (candidate_url, source_menu_url):
+        try:
+            parsed = urlparse(str(value or ""))
+        except ValueError:
+            continue
+
+        if not parsed.scheme or not parsed.netloc:
+            continue
+
+        if not (parsed.path.endswith("menu_home.action") or parsed.path.endswith("menuItem_home.action")):
+            continue
+
+        query = parse_qs(parsed.query or "")
+        restaurant_id = first_recipe_menu_text((query.get("resInput") or [""])[0])
+        cartana_menu_id = recipe_cartana_id_from_candidates(
+            "MEN",
+            (query.get("menuIdInput") or [""])[0],
+            menu_id,
+        )
+        cartana_item_id = recipe_cartana_id_from_candidates(
+            "MIT",
+            (query.get("menuItemIdInput") or [""])[0],
+            menu_item_id,
+            (query.get("menu_item_id") or [""])[0],
+        )
+        if not restaurant_id or not cartana_menu_id or not cartana_item_id:
+            continue
+
+        item_path = parsed.path.rsplit("/", 1)[0] + "/menuItem_home.action"
+        query_text = urlencode({
+            "resInput": restaurant_id,
+            "menuIdInput": cartana_menu_id,
+            "menuItemIdInput": cartana_item_id,
+            "orderType": "null",
+        })
+        return urlunparse((parsed.scheme, parsed.netloc, item_path, "", query_text, ""))
+
+    return ""
 
 
 def recipe_menu_source_url_from_candidates(recipe_data):
@@ -668,6 +718,8 @@ def recipe_menu_snapshot_item_fields(recipe_data):
             item_name = recipe_menu_match_text(item.get("name") or item.get("item_name"))
             item_section = recipe_menu_match_text(section_name)
             item_fields = {
+                "menu_id": first_recipe_menu_text(item.get("menu_id"), metadata.get("menu_id")),
+                "menu_item_id": current_item_id,
                 "menu_section": section_name,
                 "menu_item_name": first_recipe_menu_text(item.get("name"), item.get("item_name")),
                 "menu_order_url": first_recipe_menu_text(item.get("menu_order_url"), item.get("deep_link_url")),
@@ -914,6 +966,30 @@ def editable_recipe_menu_metadata(recipe_data):
         recipe_menu_source_url_from_candidates(recipe_data),
         recipe_data.get("source_display_url") if recipe_has_menu_metadata(recipe_data) else "",
     )
+    raw_menu_order_url = first_recipe_menu_text(
+        recipe_data.get("menu_order_url"),
+        recipe_data.get("deep_link_url"),
+        metadata.get("menu_order_url"),
+        metadata.get("deep_link_url"),
+        item.get("menu_order_url"),
+        item.get("deep_link_url"),
+        snapshot_item_fields.get("menu_order_url"),
+    )
+    menu_order_url = (
+        recipe_cartana_menu_item_order_url(
+            raw_menu_order_url,
+            source_menu_url,
+            first_recipe_menu_text(
+                recipe_menu_relation_value(recipe_data, "menu_id"),
+                snapshot_item_fields.get("menu_id"),
+            ),
+            first_recipe_menu_text(
+                recipe_menu_relation_value(recipe_data, "menu_item_id"),
+                snapshot_item_fields.get("menu_item_id"),
+            ),
+        )
+        or raw_menu_order_url
+    )
     fields = {
         "restaurant_name": first_recipe_menu_text(
             restaurant.get("restaurant_name"),
@@ -991,15 +1067,7 @@ def editable_recipe_menu_metadata(recipe_data):
             item.get("item_name"),
             snapshot_item_fields.get("menu_item_name"),
         ),
-        "menu_order_url": first_recipe_menu_text(
-            recipe_data.get("menu_order_url"),
-            recipe_data.get("deep_link_url"),
-            metadata.get("menu_order_url"),
-            metadata.get("deep_link_url"),
-            item.get("menu_order_url"),
-            item.get("deep_link_url"),
-            snapshot_item_fields.get("menu_order_url"),
-        ),
+        "menu_order_url": menu_order_url,
         "menu_price": first_recipe_menu_text(
             recipe_data.get("menu_price"),
             metadata.get("menu_price"),

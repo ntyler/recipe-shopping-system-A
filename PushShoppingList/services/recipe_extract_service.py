@@ -9627,15 +9627,40 @@ def cartana_menu_api_url(menu_url):
     ))
 
 
+def cartana_id_from_candidates(prefix, *values):
+    cleaned = [clean_recipe_text(value) for value in values if clean_recipe_text(value)]
+    for value in cleaned:
+        if value.upper().startswith(prefix):
+            return value
+    return ""
+
+
 def cartana_menu_item_order_url(menu_url, menu_id="", menu_item_id=""):
-    menu_id = clean_recipe_text(menu_id)
-    menu_item_id = clean_recipe_text(menu_item_id)
-    restaurant_id = extract_cartana_restaurant_id(menu_url)
-    if not restaurant_id or not menu_id or not menu_item_id:
+    try:
+        parsed = urlparse(str(menu_url or ""))
+    except ValueError:
         return ""
 
-    parsed = urlparse(str(menu_url or ""))
-    if not parsed.scheme or not parsed.netloc or not parsed.path.endswith("menu_home.action"):
+    if not parsed.scheme or not parsed.netloc:
+        return ""
+
+    if not (parsed.path.endswith("menu_home.action") or parsed.path.endswith("menuItem_home.action")):
+        return ""
+
+    query = parse_qs(parsed.query or "")
+    restaurant_id = clean_recipe_text((query.get("resInput") or [""])[0]) or extract_cartana_restaurant_id(menu_url)
+    menu_id = cartana_id_from_candidates(
+        "MEN",
+        (query.get("menuIdInput") or [""])[0],
+        menu_id,
+    )
+    menu_item_id = cartana_id_from_candidates(
+        "MIT",
+        (query.get("menuItemIdInput") or [""])[0],
+        menu_item_id,
+        (query.get("menu_item_id") or [""])[0],
+    )
+    if not restaurant_id or not menu_id or not menu_item_id:
         return ""
 
     base_path = parsed.path.rsplit("/", 1)[0] + "/"
@@ -10402,19 +10427,28 @@ def attach_menu_item_metadata(recipe, menu_item):
     description = clean_recipe_text(menu_item.get("description") or "")
     price = clean_recipe_text(menu_item.get("price") or "")
     section = clean_recipe_text(menu_item.get("menu_section") or "")
-    menu_order_url = clean_recipe_text(
+    source_menu_url = (
+        menu_item.get("source_url")
+        or menu_item.get("source_menu_url")
+        or recipe.get("source_menu_url")
+        or recipe.get("menu_source_url")
+        or ""
+    )
+    raw_menu_order_url = clean_recipe_text(
         menu_item.get("menu_order_url")
         or menu_item.get("deep_link_url")
         or menu_item.get("item_url")
+        or recipe.get("menu_order_url")
+        or recipe.get("deep_link_url")
         or ""
+    )
+    menu_order_url = (
+        cartana_menu_item_order_url(raw_menu_order_url, menu_item.get("menu_id"), menu_item.get("menu_item_id"))
+        or raw_menu_order_url
     )
     if not menu_order_url:
         menu_order_url = menu_item_deep_link(
-            menu_item.get("source_url")
-            or menu_item.get("source_menu_url")
-            or recipe.get("source_menu_url")
-            or recipe.get("menu_source_url")
-            or "",
+            source_menu_url,
             menu_item,
         )
 
@@ -10423,8 +10457,24 @@ def attach_menu_item_metadata(recipe, menu_item):
     recipe["menu_description"] = description
     recipe["menu_price"] = price
     if menu_order_url:
-        recipe["menu_order_url"] = recipe.get("menu_order_url") or menu_order_url
-        recipe["deep_link_url"] = recipe.get("deep_link_url") or menu_order_url
+        recipe["menu_order_url"] = (
+            cartana_menu_item_order_url(
+                recipe.get("menu_order_url"),
+                menu_item.get("menu_id"),
+                menu_item.get("menu_item_id"),
+            )
+            or recipe.get("menu_order_url")
+            or menu_order_url
+        )
+        recipe["deep_link_url"] = (
+            cartana_menu_item_order_url(
+                recipe.get("deep_link_url"),
+                menu_item.get("menu_id"),
+                menu_item.get("menu_item_id"),
+            )
+            or recipe.get("deep_link_url")
+            or menu_order_url
+        )
     for metadata_field in ("restaurant_id", "menu_id", "menu_section_id", "menu_item_id"):
         metadata_value = clean_recipe_text(menu_item.get(metadata_field) or "")
         if metadata_value:
@@ -10966,7 +11016,7 @@ def menu_item_deep_link(menu_url, item):
     item = item if isinstance(item, dict) else {}
     explicit = clean_recipe_text(item.get("menu_order_url") or item.get("deep_link_url") or item.get("item_url") or "")
     if explicit:
-        return explicit
+        return cartana_menu_item_order_url(explicit, item.get("menu_id"), item.get("menu_item_id")) or explicit
     item_id = clean_recipe_text(item.get("menu_item_id") or "")
     if not item_id:
         return ""
@@ -11485,6 +11535,10 @@ def generate_menu_recipe_from_stub(recipe_url, stub, user_id=None):
         or recipe.get("menu_order_url")
         or recipe.get("deep_link_url")
         or ""
+    )
+    menu_order_url = (
+        cartana_menu_item_order_url(menu_order_url, menu_item.get("menu_id"), menu_item.get("menu_item_id"))
+        or menu_order_url
     )
     normalized = normalize_menu_item_recipe(
         recipe,

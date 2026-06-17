@@ -134,6 +134,54 @@ def test_cartana_menu_payload_extracts_sections_items_and_prices():
     assert items[0]["deep_link_url"] == items[0]["menu_order_url"]
 
 
+def test_cartana_menu_order_url_for_takoyi_uses_item_order_page():
+    source_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902"
+    expected_url = (
+        "https://www.velasiancuisine.com/rs/menuItem_home.action?"
+        "resInput=RES4902&menuIdInput=MEN25930&menuItemIdInput=MIT354158&orderType=null"
+    )
+    payload = [{
+        "menu": {
+            "menuId": "MEN25930",
+            "menuData": {
+                "enMenuTitle": "Kitchen Appetizers",
+                "enMenuText": "Appetizers from the Kitchen",
+            },
+        },
+        "itemList": [{
+            "price": 8.99,
+            "menuItemId": "MIT354158",
+            "menuItemData": {
+                "enItemTitle": "Takoyi",
+                "enItemText": "5pcs of Japanese fried octopus ball with takoyaki sauce, mayo and bonito flakes.",
+            },
+        }],
+    }]
+
+    sections = recipe_extract_service.parse_cartana_menu_sections(payload, source_url)
+    item = recipe_extract_service.flatten_menu_sections(sections)[0]
+
+    assert item["item_name"] == "Takoyi"
+    assert item["menu_order_url"] == expected_url
+    assert item["deep_link_url"] == expected_url
+    assert recipe_extract_service.menu_item_deep_link(
+        source_url,
+        {
+            "menu_id": "MEN25930",
+            "menu_item_id": "MIT354158",
+            "deep_link_url": f"{source_url}&menu_item_id=MIT354158",
+        },
+    ) == expected_url
+    assert menu_mega_json_service.item_deep_link(
+        source_url,
+        {
+            "menu_id": "MEN25930",
+            "deep_link_url": f"{source_url}&menu_item_id=MIT354158",
+        },
+        "MIT354158",
+    ) == expected_url
+
+
 def test_mega_menu_json_snapshot_builds_saves_and_unpacks(tmp_path, monkeypatch):
     monkeypatch.setattr(menu_mega_json_service, "workspace_data_root", lambda: tmp_path)
     source_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902"

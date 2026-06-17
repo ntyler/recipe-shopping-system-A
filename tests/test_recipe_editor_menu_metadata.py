@@ -453,6 +453,34 @@ def test_menu_metadata_loads_restaurant_fields_from_menu_mega_snapshot(monkeypat
     )
 
 
+def test_menu_order_url_upgrades_old_cartana_fallback_url(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    source_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902"
+    old_fallback_url = f"{source_url}&menu_item_id=MIT354158"
+    expected_url = (
+        "https://www.velasiancuisine.com/rs/menuItem_home.action?"
+        "resInput=RES4902&menuIdInput=MEN25930&menuItemIdInput=MIT354158&orderType=null"
+    )
+    recipe_edit_service.save_recipe_output(old_fallback_url, {
+        "source_url": old_fallback_url,
+        "source_type": "menu_item_inferred",
+        "ai_inferred": True,
+        "menu_id": "MEN25930",
+        "menu_item_id": "MIT354158",
+        "menu_section": "Kitchen Appetizers",
+        "menu_item_name": "Takoyi",
+        "menu_order_url": old_fallback_url,
+        "deep_link_url": old_fallback_url,
+        "menu_price": "$8.99",
+        "menu_description": "5pcs of Japanese fried octopus ball with takoyaki sauce, mayo and bonito flakes.",
+    })
+
+    loaded = recipe_edit_service.load_editable_recipe(old_fallback_url)["recipe"]
+
+    assert loaded["source_menu_url"] == source_url
+    assert loaded["menu_order_url"] == expected_url
+
+
 def test_menu_metadata_matches_menu_store_by_base_url_and_preserves_recipe_item_fields(monkeypatch, tmp_path):
     configure_editor_recipe_storage(monkeypatch, tmp_path)
     source_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902"

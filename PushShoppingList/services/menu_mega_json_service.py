@@ -89,22 +89,36 @@ def absolute_url(base_url, value):
     return urljoin(str(base_url or ""), text)
 
 
+def cartana_id_from_candidates(prefix, *values):
+    cleaned = [clean_text(value) for value in values if clean_text(value)]
+    for value in cleaned:
+        if value.upper().startswith(prefix):
+            return value
+    return ""
+
+
 def cartana_menu_item_order_url(source_url, menu_id="", menu_item_id=""):
-    menu_id = clean_text(menu_id)
-    menu_item_id = clean_text(menu_item_id)
-    if not menu_id or not menu_item_id:
+    try:
+        parsed = urlparse(str(source_url or ""))
+    except ValueError:
         return ""
 
-    parsed = urlparse(str(source_url or ""))
-    if not parsed.scheme or not parsed.netloc or not parsed.path.endswith("menu_home.action"):
+    if not parsed.scheme or not parsed.netloc:
         return ""
 
-    res_input = ""
-    for key, value in parse_qsl(parsed.query, keep_blank_values=True):
-        if key == "resInput" and value:
-            res_input = value
-            break
-    if not res_input:
+    if not (parsed.path.endswith("menu_home.action") or parsed.path.endswith("menuItem_home.action")):
+        return ""
+
+    query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+    res_input = clean_text(query.get("resInput"))
+    menu_id = cartana_id_from_candidates("MEN", query.get("menuIdInput"), menu_id)
+    menu_item_id = cartana_id_from_candidates(
+        "MIT",
+        query.get("menuItemIdInput"),
+        menu_item_id,
+        query.get("menu_item_id"),
+    )
+    if not res_input or not menu_id or not menu_item_id:
         return ""
 
     base_path = parsed.path.rsplit("/", 1)[0] + "/"
@@ -122,7 +136,8 @@ def item_deep_link(source_url, item, menu_item_id):
     item = item if isinstance(item, dict) else {}
     explicit = clean_text(item.get("menu_order_url") or item.get("deep_link_url") or item.get("item_url") or item.get("url"))
     if explicit:
-        return absolute_url(source_url, explicit)
+        explicit_url = absolute_url(source_url, explicit)
+        return cartana_menu_item_order_url(explicit_url, item.get("menu_id"), menu_item_id) or explicit_url
 
     if not menu_item_id:
         return ""
