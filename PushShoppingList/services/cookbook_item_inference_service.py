@@ -1,6 +1,8 @@
 import json
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import as_completed
 from datetime import datetime
 from datetime import timezone
 
@@ -13,21 +15,20 @@ from PushShoppingList.services.openai_throttle_service import throttled_chat_com
 from PushShoppingList.services.openai_usage_service import record_openai_usage
 from PushShoppingList.services.recipe_extract_service import STORE_SECTION_ORDER
 from PushShoppingList.services.recipe_extract_service import apply_menu_batch_inference_to_stub
+from PushShoppingList.services.recipe_extract_service import build_menu_item_recipe_batch_prompt
 from PushShoppingList.services.recipe_extract_service import build_openai_chat_payload
+from PushShoppingList.services.recipe_extract_service import classify_vision_ai_exception
 from PushShoppingList.services.recipe_extract_service import classify_store_section
 from PushShoppingList.services.recipe_extract_service import clean_json_response
+from PushShoppingList.services.recipe_extract_service import compact_menu_batch_item
 from PushShoppingList.services.recipe_extract_service import get_openai_client
 from PushShoppingList.services.recipe_extract_service import get_openai_error_code_and_param
 from PushShoppingList.services.recipe_extract_service import generate_menu_recipe_from_stub
-from PushShoppingList.services.recipe_extract_service import infer_menu_item_recipe_batch
 from PushShoppingList.services.recipe_extract_service import menu_batch_item_from_stub
-from PushShoppingList.services.recipe_extract_service import menu_inference_batches
 from PushShoppingList.services.recipe_extract_service import menu_item_name_is_blank_divider
 from PushShoppingList.services.recipe_extract_service import normalize_extracted_equipment_fields
 from PushShoppingList.services.recipe_extract_service import normalize_extracted_ingredient_fields
 from PushShoppingList.services.recipe_extract_service import normalize_recipe_scaling_metadata
-from PushShoppingList.services.recipe_extract_service import resolve_menu_model
-from PushShoppingList.services.recipe_extract_service import resolve_menu_model_source
 from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
 from PushShoppingList.services.recipe_ingredient_service import recipe_ingredients_for_key
 from PushShoppingList.services.recipe_url_service import normalize_recipe_quantity
@@ -48,6 +49,17 @@ INFERRED_FIELD_SOURCE_KEY = "cookbook_item_inference_field_sources"
 COOKBOOK_ITEM_INFERENCE_WORKERS = 3
 COOKBOOK_ITEM_INFERENCE_MAX_WORKERS_ENV_VAR = "COOKBOOK_ITEM_INFERENCE_MAX_WORKERS"
 COOKBOOK_ITEM_INFERENCE_MAX_RETRIES = 2
+COOKBOOK_ITEM_BATCH_INFERENCE_MAX_ITEMS_ENV_VAR = "COOKBOOK_ITEM_BATCH_INFERENCE_MAX_ITEMS"
+COOKBOOK_ITEM_BATCH_INFERENCE_MIN_ITEMS_ENV_VAR = "COOKBOOK_ITEM_BATCH_INFERENCE_MIN_ITEMS"
+COOKBOOK_ITEM_BATCH_INFERENCE_TARGET_CHARS_ENV_VAR = "COOKBOOK_ITEM_BATCH_INFERENCE_TARGET_CHARS"
+COOKBOOK_ITEM_BATCH_INFERENCE_DEFAULT_MAX_ITEMS = 8
+COOKBOOK_ITEM_BATCH_INFERENCE_DEFAULT_MIN_ITEMS = 4
+COOKBOOK_ITEM_BATCH_INFERENCE_DEFAULT_TARGET_CHARS = 9000
+COOKBOOK_ITEM_BATCH_INFERENCE_ACTION = "cookbook-item-recipe-batch-inference"
+COOKBOOK_ITEM_BATCH_SPLITTABLE_ERROR_CODES = {
+    "OPENAI_TIMEOUT",
+    "OPENAI_CONNECTION_ERROR",
+}
 TEXT_DETAIL_FIELDS = (
     "recipe_amount",
     "yield",
@@ -240,6 +252,312 @@ def resolve_cookbook_item_model():
         or default_model_for_env("OPENAI_RECIPE_MODEL")
     )
     return model, f"default:{COOKBOOK_ITEM_MODEL_ENV_VAR}"
+
+
+def env_int(name, default_value, minimum=1, maximum=None):
+    try:
+        value = int(os.getenv(name, str(default_value)))
+    except (TypeError, ValueError):
+        value = int(default_value)
+    value = max(int(minimum), value)
+    if maximum is not None:
+        value = min(int(maximum), value)
+    return value
+
+
+def cookbook_item_batch_size_limits():
+    max_items = env_int(
+        COOKBOOK_ITEM_BATCH_INFERENCE_MAX_ITEMS_ENV_VAR,
+        COOKBOOK_ITEM_BATCH_INFERENCE_DEFAULT_MAX_ITEMS,
+        minimum=1,
+        maximum=25,
+    )
+    min_items = env_int(
+        COOKBOOK_ITEM_BATCH_INFERENCE_MIN_ITEMS_ENV_VAR,
+        COOKBOOK_ITEM_BATCH_INFERENCE_DEFAULT_MIN_ITEMS,
+        minimum=1,
+        maximum=max_items,
+    )
+    return min_items, max_items
+
+
+def cookbook_item_batch_target_chars():
+    return env_int(
+        COOKBOOK_ITEM_BATCH_INFERENCE_TARGET_CHARS_ENV_VAR,
+        COOKBOOK_ITEM_BATCH_INFERENCE_DEFAULT_TARGET_CHARS,
+        minimum=3000,
+    )
+
+
+def cookbook_item_inference_batches(entries):
+    min_items, max_items = cookbook_item_batch_size_limits()
+    target_chars = cookbook_item_batch_target_chars()
+    batches = []
+    current = []
+    current_chars = 0
+
+    for entry in entries or []:
+        item = entry.get("menu_item") if isinstance(entry, dict) else {}
+        item_chars = len(json.dumps(compact_menu_batch_item(item), ensure_ascii=False))
+        should_split = (
+            current
+            and len(current) >= min_items
+            and (
+                len(current) >= max_items
+                or current_chars + item_chars > target_chars
+            )
+        )
+        if should_split:
+            batches.append(current)
+            current = []
+            current_chars = 0
+
+        current.append(entry)
+        current_chars += item_chars
+
+        if len(current) >= max_items:
+            batches.append(current)
+            current = []
+            current_chars = 0
+
+    if current:
+        batches.append(current)
+
+    return batches
+
+
+def cookbook_batch_entry_item_id(entry):
+    entry = entry if isinstance(entry, dict) else {}
+    menu_item = entry.get("menu_item") if isinstance(entry.get("menu_item"), dict) else {}
+    return clean_text(menu_item.get("menu_item_id"))
+
+
+def normalize_openai_error_message(error_code, error_message, fallback=""):
+    message = clean_text(error_message) or clean_text(fallback)
+    if message.startswith("Vision AI "):
+        message = "OpenAI " + message[len("Vision AI "):]
+    if error_code == "OPENAI_TIMEOUT" and (not message or "vision" in message.lower()):
+        return "Cookbook item batch inference timed out."
+    return message or "Unable to infer cookbook item batch."
+
+
+def coerce_batch_inference_payload(payload):
+    if not isinstance(payload, dict):
+        return {}
+    candidates = payload.get("items") or payload.get("recipes") or payload.get("recipe_inference") or payload
+    if isinstance(candidates, list):
+        keyed = {}
+        for item in candidates:
+            if not isinstance(item, dict):
+                continue
+            item_id = clean_text(item.get("menu_item_id") or item.get("id") or "")
+            if item_id:
+                keyed[item_id] = item
+        return keyed
+    if isinstance(candidates, dict):
+        return {
+            clean_text(key): value
+            for key, value in candidates.items()
+            if clean_text(key) and isinstance(value, dict)
+        }
+    return {}
+
+
+def batch_failure_map(entries, batch_result):
+    batch_result = batch_result if isinstance(batch_result, dict) else {}
+    items = batch_result.get("items") if isinstance(batch_result.get("items"), dict) else {}
+    error = (
+        batch_result.get("error_message")
+        or batch_result.get("error")
+        or batch_result.get("technical_message")
+        or "Unable to infer this cookbook item batch."
+    )
+    failures = {}
+    for entry in entries or []:
+        item_id = cookbook_batch_entry_item_id(entry)
+        if item_id and isinstance(items.get(item_id), dict):
+            continue
+        failures[item_id or clean_text(entry.get("recipe_url")) or str(len(failures) + 1)] = {
+            "error": error,
+            "error_code": batch_result.get("error_code", ""),
+            "exception_type": batch_result.get("exception_type", ""),
+            "model": batch_result.get("model", ""),
+            "model_source": batch_result.get("model_source", ""),
+        }
+    return failures
+
+
+def batch_result_can_split(batch_result):
+    batch_result = batch_result if isinstance(batch_result, dict) else {}
+    error_code = clean_text(batch_result.get("error_code"))
+    exception_type = clean_text(batch_result.get("exception_type")).lower()
+    error_text = clean_text(batch_result.get("technical_message") or batch_result.get("error_message") or batch_result.get("error")).lower()
+    return bool(
+        error_code in COOKBOOK_ITEM_BATCH_SPLITTABLE_ERROR_CODES
+        or exception_type in {"apitimeouterror", "timeouterror", "apiconnectionerror"}
+        or "timed out" in error_text
+        or "timeout" in error_text
+    )
+
+
+def send_cookbook_item_recipe_batch_prompt_to_openai(prompt_text, model, model_source, user_id=None):
+    payload, temperature_included, resolved_model = build_openai_chat_payload(
+        model,
+        COOKBOOK_ITEM_BATCH_INFERENCE_ACTION,
+        [
+            {
+                "role": "system",
+                "content": (
+                    "You infer practical, clearly labeled AI-inferred recipes from cookbook and restaurant menu items. "
+                    "Return only strict valid JSON keyed by menu_item_id."
+                ),
+            },
+            {
+                "role": "user",
+                "content": prompt_text,
+            },
+        ],
+        response_format={"type": "json_object"},
+        temperature=0,
+    )
+    print(
+        f"[OpenAI] action={COOKBOOK_ITEM_BATCH_INFERENCE_ACTION} "
+        f"model={resolved_model} model_source={model_source} "
+        f"temperature_included={temperature_included}"
+    )
+    response = throttled_chat_completion(
+        get_openai_client(),
+        payload,
+        action_name=COOKBOOK_ITEM_BATCH_INFERENCE_ACTION,
+        model=resolved_model,
+        kind="menu",
+    )
+    record_openai_usage(
+        response,
+        COOKBOOK_ITEM_BATCH_INFERENCE_ACTION,
+        model=resolved_model,
+        user_id=user_id,
+    )
+    return response.choices[0].message.content
+
+
+def _infer_menu_item_recipe_batch_once(entries, user_id=None):
+    model, model_source = resolve_cookbook_item_model()
+    try:
+        response_text = send_cookbook_item_recipe_batch_prompt_to_openai(
+            build_menu_item_recipe_batch_prompt(entries),
+            model,
+            model_source,
+            user_id=user_id,
+        )
+        payload = json.loads(clean_json_response(response_text))
+        items = coerce_batch_inference_payload(payload)
+        if not items:
+            raise ValueError("Cookbook item batch inference did not return item results.")
+        return {
+            "ok": True,
+            "items": items,
+            "failures": {},
+            "model": model,
+            "model_source": model_source,
+            "raw_response": response_text,
+        }
+    except Exception as exc:
+        error_code, error_message = classify_vision_ai_exception(exc)
+        error_message = normalize_openai_error_message(error_code, error_message, fallback=str(exc))
+        openai_error_code, openai_error_param = get_openai_error_code_and_param(exc)
+        print(
+            f"[OpenAI] action={COOKBOOK_ITEM_BATCH_INFERENCE_ACTION}_exception "
+            f"batch_size={len(entries or [])} "
+            f"model={model} model_source={model_source} "
+            f"exception_type={type(exc).__name__} error={exc} "
+            f"openai_error_code={openai_error_code or 'n/a'} "
+            f"openai_error_param={openai_error_param or 'n/a'}"
+        )
+        return {
+            "ok": False,
+            "items": {},
+            "failures": {},
+            "error_code": error_code,
+            "error_message": error_message,
+            "technical_message": str(exc),
+            "exception_type": type(exc).__name__,
+            "openai_error_code": openai_error_code,
+            "openai_error_param": openai_error_param,
+            "model": model,
+            "model_source": model_source,
+        }
+
+
+def combine_batch_results(results):
+    combined_items = {}
+    combined_failures = {}
+    model = ""
+    model_source = ""
+    error_messages = []
+
+    for result in results:
+        result = result if isinstance(result, dict) else {}
+        if not model:
+            model = result.get("model", "")
+        if not model_source:
+            model_source = result.get("model_source", "")
+        items = result.get("items") if isinstance(result.get("items"), dict) else {}
+        combined_items.update(items)
+        failures = result.get("failures") if isinstance(result.get("failures"), dict) else {}
+        combined_failures.update(failures)
+        if not result.get("ok"):
+            error_messages.append(
+                result.get("error_message")
+                or result.get("error")
+                or "Unable to infer part of this cookbook item batch."
+            )
+
+    for item_id in list(combined_failures.keys()):
+        if item_id and item_id in combined_items:
+            combined_failures.pop(item_id, None)
+
+    return {
+        "ok": not combined_failures,
+        "items": combined_items,
+        "failures": combined_failures,
+        "error_message": "; ".join(dict.fromkeys(error_messages)),
+        "model": model,
+        "model_source": model_source,
+    }
+
+
+def infer_menu_item_recipe_batch(entries, user_id=None):
+    entries = [entry for entry in entries or [] if isinstance(entry, dict)]
+    if not entries:
+        model, model_source = resolve_cookbook_item_model()
+        return {
+            "ok": True,
+            "items": {},
+            "failures": {},
+            "model": model,
+            "model_source": model_source,
+        }
+
+    result = _infer_menu_item_recipe_batch_once(entries, user_id=user_id)
+    if result.get("ok") or len(entries) <= 1 or not batch_result_can_split(result):
+        if not result.get("ok"):
+            result["failures"] = batch_failure_map(entries, result)
+        return result
+
+    midpoint = max(1, len(entries) // 2)
+    log_inference_event(
+        "batch_split",
+        batch_size=len(entries),
+        left_size=midpoint,
+        right_size=len(entries) - midpoint,
+        error_code=result.get("error_code", ""),
+        exception_type=result.get("exception_type", ""),
+        model=result.get("model", ""),
+    )
+    left = infer_menu_item_recipe_batch(entries[:midpoint], user_id=user_id)
+    right = infer_menu_item_recipe_batch(entries[midpoint:], user_id=user_id)
+    return combine_batch_results([left, right])
 
 
 def text_list_for_prompt(value, kind):
@@ -1018,8 +1336,7 @@ def infer_missing_details_for_cookbook(
     completed = 0
     detail_entries = []
     menu_stub_entries = []
-    menu_model = resolve_menu_model()
-    menu_model_source = resolve_menu_model_source()
+    cookbook_batch_model, cookbook_batch_model_source = resolve_cookbook_item_model()
 
     for index, recipe in enumerate(recipes, start=1):
         recipe_url = recipe.get("url", "")
@@ -1035,7 +1352,12 @@ def infer_missing_details_for_cookbook(
         if recipe_needs_menu_recipe_generation(recipe_data):
             if preview_only:
                 emit_started(index, recipe, recipe_name)
-                result = menu_stub_generation_preview_result(recipe_url, recipe_data, menu_model, menu_model_source)
+                result = menu_stub_generation_preview_result(
+                    recipe_url,
+                    recipe_data,
+                    cookbook_batch_model,
+                    cookbook_batch_model_source,
+                )
                 results.append(result)
                 completed += 1
                 emit_completed(index, recipe, result, completed)
@@ -1051,8 +1373,8 @@ def infer_missing_details_for_cookbook(
                     "reason": "Menu divider item skipped.",
                     "missing_fields": [],
                     "updated_fields": [],
-                    "model": menu_model,
-                    "model_source": menu_model_source,
+                    "model": cookbook_batch_model,
+                    "model_source": cookbook_batch_model_source,
                 }
                 results.append(result)
                 completed += 1
@@ -1071,26 +1393,35 @@ def infer_missing_details_for_cookbook(
         else:
             detail_entries.append((index, recipe))
 
-    for batch in menu_inference_batches(menu_stub_entries):
-        batch_result = infer_menu_item_recipe_batch(batch, user_id=user_id)
+    def infer_cookbook_stub_batch(batch):
+        return batch, infer_menu_item_recipe_batch(batch, user_id=user_id)
+
+    def process_cookbook_stub_batch(batch, batch_result):
+        nonlocal completed
+
+        batch_result = batch_result if isinstance(batch_result, dict) else {}
         result_items = batch_result.get("items") if isinstance(batch_result.get("items"), dict) else {}
-        batch_model = batch_result.get("model") or menu_model
-        batch_model_source = batch_result.get("model_source") or menu_model_source
+        failures = batch_result.get("failures") if isinstance(batch_result.get("failures"), dict) else {}
+        batch_model = batch_result.get("model") or cookbook_batch_model
+        batch_model_source = batch_result.get("model_source") or cookbook_batch_model_source
         for entry in batch:
             recipe = entry["recipe"]
             recipe_url = entry["recipe_url"]
             menu_item = entry.get("menu_item") if isinstance(entry.get("menu_item"), dict) else {}
             item_id = clean_text(menu_item.get("menu_item_id"))
             item_result = result_items.get(item_id)
-            if not batch_result.get("ok") or not isinstance(item_result, dict):
+            item_failure = failures.get(item_id) if item_id else None
+            item_failure = item_failure if isinstance(item_failure, dict) else {}
+            if not isinstance(item_result, dict):
                 result = menu_stub_generation_failure_result(
                     recipe_url,
                     entry.get("recipe_name") or recipe.get("name", ""),
-                    batch_result.get("error_message")
+                    item_failure.get("error")
+                    or batch_result.get("error_message")
                     or batch_result.get("error")
                     or (f"Batch response did not include menu_item_id {item_id}." if item_id else "Batch response did not include this item."),
-                    batch_model,
-                    batch_model_source,
+                    item_failure.get("model") or batch_model,
+                    item_failure.get("model_source") or batch_model_source,
                 )
             else:
                 result = apply_menu_batch_inference_to_stub(
@@ -1128,6 +1459,37 @@ def infer_missing_details_for_cookbook(
             results.append(result)
             completed += 1
             emit_completed(entry["index"], recipe, result, completed)
+
+    menu_stub_batches = cookbook_item_inference_batches(menu_stub_entries)
+    if len(menu_stub_batches) > 1 and worker_count > 1:
+        with ThreadPoolExecutor(max_workers=min(worker_count, len(menu_stub_batches))) as executor:
+            future_batches = {
+                executor.submit(infer_cookbook_stub_batch, batch): batch
+                for batch in menu_stub_batches
+            }
+            for future in as_completed(future_batches):
+                batch = future_batches[future]
+                try:
+                    completed_batch, batch_result = future.result()
+                except Exception as exc:
+                    error_code, error_message = classify_vision_ai_exception(exc)
+                    batch_result = {
+                        "ok": False,
+                        "items": {},
+                        "failures": {},
+                        "error_code": error_code,
+                        "error_message": normalize_openai_error_message(error_code, error_message, fallback=str(exc)),
+                        "technical_message": str(exc),
+                        "exception_type": type(exc).__name__,
+                        "model": cookbook_batch_model,
+                        "model_source": cookbook_batch_model_source,
+                    }
+                    completed_batch = batch
+                process_cookbook_stub_batch(completed_batch, batch_result)
+    else:
+        for batch in menu_stub_batches:
+            batch, batch_result = infer_cookbook_stub_batch(batch)
+            process_cookbook_stub_batch(batch, batch_result)
 
     for index, recipe in detail_entries:
         emit_started(index, recipe)

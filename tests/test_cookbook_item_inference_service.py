@@ -1,6 +1,7 @@
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -346,6 +347,127 @@ def test_cookbook_batch_generates_explicit_menu_stubs(monkeypatch, tmp_path):
     assert cookbook_recipe["recipe_status"] == "generated"
     assert cookbook_recipe["servings"] == "1 appetizer serving"
     assert cookbook_recipe["equipment_items"] == ["skillet"]
+
+
+def cookbook_batch_entry(index):
+    return {
+        "recipe_url": f"menu-item://vel-asian-cuisine/item-{index}",
+        "menu_item": {
+            "menu_item_id": f"item-{index}",
+            "item_name": f"Item {index}",
+            "menu_section": "Entrees",
+        },
+    }
+
+
+def test_cookbook_item_batches_default_smaller_than_menu_batches(monkeypatch):
+    monkeypatch.delenv(inference.COOKBOOK_ITEM_BATCH_INFERENCE_MAX_ITEMS_ENV_VAR, raising=False)
+    monkeypatch.delenv(inference.COOKBOOK_ITEM_BATCH_INFERENCE_MIN_ITEMS_ENV_VAR, raising=False)
+    monkeypatch.delenv(inference.COOKBOOK_ITEM_BATCH_INFERENCE_TARGET_CHARS_ENV_VAR, raising=False)
+    entries = [cookbook_batch_entry(index) for index in range(22)]
+
+    batches = inference.cookbook_item_inference_batches(entries)
+
+    assert [len(batch) for batch in batches] == [8, 8, 6]
+
+
+def test_cookbook_menu_stub_batch_uses_cookbook_model(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        inference,
+        "resolve_cookbook_item_model",
+        lambda: ("cookbook-mini", "configured:OPENAI_COOKBOOK_ITEM_MODEL"),
+    )
+
+    def fake_build_payload(model, endpoint_name, messages, response_format=None, temperature=None, **extra_kwargs):
+        captured["model"] = model
+        captured["endpoint_name"] = endpoint_name
+        captured["messages"] = messages
+        captured["response_format"] = response_format
+        captured["temperature"] = temperature
+        return {"model": model, "messages": messages}, True, model
+
+    def fake_completion(_client, payload, action_name="", model="", kind=""):
+        captured["payload_model"] = payload["model"]
+        captured["action_name"] = action_name
+        captured["completion_model"] = model
+        captured["kind"] = kind
+        return SimpleNamespace(
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(
+                        content=json.dumps({
+                            "item-1": {
+                                "predicted_ingredients": [{"ingredient": "ginger"}],
+                                "predicted_equipment": ["skillet"],
+                                "predicted_instructions": ["Cook until hot."],
+                            }
+                        })
+                    )
+                )
+            ]
+        )
+
+    monkeypatch.setattr(inference, "build_openai_chat_payload", fake_build_payload)
+    monkeypatch.setattr(inference, "get_openai_client", lambda: object())
+    monkeypatch.setattr(inference, "throttled_chat_completion", fake_completion)
+    monkeypatch.setattr(inference, "record_openai_usage", lambda *args, **kwargs: None)
+
+    result = inference.infer_menu_item_recipe_batch([cookbook_batch_entry(1)], user_id="owner")
+
+    assert result["ok"] is True
+    assert result["model"] == "cookbook-mini"
+    assert result["model_source"] == "configured:OPENAI_COOKBOOK_ITEM_MODEL"
+    assert "item-1" in result["items"]
+    assert captured["model"] == "cookbook-mini"
+    assert captured["endpoint_name"] == inference.COOKBOOK_ITEM_BATCH_INFERENCE_ACTION
+    assert captured["action_name"] == inference.COOKBOOK_ITEM_BATCH_INFERENCE_ACTION
+    assert captured["completion_model"] == "cookbook-mini"
+    assert captured["kind"] == "menu"
+
+
+def test_cookbook_menu_stub_batch_splits_timeout_and_combines_results(monkeypatch):
+    entries = [cookbook_batch_entry(index) for index in range(4)]
+    calls = []
+
+    def fake_once(batch, user_id=None):
+        calls.append({"size": len(batch), "user_id": user_id})
+        if len(batch) > 1:
+            return {
+                "ok": False,
+                "items": {},
+                "failures": {},
+                "error_code": "OPENAI_TIMEOUT",
+                "error_message": "Request timed out.",
+                "technical_message": "Request timed out.",
+                "exception_type": "APITimeoutError",
+                "model": "cookbook-mini",
+                "model_source": "configured:OPENAI_COOKBOOK_ITEM_MODEL",
+            }
+        item_id = batch[0]["menu_item"]["menu_item_id"]
+        return {
+            "ok": True,
+            "items": {
+                item_id: {
+                    "predicted_ingredients": [{"ingredient": item_id}],
+                    "predicted_equipment": ["skillet"],
+                    "predicted_instructions": ["Cook it."],
+                }
+            },
+            "failures": {},
+            "model": "cookbook-mini",
+            "model_source": "configured:OPENAI_COOKBOOK_ITEM_MODEL",
+        }
+
+    monkeypatch.setattr(inference, "_infer_menu_item_recipe_batch_once", fake_once)
+
+    result = inference.infer_menu_item_recipe_batch(entries, user_id="owner")
+
+    assert result["ok"] is True
+    assert sorted(result["items"]) == ["item-0", "item-1", "item-2", "item-3"]
+    assert result["failures"] == {}
+    assert [call["size"] for call in calls] == [4, 2, 1, 1, 2, 1, 1]
+    assert all(call["user_id"] == "owner" for call in calls)
 
 
 def test_cookbook_item_model_fallback_order(monkeypatch):
