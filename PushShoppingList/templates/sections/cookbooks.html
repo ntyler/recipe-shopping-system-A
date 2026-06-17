@@ -145,32 +145,6 @@
                                         </div>
                                     </div>
                                     <div class="cookbook-card-actions">
-                                        {% if cookbook.recipes %}
-                                            <label class="cookbook-infer-toggle"
-                                                   title="Allow this routine to refresh fields previously filled by this AI routine."
-                                                   onclick="event.stopPropagation()">
-                                                <input type="checkbox"
-                                                       data-cookbook-infer-overwrite
-                                                       aria-label="Overwrite existing AI-inferred fields for {{ cookbook.name }}">
-                                                <span>Overwrite AI fields</span>
-                                            </label>
-                                            <label class="cookbook-infer-toggle"
-                                                   title="Preview inferred fields without saving recipe changes."
-                                                   onclick="event.stopPropagation()">
-                                                <input type="checkbox"
-                                                       data-cookbook-infer-preview
-                                                       aria-label="Preview inferred details only for {{ cookbook.name }}">
-                                                <span>Preview Only</span>
-                                            </label>
-                                            <button type="button"
-                                                    class="cookbook-action-btn cookbook-infer-details-btn"
-                                                    data-cookbook-id="{{ cookbook.id }}"
-                                                    data-cookbook-name="{{ cookbook.name }}"
-                                                    data-cookbook-recipe-count="{{ cookbook.recipes | length }}"
-                                                    onclick="return inferMissingCookbookDetails(this, event)">
-                                                Infer Missing Details for Cookbook
-                                            </button>
-                                        {% endif %}
                                         <div class="cookbook-card-menu-wrap recipe-edit-row-menu-wrap">
                                             <button type="button"
                                                     class="recipe-edit-row-menu-btn cookbook-card-menu-btn"
@@ -182,86 +156,116 @@
                                                 <span aria-hidden="true"></span>
                                             </button>
                                             <div class="recipe-edit-row-menu cookbook-card-menu" hidden>
-                                                <a class="recipe-edit-menu-link"
-                                                   href="{{ url_for('menu_bp.cookbook_menu_pdf_log_route', cookbook_id=cookbook.id) }}"
-                                                   onclick="closeRecipeEditRowMenus()">
-                                                    Menu PDF Log
-                                                </a>
-                                                {% if not cookbook.is_unclassified %}
-                                                    <button type="button"
-                                                            data-cookbook-id="{{ cookbook.id }}"
-                                                            data-cookbook-name="{{ cookbook.name }}"
-                                                            data-cookbook-unclassified="0"
-                                                            onclick="closeRecipeEditRowMenus(); openCookbookNameEditor(this); return false;">
-                                                        Rename cookbook
-                                                    </button>
-                                                {% endif %}
                                                 {% if cookbook.recipes %}
-                                                    <button type="button"
-                                                            data-cookbook-id="{{ cookbook.id }}"
-                                                            onclick="return setAllCookbookRecipesCollapsed(this, false);"
-                                                            aria-label="Expand all recipes in {{ cookbook.name }}">
-                                                        Expand all recipes in cookbook
-                                                    </button>
-                                                    <button type="button"
-                                                            data-cookbook-id="{{ cookbook.id }}"
-                                                            onclick="return setAllCookbookRecipesCollapsed(this, true);"
-                                                            aria-label="Collapse all recipes in {{ cookbook.name }}">
-                                                        Collapse all recipes in cookbook
-                                                    </button>
-                                                    <button type="button"
-                                                            class="delete"
-                                                            data-cookbook-id="{{ cookbook.id }}"
-                                                            data-cookbook-name="{{ cookbook.name }}"
-                                                            data-cookbook-unclassified="{% if cookbook.is_unclassified %}1{% else %}0{% endif %}"
-                                                            onclick="closeRecipeEditRowMenus(); deleteSelectedCookbookRecipes(this); return false;"
-                                                            aria-label="{% if cookbook.is_unclassified %}Remove selected recipes from {{ cookbook.name }}{% else %}Delete selected recipes from {{ cookbook.name }}{% endif %}">
-                                                        {% if cookbook.is_unclassified %}Remove selected recipes{% else %}Delete selected recipes{% endif %}
-                                                    </button>
-                                                    <button type="button"
-                                                            class="delete"
-                                                            data-cookbook-id="{{ cookbook.id }}"
-                                                            data-cookbook-name="{{ cookbook.name }}"
-                                                            data-cookbook-unclassified="{% if cookbook.is_unclassified %}1{% else %}0{% endif %}"
-                                                            onclick="closeRecipeEditRowMenus(); purgeSelectedCookbookRecipes(this); return false;"
-                                                            aria-label="{% if cookbook.is_unclassified %}Purge selected recipes from {{ cookbook.name }}{% else %}Delete and purge selected recipes from {{ cookbook.name }}{% endif %}">
-                                                        {% if cookbook.is_unclassified %}Purge selected recipes{% else %}Delete and purge selected recipes{% endif %}
-                                                    </button>
+                                                    <div class="overflow-menu-section cookbook-infer-menu-section">
+                                                        <div class="overflow-menu-section-title">Menu AI</div>
+                                                        <label class="recipe-menu-check-toggle cookbook-infer-toggle"
+                                                               title="Allow this routine to refresh fields previously filled by this AI routine."
+                                                               onclick="event.stopPropagation()">
+                                                            <input type="checkbox"
+                                                                   data-cookbook-infer-overwrite
+                                                                   aria-label="Overwrite existing AI-inferred fields for {{ cookbook.name }}">
+                                                            <span>Overwrite AI fields</span>
+                                                        </label>
+                                                        <label class="recipe-menu-check-toggle cookbook-infer-toggle"
+                                                               title="Preview inferred fields without saving recipe changes."
+                                                               onclick="event.stopPropagation()">
+                                                            <input type="checkbox"
+                                                                   data-cookbook-infer-preview
+                                                                   aria-label="Preview inferred details only for {{ cookbook.name }}">
+                                                            <span>Preview Only</span>
+                                                        </label>
+                                                        <button type="button"
+                                                                data-cookbook-id="{{ cookbook.id }}"
+                                                                data-cookbook-name="{{ cookbook.name }}"
+                                                                data-cookbook-recipe-count="{{ cookbook.recipes | length }}"
+                                                                onclick="return inferMissingCookbookDetails(this, event)">
+                                                            Infer Missing Details for Cookbook
+                                                        </button>
+                                                    </div>
                                                 {% endif %}
-                                                {% if cookbook.is_unclassified and cookbook.recipes %}
-                                                    <button type="button"
-                                                            class="delete"
-                                                            data-cookbook-id="{{ cookbook.id }}"
-                                                            data-cookbook-name="{{ cookbook.name }}"
-                                                            data-cookbook-unclassified="1"
-                                                            data-cookbook-recipe-count="{{ cookbook.recipes | length }}"
-                                                            onclick="closeRecipeEditRowMenus(); purgeUnclassifiedCookbookRecipes(this); return false;"
-                                                            aria-label="Purge all unclassified recipes from {{ cookbook.name }}">
-                                                        Purge all unclassified recipes
-                                                    </button>
-                                                {% endif %}
-                                                {% if not cookbook.is_unclassified %}
-                                                    <button type="button"
-                                                            class="delete"
-                                                            data-cookbook-id="{{ cookbook.id }}"
-                                                            data-cookbook-name="{{ cookbook.name }}"
-                                                            data-cookbook-unclassified="0"
-                                                            data-cookbook-recipe-count="{{ cookbook.recipes | length }}"
-                                                            onclick="closeRecipeEditRowMenus(); deleteCookbook(this); return false;"
-                                                            aria-label="Delete {{ cookbook.name }}">
-                                                        Delete cookbook, keep recipes
-                                                    </button>
-                                                    <button type="button"
-                                                            class="delete"
-                                                            data-cookbook-id="{{ cookbook.id }}"
-                                                            data-cookbook-name="{{ cookbook.name }}"
-                                                            data-cookbook-unclassified="0"
-                                                            data-cookbook-recipe-count="{{ cookbook.recipes | length }}"
-                                                            onclick="closeRecipeEditRowMenus(); purgeCookbook(this); return false;"
-                                                            aria-label="Delete {{ cookbook.name }} and purge all recipes in cookbook">
-                                                        Delete and purge all recipes in cookbook
-                                                    </button>
-                                                {% endif %}
+                                                <div class="overflow-menu-section cookbook-actions-menu-section">
+                                                    <a class="recipe-edit-menu-link"
+                                                       href="{{ url_for('menu_bp.cookbook_menu_pdf_log_route', cookbook_id=cookbook.id) }}"
+                                                       onclick="closeRecipeEditRowMenus()">
+                                                        Menu PDF Log
+                                                    </a>
+                                                    {% if not cookbook.is_unclassified %}
+                                                        <button type="button"
+                                                                data-cookbook-id="{{ cookbook.id }}"
+                                                                data-cookbook-name="{{ cookbook.name }}"
+                                                                data-cookbook-unclassified="0"
+                                                                onclick="closeRecipeEditRowMenus(); openCookbookNameEditor(this); return false;">
+                                                            Rename cookbook
+                                                        </button>
+                                                    {% endif %}
+                                                    {% if cookbook.recipes %}
+                                                        <button type="button"
+                                                                data-cookbook-id="{{ cookbook.id }}"
+                                                                onclick="return setAllCookbookRecipesCollapsed(this, false);"
+                                                                aria-label="Expand all recipes in {{ cookbook.name }}">
+                                                            Expand all recipes in cookbook
+                                                        </button>
+                                                        <button type="button"
+                                                                data-cookbook-id="{{ cookbook.id }}"
+                                                                onclick="return setAllCookbookRecipesCollapsed(this, true);"
+                                                                aria-label="Collapse all recipes in {{ cookbook.name }}">
+                                                            Collapse all recipes in cookbook
+                                                        </button>
+                                                        <button type="button"
+                                                                class="delete"
+                                                                data-cookbook-id="{{ cookbook.id }}"
+                                                                data-cookbook-name="{{ cookbook.name }}"
+                                                                data-cookbook-unclassified="{% if cookbook.is_unclassified %}1{% else %}0{% endif %}"
+                                                                onclick="closeRecipeEditRowMenus(); deleteSelectedCookbookRecipes(this); return false;"
+                                                                aria-label="{% if cookbook.is_unclassified %}Remove selected recipes from {{ cookbook.name }}{% else %}Delete selected recipes from {{ cookbook.name }}{% endif %}">
+                                                            {% if cookbook.is_unclassified %}Remove selected recipes{% else %}Delete selected recipes{% endif %}
+                                                        </button>
+                                                        <button type="button"
+                                                                class="delete"
+                                                                data-cookbook-id="{{ cookbook.id }}"
+                                                                data-cookbook-name="{{ cookbook.name }}"
+                                                                data-cookbook-unclassified="{% if cookbook.is_unclassified %}1{% else %}0{% endif %}"
+                                                                onclick="closeRecipeEditRowMenus(); purgeSelectedCookbookRecipes(this); return false;"
+                                                                aria-label="{% if cookbook.is_unclassified %}Purge selected recipes from {{ cookbook.name }}{% else %}Delete and purge selected recipes from {{ cookbook.name }}{% endif %}">
+                                                            {% if cookbook.is_unclassified %}Purge selected recipes{% else %}Delete and purge selected recipes{% endif %}
+                                                        </button>
+                                                    {% endif %}
+                                                    {% if cookbook.is_unclassified and cookbook.recipes %}
+                                                        <button type="button"
+                                                                class="delete"
+                                                                data-cookbook-id="{{ cookbook.id }}"
+                                                                data-cookbook-name="{{ cookbook.name }}"
+                                                                data-cookbook-unclassified="1"
+                                                                data-cookbook-recipe-count="{{ cookbook.recipes | length }}"
+                                                                onclick="closeRecipeEditRowMenus(); purgeUnclassifiedCookbookRecipes(this); return false;"
+                                                                aria-label="Purge all unclassified recipes from {{ cookbook.name }}">
+                                                            Purge all unclassified recipes
+                                                        </button>
+                                                    {% endif %}
+                                                    {% if not cookbook.is_unclassified %}
+                                                        <button type="button"
+                                                                class="delete"
+                                                                data-cookbook-id="{{ cookbook.id }}"
+                                                                data-cookbook-name="{{ cookbook.name }}"
+                                                                data-cookbook-unclassified="0"
+                                                                data-cookbook-recipe-count="{{ cookbook.recipes | length }}"
+                                                                onclick="closeRecipeEditRowMenus(); deleteCookbook(this); return false;"
+                                                                aria-label="Delete {{ cookbook.name }}">
+                                                            Delete cookbook, keep recipes
+                                                        </button>
+                                                        <button type="button"
+                                                                class="delete"
+                                                                data-cookbook-id="{{ cookbook.id }}"
+                                                                data-cookbook-name="{{ cookbook.name }}"
+                                                                data-cookbook-unclassified="0"
+                                                                data-cookbook-recipe-count="{{ cookbook.recipes | length }}"
+                                                                onclick="closeRecipeEditRowMenus(); purgeCookbook(this); return false;"
+                                                                aria-label="Delete {{ cookbook.name }} and purge all recipes in cookbook">
+                                                            Delete and purge all recipes in cookbook
+                                                        </button>
+                                                    {% endif %}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

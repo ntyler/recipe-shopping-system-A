@@ -66,6 +66,30 @@ def test_cookbook_menu_mode_static_hooks_are_present():
     assert ".cookbook-category-grid" in css
 
 
+def test_cookbook_infer_controls_live_inside_cookbook_submenu():
+    template = read_text("PushShoppingList/templates/sections/cookbooks.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+
+    actions_start = template.index('<div class="cookbook-card-actions">')
+    menu_wrap_start = template.index('<div class="cookbook-card-menu-wrap', actions_start)
+    header_actions_block = template[actions_start:menu_wrap_start]
+
+    menu_start = template.index('<div class="recipe-edit-row-menu cookbook-card-menu" hidden>', menu_wrap_start)
+    browser_start = template.index('<div class="cookbook-menu-browser"', menu_start)
+    cookbook_menu_block = template[menu_start:browser_start]
+
+    assert "data-cookbook-infer-overwrite" not in header_actions_block
+    assert "data-cookbook-infer-preview" not in header_actions_block
+    assert "inferMissingCookbookDetails" not in header_actions_block
+    assert cookbook_menu_block.index("Menu AI") < cookbook_menu_block.index("data-cookbook-infer-overwrite")
+    assert cookbook_menu_block.index("data-cookbook-infer-overwrite") < cookbook_menu_block.index("data-cookbook-infer-preview")
+    assert cookbook_menu_block.index("data-cookbook-infer-preview") < cookbook_menu_block.index("inferMissingCookbookDetails")
+    assert cookbook_menu_block.index("inferMissingCookbookDetails") < cookbook_menu_block.index("Menu PDF Log")
+    assert "function cookbookInferOptionCheckbox" in script
+    assert 'button.closest(".recipe-edit-row-menu")' in script
+    assert "menu.recipeEditAnchorButton" in script
+
+
 def test_cookbook_recipe_rows_match_current_recipe_summary_layout():
     template = read_text("PushShoppingList/templates/sections/cookbooks.html")
     css = read_text("PushShoppingList/static/css/app.css")

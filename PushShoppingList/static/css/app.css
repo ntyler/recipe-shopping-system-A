@@ -7628,6 +7628,10 @@ body {
             min-width: 134px;
         }
 
+        .cookbook-card-menu {
+            min-width: 226px;
+        }
+
         .cookbook-name-modal-backdrop {
             position: fixed;
             inset: 0;
@@ -21006,6 +21010,11 @@ img[data-deferred-src] {
             height: 16px;
             margin: 0;
             accent-color: #16a34a;
+        }
+
+        .recipe-edit-row-menu .cookbook-infer-toggle {
+            justify-content: flex-start;
+            white-space: normal;
         }
 
         .cookbook-infer-details-btn {

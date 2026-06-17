@@ -6355,15 +6355,31 @@ function selectedCookbookRestoreCount() {
     return document.querySelectorAll("[data-cookbook-restore-checkbox]:checked").length;
 }
 
+function cookbookInferOptionCheckbox(button, selector) {
+    const menu = button && typeof button.closest === "function"
+        ? button.closest(".recipe-edit-row-menu")
+        : null;
+    const menuCheckbox = menu ? menu.querySelector(selector) : null;
+
+    if (menuCheckbox) {
+        return menuCheckbox;
+    }
+
+    const anchorCard = menu && menu.recipeEditAnchorButton
+        ? menu.recipeEditAnchorButton.closest("[data-cookbook-card]")
+        : null;
+    const card = anchorCard || (button && typeof button.closest === "function" ? button.closest("[data-cookbook-card]") : null);
+
+    return card ? card.querySelector(selector) : null;
+}
+
 function cookbookInferOverwriteEnabled(button) {
-    const card = button ? button.closest("[data-cookbook-card]") : null;
-    const checkbox = card ? card.querySelector("[data-cookbook-infer-overwrite]") : null;
+    const checkbox = cookbookInferOptionCheckbox(button, "[data-cookbook-infer-overwrite]");
     return Boolean(checkbox && checkbox.checked);
 }
 
 function cookbookInferPreviewEnabled(button) {
-    const card = button ? button.closest("[data-cookbook-card]") : null;
-    const checkbox = card ? card.querySelector("[data-cookbook-infer-preview]") : null;
+    const checkbox = cookbookInferOptionCheckbox(button, "[data-cookbook-infer-preview]");
     return Boolean(checkbox && checkbox.checked);
 }
 
