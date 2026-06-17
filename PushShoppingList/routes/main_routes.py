@@ -974,10 +974,15 @@ def cookbook_view_for_render(recipe_rows, food_rules=None, image_variants=None):
             recipe["name"] = recipe.get("name") or recipe_data.get("recipe_title") or recipe_url
             recipe["source_href"] = recipe.get("source_href") or recipe_source_href(recipe_url)
             recipe["source_display_url"] = recipe.get("source_display_url") or recipe_source_display_url(recipe_url)
-            recipe["source_type"] = recipe.get("source_type") or recipe_data.get("source_type", "")
-            recipe["ai_inferred"] = bool(recipe.get("ai_inferred") or recipe_data.get("ai_inferred"))
-            recipe["needs_ai_recipe"] = bool(recipe.get("needs_ai_recipe") or recipe_data.get("needs_ai_recipe"))
-            recipe["recipe_status"] = recipe.get("recipe_status") or recipe_data.get("recipe_status", "")
+            recipe["source_type"] = recipe_data.get("source_type") or recipe.get("source_type") or ""
+            recipe["ai_inferred"] = bool(recipe_data.get("ai_inferred") or recipe.get("ai_inferred"))
+            if recipe_data:
+                recipe["needs_ai_recipe"] = bool(recipe_data.get("needs_ai_recipe"))
+            else:
+                recipe["needs_ai_recipe"] = bool(recipe.get("needs_ai_recipe"))
+            recipe["recipe_status"] = recipe_data.get("recipe_status") or recipe.get("recipe_status") or ""
+            if str(recipe["recipe_status"] or "").strip().lower() == "generated":
+                recipe["needs_ai_recipe"] = False
             recipe["menu_section"] = recipe.get("menu_section") or recipe_data.get("menu_section", "")
             recipe["menu_item_name"] = recipe.get("menu_item_name") or recipe_data.get("menu_item_name", "")
             recipe["menu_description"] = recipe.get("menu_description") or recipe_data.get("menu_description", "")

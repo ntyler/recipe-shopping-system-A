@@ -183,6 +183,54 @@ def test_cookbook_recipe_view_renders_menu_stub_actions_above_amount():
     assert "Vel Asain Cuisine" in card_html[cookbook_index:]
 
 
+def test_cookbook_view_generated_recipe_clears_stale_stub_state(monkeypatch):
+    recipe_url = "menu-item://vel-asain-cuisine/spring-roll"
+    generated_recipe = {
+        "source_url": recipe_url,
+        "source_type": "menu_item_inferred",
+        "ai_inferred": True,
+        "needs_ai_recipe": False,
+        "recipe_status": "generated",
+        "recipe_title": "Spring Roll",
+        "servings": "2 servings",
+        "ingredients": [{"ingredient": "spring roll wrappers", "quantity": "2"}],
+        "instructions": [{"instruction": "Fill and fry."}],
+        "nutrition": {},
+    }
+
+    with TemporaryDirectory() as temp_dir, patch.object(
+        cookbook_service,
+        "COOKBOOKS_FILE",
+        Path(temp_dir) / "cookbooks.json",
+    ):
+        cookbook_service.save_cookbooks({
+            "cookbooks": [
+                {
+                    "id": "vel-asain-cuisine",
+                    "name": "Vel Asain Cuisine",
+                    "recipes": [
+                        {
+                            "url": recipe_url,
+                            "name": "Spring Roll",
+                            "needs_ai_recipe": True,
+                            "source_type": "menu_item_stub",
+                            "recipe_status": "stub",
+                        },
+                    ],
+                },
+            ],
+        })
+        monkeypatch.setattr(main_routes, "load_saved_recipe_output", lambda url: generated_recipe if url == recipe_url else {})
+        monkeypatch.setattr(main_routes, "load_recipe_ingredients", lambda: {})
+
+        view = main_routes.cookbook_view_for_render([])
+
+    recipe = view["cookbooks"][0]["recipes"][0]
+    assert recipe["source_type"] == "menu_item_inferred"
+    assert recipe["recipe_status"] == "generated"
+    assert recipe["needs_ai_recipe"] is False
+
+
 def test_unclassified_cookbook_menu_keeps_cookbook_management_protected():
     app = create_app()
     app.config.update(TESTING=True)

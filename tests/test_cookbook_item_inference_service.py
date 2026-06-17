@@ -286,6 +286,68 @@ def test_cookbook_batch_only_processes_selected_cookbook(monkeypatch, tmp_path):
     assert other["ingredients"] == [{"ingredient": "", "original_text": "", "quantity": "", "unit": ""}]
 
 
+def test_cookbook_batch_generates_explicit_menu_stubs(monkeypatch, tmp_path):
+    configure_inference_storage(monkeypatch, tmp_path)
+    seed_cookbook_and_recipe(recipe_overrides={
+        "needs_ai_recipe": True,
+        "recipe_status": "stub",
+        "ingredients": [],
+        "equipment": [],
+        "instructions": [],
+        "recipe_inference": {"status": "not_generated"},
+    })
+    calls = []
+
+    def fail_cookbook_detail_request(*_args, **_kwargs):
+        raise AssertionError("Explicit menu stubs should use menu recipe generation")
+
+    def fake_menu_batch(entries, user_id=None):
+        calls.append({"entries": entries, "user_id": user_id})
+        items = {}
+        for entry in entries:
+            item_id = entry["menu_item"]["menu_item_id"]
+            items[item_id] = {
+                "servings": "1 appetizer serving",
+                "predicted_ingredients": [
+                    {"ingredient": "spring roll wrappers", "quantity": "2", "unit": ""},
+                    {"ingredient": "shredded carrots", "quantity": "1/2", "unit": "cup"},
+                ],
+                "predicted_equipment": ["skillet"],
+                "predicted_instructions": [
+                    "Fill the wrappers with vegetables.",
+                    "Pan-fry until crisp.",
+                ],
+                "confidence": 0.74,
+            }
+        return {
+            "ok": True,
+            "items": items,
+            "model": "menu-test-model",
+            "model_source": "test:OPENAI_MENU_MODEL",
+        }
+
+    monkeypatch.setattr(inference, "request_cookbook_item_details_from_openai", fail_cookbook_detail_request)
+    monkeypatch.setattr(inference, "infer_menu_item_recipe_batch", fake_menu_batch)
+
+    result = inference.infer_missing_details_for_cookbook("vel-asian-cuisine", user_id="owner")
+    saved = recipe_edit_service.load_recipe_output(SPRING_ROLL_URL)
+    cookbook_recipe = cookbook_service.load_cookbooks()["cookbooks"][0]["recipes"][0]
+
+    assert result["ok"] is True
+    assert result["updated"] == 1
+    assert result["skipped"] == 0
+    assert len(calls) == 1
+    assert calls[0]["user_id"] == "owner"
+    assert saved["needs_ai_recipe"] is False
+    assert saved["recipe_status"] == "generated"
+    assert saved["ingredients"][0]["ingredient"] == "spring roll wrappers"
+    assert saved["instructions"][0]["instruction"] == "Fill the wrappers with vegetables."
+    assert cookbook_recipe["needs_ai_recipe"] is False
+    assert cookbook_recipe["recipe_status"] == "generated"
+    assert cookbook_recipe["servings"] == "1 appetizer serving"
+    assert cookbook_recipe["equipment_items"] == ["skillet"]
+
+
 def test_cookbook_item_model_fallback_order(monkeypatch):
     monkeypatch.setattr(inference, "sync_openai_model_environment_from_overrides", lambda: None)
     monkeypatch.setattr(inference, "openai_model_recommendations", lambda: {"mappings": {}})

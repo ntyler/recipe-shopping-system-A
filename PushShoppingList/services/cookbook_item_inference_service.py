@@ -1,8 +1,6 @@
 import json
 import os
 import time
-from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import as_completed
 from datetime import datetime
 from datetime import timezone
 
@@ -14,14 +12,22 @@ from PushShoppingList.services.openai_model_service import sync_openai_model_env
 from PushShoppingList.services.openai_throttle_service import throttled_chat_completion
 from PushShoppingList.services.openai_usage_service import record_openai_usage
 from PushShoppingList.services.recipe_extract_service import STORE_SECTION_ORDER
+from PushShoppingList.services.recipe_extract_service import apply_menu_batch_inference_to_stub
 from PushShoppingList.services.recipe_extract_service import build_openai_chat_payload
 from PushShoppingList.services.recipe_extract_service import classify_store_section
 from PushShoppingList.services.recipe_extract_service import clean_json_response
 from PushShoppingList.services.recipe_extract_service import get_openai_client
 from PushShoppingList.services.recipe_extract_service import get_openai_error_code_and_param
+from PushShoppingList.services.recipe_extract_service import generate_menu_recipe_from_stub
+from PushShoppingList.services.recipe_extract_service import infer_menu_item_recipe_batch
+from PushShoppingList.services.recipe_extract_service import menu_batch_item_from_stub
+from PushShoppingList.services.recipe_extract_service import menu_inference_batches
+from PushShoppingList.services.recipe_extract_service import menu_item_name_is_blank_divider
 from PushShoppingList.services.recipe_extract_service import normalize_extracted_equipment_fields
 from PushShoppingList.services.recipe_extract_service import normalize_extracted_ingredient_fields
 from PushShoppingList.services.recipe_extract_service import normalize_recipe_scaling_metadata
+from PushShoppingList.services.recipe_extract_service import resolve_menu_model
+from PushShoppingList.services.recipe_extract_service import resolve_menu_model_source
 from PushShoppingList.services.recipe_ingredient_service import load_recipe_ingredients
 from PushShoppingList.services.recipe_ingredient_service import recipe_ingredients_for_key
 from PushShoppingList.services.recipe_url_service import normalize_recipe_quantity
@@ -142,6 +148,41 @@ def field_has_real_value(recipe_data, field):
         scaling = recipe_data.get("scaling") if isinstance(recipe_data.get("scaling"), dict) else {}
         return not missing_text(recipe_data.get("servings")) or not missing_text(scaling.get("base_servings"))
     return not missing_text(recipe_data.get(field))
+
+
+def nested_recipe_raw(recipe_data):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    raw = recipe_data.get("raw")
+    return raw if isinstance(raw, dict) else {}
+
+
+def recipe_inference_record(recipe_data):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    raw = nested_recipe_raw(recipe_data)
+    inference = recipe_data.get("recipe_inference")
+    if not isinstance(inference, dict):
+        inference = raw.get("recipe_inference")
+    return inference if isinstance(inference, dict) else {}
+
+
+def recipe_needs_menu_recipe_generation(recipe_data):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    raw = nested_recipe_raw(recipe_data)
+    inference = recipe_inference_record(recipe_data)
+    source_types = {
+        clean_text(recipe_data.get("source_type")).lower(),
+        clean_text(raw.get("source_type")).lower(),
+    }
+    statuses = {
+        clean_text(recipe_data.get("recipe_status")).lower(),
+        clean_text(raw.get("recipe_status")).lower(),
+        clean_text(inference.get("status")).lower(),
+    }
+    if recipe_data.get("needs_ai_recipe") or raw.get("needs_ai_recipe"):
+        return True
+    if "menu_item_stub" in source_types or "stub" in statuses:
+        return True
+    return False
 
 
 def inferred_fields_for_recipe(recipe_data):
@@ -571,6 +612,7 @@ def update_cookbook_recipe_snapshot(cookbook_id, recipe_url, recipe_data):
                 or recipe_url
             )
             for field in (
+                "recipe_status",
                 "servings",
                 "level",
                 "total_time",
@@ -591,6 +633,8 @@ def update_cookbook_recipe_snapshot(cookbook_id, recipe_url, recipe_data):
                 if recipe_data.get(field) not in (None, "", [], {}):
                     recipe[field] = recipe_data.get(field)
             recipe["ai_inferred"] = bool(recipe_data.get("ai_inferred"))
+            if "needs_ai_recipe" in recipe_data:
+                recipe["needs_ai_recipe"] = bool(recipe_data.get("needs_ai_recipe"))
             recipe["base_servings"] = recipe_data.get("servings") or recipe.get("base_servings", "")
             recipe["equipment_items"] = text_list_for_prompt(recipe_data.get("equipment", []), "equipment")
             recipe["instruction_items"] = text_list_for_prompt(recipe_data.get("instructions", []), "instructions")
@@ -618,6 +662,114 @@ def save_inferred_recipe(recipe_url, recipe_data, cookbook_id=""):
     return recipe_url
 
 
+def menu_stub_generation_preview_result(recipe_url, recipe_data, model="", model_source=""):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    recipe_name = first_clean_text(
+        recipe_data.get("menu_item_name"),
+        recipe_data.get("recipe_title"),
+        recipe_data.get("display_name"),
+        nested_recipe_raw(recipe_data).get("menu_item_name"),
+        nested_recipe_raw(recipe_data).get("recipe_title"),
+        recipe_url,
+    )
+    return {
+        "ok": True,
+        "skipped": False,
+        "recipe_url": recipe_url,
+        "recipe_name": recipe_name,
+        "preview_only": True,
+        "missing_fields": list(DETAIL_FIELDS),
+        "updated_fields": [],
+        "would_update_fields": ["full_menu_recipe"],
+        "generated_menu_recipe": False,
+        "model": model or resolve_menu_model(),
+        "model_source": model_source or resolve_menu_model_source(),
+        "reason": "Menu item stub needs full recipe generation.",
+    }
+
+
+def menu_stub_generation_success_result(recipe_url, result, cookbook_id="", preview_only=False):
+    result = result if isinstance(result, dict) else {}
+    raw_recipe = result.get("raw") if isinstance(result.get("raw"), dict) else {}
+    recipe_data = raw_recipe or recipe_edit_service.load_recipe_output(recipe_url) or {}
+    recipe_name = first_clean_text(
+        result.get("menu_item_name"),
+        recipe_data.get("menu_item_name"),
+        recipe_data.get("recipe_title"),
+        result.get("recipe_title"),
+        result.get("display_name"),
+        recipe_url,
+    )
+    saved_url = recipe_url
+    loaded_recipe = recipe_data
+
+    if not preview_only:
+        saved_url = save_inferred_recipe(recipe_url, recipe_data, cookbook_id)
+        loaded = recipe_edit_service.load_editable_recipe(saved_url)
+        loaded_recipe = loaded.get("recipe", {}) if isinstance(loaded, dict) else recipe_data
+
+    return {
+        "ok": True,
+        "skipped": False,
+        "recipe_url": saved_url,
+        "recipe_name": recipe_name,
+        "preview_only": bool(preview_only),
+        "missing_fields": list(DETAIL_FIELDS),
+        "updated_fields": list(DETAIL_FIELDS),
+        "would_update_fields": list(DETAIL_FIELDS) if preview_only else [],
+        "generated_menu_recipe": True,
+        "model": result.get("model") or result.get("model_used") or recipe_data.get("model_used") or resolve_menu_model(),
+        "model_source": result.get("model_source") or recipe_data.get("model_source") or resolve_menu_model_source(),
+        "confidence": recipe_data.get("extraction_confidence") or recipe_data.get("confidence") or "medium",
+        "recipe": loaded_recipe,
+        "saved_counts": {
+            "ingredients": len((recipe_data.get("ingredients") or []) if isinstance(recipe_data.get("ingredients"), list) else []),
+            "equipment": len((recipe_data.get("equipment") or []) if isinstance(recipe_data.get("equipment"), list) else []),
+            "instructions": len((recipe_data.get("instructions") or []) if isinstance(recipe_data.get("instructions"), list) else []),
+        },
+    }
+
+
+def menu_stub_generation_failure_result(recipe_url, recipe_name="", error="", model="", model_source=""):
+    return {
+        "ok": False,
+        "skipped": False,
+        "recipe_url": recipe_url,
+        "recipe_name": recipe_name or recipe_url,
+        "error": error or "Unable to generate a full recipe from this menu item stub.",
+        "model": model or resolve_menu_model(),
+        "model_source": model_source or resolve_menu_model_source(),
+        "generated_menu_recipe": False,
+    }
+
+
+def infer_menu_stub_recipe_for_recipe(recipe_url, recipe_data, cookbook_id="", preview_only=False, user_id=None):
+    if preview_only:
+        return menu_stub_generation_preview_result(recipe_url, recipe_data)
+
+    result = generate_menu_recipe_from_stub(recipe_url, recipe_data, user_id=user_id)
+    if not result.get("ok"):
+        return menu_stub_generation_failure_result(
+            recipe_url,
+            first_clean_text(recipe_data.get("menu_item_name"), recipe_data.get("recipe_title"), recipe_url),
+            result.get("error") or "Unable to generate a full recipe from this menu item stub.",
+            result.get("model") or result.get("model_used") or resolve_menu_model(),
+            result.get("model_source") or resolve_menu_model_source(),
+        )
+
+    raw_recipe = result.get("raw") if isinstance(result.get("raw"), dict) else {}
+    if not ingredients_have_real_values(raw_recipe.get("ingredients")):
+        return menu_stub_generation_failure_result(
+            recipe_url,
+            result.get("menu_item_name") or recipe_data.get("recipe_title") or recipe_url,
+            "Generated menu recipe did not include ingredients.",
+            result.get("model") or result.get("model_used") or resolve_menu_model(),
+            result.get("model_source") or resolve_menu_model_source(),
+        )
+
+    return menu_stub_generation_success_result(recipe_url, result, cookbook_id=cookbook_id)
+
+
 def log_inference_event(stage, **values):
     safe_values = " ".join(
         f"{key}={json.dumps(value, ensure_ascii=False) if isinstance(value, (dict, list)) else repr(value)}"
@@ -641,6 +793,15 @@ def infer_missing_details_for_recipe(
     recipe_data = recipe_edit_service.load_recipe_output(recipe_url) or {"source_url": recipe_url}
     recipe_data.setdefault("source_url", recipe_url)
     cookbook_context = cookbook_context_for_recipe(recipe_url, cookbook_id, cookbook_name)
+    if recipe_needs_menu_recipe_generation(recipe_data):
+        return infer_menu_stub_recipe_for_recipe(
+            recipe_url,
+            recipe_data,
+            cookbook_context.get("cookbook_id", ""),
+            preview_only=preview_only,
+            user_id=user_id,
+        )
+
     missing_fields = missing_fields_for_recipe(recipe_data, overwrite_ai_fields=overwrite_ai_fields)
     item_name = first_clean_text(
         recipe_data.get("menu_item_name"),
@@ -830,62 +991,171 @@ def infer_missing_details_for_cookbook(
         except Exception as exc:
             log_inference_event("progress_callback_failed", error=str(exc))
 
-    def run_one(index, recipe):
+    def emit_started(index, recipe, recipe_name=""):
         recipe_url = recipe.get("url", "")
-        recipe_name = recipe.get("name", "") or recipe_url
         emit_progress({
             "phase": "details",
             "event": "started",
             "recipe_url": recipe_url,
-            "recipe_name": recipe_name,
+            "recipe_name": recipe_name or recipe.get("name", "") or recipe_url,
             "index": index,
             "total": total,
         })
-        return infer_missing_details_for_recipe(
-            recipe_url,
-            cookbook_id=cookbook.get("id", ""),
-            cookbook_name=cookbook.get("name", ""),
-            overwrite_ai_fields=overwrite_ai_fields,
-            preview_only=preview_only,
-            user_id=user_id,
-        )
 
-    with ThreadPoolExecutor(max_workers=worker_count) as executor:
-        future_to_recipe = {
-            executor.submit(run_one, index, recipe): (index, recipe)
-            for index, recipe in enumerate(recipes, start=1)
-        }
-        completed = 0
-        for future in as_completed(future_to_recipe):
-            index, recipe = future_to_recipe[future]
-            try:
-                result = future.result()
-            except Exception as exc:
+    def emit_completed(index, recipe, result, completed):
+        emit_progress({
+            "phase": "details",
+            "event": "completed",
+            "recipe_url": result.get("recipe_url") or recipe.get("url", ""),
+            "recipe_name": result.get("recipe_name") or recipe.get("name", "") or recipe.get("url", ""),
+            "index": index,
+            "completed": completed,
+            "total": total,
+            "ok": bool(result.get("ok")),
+            "skipped": bool(result.get("skipped")),
+        })
+
+    completed = 0
+    detail_entries = []
+    menu_stub_entries = []
+    menu_model = resolve_menu_model()
+    menu_model_source = resolve_menu_model_source()
+
+    for index, recipe in enumerate(recipes, start=1):
+        recipe_url = recipe.get("url", "")
+        recipe_data = recipe_edit_service.load_recipe_output(recipe_url) or {"source_url": recipe_url}
+        recipe_data.setdefault("source_url", recipe_url)
+        recipe_name = first_clean_text(
+            recipe_data.get("menu_item_name"),
+            recipe_data.get("recipe_title"),
+            recipe_data.get("display_name"),
+            recipe.get("name"),
+            recipe_url,
+        )
+        if recipe_needs_menu_recipe_generation(recipe_data):
+            if preview_only:
+                emit_started(index, recipe, recipe_name)
+                result = menu_stub_generation_preview_result(recipe_url, recipe_data, menu_model, menu_model_source)
+                results.append(result)
+                completed += 1
+                emit_completed(index, recipe, result, completed)
+                continue
+
+            menu_item = menu_batch_item_from_stub(recipe_url, recipe_data, index - 1)
+            if menu_item_name_is_blank_divider(menu_item.get("item_name")):
                 result = {
-                    "ok": False,
-                    "recipe_url": recipe.get("url", ""),
-                    "recipe_name": recipe.get("name", "") or recipe.get("url", ""),
-                    "error": str(exc) or "Unable to infer this recipe.",
+                    "ok": True,
+                    "skipped": True,
+                    "recipe_url": recipe_url,
+                    "recipe_name": recipe_name,
+                    "reason": "Menu divider item skipped.",
+                    "missing_fields": [],
+                    "updated_fields": [],
+                    "model": menu_model,
+                    "model_source": menu_model_source,
                 }
-                log_inference_event(
-                    "item_failed",
-                    recipe_id=result["recipe_url"],
-                    recipe_name=result["recipe_name"],
-                    error=result["error"],
+                results.append(result)
+                completed += 1
+                emit_completed(index, recipe, result, completed)
+                continue
+
+            emit_started(index, recipe, recipe_name)
+            menu_stub_entries.append({
+                "index": index,
+                "recipe": recipe,
+                "recipe_url": recipe_url,
+                "recipe_name": recipe_name,
+                "stub": recipe_data,
+                "menu_item": menu_item,
+            })
+        else:
+            detail_entries.append((index, recipe))
+
+    for batch in menu_inference_batches(menu_stub_entries):
+        batch_result = infer_menu_item_recipe_batch(batch, user_id=user_id)
+        result_items = batch_result.get("items") if isinstance(batch_result.get("items"), dict) else {}
+        batch_model = batch_result.get("model") or menu_model
+        batch_model_source = batch_result.get("model_source") or menu_model_source
+        for entry in batch:
+            recipe = entry["recipe"]
+            recipe_url = entry["recipe_url"]
+            menu_item = entry.get("menu_item") if isinstance(entry.get("menu_item"), dict) else {}
+            item_id = clean_text(menu_item.get("menu_item_id"))
+            item_result = result_items.get(item_id)
+            if not batch_result.get("ok") or not isinstance(item_result, dict):
+                result = menu_stub_generation_failure_result(
+                    recipe_url,
+                    entry.get("recipe_name") or recipe.get("name", ""),
+                    batch_result.get("error_message")
+                    or batch_result.get("error")
+                    or (f"Batch response did not include menu_item_id {item_id}." if item_id else "Batch response did not include this item."),
+                    batch_model,
+                    batch_model_source,
                 )
+            else:
+                result = apply_menu_batch_inference_to_stub(
+                    recipe_url,
+                    entry.get("stub") or {},
+                    menu_item,
+                    item_result,
+                    model=batch_model,
+                    model_source=batch_model_source,
+                )
+                if not result.get("ok"):
+                    result = menu_stub_generation_failure_result(
+                        recipe_url,
+                        entry.get("recipe_name") or recipe.get("name", ""),
+                        result.get("error") or "Unable to save predicted menu recipe.",
+                        batch_model,
+                        batch_model_source,
+                    )
+                else:
+                    raw_recipe = result.get("raw") if isinstance(result.get("raw"), dict) else {}
+                    if not ingredients_have_real_values(raw_recipe.get("ingredients")):
+                        result = menu_stub_generation_failure_result(
+                            recipe_url,
+                            entry.get("recipe_name") or recipe.get("name", ""),
+                            "Generated menu recipe did not include ingredients.",
+                            batch_model,
+                            batch_model_source,
+                        )
+                    else:
+                        result = menu_stub_generation_success_result(
+                            recipe_url,
+                            result,
+                            cookbook_id=cookbook.get("id", ""),
+                        )
             results.append(result)
             completed += 1
-            emit_progress({
-                "phase": "details",
-                "event": "completed",
-                "recipe_url": result.get("recipe_url") or recipe.get("url", ""),
-                "recipe_name": result.get("recipe_name") or recipe.get("name", "") or recipe.get("url", ""),
-                "index": index,
-                "completed": completed,
-                "total": total,
-                "ok": bool(result.get("ok")),
-                "skipped": bool(result.get("skipped")),
-            })
+            emit_completed(entry["index"], recipe, result, completed)
+
+    for index, recipe in detail_entries:
+        emit_started(index, recipe)
+        try:
+            result = infer_missing_details_for_recipe(
+                recipe.get("url", ""),
+                cookbook_id=cookbook.get("id", ""),
+                cookbook_name=cookbook.get("name", ""),
+                overwrite_ai_fields=overwrite_ai_fields,
+                preview_only=preview_only,
+                user_id=user_id,
+            )
+        except Exception as exc:
+            result = {
+                "ok": False,
+                "recipe_url": recipe.get("url", ""),
+                "recipe_name": recipe.get("name", "") or recipe.get("url", ""),
+                "error": str(exc) or "Unable to infer this recipe.",
+            }
+            log_inference_event(
+                "item_failed",
+                recipe_id=result["recipe_url"],
+                recipe_name=result["recipe_name"],
+                error=result["error"],
+            )
+        results.append(result)
+        completed += 1
+        emit_completed(index, recipe, result, completed)
 
     updated = sum(1 for result in results if result.get("ok") and not result.get("skipped"))
     skipped = sum(1 for result in results if result.get("ok") and result.get("skipped"))
