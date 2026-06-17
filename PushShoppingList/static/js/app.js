@@ -7521,6 +7521,32 @@ function toggleCookbookRecipeDetails(button, event = null) {
     return false;
 }
 
+function setAllCookbookRecipesCollapsed(button, collapsed) {
+    const directCard = button ? button.closest("[data-cookbook-card]") : null;
+    const actionRow = !directCard && typeof recipeEditActionRowFromButton === "function"
+        ? recipeEditActionRowFromButton(button)
+        : null;
+    const card = directCard || (actionRow && actionRow.matches("[data-cookbook-card]") ? actionRow : null);
+
+    if (!card) {
+        closeRecipeEditRowMenus();
+        return false;
+    }
+
+    card.querySelectorAll("[data-cookbook-recipe-card]").forEach(recipeCard => {
+        const storageKey = cookbookRecipeCollapseStorageKey(recipeCard.dataset.cookbookRecipeKey || "");
+
+        setCookbookRecipeCollapsed(recipeCard, collapsed);
+
+        if (storageKey) {
+            localStorage.setItem(storageKey, collapsed ? "collapsed" : "expanded");
+        }
+    });
+
+    closeRecipeEditRowMenus();
+    return false;
+}
+
 function handleCookbookRecipeTitleKeydown(button, event) {
     if (!event || (event.key !== "Enter" && event.key !== " ")) {
         return true;

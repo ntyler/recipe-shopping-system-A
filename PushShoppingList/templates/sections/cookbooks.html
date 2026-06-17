@@ -198,6 +198,18 @@
                                                 {% endif %}
                                                 {% if cookbook.recipes %}
                                                     <button type="button"
+                                                            data-cookbook-id="{{ cookbook.id }}"
+                                                            onclick="return setAllCookbookRecipesCollapsed(this, false);"
+                                                            aria-label="Expand all recipes in {{ cookbook.name }}">
+                                                        Expand all recipes in cookbook
+                                                    </button>
+                                                    <button type="button"
+                                                            data-cookbook-id="{{ cookbook.id }}"
+                                                            onclick="return setAllCookbookRecipesCollapsed(this, true);"
+                                                            aria-label="Collapse all recipes in {{ cookbook.name }}">
+                                                        Collapse all recipes in cookbook
+                                                    </button>
+                                                    <button type="button"
                                                             class="delete"
                                                             data-cookbook-id="{{ cookbook.id }}"
                                                             data-cookbook-name="{{ cookbook.name }}"
