@@ -88,6 +88,23 @@ def test_import_cookbook_selector_static_hooks_are_present():
     assert "save_import_cookbook_assignment(url, result, cookbook)" in routes
 
 
+def test_import_buttons_match_edit_items_button_size():
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+
+    import_button_block = css[
+        css.index(".recipe-import-actions .extract-btn,"):
+        css.index(".recipe-import-action-url { order: 1; }")
+    ]
+
+    assert "height: 32px;" in import_button_block
+    assert "min-height: 32px;" in import_button_block
+    assert "padding: 2px 12px;" in import_button_block
+    assert "line-height: 1.1;" in import_button_block
+    assert "min-height: 52px" not in import_button_block
+    assert "@media (max-width: 650px)" in import_button_block
+    assert ".recipe-import-actions {\n                grid-template-columns: 1fr;\n            }" in import_button_block
+
+
 def test_enter_recipe_links_has_four_independent_import_actions():
     template = (ROOT / "PushShoppingList/templates/sections/enter_recipe_links.html").read_text(encoding="utf-8")
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")

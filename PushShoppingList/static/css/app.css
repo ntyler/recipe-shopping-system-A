@@ -635,17 +635,24 @@ body {
         .recipe-import-actions .recipe-media-upload-btn {
             margin-top: 0;
             width: 100%;
-            min-height: 52px;
-            height: 100%;
+            height: 32px;
+            min-height: 32px;
+            padding: 2px 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            line-height: 1.15;
+            line-height: 1.1;
             white-space: normal;
             word-break: normal;
             color: #fff;
             text-decoration: none;
             box-sizing: border-box;
+        }
+
+        @media (max-width: 650px) {
+            .recipe-import-actions {
+                grid-template-columns: 1fr;
+            }
         }
 
         .recipe-import-action-url { order: 1; }
