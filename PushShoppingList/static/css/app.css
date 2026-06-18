@@ -18825,11 +18825,16 @@ body {
 @media (max-width: 650px) {
     #cookbooksCard .cookbook-recipe-card.recipe-url-summary-row,
     #cookbooksCard .cookbook-recipe-card.recipe-url-summary-row:has(.recipe-url-menu-order-link) {
-        padding: 10px;
+        position: relative;
+        padding: 10px 46px 10px 10px;
+    }
+
+    #cookbooksCard .cookbook-recipe-card.recipe-url-summary-row:has(.recipe-url-menu-order-link) {
+        padding-right: 86px;
     }
 
     #cookbooksCard .cookbook-recipe-card .recipe-url-summary-header {
-        grid-template-columns: 18px 28px minmax(0, 1fr) auto;
+        grid-template-columns: 18px 28px minmax(0, 1fr);
         gap: 0 6px;
     }
 
@@ -18844,10 +18849,45 @@ body {
         padding-right: 0;
     }
 
+    #cookbooksCard .cookbook-recipe-card .recipe-url-summary-title-line {
+        grid-template-columns: minmax(0, 1fr);
+        row-gap: 2px;
+    }
+
+    #cookbooksCard .cookbook-recipe-card .recipe-url-summary-number,
+    #cookbooksCard .cookbook-recipe-card .recipe-url-summary-name,
+    #cookbooksCard .cookbook-recipe-card .recipe-rating-display,
+    #cookbooksCard .cookbook-recipe-card .recipe-url-summary-title-line > .recipe-url-summary-food-review {
+        grid-column: 1;
+    }
+
+    #cookbooksCard .cookbook-recipe-card .recipe-url-summary-body,
+    #cookbooksCard .cookbook-recipe-card .recipe-url-summary-main,
+    #cookbooksCard .cookbook-recipe-card .recipe-url-summary-meta {
+        justify-self: start;
+        width: 100%;
+        margin-left: 0;
+    }
+
     #cookbooksCard .cookbook-recipe-actions.recipe-url-summary-actions {
-        grid-column: 4;
-        justify-content: flex-end;
-        width: auto;
+        grid-column: 3;
+        justify-content: flex-start;
+        width: 100%;
+    }
+
+    #cookbooksCard .cookbook-recipe-actions .recipe-url-summary-menu-wrap,
+    #cookbooksCard .cookbook-recipe-actions .cookbook-recipe-menu-wrap {
+        position: absolute;
+        top: 0;
+        right: 6px;
+        z-index: 2;
+    }
+
+    #cookbooksCard .cookbook-recipe-menu-order-link {
+        position: absolute;
+        top: 0;
+        right: 44px;
+        z-index: 2;
     }
 
     #cookbooksCard .cookbook-recipe-card .recipe-url-summary-menu-btn {

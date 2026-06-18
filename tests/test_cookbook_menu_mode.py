@@ -222,6 +222,10 @@ def test_cookbook_recipe_rows_match_current_recipe_summary_layout():
     assert 'class="recipe-url-summary-actions cookbook-recipe-actions"' in template
     assert "display: grid;\n                grid-template-columns: minmax(0, 1fr) auto;" not in css
     assert "justify-content: flex-end;\n                width: 100%;\n                margin-left: auto;" not in css
+    assert "#cookbooksCard .cookbook-recipe-card .recipe-url-summary-title-line" in css
+    assert "#cookbooksCard .cookbook-recipe-card .recipe-url-summary-number,\n    #cookbooksCard .cookbook-recipe-card .recipe-url-summary-name" in css
+    assert "#cookbooksCard .cookbook-recipe-card .recipe-url-summary-body,\n    #cookbooksCard .cookbook-recipe-card .recipe-url-summary-main,\n    #cookbooksCard .cookbook-recipe-card .recipe-url-summary-meta" in css
+    assert "#cookbooksCard .cookbook-recipe-actions .recipe-url-summary-menu-wrap,\n    #cookbooksCard .cookbook-recipe-actions .cookbook-recipe-menu-wrap" in css
 
 
 def test_cookbook_recipe_view_renders_menu_stub_actions_above_amount():
