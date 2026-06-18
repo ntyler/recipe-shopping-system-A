@@ -9537,6 +9537,14 @@ body {
             cursor: pointer;
         }
 
+        #cookbooksCard .cookbook-recipe-card .recipe-url-summary-food-review-collapsed {
+            display: none;
+        }
+
+        #cookbooksCard .cookbook-recipe-card.recipe-url-summary-collapsed .recipe-url-summary-food-review-collapsed {
+            display: inline-flex;
+        }
+
         .recipe-url-summary-actions {
             flex: 0 1 auto;
             display: inline-flex;

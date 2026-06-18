@@ -246,15 +246,19 @@ def test_cookbook_recipe_rows_match_current_recipe_summary_layout():
 
     assert "menu-recipe-status-stub" not in title_block
     assert title_line_start < title_food_review_index < summary_body_index
+    assert "recipe-url-summary-food-review-collapsed" in title_block
     assert stub_status_block.index("menu-recipe-status-stub") < stub_status_block.index("recipe-url-summary-food-review")
     assert stub_status_block.index("recipe-url-summary-food-review") < stub_status_block.index("Generate Recipe")
     assert stub_status_block.index("menu-recipe-status-stub") < stub_status_block.index("Generate Recipe")
     assert stub_status_block.index("Generate Recipe") < stub_status_block.index("Generate Section")
     assert stub_status_block.index("Generate Section") < stub_status_block.index("Run Section Routine")
     assert stub_status_block.index("Run Section Routine") < stub_status_block.index("View Mega Menu JSON")
-    assert inferred_status_block.index("menu-recipe-status-generated") < inferred_status_block.index("View Mega Menu JSON")
+    assert inferred_status_block.index("menu-recipe-status-generated") < inferred_status_block.index("recipe-url-summary-food-review")
+    assert inferred_status_block.index("recipe-url-summary-food-review") < inferred_status_block.index("View Mega Menu JSON")
     assert 'data-menu-snapshot-id="{{ recipe.parent_menu_snapshot_id or recipe.menu_mega_snapshot_id }}"' in menu_status_block
     assert ".recipe-url-summary-menu-status" in css
+    assert "#cookbooksCard .cookbook-recipe-card .recipe-url-summary-food-review-collapsed" in css
+    assert "#cookbooksCard .cookbook-recipe-card.recipe-url-summary-collapsed .recipe-url-summary-food-review-collapsed" in css
     assert "recipe-url-summary-row" in template
     assert 'class="recipe-url-summary-header"' in template
     assert 'class="recipe-batch-select cookbook-restore-checkbox cookbook-recipe-restore-checkbox"' in template

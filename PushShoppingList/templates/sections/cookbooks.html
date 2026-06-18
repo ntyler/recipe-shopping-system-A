@@ -500,7 +500,16 @@
                                                                                 {{ recipe.rating_stars }}
                                                                             </span>
                                                                         {% endif %}
-                                                                        {% if recipe_needs_food_review and not recipe_has_menu_status %}
+                                                                        {% if recipe_needs_food_review and recipe_has_menu_status %}
+                                                                            <button type="button"
+                                                                                    class="food-rule-marker recipe-log-food-review-btn recipe-url-summary-food-review recipe-url-summary-food-review-collapsed"
+                                                                                    data-recipe-url="{{ recipe.url }}"
+                                                                                    title="{{ recipe.food_rule_status.marker }}"
+                                                                                    aria-label="Food Review: {{ recipe.food_rule_status.count }} item{% if recipe.food_rule_status.count != 1 %}s{% endif %} need review"
+                                                                                    onclick="return openRecipeFoodReviewFromRecipeView(this, event)">
+                                                                                Food Review ({{ recipe.food_rule_status.count }})
+                                                                            </button>
+                                                                        {% elif recipe_needs_food_review %}
                                                                             <button type="button"
                                                                                     class="food-rule-marker recipe-log-food-review-btn recipe-url-summary-food-review"
                                                                                     data-recipe-url="{{ recipe.url }}"
