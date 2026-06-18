@@ -632,6 +632,22 @@
                                                             </div>
                                                         </div>
                                                         <div class="recipe-url-summary-actions cookbook-recipe-actions">
+                                                            {% set recipe_menu_order_url = recipe.menu_order_url or recipe.deep_link_url %}
+                                                            {% if recipe_menu_order_url %}
+                                                                <a class="menu-order-icon-link recipe-url-menu-order-link cookbook-recipe-menu-order-link"
+                                                                   href="{{ recipe_menu_order_url }}"
+                                                                   target="_blank"
+                                                                   rel="noopener noreferrer"
+                                                                   aria-label="Open menu order URL for {{ recipe.name }}"
+                                                                   title="Open menu order URL"
+                                                                   onclick="event.stopPropagation()">
+                                                                    <img class="menu-order-icon-image"
+                                                                         src="{{ url_for('static', filename='images/menu-order-icon.svg') }}"
+                                                                         alt=""
+                                                                         aria-hidden="true">
+                                                                    <span class="sr-only">Open menu order URL</span>
+                                                                </a>
+                                                            {% endif %}
                                                             <div class="recipe-url-summary-menu-wrap cookbook-recipe-menu-wrap recipe-edit-row-menu-wrap">
                                                                 <button type="button"
                                                                         class="recipe-edit-row-menu-btn recipe-url-summary-menu-btn cookbook-recipe-menu-btn"

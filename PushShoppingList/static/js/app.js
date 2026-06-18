@@ -16100,6 +16100,24 @@ function updateRecipeMenuMetadataUrlLink(inputId, linkId) {
     link.href = canOpen ? url : "#";
     link.hidden = !canOpen;
     link.setAttribute("aria-disabled", canOpen ? "false" : "true");
+
+    if (inputId === "recipeEditMenuOrderUrl") {
+        updateRecipeEditMenuOrderButton(url, canOpen);
+    }
+}
+
+function updateRecipeEditMenuOrderButton(url, canOpen = isLegitimateWebUrl(url)) {
+    const button = document.getElementById("recipeEditMenuOrderButton");
+
+    if (!button) {
+        return;
+    }
+
+    const openUrl = canOpen ? String(url || "").trim() : "";
+    button.href = openUrl || "#";
+    button.hidden = !openUrl;
+    button.dataset.menuOrderUrl = openUrl;
+    button.setAttribute("aria-disabled", openUrl ? "false" : "true");
 }
 
 function bindRecipeMenuMetadataUrlLinks() {
