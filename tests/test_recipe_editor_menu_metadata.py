@@ -4,6 +4,7 @@ from PushShoppingList.services import menu_store_service
 from PushShoppingList.services import menu_mega_json_service
 from PushShoppingList.services import recipe_edit_service
 from PushShoppingList.services import recipe_extract_service
+from PushShoppingList.routes import main_routes
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -179,6 +180,40 @@ def test_recipe_editor_menu_metadata_panels_are_wired_before_amount():
     assert "return payload;" in js[js.index("function collectRecipeMenuMetadataPayload"):js.index("function currentRecipeEditorPdfFieldValues")]
     assert ".recipe-edit-menu-metadata-details" in css
     assert ".recipe-edit-menu-metadata-grid" in css
+
+
+def test_menu_order_icon_hooks_and_row_data_are_present(monkeypatch):
+    current_template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    cookbook_template = read_text("PushShoppingList/templates/sections/cookbooks.html")
+    css = read_text("PushShoppingList/static/css/app.css")
+    route_source = read_text("PushShoppingList/routes/main_routes.py")
+    cookbook_service = read_text("PushShoppingList/services/cookbook_service.py")
+    recipe_url = "https://velasian.example/menu#spring-roll"
+    recipe_data = {
+        "recipe_title": "Spring Roll",
+        "source_type": "menu_item_inferred",
+        "menu_order_url": "https://velasian.example/order/spring-roll",
+        "deep_link_url": "https://velasian.example/order/spring-roll",
+    }
+
+    monkeypatch.setattr(main_routes, "load_saved_recipe_output", lambda url: recipe_data if url == recipe_url else {})
+    monkeypatch.setattr(main_routes, "load_recipe_ingredients", lambda: {})
+    monkeypatch.setattr(main_routes, "recipe_pdf_public_url", lambda *args, **kwargs: "")
+    monkeypatch.setattr(main_routes, "recipe_archive_pdf_exists", lambda *args, **kwargs: False)
+
+    rows = main_routes.recipe_url_log_rows([{"url": recipe_url, "name": "Spring Roll", "quantity": 1}])
+
+    assert rows[0]["menu_order_url"] == "https://velasian.example/order/spring-roll"
+    assert rows[0]["deep_link_url"] == "https://velasian.example/order/spring-roll"
+    assert "recipe-url-menu-order-link" in current_template
+    assert "cookbook-recipe-menu-order-link" in cookbook_template
+    assert current_template.index("recipe-url-menu-order-link") < current_template.index("recipe-url-summary-menu-wrap", current_template.index("recipe-url-menu-order-link"))
+    assert cookbook_template.index("cookbook-recipe-menu-order-link") < cookbook_template.index("cookbook-recipe-menu-wrap", cookbook_template.index("cookbook-recipe-menu-order-link"))
+    assert ".recipe-url-summary-row:has(.recipe-url-menu-order-link)" in css
+    assert ".recipe-url-menu-order-link" in css
+    assert '"menu_order_url",' in cookbook_service
+    assert '"deep_link_url",' in cookbook_service
+    assert '"menu_order_url": clean_display_text' in route_source
 
 
 def test_normal_recipe_load_and_save_do_not_add_menu_metadata(monkeypatch, tmp_path):
