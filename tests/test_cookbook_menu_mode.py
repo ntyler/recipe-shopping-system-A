@@ -120,6 +120,24 @@ def test_cookbook_recipe_submenu_has_menu_ai_controls_before_recipe_actions():
     assert menu_ai_start < recipe_section_start
 
 
+def test_cookbook_recipe_infer_button_uses_recipe_editor_inference_flow():
+    script = read_text("PushShoppingList/static/js/app.js")
+    block = script[
+        script.index("async function inferMissingCookbookRecipeDetails"):
+        script.index("function updateCookbookMoveButton")
+    ]
+
+    assert "cookbookInferOverwriteEnabled(button)" in block
+    assert "cookbookInferPreviewEnabled(button)" in block
+    assert "await openRecipeEditor(button, {" in block
+    assert "inferMissingDetails: true" in block
+    assert "cookbookId" in block
+    assert "cookbookName" in block
+    assert "overwriteAiFields" in block
+    assert "previewOnly" in block
+    assert 'fetch("/api/recipe/infer_missing_details"' not in block
+
+
 def test_cookbook_recipe_rows_match_current_recipe_summary_layout():
     template = read_text("PushShoppingList/templates/sections/cookbooks.html")
     css = read_text("PushShoppingList/static/css/app.css")

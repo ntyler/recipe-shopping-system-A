@@ -59,6 +59,25 @@ def test_recipe_editor_page_navigation_remembers_return_target():
     assert "toggleCardCollapse(collapseKey);" in script
 
 
+def test_recipe_editor_pending_action_preserves_infer_details_options():
+    script = read_text("PushShoppingList/static/js/app.js")
+    pending_block = script[
+        script.index("function recipeEditPendingActionFromOptions"):
+        script.index("function openRecipeEditPageFallback")
+    ]
+
+    assert "action.inferMissingDetails = true;" in pending_block
+    assert "action.cookbookId = String(optionObject.cookbookId || optionObject.cookbook_id || \"\").trim();" in pending_block
+    assert "action.cookbookName = String(optionObject.cookbookName || optionObject.cookbook_name || \"\").trim();" in pending_block
+    assert "action.overwriteAiFields = Boolean(optionObject.overwriteAiFields);" in pending_block
+    assert "action.previewOnly = Boolean(optionObject.previewOnly);" in pending_block
+    assert "inferMissingDetails: Boolean(action.inferMissingDetails)" in pending_block
+    assert "cookbookId: String(action.cookbookId || \"\").trim()" in pending_block
+    assert "cookbookName: String(action.cookbookName || \"\").trim()" in pending_block
+    assert "overwriteAiFields: Boolean(action.overwriteAiFields)" in pending_block
+    assert "previewOnly: Boolean(action.previewOnly)" in pending_block
+
+
 def test_recipe_editor_modal_close_does_not_reload_current_page():
     script = read_text("PushShoppingList/static/js/app.js")
 

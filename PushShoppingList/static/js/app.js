@@ -6928,63 +6928,24 @@ async function inferMissingCookbookRecipeDetails(button, event = null) {
     }
 
     const recipeUrl = button && button.dataset ? button.dataset.recipeUrl || "" : "";
-    const recipeName = button && button.dataset ? button.dataset.recipeName || "this recipe" : "this recipe";
     const cookbookId = button && button.dataset ? button.dataset.cookbookId || "" : "";
     const cookbookName = button && button.dataset ? button.dataset.cookbookName || "" : "";
     const overwriteAiFields = cookbookInferOverwriteEnabled(button);
     const previewOnly = cookbookInferPreviewEnabled(button);
-    const originalText = button ? button.textContent : "";
 
     if (!recipeUrl) {
         setCookbookStatus("Recipe URL is required before inference.", true);
         return false;
     }
 
-    try {
-        closeRecipeEditRowMenus();
-        if (button) {
-            button.disabled = true;
-            button.textContent = previewOnly ? "Previewing..." : "Inferring...";
-        }
-        setCookbookStatus(`${previewOnly ? "Previewing" : "Inferring"} missing details for ${recipeName}...`);
-
-        const response = await fetch("/api/recipe/infer_missing_details", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-Requested-With": "fetch",
-            },
-            body: JSON.stringify({
-                url: recipeUrl,
-                cookbook_id: cookbookId,
-                cookbook_name: cookbookName,
-                overwrite_ai_fields: overwriteAiFields,
-                preview_only: previewOnly,
-            }),
-        });
-        const data = await response.json();
-
-        if (!response.ok || !data.ok) {
-            throw new Error((data && data.error) || "Unable to infer recipe details.");
-        }
-
-        syncOpenAiUsageDashboardFromResponse(data);
-        if (!previewOnly) {
-            await refreshStoreMarkup({ cacheBust: true });
-        }
-        const message = `${recipeName}: ${recipeInferenceSummary(data)}`;
-        setCookbookStatus(message);
-        showRecipeQuantityUpdatedMessage("", "", "", message);
-    } catch (err) {
-        console.warn("Unable to infer recipe details.", err);
-        setCookbookStatus(err.message || "Unable to infer recipe details.", true);
-        window.alert(err.message || "Unable to infer recipe details.");
-    } finally {
-        if (button && button.isConnected) {
-            button.disabled = false;
-            button.textContent = originalText || "Infer Details for This Recipe";
-        }
-    }
+    closeRecipeEditRowMenus();
+    await openRecipeEditor(button, {
+        inferMissingDetails: true,
+        cookbookId,
+        cookbookName,
+        overwriteAiFields,
+        previewOnly,
+    });
 
     return false;
 }
@@ -14846,6 +14807,7 @@ let recipeEditStoreSections = [];
 let recipeEditFoodRules = { require: [], avoid: [] };
 let recipeEditOriginalSnapshot = null;
 let recipeEditScalingOptions = [];
+let recipeEditInferenceContext = {};
 let activeFoodReviewRow = null;
 let activeFoodReviewAlternatives = [];
 let recipeEditDraggedRow = null;
@@ -15336,13 +15298,15 @@ async function decideRecipeEditCategoriesWithChatGPT(button, mode = "missing", o
 async function openRecipeEditor(button, options = {}) {
     const url = button ? button.dataset.recipeUrl || "" : "";
     let modal = document.getElementById("recipeEditModal");
+    const optionObject = options && typeof options === "object" ? options : {};
     const shouldScrollToFoodReview = options === true || Boolean(options.scrollToFoodReview);
-    const shouldActivateFoodReview = options && typeof options === "object" && Boolean(options.activateFoodReview);
-    const targetIngredient = options && typeof options === "object"
-        ? String(options.ingredient || options.scrollToIngredient || "").trim()
+    const shouldActivateFoodReview = Boolean(optionObject.activateFoodReview);
+    const shouldInferMissingDetails = Boolean(optionObject.inferMissingDetails);
+    const targetIngredient = Object.keys(optionObject).length
+        ? String(optionObject.ingredient || optionObject.scrollToIngredient || "").trim()
         : "";
-    const targetSection = options && typeof options === "object"
-        ? String(options.section || options.scrollToSection || "").trim()
+    const targetSection = Object.keys(optionObject).length
+        ? String(optionObject.section || optionObject.scrollToSection || "").trim()
         : "";
 
     if (!url) {
@@ -15366,6 +15330,7 @@ async function openRecipeEditor(button, options = {}) {
     }
 
     rememberRecipeEditorReturnState(button, url);
+    recipeEditInferenceContext = {};
     syncRecipeEditSourceFilesDetails();
     setRecipeEditStatus("Loading recipe...");
     modal.classList.add("open");
@@ -15403,6 +15368,11 @@ async function openRecipeEditor(button, options = {}) {
         } else if (targetSection) {
             await waitForNextPaint();
             scrollRecipeEditorToSection(targetSection);
+        }
+        if (shouldInferMissingDetails) {
+            await waitForNextPaint();
+            applyRecipeEditorInferenceOptions(optionObject);
+            await inferMissingRecipeDetails(document.querySelector(".recipe-edit-ai-infer"));
         }
     } catch (err) {
         console.warn("Unable to open recipe editor.", err);
@@ -15504,6 +15474,14 @@ function recipeEditPendingActionFromOptions(recipeUrl, options = {}) {
         action.activateFoodReview = true;
     }
 
+    if (Boolean(optionObject.inferMissingDetails)) {
+        action.inferMissingDetails = true;
+        action.cookbookId = String(optionObject.cookbookId || optionObject.cookbook_id || "").trim();
+        action.cookbookName = String(optionObject.cookbookName || optionObject.cookbook_name || "").trim();
+        action.overwriteAiFields = Boolean(optionObject.overwriteAiFields);
+        action.previewOnly = Boolean(optionObject.previewOnly);
+    }
+
     return action;
 }
 
@@ -15555,6 +15533,11 @@ function consumeRecipeEditPendingAction(recipeUrl) {
         scrollToIngredient: String(action.scrollToIngredient || "").trim(),
         scrollToSection: String(action.scrollToSection || "").trim(),
         activateFoodReview: Boolean(action.activateFoodReview),
+        inferMissingDetails: Boolean(action.inferMissingDetails),
+        cookbookId: String(action.cookbookId || "").trim(),
+        cookbookName: String(action.cookbookName || "").trim(),
+        overwriteAiFields: Boolean(action.overwriteAiFields),
+        previewOnly: Boolean(action.previewOnly),
     };
 }
 
@@ -20315,6 +20298,25 @@ function recipeInferPreviewEnabled() {
     return Boolean(checkbox && checkbox.checked);
 }
 
+function applyRecipeEditorInferenceOptions(options = {}) {
+    const optionObject = options && typeof options === "object" ? options : {};
+    const overwriteCheckbox = document.getElementById("recipeEditInferOverwriteAiFields");
+    const previewCheckbox = document.getElementById("recipeEditInferPreviewOnly");
+
+    recipeEditInferenceContext = {
+        cookbook_id: String(optionObject.cookbookId || optionObject.cookbook_id || "").trim(),
+        cookbook_name: String(optionObject.cookbookName || optionObject.cookbook_name || "").trim(),
+    };
+
+    if (overwriteCheckbox && Object.prototype.hasOwnProperty.call(optionObject, "overwriteAiFields")) {
+        overwriteCheckbox.checked = Boolean(optionObject.overwriteAiFields);
+    }
+
+    if (previewCheckbox && Object.prototype.hasOwnProperty.call(optionObject, "previewOnly")) {
+        previewCheckbox.checked = Boolean(optionObject.previewOnly);
+    }
+}
+
 function recipeInferenceSummary(data = {}) {
     if (data.skipped) {
         return "No missing recipe details were found.";
@@ -20415,6 +20417,8 @@ async function inferMissingRecipeDetails(button) {
             },
             body: JSON.stringify({
                 url: recipeUrl,
+                cookbook_id: recipeEditInferenceContext.cookbook_id || "",
+                cookbook_name: recipeEditInferenceContext.cookbook_name || "",
                 overwrite_ai_fields: recipeInferOverwriteEnabled(),
                 preview_only: previewOnly,
             }),

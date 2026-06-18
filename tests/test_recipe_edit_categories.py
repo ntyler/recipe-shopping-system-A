@@ -49,6 +49,9 @@ def test_recipe_editor_infer_missing_details_runs_full_ai_followups():
     assert "async function estimateRecipeNutrition(button, options = {})" in script
     assert "async function decideRecipeEditCategoriesWithChatGPT(button, mode = \"missing\", options = {})" in script
     assert "async function runRecipeEditorInferenceFollowups()" in script
+    assert "let recipeEditInferenceContext = {};" in script
+    assert "cookbook_id: recipeEditInferenceContext.cookbook_id || \"\"" in script
+    assert "cookbook_name: recipeEditInferenceContext.cookbook_name || \"\"" in script
     assert "await estimateRecipeNutrition(null, {" in script
     assert "await decideRecipeEditCategoriesWithChatGPT(null, \"all\", {" in script
     assert "const followupResult = previewOnly ? null : await runRecipeEditorInferenceFollowups();" in script
