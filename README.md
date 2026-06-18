@@ -238,6 +238,19 @@ http://127.0.0.1:5083
 
 For production-style background processing, start Redis and run one or more RQ workers alongside the Flask app:
 
+Local Redis with Docker Desktop on Windows:
+
+```powershell
+docker run --name ai-pantry-redis -p 6379:6379 -d redis:7
+$env:REDIS_URL="redis://localhost:6379/0"
+```
+
+If the container already exists:
+
+```powershell
+docker start ai-pantry-redis
+```
+
 ```powershell
 $env:REDIS_URL="redis://localhost:6379/0"
 $env:JOB_QUEUE_THREAD_FALLBACK="0"
@@ -263,6 +276,14 @@ python worker.py
 Product workers can listen on `ai-pantry-product`, or a single worker can listen to multiple queues with `WORKER_QUEUES="ai-pantry-menu,ai-pantry-recipe,ai-pantry-media,ai-pantry-product,ai-pantry-light"`.
 
 On Windows local development, Redis can run through Docker Desktop, WSL, Memurai, or another Redis-compatible service. In production, run Redis as a private service reachable by the Flask app and worker, set the same `REDIS_URL` in both processes, and keep service credentials out of frontend templates and JavaScript.
+
+Queue readiness is logged at app startup with `[Job Queue] action=startup_diagnostics`. For Redis/RQ mode, confirm the line includes `redis_package_installed=true`, `rq_package_installed=true`, `redis_url_configured=true`, `redis_connection_succeeded=true`, and `mode=redis/rq`. Menu imports should then log `[Job Queue] action=rq_enqueued ... queue=ai-pantry-menu`, and the worker should log `[Job Worker] action=start ... execution=rq`. If Redis is missing or unavailable, the startup log shows a distinct `reason` such as `missing_redis_package`, `missing_rq_package`, `invalid_redis_url`, or `redis_connection_failed`; fallback jobs log `[Job Queue] action=thread_fallback_started ... reason=<reason>`.
+
+After signing in, the queue diagnostic endpoint returns the same readiness details:
+
+```text
+http://127.0.0.1:5000/api/debug/job-queue
+```
 
 The app also listens on your LAN address, so another device on the same Wi-Fi can open:
 

@@ -1,5 +1,9 @@
+import importlib.metadata
+import importlib.util
 import os
 import threading
+from urllib.parse import urlsplit
+from urllib.parse import urlunsplit
 
 from PushShoppingList.services.job_service import fail_job
 from PushShoppingList.services.job_service import get_job
@@ -8,6 +12,7 @@ from PushShoppingList.services.job_service import update_job
 
 
 DEFAULT_REDIS_URL = "redis://localhost:6379/0"
+REDIS_CONNECT_TIMEOUT_SECONDS = 1.0
 QUEUE_AI_PANTRY_MENU = "ai-pantry-menu"
 QUEUE_AI_PANTRY_RECIPE = "ai-pantry-recipe"
 QUEUE_AI_PANTRY_MEDIA = "ai-pantry-media"
@@ -22,10 +27,56 @@ ALL_QUEUE_NAMES = (
     QUEUE_AI_PANTRY_LIGHT,
 )
 QUEUE_UNAVAILABLE_MESSAGE = "Job queue is unavailable. Check REDIS_URL and the RQ worker."
+_STARTUP_DIAGNOSTICS_LOGGED = False
+
+
+class JobQueueUnavailable(RuntimeError):
+    def __init__(self, reason, message, original_exception=None):
+        super().__init__(message)
+        self.reason = str(reason or "job_queue_unavailable")
+        self.original_exception = original_exception
 
 
 def redis_url():
     return os.getenv("REDIS_URL", DEFAULT_REDIS_URL).strip() or DEFAULT_REDIS_URL
+
+
+def redis_url_configured():
+    return bool(os.getenv("REDIS_URL", "").strip())
+
+
+def redis_url_source():
+    return "REDIS_URL" if redis_url_configured() else "default"
+
+
+def redacted_redis_url(value=None):
+    value = str(value or redis_url() or "").strip()
+    if not value:
+        return ""
+
+    try:
+        parsed = urlsplit(value)
+    except Exception:
+        return "<invalid Redis URL>"
+
+    if not parsed.scheme:
+        return "<invalid Redis URL>"
+
+    username = parsed.username or ""
+    hostname = parsed.hostname or ""
+    try:
+        parsed_port = parsed.port
+    except ValueError:
+        parsed_port = None
+    port = f":{parsed_port}" if parsed_port else ""
+    auth = ""
+    if username:
+        auth = f"{username}:***@"
+    elif parsed.password:
+        auth = "***@"
+
+    netloc = f"{auth}{hostname}{port}"
+    return urlunsplit((parsed.scheme, netloc, parsed.path, "", ""))
 
 
 def queue_name():
@@ -56,6 +107,193 @@ def thread_fallback_enabled():
 
 def inline_jobs_enabled():
     return os.getenv("JOB_QUEUE_MODE", "").strip().lower() in {"inline", "sync"}
+
+
+def _bool_for_log(value):
+    return "true" if bool(value) else "false"
+
+
+def _package_installed(module_name):
+    try:
+        return importlib.util.find_spec(module_name) is not None
+    except Exception:
+        return False
+
+
+def _package_version(distribution_name):
+    try:
+        return importlib.metadata.version(distribution_name)
+    except Exception:
+        return ""
+
+
+def _redis_connection_from_class(Redis):
+    return Redis.from_url(
+        redis_url(),
+        socket_connect_timeout=REDIS_CONNECT_TIMEOUT_SECONDS,
+        socket_timeout=REDIS_CONNECT_TIMEOUT_SECONDS,
+    )
+
+
+def _missing_dependency_error(module_name, package_name, install_name):
+    return JobQueueUnavailable(
+        f"missing_{module_name}_package",
+        (
+            f"The {package_name} Python package is not installed. "
+            f"Run: C:\\Python39\\python.exe -m pip install -r requirements.txt "
+            f"(missing dependency: {install_name})"
+        ),
+    )
+
+
+def redis_queue_connection():
+    try:
+        from redis import Redis
+    except ImportError as exc:
+        raise _missing_dependency_error("redis", "Redis", "redis") from exc
+
+    try:
+        from rq import Queue
+    except ImportError as exc:
+        raise _missing_dependency_error("rq", "RQ", "rq") from exc
+
+    try:
+        connection = _redis_connection_from_class(Redis)
+        connection.ping()
+        return connection, Queue
+    except ValueError as exc:
+        raise JobQueueUnavailable(
+            "invalid_redis_url",
+            f"REDIS_URL is invalid ({redacted_redis_url()}): {exc}",
+            exc,
+        ) from exc
+    except Exception as exc:
+        source_label = "REDIS_URL" if redis_url_configured() else "the default local Redis URL"
+        raise JobQueueUnavailable(
+            "redis_connection_failed",
+            f"Redis connection failed using {source_label} ({redacted_redis_url()}): {exc}",
+            exc,
+        ) from exc
+
+
+def redis_queue_readiness(check_connection=True):
+    redis_installed = _package_installed("redis")
+    rq_installed = _package_installed("rq")
+    readiness = {
+        "redis_package_installed": redis_installed,
+        "redis_package_version": _package_version("redis") if redis_installed else "",
+        "rq_package_installed": rq_installed,
+        "rq_package_version": _package_version("rq") if rq_installed else "",
+        "redis_url_configured": redis_url_configured(),
+        "redis_url_source": redis_url_source(),
+        "redis_url": redacted_redis_url(),
+        "redis_connection_checked": bool(check_connection),
+        "redis_connection_succeeded": False,
+        "redis_connection_error": "",
+        "redis_connection_error_type": "",
+        "thread_fallback_enabled": thread_fallback_enabled(),
+        "inline_jobs_enabled": inline_jobs_enabled(),
+        "mode": "unknown",
+        "reason": "",
+        "menu_queue": QUEUE_AI_PANTRY_MENU,
+        "worker_queues": worker_queue_names(),
+    }
+
+    if not redis_installed:
+        readiness["reason"] = "missing_redis_package"
+    elif check_connection:
+        try:
+            from redis import Redis
+
+            connection = _redis_connection_from_class(Redis)
+            connection.ping()
+            readiness["redis_connection_succeeded"] = True
+        except ValueError as exc:
+            readiness["reason"] = "invalid_redis_url"
+            readiness["redis_connection_error"] = str(exc)
+            readiness["redis_connection_error_type"] = type(exc).__name__
+        except Exception as exc:
+            readiness["reason"] = "redis_connection_failed"
+            readiness["redis_connection_error"] = str(exc)
+            readiness["redis_connection_error_type"] = type(exc).__name__
+    else:
+        readiness["reason"] = "not_checked"
+
+    if redis_installed and not rq_installed:
+        readiness["reason"] = "missing_rq_package"
+
+    if readiness["inline_jobs_enabled"]:
+        readiness["mode"] = "inline"
+        readiness["fallback_intent"] = "JOB_QUEUE_MODE requests inline execution"
+    elif (
+        readiness["redis_package_installed"]
+        and readiness["rq_package_installed"]
+        and readiness["redis_connection_succeeded"]
+    ):
+        readiness["mode"] = "redis/rq"
+        readiness["reason"] = "redis_connected"
+        readiness["fallback_intent"] = ""
+    elif readiness["thread_fallback_enabled"]:
+        readiness["mode"] = "local/thread"
+        if not readiness["redis_url_configured"]:
+            readiness["fallback_intent"] = "development fallback allowed because REDIS_URL is not configured"
+        else:
+            readiness["fallback_intent"] = "JOB_QUEUE_THREAD_FALLBACK allows local thread fallback"
+    else:
+        readiness["mode"] = "unavailable"
+        readiness["fallback_intent"] = "JOB_QUEUE_THREAD_FALLBACK is disabled"
+
+    return readiness
+
+
+def log_job_queue_startup_diagnostics(force=False):
+    global _STARTUP_DIAGNOSTICS_LOGGED
+    if _STARTUP_DIAGNOSTICS_LOGGED and not force:
+        return redis_queue_readiness(check_connection=False)
+
+    _STARTUP_DIAGNOSTICS_LOGGED = True
+    readiness = redis_queue_readiness(check_connection=True)
+    print(
+        "[Job Queue] action=startup_diagnostics "
+        f"redis_package_installed={_bool_for_log(readiness['redis_package_installed'])} "
+        f"redis_package_version={readiness['redis_package_version'] or 'none'} "
+        f"rq_package_installed={_bool_for_log(readiness['rq_package_installed'])} "
+        f"rq_package_version={readiness['rq_package_version'] or 'none'} "
+        f"redis_url_configured={_bool_for_log(readiness['redis_url_configured'])} "
+        f"redis_url_source={readiness['redis_url_source']} "
+        f"redis_url={readiness['redis_url']} "
+        f"redis_connection_succeeded={_bool_for_log(readiness['redis_connection_succeeded'])} "
+        f"redis_connection_error_type={readiness['redis_connection_error_type'] or 'none'} "
+        f"mode={readiness['mode']} "
+        f"thread_fallback_enabled={_bool_for_log(readiness['thread_fallback_enabled'])} "
+        f"reason={readiness['reason'] or 'none'} "
+        f"fallback_intent={readiness.get('fallback_intent') or 'none'}"
+    )
+    if readiness.get("redis_connection_error"):
+        level = "warning" if readiness["thread_fallback_enabled"] else "error"
+        print(
+            "[Job Queue] action=redis_readiness_error "
+            f"level={level} "
+            f"redis_url_configured={_bool_for_log(readiness['redis_url_configured'])} "
+            f"redis_url={readiness['redis_url']} "
+            f"reason={readiness['reason']} "
+            f"error={readiness['redis_connection_error']}"
+        )
+    return readiness
+
+
+def _log_queue_unavailable(action, unavailable, job_id="", queue_name_value=""):
+    level = "warning" if thread_fallback_enabled() else "error"
+    job_part = f" job_id={job_id}" if job_id else ""
+    queue_part = f" queue={queue_name_value}" if queue_name_value else ""
+    print(
+        f"[Job Queue] action={action} level={level}{job_part}{queue_part} "
+        f"reason={unavailable.reason} "
+        f"redis_url_configured={_bool_for_log(redis_url_configured())} "
+        f"redis_url={redacted_redis_url()} "
+        f"thread_fallback_enabled={_bool_for_log(thread_fallback_enabled())} "
+        f"error={unavailable}"
+    )
 
 
 def worker_queue_names():
@@ -120,12 +358,9 @@ def enqueue_job(job_id, queue_name_override=""):
         print(f"[Job Queue] action=inline_done job_id={job_id} queue={target_queue_name}")
         return {"ok": True, "mode": "inline", "queue_name": target_queue_name}
 
+    queue_unavailable = None
     try:
-        from redis import Redis
-        from rq import Queue
-
-        connection = Redis.from_url(redis_url())
-        connection.ping()
+        connection, Queue = redis_queue_connection()
         queue = Queue(target_queue_name, connection=connection)
         rq_job = queue.enqueue(
             "PushShoppingList.workers.job_worker.run_job",
@@ -137,11 +372,26 @@ def enqueue_job(job_id, queue_name_override=""):
         update_job(job_id, rq_job_id=rq_job.id, queue_name=target_queue_name)
         print(f"[Job Queue] action=rq_enqueued job_id={job_id} queue={target_queue_name} rq_job_id={rq_job.id}")
         return {"ok": True, "mode": "rq", "rq_job_id": rq_job.id, "queue_name": target_queue_name}
+    except JobQueueUnavailable as exc:
+        queue_unavailable = exc
     except Exception as exc:
+        queue_unavailable = JobQueueUnavailable(
+            "rq_enqueue_failed",
+            f"RQ enqueue failed for queue {target_queue_name}: {exc}",
+            exc,
+        )
+
+    if queue_unavailable:
+        _log_queue_unavailable(
+            "enqueue_unavailable",
+            queue_unavailable,
+            job_id=job_id,
+            queue_name_value=target_queue_name,
+        )
         if not thread_fallback_enabled():
             print(
                 f"[Job Queue] action=enqueue_failed job_id={job_id} queue={target_queue_name} "
-                f"thread_fallback=false error={exc}"
+                f"thread_fallback=false reason={queue_unavailable.reason} error={queue_unavailable}"
             )
             fail_job(
                 job_id,
@@ -151,7 +401,8 @@ def enqueue_job(job_id, queue_name_override=""):
             return {
                 "ok": False,
                 "error": QUEUE_UNAVAILABLE_MESSAGE,
-                "details": str(exc),
+                "details": str(queue_unavailable),
+                "reason": queue_unavailable.reason,
                 "queue_name": target_queue_name,
             }
 
@@ -164,13 +415,15 @@ def enqueue_job(job_id, queue_name_override=""):
         thread.start()
         print(
             f"[Job Queue] action=thread_fallback_started job_id={job_id} "
-            f"queue={target_queue_name} thread_name={thread.name} reason={exc}"
+            f"queue={target_queue_name} thread_name={thread.name} "
+            f"reason={queue_unavailable.reason} detail={queue_unavailable}"
         )
         return {
             "ok": True,
             "mode": "thread",
             "queue_name": target_queue_name,
             "warning": "Redis/RQ was unavailable; running in a local background thread.",
+            "reason": queue_unavailable.reason,
         }
 
 
@@ -187,11 +440,10 @@ def cancel_queued_rq_job(rq_job_id):
 
     stopped = False
     try:
-        from redis import Redis
+        connection, _Queue = redis_queue_connection()
         from rq.command import send_stop_job_command
         from rq.job import Job
 
-        connection = Redis.from_url(redis_url())
         try:
             send_stop_job_command(connection, rq_job_id)
             stopped = True
@@ -201,5 +453,8 @@ def cancel_queued_rq_job(rq_job_id):
         job = Job.fetch(rq_job_id, connection=connection)
         job.cancel()
         return True
+    except JobQueueUnavailable as exc:
+        _log_queue_unavailable("cancel_rq_unavailable", exc)
+        return stopped
     except Exception:
         return stopped

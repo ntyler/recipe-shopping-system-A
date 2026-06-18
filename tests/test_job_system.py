@@ -66,6 +66,39 @@ def test_job_routes_create_and_scope_jobs_to_owner(monkeypatch, tmp_path):
         assert hidden.status_code == 404
 
 
+def test_job_queue_debug_route_returns_readiness(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        job_routes,
+        "redis_queue_readiness",
+        lambda check_connection=True: {
+            "mode": "redis/rq",
+            "redis_package_installed": True,
+            "rq_package_installed": True,
+            "redis_url_configured": True,
+            "redis_connection_succeeded": True,
+            "menu_queue": "ai-pantry-menu",
+        },
+    )
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["user_id"] = "owner"
+
+        response = client.get(
+            "/api/debug/job-queue",
+            headers={"X-Requested-With": "fetch"},
+        )
+        data = response.get_json()
+
+    assert response.status_code == 200
+    assert data["ok"] is True
+    assert data["job_queue"]["mode"] == "redis/rq"
+    assert data["job_queue"]["menu_queue"] == "ai-pantry-menu"
+
+
 def test_clear_recent_jobs_removes_finished_owner_jobs_only(monkeypatch, tmp_path):
     configure_job_paths(monkeypatch, tmp_path)
     app = create_app()
@@ -592,6 +625,66 @@ def test_queue_routing_by_job_type_and_payload():
         "doc-photo-import",
         {"upload_mode": "image"},
     ) == "ai-pantry-media"
+
+
+def test_job_queue_readiness_reports_missing_redis_dependency(monkeypatch):
+    monkeypatch.delenv("REDIS_URL", raising=False)
+    monkeypatch.setenv("JOB_QUEUE_THREAD_FALLBACK", "1")
+    monkeypatch.setattr(
+        job_queue_service,
+        "_package_installed",
+        lambda module_name: False if module_name == "redis" else True,
+    )
+
+    readiness = job_queue_service.redis_queue_readiness(check_connection=True)
+
+    assert readiness["redis_package_installed"] is False
+    assert readiness["rq_package_installed"] is True
+    assert readiness["redis_url_configured"] is False
+    assert readiness["redis_connection_succeeded"] is False
+    assert readiness["reason"] == "missing_redis_package"
+    assert readiness["mode"] == "local/thread"
+
+
+def test_menu_import_enqueues_to_rq_menu_queue_when_redis_ready(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    monkeypatch.delenv("JOB_QUEUE_MODE", raising=False)
+    enqueued = {}
+
+    class FakeQueue:
+        def __init__(self, name, connection):
+            enqueued["queue_name"] = name
+            enqueued["connection"] = connection
+
+        def enqueue(self, import_path, job_id, **kwargs):
+            enqueued["import_path"] = import_path
+            enqueued["job_id"] = job_id
+            enqueued["kwargs"] = kwargs
+            return type("FakeRQJob", (), {"id": "rq-job-1"})()
+
+    monkeypatch.setattr(
+        job_queue_service,
+        "redis_queue_connection",
+        lambda: ("redis-connection", FakeQueue),
+    )
+
+    job = job_service.create_job(
+        "menu-import",
+        input_payload={"urls": ["https://example.com/menu"]},
+        user_id="owner",
+    )
+
+    result = job_queue_service.enqueue_job(job["id"])
+    saved = job_service.get_job(job["id"])
+
+    assert result["ok"] is True
+    assert result["mode"] == "rq"
+    assert result["queue_name"] == "ai-pantry-menu"
+    assert result["rq_job_id"] == "rq-job-1"
+    assert enqueued["queue_name"] == "ai-pantry-menu"
+    assert enqueued["import_path"] == "PushShoppingList.workers.job_worker.run_job"
+    assert enqueued["job_id"] == job["id"]
+    assert saved["rq_job_id"] == "rq-job-1"
 
 
 def test_thread_fallback_disabled_fails_job_when_redis_unavailable(monkeypatch, tmp_path):

@@ -39,6 +39,7 @@ from PushShoppingList.services.user_account_service import current_user
 from PushShoppingList.services.user_account_service import is_admin_user
 from PushShoppingList.services.user_account_service import pending_two_factor_setup
 from PushShoppingList.services.recipe_extract_service import log_openai_startup_diagnostics
+from PushShoppingList.services.job_queue_service import log_job_queue_startup_diagnostics
 
 
 mimetypes.add_type("image/webp", ".webp")
@@ -216,6 +217,7 @@ def create_app():
         debug_mode=app.debug,
         reloader_mode=os.environ.get("WERKZEUG_RUN_MAIN") == "true",
     )
+    log_job_queue_startup_diagnostics()
 
     app.register_blueprint(account_bp)
     app.register_blueprint(feedback_bp)

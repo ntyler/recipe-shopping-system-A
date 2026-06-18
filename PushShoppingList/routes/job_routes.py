@@ -10,6 +10,7 @@ from werkzeug.utils import secure_filename
 from PushShoppingList.services.job_queue_service import cancel_queued_rq_job
 from PushShoppingList.services.job_queue_service import enqueue_job
 from PushShoppingList.services.job_queue_service import queue_name_for_job
+from PushShoppingList.services.job_queue_service import redis_queue_readiness
 from PushShoppingList.services.job_service import active_limit_for_job
 from PushShoppingList.services.job_service import active_limit_wait_message
 from PushShoppingList.services.job_service import cancel_job
@@ -218,6 +219,14 @@ def start_menu_import_job_route():
         model_env_var="OPENAI_MENU_CLEANUP_MODEL",
     )
     return create_and_enqueue("menu-import", payload, total_items=len(urls))
+
+
+@job_bp.route("/api/debug/job-queue", methods=["GET"])
+def debug_job_queue_route():
+    return jsonify({
+        "ok": True,
+        "job_queue": redis_queue_readiness(check_connection=True),
+    })
 
 
 @job_bp.route("/api/jobs/menu-generate-recipes", methods=["POST"])

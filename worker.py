@@ -2,11 +2,9 @@ import os
 import sys
 from pathlib import Path
 
-from redis import Redis
-from rq import Queue
-from rq import Worker
-
-from PushShoppingList.services.job_queue_service import redis_url
+from PushShoppingList.services.job_queue_service import JobQueueUnavailable
+from PushShoppingList.services.job_queue_service import log_job_queue_startup_diagnostics
+from PushShoppingList.services.job_queue_service import redis_queue_connection
 from PushShoppingList.services.job_queue_service import worker_queue_names
 from PushShoppingList.services.openai_model_service import apply_openai_model_overrides
 
@@ -37,7 +35,18 @@ def enforce_required_python_runtime():
 def main():
     enforce_required_python_runtime()
     apply_openai_model_overrides()
-    connection = Redis.from_url(redis_url())
+    log_job_queue_startup_diagnostics(force=True)
+    try:
+        connection, Queue = redis_queue_connection()
+        from rq import Worker
+    except JobQueueUnavailable as exc:
+        raise SystemExit(f"[worker] Redis/RQ unavailable reason={exc.reason} error={exc}") from exc
+    except ImportError as exc:
+        raise SystemExit(
+            "[worker] RQ Python package is not installed. "
+            "Run: C:\\Python39\\python.exe -m pip install -r requirements.txt"
+        ) from exc
+
     queue_names = worker_queue_names()
     print(f"[worker] Listening on queues: {', '.join(queue_names)}")
     worker = Worker([Queue(name, connection=connection) for name in queue_names], connection=connection)
