@@ -129,6 +129,16 @@ def test_recipe_editor_uses_split_source_and_generated_pdf_fields():
     assert "function recipePdfSaveChoiceForPayload" in js
 
 
+def test_recipe_editor_header_orders_menu_icon_after_source_pdf():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    header_start = template.index('<div class="recipe-edit-header-actions">')
+    header_end = template.index('<div class="recipe-edit-section-menu-wrap recipe-edit-header-menu-wrap">', header_start)
+    header_actions = template[header_start:header_end]
+
+    assert header_actions.index('id="recipeEditPdfButton"') < header_actions.index('id="recipeEditSourcePdfButton"')
+    assert header_actions.index('id="recipeEditSourcePdfButton"') < header_actions.index('id="recipeEditMenuOrderButton"')
+
+
 def test_recipe_overflow_menus_include_source_pdf_near_recipe_pdf():
     current_recipe_template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     cookbook_template = read_text("PushShoppingList/templates/sections/cookbooks.html")
