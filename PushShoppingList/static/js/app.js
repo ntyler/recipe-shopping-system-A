@@ -8936,6 +8936,87 @@ async function restoreSingleCookbookRecipe(button) {
     return false;
 }
 
+function cookbookRecipeCardIsOrderCandidate(card) {
+    return Boolean(
+        card
+        && card.matches
+        && card.matches("[data-cookbook-recipe-card]")
+        && !card.hidden
+        && !card.classList.contains("cookbook-recipe-search-hidden")
+    );
+}
+
+function adjacentCookbookRecipeCard(card, direction) {
+    let sibling = direction < 0 ? card.previousElementSibling : card.nextElementSibling;
+
+    while (sibling) {
+        if (cookbookRecipeCardIsOrderCandidate(sibling)) {
+            return sibling;
+        }
+
+        sibling = direction < 0 ? sibling.previousElementSibling : sibling.nextElementSibling;
+    }
+
+    return null;
+}
+
+async function moveCookbookRecipeFromMenu(button, direction) {
+    const card = recipeEditActionRowFromButton(button);
+    const cookbookCard = card ? card.closest("[data-cookbook-card]") : null;
+    const cookbookId = (card && card.dataset.cookbookId) || (cookbookCard && cookbookCard.dataset.cookbookId) || "";
+    const recipeUrl = card ? card.dataset.recipeUrl || "" : "";
+    const adjacentCard = cookbookRecipeCardIsOrderCandidate(card)
+        ? adjacentCookbookRecipeCard(card, direction)
+        : null;
+    const adjacentRecipeUrl = adjacentCard ? adjacentCard.dataset.recipeUrl || "" : "";
+    const movingUp = direction < 0;
+    const originalText = button ? button.textContent : "";
+
+    if (!cookbookId || !recipeUrl) {
+        closeRecipeEditRowMenus();
+        setCookbookStatus("Unable to move recipe: cookbook recipe data is missing.", true);
+        return false;
+    }
+
+    if (!adjacentRecipeUrl) {
+        closeRecipeEditRowMenus();
+        setCookbookStatus(`Recipe is already at the ${movingUp ? "top" : "bottom"} of this cookbook.`);
+        return false;
+    }
+
+    try {
+        closeRecipeEditRowMenus();
+
+        if (button) {
+            button.disabled = true;
+            button.textContent = movingUp ? "Moving up..." : "Moving down...";
+        }
+
+        setCookbookStatus(movingUp ? "Moving recipe up..." : "Moving recipe down...");
+        await moveRecipeUrlToCookbook(recipeUrl, cookbookId, movingUp
+            ? { insertBeforeRecipeUrl: adjacentRecipeUrl }
+            : { insertAfterRecipeUrl: adjacentRecipeUrl });
+        await refreshStoreMarkup({
+            cacheBust: true,
+            requireRecipeLog: true,
+            scrollX: window.scrollX,
+            scrollY: window.scrollY,
+        });
+        showRecipeQuantityUpdatedMessage("", "", "", movingUp ? "Recipe moved up." : "Recipe moved down.");
+    } catch (err) {
+        console.warn("Unable to move cookbook recipe.", err);
+        setCookbookStatus(err.message || "Unable to move recipe.", true);
+        window.alert(err.message || "Unable to move recipe.");
+    } finally {
+        if (button && button.isConnected) {
+            button.disabled = false;
+            button.textContent = originalText || (movingUp ? "Move Up" : "Move Down");
+        }
+    }
+
+    return false;
+}
+
 function isUnclassifiedCookbookAction(button) {
     const data = button && button.dataset ? button.dataset : {};
     const cookbookId = String(data.cookbookId || "").trim().toLowerCase();

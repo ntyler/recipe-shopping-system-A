@@ -128,6 +128,7 @@ def test_cookbook_submenu_has_recipe_sort_controls():
 
 def test_cookbook_recipe_submenu_has_menu_ai_controls_before_recipe_actions():
     template = read_text("PushShoppingList/templates/sections/cookbooks.html")
+    script = read_text("PushShoppingList/static/js/app.js")
 
     recipe_menu_start = template.index(
         '<div class="recipe-edit-row-menu overflow-menu cookbook-recipe-menu" hidden>'
@@ -143,6 +144,7 @@ def test_cookbook_recipe_submenu_has_menu_ai_controls_before_recipe_actions():
         '<div class="overflow-menu-section recipe-view-menu-section">',
         menu_ai_start,
     )
+    order_section_start = recipe_menu_block.index("Recipe Order", recipe_section_start)
     menu_ai_block = recipe_menu_block[menu_ai_start:recipe_section_start]
     recipe_section_block = recipe_menu_block[recipe_section_start:]
 
@@ -152,8 +154,16 @@ def test_cookbook_recipe_submenu_has_menu_ai_controls_before_recipe_actions():
     assert menu_ai_block.index("inferMissingCookbookRecipeDetails") < menu_ai_block.index("Infer Details for This Recipe")
     assert "Add to current recipes" in recipe_section_block
     assert "Edit recipe" in recipe_section_block
+    assert "Move Up" in recipe_section_block
+    assert "Move Down" in recipe_section_block
+    assert "moveCookbookRecipeFromMenu(this, -1)" in recipe_section_block
+    assert "moveCookbookRecipeFromMenu(this, 1)" in recipe_section_block
     assert "Infer Details for This Recipe" not in recipe_section_block
     assert menu_ai_start < recipe_section_start
+    assert recipe_section_start < order_section_start
+    assert "function moveCookbookRecipeFromMenu" in script
+    assert "insertBeforeRecipeUrl: adjacentRecipeUrl" in script
+    assert "insertAfterRecipeUrl: adjacentRecipeUrl" in script
 
 
 def test_cookbook_recipe_infer_button_uses_recipe_editor_inference_flow():
@@ -562,6 +572,48 @@ def test_cookbook_menu_metadata_uses_saved_values_without_render_inference():
             if section["label"] == "🍽️ Other Recipes"
         )
         assert restaurant_fallback_section["recipes"][0]["name"] == "Chicken Alfredo"
+
+
+def test_cookbook_recipe_move_can_insert_before_and_after_saved_recipes():
+    with TemporaryDirectory() as temp_dir, patch.object(
+        cookbook_service,
+        "COOKBOOKS_FILE",
+        Path(temp_dir) / "cookbooks.json",
+    ):
+        cookbook_service.create_cookbook("Dinner")
+        recipe_rows = [
+            {"name": "Alpha", "url": "https://example.com/alpha"},
+            {"name": "Bravo", "url": "https://example.com/bravo"},
+            {"name": "Charlie", "url": "https://example.com/charlie"},
+        ]
+
+        cookbook_service.move_recipes_to_cookbook(
+            "dinner",
+            [recipe["url"] for recipe in recipe_rows],
+            recipe_rows,
+        )
+        cookbook_service.move_recipes_to_cookbook(
+            "dinner",
+            ["https://example.com/charlie"],
+            recipe_rows,
+            overwrite_existing=True,
+            insert_before_recipe_url="https://example.com/bravo",
+        )
+        cookbook_service.move_recipes_to_cookbook(
+            "dinner",
+            ["https://example.com/alpha"],
+            recipe_rows,
+            overwrite_existing=True,
+            insert_after_recipe_url="https://example.com/bravo",
+        )
+
+        saved = cookbook_service.load_cookbooks()["cookbooks"][0]["recipes"]
+
+    assert [recipe["url"] for recipe in saved] == [
+        "https://example.com/charlie",
+        "https://example.com/bravo",
+        "https://example.com/alpha",
+    ]
 
 
 def test_cookbook_category_update_requires_confirmation_before_overwriting_manual_values():

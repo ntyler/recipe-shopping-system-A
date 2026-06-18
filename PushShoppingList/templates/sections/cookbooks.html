@@ -756,6 +756,17 @@
                                             </a>
                                                                         {% endif %}
                                                                      </div>
+                                                                    <div class="overflow-menu-section recipe-view-menu-section">
+                                                                        <div class="overflow-menu-section-title recipe-view-menu-section-title">Recipe Order</div>
+                                                                        <button type="button"
+                                                                                onclick="return moveCookbookRecipeFromMenu(this, -1)">
+                                                                            Move Up
+                                                                        </button>
+                                                                        <button type="button"
+                                                                                onclick="return moveCookbookRecipeFromMenu(this, 1)">
+                                                                            Move Down
+                                                                        </button>
+                                                                    </div>
                                                                     <div class="overflow-menu-section recipe-view-menu-section recipe-view-menu-section-danger">
                                                                         <button type="button"
                                                                                 class="delete"
