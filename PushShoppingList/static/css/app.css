@@ -18748,6 +18748,28 @@ body {
     width: auto;
 }
 
+#cookbooksCard .cookbook-recipe-card.cookbook-recipe-menu-price-visible .recipe-url-summary-title-line {
+    grid-template-columns: max-content minmax(0, auto) max-content;
+}
+
+#cookbooksCard .cookbook-recipe-menu-price-badge {
+    grid-column: 3;
+    justify-self: start;
+    align-self: center;
+    display: inline-flex;
+    align-items: center;
+    min-height: 20px;
+    padding: 2px 7px;
+    border: 1px solid rgba(20, 184, 166, 0.34);
+    border-radius: 6px;
+    background: rgba(20, 184, 166, 0.12);
+    color: #bfffee;
+    font-size: 0.72rem;
+    font-weight: 800;
+    line-height: 1.1;
+    white-space: nowrap;
+}
+
 #cookbooksCard .cookbook-recipe-card .recipe-rating-display,
 #cookbooksCard .cookbook-recipe-card .recipe-url-summary-title-line > .recipe-url-summary-food-review {
     grid-column: 2;
@@ -18781,6 +18803,27 @@ body {
     position: static;
     top: auto;
     right: auto;
+}
+
+.cookbook-recipe-sort-section-heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 10px 0 4px;
+    padding: 7px 10px;
+    border: 1px solid rgba(20, 184, 166, 0.28);
+    border-left: 3px solid #14b8a6;
+    border-radius: 6px;
+    background: rgba(12, 28, 32, 0.74);
+    color: #8ff0ad;
+    font-size: 0.78rem;
+    font-weight: 900;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.cookbook-recipe-sort-section-heading[hidden] {
+    display: none;
 }
 
 .cookbook-recipe-card.recipe-url-summary-row.is-dragging {
@@ -18881,9 +18924,15 @@ body {
 
     #cookbooksCard .cookbook-recipe-card .recipe-url-summary-number,
     #cookbooksCard .cookbook-recipe-card .recipe-url-summary-name,
+    #cookbooksCard .cookbook-recipe-menu-price-badge,
     #cookbooksCard .cookbook-recipe-card .recipe-rating-display,
     #cookbooksCard .cookbook-recipe-card .recipe-url-summary-title-line > .recipe-url-summary-food-review {
         grid-column: 1;
+    }
+
+    #cookbooksCard .cookbook-recipe-menu-price-badge {
+        justify-self: start;
+        white-space: normal;
     }
 
     #cookbooksCard .cookbook-recipe-card .recipe-url-summary-body,

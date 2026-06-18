@@ -7242,6 +7242,16 @@ function cookbookRecipeSortDirectionLabel(direction) {
     return direction === "desc" ? "descending" : "ascending";
 }
 
+function cookbookRecipeMenuSectionLabel(card) {
+    const value = String(card && card.dataset ? card.dataset.cookbookMenuSection || "" : "").trim();
+    return value || "Other Recipes";
+}
+
+function cookbookRecipeMenuPriceLabel(card) {
+    const value = String(card && card.dataset ? card.dataset.cookbookMenuPrice || "" : "").trim();
+    return value || "Not listed";
+}
+
 function cookbookSortText(value) {
     return normalizedCookbookSearchText(value);
 }
@@ -7367,6 +7377,103 @@ function sortCookbookRecipeElements(container, selector, sortKey, direction = "a
     return cards.length;
 }
 
+function clearCookbookRecipeSortDecorations(card) {
+    if (!card) {
+        return;
+    }
+
+    card.querySelectorAll("[data-cookbook-sort-section-heading]").forEach(heading => heading.remove());
+    card.querySelectorAll("[data-cookbook-menu-price-badge]").forEach(badge => badge.remove());
+    card.querySelectorAll("[data-cookbook-recipe-card]").forEach(recipeCard => {
+        recipeCard.classList.remove("cookbook-recipe-menu-price-visible");
+    });
+}
+
+function updateCookbookRecipeSortDecorationVisibility(card) {
+    if (!card) {
+        return;
+    }
+
+    card.querySelectorAll("[data-cookbook-sort-section-heading]").forEach(heading => {
+        let sibling = heading.nextElementSibling;
+        let hasVisibleRecipe = false;
+
+        while (sibling && !sibling.matches("[data-cookbook-sort-section-heading]")) {
+            if (
+                sibling.matches("[data-cookbook-recipe-card]")
+                && !sibling.hidden
+                && !sibling.classList.contains("cookbook-recipe-search-hidden")
+            ) {
+                hasVisibleRecipe = true;
+                break;
+            }
+
+            sibling = sibling.nextElementSibling;
+        }
+
+        heading.hidden = !hasVisibleRecipe;
+    });
+}
+
+function renderCookbookRecipeSectionHeadings(card) {
+    const list = card ? card.querySelector("[data-cookbook-recipe-list]") : null;
+
+    if (!list) {
+        return;
+    }
+
+    let currentSection = "";
+    Array.from(list.children)
+        .filter(child => child.matches("[data-cookbook-recipe-card]"))
+        .forEach(recipeCard => {
+            const sectionLabel = cookbookRecipeMenuSectionLabel(recipeCard);
+
+            if (sectionLabel === currentSection) {
+                return;
+            }
+
+            currentSection = sectionLabel;
+            const heading = document.createElement("div");
+            heading.className = "cookbook-recipe-sort-section-heading";
+            heading.dataset.cookbookSortSectionHeading = "1";
+            heading.textContent = sectionLabel;
+            list.insertBefore(heading, recipeCard);
+        });
+}
+
+function renderCookbookRecipeMenuPriceBadges(card) {
+    if (!card) {
+        return;
+    }
+
+    card.querySelectorAll("[data-cookbook-recipe-card]").forEach(recipeCard => {
+        const titleLine = recipeCard.querySelector(".recipe-url-summary-title-line");
+
+        if (!titleLine) {
+            return;
+        }
+
+        const badge = document.createElement("span");
+        badge.className = "cookbook-recipe-menu-price-badge";
+        badge.dataset.cookbookMenuPriceBadge = "1";
+        badge.textContent = `Menu Price: ${cookbookRecipeMenuPriceLabel(recipeCard)}`;
+        recipeCard.classList.add("cookbook-recipe-menu-price-visible");
+        titleLine.appendChild(badge);
+    });
+}
+
+function renderCookbookRecipeSortDecorations(card, sortKey) {
+    clearCookbookRecipeSortDecorations(card);
+
+    if (sortKey === "menu_section") {
+        renderCookbookRecipeSectionHeadings(card);
+    } else if (sortKey === "menu_price") {
+        renderCookbookRecipeMenuPriceBadges(card);
+    }
+
+    updateCookbookRecipeSortDecorationVisibility(card);
+}
+
 function updateCookbookSortButtons(card, sortKey = "", direction = "", sourceControl = null) {
     if (!card && !sourceControl) {
         return;
@@ -7425,6 +7532,7 @@ function applyCookbookRecipeSort(card, sortKey, options = {}) {
     });
 
     updateCookbookSortButtons(card, state.sortKey, state.direction, options.sourceControl || null);
+    renderCookbookRecipeSortDecorations(card, state.sortKey);
 
     if (options.persist !== false) {
         const storageKey = cookbookRecipeSortStorageKey(card.dataset.cookbookId || "");
@@ -7832,6 +7940,7 @@ function applyCookbookRecipeSearch() {
             cardEmpty.hidden = viewMode !== "recipes" || !searchActive || matchingRecipes > 0 || !cookbookMatches;
         }
 
+        updateCookbookRecipeSortDecorationVisibility(card);
         updateCookbookCardCollapseDisplay(card);
     });
 

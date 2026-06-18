@@ -123,11 +123,21 @@ def test_cookbook_submenu_has_recipe_sort_controls():
     assert "function normalizeCookbookRecipeSortState(value)" in script
     assert "function serializeCookbookRecipeSortState(sortKey, direction)" in script
     assert "function cookbookRecipeNextSortState(card, sortKey)" in script
+    assert "function renderCookbookRecipeSortDecorations(card, sortKey)" in script
+    assert "function renderCookbookRecipeSectionHeadings(card)" in script
+    assert "function renderCookbookRecipeMenuPriceBadges(card)" in script
+    assert "function updateCookbookRecipeSortDecorationVisibility(card)" in script
     assert "function sortCookbookRecipes(button, sortKey)" in script
     assert "function applyCookbookRecipeSort(card, sortKey, options = {})" in script
     assert "function compareCookbookSortNumbers(left, right)" in script
+    assert "data-cookbook-sort-section-heading" in script
+    assert "data-cookbook-menu-price-badge" in script
+    assert "Menu Price:" in script
+    assert "updateCookbookRecipeSortDecorationVisibility(card);" in script
     assert "restoreCookbookRecipeSortState();" in script
     assert ".cookbook-sort-menu-section [data-cookbook-sort-option][aria-pressed=\"true\"]" in css
+    assert ".cookbook-recipe-sort-section-heading" in css
+    assert ".cookbook-recipe-menu-price-badge" in css
     assert "[data-cookbook-sort-direction=\"desc\"]::before" in css
     assert "content: \"↑\";" in css
     assert "content: \"↓\";" in css
