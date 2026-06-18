@@ -114,6 +114,7 @@ def test_cookbook_submenu_has_recipe_sort_controls():
         assert label in cookbook_menu_block
 
     assert 'data-cookbook-menu-section="{{ recipe.menu_section }}"' in template
+    assert 'data-cookbook-menu-section-id="{{ recipe.menu_section_id }}"' in template
     assert 'data-cookbook-menu-price="{{ recipe.menu_price }}"' in template
     assert 'data-cookbook-recipe-number="{{ recipe.number or loop.index }}"' in template
     assert "const COOKBOOK_RECIPE_SORT_KEYS" in script
@@ -123,6 +124,8 @@ def test_cookbook_submenu_has_recipe_sort_controls():
     assert "function normalizeCookbookRecipeSortState(value)" in script
     assert "function serializeCookbookRecipeSortState(sortKey, direction)" in script
     assert "function cookbookRecipeNextSortState(card, sortKey)" in script
+    assert "function cookbookRecipeMenuSectionOrder(card)" in script
+    assert "dataset.cookbookMenuSectionId" in script
     assert "function renderCookbookRecipeSortDecorations(card, sortKey)" in script
     assert "function renderCookbookRecipeSectionHeadings(card)" in script
     assert "function renderCookbookRecipeMenuPriceBadges(card)" in script
@@ -143,6 +146,7 @@ def test_cookbook_submenu_has_recipe_sort_controls():
     assert "content: \"↓\";" in css
     assert "currentState.direction === \"asc\"" in script
     assert "currentState.direction === \"desc\"" in script
+    assert '"menu_section_id"' in read_text("PushShoppingList/services/cookbook_service.py")
     assert "returned to default order" in script
 
 
@@ -317,6 +321,7 @@ def test_cookbook_recipe_view_renders_menu_stub_actions_above_amount():
                             "needs_ai_recipe": True,
                             "source_type": "menu_item_stub",
                             "menu_section": "Appetizers",
+                            "menu_section_id": "section-003",
                             "parent_menu_snapshot_id": "mega-menu-1",
                         },
                     ],
@@ -356,6 +361,7 @@ def test_cookbook_recipe_view_renders_menu_stub_actions_above_amount():
     assert menu_status_block.index("Generate Section") < menu_status_block.index("Run Section Routine")
     assert menu_status_block.index("Run Section Routine") < menu_status_block.index("View Mega Menu JSON")
     assert summary_body_index < amount_index < cookbook_index
+    assert 'data-cookbook-menu-section-id="section-003"' in card_html
     assert "Vel Asain Cuisine" in card_html[cookbook_index:]
 
 

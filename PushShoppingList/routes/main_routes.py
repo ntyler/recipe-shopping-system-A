@@ -988,6 +988,10 @@ def cookbook_view_for_render(recipe_rows, food_rules=None, image_variants=None):
             if str(recipe["recipe_status"] or "").strip().lower() == "generated":
                 recipe["needs_ai_recipe"] = False
             recipe["menu_section"] = recipe.get("menu_section") or recipe_data.get("menu_section", "")
+            recipe["restaurant_id"] = recipe.get("restaurant_id") or recipe_data.get("restaurant_id", "")
+            recipe["menu_id"] = recipe.get("menu_id") or recipe_data.get("menu_id", "")
+            recipe["menu_section_id"] = recipe.get("menu_section_id") or recipe_data.get("menu_section_id", "")
+            recipe["menu_item_id"] = recipe.get("menu_item_id") or recipe_data.get("menu_item_id", "")
             recipe["menu_item_name"] = recipe.get("menu_item_name") or recipe_data.get("menu_item_name", "")
             recipe["menu_description"] = recipe.get("menu_description") or recipe_data.get("menu_description", "")
             recipe["menu_price"] = recipe.get("menu_price") or recipe_data.get("menu_price", "")

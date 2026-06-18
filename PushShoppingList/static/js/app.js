@@ -7252,6 +7252,13 @@ function cookbookRecipeMenuPriceLabel(card) {
     return value || "Not listed";
 }
 
+function cookbookRecipeMenuSectionOrder(card) {
+    const value = String(card && card.dataset ? card.dataset.cookbookMenuSectionId || "" : "").trim();
+    const match = value.match(/(\d+)(?!.*\d)/);
+    const order = match ? Number.parseInt(match[1], 10) : Number.NaN;
+    return Number.isFinite(order) ? order : Number.POSITIVE_INFINITY;
+}
+
 function cookbookSortText(value) {
     return normalizedCookbookSearchText(value);
 }
@@ -7317,7 +7324,11 @@ function compareCookbookRecipeSortCriterion(sortKey, left, right, leftIndex = 0,
     let result = 0;
 
     if (sortKey === "menu_section") {
-        result = compareCookbookSortText(
+        result = compareCookbookSortNumbers(
+            cookbookRecipeMenuSectionOrder(left),
+            cookbookRecipeMenuSectionOrder(right),
+        );
+        result = result || compareCookbookSortText(
             cookbookSortText(left.dataset.cookbookMenuSection),
             cookbookSortText(right.dataset.cookbookMenuSection),
         );
