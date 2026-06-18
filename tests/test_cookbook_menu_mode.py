@@ -223,7 +223,7 @@ def test_cookbook_recipe_rows_match_current_recipe_summary_layout():
         recipe_card_start,
     )
     title_food_review_index = template.index(
-        'class="food-rule-marker recipe-log-food-review-btn recipe-url-summary-food-review"',
+        "recipe-url-summary-food-review-collapsed",
         recipe_card_start,
     )
     summary_body_index = template.index(
@@ -243,6 +243,7 @@ def test_cookbook_recipe_rows_match_current_recipe_summary_layout():
     inferred_branch_start = menu_status_block.index('{% elif recipe.source_type == "menu_item_inferred" or recipe.ai_inferred %}')
     stub_status_block = menu_status_block[:inferred_branch_start]
     inferred_status_block = menu_status_block[inferred_branch_start:]
+    standard_review_block = menu_status_block[menu_status_block.index("{% elif recipe_needs_food_review %}"):]
 
     assert "menu-recipe-status-stub" not in title_block
     assert title_line_start < title_food_review_index < summary_body_index
@@ -255,6 +256,7 @@ def test_cookbook_recipe_rows_match_current_recipe_summary_layout():
     assert stub_status_block.index("Run Section Routine") < stub_status_block.index("View Mega Menu JSON")
     assert inferred_status_block.index("menu-recipe-status-generated") < inferred_status_block.index("recipe-url-summary-food-review")
     assert inferred_status_block.index("recipe-url-summary-food-review") < inferred_status_block.index("View Mega Menu JSON")
+    assert standard_review_block.index("recipe-url-summary-food-review") < standard_review_block.index("recipe-url-summary-servings")
     assert 'data-menu-snapshot-id="{{ recipe.parent_menu_snapshot_id or recipe.menu_mega_snapshot_id }}"' in menu_status_block
     assert ".recipe-url-summary-menu-status" in css
     assert "#cookbooksCard .cookbook-recipe-card .recipe-url-summary-food-review-collapsed" in css
