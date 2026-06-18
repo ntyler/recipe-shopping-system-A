@@ -20031,14 +20031,14 @@ async function askRecipeNoteFeedback(button) {
 }
 
 function removeRecipeEditRow(button) {
-    const row = button ? button.closest(recipeEditMovableRowSelector()) : null;
+    const row = recipeEditActionRowFromButton(button);
 
     if (row) {
         const wasIngredient = row.classList.contains("recipe-edit-ingredient-row");
         const wasEquipment = row.classList.contains("recipe-edit-equipment-row");
         const wasInstruction = row.classList.contains("recipe-edit-instruction-row");
-        row.remove();
         closeRecipeEditRowMenus();
+        row.remove();
 
         if (wasIngredient) {
             updateRecipeIngredientRowIndexes();
@@ -20050,6 +20050,8 @@ function removeRecipeEditRow(button) {
             updateRecipeInstructionStepNumbers();
         }
     }
+
+    return false;
 }
 
 function recipeHasGeneratedCloudflarePdf(recipe = {}) {

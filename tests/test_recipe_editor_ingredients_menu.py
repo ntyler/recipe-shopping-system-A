@@ -44,6 +44,23 @@ def test_ingredients_header_has_image_overflow_menu():
     assert "closeRecipeEditRowMenus();" in script
 
 
+def test_recipe_editor_row_delete_uses_portaled_menu_anchor():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    remove_start = script.index("function removeRecipeEditRow")
+    remove_end = script.index("function recipeHasGeneratedCloudflarePdf", remove_start)
+    remove_block = script[remove_start:remove_end]
+    nutrition_start = script.index("function addRecipeNutritionRow")
+    nutrition_end = script.index("function recipeNutritionHeaderHtml", nutrition_start)
+    nutrition_block = script[nutrition_start:nutrition_end]
+
+    assert 'Delete nutrition row' in nutrition_block
+    assert 'onclick="removeRecipeEditRow(this)"' in nutrition_block
+    assert "const row = recipeEditActionRowFromButton(button);" in remove_block
+    assert "button.closest(recipeEditMovableRowSelector())" not in remove_block
+    assert remove_block.index("closeRecipeEditRowMenus();") < remove_block.index("row.remove();")
+    assert "return false;" in remove_block
+
+
 def test_collapsed_ingredient_rows_use_compact_one_line_layout():
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
@@ -79,7 +96,8 @@ def test_recipe_menu_edit_links_to_standalone_editor_page():
     assert "recipe_edit_only = true" in standalone_page
     assert "data-recipe-edit-page=\"true\"" in standalone_page
     assert "data-recipe-edit-url=\"{{ recipe_url }}\"" in standalone_page
-    assert "openRecipeEditor({ dataset: { recipeUrl } });" in standalone_page
+    assert "consumeRecipeEditPendingAction(recipeUrl)" in standalone_page
+    assert "openRecipeEditor({ dataset: { recipeUrl } }, pendingOptions);" in standalone_page
     assert "await waitForNextPaint();" in script
     assert "scheduleRecipeImageProgressPoll(750);" in script
     assert "document.body.dataset.recipeEditPage" in script
