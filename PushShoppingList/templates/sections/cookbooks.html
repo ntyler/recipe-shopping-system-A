@@ -643,6 +643,33 @@
                                                                     <span aria-hidden="true"></span>
                                                                 </button>
                                                                 <div class="recipe-edit-row-menu overflow-menu cookbook-recipe-menu" hidden>
+                                                                    <div class="overflow-menu-section cookbook-infer-menu-section">
+                                                                        <div class="overflow-menu-section-title">Menu AI</div>
+                                                                        <label class="recipe-menu-check-toggle cookbook-infer-toggle"
+                                                                               title="Allow this routine to refresh fields previously filled by this AI routine."
+                                                                               onclick="event.stopPropagation()">
+                                                                            <input type="checkbox"
+                                                                                   data-cookbook-infer-overwrite
+                                                                                   aria-label="Overwrite existing AI-inferred fields for {{ recipe.name }}">
+                                                                            <span>Overwrite AI fields</span>
+                                                                        </label>
+                                                                        <label class="recipe-menu-check-toggle cookbook-infer-toggle"
+                                                                               title="Preview inferred fields without saving recipe changes."
+                                                                               onclick="event.stopPropagation()">
+                                                                            <input type="checkbox"
+                                                                                   data-cookbook-infer-preview
+                                                                                   aria-label="Preview inferred details only for {{ recipe.name }}">
+                                                                            <span>Preview Only</span>
+                                                                        </label>
+                                                                        <button type="button"
+                                                                                data-recipe-url="{{ recipe.url }}"
+                                                                                data-recipe-name="{{ recipe.name }}"
+                                                                                data-cookbook-id="{{ cookbook.id }}"
+                                                                                data-cookbook-name="{{ cookbook.name }}"
+                                                                                onclick="return inferMissingCookbookRecipeDetails(this, event)">
+                                                                            Infer Details for This Recipe
+                                                                        </button>
+                                                                    </div>
                                                                     <div class="overflow-menu-section recipe-view-menu-section">
                                                                         <div class="overflow-menu-section-title recipe-view-menu-section-title">Recipe</div>
                                                                         <button type="button"
@@ -656,14 +683,6 @@
                                                                            onclick="return openRecipeEditPageFromMenu(this, event)">
                                                                             Edit recipe
                                                                         </a>
-                                                                        <button type="button"
-                                                                                data-recipe-url="{{ recipe.url }}"
-                                                                                data-recipe-name="{{ recipe.name }}"
-                                                                                data-cookbook-id="{{ cookbook.id }}"
-                                                                                data-cookbook-name="{{ cookbook.name }}"
-                                                                                onclick="return inferMissingCookbookRecipeDetails(this, event)">
-                                                                            Infer Details for This Recipe
-                                                                        </button>
                                         {% set recipe_public_pdf_url = recipe.pdf_public_url %}
                                         {% set recipe_pdf_url = recipe_public_pdf_url or (url_for('recipe_bp.recipe_archive_pdf_route', url=recipe.url, kind='generated_recipe') if recipe.archive_pdf_available else "") %}
                                          {% if recipe_pdf_url %}

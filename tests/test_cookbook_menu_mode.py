@@ -90,6 +90,36 @@ def test_cookbook_infer_controls_live_inside_cookbook_submenu():
     assert "menu.recipeEditAnchorButton" in script
 
 
+def test_cookbook_recipe_submenu_has_menu_ai_controls_before_recipe_actions():
+    template = read_text("PushShoppingList/templates/sections/cookbooks.html")
+
+    recipe_menu_start = template.index(
+        '<div class="recipe-edit-row-menu overflow-menu cookbook-recipe-menu" hidden>'
+    )
+    danger_section_start = template.index(
+        '<div class="overflow-menu-section recipe-view-menu-section recipe-view-menu-section-danger">',
+        recipe_menu_start,
+    )
+    recipe_menu_block = template[recipe_menu_start:danger_section_start]
+
+    menu_ai_start = recipe_menu_block.index('<div class="overflow-menu-section cookbook-infer-menu-section">')
+    recipe_section_start = recipe_menu_block.index(
+        '<div class="overflow-menu-section recipe-view-menu-section">',
+        menu_ai_start,
+    )
+    menu_ai_block = recipe_menu_block[menu_ai_start:recipe_section_start]
+    recipe_section_block = recipe_menu_block[recipe_section_start:]
+
+    assert menu_ai_block.index("Menu AI") < menu_ai_block.index("data-cookbook-infer-overwrite")
+    assert menu_ai_block.index("data-cookbook-infer-overwrite") < menu_ai_block.index("data-cookbook-infer-preview")
+    assert menu_ai_block.index("data-cookbook-infer-preview") < menu_ai_block.index("inferMissingCookbookRecipeDetails")
+    assert menu_ai_block.index("inferMissingCookbookRecipeDetails") < menu_ai_block.index("Infer Details for This Recipe")
+    assert "Add to current recipes" in recipe_section_block
+    assert "Edit recipe" in recipe_section_block
+    assert "Infer Details for This Recipe" not in recipe_section_block
+    assert menu_ai_start < recipe_section_start
+
+
 def test_cookbook_recipe_rows_match_current_recipe_summary_layout():
     template = read_text("PushShoppingList/templates/sections/cookbooks.html")
     css = read_text("PushShoppingList/static/css/app.css")
