@@ -4498,6 +4498,10 @@ body {
             display: none;
         }
 
+        #cookbooksCard.cookbooks-hide-ai-inferred .menu-recipe-status-generated {
+            display: none;
+        }
+
         #currentRecipeUrlLogCard,
         #jobActivitySection,
         #cookbooksCard,

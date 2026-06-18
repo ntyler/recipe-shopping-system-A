@@ -175,6 +175,14 @@
                                                                    aria-label="Preview inferred details only for {{ cookbook.name }}">
                                                             <span>Preview Only</span>
                                                         </label>
+                                                        <label class="recipe-menu-check-toggle recipe-url-log-ai-inferred-toggle"
+                                                               onclick="event.stopPropagation()">
+                                                            <input type="checkbox"
+                                                                   data-cookbooks-ai-inferred-toggle
+                                                                   onchange="return toggleCookbooksAiInferredBadges(this, event)"
+                                                                   aria-label="Hide AI-inferred recipe badges in {{ cookbook.name }}">
+                                                            <span>Hide AI-Inferred Recipe</span>
+                                                        </label>
                                                         <button type="button"
                                                                 data-cookbook-id="{{ cookbook.id }}"
                                                                 data-cookbook-name="{{ cookbook.name }}"

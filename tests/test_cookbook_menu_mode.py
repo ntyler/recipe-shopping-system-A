@@ -83,11 +83,15 @@ def test_cookbook_infer_controls_live_inside_cookbook_submenu():
     assert "inferMissingCookbookDetails" not in header_actions_block
     assert cookbook_menu_block.index("Menu AI") < cookbook_menu_block.index("data-cookbook-infer-overwrite")
     assert cookbook_menu_block.index("data-cookbook-infer-overwrite") < cookbook_menu_block.index("data-cookbook-infer-preview")
-    assert cookbook_menu_block.index("data-cookbook-infer-preview") < cookbook_menu_block.index("inferMissingCookbookDetails")
+    assert cookbook_menu_block.index("data-cookbook-infer-preview") < cookbook_menu_block.index("data-cookbooks-ai-inferred-toggle")
+    assert cookbook_menu_block.index("data-cookbooks-ai-inferred-toggle") < cookbook_menu_block.index("inferMissingCookbookDetails")
     assert cookbook_menu_block.index("inferMissingCookbookDetails") < cookbook_menu_block.index("Sort By")
     assert cookbook_menu_block.index("Sort By") < cookbook_menu_block.index("Menu PDF Log")
     assert cookbook_menu_block.index("inferMissingCookbookDetails") < cookbook_menu_block.index("Menu PDF Log")
+    assert "Hide AI-Inferred Recipe" in cookbook_menu_block
     assert "function cookbookInferOptionCheckbox" in script
+    assert "function toggleCookbooksAiInferredBadges" in script
+    assert "restoreCookbooksAiInferredBadgeSetting" in script
     assert 'button.closest(".recipe-edit-row-menu")' in script
     assert "menu.recipeEditAnchorButton" in script
 
@@ -141,6 +145,7 @@ def test_cookbook_submenu_has_recipe_sort_controls():
     assert ".cookbook-sort-menu-section [data-cookbook-sort-option][aria-pressed=\"true\"]" in css
     assert ".cookbook-recipe-sort-section-heading" in css
     assert ".cookbook-recipe-menu-price-badge" in css
+    assert "#cookbooksCard.cookbooks-hide-ai-inferred .menu-recipe-status-generated" in css
     assert "[data-cookbook-sort-direction=\"desc\"]::before" in css
     assert "content: \"↑\";" in css
     assert "content: \"↓\";" in css
