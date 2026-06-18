@@ -1,9 +1,13 @@
 <section id="jobActivitySection"
-         class="app-card job-activity-card"
+         class="{% if not job_activity_account_panel|default(false) %}app-card {% endif %}job-activity-card{% if job_activity_account_panel|default(false) %} user-job-activity-panel{% endif %}"
          data-job-activity-panel
          data-admin-job-view="{{ '1' if current_user and current_user.is_admin else '0' }}"
-         aria-live="polite">
-    <div class="job-activity-header recipe-url-log-header">
+         aria-live="polite"
+         {% if job_activity_account_panel|default(false) %}hidden{% endif %}>
+    {% if job_activity_account_panel|default(false) %}
+        <div class="app-section-divider recipe-entry-section-divider user-job-activity-divider" aria-hidden="true"></div>
+    {% endif %}
+    <div class="job-activity-header recipe-url-log-header{% if job_activity_account_panel|default(false) %} user-push-panel-header user-job-activity-header{% endif %}">
         <button type="button"
                 class="card-collapse-toggle recipe-url-log-toggle job-activity-toggle"
                 data-collapse-toggle="job-activity"
@@ -13,6 +17,14 @@
                 Job Activity / Import Progress
             </span>
         </button>
+        {% if job_activity_account_panel|default(false) %}
+            <button type="button"
+                    class="secondary user-push-panel-close user-job-activity-close"
+                    data-job-activity-close
+                    onclick="return closeJobActivityPanel()">
+                Close
+            </button>
+        {% endif %}
     </div>
     <div class="card-collapse-content job-activity-content"
          data-collapse-content="job-activity"

@@ -131,13 +131,14 @@ def test_account_menu_uses_compact_grouped_dropdown_style():
     assert 'role="menuitem"' in menu_markup
     assert 'class="sr-only">Account Menu</span>' in menu_markup
     assert "user-account-menu-trigger-icon" in menu_markup
-    for label in ("PROFILE", "USAGE &amp; BILLING", "DISPLAY", "SECURITY", "COMMUNICATIONS", "SESSION", "DANGER ZONE"):
+    for label in ("PROFILE", "USAGE &amp; BILLING", "ACTIVITY", "DISPLAY", "SECURITY", "COMMUNICATIONS", "SESSION", "DANGER ZONE"):
         assert f">{label}</div>" in menu_markup
     for label in (
         "Account Settings",
         "Account Notices",
         "AI Usage &amp; Billing",
         "Chat GPT Models",
+        "Job Activity / Import Progress",
         "Screen Settings",
         "Change Password",
         "Email Verified",
@@ -150,7 +151,9 @@ def test_account_menu_uses_compact_grouped_dropdown_style():
         assert label in menu_markup
     assert menu_markup.index(">PROFILE</div>") < menu_markup.index("Account Settings")
     assert menu_markup.index(">USAGE &amp; BILLING</div>") < menu_markup.index("AI Usage &amp; Billing")
-    assert menu_markup.index(">USAGE &amp; BILLING</div>") < menu_markup.index(">DISPLAY</div>")
+    assert menu_markup.index(">USAGE &amp; BILLING</div>") < menu_markup.index(">ACTIVITY</div>")
+    assert menu_markup.index(">ACTIVITY</div>") < menu_markup.index("Job Activity / Import Progress")
+    assert menu_markup.index(">ACTIVITY</div>") < menu_markup.index(">DISPLAY</div>")
     assert menu_markup.index(">DISPLAY</div>") < menu_markup.index("Screen Settings")
     assert menu_markup.index(">DISPLAY</div>") < menu_markup.index(">SECURITY</div>")
     assert menu_markup.index(">SESSION</div>") < menu_markup.index("Sign Out")
@@ -175,11 +178,14 @@ def test_account_menu_uses_compact_grouped_dropdown_style():
     assert ".user-account-menu-panel .user-account-menu-danger" in css
     assert 'aria-controls="accountUsageDashboardPanel"' in menu_markup
     assert 'aria-controls="chatGptModelsSection"' in menu_markup
+    assert 'aria-controls="jobActivitySection"' in menu_markup
     assert 'aria-controls="screenSettingsCard"' in menu_markup
     assert "toggleUsageDashboardPanel()" in menu_markup
     assert "toggleChatGptModelsPanel()" in menu_markup
+    assert "openJobActivityPanel()" in menu_markup
     assert "toggleScreenSettingsPanel()" in menu_markup
     assert "function toggleUsageDashboardPanel(open = null)" in script
+    assert "function openJobActivityPanel()" in script
     assert "function toggleScreenSettingsPanel(open = null)" in script
     assert "function bindAccountMenuDropdowns()" in script
     assert "function closeAccountMenuDropdown(menu, options = {})" in script
@@ -425,6 +431,7 @@ def test_account_panels_remember_open_state_across_refreshes():
         "accountNotices",
         "usageDashboard",
         "chatGptModels",
+        "jobActivity",
         "twoFactor",
         "pushNotifications",
         "deleteAccount",
@@ -435,6 +442,7 @@ def test_account_panels_remember_open_state_across_refreshes():
         "[data-account-notices-panel]",
         "[data-usage-dashboard-panel]",
         "[data-chatgpt-models-panel]",
+        "[data-job-activity-panel]",
         "[data-two-factor-panel]",
         "[data-push-notifications-panel]",
         "[data-delete-account-panel]",
@@ -532,6 +540,38 @@ def test_chatgpt_models_live_inside_account_menu_panel():
     assert "[data-chatgpt-models-panel]" in script
     assert "#chatGptModelsSection" in script
     assert "[data-chatgpt-models-panel]" in firebase_script
+
+
+def test_job_activity_lives_inside_account_menu_panel():
+    index_template = (ROOT / "PushShoppingList/templates/index.html").read_text(encoding="utf-8")
+    account_template = (ROOT / "PushShoppingList/templates/sections/user_account.html").read_text(encoding="utf-8")
+    job_template = (ROOT / "PushShoppingList/templates/sections/job_activity.html").read_text(encoding="utf-8")
+    css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    firebase_script = (ROOT / "PushShoppingList/static/js/firebase-auth.js").read_text(encoding="utf-8")
+
+    assert '{% include "sections/job_activity.html" %}' not in index_template
+    assert '{% include "sections/job_activity.html" %}' in account_template
+    assert "{% set job_activity_account_panel = true %}" in account_template
+    assert 'aria-controls="jobActivitySection"' in account_template
+    assert "data-job-activity-open" in account_template
+    assert "openJobActivityPanel()" in account_template
+    assert "job_activity_account_panel|default(false)" in job_template
+    assert "user-job-activity-panel" in job_template
+    assert "user-job-activity-divider" in job_template
+    assert "data-job-activity-close" in job_template
+    assert "closeJobActivityPanel()" in job_template
+    assert "hidden{% endif %}" in job_template
+    assert "function openJobActivityPanel()" in script
+    assert "function closeJobActivityPanel()" in script
+    assert "function expandJobActivityContent()" in script
+    assert '"#jobActivitySection": "jobActivity"' in script
+    assert "refreshJobActivityPanel({ force: true })" in script
+    assert ".user-job-activity-panel.job-activity-card" in css
+    assert ".user-job-activity-panel[hidden]" in css
+    assert ".user-job-activity-header .job-activity-toggle" in css
+    assert ".user-job-activity-close" in css
+    assert "[data-job-activity-panel]" in firebase_script
 
 
 def test_usage_dashboard_receives_openai_usage_summary_from_route():

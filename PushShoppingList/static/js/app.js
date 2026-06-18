@@ -30,6 +30,7 @@ const USER_ACCOUNT_REMEMBERED_PANEL_SELECTORS = {
     aiPantry: "[data-ai-pantry-panel]",
     adminSupport: "[data-admin-support-panel]",
     chatGptModels: "[data-chatgpt-models-panel]",
+    jobActivity: "[data-job-activity-panel]",
     sharedRecipePdfs: "[data-shared-recipe-pdfs-panel]",
     twoFactor: "[data-two-factor-panel]",
     pushNotifications: "[data-push-notifications-panel]",
@@ -99,6 +100,7 @@ const USER_ACCOUNT_PANEL_HASH_KEYS = {
     "#aiPantrySection": "aiPantry",
     "#adminSupportSection": "adminSupport",
     "#chatGptModelsSection": "chatGptModels",
+    "#jobActivitySection": "jobActivity",
     "#sharedRecipePdfsSection": "sharedRecipePdfs",
     "#accountTwoFactorPanel": "twoFactor",
     "#accountPushNotificationsPanel": "pushNotifications",
@@ -2258,6 +2260,11 @@ function restoreRememberedAccountPanelOpenWithOptions(options = {}) {
         });
     }
 
+    if (panelKey === "jobActivity") {
+        expandJobActivityContent();
+        refreshJobActivityPanel({ force: true });
+    }
+
     if (panelKey === "aiPantry") {
         loadLazySection("pantry", { focus: false }).then(() => {
             const pantryPanel = document.querySelector("[data-ai-pantry-panel]");
@@ -3072,6 +3079,14 @@ function expandAiPantryContent() {
     }
 }
 
+function expandJobActivityContent() {
+    const content = document.querySelector('[data-collapse-content="job-activity"]');
+
+    if (content && content.classList.contains("collapsed")) {
+        setCardCollapseContentCollapsed(content, false);
+    }
+}
+
 async function openAiPantryPanel() {
     const panel = document.querySelector("[data-ai-pantry-panel]");
 
@@ -3229,6 +3244,55 @@ async function openSharedRecipePdfsPanel() {
 
 function closeSharedRecipePdfsPanel() {
     const panel = document.querySelector("[data-shared-recipe-pdfs-panel]");
+
+    if (!panel) {
+        return false;
+    }
+
+    panel.hidden = true;
+    rememberAccountPanelElement(panel, false);
+
+    if (typeof scrollToUserAccountProfile === "function") {
+        scrollToUserAccountProfile("auto");
+    }
+
+    return false;
+}
+
+function openJobActivityPanel() {
+    const panel = document.querySelector("[data-job-activity-panel]");
+
+    if (!panel) {
+        return false;
+    }
+
+    const accountMenu = document.querySelector("[data-account-menu]");
+    if (accountMenu) {
+        closeAccountMenuDropdown(accountMenu);
+    }
+
+    panel.hidden = false;
+    rememberAccountPanelElement(panel, true);
+    hideRememberedAccountPanels(panel);
+    expandJobActivityContent();
+    refreshJobActivityPanel({ force: true });
+
+    window.requestAnimationFrame(() => {
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+        const firstControl = panel.querySelector("[data-job-activity-close]")
+            || panel.querySelector("[data-collapse-toggle='job-activity']")
+            || panel.querySelector("button, a, input, select, textarea");
+
+        if (firstControl) {
+            firstControl.focus({ preventScroll: true });
+        }
+    });
+
+    return false;
+}
+
+function closeJobActivityPanel() {
+    const panel = document.querySelector("[data-job-activity-panel]");
 
     if (!panel) {
         return false;

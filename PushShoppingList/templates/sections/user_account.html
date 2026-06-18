@@ -335,6 +335,19 @@
                             {% endif %}
                         </div>
 
+                        <div class="user-account-menu-section">
+                            <div class="user-account-menu-section-title">ACTIVITY</div>
+                            <button type="button"
+                                    class="user-account-menu-item"
+                                    role="menuitem"
+                                    aria-controls="jobActivitySection"
+                                    data-job-activity-open
+                                    onclick="return openJobActivityPanel()">
+                                <span class="user-account-menu-item-icon" aria-hidden="true">J</span>
+                                <span class="user-account-menu-item-label">Job Activity / Import Progress</span>
+                            </button>
+                        </div>
+
                         {% if current_user.is_admin %}
                             <div class="user-account-menu-section">
                                 <div class="user-account-menu-section-title">ADMIN</div>
@@ -717,6 +730,10 @@
         {% if chatgpt_models_dashboard and chatgpt_models_dashboard.is_admin %}
             {% include "sections/chatgpt_models.html" %}
         {% endif %}
+
+        {% set job_activity_account_panel = true %}
+        {% include "sections/job_activity.html" %}
+        {% set job_activity_account_panel = false %}
 
         <form id="userProfileEditForm"
               class="user-account-form user-account-edit-form"

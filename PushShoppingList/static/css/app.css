@@ -6539,6 +6539,7 @@ body {
         }
 
         .user-ai-pantry-panel,
+        .user-job-activity-panel.job-activity-card,
         .user-shared-recipe-pdfs-panel {
             display: grid;
             gap: 10px;
@@ -6551,11 +6552,13 @@ body {
         }
 
         .user-ai-pantry-panel[hidden],
+        .user-job-activity-panel[hidden],
         .user-shared-recipe-pdfs-panel[hidden] {
             display: none;
         }
 
         .user-ai-pantry-divider,
+        .user-job-activity-divider,
         .user-shared-recipe-pdfs-divider {
             width: 100%;
             max-width: none;
@@ -6563,6 +6566,7 @@ body {
         }
 
         .user-ai-pantry-header .ai-pantry-toggle,
+        .user-job-activity-header .job-activity-toggle,
         .user-shared-recipe-pdfs-header .pdf-share-toggle {
             flex: 1 1 auto;
             width: auto;
@@ -6571,6 +6575,7 @@ body {
         }
 
         .user-ai-pantry-close,
+        .user-job-activity-close,
         .user-shared-recipe-pdfs-close {
             flex: 0 0 auto;
             width: auto;
@@ -6588,6 +6593,8 @@ body {
 
         .user-ai-pantry-close:hover,
         .user-ai-pantry-close:focus-visible,
+        .user-job-activity-close:hover,
+        .user-job-activity-close:focus-visible,
         .user-shared-recipe-pdfs-close:hover,
         .user-shared-recipe-pdfs-close:focus-visible {
             background: #2a3036;
@@ -6925,7 +6932,8 @@ body {
             grid-template-columns: minmax(0, 1fr);
         }
 
-        .user-push-panel-header {
+        .user-push-panel-header,
+        .user-job-activity-header.job-activity-header {
             display: flex;
             gap: 10px;
             align-items: center;
@@ -13366,7 +13374,8 @@ body {
                 grid-column: auto;
             }
 
-            .user-push-panel-header {
+            .user-push-panel-header,
+            .user-job-activity-header.job-activity-header {
                 align-items: stretch;
                 flex-direction: column;
             }
