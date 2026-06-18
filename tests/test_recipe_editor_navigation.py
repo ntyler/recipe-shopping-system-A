@@ -86,6 +86,20 @@ def test_recipe_editor_return_scroll_offsets_current_recipe_sticky_header():
     assert "top: -offset" in jump_block
 
 
+def test_recipe_editor_return_scroll_offsets_cookbook_sticky_header():
+    script = read_text("PushShoppingList/static/js/app.js")
+    jump_block = script[
+        script.index("function scrollRecipeJumpTargetIntoView"):
+        script.index("function updateViewSwitcherStickyOffset")
+    ]
+
+    assert "function cookbooksStickyHeaderOffset" in jump_block
+    assert '#cookbooksCard:not(.card-collapsed)' in jump_block
+    assert ":scope > .cookbooks-toggle" in jump_block
+    assert "[data-cookbook-recipe-card]" in jump_block
+    assert "currentRecipesStickyHeaderOffset(target) || cookbooksStickyHeaderOffset(target)" in jump_block
+
+
 def test_recipe_editor_cancel_uses_stored_page_return_before_history():
     template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
     script = read_text("PushShoppingList/static/js/app.js")

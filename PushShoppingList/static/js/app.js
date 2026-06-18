@@ -11952,8 +11952,24 @@ function currentRecipesStickyHeaderOffset(target) {
     return headerHeight > 0 ? headerHeight + 12 : 0;
 }
 
+function cookbooksStickyHeaderOffset(target) {
+    const cookbooksCard = target && target.closest
+        ? target.closest("#cookbooksCard:not(.card-collapsed)")
+        : null;
+    const header = cookbooksCard
+        ? cookbooksCard.querySelector(":scope > .cookbooks-toggle")
+        : null;
+
+    if (!header || !target.matches || !target.matches("[data-cookbook-recipe-card]")) {
+        return 0;
+    }
+
+    const headerHeight = Math.ceil(header.getBoundingClientRect().height || 0);
+    return headerHeight > 0 ? headerHeight + 12 : 0;
+}
+
 function scrollRecipeJumpTargetBelowStickyHeader(target) {
-    const offset = currentRecipesStickyHeaderOffset(target);
+    const offset = currentRecipesStickyHeaderOffset(target) || cookbooksStickyHeaderOffset(target);
 
     if (offset <= 0) {
         return;
