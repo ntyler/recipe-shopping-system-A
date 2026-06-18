@@ -117,13 +117,23 @@ def test_cookbook_submenu_has_recipe_sort_controls():
     assert 'data-cookbook-menu-price="{{ recipe.menu_price }}"' in template
     assert 'data-cookbook-recipe-number="{{ recipe.number or loop.index }}"' in template
     assert "const COOKBOOK_RECIPE_SORT_KEYS" in script
+    assert "const COOKBOOK_RECIPE_SORT_DIRECTIONS" in script
     assert "function cookbookCardFromControl(control)" in script
     assert 'menu.recipeEditAnchorButton.closest("[data-cookbook-card]")' in script
+    assert "function normalizeCookbookRecipeSortState(value)" in script
+    assert "function serializeCookbookRecipeSortState(sortKey, direction)" in script
+    assert "function cookbookRecipeNextSortState(card, sortKey)" in script
     assert "function sortCookbookRecipes(button, sortKey)" in script
     assert "function applyCookbookRecipeSort(card, sortKey, options = {})" in script
     assert "function compareCookbookSortNumbers(left, right)" in script
     assert "restoreCookbookRecipeSortState();" in script
     assert ".cookbook-sort-menu-section [data-cookbook-sort-option][aria-pressed=\"true\"]" in css
+    assert "[data-cookbook-sort-direction=\"desc\"]::before" in css
+    assert "content: \"↑\";" in css
+    assert "content: \"↓\";" in css
+    assert "currentState.direction === \"asc\"" in script
+    assert "currentState.direction === \"desc\"" in script
+    assert "returned to default order" in script
 
 
 def test_cookbook_recipe_submenu_has_menu_ai_controls_before_recipe_actions():
@@ -243,15 +253,25 @@ def test_cookbook_recipe_rows_match_current_recipe_summary_layout():
     cookbook_mobile_end = css.index(".admin-support-card", cookbook_mobile_start)
     cookbook_mobile_block = css[cookbook_mobile_start:cookbook_mobile_end]
 
-    assert "grid-template-columns: 32px minmax(0, 1fr);" in cookbook_mobile_block
+    assert "grid-template-columns: 18px 28px minmax(0, 1fr);" in cookbook_mobile_block
+    assert (
+        "#cookbooksCard .cookbook-recipe-card .cookbook-recipe-restore-checkbox {\n"
+        "        grid-column: 1;\n"
+        "        grid-row: 1;"
+    ) in cookbook_mobile_block
+    assert (
+        "#cookbooksCard .cookbook-recipe-card .cookbook-recipe-drag-handle {\n"
+        "        grid-column: 2;\n"
+        "        grid-row: 1;"
+    ) in cookbook_mobile_block
     assert (
         "#cookbooksCard .cookbook-recipe-summary-title {\n"
-        "        grid-column: 2;\n"
-        "        grid-row: 2;"
+        "        grid-column: 3;\n"
+        "        grid-row: 1;"
     ) in cookbook_mobile_block
     assert (
         "#cookbooksCard .cookbook-recipe-actions.recipe-url-summary-actions {\n"
-        "        grid-column: 2;\n"
+        "        grid-column: 3;\n"
         "        grid-row: 1;"
     ) in cookbook_mobile_block
     assert (

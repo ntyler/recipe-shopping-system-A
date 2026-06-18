@@ -7117,6 +7117,7 @@ const DEFAULT_COOKBOOK_VIEW_MODE = "recipes";
 const COOKBOOK_MENU_MODE_SESSION_KEY = "cookbook-menu-mode";
 const DEFAULT_COOKBOOK_MENU_MODE = "restaurant_menu";
 const COOKBOOK_RECIPE_SORT_KEYS = new Set(["menu_section", "menu_price", "name", "recipe_number"]);
+const COOKBOOK_RECIPE_SORT_DIRECTIONS = new Set(["asc", "desc"]);
 
 function normalizedCookbookSearchText(value) {
     return String(value || "")
@@ -7166,6 +7167,68 @@ function cookbookRecipeSortStorageKey(cookbookId) {
     return cookbookId ? `cookbook-recipe-sort:${cookbookId}` : "";
 }
 
+function normalizeCookbookRecipeSortState(value) {
+    if (!value) {
+        return { sortKey: "", direction: "" };
+    }
+
+    if (typeof value === "string") {
+        const trimmed = value.trim();
+
+        if (COOKBOOK_RECIPE_SORT_KEYS.has(trimmed)) {
+            return { sortKey: trimmed, direction: "asc" };
+        }
+
+        const parts = trimmed.split(":");
+        if (parts.length === 2 && COOKBOOK_RECIPE_SORT_KEYS.has(parts[0]) && COOKBOOK_RECIPE_SORT_DIRECTIONS.has(parts[1])) {
+            return { sortKey: parts[0], direction: parts[1] };
+        }
+
+        try {
+            return normalizeCookbookRecipeSortState(JSON.parse(trimmed));
+        } catch (err) {
+            return { sortKey: "", direction: "" };
+        }
+    }
+
+    if (typeof value === "object") {
+        const sortKey = String(value.sortKey || value.key || "").trim();
+        const direction = String(value.direction || value.dir || "").trim();
+
+        if (COOKBOOK_RECIPE_SORT_KEYS.has(sortKey) && COOKBOOK_RECIPE_SORT_DIRECTIONS.has(direction)) {
+            return { sortKey, direction };
+        }
+    }
+
+    return { sortKey: "", direction: "" };
+}
+
+function serializeCookbookRecipeSortState(sortKey, direction) {
+    return sortKey && direction ? `${sortKey}:${direction}` : "";
+}
+
+function cookbookRecipeNextSortState(card, sortKey) {
+    const normalizedSortKey = COOKBOOK_RECIPE_SORT_KEYS.has(sortKey) ? sortKey : "";
+    const currentState = normalizeCookbookRecipeSortState({
+        sortKey: card ? card.dataset.cookbookSortKey || "" : "",
+        direction: card ? card.dataset.cookbookSortDirection || "" : "",
+    });
+
+    if (!normalizedSortKey || currentState.sortKey !== normalizedSortKey) {
+        return { sortKey: normalizedSortKey, direction: "asc" };
+    }
+
+    if (currentState.direction === "asc") {
+        return { sortKey: normalizedSortKey, direction: "desc" };
+    }
+
+    if (currentState.direction === "desc") {
+        return { sortKey: "", direction: "" };
+    }
+
+    return { sortKey: normalizedSortKey, direction: "asc" };
+}
+
 function cookbookRecipeSortLabel(sortKey) {
     return {
         menu_section: "Menu Section",
@@ -7173,6 +7236,10 @@ function cookbookRecipeSortLabel(sortKey) {
         name: "Name",
         recipe_number: "Recipe #",
     }[sortKey] || "Recipe #";
+}
+
+function cookbookRecipeSortDirectionLabel(direction) {
+    return direction === "desc" ? "descending" : "ascending";
 }
 
 function cookbookSortText(value) {
@@ -7236,7 +7303,7 @@ function compareCookbookSortText(left, right) {
     return left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
 }
 
-function compareCookbookRecipeCards(sortKey, left, right, leftIndex = 0, rightIndex = 0) {
+function compareCookbookRecipeSortCriterion(sortKey, left, right, leftIndex = 0, rightIndex = 0) {
     let result = 0;
 
     if (sortKey === "menu_section") {
@@ -7259,8 +7326,17 @@ function compareCookbookRecipeCards(sortKey, left, right, leftIndex = 0, rightIn
             - cookbookRecipeNumber(right, rightIndex + 1);
     }
 
+    return Number.isFinite(result) ? result : 0;
+}
+
+function compareCookbookRecipeCards(sortKey, left, right, leftIndex = 0, rightIndex = 0, direction = "asc") {
+    const normalizedDirection = direction === "desc" ? "desc" : "asc";
+    const result = COOKBOOK_RECIPE_SORT_KEYS.has(sortKey)
+        ? compareCookbookRecipeSortCriterion(sortKey, left, right, leftIndex, rightIndex)
+        : 0;
+
     if (result !== 0 && Number.isFinite(result)) {
-        return result;
+        return normalizedDirection === "desc" ? -result : result;
     }
 
     const numberResult = cookbookRecipeNumber(left, leftIndex + 1)
@@ -7269,24 +7345,37 @@ function compareCookbookRecipeCards(sortKey, left, right, leftIndex = 0, rightIn
     return numberResult || (cookbookRecipeOriginalIndex(left, leftIndex) - cookbookRecipeOriginalIndex(right, rightIndex));
 }
 
-function sortCookbookRecipeElements(container, selector, sortKey) {
+function sortCookbookRecipeElements(container, selector, sortKey, direction = "asc") {
     if (!container) {
         return 0;
     }
 
     const cards = Array.from(container.children).filter(child => child.matches(selector));
+    const normalizedSortKey = COOKBOOK_RECIPE_SORT_KEYS.has(sortKey) ? sortKey : "";
+    const normalizedDirection = direction === "desc" ? "desc" : "asc";
 
     cards
-        .map((card, index) => ({ card, index }))
-        .sort((left, right) => compareCookbookRecipeCards(sortKey, left.card, right.card, left.index, right.index))
+        .map((card, index) => {
+            cookbookRecipeOriginalIndex(card, index);
+            return { card, index };
+        })
+        .sort((left, right) => normalizedSortKey
+            ? compareCookbookRecipeCards(normalizedSortKey, left.card, right.card, left.index, right.index, normalizedDirection)
+            : cookbookRecipeOriginalIndex(left.card, left.index) - cookbookRecipeOriginalIndex(right.card, right.index))
         .forEach(({ card }) => container.appendChild(card));
 
     return cards.length;
 }
 
-function updateCookbookSortButtons(card, sortKey = "", sourceControl = null) {
+function updateCookbookSortButtons(card, sortKey = "", direction = "", sourceControl = null) {
     if (!card && !sourceControl) {
         return;
+    }
+
+    const normalizedState = normalizeCookbookRecipeSortState({ sortKey, direction });
+    if (card) {
+        card.dataset.cookbookSortKey = normalizedState.sortKey;
+        card.dataset.cookbookSortDirection = normalizedState.direction;
     }
 
     const buttons = new Set();
@@ -7302,35 +7391,50 @@ function updateCookbookSortButtons(card, sortKey = "", sourceControl = null) {
     }
 
     buttons.forEach(button => {
-        const selected = button.dataset.cookbookSortOption === sortKey;
+        const selected = button.dataset.cookbookSortOption === normalizedState.sortKey && Boolean(normalizedState.direction);
         button.setAttribute("aria-pressed", selected ? "true" : "false");
+        button.dataset.cookbookSortDirection = selected ? normalizedState.direction : "";
+        button.setAttribute("aria-label", selected
+            ? `${button.textContent.trim()}, ${cookbookRecipeSortDirectionLabel(normalizedState.direction)}`
+            : button.textContent.trim());
     });
 }
 
 function applyCookbookRecipeSort(card, sortKey, options = {}) {
-    if (!card || !COOKBOOK_RECIPE_SORT_KEYS.has(sortKey)) {
+    if (!card) {
         return false;
     }
+
+    const state = normalizeCookbookRecipeSortState({
+        sortKey,
+        direction: options.direction || "asc",
+    });
+    const hasActiveSort = Boolean(state.sortKey && state.direction);
 
     let sortedCount = sortCookbookRecipeElements(
         card.querySelector("[data-cookbook-recipe-list]"),
         "[data-cookbook-recipe-card]",
-        sortKey,
+        state.sortKey,
+        state.direction,
     );
 
     card.querySelectorAll("[data-cookbook-menu-view]").forEach(view => {
         view.querySelectorAll(".cookbook-menu-recipe-grid").forEach(grid => {
-            sortedCount += sortCookbookRecipeElements(grid, "[data-cookbook-menu-recipe]", sortKey);
+            sortedCount += sortCookbookRecipeElements(grid, "[data-cookbook-menu-recipe]", state.sortKey, state.direction);
         });
     });
 
-    updateCookbookSortButtons(card, sortKey, options.sourceControl || null);
+    updateCookbookSortButtons(card, state.sortKey, state.direction, options.sourceControl || null);
 
     if (options.persist !== false) {
         const storageKey = cookbookRecipeSortStorageKey(card.dataset.cookbookId || "");
         try {
             if (storageKey) {
-                sessionStorage.setItem(storageKey, sortKey);
+                if (hasActiveSort) {
+                    sessionStorage.setItem(storageKey, serializeCookbookRecipeSortState(state.sortKey, state.direction));
+                } else {
+                    sessionStorage.removeItem(storageKey);
+                }
             }
         } catch (err) {
             // Sort persistence is optional.
@@ -7343,38 +7447,45 @@ function applyCookbookRecipeSort(card, sortKey, options = {}) {
 function restoreCookbookRecipeSortState() {
     document.querySelectorAll("[data-cookbook-card]").forEach(card => {
         const storageKey = cookbookRecipeSortStorageKey(card.dataset.cookbookId || "");
-        let sortKey = "";
+        let state = { sortKey: "", direction: "" };
 
         try {
-            sortKey = storageKey ? sessionStorage.getItem(storageKey) || "" : "";
+            state = normalizeCookbookRecipeSortState(storageKey ? sessionStorage.getItem(storageKey) || "" : "");
         } catch (err) {
-            sortKey = "";
+            state = { sortKey: "", direction: "" };
         }
 
-        if (COOKBOOK_RECIPE_SORT_KEYS.has(sortKey)) {
-            applyCookbookRecipeSort(card, sortKey, { persist: false });
+        if (state.sortKey && state.direction) {
+            applyCookbookRecipeSort(card, state.sortKey, { direction: state.direction, persist: false });
         } else {
-            updateCookbookSortButtons(card, "");
+            applyCookbookRecipeSort(card, "", { persist: false });
         }
     });
 }
 
 function sortCookbookRecipes(button, sortKey) {
     const card = cookbookCardFromControl(button);
-    const normalizedSortKey = COOKBOOK_RECIPE_SORT_KEYS.has(sortKey) ? sortKey : "recipe_number";
 
     if (!card) {
         closeRecipeEditRowMenus();
         return false;
     }
 
-    const sorted = applyCookbookRecipeSort(card, normalizedSortKey, { sourceControl: button || null });
+    const nextState = cookbookRecipeNextSortState(card, sortKey);
+    const sorted = applyCookbookRecipeSort(card, nextState.sortKey, {
+        direction: nextState.direction,
+        sourceControl: button || null,
+    });
     const title = card.querySelector(".cookbook-card-title h3");
     const cookbookName = title ? title.textContent.trim() : "Cookbook";
 
     if (sorted) {
         applyCookbookRecipeSearch();
-        setCookbookStatus(`${cookbookName} sorted by ${cookbookRecipeSortLabel(normalizedSortKey)}.`);
+        if (nextState.sortKey && nextState.direction) {
+            setCookbookStatus(`${cookbookName} sorted by ${cookbookRecipeSortLabel(nextState.sortKey)} ${cookbookRecipeSortDirectionLabel(nextState.direction)}.`);
+        } else {
+            setCookbookStatus(`${cookbookName} returned to default order.`);
+        }
     } else {
         setCookbookStatus(`${cookbookName} has no recipes to sort.`, true);
     }
