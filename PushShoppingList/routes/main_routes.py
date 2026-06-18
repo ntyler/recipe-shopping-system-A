@@ -706,6 +706,8 @@ def recipe_view_rows(recipe_urls, food_rules=None, image_variants=None, include_
             "needs_ai_recipe": bool(recipe_data.get("needs_ai_recipe")),
             "recipe_status": recipe_data.get("recipe_status", ""),
             "menu_section": recipe_data.get("menu_section", ""),
+            "menu_order_url": clean_display_text(recipe_data.get("menu_order_url") or recipe_data.get("deep_link_url")),
+            "deep_link_url": clean_display_text(recipe_data.get("deep_link_url") or recipe_data.get("menu_order_url")),
             "parent_menu_snapshot_id": recipe_menu_snapshot_id(recipe_data),
             "menu_mega_snapshot_id": recipe_menu_snapshot_id(recipe_data),
             "source_href": recipe_source_href(recipe["url"]),
@@ -833,6 +835,8 @@ def recipe_url_log_rows(recipe_urls, cookbook_assignments=None, food_rules=None,
             "needs_ai_recipe": bool(recipe_data.get("needs_ai_recipe")),
             "recipe_status": recipe_data.get("recipe_status", ""),
             "menu_section": recipe_data.get("menu_section", ""),
+            "menu_order_url": clean_display_text(recipe_data.get("menu_order_url") or recipe_data.get("deep_link_url")),
+            "deep_link_url": clean_display_text(recipe_data.get("deep_link_url") or recipe_data.get("menu_order_url")),
             "parent_menu_snapshot_id": recipe_menu_snapshot_id(recipe_data),
             "menu_mega_snapshot_id": recipe_menu_snapshot_id(recipe_data),
             "source_href": recipe_source_href(recipe["url"]),
@@ -987,6 +991,18 @@ def cookbook_view_for_render(recipe_rows, food_rules=None, image_variants=None):
             recipe["menu_item_name"] = recipe.get("menu_item_name") or recipe_data.get("menu_item_name", "")
             recipe["menu_description"] = recipe.get("menu_description") or recipe_data.get("menu_description", "")
             recipe["menu_price"] = recipe.get("menu_price") or recipe_data.get("menu_price", "")
+            recipe["menu_order_url"] = clean_display_text(
+                recipe.get("menu_order_url")
+                or recipe_data.get("menu_order_url")
+                or recipe.get("deep_link_url")
+                or recipe_data.get("deep_link_url")
+            )
+            recipe["deep_link_url"] = clean_display_text(
+                recipe.get("deep_link_url")
+                or recipe_data.get("deep_link_url")
+                or recipe.get("menu_order_url")
+                or recipe_data.get("menu_order_url")
+            )
             recipe["parent_menu_snapshot_id"] = recipe.get("parent_menu_snapshot_id") or recipe_menu_snapshot_id(recipe_data)
             recipe["menu_mega_snapshot_id"] = recipe.get("menu_mega_snapshot_id") or recipe_menu_snapshot_id(recipe_data)
             recipe["quantity"] = recipe_quantity

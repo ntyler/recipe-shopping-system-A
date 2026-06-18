@@ -13993,6 +13993,10 @@ body {
                 padding-right: 46px;
             }
 
+            .recipe-url-summary-row:has(.recipe-url-menu-order-link) {
+                padding-right: 86px;
+            }
+
             .recipe-url-summary-header {
                 display: grid;
                 grid-template-columns: 32px minmax(0, 1fr);
@@ -14034,6 +14038,13 @@ body {
                 position: absolute;
                 top: 0;
                 right: 6px;
+            }
+
+            .recipe-url-menu-order-link {
+                position: absolute;
+                top: 0;
+                right: 44px;
+                z-index: 2;
             }
 
             .recipe-url-summary-save-qty {

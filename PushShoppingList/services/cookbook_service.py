@@ -32,6 +32,8 @@ COOKBOOK_RECIPE_METADATA_FIELDS = (
     "section_name",
     "menu_item_name",
     "item_name",
+    "menu_order_url",
+    "deep_link_url",
     "menu_description",
     "menu_price",
     "parent_menu_snapshot_id",
