@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title>Menu order</title>
+  <desc>A green menu order icon with a checklist and arrow.</desc>
+  <defs>
+    <linearGradient id="bg" x1="12" y1="8" x2="52" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#d8ffb2"/>
+      <stop offset="0.45" stop-color="#91df7f"/>
+      <stop offset="1" stop-color="#49a46d"/>
+    </linearGradient>
+    <linearGradient id="arrow" x1="39" y1="20" x2="57" y2="34" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#adf2cf"/>
+      <stop offset="1" stop-color="#45b88d"/>
+    </linearGradient>
+  </defs>
+  <rect x="3" y="3" width="58" height="58" rx="15" fill="url(#bg)" stroke="#0d3e3f" stroke-width="2"/>
+  <path d="M7 39c8 4 18 6 30 5 8-.6 15-3 21-7v11c0 6-5 11-11 11H18C10 59 5 54 5 46v-9c.6.6 1.2 1.2 2 2z" fill="#2d8e6a" opacity=".24"/>
+  <path d="M20 18h24c3 0 5 2 5 5v25c0 3-2 5-5 5H20c-3 0-5-2-5-5V23c0-3 2-5 5-5z" fill="#f8fff8" stroke="#073234" stroke-width="3"/>
+  <path d="M21 16v6M28 16v6M35 16v6" stroke="#073234" stroke-width="4" stroke-linecap="round"/>
+  <path d="M21 31h18M21 40h8M21 47h19" stroke="#073234" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="35" cy="40" r="9" fill="#d9ffd5" stroke="#073234" stroke-width="3"/>
+  <path d="M30 40l4 4 8-9" fill="none" stroke="#073234" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M40 21h17v17l-5-3-10 10-7-7 10-10-5-7z" fill="#efffee" opacity=".95"/>
+  <path d="M42 22h13v13l-4-3-12 12-5-5 12-12-4-5z" fill="url(#arrow)" stroke="#073234" stroke-width="3" stroke-linejoin="round"/>
+</svg>
