@@ -184,6 +184,35 @@
                                                         </button>
                                                     </div>
                                                 {% endif %}
+                                                {% if cookbook.recipes %}
+                                                    <div class="overflow-menu-section cookbook-sort-menu-section">
+                                                        <div class="overflow-menu-section-title">Sort By</div>
+                                                        <button type="button"
+                                                                data-cookbook-sort-option="menu_section"
+                                                                aria-pressed="false"
+                                                                onclick="return sortCookbookRecipes(this, 'menu_section')">
+                                                            Sort by Menu Section
+                                                        </button>
+                                                        <button type="button"
+                                                                data-cookbook-sort-option="menu_price"
+                                                                aria-pressed="false"
+                                                                onclick="return sortCookbookRecipes(this, 'menu_price')">
+                                                            Sort by Menu Price
+                                                        </button>
+                                                        <button type="button"
+                                                                data-cookbook-sort-option="name"
+                                                                aria-pressed="false"
+                                                                onclick="return sortCookbookRecipes(this, 'name')">
+                                                            Sort by Name
+                                                        </button>
+                                                        <button type="button"
+                                                                data-cookbook-sort-option="recipe_number"
+                                                                aria-pressed="false"
+                                                                onclick="return sortCookbookRecipes(this, 'recipe_number')">
+                                                            Sort by Recipe #
+                                                        </button>
+                                                    </div>
+                                                {% endif %}
                                                 <div class="overflow-menu-section cookbook-actions-menu-section">
                                                     <a class="recipe-edit-menu-link"
                                                        href="{{ url_for('menu_bp.cookbook_menu_pdf_log_route', cookbook_id=cookbook.id) }}"
@@ -298,6 +327,9 @@
                                                                                  data-cookbook-id="{{ cookbook.id }}"
                                                                                  data-recipe-url="{{ recipe.url }}"
                                                                                  data-cookbook-recipe-name="{{ recipe.name }}"
+                                                                                 data-cookbook-menu-section="{{ recipe.menu_section }}"
+                                                                                 data-cookbook-menu-price="{{ recipe.menu_price }}"
+                                                                                 data-cookbook-recipe-number="{{ recipe.number or loop.index }}"
                                                                                  data-cookbook-search-text="{{ recipe.menu_search_text }}"
                                                                                  data-cookbook-category-user-set="{% if recipe.category_metadata_user_set %}1{% else %}0{% endif %}">
                                                                             {% if recipe.cover_image and recipe.cover_image.src %}
@@ -404,6 +436,9 @@
                                                          data-recipe-url="{{ recipe.url }}"
                                                          data-cookbook-recipe-name="{{ recipe.name }}"
                                                          data-cookbook-recipe-key="{{ cookbook.id }}|{{ recipe.url }}"
+                                                         data-cookbook-menu-section="{{ recipe.menu_section }}"
+                                                         data-cookbook-menu-price="{{ recipe.menu_price }}"
+                                                         data-cookbook-recipe-number="{{ recipe.number or loop.index }}"
                                                          data-cookbook-search-text="{{ recipe.menu_search_text }}"
                                                          draggable="true"
                                                          aria-grabbed="false">

@@ -7116,6 +7116,7 @@ const COOKBOOK_VIEW_MODE_SESSION_KEY = "cookbook-view-mode";
 const DEFAULT_COOKBOOK_VIEW_MODE = "recipes";
 const COOKBOOK_MENU_MODE_SESSION_KEY = "cookbook-menu-mode";
 const DEFAULT_COOKBOOK_MENU_MODE = "restaurant_menu";
+const COOKBOOK_RECIPE_SORT_KEYS = new Set(["menu_section", "menu_price", "name", "recipe_number"]);
 
 function normalizedCookbookSearchText(value) {
     return String(value || "")
@@ -7141,6 +7142,245 @@ function cookbookViewModeSelect() {
 
 function cookbookFilterSelect() {
     return document.getElementById("cookbookFilterSelect");
+}
+
+function cookbookCardFromControl(control) {
+    const directCard = control && typeof control.closest === "function"
+        ? control.closest("[data-cookbook-card]")
+        : null;
+
+    if (directCard) {
+        return directCard;
+    }
+
+    const menu = control && typeof control.closest === "function"
+        ? control.closest(".recipe-edit-row-menu")
+        : null;
+
+    return menu && menu.recipeEditAnchorButton
+        ? menu.recipeEditAnchorButton.closest("[data-cookbook-card]")
+        : null;
+}
+
+function cookbookRecipeSortStorageKey(cookbookId) {
+    return cookbookId ? `cookbook-recipe-sort:${cookbookId}` : "";
+}
+
+function cookbookRecipeSortLabel(sortKey) {
+    return {
+        menu_section: "Menu Section",
+        menu_price: "Menu Price",
+        name: "Name",
+        recipe_number: "Recipe #",
+    }[sortKey] || "Recipe #";
+}
+
+function cookbookSortText(value) {
+    return normalizedCookbookSearchText(value);
+}
+
+function cookbookSortNumber(value) {
+    const match = String(value || "").replace(/,/g, "").match(/-?\d+(?:\.\d+)?/);
+    return match ? Number.parseFloat(match[0]) : Number.POSITIVE_INFINITY;
+}
+
+function compareCookbookSortNumbers(left, right) {
+    const leftMissing = !Number.isFinite(left);
+    const rightMissing = !Number.isFinite(right);
+
+    if (leftMissing && rightMissing) {
+        return 0;
+    }
+    if (leftMissing) {
+        return 1;
+    }
+    if (rightMissing) {
+        return -1;
+    }
+
+    return left - right;
+}
+
+function cookbookRecipeNumber(card, fallback = Number.POSITIVE_INFINITY) {
+    const value = Number.parseInt(card ? card.dataset.cookbookRecipeNumber : "", 10);
+    return Number.isFinite(value) ? value : fallback;
+}
+
+function cookbookRecipeOriginalIndex(card, fallback = 0) {
+    if (!card) {
+        return fallback;
+    }
+
+    if (!card.dataset.cookbookOriginalIndex) {
+        card.dataset.cookbookOriginalIndex = String(fallback);
+    }
+
+    const value = Number.parseInt(card.dataset.cookbookOriginalIndex, 10);
+    return Number.isFinite(value) ? value : fallback;
+}
+
+function compareCookbookSortText(left, right) {
+    const leftBlank = !left;
+    const rightBlank = !right;
+
+    if (leftBlank && rightBlank) {
+        return 0;
+    }
+    if (leftBlank) {
+        return 1;
+    }
+    if (rightBlank) {
+        return -1;
+    }
+
+    return left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
+}
+
+function compareCookbookRecipeCards(sortKey, left, right, leftIndex = 0, rightIndex = 0) {
+    let result = 0;
+
+    if (sortKey === "menu_section") {
+        result = compareCookbookSortText(
+            cookbookSortText(left.dataset.cookbookMenuSection),
+            cookbookSortText(right.dataset.cookbookMenuSection),
+        );
+    } else if (sortKey === "menu_price") {
+        result = compareCookbookSortNumbers(
+            cookbookSortNumber(left.dataset.cookbookMenuPrice),
+            cookbookSortNumber(right.dataset.cookbookMenuPrice),
+        );
+    } else if (sortKey === "name") {
+        result = compareCookbookSortText(
+            cookbookSortText(left.dataset.cookbookRecipeName),
+            cookbookSortText(right.dataset.cookbookRecipeName),
+        );
+    } else {
+        result = cookbookRecipeNumber(left, leftIndex + 1)
+            - cookbookRecipeNumber(right, rightIndex + 1);
+    }
+
+    if (result !== 0 && Number.isFinite(result)) {
+        return result;
+    }
+
+    const numberResult = cookbookRecipeNumber(left, leftIndex + 1)
+        - cookbookRecipeNumber(right, rightIndex + 1);
+
+    return numberResult || (cookbookRecipeOriginalIndex(left, leftIndex) - cookbookRecipeOriginalIndex(right, rightIndex));
+}
+
+function sortCookbookRecipeElements(container, selector, sortKey) {
+    if (!container) {
+        return 0;
+    }
+
+    const cards = Array.from(container.children).filter(child => child.matches(selector));
+
+    cards
+        .map((card, index) => ({ card, index }))
+        .sort((left, right) => compareCookbookRecipeCards(sortKey, left.card, right.card, left.index, right.index))
+        .forEach(({ card }) => container.appendChild(card));
+
+    return cards.length;
+}
+
+function updateCookbookSortButtons(card, sortKey = "", sourceControl = null) {
+    if (!card && !sourceControl) {
+        return;
+    }
+
+    const buttons = new Set();
+    if (card) {
+        card.querySelectorAll("[data-cookbook-sort-option]").forEach(button => buttons.add(button));
+    }
+
+    const menu = sourceControl && typeof sourceControl.closest === "function"
+        ? sourceControl.closest(".recipe-edit-row-menu")
+        : null;
+    if (menu) {
+        menu.querySelectorAll("[data-cookbook-sort-option]").forEach(button => buttons.add(button));
+    }
+
+    buttons.forEach(button => {
+        const selected = button.dataset.cookbookSortOption === sortKey;
+        button.setAttribute("aria-pressed", selected ? "true" : "false");
+    });
+}
+
+function applyCookbookRecipeSort(card, sortKey, options = {}) {
+    if (!card || !COOKBOOK_RECIPE_SORT_KEYS.has(sortKey)) {
+        return false;
+    }
+
+    let sortedCount = sortCookbookRecipeElements(
+        card.querySelector("[data-cookbook-recipe-list]"),
+        "[data-cookbook-recipe-card]",
+        sortKey,
+    );
+
+    card.querySelectorAll("[data-cookbook-menu-view]").forEach(view => {
+        view.querySelectorAll(".cookbook-menu-recipe-grid").forEach(grid => {
+            sortedCount += sortCookbookRecipeElements(grid, "[data-cookbook-menu-recipe]", sortKey);
+        });
+    });
+
+    updateCookbookSortButtons(card, sortKey, options.sourceControl || null);
+
+    if (options.persist !== false) {
+        const storageKey = cookbookRecipeSortStorageKey(card.dataset.cookbookId || "");
+        try {
+            if (storageKey) {
+                sessionStorage.setItem(storageKey, sortKey);
+            }
+        } catch (err) {
+            // Sort persistence is optional.
+        }
+    }
+
+    return sortedCount > 0;
+}
+
+function restoreCookbookRecipeSortState() {
+    document.querySelectorAll("[data-cookbook-card]").forEach(card => {
+        const storageKey = cookbookRecipeSortStorageKey(card.dataset.cookbookId || "");
+        let sortKey = "";
+
+        try {
+            sortKey = storageKey ? sessionStorage.getItem(storageKey) || "" : "";
+        } catch (err) {
+            sortKey = "";
+        }
+
+        if (COOKBOOK_RECIPE_SORT_KEYS.has(sortKey)) {
+            applyCookbookRecipeSort(card, sortKey, { persist: false });
+        } else {
+            updateCookbookSortButtons(card, "");
+        }
+    });
+}
+
+function sortCookbookRecipes(button, sortKey) {
+    const card = cookbookCardFromControl(button);
+    const normalizedSortKey = COOKBOOK_RECIPE_SORT_KEYS.has(sortKey) ? sortKey : "recipe_number";
+
+    if (!card) {
+        closeRecipeEditRowMenus();
+        return false;
+    }
+
+    const sorted = applyCookbookRecipeSort(card, normalizedSortKey, { sourceControl: button || null });
+    const title = card.querySelector(".cookbook-card-title h3");
+    const cookbookName = title ? title.textContent.trim() : "Cookbook";
+
+    if (sorted) {
+        applyCookbookRecipeSearch();
+        setCookbookStatus(`${cookbookName} sorted by ${cookbookRecipeSortLabel(normalizedSortKey)}.`);
+    } else {
+        setCookbookStatus(`${cookbookName} has no recipes to sort.`, true);
+    }
+
+    closeRecipeEditRowMenus();
+    return false;
 }
 
 function activeCookbookFilter() {
@@ -8069,6 +8309,7 @@ function bindCookbooks() {
     restoreCookbookFilterValue();
     restoreCookbookMenuModeValue();
     restoreCookbookViewModeValue();
+    restoreCookbookRecipeSortState();
     applyCookbookViewMode();
     bindCookbookDragAndDrop();
     bindCookbookRecipeDragAndDrop();

@@ -84,10 +84,46 @@ def test_cookbook_infer_controls_live_inside_cookbook_submenu():
     assert cookbook_menu_block.index("Menu AI") < cookbook_menu_block.index("data-cookbook-infer-overwrite")
     assert cookbook_menu_block.index("data-cookbook-infer-overwrite") < cookbook_menu_block.index("data-cookbook-infer-preview")
     assert cookbook_menu_block.index("data-cookbook-infer-preview") < cookbook_menu_block.index("inferMissingCookbookDetails")
+    assert cookbook_menu_block.index("inferMissingCookbookDetails") < cookbook_menu_block.index("Sort By")
+    assert cookbook_menu_block.index("Sort By") < cookbook_menu_block.index("Menu PDF Log")
     assert cookbook_menu_block.index("inferMissingCookbookDetails") < cookbook_menu_block.index("Menu PDF Log")
     assert "function cookbookInferOptionCheckbox" in script
     assert 'button.closest(".recipe-edit-row-menu")' in script
     assert "menu.recipeEditAnchorButton" in script
+
+
+def test_cookbook_submenu_has_recipe_sort_controls():
+    template = read_text("PushShoppingList/templates/sections/cookbooks.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+    css = read_text("PushShoppingList/static/css/app.css")
+
+    menu_start = template.index('<div class="recipe-edit-row-menu cookbook-card-menu" hidden>')
+    browser_start = template.index('<div class="cookbook-menu-browser"', menu_start)
+    cookbook_menu_block = template[menu_start:browser_start]
+
+    assert '<div class="overflow-menu-section cookbook-sort-menu-section">' in cookbook_menu_block
+    assert cookbook_menu_block.index("Sort By") < cookbook_menu_block.index("Menu PDF Log")
+    for sort_key, label in (
+        ("menu_section", "Sort by Menu Section"),
+        ("menu_price", "Sort by Menu Price"),
+        ("name", "Sort by Name"),
+        ("recipe_number", "Sort by Recipe #"),
+    ):
+        assert f'data-cookbook-sort-option="{sort_key}"' in cookbook_menu_block
+        assert f"sortCookbookRecipes(this, '{sort_key}')" in cookbook_menu_block
+        assert label in cookbook_menu_block
+
+    assert 'data-cookbook-menu-section="{{ recipe.menu_section }}"' in template
+    assert 'data-cookbook-menu-price="{{ recipe.menu_price }}"' in template
+    assert 'data-cookbook-recipe-number="{{ recipe.number or loop.index }}"' in template
+    assert "const COOKBOOK_RECIPE_SORT_KEYS" in script
+    assert "function cookbookCardFromControl(control)" in script
+    assert 'menu.recipeEditAnchorButton.closest("[data-cookbook-card]")' in script
+    assert "function sortCookbookRecipes(button, sortKey)" in script
+    assert "function applyCookbookRecipeSort(card, sortKey, options = {})" in script
+    assert "function compareCookbookSortNumbers(left, right)" in script
+    assert "restoreCookbookRecipeSortState();" in script
+    assert ".cookbook-sort-menu-section [data-cookbook-sort-option][aria-pressed=\"true\"]" in css
 
 
 def test_cookbook_recipe_submenu_has_menu_ai_controls_before_recipe_actions():

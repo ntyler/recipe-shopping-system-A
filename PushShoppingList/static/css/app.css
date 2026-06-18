@@ -7640,6 +7640,18 @@ body {
             min-width: 226px;
         }
 
+        .cookbook-sort-menu-section [data-cookbook-sort-option][aria-pressed="true"] {
+            color: #d8ffe4;
+            background: rgba(47, 133, 90, 0.18);
+        }
+
+        .cookbook-sort-menu-section [data-cookbook-sort-option][aria-pressed="true"]::before {
+            content: ">";
+            flex: 0 0 auto;
+            color: #8ff0ad;
+            font-weight: 900;
+        }
+
         .cookbook-name-modal-backdrop {
             position: fixed;
             inset: 0;
