@@ -19739,8 +19739,9 @@ async function estimateRecipeNutrition(button, options = {}) {
     const payload = collectRecipeEditorPayload();
     const returnResult = Boolean(options.returnResult);
     const setStatusMessages = options.setStatus !== false;
+    const forceEstimate = Boolean(options.forceEstimate || options.force);
 
-    if (payload && payload.recipe && recipeHasPerServingEstimate(payload.recipe)) {
+    if (!forceEstimate && payload && payload.recipe && recipeHasPerServingEstimate(payload.recipe)) {
         updateRecipeEditorPdfControls(payload.recipe, {
             updateInputValues: false,
             useCurrentForMissing: true,
@@ -19765,7 +19766,10 @@ async function estimateRecipeNutrition(button, options = {}) {
             headers: {
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify(payload),
+            body: JSON.stringify({
+                ...payload,
+                force_estimate: forceEstimate,
+            }),
         });
         const data = await response.json();
         syncOpenAiUsageDashboardFromResponse(data);
@@ -20372,6 +20376,7 @@ async function runRecipeEditorInferenceFollowups() {
     try {
         setRecipeEditStatus("Estimating per-serving nutrition...");
         result.nutrition = await estimateRecipeNutrition(null, {
+            forceEstimate: true,
             returnResult: true,
             throwOnError: true,
         });

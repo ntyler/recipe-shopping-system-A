@@ -3596,7 +3596,8 @@ def api_create_recipe_route():
 def api_recipe_nutrition_estimate_route():
     data = request.get_json(silent=True) or {}
     recipe = data.get("recipe", data)
-    if _has_per_serving_estimate(recipe.get("nutrition") if isinstance(recipe, dict) else None):
+    force_estimate = bool(data.get("force_estimate") or data.get("force"))
+    if not force_estimate and _has_per_serving_estimate(recipe.get("nutrition") if isinstance(recipe, dict) else None):
         recipe = _recipe_with_default_serving_basis(recipe)
         return jsonify(with_openai_usage_dashboard(_existing_nutrition_success(recipe))), 200
 

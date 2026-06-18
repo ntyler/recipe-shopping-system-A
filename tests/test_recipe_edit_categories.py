@@ -4,8 +4,12 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from PushShoppingList.app import create_app
+from PushShoppingList.routes import recipe_routes
 from PushShoppingList.services import cookbook_service
 from PushShoppingList.services import recipe_edit_service
+from PushShoppingList.services import storage_service
+from PushShoppingList.services import user_account_service
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -53,9 +57,65 @@ def test_recipe_editor_infer_missing_details_runs_full_ai_followups():
     assert "cookbook_id: recipeEditInferenceContext.cookbook_id || \"\"" in script
     assert "cookbook_name: recipeEditInferenceContext.cookbook_name || \"\"" in script
     assert "await estimateRecipeNutrition(null, {" in script
+    assert "forceEstimate: true" in script
+    assert "force_estimate: forceEstimate" in script
     assert "await decideRecipeEditCategoriesWithChatGPT(null, \"all\", {" in script
     assert "const followupResult = previewOnly ? null : await runRecipeEditorInferenceFollowups();" in script
     assert "Save Recipe to keep nutrition/categories." in script
+
+
+def test_recipe_nutrition_estimate_force_bypasses_existing_nutrition(monkeypatch, tmp_path):
+    calls = []
+
+    def fake_estimate(recipe):
+        calls.append(recipe)
+        return {
+            "ok": True,
+            "nutrition": [
+                {"key": "serving_basis", "value": "per serving"},
+                {"key": "calories", "value": "210 kcal"},
+            ],
+        }
+
+    monkeypatch.setattr(recipe_routes, "estimate_recipe_nutrition", fake_estimate)
+    monkeypatch.setattr(storage_service, "USER_DATA_DIR", tmp_path / "users")
+    monkeypatch.setattr(user_account_service, "USERS_FILE", tmp_path / "users.json")
+    user_account_service.save_users({
+        "users": [{
+            "user_id": "nutrition-user",
+            "email": "nutrition@example.com",
+            "username": "nutrition",
+            "account_status": "active",
+        }],
+    })
+
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["user_id"] = "nutrition-user"
+
+        response = client.post(
+            "/api/recipe_nutrition_estimate",
+            json={
+                "force_estimate": True,
+                "recipe": {
+                    "recipe_title": "Spring Roll",
+                    "ingredients": [{"ingredient": "rice paper"}],
+                    "nutrition": [
+                        {"key": "serving_basis", "value": "per serving"},
+                        {"key": "calories", "value": "165 kcal"},
+                    ],
+                },
+            },
+        )
+
+    data = response.get_json()
+
+    assert response.status_code == 200
+    assert calls
+    assert data["nutrition"][1] == {"key": "calories", "value": "210 kcal"}
 
 
 def test_recipe_editor_category_metadata_preserves_saved_values_without_live_inference():
