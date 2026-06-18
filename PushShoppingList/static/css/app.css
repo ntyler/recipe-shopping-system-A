@@ -18841,8 +18841,8 @@ body {
     }
 
     #cookbooksCard .cookbook-recipe-card .recipe-url-summary-header {
-        grid-template-columns: 18px 28px minmax(0, 1fr);
-        gap: 0 6px;
+        grid-template-columns: 32px minmax(0, 1fr);
+        gap: 8px;
     }
 
     #cookbooksCard .cookbook-recipe-card .cookbook-recipe-drag-handle {
@@ -18852,7 +18852,8 @@ body {
     }
 
     #cookbooksCard .cookbook-recipe-summary-title {
-        grid-column: 3;
+        grid-column: 2;
+        grid-row: 2;
         padding-right: 0;
     }
 
@@ -18877,7 +18878,8 @@ body {
     }
 
     #cookbooksCard .cookbook-recipe-actions.recipe-url-summary-actions {
-        grid-column: 3;
+        grid-column: 2;
+        grid-row: 1;
         justify-content: flex-start;
         width: 100%;
     }
@@ -18885,14 +18887,14 @@ body {
     #cookbooksCard .cookbook-recipe-actions .recipe-url-summary-menu-wrap,
     #cookbooksCard .cookbook-recipe-actions .cookbook-recipe-menu-wrap {
         position: absolute;
-        top: 0;
+        top: 10px;
         right: 6px;
         z-index: 2;
     }
 
     #cookbooksCard .cookbook-recipe-menu-order-link {
         position: absolute;
-        top: 0;
+        top: 10px;
         right: 44px;
         z-index: 2;
     }

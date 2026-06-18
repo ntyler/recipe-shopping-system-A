@@ -226,6 +226,30 @@ def test_cookbook_recipe_rows_match_current_recipe_summary_layout():
     assert "#cookbooksCard .cookbook-recipe-card .recipe-url-summary-number,\n    #cookbooksCard .cookbook-recipe-card .recipe-url-summary-name" in css
     assert "#cookbooksCard .cookbook-recipe-card .recipe-url-summary-body,\n    #cookbooksCard .cookbook-recipe-card .recipe-url-summary-main,\n    #cookbooksCard .cookbook-recipe-card .recipe-url-summary-meta" in css
     assert "#cookbooksCard .cookbook-recipe-actions .recipe-url-summary-menu-wrap,\n    #cookbooksCard .cookbook-recipe-actions .cookbook-recipe-menu-wrap" in css
+    cookbook_mobile_start = css.index(
+        "@media (max-width: 650px)",
+        css.index(".cookbook-recipe-card.recipe-url-summary-row"),
+    )
+    cookbook_mobile_end = css.index(".admin-support-card", cookbook_mobile_start)
+    cookbook_mobile_block = css[cookbook_mobile_start:cookbook_mobile_end]
+
+    assert "grid-template-columns: 32px minmax(0, 1fr);" in cookbook_mobile_block
+    assert (
+        "#cookbooksCard .cookbook-recipe-summary-title {\n"
+        "        grid-column: 2;\n"
+        "        grid-row: 2;"
+    ) in cookbook_mobile_block
+    assert (
+        "#cookbooksCard .cookbook-recipe-actions.recipe-url-summary-actions {\n"
+        "        grid-column: 2;\n"
+        "        grid-row: 1;"
+    ) in cookbook_mobile_block
+    assert (
+        "#cookbooksCard .cookbook-recipe-actions .recipe-url-summary-menu-wrap,\n"
+        "    #cookbooksCard .cookbook-recipe-actions .cookbook-recipe-menu-wrap {\n"
+        "        position: absolute;\n"
+        "        top: 10px;"
+    ) in cookbook_mobile_block
 
 
 def test_cookbook_recipe_view_renders_menu_stub_actions_above_amount():
