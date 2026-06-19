@@ -246,6 +246,7 @@ function safeStorageGet(storage, key) {
 let jobActivityPollTimer = null;
 let lastJobActivityJobs = [];
 const jobActivityExpandedRows = new Set();
+let jobActivityActiveFilterOnly = false;
 const JOB_COMPLETION_DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
 const IMPORT_JOB_COMPLETION_TIMEOUT_MS = 0;
 
@@ -271,6 +272,16 @@ function jobActivityHeaderSummaryElement() {
 function jobActivityClearButton() {
     const panel = jobActivityPanel();
     return panel ? panel.querySelector("[data-job-activity-clear]") : null;
+}
+
+function jobActivityCancelAllButton() {
+    const panel = jobActivityPanel();
+    return panel ? panel.querySelector("[data-job-activity-cancel-all]") : null;
+}
+
+function jobActivityActiveFilterButton() {
+    const panel = jobActivityPanel();
+    return panel ? panel.querySelector("[data-job-activity-active-filter]") : null;
 }
 
 function jobIsActive(job) {
@@ -633,18 +644,26 @@ function jobActivityHeaderSummaryText(sortedJobs) {
     return [activeText, primaryText, step].filter(Boolean).join(" | ");
 }
 
+function filteredJobActivityJobs(sortedJobs) {
+    const jobs = Array.isArray(sortedJobs) ? sortedJobs : [];
+    return jobActivityActiveFilterOnly ? jobs.filter(jobIsActive) : jobs;
+}
+
 function renderJobActivityPanel(jobs) {
     const list = jobActivityListElement();
     const summary = jobActivitySummaryElement();
     const headerSummary = jobActivityHeaderSummaryElement();
     const panel = jobActivityPanel();
     const clearButton = jobActivityClearButton();
+    const cancelAllButton = jobActivityCancelAllButton();
+    const activeFilterButton = jobActivityActiveFilterButton();
 
     if (!list || !panel) {
         return;
     }
 
     const sortedJobs = jobActivitySort(jobs);
+    const visibleJobs = filteredJobActivityJobs(sortedJobs);
     const activeCount = sortedJobs.filter(jobIsActive).length;
     const finishedCount = sortedJobs.filter(jobIsFinished).length;
     const visibleJobIds = new Set(sortedJobs.map(job => String(job.id || job.job_id || "").trim()).filter(Boolean));
@@ -661,24 +680,151 @@ function renderJobActivityPanel(jobs) {
             ? `Clear ${finishedCount} finished job ${finishedCount === 1 ? "entry" : "entries"}`
             : "No finished job activity to clear";
     }
+    if (cancelAllButton) {
+        cancelAllButton.disabled = activeCount === 0;
+        cancelAllButton.title = activeCount
+            ? `Cancel ${activeCount} active job${activeCount === 1 ? "" : "s"}`
+            : "No active jobs to cancel";
+    }
+    if (activeFilterButton) {
+        activeFilterButton.classList.toggle("is-active", jobActivityActiveFilterOnly);
+        activeFilterButton.setAttribute("aria-pressed", jobActivityActiveFilterOnly ? "true" : "false");
+        activeFilterButton.textContent = jobActivityActiveFilterOnly ? "Showing Active" : "Active Only";
+    }
 
     if (summary) {
         const completedCount = sortedJobs.filter(job => job.status === "completed").length;
         const failedCount = sortedJobs.filter(job => job.status === "failed").length;
-        summary.textContent = activeCount
+        const baseSummary = activeCount
             ? `${activeCount} active job${activeCount === 1 ? "" : "s"} running.`
             : `${completedCount} completed, ${failedCount} failed in recent activity.`;
+        summary.textContent = jobActivityActiveFilterOnly
+            ? `${baseSummary} Showing active only.`
+            : baseSummary;
     }
     if (headerSummary) {
         headerSummary.textContent = jobActivityHeaderSummaryText(sortedJobs);
     }
 
-    if (!sortedJobs.length) {
-        list.innerHTML = '<div class="job-activity-empty">No recent jobs.</div>';
+    if (!visibleJobs.length) {
+        list.innerHTML = jobActivityActiveFilterOnly
+            ? '<div class="job-activity-empty">No active jobs.</div>'
+            : '<div class="job-activity-empty">No recent jobs.</div>';
         return;
     }
 
-    list.innerHTML = sortedJobs.map((job, index) => renderJobActivityRow(job, index)).join("");
+    list.innerHTML = visibleJobs.map((job, index) => renderJobActivityRow(job, index)).join("");
+}
+
+function toggleJobActivityActiveFilter(button) {
+    jobActivityActiveFilterOnly = !jobActivityActiveFilterOnly;
+    renderJobActivityPanel(lastJobActivityJobs);
+    return false;
+}
+
+async function cancelJobActivityRequest(jobId) {
+    const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/cancel`, {
+        method: "POST",
+        headers: {
+            "Accept": "application/json",
+            "X-Requested-With": "fetch",
+        },
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+        throw new Error((data && data.error) || "Unable to cancel job.");
+    }
+    return data.job || null;
+}
+
+function jobActivityJobId(job) {
+    return String((job && (job.id || job.job_id)) || "").trim();
+}
+
+function jobActivityJobName(job) {
+    const typeLabel = jobTypeLabel(job && job.job_type);
+    const step = String((job && job.current_step) || "").trim();
+    const id = jobActivityJobId(job);
+    return [typeLabel, step || id].filter(Boolean).join(": ");
+}
+
+function mergeJobActivityUpdates(updatedJobs, existingJobs = lastJobActivityJobs) {
+    const updates = (Array.isArray(updatedJobs) ? updatedJobs : []).filter(Boolean);
+    if (!updates.length) {
+        return jobActivitySort(existingJobs || []);
+    }
+    const updatedIds = new Set(updates.map(jobActivityJobId).filter(Boolean));
+    return jobActivitySort([
+        ...updates,
+        ...(Array.isArray(existingJobs) ? existingJobs : []).filter(job => !updatedIds.has(jobActivityJobId(job))),
+    ]);
+}
+
+async function cancelAllJobActivityJobs(button) {
+    const activeJobs = lastJobActivityJobs.filter(job => jobIsActive(job) && jobActivityJobId(job));
+    const summary = jobActivitySummaryElement();
+    if (!activeJobs.length) {
+        if (summary) {
+            summary.textContent = "No active jobs to cancel.";
+        }
+        return false;
+    }
+
+    const count = activeJobs.length;
+    if (!window.confirm(`Cancel ${count} active job${count === 1 ? "" : "s"}?`)) {
+        return false;
+    }
+
+    const originalText = button ? button.textContent : "";
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Cancelling...";
+    }
+    if (summary) {
+        summary.textContent = `Cancelling ${count} active job${count === 1 ? "" : "s"}...`;
+    }
+
+    const results = await Promise.all(activeJobs.map(async job => {
+        const jobId = jobActivityJobId(job);
+        try {
+            return {
+                ok: true,
+                id: jobId,
+                job: await cancelJobActivityRequest(jobId),
+                name: jobActivityJobName(job),
+            };
+        } catch (err) {
+            return {
+                ok: false,
+                id: jobId,
+                name: jobActivityJobName(job),
+                error: err.message || "Unable to cancel job.",
+            };
+        }
+    }));
+
+    const successfulJobs = results
+        .filter(result => result.ok && result.job)
+        .map(result => result.job);
+    const failedResults = results.filter(result => !result.ok);
+    const nextJobs = mergeJobActivityUpdates(successfulJobs, lastJobActivityJobs);
+
+    renderJobActivityPanel(nextJobs);
+    const updatedSummary = jobActivitySummaryElement();
+    if (updatedSummary) {
+        if (failedResults.length) {
+            const names = failedResults.map(result => result.name || result.id).filter(Boolean).slice(0, 3).join(", ");
+            updatedSummary.textContent = `Cancelled ${results.length - failedResults.length} active job${results.length - failedResults.length === 1 ? "" : "s"}. ${failedResults.length} failed${names ? `: ${names}` : ""}.`;
+        } else {
+            updatedSummary.textContent = `Cancelled ${results.length} active job${results.length === 1 ? "" : "s"}.`;
+        }
+    }
+    if (button) {
+        button.textContent = originalText || "Cancel All Active";
+        button.disabled = lastJobActivityJobs.filter(jobIsActive).length === 0;
+    }
+    scheduleJobActivityPolling(500);
+    return false;
 }
 
 function renderJobActivityRow(job, index = 0) {
@@ -953,19 +1099,9 @@ async function cancelJobActivityJob(jobId) {
     }
 
     try {
-        const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/cancel`, {
-            method: "POST",
-            headers: {
-                "Accept": "application/json",
-                "X-Requested-With": "fetch",
-            },
-        });
-        const data = await response.json();
-        if (!response.ok || !data.ok) {
-            throw new Error((data && data.error) || "Unable to cancel job.");
-        }
-        if (data.job) {
-            renderJobActivityPanel([data.job, ...lastJobActivityJobs.filter(job => job.id !== data.job.id)]);
+        const job = await cancelJobActivityRequest(jobId);
+        if (job) {
+            renderJobActivityPanel(mergeJobActivityUpdates([job]));
         }
         scheduleJobActivityPolling(500);
     } catch (err) {

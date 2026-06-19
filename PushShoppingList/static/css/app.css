@@ -21017,6 +21017,8 @@ img[data-deferred-src] {
         }
 
         .job-activity-refresh,
+        .job-activity-filter-active,
+        .job-activity-cancel-all,
         .job-activity-clear,
         .job-activity-row-action {
             border: 1px solid #334155;
@@ -21029,16 +21031,26 @@ img[data-deferred-src] {
         }
 
         .job-activity-refresh,
+        .job-activity-filter-active,
+        .job-activity-cancel-all,
         .job-activity-clear {
             width: min(100%, 240px);
             margin-top: 0;
         }
 
+        .job-activity-filter-active.is-active {
+            border-color: #2563eb;
+            background: #172554;
+            color: #bfdbfe;
+        }
+
+        .job-activity-cancel-all,
         .job-activity-clear {
             border-color: #7f1d1d;
             color: #fecaca;
         }
 
+        .job-activity-cancel-all:disabled,
         .job-activity-clear:disabled {
             border-color: #334155;
             color: #94a3b8;
@@ -21325,6 +21337,8 @@ img[data-deferred-src] {
             }
 
             .job-activity-refresh,
+            .job-activity-filter-active,
+            .job-activity-cancel-all,
             .job-activity-clear {
                 width: 100%;
             }

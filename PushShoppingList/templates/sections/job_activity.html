@@ -41,6 +41,20 @@
                 Refresh
             </button>
             <button type="button"
+                    class="secondary job-activity-filter-active"
+                    data-job-activity-active-filter
+                    aria-pressed="false"
+                    onclick="return toggleJobActivityActiveFilter(this)">
+                Active Only
+            </button>
+            <button type="button"
+                    class="secondary job-activity-cancel-all danger"
+                    data-job-activity-cancel-all
+                    onclick="return cancelAllJobActivityJobs(this)"
+                    disabled>
+                Cancel All Active
+            </button>
+            <button type="button"
                     class="secondary job-activity-clear"
                     data-job-activity-clear
                     onclick="return clearJobActivityLog(this)"
