@@ -302,6 +302,7 @@ def run_recipe_import_job(job_id, payload):
 def run_menu_generate_recipes_job(job_id, payload):
     from PushShoppingList.routes.recipe_routes import add_items
     from PushShoppingList.routes.recipe_routes import apply_imported_recipe_category_routine
+    from PushShoppingList.routes.recipe_routes import ensure_menu_recipe_serving_basis_estimate
     from PushShoppingList.routes.recipe_routes import import_recipe_title
     from PushShoppingList.routes.recipe_routes import load_editable_recipe
     from PushShoppingList.routes.recipe_routes import record_recipe_import_activity
@@ -344,6 +345,9 @@ def run_menu_generate_recipes_job(job_id, payload):
     pending_entries = []
     category_statuses = []
     category_success_count = 0
+    nutrition_statuses = []
+    nutrition_success_count = 0
+    nutrition_failed_count = 0
 
     update_job_progress(
         job_id,
@@ -357,6 +361,7 @@ def run_menu_generate_recipes_job(job_id, payload):
             "recipe_shells_created": total,
             "recipe_inference_completed": 0,
             "nutrition_completed": 0,
+            "nutrition_failed": 0,
             "pdfs_completed": 0,
             "failed_items": 0,
         },
@@ -482,6 +487,8 @@ def run_menu_generate_recipes_job(job_id, payload):
         nonlocal category_success_count
         nonlocal completed_batches
         nonlocal failed_items
+        nonlocal nutrition_failed_count
+        nonlocal nutrition_success_count
 
         batch_result = batch_result if isinstance(batch_result, dict) else {}
         result_items = batch_result.get("items") if isinstance(batch_result.get("items"), dict) else {}
@@ -563,6 +570,8 @@ def run_menu_generate_recipes_job(job_id, payload):
                     "recipe_prediction_batches_completed": predicted_batches_completed,
                     "batch_workers": batch_worker_count,
                     "skipped_count": len(skipped_urls),
+                    "nutrition_completed": nutrition_success_count,
+                    "nutrition_failed": nutrition_failed_count,
                     "category_success_count": category_success_count,
                     "failed_items": failed_items,
                     **cookbook_recipe_progress_payload(
@@ -601,6 +610,104 @@ def run_menu_generate_recipes_job(job_id, payload):
 
             update_job_progress(
                 job_id,
+                current_step=f"Estimating per serving basis for {recipe_name} ({recipe_position}/{total})",
+                progress_percent=bounded_percent(len(created_urls), total, 82, 88),
+                completed_items=len(created_urls) + len(skipped_urls),
+                failed_items=failed_items,
+                result_payload={
+                    **model_info,
+                    "stage": "Estimating per serving basis",
+                    "total_items": total,
+                    "recipe_inference_completed": len(created_urls),
+                    "recipe_prediction_batches_completed": predicted_batches_completed,
+                    "batch_workers": batch_worker_count,
+                    "nutrition_completed": nutrition_success_count,
+                    "nutrition_failed": nutrition_failed_count,
+                    "category_success_count": category_success_count,
+                    "failed_items": failed_items,
+                    **cookbook_recipe_progress_payload(
+                        "nutrition",
+                        "Estimating nutrition for",
+                        recipe_url,
+                        recipe_name,
+                        recipe_position,
+                        total,
+                        event="started",
+                    ),
+                },
+            )
+            print(
+                "[MenuRecipeGeneration] action=nutrition_start "
+                f"job_id={job_id} recipe_url={recipe_url} recipe_name={recipe_name}"
+            )
+            try:
+                nutrition_status = ensure_menu_recipe_serving_basis_estimate(recipe_url, result)
+            except Exception as exc:
+                nutrition_status = {
+                    "ok": False,
+                    "recipe_url": recipe_url,
+                    "error": str(exc) or "Unable to estimate serving basis.",
+                }
+            nutrition_status = nutrition_status if isinstance(nutrition_status, dict) else {
+                "ok": False,
+                "recipe_url": recipe_url,
+                "error": "Invalid serving basis result.",
+            }
+            nutrition_statuses.append({
+                "ok": bool(nutrition_status.get("ok")),
+                "recipe_url": recipe_url,
+                "already_complete": bool(nutrition_status.get("already_complete")),
+                "estimated": bool(nutrition_status.get("estimated")),
+                "error": str(nutrition_status.get("error") or ""),
+                "model_used": str(nutrition_status.get("model_used") or ""),
+            })
+            result = {
+                **result,
+                "serving_basis_status": nutrition_status,
+                "nutrition_status": nutrition_status,
+            }
+            if nutrition_status.get("ok"):
+                nutrition_success_count += 1
+                updated_recipe = nutrition_status.get("recipe_json") if isinstance(nutrition_status.get("recipe_json"), dict) else {}
+                if updated_recipe:
+                    result = {
+                        **result,
+                        "raw": updated_recipe,
+                        "recipe_json": updated_recipe,
+                        "nutrition": updated_recipe.get("nutrition", result.get("nutrition", [])),
+                        "nutrition_inference": updated_recipe.get("nutrition_inference", result.get("nutrition_inference")),
+                    }
+                print(
+                    "[MenuRecipeGeneration] action=nutrition_ready "
+                    f"job_id={job_id} recipe_url={recipe_url} recipe_name={recipe_name} "
+                    f"already_complete={bool(nutrition_status.get('already_complete'))}"
+                )
+            else:
+                nutrition_failed_count += 1
+                error = nutrition_status.get("error") or "Unable to estimate serving basis."
+                append_job_warning(job_id, f"{recipe_name} ({recipe_url}): {error}")
+                category_status = {
+                    "ok": False,
+                    "recipe_url": recipe_url,
+                    "status": "skipped",
+                    "error": f"Category generation skipped because serving basis estimation failed: {error}",
+                }
+                category_statuses.append(category_status)
+                result = {
+                    **result,
+                    "import_category_status": category_status,
+                    "category_status": category_status,
+                }
+                record_recipe_import_activity(recipe_url, result, "menu-batch-generation")
+                print(
+                    "[MenuRecipeGeneration] action=nutrition_failed "
+                    f"job_id={job_id} recipe_url={recipe_url} recipe_name={recipe_name} error={error}"
+                )
+                created_urls.append(recipe_url)
+                continue
+
+            update_job_progress(
+                job_id,
                 current_step=f"Generating ChatGPT categories for {recipe_name} ({recipe_position}/{total})",
                 progress_percent=bounded_percent(len(created_urls), total, 82, 88),
                 completed_items=len(created_urls) + len(skipped_urls),
@@ -612,6 +719,8 @@ def run_menu_generate_recipes_job(job_id, payload):
                     "recipe_inference_completed": len(created_urls),
                     "recipe_prediction_batches_completed": predicted_batches_completed,
                     "batch_workers": batch_worker_count,
+                    "nutrition_completed": nutrition_success_count,
+                    "nutrition_failed": nutrition_failed_count,
                     "category_success_count": category_success_count,
                     "failed_items": failed_items,
                     **cookbook_recipe_progress_payload(
@@ -748,7 +857,9 @@ def run_menu_generate_recipes_job(job_id, payload):
                 **model_info,
                 "stage": "Predicting recipes",
                 "recipe_inference_completed": len(created_urls),
-                "failed_items": failed_items,
+                "nutrition_completed": nutrition_success_count,
+                "nutrition_failed": nutrition_failed_count,
+                "failed_items": failed_items + nutrition_failed_count,
             },
         )
         with workspace_write_lock("recipe-imports"):
@@ -764,9 +875,10 @@ def run_menu_generate_recipes_job(job_id, payload):
                 **model_info,
                 "stage": "Estimating nutrition",
                 "recipe_inference_completed": len(created_urls),
-                "nutrition_completed": 0,
+                "nutrition_completed": nutrition_success_count,
+                "nutrition_failed": nutrition_failed_count,
                 "pdfs_completed": 0,
-                "failed_items": failed_items,
+                "failed_items": failed_items + nutrition_failed_count,
             },
         )
         heavy_job = enqueue_followup_job(
@@ -782,6 +894,7 @@ def run_menu_generate_recipes_job(job_id, payload):
         if not heavy_job.get("queued"):
             append_job_warning(job_id, heavy_job.get("error") or "Deferred heavy tasks were not queued.")
 
+    total_failed_items = failed_items + nutrition_failed_count
     result_payload = {
         "ok": bool(created_urls or skipped_urls),
         "created_count": len(created_urls),
@@ -789,14 +902,16 @@ def run_menu_generate_recipes_job(job_id, payload):
         "full_recipes_generated": len(created_urls),
         "recipe_inference_completed": len(created_urls),
         "skipped_count": len(skipped_urls),
-        "failed_count": failed_items,
-        "failed_items": failed_items,
+        "failed_count": total_failed_items,
+        "failed_items": total_failed_items,
         "recipe_urls": created_urls + skipped_urls,
         "generated_recipe_urls": created_urls,
         "skipped_recipe_urls": skipped_urls,
         "links": recipe_links(created_urls + skipped_urls),
-        "nutrition_estimates_completed": 0,
-        "nutrition_completed": 0,
+        "nutrition_estimates_completed": nutrition_success_count,
+        "nutrition_completed": nutrition_success_count,
+        "nutrition_failed": nutrition_failed_count,
+        "nutrition_statuses": nutrition_statuses,
         "pdfs_created": 0,
         "pdfs_completed": 0,
         "category_statuses": category_statuses,
@@ -817,7 +932,7 @@ def run_menu_generate_recipes_job(job_id, payload):
         progress_percent=95,
         total_items=total,
         completed_items=len(created_urls) + len(skipped_urls),
-        failed_items=failed_items,
+        failed_items=total_failed_items,
         result_payload=result_payload,
     )
 

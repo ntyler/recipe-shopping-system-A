@@ -23,6 +23,21 @@ def configure_job_paths(monkeypatch, tmp_path):
     monkeypatch.setattr(guest_session_service, "GUEST_DATA_DIR", tmp_path / "guests")
 
 
+def successful_menu_serving_basis(recipe_url, result):
+    recipe_json = dict(result or {})
+    recipe_json["nutrition"] = [
+        {"key": "serving_basis", "value": "per serving"},
+        {"key": "calories", "value": "100 kcal"},
+    ]
+    recipe_json["nutrition_inference"] = {"status": "generated"}
+    return {
+        "ok": True,
+        "recipe_url": recipe_url,
+        "recipe_json": recipe_json,
+        "nutrition": recipe_json["nutrition"],
+    }
+
+
 def test_job_routes_create_and_scope_jobs_to_owner(monkeypatch, tmp_path):
     configure_job_paths(monkeypatch, tmp_path)
     monkeypatch.setattr(
@@ -269,6 +284,7 @@ def test_menu_generate_job_runs_decide_all_categories_after_generation(monkeypat
         "cookbook_name": "Dinner",
     }
     category_calls = []
+    events = []
 
     monkeypatch.setattr(recipe_routes, "load_editable_recipe", lambda url: {"recipe": stub})
     monkeypatch.setattr(
@@ -315,8 +331,14 @@ def test_menu_generate_job_runs_decide_all_categories_after_generation(monkeypat
     })
     monkeypatch.setattr("PushShoppingList.services.recipe_url_service.add_recipe_urls", lambda urls: None)
     monkeypatch.setattr("PushShoppingList.scripts.sort_ingredients.main", lambda: None)
+    monkeypatch.setattr(
+        recipe_routes,
+        "ensure_menu_recipe_serving_basis_estimate",
+        lambda url, result: events.append(("nutrition", url)) or successful_menu_serving_basis(url, result),
+    )
 
     def fake_category_routine(url, result, assignment, trigger_source=""):
+        events.append(("categories", url, result.get("nutrition")))
         category_calls.append({
             "url": url,
             "title": result.get("recipe_title"),
@@ -340,12 +362,20 @@ def test_menu_generate_job_runs_decide_all_categories_after_generation(monkeypat
     finished = job_tasks.run_menu_generate_recipes_job(job["id"], job["input_payload"])
 
     assert finished["status"] == "completed"
+    assert events == [
+        ("nutrition", recipe_url),
+        ("categories", recipe_url, [
+            {"key": "serving_basis", "value": "per serving"},
+            {"key": "calories", "value": "100 kcal"},
+        ]),
+    ]
     assert category_calls == [{
         "url": recipe_url,
         "title": "Crab Wonton",
         "assignment": {"cookbook_id": "cb1", "cookbook_name": "Dinner"},
         "trigger_source": "menu_generate:all",
     }]
+    assert finished["result_payload"]["nutrition_completed"] == 1
     assert finished["result_payload"]["category_success_count"] == 1
     assert finished["result_payload"]["category_statuses"][0]["recipe_url"] == recipe_url
 
@@ -431,6 +461,11 @@ def test_menu_generate_job_keeps_partial_batch_predictions(monkeypatch, tmp_path
         recipe_routes,
         "apply_imported_recipe_category_routine",
         lambda url, result, assignment, trigger_source="": {"ok": True, "status": "updated"},
+    )
+    monkeypatch.setattr(
+        recipe_routes,
+        "ensure_menu_recipe_serving_basis_estimate",
+        successful_menu_serving_basis,
     )
 
     job = job_service.create_job(
@@ -545,6 +580,11 @@ def test_menu_generate_job_predicts_batches_in_parallel(monkeypatch, tmp_path):
         recipe_routes,
         "apply_imported_recipe_category_routine",
         lambda url, result, assignment, trigger_source="": {"ok": True, "status": "updated"},
+    )
+    monkeypatch.setattr(
+        recipe_routes,
+        "ensure_menu_recipe_serving_basis_estimate",
+        successful_menu_serving_basis,
     )
 
     job = job_service.create_job(

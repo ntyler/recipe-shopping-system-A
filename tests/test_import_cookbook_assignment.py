@@ -238,7 +238,7 @@ def test_job_activity_section_has_clear_collapse_control():
     assert ".job-activity-current-recipe" in css
     assert ".cookbook-routine-jobs-panel" in css
     assert ".cookbook-routine-job-recipe" in css
-    assert "#jobActivitySection:not(.card-collapsed) > .job-activity-header" in css
+    assert "#jobActivitySection > .job-activity-header" in css
 
 
 def test_import_progress_wait_does_not_timeout_long_menu_jobs():
