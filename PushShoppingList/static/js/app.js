@@ -247,6 +247,10 @@ let jobActivityPollTimer = null;
 let lastJobActivityJobs = [];
 const jobActivityExpandedRows = new Set();
 let jobActivityActiveFilterOnly = false;
+const JOB_ACTIVITY_ITEM_FILTERS = new Set(["all", "passed", "failed"]);
+let jobActivityItemFilter = "all";
+let jobActivityDateFrom = "";
+let jobActivityDateTo = "";
 const JOB_COMPLETION_DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
 const IMPORT_JOB_COMPLETION_TIMEOUT_MS = 0;
 
@@ -282,6 +286,26 @@ function jobActivityCancelAllButton() {
 function jobActivityActiveFilterButton() {
     const panel = jobActivityPanel();
     return panel ? panel.querySelector("[data-job-activity-active-filter]") : null;
+}
+
+function jobActivityItemFilterButtons() {
+    const panel = jobActivityPanel();
+    return panel ? Array.from(panel.querySelectorAll("[data-job-activity-item-filter]")) : [];
+}
+
+function jobActivityDateFromInput() {
+    const panel = jobActivityPanel();
+    return panel ? panel.querySelector("[data-job-activity-date-from]") : null;
+}
+
+function jobActivityDateToInput() {
+    const panel = jobActivityPanel();
+    return panel ? panel.querySelector("[data-job-activity-date-to]") : null;
+}
+
+function jobActivityDateClearButton() {
+    const panel = jobActivityPanel();
+    return panel ? panel.querySelector("[data-job-activity-date-clear]") : null;
 }
 
 function jobIsActive(job) {
@@ -344,16 +368,119 @@ function jobSourceIsChecked(job, index, sourceCount) {
     return sourceCount > 1 && (!total || total === sourceCount) && index < completed;
 }
 
-function renderJobSourceList(job) {
+function normalizedJobActivityItemFilter(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+    return JOB_ACTIVITY_ITEM_FILTERS.has(normalized) ? normalized : "all";
+}
+
+function firstPositiveJobCount(...values) {
+    for (const value of values) {
+        const count = Number(value);
+        if (Number.isFinite(count) && count > 0) {
+            return Math.floor(count);
+        }
+    }
+    return 0;
+}
+
+function jobFailedItemCount(job, failureRecords = null) {
+    const failures = Array.isArray(failureRecords) ? failureRecords : menuFailureRecordsFromJob(job);
+    if (failures.length) {
+        return failures.length;
+    }
+    const result = jobResultPayload(job);
+    return firstPositiveJobCount(
+        job && job.failed_items,
+        result.failed_items,
+        result.failed_count,
+        result.error_count,
+        result.failure_count
+    );
+}
+
+function jobPassedItemCount(job, failureRecords = null) {
+    const failures = Array.isArray(failureRecords) ? failureRecords : menuFailureRecordsFromJob(job);
+    const sources = jobSourceItems(job);
+    if (sources.length) {
+        const failureMap = menuFailureMapFromRecords(failures);
+        return sources.filter(source => !menuFailureForSource(source, failureMap)).length;
+    }
+
+    const result = jobResultPayload(job);
+    const explicitCount = firstPositiveJobCount(
+        job && job.completed_items,
+        result.completed_items,
+        result.success_count,
+        result.completed_count,
+        result.generated_count,
+        result.recipe_inference_completed,
+        result.full_recipes_generated,
+        result.nutrition_completed,
+        result.category_success_count
+    );
+    if (explicitCount) {
+        return explicitCount;
+    }
+
+    const linksCount = jobResultLinks(job).length;
+    if (linksCount) {
+        return linksCount;
+    }
+
+    const totalCount = firstPositiveJobCount(job && job.total_items, result.total_items);
+    const failedCount = jobFailedItemCount(job, failures);
+    if (totalCount > failedCount) {
+        return totalCount - failedCount;
+    }
+
+    const status = String((job && job.status) || "").trim().toLowerCase();
+    return status === "completed" && !failedCount ? 1 : 0;
+}
+
+function jobSourcePassesItemFilter(source, failureMap, itemFilter) {
+    const normalized = normalizedJobActivityItemFilter(itemFilter);
+    if (normalized === "all") {
+        return true;
+    }
+    const failed = Boolean(menuFailureForSource(source, failureMap));
+    return normalized === "failed" ? failed : !failed;
+}
+
+function jobSourceItemsForFilter(job, itemFilter = jobActivityItemFilter) {
+    const sources = jobSourceItems(job);
+    const normalized = normalizedJobActivityItemFilter(itemFilter);
+    if (normalized === "all" || !sources.length) {
+        return sources;
+    }
+    const failureMap = menuFailureMapFromJob(job);
+    return sources.filter(source => jobSourcePassesItemFilter(source, failureMap, normalized));
+}
+
+function jobSourceFilterEmptyText(itemFilter) {
+    const normalized = normalizedJobActivityItemFilter(itemFilter);
+    if (normalized === "failed") {
+        return "No failed source rows were reported for this job.";
+    }
+    if (normalized === "passed") {
+        return "No passed source rows match this job.";
+    }
+    return "";
+}
+
+function renderJobSourceList(job, itemFilter = jobActivityItemFilter) {
     const sources = jobSourceItems(job);
     if (!sources.length) {
         return "";
     }
     const failureMap = menuFailureMapFromJob(job);
+    const normalizedFilter = normalizedJobActivityItemFilter(itemFilter);
+    const visibleSources = sources
+        .map((source, index) => ({ source, index }))
+        .filter(({ source }) => jobSourcePassesItemFilter(source, failureMap, normalizedFilter));
 
     return `
         <div class="job-activity-sources" aria-label="Job sources">
-            ${sources.map((source, index) => {
+            ${visibleSources.length ? visibleSources.map(({ source, index }) => {
                 const href = String(source.url || "").trim();
                 const label = String(source.label || href || "Source").trim();
                 const displayLabel = menuRecipeDisplayName(source) || label;
@@ -381,7 +508,7 @@ function renderJobSourceList(job) {
                         </span>
                     </label>
                 `;
-            }).join("")}
+            }).join("") : `<div class="job-activity-source-empty">${escapeHtml(jobSourceFilterEmptyText(normalizedFilter))}</div>`}
         </div>
     `;
 }
@@ -774,7 +901,10 @@ function menuFailureLabel(failure) {
     return stage ? `Failed: ${stage}` : "Failed";
 }
 
-function renderJobFailureSummary(job) {
+function renderJobFailureSummary(job, itemFilter = jobActivityItemFilter) {
+    if (normalizedJobActivityItemFilter(itemFilter) === "passed") {
+        return "";
+    }
     const failures = menuFailureRecordsFromJob(job);
     if (!failures.length) {
         return "";
@@ -809,6 +939,74 @@ function renderJobFailureSummary(job) {
                     `;
                 }).join("")}
                 ${remainingCount ? `<div class="job-activity-failure-more">${escapeHtml(String(remainingCount))} more failed item${remainingCount === 1 ? "" : "s"}</div>` : ""}
+            </div>
+        </div>
+    `;
+}
+
+function renderJobPassedSummary(job, itemFilter = jobActivityItemFilter) {
+    if (normalizedJobActivityItemFilter(itemFilter) !== "passed") {
+        return "";
+    }
+
+    const failures = menuFailureRecordsFromJob(job);
+    const passedCount = jobPassedItemCount(job, failures);
+    if (!passedCount) {
+        return "";
+    }
+
+    const passedSources = jobSourceItemsForFilter(job, "passed");
+    const shownSources = passedSources.slice(0, 8);
+    const linkFallbacks = shownSources.length ? [] : jobResultLinks(job).slice(0, 8);
+    const shownCount = shownSources.length || linkFallbacks.length || (passedCount ? 1 : 0);
+    const remainingCount = Math.max(0, passedCount - shownCount);
+    const sourceCards = shownSources.map(source => {
+        const href = String(source.url || "").trim();
+        const label = String(source.label || href || "Menu item").trim();
+        const title = menuRecipeDisplayName(source) || label;
+        const detail = String(source.detail || source.type || "").trim();
+        const titleHtml = href
+            ? `<a href="${escapeAttribute(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(title)}</a>`
+            : `<span>${escapeHtml(title)}</span>`;
+        return `
+            <div class="job-activity-passed-card">
+                <div class="job-activity-passed-heading">${titleHtml}</div>
+                ${detail ? `<div class="job-activity-passed-detail">${escapeHtml(detail)}</div>` : ""}
+            </div>
+        `;
+    });
+    const linkCards = linkFallbacks.map(link => {
+        const href = String(link.url || "").trim();
+        const external = /^https?:\/\//i.test(href);
+        const title = String(link.label || href || "Completed item").trim();
+        const titleHtml = href
+            ? `<a href="${escapeAttribute(href)}"${external ? ' target="_blank" rel="noopener noreferrer"' : ""}>${escapeHtml(title)}</a>`
+            : `<span>${escapeHtml(title)}</span>`;
+        return `
+            <div class="job-activity-passed-card">
+                <div class="job-activity-passed-heading">${titleHtml}</div>
+            </div>
+        `;
+    });
+    const fallbackCard = sourceCards.length || linkCards.length
+        ? ""
+        : `
+            <div class="job-activity-passed-card">
+                <div class="job-activity-passed-heading">${escapeHtml(String(passedCount))} completed item${passedCount === 1 ? "" : "s"}</div>
+            </div>
+        `;
+
+    return `
+        <div class="job-activity-passed-items" aria-label="Passed items">
+            <div class="job-activity-passed-title">
+                <strong>${escapeHtml(String(passedCount))} passed item${passedCount === 1 ? "" : "s"}</strong>
+                <span>Passed items</span>
+            </div>
+            <div class="job-activity-passed-list">
+                ${sourceCards.join("")}
+                ${linkCards.join("")}
+                ${fallbackCard}
+                ${remainingCount ? `<div class="job-activity-passed-more">${escapeHtml(String(remainingCount))} more passed item${remainingCount === 1 ? "" : "s"}</div>` : ""}
             </div>
         </div>
     `;
@@ -942,6 +1140,217 @@ function appendJobModelReference(message, job) {
     return `${text} (${modelReference})`;
 }
 
+function finiteJobDurationSeconds(value) {
+    const seconds = Number(value);
+    return Number.isFinite(seconds) && seconds >= 0 ? Math.floor(seconds) : null;
+}
+
+function jobTimestampMillis(value) {
+    const text = String(value || "").trim();
+    if (!text) {
+        return null;
+    }
+    const millis = Date.parse(text);
+    return Number.isFinite(millis) ? millis : null;
+}
+
+function jobSecondsBetween(startValue, endValue) {
+    const started = jobTimestampMillis(startValue);
+    const finished = typeof endValue === "number" ? endValue : jobTimestampMillis(endValue);
+    if (started === null || finished === null) {
+        return null;
+    }
+    return Math.max(0, Math.floor((finished - started) / 1000));
+}
+
+function formatJobDurationSeconds(value) {
+    let seconds = finiteJobDurationSeconds(value);
+    if (seconds === null) {
+        return "";
+    }
+    if (seconds < 60) {
+        return `${seconds}s`;
+    }
+
+    const days = Math.floor(seconds / 86400);
+    seconds -= days * 86400;
+    const hours = Math.floor(seconds / 3600);
+    seconds -= hours * 3600;
+    const minutes = Math.floor(seconds / 60);
+    seconds -= minutes * 60;
+    const parts = [];
+
+    if (days) {
+        parts.push(`${days}d`);
+    }
+    if (hours && parts.length < 2) {
+        parts.push(`${hours}h`);
+    }
+    if (minutes && parts.length < 2) {
+        parts.push(`${minutes}m`);
+    }
+    if (!parts.length || (seconds && parts.length < 2 && !days)) {
+        parts.push(`${seconds}s`);
+    }
+
+    return parts.join(" ");
+}
+
+function firstJobDurationSeconds(...values) {
+    for (const value of values) {
+        const seconds = finiteJobDurationSeconds(value);
+        if (seconds !== null) {
+            return seconds;
+        }
+    }
+    return null;
+}
+
+function jobDurationSummary(job) {
+    const status = String((job && job.status) || "").trim().toLowerCase();
+    const terminal = ["completed", "failed", "cancelled"].includes(status);
+    const now = Date.now();
+    const finishedAt = String((job && (job.finished_at || job.completed_at)) || "").trim();
+    const fallbackEnd = terminal
+        ? (finishedAt || String((job && job.updated_at) || "").trim())
+        : now;
+    const durationSeconds = firstJobDurationSeconds(
+        job && job.duration_seconds,
+        terminal ? jobSecondsBetween(job && job.created_at, fallbackEnd) : null
+    );
+    const elapsedSeconds = firstJobDurationSeconds(
+        job && job.elapsed_seconds,
+        jobSecondsBetween(job && job.created_at, fallbackEnd)
+    );
+    const runtimeSeconds = firstJobDurationSeconds(
+        job && job.runtime_seconds,
+        jobSecondsBetween(job && job.started_at, fallbackEnd)
+    );
+    const queueWaitSeconds = firstJobDurationSeconds(
+        job && job.queue_wait_seconds,
+        jobSecondsBetween(job && job.created_at, job && job.started_at)
+    );
+    const label = terminal ? "Duration" : (status === "queued" ? "Queued" : "Elapsed");
+    const seconds = terminal
+        ? firstJobDurationSeconds(durationSeconds, runtimeSeconds, elapsedSeconds)
+        : (status === "queued" ? elapsedSeconds : firstJobDurationSeconds(runtimeSeconds, elapsedSeconds));
+    const value = formatJobDurationSeconds(seconds);
+    if (!value) {
+        return null;
+    }
+
+    const detailParts = [];
+    if (durationSeconds !== null) {
+        detailParts.push(`total ${formatJobDurationSeconds(durationSeconds)}`);
+    }
+    if (runtimeSeconds !== null) {
+        detailParts.push(`run ${formatJobDurationSeconds(runtimeSeconds)}`);
+    }
+    if (queueWaitSeconds !== null && queueWaitSeconds > 0) {
+        detailParts.push(`queue ${formatJobDurationSeconds(queueWaitSeconds)}`);
+    }
+
+    return {
+        label,
+        value,
+        title: detailParts.join("; "),
+    };
+}
+
+function renderJobDuration(job) {
+    const summary = jobDurationSummary(job);
+    if (!summary) {
+        return "";
+    }
+    return `
+        <span class="job-activity-duration"${summary.title ? ` title="${escapeAttribute(summary.title)}"` : ""}>
+            ${escapeHtml(summary.label)}: <strong>${escapeHtml(summary.value)}</strong>
+        </span>
+    `;
+}
+
+function jobActivityDateString(value) {
+    const millis = jobTimestampMillis(value);
+    if (millis === null) {
+        return "";
+    }
+    const date = new Date(millis);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+}
+
+function jobActivityDateForJob(job) {
+    return jobActivityDateString(
+        job && (
+            job.finished_at
+            || job.completed_at
+            || job.updated_at
+            || job.created_at
+        )
+    );
+}
+
+function jobPassesDateFilter(job) {
+    if (!jobActivityDateFrom && !jobActivityDateTo) {
+        return true;
+    }
+    const jobDate = jobActivityDateForJob(job);
+    if (!jobDate) {
+        return false;
+    }
+    if (jobActivityDateFrom && jobDate < jobActivityDateFrom) {
+        return false;
+    }
+    if (jobActivityDateTo && jobDate > jobActivityDateTo) {
+        return false;
+    }
+    return true;
+}
+
+function jobActivityDateFilterText() {
+    if (jobActivityDateFrom && jobActivityDateTo) {
+        return `${jobActivityDateFrom} to ${jobActivityDateTo}`;
+    }
+    if (jobActivityDateFrom) {
+        return `from ${jobActivityDateFrom}`;
+    }
+    if (jobActivityDateTo) {
+        return `through ${jobActivityDateTo}`;
+    }
+    return "";
+}
+
+function jobPassesItemFilter(job) {
+    const normalized = normalizedJobActivityItemFilter(jobActivityItemFilter);
+    if (normalized === "all") {
+        return true;
+    }
+    const failures = menuFailureRecordsFromJob(job);
+    if (normalized === "failed") {
+        return jobFailedItemCount(job, failures) > 0;
+    }
+    return jobPassedItemCount(job, failures) > 0;
+}
+
+function jobActivityFilterSummaryParts() {
+    const parts = [];
+    if (jobActivityActiveFilterOnly) {
+        parts.push("active only");
+    }
+    if (jobActivityItemFilter === "passed") {
+        parts.push("passed items");
+    } else if (jobActivityItemFilter === "failed") {
+        parts.push("failed items");
+    }
+    const dateText = jobActivityDateFilterText();
+    if (dateText) {
+        parts.push(dateText);
+    }
+    return parts;
+}
+
 function jobActivitySort(jobs) {
     return [...(jobs || [])].sort((left, right) => {
         const leftActive = jobIsActive(left) ? 0 : 1;
@@ -979,7 +1388,11 @@ function jobActivityHeaderSummaryText(sortedJobs) {
 
 function filteredJobActivityJobs(sortedJobs) {
     const jobs = Array.isArray(sortedJobs) ? sortedJobs : [];
-    return jobActivityActiveFilterOnly ? jobs.filter(jobIsActive) : jobs;
+    return jobs.filter(job => (
+        (!jobActivityActiveFilterOnly || jobIsActive(job))
+        && jobPassesDateFilter(job)
+        && jobPassesItemFilter(job)
+    ));
 }
 
 function renderJobActivityPanel(jobs) {
@@ -990,6 +1403,10 @@ function renderJobActivityPanel(jobs) {
     const clearButton = jobActivityClearButton();
     const cancelAllButton = jobActivityCancelAllButton();
     const activeFilterButton = jobActivityActiveFilterButton();
+    const itemFilterButtons = jobActivityItemFilterButtons();
+    const dateFromInput = jobActivityDateFromInput();
+    const dateToInput = jobActivityDateToInput();
+    const dateClearButton = jobActivityDateClearButton();
 
     if (!list || !panel) {
         return;
@@ -1024,24 +1441,46 @@ function renderJobActivityPanel(jobs) {
         activeFilterButton.setAttribute("aria-pressed", jobActivityActiveFilterOnly ? "true" : "false");
         activeFilterButton.textContent = jobActivityActiveFilterOnly ? "Showing Active" : "Active Only";
     }
+    itemFilterButtons.forEach(button => {
+        const value = normalizedJobActivityItemFilter(button.dataset.jobActivityItemFilter);
+        const active = value === jobActivityItemFilter;
+        button.classList.toggle("is-active", active);
+        button.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+    if (dateFromInput && dateFromInput.value !== jobActivityDateFrom) {
+        dateFromInput.value = jobActivityDateFrom;
+    }
+    if (dateToInput && dateToInput.value !== jobActivityDateTo) {
+        dateToInput.value = jobActivityDateTo;
+    }
+    if (dateClearButton) {
+        const hasDateFilter = Boolean(jobActivityDateFrom || jobActivityDateTo);
+        dateClearButton.disabled = !hasDateFilter;
+        dateClearButton.title = hasDateFilter ? "Clear activity date filters" : "No date filters selected";
+    }
 
     if (summary) {
-        const completedCount = sortedJobs.filter(job => job.status === "completed").length;
-        const failedCount = sortedJobs.filter(job => job.status === "failed").length;
-        const baseSummary = activeCount
-            ? `${activeCount} active job${activeCount === 1 ? "" : "s"} running.`
-            : `${completedCount} completed, ${failedCount} failed in recent activity.`;
-        summary.textContent = jobActivityActiveFilterOnly
-            ? `${baseSummary} Showing active only.`
-            : baseSummary;
+        const completedCount = visibleJobs.filter(job => job.status === "completed").length;
+        const failedCount = visibleJobs.filter(job => job.status === "failed").length;
+        const filterParts = jobActivityFilterSummaryParts();
+        const filterText = filterParts.length ? ` (${filterParts.join(", ")})` : "";
+        if (activeCount) {
+            summary.textContent = `${visibleJobs.length} shown${filterText}. ${activeCount} active job${activeCount === 1 ? "" : "s"} running in recent activity.`;
+        } else {
+            summary.textContent = `${visibleJobs.length} shown${filterText}. ${completedCount} completed, ${failedCount} failed in recent activity.`;
+        }
     }
     if (headerSummary) {
         headerSummary.textContent = jobActivityHeaderSummaryText(sortedJobs);
     }
 
     if (!visibleJobs.length) {
-        list.innerHTML = jobActivityActiveFilterOnly
-            ? '<div class="job-activity-empty">No active jobs.</div>'
+        const hasFilters = jobActivityActiveFilterOnly
+            || jobActivityItemFilter !== "all"
+            || jobActivityDateFrom
+            || jobActivityDateTo;
+        list.innerHTML = hasFilters
+            ? '<div class="job-activity-empty">No jobs match the selected filters.</div>'
             : '<div class="job-activity-empty">No recent jobs.</div>';
         return;
     }
@@ -1051,6 +1490,36 @@ function renderJobActivityPanel(jobs) {
 
 function toggleJobActivityActiveFilter(button) {
     jobActivityActiveFilterOnly = !jobActivityActiveFilterOnly;
+    renderJobActivityPanel(lastJobActivityJobs);
+    return false;
+}
+
+function setJobActivityItemFilter(value) {
+    jobActivityItemFilter = normalizedJobActivityItemFilter(value);
+    renderJobActivityPanel(lastJobActivityJobs);
+    return false;
+}
+
+function setJobActivityDateFilter() {
+    const fromInput = jobActivityDateFromInput();
+    const toInput = jobActivityDateToInput();
+    jobActivityDateFrom = fromInput ? String(fromInput.value || "").trim() : "";
+    jobActivityDateTo = toInput ? String(toInput.value || "").trim() : "";
+    renderJobActivityPanel(lastJobActivityJobs);
+    return false;
+}
+
+function clearJobActivityDateFilter() {
+    jobActivityDateFrom = "";
+    jobActivityDateTo = "";
+    const fromInput = jobActivityDateFromInput();
+    const toInput = jobActivityDateToInput();
+    if (fromInput) {
+        fromInput.value = "";
+    }
+    if (toInput) {
+        toInput.value = "";
+    }
     renderJobActivityPanel(lastJobActivityJobs);
     return false;
 }
@@ -1175,12 +1644,15 @@ function renderJobActivityRow(job, index = 0) {
     );
     const nonItemWarnings = warnings.filter(warning => !itemFailureWarnings.has(String(warning || "")));
     const links = jobResultLinks(job);
-    const sourceHtml = renderJobSourceList(job);
-    const failureSummaryHtml = renderJobFailureSummary(job);
+    const itemFilter = normalizedJobActivityItemFilter(jobActivityItemFilter);
+    const sourceHtml = renderJobSourceList(job, itemFilter);
+    const failureSummaryHtml = renderJobFailureSummary(job, itemFilter);
+    const passedSummaryHtml = renderJobPassedSummary(job, itemFilter);
     const modelHtml = renderJobModelDetails(job);
     const workerHtml = renderJobWorkerDetails(job);
     const stageCountsHtml = renderJobStageCounts(job);
     const currentRecipeHtml = renderJobCurrentRecipe(job);
+    const durationHtml = renderJobDuration(job);
     const active = jobIsActive(job);
     const sourceCount = jobSourceItems(job).length;
     const jobId = String(job.id || job.job_id || "").trim();
@@ -1191,6 +1663,7 @@ function renderJobActivityRow(job, index = 0) {
         active ? "job-activity-active" : "",
         index === 0 ? "job-activity-primary-row" : "",
         failureSummaryHtml ? "job-activity-has-failures" : "",
+        itemFilter !== "all" ? `job-activity-item-filter-${escapeAttribute(itemFilter)}` : "",
         !detailsExpanded ? "job-activity-row-details-collapsed" : "",
     ].filter(Boolean).join(" ");
     const detailsToggleButton = `
@@ -1219,7 +1692,7 @@ function renderJobActivityRow(job, index = 0) {
                 : "";
         }).join("")}</div>`
         : "";
-    const displayedWarnings = failureSummaryHtml ? nonItemWarnings : warnings;
+    const displayedWarnings = failureSummaryHtml || itemFilter === "passed" ? nonItemWarnings : warnings;
     const warningHtml = displayedWarnings.length
         ? `<div class="job-activity-warning">${escapeHtml(displayedWarnings.slice(0, 2).join(" "))}</div>`
         : "";
@@ -1240,12 +1713,14 @@ function renderJobActivityRow(job, index = 0) {
                     </div>
                     <div class="job-activity-meta">
                         <span>${percent}%</span>
+                        ${durationHtml}
                         ${countText ? `<span>${escapeHtml(countText)}</span>` : ""}
                         ${sourceCount ? `<span>${escapeHtml(String(sourceCount))} source${sourceCount === 1 ? "" : "s"}</span>` : ""}
                         ${links.length ? `<span>${escapeHtml(String(links.length))} result${links.length === 1 ? "" : "s"}</span>` : ""}
                     </div>
                     ${error ? `<div class="job-activity-error">${escapeHtml(error)}</div>` : ""}
                     ${failureSummaryHtml}
+                    ${passedSummaryHtml}
                     ${warningHtml}
                 </div>
                 <div class="job-activity-actions">

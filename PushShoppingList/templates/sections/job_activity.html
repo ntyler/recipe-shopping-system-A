@@ -62,6 +62,52 @@
                 Clear Log
             </button>
         </div>
+        <div class="job-activity-filters">
+            <div class="job-activity-segment" role="group" aria-label="Item status filter">
+                <button type="button"
+                        class="job-activity-item-filter is-active"
+                        data-job-activity-item-filter="all"
+                        aria-pressed="true"
+                        onclick="return setJobActivityItemFilter('all')">
+                    All Items
+                </button>
+                <button type="button"
+                        class="job-activity-item-filter"
+                        data-job-activity-item-filter="passed"
+                        aria-pressed="false"
+                        onclick="return setJobActivityItemFilter('passed')">
+                    Passed Items
+                </button>
+                <button type="button"
+                        class="job-activity-item-filter"
+                        data-job-activity-item-filter="failed"
+                        aria-pressed="false"
+                        onclick="return setJobActivityItemFilter('failed')">
+                    Failed Items
+                </button>
+            </div>
+            <div class="job-activity-date-filters" aria-label="Activity date filter">
+                <label>
+                    <span>From</span>
+                    <input type="date"
+                           data-job-activity-date-from
+                           onchange="return setJobActivityDateFilter()">
+                </label>
+                <label>
+                    <span>To</span>
+                    <input type="date"
+                           data-job-activity-date-to
+                           onchange="return setJobActivityDateFilter()">
+                </label>
+                <button type="button"
+                        class="job-activity-date-clear"
+                        data-job-activity-date-clear
+                        onclick="return clearJobActivityDateFilter()"
+                        disabled>
+                    Clear Dates
+                </button>
+            </div>
+        </div>
         <div class="job-activity-summary" data-job-activity-summary>
             No active jobs.
         </div>

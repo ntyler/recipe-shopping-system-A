@@ -550,11 +550,43 @@ def queued_position(job):
     return position or None
 
 
+def duration_seconds_between(started_at, finished_at):
+    if not started_at or not finished_at:
+        return None
+    seconds = int((finished_at - started_at).total_seconds())
+    return max(0, seconds)
+
+
+def job_duration_details(job, reference_time=None):
+    job = job if isinstance(job, dict) else {}
+    reference_time = reference_time or utc_now()
+    created = parse_iso_datetime(job.get("created_at") or "")
+    started = parse_iso_datetime(job.get("started_at") or "")
+    finished = parse_iso_datetime(
+        job.get("finished_at")
+        or job.get("completed_at")
+        or ""
+    )
+    status = normalize_status(job.get("status"))
+    end = finished or reference_time
+    elapsed_seconds = duration_seconds_between(created, end)
+    runtime_seconds = duration_seconds_between(started, end)
+    queue_wait_seconds = duration_seconds_between(created, started)
+
+    return {
+        "duration_seconds": elapsed_seconds if status in TERMINAL_JOB_STATUSES and finished else None,
+        "elapsed_seconds": elapsed_seconds,
+        "runtime_seconds": runtime_seconds,
+        "queue_wait_seconds": queue_wait_seconds,
+    }
+
+
 def job_for_client(job, include_input=False):
     if not job:
         return None
 
     model_details = job_model_details(job)
+    duration_details = job_duration_details(job)
     payload = {
         "id": job.get("id", ""),
         "job_id": job.get("id", ""),
@@ -584,6 +616,7 @@ def job_for_client(job, include_input=False):
         "queued_position": queued_position(job),
         "retry_of": job.get("retry_of") or "",
         "source_items": job_source_items(job),
+        **duration_details,
         **model_details,
     }
 

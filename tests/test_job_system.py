@@ -227,6 +227,43 @@ def test_job_for_client_shows_safe_sources_and_model_metadata(monkeypatch, tmp_p
     assert str(upload_path) not in str(payload)
 
 
+def test_job_for_client_includes_duration_details():
+    job = {
+        "id": "job-duration",
+        "user_id": "owner",
+        "guest_session_id": "",
+        "job_type": "menu-deferred-heavy-tasks",
+        "status": "completed",
+        "current_step": "Completed",
+        "progress_percent": 100,
+        "total_items": 236,
+        "completed_items": 234,
+        "failed_items": 2,
+        "input_payload": {},
+        "result_payload": {},
+        "error_message": "",
+        "warning_messages": [],
+        "created_at": "2026-06-19T12:00:00Z",
+        "started_at": "2026-06-19T12:01:10Z",
+        "updated_at": "2026-06-19T12:06:40Z",
+        "completed_at": "2026-06-19T12:06:40Z",
+        "finished_at": "2026-06-19T12:06:40Z",
+        "expires_at": "",
+        "queue_name": "",
+        "rq_job_id": "",
+        "attempts": 0,
+        "retry_of": "",
+        "worker_id": "",
+    }
+
+    payload = job_service.job_for_client(job)
+
+    assert payload["duration_seconds"] == 400
+    assert payload["elapsed_seconds"] == 400
+    assert payload["runtime_seconds"] == 330
+    assert payload["queue_wait_seconds"] == 70
+
+
 def test_menu_generate_job_sources_link_to_recipe_item_editor(monkeypatch, tmp_path):
     configure_job_paths(monkeypatch, tmp_path)
     recipe_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=spring-roll"

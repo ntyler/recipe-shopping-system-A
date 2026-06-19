@@ -234,16 +234,37 @@ def test_job_activity_section_has_clear_collapse_control():
     assert clear_index > refresh_index
     assert 'data-job-activity-clear' in template
     assert "clearJobActivityLog(this)" in template
+    assert 'data-job-activity-item-filter="all"' in template
+    assert "Passed Items" in template
+    assert "Failed Items" in template
+    assert "data-job-activity-date-from" in template
+    assert "data-job-activity-date-to" in template
+    assert "clearJobActivityDateFilter()" in template
     assert '"job-activity",' in script
     assert "function openJobActivityPanel()" in script
     assert "function closeJobActivityPanel()" in script
     assert "function clearJobActivityLog" in script
+    assert "function setJobActivityItemFilter" in script
+    assert "function setJobActivityDateFilter" in script
+    assert "function clearJobActivityDateFilter" in script
+    assert "function jobPassesDateFilter" in script
+    assert "function jobPassesItemFilter" in script
     assert "function menuItemDisplayNameFromUrl" in script
     assert "function renderJobFailureSummary" in script
+    assert "function renderJobPassedSummary" in script
+    assert "function formatJobDurationSeconds" in script
+    assert "function renderJobDuration" in script
     assert "job-activity-failure-card" in script
     assert "job-activity-source-failed" in script
+    assert "job-activity-duration" in script
+    assert "job-activity-passed-card" in script
     assert ".job-activity-failures" in css
+    assert ".job-activity-filters" in css
+    assert ".job-activity-item-filter" in css
+    assert ".job-activity-date-filters" in css
+    assert ".job-activity-passed-items" in css
     assert ".job-activity-source-failed" in css
+    assert ".job-activity-duration" in css
     assert 'method: "DELETE"' in script
     assert ".job-activity-toolbar" in css
     assert ".job-activity-clear" in css
