@@ -35,6 +35,7 @@ from PushShoppingList.services.extraction_progress_service import request_cancel
 from PushShoppingList.services.extraction_progress_service import set_url_menu_recipes
 from PushShoppingList.services.extraction_progress_service import start_progress
 from PushShoppingList.services.extraction_progress_service import update_menu_recipe_step
+from PushShoppingList.services.file_lock_service import workspace_write_lock
 from PushShoppingList.services.recipe_extract_service import extract_recipe_from_upload
 from PushShoppingList.services.recipe_extract_service import extract_recipe_cover_image_from_upload
 from PushShoppingList.services.recipe_extract_service import extract_recipe_from_url
@@ -548,7 +549,8 @@ def ensure_uploaded_recipe_nutrition_estimate(recipe_url):
             model=str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL)),
         ),
     }
-    save_result = save_editable_recipe(recipe_url, updated_recipe)
+    with workspace_write_lock("recipe-imports"):
+        save_result = save_editable_recipe(recipe_url, updated_recipe)
     if not save_result.get("ok"):
         _mark_uploaded_recipe_nutrition_estimated(recipe_url, False)
         return {
@@ -876,7 +878,8 @@ def ensure_menu_recipe_serving_basis_estimate(recipe_url, recipe_result):
             model=str(os.getenv("OPENAI_NUTRITION_MODEL", MODEL)),
         ),
     }
-    save_result = save_editable_recipe(recipe_url, updated_recipe)
+    with workspace_write_lock("recipe-imports"):
+        save_result = save_editable_recipe(recipe_url, updated_recipe)
     if not save_result.get("ok"):
         return {
             "ok": False,

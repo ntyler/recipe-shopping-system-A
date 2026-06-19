@@ -491,12 +491,11 @@ def test_menu_generate_job_finishes_all_nutrition_before_categories(monkeypatch,
     finished = job_tasks.run_menu_generate_recipes_job(job["id"], job["input_payload"])
 
     assert finished["status"] == "completed"
-    assert events == [
-        ("nutrition", recipe_urls[0]),
-        ("nutrition", recipe_urls[1]),
-        ("categories", recipe_urls[0]),
-        ("categories", recipe_urls[1]),
-    ]
+    nutrition_event_indexes = [index for index, event in enumerate(events) if event[0] == "nutrition"]
+    category_event_indexes = [index for index, event in enumerate(events) if event[0] == "categories"]
+    assert sorted(event[1] for event in events if event[0] == "nutrition") == sorted(recipe_urls)
+    assert sorted(event[1] for event in events if event[0] == "categories") == sorted(recipe_urls)
+    assert max(nutrition_event_indexes) < min(category_event_indexes)
     assert finished["result_payload"]["nutrition_completed"] == 2
     assert finished["result_payload"]["category_success_count"] == 2
     assert ingredient_save_batches == [recipe_urls]
