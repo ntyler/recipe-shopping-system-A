@@ -843,11 +843,23 @@ def test_menu_generate_job_bulk_saves_predicted_recipes_with_throttled_progress(
         update for update in progress_updates
         if (update.get("result_payload") or {}).get("stage") == "Saving predicted recipes"
     ]
+    nutrition_updates = [
+        update for update in progress_updates
+        if (update.get("result_payload") or {}).get("stage") == "Estimating per serving basis"
+    ]
+    category_updates = [
+        update for update in progress_updates
+        if (update.get("result_payload") or {}).get("stage") == "Generating categories"
+    ]
     assert finished["status"] == "completed"
     assert finished["result_payload"]["created_count"] == len(recipe_urls)
     assert saved_url_batches == [recipe_urls]
     assert len(save_updates) < len(recipe_urls)
     assert save_updates[-1]["result_payload"]["save_progress_every"] == 10
+    assert len(nutrition_updates) < len(recipe_urls)
+    assert len(category_updates) < len(recipe_urls)
+    assert nutrition_updates[-1]["result_payload"]["followup_progress_every"] == 10
+    assert category_updates[-1]["result_payload"]["followup_progress_every"] == 10
 
 
 def test_menu_import_queues_recipe_generation_after_source_completed(monkeypatch, tmp_path):

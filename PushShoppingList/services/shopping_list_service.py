@@ -32,11 +32,13 @@ def save_items(items):
 def add_items(new_items):
     with SHOPPING_LIST_LOCK:
         items = load_items()
+        existing_items = set(items)
 
         for item in new_items:
             item = normalize_ingredient_for_shopping_list(item)
 
-            if item and item not in items:
+            if item and item not in existing_items:
                 items.append(item)
+                existing_items.add(item)
 
         save_items(items)

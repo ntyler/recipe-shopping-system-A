@@ -133,3 +133,12 @@ def test_add_missing_ingredients_route_dedupes_shopping_list(monkeypatch, tmp_pa
 
     assert items.count("Eggs") == 1
     assert "Flour" in items
+
+
+def test_add_items_keeps_exact_dedupe_when_batch_has_repeats(monkeypatch, tmp_path):
+    monkeypatch.setattr(shopping_list_service, "SHOPPING_LIST_FILE", tmp_path / "shopping_list.txt")
+
+    shopping_list_service.save_items(["Eggs"])
+    shopping_list_service.add_items(["Eggs", "Flour", "Flour", "Sugar"])
+
+    assert shopping_list_service.load_items() == ["Eggs", "egg", "Flour", "Sugar"]
