@@ -349,6 +349,18 @@ def run_menu_generate_recipes_job(job_id, payload):
     nutrition_success_count = 0
     nutrition_failed_count = 0
     generated_recipe_results = {}
+    failed_recipe_items = []
+
+    def record_failed_recipe_item(recipe_url, recipe_name="", stage="", error=""):
+        recipe_url = str(recipe_url or "").strip()
+        if not recipe_url:
+            return
+        failed_recipe_items.append({
+            "recipe_url": recipe_url,
+            "recipe_name": str(recipe_name or "").strip(),
+            "stage": str(stage or "").strip(),
+            "error": str(error or "").strip(),
+        })
 
     update_job_progress(
         job_id,
@@ -363,6 +375,7 @@ def run_menu_generate_recipes_job(job_id, payload):
             "recipe_inference_completed": 0,
             "nutrition_completed": 0,
             "nutrition_failed": 0,
+            "failed_recipe_items": [],
             "pdfs_completed": 0,
             "failed_items": 0,
         },
@@ -477,6 +490,7 @@ def run_menu_generate_recipes_job(job_id, payload):
                 "recipe_prediction_batches_completed": predicted_batches_completed,
                 "skipped_count": len(skipped_urls),
                 "failed_items": failed_items,
+                "failed_recipe_items": failed_recipe_items,
                 "batch_count": batch_total,
                 "batch_index": batch_index,
                 "batch_workers": batch_worker_count,
@@ -510,11 +524,23 @@ def run_menu_generate_recipes_job(job_id, payload):
             )
         if not result_items:
             failed_items += len(batch)
+            batch_error = (
+                batch_result.get("error_message")
+                or ("Missing menu_item_id: " + ", ".join(missing_ids[:3]) if missing_ids else "Unable to predict recipes.")
+            )
+            for entry in batch:
+                failed_recipe_url = str(entry.get("recipe_url") or "").strip()
+                record_failed_recipe_item(
+                    failed_recipe_url,
+                    menu_batch_entry_item_name(entry),
+                    "Recipe generation",
+                    batch_error,
+                )
             append_job_warning(
                 job_id,
                 (
                     f"Batch {batch_index}/{batch_total}: "
-                    f"{batch_result.get('error_message') or ('Missing menu_item_id: ' + ', '.join(missing_ids[:3]) if missing_ids else 'Unable to predict recipes.')} "
+                    f"{batch_error} "
                     f"Failed item names: {failed_names_text}"
                 ).strip(),
             )
@@ -545,11 +571,13 @@ def run_menu_generate_recipes_job(job_id, payload):
             if not isinstance(item_result, dict):
                 failed_items += 1
                 failure = failure_items.get(item_id) if isinstance(failure_items.get(item_id), dict) else {}
+                failure_error = failure.get("error") or f"Batch response did not include menu_item_id {item_id}."
+                record_failed_recipe_item(recipe_url, recipe_name, "Recipe generation", failure_error)
                 append_job_warning(
                     job_id,
                     (
                         f"{recipe_name} ({recipe_url}): "
-                        f"{failure.get('error') or f'Batch response did not include menu_item_id {item_id}.'}"
+                        f"{failure_error}"
                     ).strip(),
                 )
                 continue
@@ -572,6 +600,7 @@ def run_menu_generate_recipes_job(job_id, payload):
                     "nutrition_failed": nutrition_failed_count,
                     "category_success_count": category_success_count,
                     "failed_items": failed_items,
+                    "failed_recipe_items": failed_recipe_items,
                     **cookbook_recipe_progress_payload(
                         "recipe_generation",
                         "Saving predicted recipe for",
@@ -594,7 +623,9 @@ def run_menu_generate_recipes_job(job_id, payload):
             )
             if not result.get("ok"):
                 failed_items += 1
-                append_job_warning(job_id, f"{recipe_url}: {result.get('error') or 'Unable to save predicted recipe.'}")
+                save_error = result.get("error") or "Unable to save predicted recipe."
+                record_failed_recipe_item(recipe_url, recipe_name, "Recipe generation", save_error)
+                append_job_warning(job_id, f"{recipe_url}: {save_error}")
                 continue
 
             ingredients = result.get("ingredients") if isinstance(result.get("ingredients"), list) else []
@@ -704,6 +735,7 @@ def run_menu_generate_recipes_job(job_id, payload):
                 "nutrition_completed": nutrition_success_count,
                 "nutrition_failed": nutrition_failed_count,
                 "failed_items": failed_items + nutrition_failed_count,
+                "failed_recipe_items": failed_recipe_items,
             },
         )
         with workspace_write_lock("recipe-imports"):
@@ -732,6 +764,7 @@ def run_menu_generate_recipes_job(job_id, payload):
                     "nutrition_failed": nutrition_failed_count,
                     "category_success_count": category_success_count,
                     "failed_items": failed_items + nutrition_failed_count,
+                    "failed_recipe_items": failed_recipe_items,
                     **cookbook_recipe_progress_payload(
                         "nutrition",
                         "Estimating nutrition for",
@@ -794,6 +827,7 @@ def run_menu_generate_recipes_job(job_id, payload):
                 nutrition_failed_count += 1
                 nutrition_ok_by_url[recipe_url] = False
                 error = nutrition_status.get("error") or "Unable to estimate serving basis."
+                record_failed_recipe_item(recipe_url, recipe_name, "Nutrition", error)
                 append_job_warning(job_id, f"{recipe_name} ({recipe_url}): {error}")
                 print(
                     "[MenuRecipeGeneration] action=nutrition_failed "
@@ -817,6 +851,7 @@ def run_menu_generate_recipes_job(job_id, payload):
                     "nutrition_failed": nutrition_failed_count,
                     "category_success_count": category_success_count,
                     "failed_items": failed_items + nutrition_failed_count,
+                    "failed_recipe_items": failed_recipe_items,
                     **cookbook_recipe_progress_payload(
                         "nutrition",
                         "Finished nutrition for",
@@ -847,6 +882,7 @@ def run_menu_generate_recipes_job(job_id, payload):
                 "nutrition_failed": nutrition_failed_count,
                 "category_success_count": category_success_count,
                 "failed_items": failed_items + nutrition_failed_count,
+                "failed_recipe_items": failed_recipe_items,
             },
         )
         for index, recipe_url in enumerate(created_urls):
@@ -895,6 +931,7 @@ def run_menu_generate_recipes_job(job_id, payload):
                     "nutrition_failed": nutrition_failed_count,
                     "category_success_count": category_success_count,
                     "failed_items": failed_items + nutrition_failed_count,
+                    "failed_recipe_items": failed_recipe_items,
                     **cookbook_recipe_progress_payload(
                         "categories",
                         "Deciding categories for",
@@ -925,9 +962,11 @@ def run_menu_generate_recipes_job(job_id, payload):
             if category_status.get("ok"):
                 category_success_count += 1
             else:
+                category_error = category_status.get("error") or "Category inference skipped."
+                record_failed_recipe_item(recipe_url, recipe_name, "Categories", category_error)
                 append_job_warning(
                     job_id,
-                    f"{import_recipe_title(result, recipe_url)}: {category_status.get('error') or 'Category inference skipped.'}",
+                    f"{import_recipe_title(result, recipe_url)}: {category_error}",
                 )
             result = {
                 **result,
@@ -953,6 +992,7 @@ def run_menu_generate_recipes_job(job_id, payload):
                     "nutrition_failed": nutrition_failed_count,
                     "category_success_count": category_success_count,
                     "failed_items": failed_items + nutrition_failed_count,
+                    "failed_recipe_items": failed_recipe_items,
                     **cookbook_recipe_progress_payload(
                         "categories",
                         "Finished category decision for",
@@ -979,6 +1019,7 @@ def run_menu_generate_recipes_job(job_id, payload):
                 "nutrition_failed": nutrition_failed_count,
                 "pdfs_completed": 0,
                 "failed_items": failed_items + nutrition_failed_count,
+                "failed_recipe_items": failed_recipe_items,
             },
         )
         heavy_job = enqueue_followup_job(
@@ -1012,6 +1053,7 @@ def run_menu_generate_recipes_job(job_id, payload):
         "nutrition_completed": nutrition_success_count,
         "nutrition_failed": nutrition_failed_count,
         "nutrition_statuses": nutrition_statuses,
+        "failed_recipe_items": failed_recipe_items,
         "pdfs_created": 0,
         "pdfs_completed": 0,
         "category_statuses": category_statuses,

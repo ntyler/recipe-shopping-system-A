@@ -12360,8 +12360,48 @@ body {
         .bulk-progress-title-line {
             display: flex;
             align-items: center;
+            flex-wrap: wrap;
             gap: 8px;
             min-width: 0;
+        }
+
+        .bulk-progress-item.failed {
+            border-left: 3px solid #ef4444;
+            background: rgba(127, 29, 29, 0.16);
+        }
+
+        .bulk-progress-item.failed .bulk-skip-reason {
+            color: #fecaca;
+            font-weight: 700;
+        }
+
+        .bulk-progress-text.failed {
+            color: #fecaca;
+        }
+
+        .bulk-progress-source-detail,
+        .bulk-progress-failure-flag {
+            display: inline-flex;
+            align-items: center;
+            min-height: 20px;
+            padding: 2px 7px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 800;
+            line-height: 1.2;
+            white-space: nowrap;
+        }
+
+        .bulk-progress-source-detail {
+            border: 1px solid #475569;
+            background: #111827;
+            color: #cbd5e1;
+        }
+
+        .bulk-progress-failure-flag {
+            border: 1px solid #ef4444;
+            background: #450a0a;
+            color: #fecaca;
         }
 
 
@@ -12403,10 +12443,16 @@ body {
             color: #e5e7eb;
         }
 
+        .menu-recipe-progress-card.failed {
+            border-color: #ef4444;
+            background: rgba(127, 29, 29, 0.18);
+        }
+
         .menu-recipe-progress-header {
             display: flex;
             align-items: flex-start;
             justify-content: space-between;
+            flex-wrap: wrap;
             gap: 10px;
             min-width: 0;
         }
@@ -12438,6 +12484,33 @@ body {
             line-height: 1.2;
             overflow-wrap: anywhere;
             text-align: center;
+        }
+
+        .menu-recipe-progress-failure-flag {
+            flex: 0 0 auto;
+            display: inline-flex;
+            align-items: center;
+            min-height: 22px;
+            padding: 3px 8px;
+            border: 1px solid #ef4444;
+            border-radius: 999px;
+            background: #450a0a;
+            color: #fecaca;
+            font-size: 11px;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+
+        .menu-recipe-progress-failure {
+            padding: 7px 9px;
+            border: 1px solid rgba(248, 113, 113, 0.45);
+            border-radius: 6px;
+            background: rgba(69, 10, 10, 0.55);
+            color: #fecaca;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.35;
+            overflow-wrap: anywhere;
         }
 
         .menu-recipe-progress-description {

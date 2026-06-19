@@ -481,6 +481,144 @@ function jobSourceUrls(job) {
         .filter(Boolean);
 }
 
+function menuRecipeFailureKey(value) {
+    let text = String(value || "").trim();
+    if (!text) {
+        return "";
+    }
+
+    try {
+        text = decodeURIComponent(text);
+    } catch (err) {
+        // Keep the raw value when it is not URI-encoded text.
+    }
+
+    return text.trim().toLowerCase();
+}
+
+function menuRecipeEditTargetUrl(value) {
+    const text = String(value || "").trim();
+    if (!text) {
+        return "";
+    }
+
+    try {
+        const parsed = new URL(text, window.location.origin);
+        if (parsed.pathname === "/recipe/edit") {
+            return parsed.searchParams.get("url") || "";
+        }
+    } catch (err) {
+        return "";
+    }
+
+    return "";
+}
+
+function menuRecipeIdentityCandidates(...values) {
+    const candidates = [];
+    values.forEach(value => {
+        const text = String(value || "").trim();
+        if (!text) {
+            return;
+        }
+        candidates.push(text);
+        const editTarget = menuRecipeEditTargetUrl(text);
+        if (editTarget) {
+            candidates.push(editTarget);
+        }
+        try {
+            candidates.push(decodeURIComponent(text));
+        } catch (err) {
+            // Ignore invalid escape sequences.
+        }
+    });
+
+    return Array.from(new Set(
+        candidates
+            .map(menuRecipeFailureKey)
+            .filter(Boolean)
+    ));
+}
+
+function menuFailureMessage(record, fallback = "This item failed during import.") {
+    if (!record || typeof record !== "object") {
+        return fallback;
+    }
+    return String(record.error || record.message || record.status || fallback).trim() || fallback;
+}
+
+function menuFailureRecordsFromJob(job) {
+    const result = jobResultPayload(job || {});
+    const records = [];
+    const addRecord = (record, defaultStage = "") => {
+        if (!record || typeof record !== "object") {
+            return;
+        }
+        const recipeUrl = String(record.recipe_url || record.source_url || record.url || "").trim();
+        const recipeName = String(record.recipe_name || record.display_name || record.recipe_title || record.item_name || "").trim();
+        const stage = String(record.stage || record.step || defaultStage || "").trim();
+        const message = menuFailureMessage(record);
+        if (!recipeUrl && !recipeName) {
+            return;
+        }
+        records.push({
+            recipe_url: recipeUrl,
+            recipe_name: recipeName,
+            stage,
+            error: message,
+        });
+    };
+
+    if (Array.isArray(result.failed_recipe_items)) {
+        result.failed_recipe_items.forEach(record => addRecord(record));
+    }
+    if (Array.isArray(result.nutrition_statuses)) {
+        result.nutrition_statuses
+            .filter(record => record && record.ok === false)
+            .forEach(record => addRecord(record, "Nutrition"));
+    }
+    if (Array.isArray(result.category_statuses)) {
+        result.category_statuses
+            .filter(record => record && record.ok === false)
+            .forEach(record => addRecord(record, "Categories"));
+    }
+
+    return records;
+}
+
+function menuFailureMapFromJob(job) {
+    const failureMap = new Map();
+    menuFailureRecordsFromJob(job).forEach(record => {
+        menuRecipeIdentityCandidates(record.recipe_url, record.recipe_name).forEach(key => {
+            if (!failureMap.has(key)) {
+                failureMap.set(key, record);
+            }
+        });
+    });
+    return failureMap;
+}
+
+function menuFailureForSource(source, failureMap) {
+    if (!source || !failureMap || typeof failureMap.get !== "function") {
+        return null;
+    }
+    const keys = menuRecipeIdentityCandidates(source.recipe_url, source.url, source.label, source.name);
+    for (const key of keys) {
+        if (failureMap.has(key)) {
+            return failureMap.get(key);
+        }
+    }
+    return null;
+}
+
+function menuFailureLabel(failure) {
+    if (!failure) {
+        return "";
+    }
+    const stage = String(failure.stage || "").trim();
+    return stage ? `Failed: ${stage}` : "Failed";
+}
+
 function jobCanOpenImportProgress(job) {
     const jobType = String((job && job.job_type) || "").trim();
     return ["menu-import", "recipe-import", "menu-generate-recipes", "menu-deferred-heavy-tasks"].includes(jobType) && jobSourceUrls(job).length > 0;
@@ -26824,9 +26962,25 @@ function importJobToExtractionProgress(job, urls, isMenuExtract, options = {}) {
     const completedItems = Math.max(0, Number((job && job.completed_items) || 0));
     const failedItems = Math.max(0, Number((job && job.failed_items) || 0));
     const sourceUrls = Array.isArray(urls) ? urls : [];
-    const sourceRows = sourceUrls.map((url, index) => {
+    const sourceItems = jobSourceItems(job || {});
+    const sourceRecords = sourceItems.length
+        ? sourceItems.map(source => ({
+            url: String(source.url || source.recipe_url || "").trim(),
+            label: String(source.label || source.name || source.url || source.recipe_url || "").trim(),
+            recipe_url: String(source.recipe_url || "").trim(),
+            detail: String(source.detail || source.type || "").trim(),
+        }))
+        : sourceUrls.map(url => ({
+            url: String(url || "").trim(),
+            label: String(url || "").trim(),
+            recipe_url: "",
+            detail: "",
+        }));
+    const failureMap = isMenuExtract ? menuFailureMapFromJob(job || {}) : new Map();
+    const sourceRows = sourceRecords.map((source, index) => {
         let state = "waiting";
         let message = job && job.current_step ? job.current_step : "Queued";
+        const itemFailure = isMenuExtract ? menuFailureForSource(source, failureMap) : null;
 
         if (completed) {
             state = "done";
@@ -26850,11 +27004,21 @@ function importJobToExtractionProgress(job, urls, isMenuExtract, options = {}) {
         if (isMenuExtract && active && state === "running") {
             message = appendJobModelReference(message, job);
         }
+        if (itemFailure) {
+            state = "failed";
+            message = menuFailureMessage(itemFailure);
+        }
 
         return {
-            url,
+            url: source.url,
+            label: source.label,
+            recipe_url: source.recipe_url,
+            detail: source.detail,
             state,
             message,
+            failed: Boolean(itemFailure),
+            failed_step: itemFailure ? String(itemFailure.stage || "").trim() : "",
+            failed_message: itemFailure ? menuFailureMessage(itemFailure) : "",
         };
     });
 
@@ -26889,7 +27053,7 @@ function importJobToExtractionProgress(job, urls, isMenuExtract, options = {}) {
         defer_refresh: Boolean(options.deferRefresh),
         status: completed ? "complete" : failed ? "failed" : cancelled ? "cancelled" : "running",
         extraction_mode: isMenuExtract ? "menu_extract" : "recipe",
-        total: sourceUrls.length,
+        total: sourceRecords.length,
         percent: Math.max(0, Math.min(100, Number((job && job.progress_percent) || 0))),
         summary,
         menu_activity: menuActivity,
@@ -27201,6 +27365,9 @@ const MENU_RECIPE_CHECKLIST_GROUPS = [
 function buildExtractionSourceProgressRow(item, index) {
     const row = document.createElement("div");
     row.className = "bulk-progress-item";
+    if (item.failed || item.state === "failed") {
+        row.classList.add("failed");
+    }
 
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
@@ -27221,9 +27388,12 @@ function buildExtractionSourceProgressRow(item, index) {
     const text = document.createElement("a");
     text.className = "bulk-progress-text";
     text.classList.add("extract-url-progress-link");
-    text.href = item.url;
-    text.target = "_blank";
-    text.rel = "noopener noreferrer";
+    const href = String(item.url || item.recipe_url || "").trim();
+    if (href) {
+        text.href = href;
+        text.target = "_blank";
+        text.rel = "noopener noreferrer";
+    }
 
     if (item.state === "running") {
         text.classList.add("active");
@@ -27237,14 +27407,35 @@ function buildExtractionSourceProgressRow(item, index) {
         text.classList.add("cancelled");
     }
 
-    text.textContent = item.url;
+    if (item.failed || item.state === "failed") {
+        text.classList.add("failed");
+    }
+
+    text.textContent = item.label || item.url || item.recipe_url || "Menu item";
+    titleLine.appendChild(prefix);
+    titleLine.appendChild(text);
+
+    if (item.detail) {
+        const detail = document.createElement("span");
+        detail.className = "bulk-progress-source-detail";
+        detail.textContent = item.detail;
+        titleLine.appendChild(detail);
+    }
+
+    const failureMessage = item.failed_message || (item.failed || item.state === "failed" ? item.message : "");
+    const failureLabel = item.failed ? menuFailureLabel({ stage: item.failed_step }) : (item.state === "failed" ? "Failed" : "");
+    if (failureLabel) {
+        const failureFlag = document.createElement("span");
+        failureFlag.className = "bulk-progress-failure-flag";
+        failureFlag.textContent = failureLabel;
+        failureFlag.title = failureMessage || "This item failed during import.";
+        titleLine.appendChild(failureFlag);
+    }
 
     const reason = document.createElement("div");
     reason.className = "bulk-skip-reason";
-    reason.textContent = item.message || "waiting...";
+    reason.textContent = failureMessage || item.message || "waiting...";
 
-    titleLine.appendChild(prefix);
-    titleLine.appendChild(text);
     main.appendChild(titleLine);
     main.appendChild(reason);
     row.appendChild(checkbox);
@@ -27263,11 +27454,79 @@ function renderMenuRecipeProgressList(menuRecipes, progress) {
     return list;
 }
 
+function menuRecipeChecklistLabel(key) {
+    for (const group of MENU_RECIPE_CHECKLIST_GROUPS) {
+        const found = group.items.find(item => item.key === key);
+        if (found) {
+            return found.label;
+        }
+    }
+    return String(key || "").replace(/_/g, " ").trim();
+}
+
+function menuRecipeFailureFromProgress(recipe, progress) {
+    const recipeKeys = menuRecipeIdentityCandidates(
+        recipe && recipe.recipe_url,
+        recipe && recipe.recipe_name,
+        recipe && recipe.recipe_id
+    );
+    if (!recipeKeys.length || !progress || !Array.isArray(progress.urls)) {
+        return null;
+    }
+
+    for (const item of progress.urls) {
+        if (!item || !item.failed) {
+            continue;
+        }
+        const itemKeys = menuRecipeIdentityCandidates(item.recipe_url, item.url, item.label);
+        if (itemKeys.some(key => recipeKeys.includes(key))) {
+            return {
+                stage: item.failed_step || "",
+                error: item.failed_message || item.message || "This item failed during import.",
+            };
+        }
+    }
+    return null;
+}
+
+function menuRecipeFailureSummary(recipe, progress = null) {
+    if (!recipe || typeof recipe !== "object") {
+        return null;
+    }
+
+    if (recipe.failed || recipe.failed_step || recipe.failed_message || recipe.error) {
+        return {
+            stage: String(recipe.failed_step || recipe.stage || "").trim(),
+            error: String(recipe.failed_message || recipe.error || "This item failed during import.").trim(),
+        };
+    }
+
+    const progressFailure = menuRecipeFailureFromProgress(recipe, progress);
+    if (progressFailure) {
+        return progressFailure;
+    }
+
+    const errors = recipe.errors && typeof recipe.errors === "object" ? recipe.errors : {};
+    const errorEntry = Object.entries(errors).find(([_key, value]) => String(value || "").trim());
+    if (!errorEntry) {
+        return null;
+    }
+
+    return {
+        stage: menuRecipeChecklistLabel(errorEntry[0]),
+        error: String(errorEntry[1] || "This item failed during import.").trim(),
+    };
+}
+
 function renderMenuRecipeProgressCard(recipe, progress) {
     const card = document.createElement("article");
     card.className = "menu-recipe-progress-card";
     card.dataset.recipeId = recipe.recipe_id || "";
     card.dataset.recipeUrl = recipe.recipe_url || "";
+    const failureSummary = menuRecipeFailureSummary(recipe, progress);
+    if (failureSummary) {
+        card.classList.add("failed");
+    }
 
     const header = document.createElement("div");
     header.className = "menu-recipe-progress-header";
@@ -27283,6 +27542,14 @@ function renderMenuRecipeProgressCard(recipe, progress) {
 
     header.appendChild(title);
 
+    if (failureSummary) {
+        const failureFlag = document.createElement("span");
+        failureFlag.className = "menu-recipe-progress-failure-flag";
+        failureFlag.textContent = menuFailureLabel(failureSummary);
+        failureFlag.title = failureSummary.error || "This item failed during import.";
+        header.appendChild(failureFlag);
+    }
+
     if (recipe.menu_section) {
         const section = document.createElement("div");
         section.className = "menu-recipe-progress-section";
@@ -27291,6 +27558,13 @@ function renderMenuRecipeProgressCard(recipe, progress) {
     }
 
     card.appendChild(header);
+
+    if (failureSummary) {
+        const failure = document.createElement("div");
+        failure.className = "menu-recipe-progress-failure";
+        failure.textContent = failureSummary.error || "This item failed during import.";
+        card.appendChild(failure);
+    }
 
     if (recipe.extracted_description) {
         const description = document.createElement("div");

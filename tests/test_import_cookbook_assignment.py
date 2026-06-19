@@ -134,8 +134,14 @@ def test_menu_recipe_progress_checklist_static_hooks_are_present():
     assert 'checkbox.disabled = true' in script
     assert "/api/jobs/estimate-per-serving" in script
     assert "runMenuRecipeServingBasisEstimate" in script
+    assert "function menuFailureRecordsFromJob" in script
+    assert "function menuRecipeFailureSummary" in script
+    assert "bulk-progress-failure-flag" in script
+    assert "menu-recipe-progress-failure-flag" in script
     assert ".menu-recipe-progress-card" in css
     assert ".menu-recipe-check-badge" in css
+    assert ".bulk-progress-failure-flag" in css
+    assert ".menu-recipe-progress-failure-flag" in css
     assert "set_url_menu_recipes" in routes
     assert "update_menu_recipe_step" in routes
     assert "menu_recipe_progress_callback" in routes
