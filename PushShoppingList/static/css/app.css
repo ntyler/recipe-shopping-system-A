@@ -8508,7 +8508,7 @@ body {
 
         #currentRecipeUrlLogCard:not(.card-collapsed) > .recipe-url-log-header,
         #currentRecipeUrlLogCard.lazy-section-placeholder:not(.card-collapsed) > .recipe-url-log-toggle,
-        #jobActivitySection:not(.card-collapsed) > .job-activity-header,
+        #jobActivitySection > .job-activity-header,
         #cookbooksCard:not(.card-collapsed) > .cookbooks-toggle,
         #rulesCard:not(.card-collapsed) .rules-toggle {
             position: sticky;
@@ -8520,7 +8520,7 @@ body {
         }
 
         #currentRecipeUrlLogCard.lazy-section-placeholder:not(.card-collapsed) > .recipe-url-log-toggle:hover,
-        #jobActivitySection:not(.card-collapsed) > .job-activity-header:hover,
+        #jobActivitySection > .job-activity-header:hover,
         #cookbooksCard:not(.card-collapsed) > .cookbooks-toggle:hover,
         #rulesCard:not(.card-collapsed) .rules-toggle:hover {
             background: #161b1b;
@@ -8528,7 +8528,7 @@ body {
 
         #currentRecipeUrlLogCard:not(.card-collapsed) > .recipe-url-log-header,
         #currentRecipeUrlLogCard.lazy-section-placeholder:not(.card-collapsed) > .recipe-url-log-toggle,
-        #jobActivitySection:not(.card-collapsed) > .job-activity-header,
+        #jobActivitySection > .job-activity-header,
         #cookbooksCard:not(.card-collapsed) > .cookbooks-toggle,
         #rulesCard:not(.card-collapsed) .rules-toggle {
             border: 0;
@@ -20980,15 +20980,34 @@ img[data-deferred-src] {
         .job-activity-card {
             display: flex;
             flex-direction: column;
+            --job-activity-sticky-row-top: 56px;
         }
 
         .job-activity-header {
-            display: block;
+            display: flex;
+            align-items: stretch;
+            gap: 8px;
         }
 
         .job-activity-toggle {
+            flex-direction: column;
             justify-content: center;
             text-align: center;
+            gap: 3px;
+            min-height: 52px;
+            line-height: 1.2;
+        }
+
+        .job-activity-header-live {
+            display: block;
+            width: min(100%, 640px);
+            color: #bfdbfe;
+            font-size: 0.78rem;
+            font-weight: 700;
+            line-height: 1.25;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .job-activity-toolbar {
@@ -21048,6 +21067,7 @@ img[data-deferred-src] {
             display: flex;
             flex-direction: column;
             gap: 8px;
+            overflow: visible;
         }
 
         .job-activity-row {
@@ -21058,6 +21078,15 @@ img[data-deferred-src] {
             border: 1px solid #283241;
             border-radius: 8px;
             background: #111827;
+        }
+
+        .job-activity-row.job-activity-primary-active.job-activity-row-details-collapsed {
+            position: sticky;
+            top: var(--job-activity-sticky-row-top);
+            z-index: 1175;
+            border-color: #2563eb;
+            background: #101927;
+            box-shadow: 0 10px 22px rgba(0, 0, 0, 0.38);
         }
 
         .job-activity-row-main {
@@ -21150,6 +21179,17 @@ img[data-deferred-src] {
             font-weight: 800;
         }
 
+        .job-activity-row-details {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            min-width: 0;
+        }
+
+        .job-activity-row-details-collapsed .job-activity-row-details {
+            display: none;
+        }
+
         .job-activity-sources {
             display: flex;
             flex-direction: column;
@@ -21238,12 +21278,29 @@ img[data-deferred-src] {
         .job-activity-actions {
             display: flex;
             align-items: flex-start;
+            flex-wrap: wrap;
             gap: 6px;
         }
 
         @media (max-width: 640px) {
             .job-activity-row {
                 grid-template-columns: 1fr;
+            }
+
+            .job-activity-card {
+                --job-activity-sticky-row-top: 66px;
+            }
+
+            .job-activity-header {
+                gap: 6px;
+            }
+
+            .job-activity-toggle {
+                min-height: 62px;
+            }
+
+            .job-activity-header-live {
+                white-space: normal;
             }
 
             .job-activity-toolbar {

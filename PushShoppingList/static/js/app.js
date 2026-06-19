@@ -245,6 +245,7 @@ function safeStorageGet(storage, key) {
 
 let jobActivityPollTimer = null;
 let lastJobActivityJobs = [];
+const jobActivityExpandedRows = new Set();
 const JOB_COMPLETION_DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
 const IMPORT_JOB_COMPLETION_TIMEOUT_MS = 0;
 
@@ -260,6 +261,11 @@ function jobActivityListElement() {
 function jobActivitySummaryElement() {
     const panel = jobActivityPanel();
     return panel ? panel.querySelector("[data-job-activity-summary]") : null;
+}
+
+function jobActivityHeaderSummaryElement() {
+    const panel = jobActivityPanel();
+    return panel ? panel.querySelector("[data-job-activity-header-summary]") : null;
 }
 
 function jobActivityClearButton() {
@@ -603,9 +609,34 @@ function jobActivitySort(jobs) {
     });
 }
 
+function jobActivityHeaderSummaryText(sortedJobs) {
+    const jobs = Array.isArray(sortedJobs) ? sortedJobs : [];
+    const activeJobs = jobs.filter(jobIsActive);
+
+    if (!activeJobs.length) {
+        const completedCount = jobs.filter(job => job.status === "completed").length;
+        const failedCount = jobs.filter(job => job.status === "failed").length;
+        if (!jobs.length) {
+            return "No active jobs.";
+        }
+        return `${completedCount} completed, ${failedCount} failed.`;
+    }
+
+    const primary = activeJobs[0] || {};
+    const total = Number(primary.total_items || 0);
+    const completed = Number(primary.completed_items || 0);
+    const countText = total ? ` ${completed}/${total}` : "";
+    const step = String(primary.current_step || "").trim();
+    const activeText = `${activeJobs.length} active ${activeJobs.length === 1 ? "job" : "jobs"}`;
+    const primaryText = `${jobTypeLabel(primary.job_type)}${countText}`;
+
+    return [activeText, primaryText, step].filter(Boolean).join(" | ");
+}
+
 function renderJobActivityPanel(jobs) {
     const list = jobActivityListElement();
     const summary = jobActivitySummaryElement();
+    const headerSummary = jobActivityHeaderSummaryElement();
     const panel = jobActivityPanel();
     const clearButton = jobActivityClearButton();
 
@@ -616,7 +647,13 @@ function renderJobActivityPanel(jobs) {
     const sortedJobs = jobActivitySort(jobs);
     const activeCount = sortedJobs.filter(jobIsActive).length;
     const finishedCount = sortedJobs.filter(jobIsFinished).length;
+    const visibleJobIds = new Set(sortedJobs.map(job => String(job.id || job.job_id || "").trim()).filter(Boolean));
     lastJobActivityJobs = sortedJobs;
+    Array.from(jobActivityExpandedRows).forEach(jobId => {
+        if (!visibleJobIds.has(jobId)) {
+            jobActivityExpandedRows.delete(jobId);
+        }
+    });
 
     if (clearButton) {
         clearButton.disabled = finishedCount === 0;
@@ -632,16 +669,19 @@ function renderJobActivityPanel(jobs) {
             ? `${activeCount} active job${activeCount === 1 ? "" : "s"} running.`
             : `${completedCount} completed, ${failedCount} failed in recent activity.`;
     }
+    if (headerSummary) {
+        headerSummary.textContent = jobActivityHeaderSummaryText(sortedJobs);
+    }
 
     if (!sortedJobs.length) {
         list.innerHTML = '<div class="job-activity-empty">No recent jobs.</div>';
         return;
     }
 
-    list.innerHTML = sortedJobs.map(renderJobActivityRow).join("");
+    list.innerHTML = sortedJobs.map((job, index) => renderJobActivityRow(job, index)).join("");
 }
 
-function renderJobActivityRow(job) {
+function renderJobActivityRow(job, index = 0) {
     const percent = Math.max(0, Math.min(100, Number(job.progress_percent || 0)));
     const total = Number(job.total_items || 0);
     const completed = Number(job.completed_items || 0);
@@ -656,6 +696,24 @@ function renderJobActivityRow(job) {
     const stageCountsHtml = renderJobStageCounts(job);
     const currentRecipeHtml = renderJobCurrentRecipe(job);
     const active = jobIsActive(job);
+    const sourceCount = jobSourceItems(job).length;
+    const jobId = String(job.id || job.job_id || "").trim();
+    const detailsCanCollapse = active || sourceCount > 8;
+    const detailsExpanded = !detailsCanCollapse || jobActivityExpandedRows.has(jobId);
+    const rowClasses = [
+        "job-activity-row",
+        `job-activity-${escapeAttribute(job.status || "unknown")}`,
+        active && index === 0 ? "job-activity-primary-active" : "",
+        detailsCanCollapse && !detailsExpanded ? "job-activity-row-details-collapsed" : "",
+    ].filter(Boolean).join(" ");
+    const detailsToggleButton = detailsCanCollapse
+        ? `<button type="button"
+                   class="job-activity-row-action job-activity-detail-toggle"
+                   aria-expanded="${detailsExpanded ? "true" : "false"}"
+                   onclick="return toggleJobActivityRowDetails(this)">
+               ${detailsExpanded ? "Hide Details" : "Show Details"}
+           </button>`
+        : "";
     const openProgressButton = jobCanOpenImportProgress(job)
         ? `<button type="button" class="job-activity-row-action" onclick="return openJobActivityImportProgress('${escapeAttribute(job.id || job.job_id || "")}')">Open Popup</button>`
         : "";
@@ -679,7 +737,7 @@ function renderJobActivityRow(job) {
         : "";
 
     return `
-        <article class="job-activity-row job-activity-${escapeAttribute(job.status || "unknown")}" data-job-id="${escapeAttribute(job.id || job.job_id || "")}">
+        <article class="${rowClasses}" data-job-id="${escapeAttribute(jobId)}">
             <div class="job-activity-row-main">
                 <div class="job-activity-row-title">
                     <span>${escapeHtml(jobTypeLabel(job.job_type))}</span>
@@ -688,27 +746,51 @@ function renderJobActivityRow(job) {
                 <div class="job-activity-step">${escapeHtml(job.current_step || "Queued")}</div>
                 ${currentRecipeHtml}
                 ${modelHtml}
-                ${workerHtml}
-                ${sourceHtml}
                 <div class="job-activity-progress" aria-label="${percent}% complete">
                     <span style="width: ${percent}%"></span>
                 </div>
                 <div class="job-activity-meta">
                     <span>${percent}%</span>
                     ${countText ? `<span>${escapeHtml(countText)}</span>` : ""}
+                    ${sourceCount ? `<span>${escapeHtml(String(sourceCount))} source${sourceCount === 1 ? "" : "s"}</span>` : ""}
                 </div>
-                ${stageCountsHtml}
                 ${error ? `<div class="job-activity-error">${escapeHtml(error)}</div>` : ""}
                 ${warningHtml}
-                ${linkHtml}
+                <div class="job-activity-row-details" data-job-activity-row-details>
+                    ${workerHtml}
+                    ${sourceHtml}
+                    ${stageCountsHtml}
+                    ${linkHtml}
+                </div>
             </div>
             <div class="job-activity-actions">
+                ${detailsToggleButton}
                 ${openProgressButton}
                 ${cancelButton}
                 ${retryButton}
             </div>
         </article>
     `;
+}
+
+function toggleJobActivityRowDetails(button) {
+    const row = button ? button.closest(".job-activity-row") : null;
+    const jobId = row ? String(row.dataset.jobId || "").trim() : "";
+    if (!row || !jobId) {
+        return false;
+    }
+
+    const collapsed = !row.classList.contains("job-activity-row-details-collapsed");
+    row.classList.toggle("job-activity-row-details-collapsed", collapsed);
+    button.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    button.textContent = collapsed ? "Show Details" : "Hide Details";
+
+    if (collapsed) {
+        jobActivityExpandedRows.delete(jobId);
+    } else {
+        jobActivityExpandedRows.add(jobId);
+    }
+    return false;
 }
 
 async function refreshJobActivityPanel(options = {}) {
