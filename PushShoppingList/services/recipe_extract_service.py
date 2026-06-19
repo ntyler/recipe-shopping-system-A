@@ -130,6 +130,8 @@ OPENAI_MENU_MODEL_DEFAULT = "gpt-5.5"
 OPENAI_MENU_MODEL_ENV_VAR = "OPENAI_MENU_MODEL"
 OPENAI_MENU_CLEANUP_MODEL_DEFAULT = "gpt-4o-mini"
 OPENAI_MENU_CLEANUP_MODEL_ENV_VAR = "OPENAI_MENU_CLEANUP_MODEL"
+OPENAI_MENU_FAILED_ITEM_MODEL_DEFAULT = "gpt-5.4-mini"
+OPENAI_MENU_FAILED_ITEM_MODEL_ENV_VAR = "OPENAI_MENU_FAILED_ITEM_MODEL"
 OPENAI_PING_TEXT_MODEL = os.getenv("OPENAI_PING_TEXT_MODEL", "gpt-4o-mini")
 MENU_ITEM_INFERENCE_WORKERS = _safe_int(
     os.getenv("MENU_ITEM_INFERENCE_WORKERS", "8"),
@@ -155,6 +157,7 @@ print(f"[Recipe AI] OPENAI_API_KEY present: {'yes' if bool(os.getenv('OPENAI_API
 print(f"[Recipe AI] Recipe model: {os.getenv('OPENAI_RECIPE_MODEL') or OPENAI_RECIPE_MODEL_DEFAULT}")
 print(f"[Recipe AI] Menu model: {os.getenv('OPENAI_MENU_MODEL') or OPENAI_MENU_MODEL_DEFAULT}")
 print(f"[Recipe AI] Menu cleanup model: {os.getenv('OPENAI_MENU_CLEANUP_MODEL') or OPENAI_MENU_CLEANUP_MODEL_DEFAULT}")
+print(f"[Recipe AI] Menu failed-item retry model: {os.getenv('OPENAI_MENU_FAILED_ITEM_MODEL') or OPENAI_MENU_FAILED_ITEM_MODEL_DEFAULT}")
 print(f"[Recipe AI] Vision model: {os.getenv('OPENAI_VISION_MODEL') or VISION_MODEL_DEFAULT}")
 MAX_PAGE_TEXT_CHARS = 35000
 MAX_SOCIAL_VIDEO_PROMPT_CHARS = 12000
@@ -326,6 +329,31 @@ def resolve_openai_model(purpose="recipe", preferred_model=None, fallback=False)
         return OpenAIModelResolution(
             model=OPENAI_MENU_CLEANUP_MODEL_DEFAULT,
             source=f"default:{OPENAI_MENU_CLEANUP_MODEL_DEFAULT}",
+            purpose=purpose,
+        )
+
+    if purpose == "menu_failed_item":
+        snapshot = model_snapshot_for_env(OPENAI_MENU_FAILED_ITEM_MODEL_ENV_VAR)
+        if snapshot:
+            return OpenAIModelResolution(
+                model=snapshot["model"],
+                source=snapshot["source"],
+                purpose=purpose,
+            )
+        env_model, env_source = model_value_for_env(
+            OPENAI_MENU_FAILED_ITEM_MODEL_ENV_VAR,
+            OPENAI_MENU_FAILED_ITEM_MODEL_DEFAULT,
+        )
+        env_model = clean_recipe_text(env_model)
+        if env_model:
+            return OpenAIModelResolution(
+                model=env_model,
+                source=f"{env_source}:{OPENAI_MENU_FAILED_ITEM_MODEL_ENV_VAR}",
+                purpose=purpose,
+            )
+        return OpenAIModelResolution(
+            model="",
+            source="disabled",
             purpose=purpose,
         )
 
@@ -749,6 +777,17 @@ def get_openai_client():
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), timeout=45)
 
     return client
+
+
+def openai_client_with_timeout(timeout_seconds):
+    try:
+        timeout = max(5, min(120, int(timeout_seconds or 45)))
+    except (TypeError, ValueError):
+        timeout = 45
+    try:
+        return get_openai_client().with_options(timeout=timeout)
+    except Exception:
+        return get_openai_client()
 
 
 def build_vision_debug(uploaded_file_path="", filename="", mime_type=""):
@@ -10297,6 +10336,10 @@ def menu_item_recipe_model_resolution():
     return resolve_openai_model("menu")
 
 
+def menu_failed_item_model_resolution():
+    return resolve_openai_model("menu_failed_item")
+
+
 def menu_model_progress_label(model_resolution):
     model_resolution = model_resolution or menu_item_recipe_model_resolution()
     model = str(getattr(model_resolution, "model", "") or resolve_menu_model()).strip()
@@ -10322,7 +10365,7 @@ def menu_item_inference_worker_count(total_items=None):
 def menu_item_batch_size_defaults(model_name=None):
     model = clean_recipe_text(model_name or menu_item_recipe_model_resolution().model).lower()
     if model == "gpt-4o-mini":
-        return 4, 8
+        return 2, 4
     return 6, 12
 
 
@@ -10341,13 +10384,25 @@ def menu_item_batch_size_limits():
     return min_items, max_items
 
 
-def menu_item_batch_target_chars():
-    model = clean_recipe_text(menu_item_recipe_model_resolution().model).lower()
+def menu_item_batch_target_chars(model_name=None):
+    model = clean_recipe_text(model_name or menu_item_recipe_model_resolution().model).lower()
     default_target = 6500 if model == "gpt-4o-mini" else 9000
     try:
         return max(3000, int(os.getenv("MENU_ITEM_BATCH_INFERENCE_TARGET_CHARS") or default_target))
     except (TypeError, ValueError):
         return default_target
+
+
+def menu_item_batch_openai_timeout_seconds():
+    return max(5, min(120, _safe_int(os.getenv("MENU_ITEM_BATCH_OPENAI_TIMEOUT_SECONDS", "18"), 18)))
+
+
+def menu_cleanup_openai_timeout_seconds():
+    return max(5, min(120, _safe_int(os.getenv("MENU_CLEANUP_OPENAI_TIMEOUT_SECONDS", "25"), 25)))
+
+
+def menu_failed_item_fallback_batch_size():
+    return max(1, min(8, _safe_int(os.getenv("MENU_FAILED_ITEM_FALLBACK_BATCH_SIZE", "4"), 4)))
 
 
 MENU_ITEM_BATCH_SPLITTABLE_ERROR_CODES = {
@@ -11023,8 +11078,13 @@ Menu items:
 """
 
 
-def send_menu_item_recipe_batch_prompt_to_openai(prompt_text, action_name="menu-item-recipe-batch-inference", user_id=None):
-    model_resolution = menu_item_recipe_model_resolution()
+def send_menu_item_recipe_batch_prompt_to_openai(
+    prompt_text,
+    action_name="menu-item-recipe-batch-inference",
+    user_id=None,
+    model_resolution=None,
+):
+    model_resolution = model_resolution or menu_item_recipe_model_resolution()
     payload, temperature_included, resolved_model = build_openai_chat_payload(
         model_resolution.model,
         action_name,
@@ -11047,10 +11107,11 @@ def send_menu_item_recipe_batch_prompt_to_openai(prompt_text, action_name="menu-
     print(
         f"[OpenAI] action={action_name} "
         f"model={resolved_model} model_source={model_resolution.source} "
-        f"temperature_included={temperature_included}"
+        f"temperature_included={temperature_included} "
+        f"timeout_seconds={menu_item_batch_openai_timeout_seconds()}"
     )
     response = throttled_chat_completion(
-        get_openai_client(),
+        openai_client_with_timeout(menu_item_batch_openai_timeout_seconds()),
         payload,
         action_name=action_name,
         model=resolved_model,
@@ -11082,14 +11143,15 @@ def _coerce_batch_inference_payload(payload):
     return {}
 
 
-def _infer_menu_item_recipe_batch_once(entries, user_id=None):
-    model_resolution = menu_item_recipe_model_resolution()
+def _infer_menu_item_recipe_batch_once(entries, user_id=None, model_resolution=None):
+    model_resolution = model_resolution or menu_item_recipe_model_resolution()
     action_name = "menu-item-recipe-batch-inference"
     try:
         response_text = send_menu_item_recipe_batch_prompt_to_openai(
             build_menu_item_recipe_batch_prompt(entries),
             action_name=action_name,
             user_id=user_id,
+            model_resolution=model_resolution,
         )
         payload = json.loads(clean_json_response(response_text))
         items = _coerce_batch_inference_payload(payload)
@@ -11208,17 +11270,17 @@ def menu_batch_result_can_retry(batch_result):
 
 def menu_item_batch_retry_config():
     try:
-        attempts = int(os.getenv("MENU_ITEM_BATCH_INFERENCE_RETRY_ATTEMPTS") or "2")
+        attempts = int(os.getenv("MENU_ITEM_BATCH_INFERENCE_RETRY_ATTEMPTS") or "1")
     except (TypeError, ValueError):
-        attempts = 2
+        attempts = 1
     try:
-        base_delay = float(os.getenv("MENU_ITEM_BATCH_INFERENCE_RETRY_BACKOFF_SECONDS") or "1.25")
+        base_delay = float(os.getenv("MENU_ITEM_BATCH_INFERENCE_RETRY_BACKOFF_SECONDS") or "0.5")
     except (TypeError, ValueError):
-        base_delay = 1.25
+        base_delay = 0.5
     try:
-        max_delay = float(os.getenv("MENU_ITEM_BATCH_INFERENCE_RETRY_MAX_BACKOFF_SECONDS") or "8")
+        max_delay = float(os.getenv("MENU_ITEM_BATCH_INFERENCE_RETRY_MAX_BACKOFF_SECONDS") or "2")
     except (TypeError, ValueError):
-        max_delay = 8
+        max_delay = 2
     attempts = max(1, min(5, attempts))
     base_delay = max(0, base_delay)
     max_delay = max(base_delay, max_delay)
@@ -11233,11 +11295,29 @@ def menu_item_batch_retry_delay(attempt_index, base_delay, max_delay):
     return min(max(0, delay), max(0, float(max_delay or 0)))
 
 
-def infer_menu_item_recipe_batch_once_with_retries(entries, user_id=None):
+def call_infer_menu_item_recipe_batch_once(entries, user_id=None, model_resolution=None):
+    try:
+        return _infer_menu_item_recipe_batch_once(
+            entries,
+            user_id=user_id,
+            model_resolution=model_resolution,
+        )
+    except TypeError as exc:
+        if "model_resolution" not in str(exc):
+            raise
+        # Some tests monkeypatch the older 2-arg shape.
+        return _infer_menu_item_recipe_batch_once(entries, user_id=user_id)
+
+
+def infer_menu_item_recipe_batch_once_with_retries(entries, user_id=None, model_resolution=None):
     attempts, base_delay, max_delay = menu_item_batch_retry_config()
     last_result = {}
     for attempt_index in range(1, attempts + 1):
-        result = _infer_menu_item_recipe_batch_once(entries, user_id=user_id)
+        result = call_infer_menu_item_recipe_batch_once(
+            entries,
+            user_id=user_id,
+            model_resolution=model_resolution,
+        )
         last_result = result
         if result.get("ok") or attempt_index >= attempts or not menu_batch_result_can_retry(result):
             return result
@@ -11322,10 +11402,130 @@ def combine_menu_batch_results(results):
     }
 
 
-def infer_menu_item_recipe_batch(entries, user_id=None, _depth=0):
+def mark_menu_batch_missing_items(entries, result):
+    result = result if isinstance(result, dict) else {}
+    items = result.get("items") if isinstance(result.get("items"), dict) else {}
+    missing_entries = []
+    for entry in entries or []:
+        item_id = menu_batch_entry_item_id(entry)
+        if item_id and item_id in items:
+            continue
+        missing_entries.append(entry)
+
+    if not missing_entries:
+        result.setdefault("failures", {})
+        return result
+
+    result["ok"] = False
+    result.setdefault("error_code", "OPENAI_INCOMPLETE_RESPONSE")
+    result.setdefault("error_message", "Menu batch inference did not return every requested item.")
+    result["failures"] = menu_batch_failure_map(entries, result)
+    return result
+
+
+def menu_failed_item_fallback_is_available(primary_model_resolution=None):
+    fallback_resolution = menu_failed_item_model_resolution()
+    fallback_model = clean_recipe_text(getattr(fallback_resolution, "model", ""))
+    if not fallback_model:
+        return False, fallback_resolution
+
+    primary_model = clean_recipe_text(
+        getattr(primary_model_resolution, "model", "")
+        or menu_item_recipe_model_resolution().model
+    )
+    if primary_model and fallback_model.lower() == primary_model.lower():
+        return False, fallback_resolution
+
+    return True, fallback_resolution
+
+
+def menu_entries_for_failures(entries, failures):
+    failures = failures if isinstance(failures, dict) else {}
+    failed_ids = {clean_recipe_text(item_id) for item_id in failures.keys() if clean_recipe_text(item_id)}
+    if not failed_ids:
+        return []
+    failed_entries = []
+    for entry in entries or []:
+        item_id = menu_batch_entry_item_id(entry)
+        if item_id in failed_ids:
+            failed_entries.append(entry)
+    return failed_entries
+
+
+def chunk_menu_entries(entries, chunk_size):
+    chunk_size = max(1, int(chunk_size or 1))
     entries = [entry for entry in entries or [] if isinstance(entry, dict)]
+    for index in range(0, len(entries), chunk_size):
+        yield entries[index:index + chunk_size]
+
+
+def retry_menu_batch_failures_with_fallback(entries, result, user_id=None, primary_model_resolution=None):
+    result = result if isinstance(result, dict) else {}
+    failures = result.get("failures") if isinstance(result.get("failures"), dict) else {}
+    failed_entries = menu_entries_for_failures(entries, failures)
+    if not failed_entries:
+        return result
+
+    fallback_available, fallback_resolution = menu_failed_item_fallback_is_available(primary_model_resolution)
+    if not fallback_available:
+        print(
+            "[OpenAI] action=menu-item-recipe-failed-item-fallback_skipped "
+            f"failed_count={len(failed_entries)} "
+            f"primary_model={getattr(primary_model_resolution, 'model', '') or result.get('model') or ''} "
+            f"fallback_model={getattr(fallback_resolution, 'model', '') or 'disabled'}"
+        )
+        return result
+
+    failed_names = [
+        menu_batch_entry_item_name(entry)
+        for entry in failed_entries
+        if menu_batch_entry_item_name(entry)
+    ]
+    print(
+        "[OpenAI] action=menu-item-recipe-failed-item-fallback_start "
+        f"failed_count={len(failed_entries)} "
+        f"primary_model={getattr(primary_model_resolution, 'model', '') or result.get('model') or ''} "
+        f"fallback_model={fallback_resolution.model} fallback_source={fallback_resolution.source} "
+        f"item_names={json.dumps(failed_names[:20], ensure_ascii=True)}"
+    )
+
+    fallback_results = []
+    batch_size = menu_failed_item_fallback_batch_size()
+    for fallback_index, fallback_entries in enumerate(chunk_menu_entries(failed_entries, batch_size), start=1):
+        print(
+            "[OpenAI] action=menu-item-recipe-failed-item-fallback_batch_start "
+            f"batch_index={fallback_index} batch_size={len(fallback_entries)} "
+            f"fallback_model={fallback_resolution.model}"
+        )
+        fallback_results.append(
+            infer_menu_item_recipe_batch(
+                fallback_entries,
+                user_id=user_id,
+                _depth=1,
+                model_resolution=fallback_resolution,
+                allow_fallback=False,
+            )
+        )
+
+    fallback_combined = combine_menu_batch_results(fallback_results)
+    merged = combine_menu_batch_results([result, fallback_combined])
+    merged["fallback_used"] = True
+    merged["fallback_model"] = fallback_resolution.model
+    merged["fallback_model_source"] = fallback_resolution.source
+    merged["primary_model"] = getattr(primary_model_resolution, "model", "") or result.get("model", "")
+    print(
+        "[OpenAI] action=menu-item-recipe-failed-item-fallback_ready "
+        f"fallback_model={fallback_resolution.model} "
+        f"resolved_count={len(fallback_combined.get('items') or {})} "
+        f"remaining_failed_count={len(merged.get('failures') or {})}"
+    )
+    return merged
+
+
+def infer_menu_item_recipe_batch(entries, user_id=None, _depth=0, model_resolution=None, allow_fallback=True):
+    entries = [entry for entry in entries or [] if isinstance(entry, dict)]
+    model_resolution = model_resolution or menu_item_recipe_model_resolution()
     if not entries:
-        model_resolution = menu_item_recipe_model_resolution()
         return {
             "ok": True,
             "items": {},
@@ -11334,8 +11534,26 @@ def infer_menu_item_recipe_batch(entries, user_id=None, _depth=0):
             "model_source": model_resolution.source,
         }
 
-    result = infer_menu_item_recipe_batch_once_with_retries(entries, user_id=user_id)
-    if result.get("ok") or len(entries) <= 1 or not menu_batch_result_can_split(result):
+    result = infer_menu_item_recipe_batch_once_with_retries(
+        entries,
+        user_id=user_id,
+        model_resolution=model_resolution,
+    )
+    result = mark_menu_batch_missing_items(entries, result)
+    if not result.get("ok") and _depth == 0 and allow_fallback:
+        result = retry_menu_batch_failures_with_fallback(
+            entries,
+            result,
+            user_id=user_id,
+            primary_model_resolution=model_resolution,
+        )
+        if result.get("fallback_used"):
+            if result.get("failures"):
+                log_menu_item_batch_final_failures(entries, result)
+            return result
+
+    is_failed_item_fallback_run = getattr(model_resolution, "purpose", "") == "menu_failed_item"
+    if result.get("ok") or len(entries) <= 1 or is_failed_item_fallback_run or not menu_batch_result_can_split(result):
         if not result.get("ok"):
             result["failures"] = menu_batch_failure_map(entries, result)
             if _depth == 0:
@@ -11352,9 +11570,28 @@ def infer_menu_item_recipe_batch(entries, user_id=None, _depth=0):
         f"exception_type={result.get('exception_type') or 'n/a'} "
         f"model={result.get('model') or ''}"
     )
-    left = infer_menu_item_recipe_batch(entries[:midpoint], user_id=user_id, _depth=_depth + 1)
-    right = infer_menu_item_recipe_batch(entries[midpoint:], user_id=user_id, _depth=_depth + 1)
+    left = infer_menu_item_recipe_batch(
+        entries[:midpoint],
+        user_id=user_id,
+        _depth=_depth + 1,
+        model_resolution=model_resolution,
+        allow_fallback=allow_fallback,
+    )
+    right = infer_menu_item_recipe_batch(
+        entries[midpoint:],
+        user_id=user_id,
+        _depth=_depth + 1,
+        model_resolution=model_resolution,
+        allow_fallback=allow_fallback,
+    )
     combined = combine_menu_batch_results([left, right])
+    if _depth == 0 and combined.get("failures") and allow_fallback:
+        combined = retry_menu_batch_failures_with_fallback(
+            entries,
+            combined,
+            user_id=user_id,
+            primary_model_resolution=model_resolution,
+        )
     if _depth == 0 and combined.get("failures"):
         log_menu_item_batch_final_failures(entries, combined)
     return combined
@@ -11977,10 +12214,11 @@ def send_menu_cleanup_prompt_to_openai(prompt_text, action_name="menu-cleanup"):
     print(
         f"[OpenAI] action={action_name} "
         f"model={resolved_model} model_source={model_resolution.source} "
-        f"temperature_included={temperature_included}"
+        f"temperature_included={temperature_included} "
+        f"timeout_seconds={menu_cleanup_openai_timeout_seconds()}"
     )
     response = throttled_chat_completion(
-        get_openai_client(),
+        openai_client_with_timeout(menu_cleanup_openai_timeout_seconds()),
         payload,
         action_name=action_name,
         model=resolved_model,

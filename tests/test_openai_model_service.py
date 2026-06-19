@@ -14,6 +14,7 @@ ADMIN_USER = {"email": "ntylerbert@gmail.com"}
 EXPECTED_OPENAI_MODEL_ENV_VARS = {
     "OPENAI_MENU_MODEL",
     "OPENAI_MENU_CLEANUP_MODEL",
+    "OPENAI_MENU_FAILED_ITEM_MODEL",
     "OPENAI_VISION_MODEL",
     "OPENAI_RECIPE_MODEL",
     "OPENAI_COOKBOOK_ITEM_MODEL",
@@ -159,7 +160,7 @@ def test_save_models_updates_environment_and_local_env_file(monkeypatch, tmp_pat
     dashboard = models.chatgpt_models_dashboard_for_user(ADMIN_USER)
     rows = {row["env_var"]: row for row in dashboard["rows"]}
     assert rows["OPENAI_MENU_MODEL"]["model"] == "gpt-5.4-mini"
-    assert rows["OPENAI_MENU_MODEL"]["source"] == "environment"
+    assert rows["OPENAI_MENU_MODEL"]["source"] == "admin override"
 
 
 def test_model_value_syncs_changed_override_file_without_restart(monkeypatch, tmp_path):
@@ -185,10 +186,10 @@ def test_model_value_syncs_changed_override_file_without_restart(monkeypatch, tm
     rows = {row["env_var"]: row for row in dashboard["rows"]}
 
     assert model == "gpt-4o-mini"
-    assert source == "environment"
+    assert source == "admin override"
     assert os.environ["OPENAI_MENU_MODEL"] == "gpt-4o-mini"
     assert rows["OPENAI_MENU_MODEL"]["model"] == "gpt-4o-mini"
-    assert rows["OPENAI_MENU_MODEL"]["source"] == "environment"
+    assert rows["OPENAI_MENU_MODEL"]["source"] == "admin override"
 
 
 def test_lowest_viable_model_refresh_updates_recommended_mappings(monkeypatch, tmp_path):

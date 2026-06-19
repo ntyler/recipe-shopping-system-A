@@ -902,12 +902,17 @@ def test_menu_inference_batches_use_smaller_gpt_4o_mini_defaults(monkeypatch):
 
     batches = recipe_extract_service.menu_inference_batches(entries)
 
-    assert recipe_extract_service.menu_item_batch_size_limits() == (4, 8)
-    assert [len(batch) for batch in batches] == [8, 8, 1]
+    assert recipe_extract_service.menu_item_batch_size_limits() == (2, 4)
+    assert [len(batch) for batch in batches] == [4, 4, 4, 4, 1]
 
 
 def test_menu_batch_inference_splits_timeout_and_combines_results(monkeypatch):
     monkeypatch.setenv("MENU_ITEM_BATCH_INFERENCE_RETRY_ATTEMPTS", "1")
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "menu_failed_item_model_resolution",
+        lambda: recipe_extract_service.OpenAIModelResolution("", "disabled", "menu_failed_item"),
+    )
     entries = [
         {
             "recipe_url": f"https://example.com/menu?menu_item={index}",
@@ -959,6 +964,80 @@ def test_menu_batch_inference_splits_timeout_and_combines_results(monkeypatch):
     assert result["failures"] == {}
     assert [call["size"] for call in calls] == [4, 2, 1, 1, 2, 1, 1]
     assert all(call["user_id"] == "owner" for call in calls)
+
+
+def test_menu_batch_inference_uses_failed_item_fallback_model(monkeypatch, capsys):
+    monkeypatch.setenv("MENU_ITEM_BATCH_INFERENCE_RETRY_ATTEMPTS", "1")
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "menu_item_recipe_model_resolution",
+        lambda: recipe_extract_service.OpenAIModelResolution("gpt-4o-mini", "test:OPENAI_MENU_MODEL", "menu"),
+    )
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "menu_failed_item_model_resolution",
+        lambda: recipe_extract_service.OpenAIModelResolution(
+            "gpt-5.4-mini",
+            "test:OPENAI_MENU_FAILED_ITEM_MODEL",
+            "menu_failed_item",
+        ),
+    )
+    entries = [
+        {
+            "recipe_url": f"https://example.com/menu?menu_item={index}",
+            "menu_item": {
+                "menu_item_id": f"item-{index}",
+                "item_name": f"Item {index}",
+                "menu_section": "Entrees",
+            },
+        }
+        for index in range(2)
+    ]
+    calls = []
+
+    def fake_once(batch, user_id=None, model_resolution=None):
+        model = getattr(model_resolution, "model", "gpt-4o-mini")
+        calls.append({"model": model, "size": len(batch), "ids": [entry["menu_item"]["menu_item_id"] for entry in batch]})
+        if model == "gpt-5.4-mini":
+            return {
+                "ok": True,
+                "items": {
+                    entry["menu_item"]["menu_item_id"]: {
+                        "predicted_ingredients": [{"ingredient": entry["menu_item"]["item_name"]}],
+                    }
+                    for entry in batch
+                },
+                "failures": {},
+                "model": model,
+                "model_source": "test:OPENAI_MENU_FAILED_ITEM_MODEL",
+            }
+        return {
+            "ok": False,
+            "items": {},
+            "failures": {},
+            "error_code": "OPENAI_TIMEOUT",
+            "error_message": "Vision AI request timed out.",
+            "technical_message": "Request timed out.",
+            "exception_type": "APITimeoutError",
+            "model": model,
+            "model_source": "test:OPENAI_MENU_MODEL",
+        }
+
+    monkeypatch.setattr(recipe_extract_service, "_infer_menu_item_recipe_batch_once", fake_once)
+
+    result = recipe_extract_service.infer_menu_item_recipe_batch(entries, user_id="owner")
+    output = capsys.readouterr().out
+
+    assert result["ok"] is True
+    assert result["fallback_used"] is True
+    assert result["fallback_model"] == "gpt-5.4-mini"
+    assert sorted(result["items"]) == ["item-0", "item-1"]
+    assert calls == [
+        {"model": "gpt-4o-mini", "size": 2, "ids": ["item-0", "item-1"]},
+        {"model": "gpt-5.4-mini", "size": 2, "ids": ["item-0", "item-1"]},
+    ]
+    assert "action=menu-item-recipe-failed-item-fallback_start" in output
+    assert "action=menu-item-recipe-failed-item-fallback_ready" in output
 
 
 def test_menu_batch_inference_retries_with_backoff_before_success(monkeypatch):
