@@ -323,6 +323,8 @@ def test_menu_generate_job_runs_decide_all_categories_after_generation(monkeypat
     monkeypatch.setattr(recipe_routes, "add_items", lambda ingredients: None)
     monkeypatch.setattr(recipe_routes, "save_ingredients_for_recipe", lambda url, ingredients, result: None)
     monkeypatch.setattr(recipe_routes, "save_recipe_url_name", lambda url, name: None)
+    monkeypatch.setattr("PushShoppingList.services.recipe_ingredient_service.save_ingredients_for_recipes", lambda records: None)
+    monkeypatch.setattr("PushShoppingList.services.recipe_url_service.save_recipe_url_names", lambda records: None)
     monkeypatch.setattr(recipe_routes, "record_recipe_import_activity", lambda *args, **kwargs: None)
     monkeypatch.setattr(recipe_extract_service, "menu_inference_batches", lambda entries: [entries])
     monkeypatch.setattr(cookbook_service, "cookbook_recipe_assignment_for_url", lambda url: {
@@ -409,6 +411,7 @@ def test_menu_generate_job_finishes_all_nutrition_before_categories(monkeypatch,
         },
     }
     events = []
+    ingredient_save_batches = []
 
     monkeypatch.setattr(recipe_routes, "load_editable_recipe", lambda url: {"recipe": stubs[url]})
     monkeypatch.setattr(
@@ -451,6 +454,11 @@ def test_menu_generate_job_finishes_all_nutrition_before_categories(monkeypatch,
     monkeypatch.setattr(recipe_routes, "add_items", lambda ingredients: None)
     monkeypatch.setattr(recipe_routes, "save_ingredients_for_recipe", lambda url, ingredients, result: None)
     monkeypatch.setattr(recipe_routes, "save_recipe_url_name", lambda url, name: None)
+    monkeypatch.setattr(
+        "PushShoppingList.services.recipe_ingredient_service.save_ingredients_for_recipes",
+        lambda records: ingredient_save_batches.append([record["url"] for record in records]),
+    )
+    monkeypatch.setattr("PushShoppingList.services.recipe_url_service.save_recipe_url_names", lambda records: None)
     monkeypatch.setattr(recipe_routes, "record_recipe_import_activity", lambda *args, **kwargs: None)
     monkeypatch.setattr(cookbook_service, "cookbook_recipe_assignment_for_url", lambda url: {
         "cookbook_id": "cb1",
@@ -491,6 +499,7 @@ def test_menu_generate_job_finishes_all_nutrition_before_categories(monkeypatch,
     ]
     assert finished["result_payload"]["nutrition_completed"] == 2
     assert finished["result_payload"]["category_success_count"] == 2
+    assert ingredient_save_batches == [recipe_urls]
 
 
 def test_menu_generate_job_keeps_partial_batch_predictions(monkeypatch, tmp_path):
@@ -562,6 +571,11 @@ def test_menu_generate_job_keeps_partial_batch_predictions(monkeypatch, tmp_path
     monkeypatch.setattr(recipe_routes, "add_items", lambda ingredients: None)
     monkeypatch.setattr(recipe_routes, "save_ingredients_for_recipe", lambda url, ingredients, result: saved_urls.append(url))
     monkeypatch.setattr(recipe_routes, "save_recipe_url_name", lambda url, name: None)
+    monkeypatch.setattr(
+        "PushShoppingList.services.recipe_ingredient_service.save_ingredients_for_recipes",
+        lambda records: saved_urls.extend(record["url"] for record in records),
+    )
+    monkeypatch.setattr("PushShoppingList.services.recipe_url_service.save_recipe_url_names", lambda records: None)
     monkeypatch.setattr(recipe_routes, "record_recipe_import_activity", lambda *args, **kwargs: None)
     monkeypatch.setattr(recipe_extract_service, "menu_inference_batches", lambda entries: [entries])
     monkeypatch.setattr(cookbook_service, "cookbook_recipe_assignment_for_url", lambda url: {
@@ -688,6 +702,11 @@ def test_menu_generate_job_predicts_batches_in_parallel(monkeypatch, tmp_path):
     monkeypatch.setattr(recipe_routes, "add_items", lambda ingredients: None)
     monkeypatch.setattr(recipe_routes, "save_ingredients_for_recipe", lambda url, ingredients, result: saved_urls.append(url))
     monkeypatch.setattr(recipe_routes, "save_recipe_url_name", lambda url, name: None)
+    monkeypatch.setattr(
+        "PushShoppingList.services.recipe_ingredient_service.save_ingredients_for_recipes",
+        lambda records: saved_urls.extend(record["url"] for record in records),
+    )
+    monkeypatch.setattr("PushShoppingList.services.recipe_url_service.save_recipe_url_names", lambda records: None)
     monkeypatch.setattr(recipe_routes, "record_recipe_import_activity", lambda *args, **kwargs: None)
     monkeypatch.setattr(cookbook_service, "cookbook_recipe_assignment_for_url", lambda url: {
         "cookbook_id": "cb1",

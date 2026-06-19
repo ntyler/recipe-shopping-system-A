@@ -134,6 +134,33 @@ def save_recipe_url_name(url, name):
         return meta
 
 
+def save_recipe_url_names(records):
+    records = records if isinstance(records, list) else []
+    cleaned_records = []
+    for record in records:
+        record = record if isinstance(record, dict) else {}
+        url = str(record.get("url") or record.get("recipe_url") or "").strip()
+        name = str(record.get("name") or record.get("display_name") or record.get("recipe_title") or "").strip()
+        key = normalize_recipe_url_key(url)
+        if key:
+            cleaned_records.append((key, name))
+
+    if not cleaned_records:
+        return load_recipe_url_meta()
+
+    with url_file_lock:
+        meta = load_recipe_url_meta()
+        for key, name in cleaned_records:
+            recipe_meta = meta.get(key, {})
+            if name:
+                recipe_meta["name"] = name
+            else:
+                recipe_meta.pop("name", None)
+            meta[key] = recipe_meta
+        save_recipe_url_meta(meta)
+        return meta
+
+
 def save_recipe_url_quantity(url, quantity):
     key = normalize_recipe_url_key(url)
 

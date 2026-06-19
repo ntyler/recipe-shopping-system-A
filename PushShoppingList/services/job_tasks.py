@@ -308,9 +308,8 @@ def run_menu_generate_recipes_job(job_id, payload):
     from PushShoppingList.routes.recipe_routes import record_recipe_import_activity
     from PushShoppingList.routes.recipe_routes import resolve_menu_model
     from PushShoppingList.routes.recipe_routes import resolve_menu_model_source
-    from PushShoppingList.routes.recipe_routes import save_ingredients_for_recipe
-    from PushShoppingList.routes.recipe_routes import save_recipe_url_name
     from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
+    from PushShoppingList.services.recipe_ingredient_service import save_ingredients_for_recipes
     from PushShoppingList.services.recipe_extract_service import apply_menu_batch_inference_to_stub
     from PushShoppingList.services.recipe_extract_service import menu_batch_entry_item_name
     from PushShoppingList.services.recipe_extract_service import infer_menu_item_recipe_batch
@@ -318,6 +317,7 @@ def run_menu_generate_recipes_job(job_id, payload):
     from PushShoppingList.services.recipe_extract_service import menu_inference_batches
     from PushShoppingList.services.recipe_extract_service import menu_item_name_is_blank_divider
     from PushShoppingList.services.recipe_url_service import add_recipe_urls
+    from PushShoppingList.services.recipe_url_service import save_recipe_url_names
     from PushShoppingList.services.storage_service import active_user_id
     from PushShoppingList.services.cookbook_service import cookbook_recipe_assignment_for_url
 
@@ -502,6 +502,10 @@ def run_menu_generate_recipes_job(job_id, payload):
         nonlocal completed_batches
         nonlocal failed_items
 
+        batch_ingredient_records = []
+        batch_name_records = []
+        batch_recipe_urls = []
+        batch_shopping_items = []
         batch_result = batch_result if isinstance(batch_result, dict) else {}
         result_items = batch_result.get("items") if isinstance(batch_result.get("items"), dict) else {}
         failure_items = batch_result.get("failures") if isinstance(batch_result.get("failures"), dict) else {}
@@ -629,13 +633,19 @@ def run_menu_generate_recipes_job(job_id, payload):
                 continue
 
             ingredients = result.get("ingredients") if isinstance(result.get("ingredients"), list) else []
-            with workspace_write_lock("recipe-imports"):
-                if ingredients:
-                    add_items(ingredients)
-                    save_ingredients_for_recipe(recipe_url, ingredients, result)
-                if result.get("display_name") or result.get("recipe_title"):
-                    save_recipe_url_name(recipe_url, result.get("display_name") or result.get("recipe_title"))
-                add_recipe_urls([recipe_url])
+            if ingredients:
+                batch_shopping_items.extend(ingredients)
+                batch_ingredient_records.append({
+                    "url": recipe_url,
+                    "ingredients": ingredients,
+                    "recipe_metadata": result,
+                })
+            if result.get("display_name") or result.get("recipe_title"):
+                batch_name_records.append({
+                    "url": recipe_url,
+                    "name": result.get("display_name") or result.get("recipe_title"),
+                })
+            batch_recipe_urls.append(recipe_url)
 
             generated_recipe_results[recipe_url] = result
             print(
@@ -643,6 +653,16 @@ def run_menu_generate_recipes_job(job_id, payload):
                 f"title={import_recipe_title(result, recipe_url)} url={recipe_url}"
             )
             created_urls.append(recipe_url)
+
+        if batch_recipe_urls:
+            with workspace_write_lock("recipe-imports"):
+                if batch_shopping_items:
+                    add_items(batch_shopping_items)
+                if batch_ingredient_records:
+                    save_ingredients_for_recipes(batch_ingredient_records)
+                if batch_name_records:
+                    save_recipe_url_names(batch_name_records)
+                add_recipe_urls(batch_recipe_urls)
 
         completed_batches += 1
 

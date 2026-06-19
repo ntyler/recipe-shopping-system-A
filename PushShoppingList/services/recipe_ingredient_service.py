@@ -37,15 +37,10 @@ def save_recipe_ingredients(data):
     )
 
 
-def save_ingredients_for_recipe(url, ingredients, recipe_metadata=None):
+def recipe_ingredients_record(url, ingredients, recipe_metadata=None, existing=None, user=None):
     url = str(url or "").strip()
-
-    if not url:
-        return
-
     recipe_metadata = recipe_metadata if isinstance(recipe_metadata, dict) else {}
-    data = load_recipe_ingredients()
-    existing = data.get(normalize_recipe_url_key(url), {})
+    existing = existing if isinstance(existing, dict) else {}
     cover_image = recipe_metadata.get("cover_image") or existing.get("cover_image")
     record = {
         "url": url,
@@ -67,12 +62,57 @@ def save_ingredients_for_recipe(url, ingredients, recipe_metadata=None):
         record["cover_image"] = cover_image
 
     # This metadata makes imported ingredient records auditable inside user-scoped storage.
-    user = current_public_user()
     if user:
         record["owner_user_id"] = user.get("user_id", "")
         record["owner_username"] = user.get("username", "")
 
-    data[normalize_recipe_url_key(url)] = record
+    return record
+
+
+def save_ingredients_for_recipe(url, ingredients, recipe_metadata=None):
+    url = str(url or "").strip()
+
+    if not url:
+        return
+
+    data = load_recipe_ingredients()
+    key = normalize_recipe_url_key(url)
+    data[key] = recipe_ingredients_record(
+        url,
+        ingredients,
+        recipe_metadata,
+        existing=data.get(key, {}),
+        user=current_public_user(),
+    )
+    save_recipe_ingredients(data)
+
+
+def save_ingredients_for_recipes(records):
+    records = records if isinstance(records, list) else []
+    cleaned_records = []
+    for record in records:
+        record = record if isinstance(record, dict) else {}
+        url = str(record.get("url") or record.get("recipe_url") or "").strip()
+        if not url:
+            continue
+        ingredients = record.get("ingredients") if isinstance(record.get("ingredients"), list) else []
+        recipe_metadata = record.get("recipe_metadata") if isinstance(record.get("recipe_metadata"), dict) else {}
+        cleaned_records.append((url, ingredients, recipe_metadata))
+
+    if not cleaned_records:
+        return
+
+    data = load_recipe_ingredients()
+    user = current_public_user()
+    for url, ingredients, recipe_metadata in cleaned_records:
+        key = normalize_recipe_url_key(url)
+        data[key] = recipe_ingredients_record(
+            url,
+            ingredients,
+            recipe_metadata,
+            existing=data.get(key, {}),
+            user=user,
+        )
     save_recipe_ingredients(data)
 
 
