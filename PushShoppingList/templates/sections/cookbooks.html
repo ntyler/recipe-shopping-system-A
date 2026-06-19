@@ -193,6 +193,39 @@
                                                     </div>
                                                 {% endif %}
                                                 {% if cookbook.recipes %}
+                                                    <div class="overflow-menu-section cookbook-selection-menu-section">
+                                                        <div class="overflow-menu-section-title">Selection</div>
+                                                        <button type="button"
+                                                                data-cookbook-id="{{ cookbook.id }}"
+                                                                onclick="return setAllCookbookRecipesSelected(this, true, event);"
+                                                                aria-label="Select all recipes in {{ cookbook.name }}">
+                                                            Select all recipes
+                                                        </button>
+                                                        <button type="button"
+                                                                data-cookbook-id="{{ cookbook.id }}"
+                                                                onclick="return setAllCookbookRecipesSelected(this, false, event);"
+                                                                aria-label="Clear selected recipes in {{ cookbook.name }}">
+                                                            Clear selected recipes
+                                                        </button>
+                                                        {% if cookbook_view and cookbook_view.cookbooks | length > 1 %}
+                                                            <div class="overflow-menu-section-title">Move Selected To</div>
+                                                            {% for target_cookbook in cookbook_view.cookbooks %}
+                                                                {% if target_cookbook.id != cookbook.id %}
+                                                                    <button type="button"
+                                                                            data-source-cookbook-id="{{ cookbook.id }}"
+                                                                            data-target-cookbook-id="{{ target_cookbook.id }}"
+                                                                            data-target-cookbook-name="{{ target_cookbook.name }}"
+                                                                            data-target-cookbook-unclassified="{% if target_cookbook.is_unclassified %}1{% else %}0{% endif %}"
+                                                                            onclick="return moveSelectedCookbookRecipes(this, event);"
+                                                                            aria-label="Move selected recipes from {{ cookbook.name }} to {{ target_cookbook.name }}">
+                                                                        {{ target_cookbook.name }}
+                                                                    </button>
+                                                                {% endif %}
+                                                            {% endfor %}
+                                                        {% endif %}
+                                                    </div>
+                                                {% endif %}
+                                                {% if cookbook.recipes %}
                                                     <div class="overflow-menu-section cookbook-sort-menu-section">
                                                         <div class="overflow-menu-section-title">Sort By</div>
                                                         <button type="button"
@@ -458,8 +491,9 @@
                                                                name="recipe_urls"
                                                                value="{{ recipe.url }}"
                                                                form="restoreCookbookRecipesForm"
+                                                               data-cookbook-recipe-checkbox
                                                                data-cookbook-restore-checkbox
-                                                               aria-label="Select {{ recipe.name }} for recipe log"
+                                                               aria-label="Select {{ recipe.name }}"
                                                                onclick="event.stopPropagation()">
                                                         <button type="button"
                                                                 class="recipe-url-drag-handle cookbook-recipe-drag-handle"

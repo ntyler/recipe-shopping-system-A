@@ -6773,7 +6773,9 @@ function setCookbookStatus(message, isError = false) {
 }
 
 function selectedCookbookRecipeCount() {
-    return document.querySelectorAll("[data-cookbook-recipe-checkbox]:checked").length;
+    return uniqueRecipeUrls(Array.from(document.querySelectorAll("[data-cookbook-recipe-checkbox]:checked, [data-cookbook-restore-checkbox]:checked")).map(checkbox => {
+        return checkbox.value || (checkbox.dataset ? checkbox.dataset.recipeUrl || "" : "");
+    })).length;
 }
 
 function selectedCookbookRestoreCount() {
@@ -9619,16 +9621,139 @@ function isUnclassifiedCookbookAction(button) {
         || cookbookName === "unclassified";
 }
 
-function selectedCookbookRecipeUrlsForCard(button) {
-    const card = button ? button.closest("[data-cookbook-card]") : null;
+function cookbookRecipeSelectionCheckboxesForCard(control) {
+    const card = cookbookCardFromControl(control)
+        || (control && typeof control.closest === "function" ? control.closest("[data-cookbook-card]") : null);
 
     if (!card) {
         return [];
     }
 
-    return uniqueRecipeUrls(Array.from(card.querySelectorAll("[data-cookbook-restore-checkbox]:checked")).map(checkbox => {
+    return Array.from(card.querySelectorAll("[data-cookbook-recipe-checkbox], [data-cookbook-restore-checkbox]"))
+        .filter((checkbox, index, checkboxes) => {
+            return checkbox && !checkbox.disabled && checkboxes.indexOf(checkbox) === index;
+        });
+}
+
+function setAllCookbookRecipesSelected(button, selected = true, event = null) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const checkboxes = cookbookRecipeSelectionCheckboxesForCard(button);
+    const shouldSelect = Boolean(selected);
+
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = shouldSelect;
+    });
+
+    updateCookbookMoveButton();
+    updateCookbookRestoreButton();
+
+    if (checkboxes.length) {
+        setCookbookStatus(shouldSelect
+            ? `Selected ${checkboxes.length} recipe${checkboxes.length === 1 ? "" : "s"}.`
+            : "Cleared selected recipes.");
+    }
+
+    return false;
+}
+
+function selectedCookbookRecipeUrlsForCard(button) {
+    const card = cookbookCardFromControl(button)
+        || (button && typeof button.closest === "function" ? button.closest("[data-cookbook-card]") : null);
+
+    if (!card) {
+        return [];
+    }
+
+    return uniqueRecipeUrls(Array.from(card.querySelectorAll("[data-cookbook-recipe-checkbox]:checked, [data-cookbook-restore-checkbox]:checked")).map(checkbox => {
         return checkbox.value || (checkbox.dataset ? checkbox.dataset.recipeUrl || "" : "");
     }));
+}
+
+async function moveSelectedCookbookRecipes(button, event = null) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    if (!button) {
+        return false;
+    }
+
+    const targetCookbookId = button.dataset.targetCookbookId || "";
+    const targetCookbookName = button.dataset.targetCookbookName || "selected cookbook";
+    const selectedUrls = selectedCookbookRecipeUrlsForCard(button);
+
+    if (!targetCookbookId) {
+        setCookbookStatus("Choose a cookbook before moving selected recipes.", true);
+        return false;
+    }
+
+    if (!selectedUrls.length) {
+        window.alert(`Select at least one recipe to move to ${targetCookbookName}.`);
+        return false;
+    }
+
+    const originalText = button.textContent || "";
+    const formData = new FormData();
+    selectedUrls.forEach(url => formData.append("recipe_urls", url));
+    formData.set("cookbook_id", targetCookbookId);
+
+    try {
+        button.disabled = true;
+        button.textContent = "Moving...";
+        closeRecipeEditRowMenus();
+        setCookbookStatus(`Moving ${selectedUrls.length} selected recipe${selectedUrls.length === 1 ? "" : "s"} to ${targetCookbookName}...`);
+
+        try {
+            await submitCookbookApi("/api/cookbooks/move_recipes", formData);
+        } catch (err) {
+            const isOverwriteConflict = err.data && err.data.conflict === "cookbook_recipe_exists";
+
+            if (!isOverwriteConflict) {
+                throw err;
+            }
+
+            const shouldOverwrite = await promptCookbookOverwrite(err.data.conflicts || [], targetCookbookName);
+
+            if (!shouldOverwrite) {
+                setCookbookStatus("Move canceled.");
+                return false;
+            }
+
+            formData.set("overwrite_existing", "1");
+            button.textContent = "Overwriting...";
+            setCookbookStatus(`Overwriting selected recipe${selectedUrls.length === 1 ? "" : "s"} in ${targetCookbookName}...`);
+            await submitCookbookApi("/api/cookbooks/move_recipes", formData);
+        }
+
+        await refreshStoreMarkup({
+            cacheBust: true,
+            requireRecipeLog: true,
+            scrollX: window.scrollX,
+            scrollY: window.scrollY,
+        });
+        showRecipeQuantityUpdatedMessage(
+            "",
+            "",
+            "",
+            `${selectedUrls.length} selected recipe${selectedUrls.length === 1 ? "" : "s"} moved to ${targetCookbookName}.`
+        );
+    } catch (err) {
+        console.warn("Unable to move selected cookbook recipes.", err);
+        setCookbookStatus(err.message || "Unable to move selected recipes.", true);
+        window.alert(err.message || "Unable to move selected recipes.");
+    } finally {
+        if (button.isConnected) {
+            button.disabled = false;
+            button.textContent = originalText || targetCookbookName;
+        }
+    }
+
+    return false;
 }
 
 async function deleteSelectedCookbookRecipes(button, options = {}) {

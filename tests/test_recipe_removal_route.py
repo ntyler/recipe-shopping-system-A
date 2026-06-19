@@ -537,6 +537,59 @@ def test_fetch_remove_selected_cookbook_recipes_reuses_batch_removal(monkeypatch
     ]
 
 
+def test_fetch_move_selected_cookbook_recipes_reuses_bulk_move_route(monkeypatch, tmp_path):
+    app = create_app()
+    app.config.update(TESTING=True)
+    calls = []
+
+    def fake_move_recipes_to_cookbook(
+        cookbook_id,
+        recipe_urls,
+        recipe_rows,
+        overwrite_existing=False,
+        insert_before_recipe_url="",
+        insert_after_recipe_url="",
+    ):
+        calls.append({
+            "cookbook_id": cookbook_id,
+            "recipe_urls": list(recipe_urls),
+            "recipe_rows": recipe_rows,
+            "overwrite_existing": overwrite_existing,
+            "insert_before_recipe_url": insert_before_recipe_url,
+            "insert_after_recipe_url": insert_after_recipe_url,
+        })
+
+    monkeypatch.setattr(main_routes, "recipe_url_rows", lambda: ["stub-row"])
+    monkeypatch.setattr(main_routes, "recipe_view_rows", lambda rows: ["recipe-row"])
+    monkeypatch.setattr(main_routes, "move_recipes_to_cookbook", fake_move_recipes_to_cookbook)
+
+    with app.test_client() as client:
+        configure_signed_in_user(monkeypatch, tmp_path, client)
+        response = client.post(
+            "/api/cookbooks/move_recipes",
+            data={
+                "cookbook_id": "dinner",
+                "recipe_urls": [
+                    "https://example.com/chili",
+                    "https://example.com/soup",
+                ],
+                "overwrite_existing": "1",
+            },
+            headers={"X-Requested-With": "fetch"},
+        )
+
+    assert response.status_code == 200
+    assert response.get_json() == {"ok": True}
+    assert calls == [{
+        "cookbook_id": "dinner",
+        "recipe_urls": ["https://example.com/chili", "https://example.com/soup"],
+        "recipe_rows": ["recipe-row"],
+        "overwrite_existing": True,
+        "insert_before_recipe_url": "",
+        "insert_after_recipe_url": "",
+    }]
+
+
 def test_fetch_purge_selected_cookbook_recipes_reuses_recipe_cleanup(monkeypatch, tmp_path):
     app = create_app()
     app.config.update(TESTING=True)

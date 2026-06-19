@@ -159,6 +159,33 @@ def test_cookbook_submenu_has_recipe_sort_controls():
     assert "returned to default order" in script
 
 
+def test_cookbook_submenu_has_selection_and_bulk_move_controls():
+    template = read_text("PushShoppingList/templates/sections/cookbooks.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+
+    menu_start = template.index('<div class="recipe-edit-row-menu cookbook-card-menu" hidden>')
+    browser_start = template.index('<div class="cookbook-menu-browser"', menu_start)
+    cookbook_menu_block = template[menu_start:browser_start]
+
+    assert '<div class="overflow-menu-section cookbook-selection-menu-section">' in cookbook_menu_block
+    assert cookbook_menu_block.index("Menu AI") < cookbook_menu_block.index("Selection")
+    assert cookbook_menu_block.index("Selection") < cookbook_menu_block.index("Sort By")
+    assert "Select all recipes" in cookbook_menu_block
+    assert "Clear selected recipes" in cookbook_menu_block
+    assert "Move Selected To" in cookbook_menu_block
+    assert "setAllCookbookRecipesSelected(this, true, event)" in cookbook_menu_block
+    assert "setAllCookbookRecipesSelected(this, false, event)" in cookbook_menu_block
+    assert "moveSelectedCookbookRecipes(this, event)" in cookbook_menu_block
+    assert 'data-target-cookbook-id="{{ target_cookbook.id }}"' in cookbook_menu_block
+    assert "data-cookbook-recipe-checkbox" in template
+    assert 'aria-label="Select {{ recipe.name }}"' in template
+    assert "function cookbookRecipeSelectionCheckboxesForCard" in script
+    assert "function setAllCookbookRecipesSelected" in script
+    assert "function moveSelectedCookbookRecipes" in script
+    assert 'submitCookbookApi("/api/cookbooks/move_recipes", formData)' in script
+    assert "promptCookbookOverwrite(err.data.conflicts || [], targetCookbookName)" in script
+
+
 def test_cookbook_recipe_submenu_has_menu_ai_controls_before_recipe_actions():
     template = read_text("PushShoppingList/templates/sections/cookbooks.html")
     script = read_text("PushShoppingList/static/js/app.js")
