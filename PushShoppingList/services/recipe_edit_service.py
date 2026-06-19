@@ -916,6 +916,107 @@ def split_recipe_menu_text_list(value):
     return values
 
 
+def editable_menu_source_option_value(restaurant_id="", menu_id=""):
+    restaurant_id = clean_recipe_menu_text(restaurant_id)
+    menu_id = clean_recipe_menu_text(menu_id)
+    return f"{restaurant_id}|{menu_id}"
+
+
+def editable_menu_source_option_label(restaurant, menu):
+    restaurant = restaurant if isinstance(restaurant, dict) else {}
+    menu = menu if isinstance(menu, dict) else {}
+    name = first_recipe_menu_text(
+        restaurant.get("restaurant_name"),
+        menu.get("menu_title"),
+        "Restaurant Menu",
+    )
+    detail = first_recipe_menu_text(
+        menu.get("source_url"),
+        restaurant.get("source_menu_url"),
+        restaurant.get("full_address"),
+        restaurant.get("address_line"),
+        menu.get("menu_title"),
+    )
+    if detail and detail != name:
+        return f"{name} - {detail}"
+    return name
+
+
+def editable_menu_source_option_from_records(restaurant, menu):
+    restaurant = restaurant if isinstance(restaurant, dict) else {}
+    menu = menu if isinstance(menu, dict) else {}
+    restaurant_id = clean_recipe_menu_text(
+        restaurant.get("id")
+        or menu.get("restaurant_id")
+    )
+    menu_id = clean_recipe_menu_text(menu.get("id"))
+    source_menu_url = first_recipe_menu_text(menu.get("source_url"), restaurant.get("source_menu_url"))
+
+    if not restaurant_id and not menu_id:
+        return {}
+
+    return {
+        "value": editable_menu_source_option_value(restaurant_id, menu_id),
+        "restaurant_id": restaurant_id,
+        "menu_id": menu_id,
+        "label": editable_menu_source_option_label(restaurant, menu),
+        "menu_title": clean_recipe_menu_text(menu.get("menu_title")),
+        "restaurant_name": clean_recipe_menu_text(restaurant.get("restaurant_name")),
+        "restaurant_website_url": clean_recipe_menu_text(restaurant.get("restaurant_website_url")),
+        "source_menu_url": source_menu_url,
+        "restaurant_cuisine_tags": recipe_menu_text_list_for_editor(restaurant.get("cuisine_tags")),
+        "restaurant_phone": clean_recipe_menu_text(restaurant.get("phone")),
+        "restaurant_address": first_recipe_menu_text(
+            restaurant.get("full_address"),
+            restaurant.get("address_line"),
+        ),
+        "restaurant_hours_text": clean_recipe_menu_text(restaurant.get("hours_text")),
+        "restaurant_current_status": clean_recipe_menu_text(restaurant.get("current_status")),
+        "restaurant_promotions": first_recipe_menu_text(
+            restaurant.get("rewards_text"),
+            recipe_menu_text_list_for_editor(restaurant.get("promotions")),
+        ),
+        "restaurant_online_payment_available": recipe_menu_bool_for_editor(
+            restaurant.get("online_payment_available") if restaurant else None,
+        ),
+        "restaurant_delivery_available": recipe_menu_bool_for_editor(
+            restaurant.get("delivery_available") if restaurant else None,
+        ),
+    }
+
+
+def editable_menu_source_options():
+    payload = menu_store_service.load_menu_store()
+    restaurants = {
+        restaurant.get("id"): restaurant
+        for restaurant in payload.get("restaurants", [])
+        if restaurant.get("id")
+    }
+    options = []
+    seen = set()
+
+    for menu in payload.get("menus", []):
+        restaurant = restaurants.get(menu.get("restaurant_id"), {})
+        option = editable_menu_source_option_from_records(restaurant, menu)
+        value = option.get("value")
+        if value and value not in seen:
+            options.append(option)
+            seen.add(value)
+
+    for restaurant in payload.get("restaurants", []):
+        option = editable_menu_source_option_from_records(restaurant, {})
+        value = option.get("value")
+        if value and value not in seen:
+            options.append(option)
+            seen.add(value)
+
+    return sorted(options, key=lambda option: (
+        recipe_menu_match_text(option.get("restaurant_name")),
+        recipe_menu_match_text(option.get("source_menu_url")),
+        recipe_menu_match_text(option.get("menu_title")),
+    ))
+
+
 def recipe_has_menu_metadata(recipe_data):
     recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
     metadata = recipe_menu_source_metadata(recipe_data)
@@ -1122,7 +1223,7 @@ def recipe_with_menu_metadata(recipe_data):
 
 def payload_includes_menu_metadata(payload):
     payload = payload if isinstance(payload, dict) else {}
-    return any(field in payload for field in RESTAURANT_MENU_METADATA_FIELDS)
+    return any(field in payload for field in (*RESTAURANT_MENU_METADATA_FIELDS, *RESTAURANT_MENU_RELATION_FIELDS))
 
 
 def apply_recipe_menu_metadata_to_store(recipe_data, payload):
@@ -1216,6 +1317,25 @@ def apply_recipe_menu_metadata_payload(recipe_data, payload):
     if not payload_includes_menu_metadata(payload):
         return recipe_data
 
+    previous_menu_id = recipe_menu_relation_value(recipe_data, "menu_id")
+    relation_values = {}
+    for field in RESTAURANT_MENU_RELATION_FIELDS:
+        if field not in payload:
+            continue
+        relation_values[field] = clean_recipe_menu_text(payload.get(field))
+        if relation_values[field]:
+            recipe_data[field] = relation_values[field]
+        else:
+            recipe_data.pop(field, None)
+
+    if (
+        "menu_id" in relation_values
+        and relation_values.get("menu_id") != previous_menu_id
+        and "menu_item_id" not in relation_values
+    ):
+        recipe_data.pop("menu_item_id", None)
+        recipe_data.pop("menu_section_id", None)
+
     payload_has_value = any(
         parse_recipe_menu_bool(payload.get(field)) is not None
         if field in {"restaurant_online_payment_available", "restaurant_delivery_available"}
@@ -1225,6 +1345,7 @@ def apply_recipe_menu_metadata_payload(recipe_data, payload):
     )
     if (
         not payload_has_value
+        and not any(relation_values.values())
         and not recipe_is_menu_derived(recipe_data)
         and not recipe_has_menu_metadata(recipe_data)
     ):
@@ -1271,6 +1392,11 @@ def load_editable_recipe(url):
     source_url = str(recipe_data.get("source_url") or url).strip() or url
     hydrate_source_pdf_assets_from_url(recipe_data, source_url)
     menu_metadata = editable_recipe_menu_metadata(recipe_data)
+    menu_source_options = editable_menu_source_options()
+    menu_source_value = editable_menu_source_option_value(
+        menu_metadata.get("restaurant_id"),
+        menu_metadata.get("menu_id"),
+    )
     log_recipe_pdf_fields("load_editable_recipe", recipe_data)
     meta = load_recipe_ingredients().get(normalize_recipe_url_key(url), {})
     cookbook_assignment = cookbook_recipe_assignment_for_url(url)
@@ -1363,6 +1489,8 @@ def load_editable_recipe(url):
             "menu_section_id": recipe_menu_relation_value(recipe_data, "menu_section_id"),
             "menu_item_id": recipe_menu_relation_value(recipe_data, "menu_item_id"),
             **menu_metadata,
+            "menu_source_value": menu_source_value,
+            "menu_source_options": menu_source_options,
             **category_metadata,
         },
         "food_rules": load_food_rules(),

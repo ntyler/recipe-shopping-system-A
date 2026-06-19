@@ -15430,6 +15430,10 @@ body {
     grid-column: 1 / -1;
 }
 
+.recipe-edit-menu-source-select-field select {
+    width: 100%;
+}
+
 .recipe-edit-mobile-pdf-actions {
     display: none;
     min-width: 0;

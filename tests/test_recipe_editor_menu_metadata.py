@@ -170,16 +170,24 @@ def test_recipe_editor_menu_metadata_panels_are_wired_before_amount():
     assert source_files_panel < restaurant_panel < menu_item_panel < recipe_amount
     assert "Restaurant / Menu Source Info" in template
     assert "Menu Item Details" in template
+    assert 'id="recipeEditMenuSourceSelect"' in template
+    assert 'id="recipeEditRestaurantId"' in template
+    assert 'id="recipeEditMenuId"' in template
+    assert "Custom Source" in template
     assert 'id="recipeEditRestaurantWebsiteUrlLink"' in template
     assert 'id="recipeEditSourceMenuUrlLink"' in template
     assert 'id="recipeEditMenuOrderUrlLink"' in template
     assert 'id="recipeEditMenuOrderUrl"' in template
     assert '<textarea id="recipeEditMenuDescription" rows="3">' in template
     assert "panel.hidden = !showPanels;" in js
+    assert "RECIPE_EDIT_MENU_RELATION_INPUT_IDS" in js
+    assert "function applyRecipeMenuSourceSelection" in js
+    assert "function populateRecipeMenuSourceSelect" in js
     assert "function recipeMenuMetadataPanelsVisible()" in js
     assert "return payload;" in js[js.index("function collectRecipeMenuMetadataPayload"):js.index("function currentRecipeEditorPdfFieldValues")]
     assert ".recipe-edit-menu-metadata-details" in css
     assert ".recipe-edit-menu-metadata-grid" in css
+    assert ".recipe-edit-menu-source-select-field" in css
 
 
 def test_menu_order_icon_hooks_and_row_data_are_present(monkeypatch):
@@ -345,12 +353,19 @@ def test_menu_batch_generation_preserves_editor_restaurant_metadata(monkeypatch,
 
 def test_menu_derived_recipe_loads_restaurant_and_menu_item_metadata(monkeypatch, tmp_path):
     configure_editor_recipe_storage(monkeypatch, tmp_path)
-    url, _detail = seed_menu_derived_recipe()
+    url, detail = seed_menu_derived_recipe()
 
     loaded = recipe_edit_service.load_editable_recipe(url)["recipe"]
 
     assert loaded["is_menu_derived"] is True
     assert loaded["menu_metadata_available"] is True
+    assert loaded["menu_source_value"] == f'{detail["restaurant"]["id"]}|{detail["menu"]["id"]}'
+    assert any(
+        option["restaurant_id"] == detail["restaurant"]["id"]
+        and option["menu_id"] == detail["menu"]["id"]
+        and option["restaurant_name"] == "Vel Asian Cuisine"
+        for option in loaded["menu_source_options"]
+    )
     assert loaded["restaurant_name"] == "Vel Asian Cuisine"
     assert loaded["restaurant_website_url"] == "https://velasian.example"
     assert loaded["source_menu_url"] == "https://velasian.example/menu"
@@ -659,6 +674,80 @@ def test_saving_menu_derived_recipe_persists_metadata_updates(monkeypatch, tmp_p
     assert loaded["restaurant_name"] == "Vel Asian Kitchen"
     assert loaded["menu_order_url"] == "https://velasian.example/order/spring-roll-updated"
     assert loaded["menu_price"] == "$6.49"
+
+
+def test_saving_menu_source_selection_relinks_recipe_to_shared_source(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    url, first_detail = seed_menu_derived_recipe()
+    second_detail = menu_store_service.upsert_menu_from_facts({
+        "source_url": "https://thai.example/menu",
+        "restaurant": {
+            "restaurant_name": "Thai Garden",
+            "restaurant_website_url": "https://thai.example",
+            "cuisine_tags": ["Thai"],
+            "phone": "317-555-0200",
+            "full_address": "22 Garden Rd, Indianapolis, IN",
+            "hours_text": "Daily 10-10",
+            "current_status": "Open",
+            "delivery_available": True,
+            "online_payment_available": False,
+            "rewards_text": "Lunch rewards",
+        },
+        "menu": {
+            "menu_title": "Thai Garden Menu",
+        },
+        "sections": [{
+            "section_name": "Appetizers",
+            "items": [{
+                "item_name": "Garden Roll",
+                "menu_price": "$7.25",
+                "menu_description": "Fresh herbs and crisp vegetables.",
+            }],
+        }],
+    })
+
+    result = recipe_edit_service.save_editable_recipe(
+        url,
+        editable_payload(
+            url,
+            restaurant_id=second_detail["restaurant"]["id"],
+            menu_id=second_detail["menu"]["id"],
+            menu_section_id="",
+            menu_item_id="",
+            restaurant_name="Thai Garden",
+            restaurant_website_url="https://thai.example",
+            source_menu_url="https://thai.example/menu",
+            restaurant_cuisine_tags="Thai",
+            restaurant_phone="317-555-0200",
+            restaurant_address="22 Garden Rd, Indianapolis, IN",
+            restaurant_hours_text="Daily 10-10",
+            restaurant_current_status="Open",
+            restaurant_promotions="Lunch rewards",
+            restaurant_online_payment_available="false",
+            restaurant_delivery_available="true",
+            menu_section="Appetizers",
+            menu_item_name="Garden Roll",
+            menu_order_url="",
+            menu_price="$7.25",
+            menu_description="Fresh herbs and crisp vegetables.",
+        ),
+    )
+    saved = recipe_edit_service.load_recipe_output(url)
+    loaded = recipe_edit_service.load_editable_recipe(url)["recipe"]
+
+    assert result["ok"] is True
+    assert saved["restaurant_id"] == second_detail["restaurant"]["id"]
+    assert saved["menu_id"] == second_detail["menu"]["id"]
+    assert saved.get("menu_item_id") in {None, ""}
+    assert saved.get("menu_section_id") in {None, ""}
+    assert loaded["restaurant_id"] == second_detail["restaurant"]["id"]
+    assert loaded["menu_id"] == second_detail["menu"]["id"]
+    assert loaded["restaurant_id"] != first_detail["restaurant"]["id"]
+    assert loaded["restaurant_name"] == "Thai Garden"
+    assert loaded["source_menu_url"] == "https://thai.example/menu"
+    assert loaded["menu_source_value"] == f'{second_detail["restaurant"]["id"]}|{second_detail["menu"]["id"]}'
+    assert loaded["menu_item_name"] == "Garden Roll"
+    assert loaded["menu_price"] == "$7.25"
 
 
 def test_generated_recipe_pdf_includes_menu_metadata_for_menu_recipes(monkeypatch, tmp_path):

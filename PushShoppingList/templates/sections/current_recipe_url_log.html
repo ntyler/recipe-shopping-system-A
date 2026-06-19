@@ -930,6 +930,17 @@
                             <span class="recipe-edit-source-files-chevron" aria-hidden="true"></span>
                         </summary>
                         <div class="recipe-edit-menu-metadata-grid">
+                            <label class="recipe-edit-file-field recipe-edit-menu-source-select-field recipe-edit-menu-metadata-wide">
+                                <span>Restaurant Source</span>
+                                <select id="recipeEditMenuSourceSelect"
+                                        onchange="return applyRecipeMenuSourceSelection(this)">
+                                    <option value="">Custom Source</option>
+                                </select>
+                            </label>
+                            <input type="hidden" id="recipeEditRestaurantId">
+                            <input type="hidden" id="recipeEditMenuId">
+                            <input type="hidden" id="recipeEditMenuSectionId">
+                            <input type="hidden" id="recipeEditMenuItemId">
                             <label class="recipe-edit-file-field">
                                 <span>Restaurant Name</span>
                                 <input type="text" id="recipeEditRestaurantName">

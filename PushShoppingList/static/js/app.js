@@ -16674,11 +16674,18 @@ const RECIPE_EDIT_MENU_METADATA_INPUT_IDS = {
     menu_price: "recipeEditMenuPrice",
     menu_description: "recipeEditMenuDescription",
 };
+const RECIPE_EDIT_MENU_RELATION_INPUT_IDS = {
+    restaurant_id: "recipeEditRestaurantId",
+    menu_id: "recipeEditMenuId",
+    menu_section_id: "recipeEditMenuSectionId",
+    menu_item_id: "recipeEditMenuItemId",
+};
 const RECIPE_EDIT_MENU_METADATA_URL_LINKS = [
     ["recipeEditRestaurantWebsiteUrl", "recipeEditRestaurantWebsiteUrlLink"],
     ["recipeEditSourceMenuUrl", "recipeEditSourceMenuUrlLink"],
     ["recipeEditMenuOrderUrl", "recipeEditMenuOrderUrlLink"],
 ];
+let recipeEditMenuSourceOptions = [];
 
 async function fetchRecipeEditorData(url) {
     const response = await fetch(`/api/recipe?url=${encodeURIComponent(url)}`, {
@@ -17856,12 +17863,147 @@ function recipeMenuMetadataText(value) {
     return String(value || "").trim();
 }
 
+function recipeMenuSourceOptionValue(restaurantId = "", menuId = "") {
+    return `${recipeMenuMetadataText(restaurantId)}|${recipeMenuMetadataText(menuId)}`;
+}
+
+function recipeMenuSourceOptionsFromRecipe(recipe = {}) {
+    const options = Array.isArray(recipe.menu_source_options)
+        ? recipe.menu_source_options.filter(option => option && typeof option === "object")
+        : [];
+    const selectedValue = recipeMenuMetadataText(recipe.menu_source_value)
+        || recipeMenuSourceOptionValue(recipe.restaurant_id, recipe.menu_id);
+
+    if (!selectedValue || selectedValue === "|") {
+        return options;
+    }
+    if (options.some(option => recipeMenuMetadataText(option.value) === selectedValue)) {
+        return options;
+    }
+
+    return [
+        {
+            value: selectedValue,
+            restaurant_id: recipe.restaurant_id || "",
+            menu_id: recipe.menu_id || "",
+            label: recipe.restaurant_name || recipe.source_menu_url || "Current restaurant source",
+            restaurant_name: recipe.restaurant_name || "",
+            restaurant_website_url: recipe.restaurant_website_url || "",
+            source_menu_url: recipe.source_menu_url || "",
+            restaurant_cuisine_tags: recipe.restaurant_cuisine_tags || "",
+            restaurant_phone: recipe.restaurant_phone || "",
+            restaurant_address: recipe.restaurant_address || "",
+            restaurant_hours_text: recipe.restaurant_hours_text || "",
+            restaurant_current_status: recipe.restaurant_current_status || "",
+            restaurant_promotions: recipe.restaurant_promotions || "",
+            restaurant_online_payment_available: recipe.restaurant_online_payment_available || "",
+            restaurant_delivery_available: recipe.restaurant_delivery_available || "",
+        },
+        ...options,
+    ];
+}
+
+function recipeMenuSourceOptionByValue(value) {
+    const selectedValue = recipeMenuMetadataText(value);
+    return recipeEditMenuSourceOptions.find(option => recipeMenuMetadataText(option.value) === selectedValue) || null;
+}
+
+function populateRecipeMenuSourceSelect(recipe = {}) {
+    const select = document.getElementById("recipeEditMenuSourceSelect");
+
+    recipeEditMenuSourceOptions = recipeMenuSourceOptionsFromRecipe(recipe);
+    if (!select) {
+        return;
+    }
+
+    const selectedValue = recipeMenuMetadataText(recipe.menu_source_value)
+        || recipeMenuSourceOptionValue(recipe.restaurant_id, recipe.menu_id);
+    select.innerHTML = "";
+    const customOption = document.createElement("option");
+    customOption.value = "";
+    customOption.textContent = "Custom Source";
+    select.appendChild(customOption);
+
+    recipeEditMenuSourceOptions.forEach(option => {
+        const optionValue = recipeMenuMetadataText(option.value)
+            || recipeMenuSourceOptionValue(option.restaurant_id, option.menu_id);
+        if (!optionValue || optionValue === "|") {
+            return;
+        }
+        const optionElement = document.createElement("option");
+        optionElement.value = optionValue;
+        optionElement.textContent = recipeMenuMetadataText(option.label)
+            || recipeMenuMetadataText(option.restaurant_name)
+            || recipeMenuMetadataText(option.source_menu_url)
+            || "Restaurant Source";
+        select.appendChild(optionElement);
+    });
+
+    select.value = recipeMenuSourceOptionByValue(selectedValue) ? selectedValue : "";
+}
+
+function setRecipeMenuRelationFields(values = {}) {
+    Object.entries(RECIPE_EDIT_MENU_RELATION_INPUT_IDS).forEach(([field, inputId]) => {
+        const input = document.getElementById(inputId);
+        if (input) {
+            input.value = recipeMenuMetadataText(values[field]);
+        }
+    });
+}
+
+function applyRecipeMenuSourceSelection(select) {
+    const option = recipeMenuSourceOptionByValue(select ? select.value : "");
+
+    if (!option) {
+        setRecipeMenuRelationFields({
+            restaurant_id: "",
+            menu_id: "",
+            menu_section_id: "",
+            menu_item_id: "",
+        });
+        return false;
+    }
+
+    setRecipeMenuRelationFields({
+        restaurant_id: option.restaurant_id || "",
+        menu_id: option.menu_id || "",
+        menu_section_id: "",
+        menu_item_id: "",
+    });
+
+    [
+        "restaurant_name",
+        "restaurant_website_url",
+        "source_menu_url",
+        "restaurant_cuisine_tags",
+        "restaurant_phone",
+        "restaurant_address",
+        "restaurant_hours_text",
+        "restaurant_current_status",
+        "restaurant_promotions",
+        "restaurant_online_payment_available",
+        "restaurant_delivery_available",
+    ].forEach(field => {
+        const inputId = RECIPE_EDIT_MENU_METADATA_INPUT_IDS[field];
+        if (inputId) {
+            setValue(inputId, recipeMenuMetadataText(option[field]));
+        }
+    });
+    bindRecipeMenuMetadataUrlLinks();
+    return false;
+}
+
 function recipeMenuMetadataSnapshot(recipe = {}) {
     const snapshot = {};
 
     Object.keys(RECIPE_EDIT_MENU_METADATA_INPUT_IDS).forEach(field => {
         snapshot[field] = recipeMenuMetadataText(recipe[field]);
     });
+    Object.keys(RECIPE_EDIT_MENU_RELATION_INPUT_IDS).forEach(field => {
+        snapshot[field] = recipeMenuMetadataText(recipe[field]);
+    });
+    snapshot.menu_source_value = recipeMenuMetadataText(recipe.menu_source_value)
+        || recipeMenuSourceOptionValue(snapshot.restaurant_id, snapshot.menu_id);
 
     return snapshot;
 }
@@ -17876,6 +18018,10 @@ function recipeHasMenuMetadata(recipe = {}) {
     }
 
     if (["menu_item_inferred", "menu_item_stub"].includes(String(recipe.source_type || "").trim().toLowerCase())) {
+        return true;
+    }
+
+    if (Object.keys(RECIPE_EDIT_MENU_RELATION_INPUT_IDS).some(field => recipeMenuMetadataText(recipe[field]))) {
         return true;
     }
 
@@ -17948,12 +18094,14 @@ function bindRecipeMenuMetadataUrlLinks() {
 
 function populateRecipeMenuMetadata(recipe = {}) {
     setRecipeMenuMetadataPanelVisibility(recipe);
+    setRecipeMenuRelationFields(recipe);
     Object.entries(RECIPE_EDIT_MENU_METADATA_INPUT_IDS).forEach(([field, inputId]) => {
         const input = document.getElementById(inputId);
         if (input) {
             input.value = recipeMenuMetadataText(recipe[field]);
         }
     });
+    populateRecipeMenuSourceSelect(recipe);
     bindRecipeMenuMetadataUrlLinks();
 }
 
@@ -17972,6 +18120,10 @@ function collectRecipeMenuMetadataPayload() {
     }
 
     Object.entries(RECIPE_EDIT_MENU_METADATA_INPUT_IDS).forEach(([field, inputId]) => {
+        const input = document.getElementById(inputId);
+        payload[field] = input ? String(input.value || "").trim() : "";
+    });
+    Object.entries(RECIPE_EDIT_MENU_RELATION_INPUT_IDS).forEach(([field, inputId]) => {
         const input = document.getElementById(inputId);
         payload[field] = input ? String(input.value || "").trim() : "";
     });
