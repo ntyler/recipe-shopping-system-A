@@ -62,31 +62,19 @@
                 Clear Log
             </button>
         </div>
-        <div class="job-activity-filters">
-            <div class="job-activity-segment" role="group" aria-label="Item status filter">
-                <button type="button"
-                        class="job-activity-item-filter is-active"
-                        data-job-activity-item-filter="all"
-                        aria-pressed="true"
-                        onclick="return setJobActivityItemFilter('all')">
-                    All Items
-                </button>
-                <button type="button"
-                        class="job-activity-item-filter"
-                        data-job-activity-item-filter="passed"
-                        aria-pressed="false"
-                        onclick="return setJobActivityItemFilter('passed')">
-                    Passed Items
-                </button>
-                <button type="button"
-                        class="job-activity-item-filter"
-                        data-job-activity-item-filter="failed"
-                        aria-pressed="false"
-                        onclick="return setJobActivityItemFilter('failed')">
-                    Failed Items
-                </button>
-            </div>
+        <div class="job-activity-filters" aria-label="Activity filters">
+            <label class="job-activity-filter-field job-activity-item-filter-field">
+                <span>Items</span>
+                <select class="job-activity-item-filter"
+                        data-job-activity-item-filter
+                        onchange="return setJobActivityItemFilter(this.value)">
+                    <option value="all">All</option>
+                    <option value="passed">Passed</option>
+                    <option value="failed">Failed</option>
+                </select>
+            </label>
             <div class="job-activity-date-filters" aria-label="Activity date filter">
+                <span class="job-activity-filter-label">Date</span>
                 <label>
                     <span>From</span>
                     <input type="date"
@@ -104,7 +92,7 @@
                         data-job-activity-date-clear
                         onclick="return clearJobActivityDateFilter()"
                         disabled>
-                    Clear Dates
+                    Reset
                 </button>
             </div>
         </div>

@@ -1441,11 +1441,15 @@ function renderJobActivityPanel(jobs) {
         activeFilterButton.setAttribute("aria-pressed", jobActivityActiveFilterOnly ? "true" : "false");
         activeFilterButton.textContent = jobActivityActiveFilterOnly ? "Showing Active" : "Active Only";
     }
-    itemFilterButtons.forEach(button => {
-        const value = normalizedJobActivityItemFilter(button.dataset.jobActivityItemFilter);
+    itemFilterButtons.forEach(control => {
+        if (control.tagName === "SELECT") {
+            control.value = jobActivityItemFilter;
+            return;
+        }
+        const value = normalizedJobActivityItemFilter(control.dataset.jobActivityItemFilter);
         const active = value === jobActivityItemFilter;
-        button.classList.toggle("is-active", active);
-        button.setAttribute("aria-pressed", active ? "true" : "false");
+        control.classList.toggle("is-active", active);
+        control.setAttribute("aria-pressed", active ? "true" : "false");
     });
     if (dateFromInput && dateFromInput.value !== jobActivityDateFrom) {
         dateFromInput.value = jobActivityDateFrom;

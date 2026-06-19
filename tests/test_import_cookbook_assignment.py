@@ -234,9 +234,10 @@ def test_job_activity_section_has_clear_collapse_control():
     assert clear_index > refresh_index
     assert 'data-job-activity-clear' in template
     assert "clearJobActivityLog(this)" in template
-    assert 'data-job-activity-item-filter="all"' in template
-    assert "Passed Items" in template
-    assert "Failed Items" in template
+    assert 'data-job-activity-item-filter' in template
+    assert '<option value="all">All</option>' in template
+    assert '<option value="passed">Passed</option>' in template
+    assert '<option value="failed">Failed</option>' in template
     assert "data-job-activity-date-from" in template
     assert "data-job-activity-date-to" in template
     assert "clearJobActivityDateFilter()" in template
@@ -260,6 +261,7 @@ def test_job_activity_section_has_clear_collapse_control():
     assert "job-activity-passed-card" in script
     assert ".job-activity-failures" in css
     assert ".job-activity-filters" in css
+    assert ".job-activity-filter-field" in css
     assert ".job-activity-item-filter" in css
     assert ".job-activity-date-filters" in css
     assert ".job-activity-passed-items" in css
