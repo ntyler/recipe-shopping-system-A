@@ -10,6 +10,7 @@ import imghdr
 import shutil
 import subprocess
 import sys
+import threading
 import time
 import uuid
 import zipfile
@@ -24,6 +25,7 @@ from datetime import timezone
 from pathlib import Path
 from typing import Optional
 from urllib.parse import quote
+from urllib.parse import parse_qsl
 from urllib.parse import parse_qs
 from urllib.parse import unquote
 from urllib.parse import urlencode
@@ -1077,6 +1079,323 @@ def recipe_archive_pdf_exists(recipe_url):
 
 def utc_iso_now():
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+MENU_SOURCE_ITEM_QUERY_KEYS = {
+    "menu_item",
+    "menu_item_id",
+    "menuidinput",
+    "menuitemidinput",
+    "ordertype",
+}
+MENU_SOURCE_PDF_MIN_ITEM_COUNT = 20
+MENU_SOURCE_PDF_MATCH_LIMIT = 24
+MENU_SOURCE_PDF_SHELL_MARKERS = (
+    "Info",
+    "Like",
+    "Menu",
+    "Today",
+    "Terms and Privacy Policy",
+    "Cartana LLC",
+)
+MENU_SOURCE_PDF_METADATA_FIELDS = (
+    "menu_source_url",
+    "menu_source_pdf_path",
+    "menu_source_cloudflare_pdf_url",
+    "menu_source_cloudflare_pdf_path",
+    "menu_source_pdf_status",
+    "menu_source_pdf_error",
+    "source_pdf_path",
+    "source_cloudflare_pdf_url",
+    "source_cloudflare_pdf_path",
+    "webpage_backup_pdf_path",
+    "webpage_backup_pdf_url",
+    "pdf_path",
+    "cloudflare_pdf_url",
+)
+_MENU_SOURCE_PDF_LOCK = threading.RLock()
+_MENU_SOURCE_PDF_CREATED_BY_JOB = {}
+
+
+def _truthy_env(name):
+    return str(os.getenv(name, "") or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def menu_source_query_key_is_item_specific(key):
+    cleaned = str(key or "").strip().lower()
+    return cleaned in MENU_SOURCE_ITEM_QUERY_KEYS
+
+
+def canonical_menu_source_url(menu_url):
+    menu_url = str(menu_url or "").strip()
+    if not menu_url:
+        return ""
+
+    try:
+        parsed = urlparse(menu_url)
+    except ValueError:
+        return menu_url.split("#", 1)[0].strip()
+
+    path = parsed.path or ""
+    if path.endswith("menuItem_home.action"):
+        path = path.rsplit("/", 1)[0] + "/menu_home.action"
+
+    query_pairs = [
+        (key, value)
+        for key, value in parse_qsl(parsed.query or "", keep_blank_values=True)
+        if not menu_source_query_key_is_item_specific(key)
+    ]
+    return urlunparse((
+        parsed.scheme,
+        parsed.netloc,
+        path,
+        parsed.params,
+        urlencode(query_pairs, doseq=True),
+        "",
+    )).strip() or menu_url
+
+
+def menu_source_pdf_public_url(upload_result):
+    upload_result = upload_result if isinstance(upload_result, dict) else {}
+    return str(
+        upload_result.get("pdf_public_url")
+        or upload_result.get("public_url")
+        or upload_result.get("r2_public_url")
+        or ""
+    ).strip()
+
+
+def menu_source_pdf_object_key(upload_result):
+    upload_result = upload_result if isinstance(upload_result, dict) else {}
+    return str(
+        upload_result.get("object_key")
+        or upload_result.get("r2_object_key")
+        or ""
+    ).strip()
+
+
+def menu_source_pdf_metadata(
+    menu_source_url,
+    pdf_path="",
+    upload_result=None,
+    status="ready",
+    error="",
+    validation=None,
+    item_count=0,
+):
+    menu_source_url = canonical_menu_source_url(menu_source_url)
+    pdf_path_text = str(pdf_path or "").strip()
+    public_url = menu_source_pdf_public_url(upload_result)
+    object_key = menu_source_pdf_object_key(upload_result)
+    status = str(status or "").strip() or ("ready" if pdf_path_text else "failed")
+    metadata = {
+        "ok": status == "ready",
+        "success": status == "ready",
+        "menu_source_url": menu_source_url,
+        "source_url": menu_source_url,
+        "menu_source_pdf_status": status,
+        "menu_source_pdf_path": pdf_path_text if status == "ready" else "",
+        "menu_source_cloudflare_pdf_url": public_url if status == "ready" else "",
+        "menu_source_cloudflare_pdf_path": public_url if status == "ready" else "",
+        "source_pdf_path": pdf_path_text if status == "ready" else "",
+        "source_cloudflare_pdf_url": public_url if status == "ready" else "",
+        "source_cloudflare_pdf_path": public_url if status == "ready" else "",
+        "webpage_backup_pdf_path": pdf_path_text if status == "ready" else "",
+        "webpage_backup_pdf_url": public_url if status == "ready" else "",
+        "webpage_backup_pdf_object_key": object_key if status == "ready" else "",
+        "pdf_path": pdf_path_text if status == "ready" else "",
+        "cloudflare_pdf_url": public_url if status == "ready" else "",
+        "pdf_kind": PDF_KIND_WEBPAGE_BACKUP,
+        "item_count": int(item_count or 0),
+        "validation": validation if isinstance(validation, dict) else {},
+        "error": str(error or ""),
+        "menu_source_pdf_error": str(error or ""),
+    }
+    if status == "ready":
+        metadata["pdf"] = {
+            PDF_KIND_WEBPAGE_BACKUP: {
+                "local_path": pdf_path_text,
+                "r2_object_key": object_key,
+                "r2_public_url": public_url,
+                "cloud_status": "uploaded" if public_url else "local_only",
+            },
+        }
+    return metadata
+
+
+def menu_source_pdf_metadata_from_result(result):
+    result = result if isinstance(result, dict) else {}
+    status = str(result.get("menu_source_pdf_status") or "").strip()
+    path = str(
+        result.get("menu_source_pdf_path")
+        or result.get("source_pdf_path")
+        or result.get("webpage_backup_pdf_path")
+        or ""
+    ).strip()
+    public_url = str(
+        result.get("menu_source_cloudflare_pdf_url")
+        or result.get("source_cloudflare_pdf_url")
+        or result.get("webpage_backup_pdf_url")
+        or ""
+    ).strip()
+    if not status and not path and not public_url:
+        return {}
+    if not status:
+        status = "ready" if path or public_url else "failed"
+    return {
+        "ok": status == "ready",
+        "menu_source_url": canonical_menu_source_url(
+            result.get("menu_source_url")
+            or result.get("source_menu_url")
+            or result.get("source_url")
+            or ""
+        ),
+        "menu_source_pdf_status": status,
+        "menu_source_pdf_path": path if status == "ready" else "",
+        "menu_source_cloudflare_pdf_url": public_url if status == "ready" else "",
+        "menu_source_cloudflare_pdf_path": public_url if status == "ready" else "",
+        "source_pdf_path": path if status == "ready" else "",
+        "source_cloudflare_pdf_url": public_url if status == "ready" else "",
+        "source_cloudflare_pdf_path": public_url if status == "ready" else "",
+        "webpage_backup_pdf_path": path if status == "ready" else "",
+        "webpage_backup_pdf_url": public_url if status == "ready" else "",
+        "pdf_path": path if status == "ready" else "",
+        "cloudflare_pdf_url": public_url if status == "ready" else "",
+        "error": str(result.get("menu_source_pdf_error") or result.get("error") or ""),
+        "menu_source_pdf_error": str(result.get("menu_source_pdf_error") or ""),
+    }
+
+
+def recipe_is_menu_item_import(json_data):
+    json_data = json_data if isinstance(json_data, dict) else {}
+    source_type = str(json_data.get("source_type") or "").strip().lower()
+    return bool(
+        source_type == "menu_item_inferred"
+        or json_data.get("ai_inferred") and (json_data.get("source_menu_url") or json_data.get("menu_source_url"))
+        or json_data.get("menu_item_name")
+        or json_data.get("menu_item_id")
+    )
+
+
+def recipe_has_shared_menu_source_pdf(json_data):
+    json_data = json_data if isinstance(json_data, dict) else {}
+    return bool(
+        str(json_data.get("menu_source_pdf_path") or "").strip()
+        or str(json_data.get("menu_source_cloudflare_pdf_url") or "").strip()
+        or str(json_data.get("menu_source_pdf_status") or "").strip() == "ready"
+    )
+
+
+def clear_source_pdf_metadata(json_data):
+    if not isinstance(json_data, dict):
+        return json_data
+    for field in (
+        "menu_source_pdf_path",
+        "menu_source_cloudflare_pdf_url",
+        "menu_source_cloudflare_pdf_path",
+        "source_pdf_path",
+        "source_cloudflare_pdf_url",
+        "source_cloudflare_pdf_path",
+        "webpage_backup_pdf_path",
+        "webpage_backup_pdf_url",
+        "webpage_backup_pdf_object_key",
+        "webpage_backup_pdf_uploaded_at",
+        "pdf_path",
+        "cloudflare_pdf_url",
+    ):
+        json_data[field] = ""
+    pdf_metadata = json_data.get("pdf") if isinstance(json_data.get("pdf"), dict) else {}
+    if PDF_KIND_WEBPAGE_BACKUP in pdf_metadata:
+        pdf_metadata.pop(PDF_KIND_WEBPAGE_BACKUP, None)
+        json_data["pdf"] = pdf_metadata
+    return json_data
+
+
+def apply_menu_source_pdf_metadata(recipe, metadata):
+    recipe = recipe if isinstance(recipe, dict) else {}
+    metadata = menu_source_pdf_metadata_from_result(metadata)
+    if not metadata:
+        return recipe
+
+    menu_source_url = canonical_menu_source_url(
+        metadata.get("menu_source_url")
+        or recipe.get("source_menu_url")
+        or recipe.get("menu_source_url")
+        or recipe.get("source_url")
+        or ""
+    )
+    if menu_source_url:
+        recipe["menu_source_url"] = menu_source_url
+        recipe["source_menu_url"] = recipe.get("source_menu_url") or menu_source_url
+
+    recipe["menu_source_pdf_status"] = metadata.get("menu_source_pdf_status", "")
+    recipe["menu_source_pdf_error"] = metadata.get("menu_source_pdf_error", "")
+
+    if metadata.get("menu_source_pdf_status") != "ready":
+        clear_source_pdf_metadata(recipe)
+        return recipe
+
+    source_path = str(metadata.get("menu_source_pdf_path") or metadata.get("source_pdf_path") or "").strip()
+    source_url = str(
+        metadata.get("menu_source_cloudflare_pdf_url")
+        or metadata.get("source_cloudflare_pdf_url")
+        or ""
+    ).strip()
+
+    recipe["menu_source_pdf_path"] = source_path
+    recipe["menu_source_cloudflare_pdf_url"] = source_url
+    recipe["menu_source_cloudflare_pdf_path"] = source_url
+    recipe["source_pdf_path"] = source_path
+    recipe["source_cloudflare_pdf_url"] = source_url
+    recipe["source_cloudflare_pdf_path"] = source_url
+    recipe["webpage_backup_pdf_path"] = source_path
+    recipe["webpage_backup_pdf_url"] = source_url
+    recipe["pdf_path"] = source_path
+    recipe["cloudflare_pdf_url"] = source_url
+
+    source_metadata = recipe.get("source_metadata") if isinstance(recipe.get("source_metadata"), dict) else {}
+    source_metadata.update({
+        "menu_source_url": menu_source_url,
+        "menu_source_pdf_path": source_path,
+        "menu_source_cloudflare_pdf_url": source_url,
+        "menu_source_pdf_status": "ready",
+    })
+    recipe["source_metadata"] = source_metadata
+
+    pdf_metadata = recipe.get("pdf") if isinstance(recipe.get("pdf"), dict) else {}
+    kind_metadata = pdf_metadata.get(PDF_KIND_WEBPAGE_BACKUP) if isinstance(pdf_metadata.get(PDF_KIND_WEBPAGE_BACKUP), dict) else {}
+    kind_metadata.update({
+        "local_path": source_path,
+        "r2_public_url": source_url,
+        "cloud_status": "uploaded" if source_url else "local_only",
+    })
+    if source_url:
+        kind_metadata["cloudflare_r2"] = {
+            "provider": "cloudflare_r2",
+            "public_url": source_url,
+            "cloud_status": "uploaded",
+        }
+    pdf_metadata[PDF_KIND_WEBPAGE_BACKUP] = kind_metadata
+    recipe["pdf"] = pdf_metadata
+    return recipe
+
+
+def menu_source_pdf_expected_item_names(sections, limit=MENU_SOURCE_PDF_MATCH_LIMIT):
+    names = []
+    for item in flatten_menu_sections(sections):
+        if not isinstance(item, dict):
+            continue
+        name = clean_recipe_text(
+            item.get("item_name")
+            or item.get("name")
+            or item.get("title")
+            or ""
+        )
+        if name and len(name) > 2 and name.lower() not in {value.lower() for value in names}:
+            names.append(name)
+        if len(names) >= limit:
+            break
+    return names
 
 
 def cloudflare_pdf_upload_is_usable(upload_result):
@@ -4804,6 +5123,424 @@ def print_current_browser_page_to_pdf(driver, pdf_path):
         print(f"PDF continuous warning: saved {page_count} pages after retry limit.")
 
 
+def menu_source_detected_item_count_from_text(text):
+    lines = [
+        re.sub(r"\s+", " ", line).strip()
+        for line in str(text or "").splitlines()
+    ]
+    lines = [line for line in lines if line]
+    price_lines = [
+        line
+        for line in lines
+        if re.search(r"\$\s*\d+(?:\.\d{2})?", line)
+    ]
+    return len(price_lines)
+
+
+def validate_menu_source_capture_text(
+    text,
+    expected_names=None,
+    min_item_count=MENU_SOURCE_PDF_MIN_ITEM_COUNT,
+    detected_item_count=0,
+):
+    expected_names = [
+        clean_recipe_text(name)
+        for name in (expected_names if isinstance(expected_names, list) else [])
+        if clean_recipe_text(name)
+    ]
+    normalized_text = re.sub(r"\s+", " ", str(text or "")).strip()
+    lowered = normalized_text.lower()
+    matched_names = [
+        name
+        for name in expected_names
+        if name.lower() in lowered
+    ]
+    detected_count = max(
+        int(detected_item_count or 0),
+        menu_source_detected_item_count_from_text(text),
+        len(matched_names),
+    )
+    shell_marker_hits = [
+        marker
+        for marker in MENU_SOURCE_PDF_SHELL_MARKERS
+        if marker.lower() in lowered
+    ]
+    has_expected_item = bool(expected_names and matched_names)
+    has_enough_items = detected_count >= int(min_item_count or MENU_SOURCE_PDF_MIN_ITEM_COUNT)
+    shell_only = bool(shell_marker_hits and not has_expected_item and not has_enough_items)
+    ok = bool(has_expected_item or has_enough_items) and not shell_only
+    return {
+        "ok": ok,
+        "matched_item_names": matched_names[:10],
+        "matched_item_name_count": len(matched_names),
+        "detected_item_count": detected_count,
+        "min_item_count": int(min_item_count or MENU_SOURCE_PDF_MIN_ITEM_COUNT),
+        "shell_marker_hits": shell_marker_hits,
+        "shell_only": shell_only,
+        "text_length": len(normalized_text),
+    }
+
+
+def browser_menu_source_snapshot(driver, expected_names=None):
+    expected_names = expected_names if isinstance(expected_names, list) else []
+    try:
+        snapshot = driver.execute_script(
+            """
+            const expected = (arguments[0] || []).map((value) => String(value || "").toLowerCase());
+            const body = document.body || document.documentElement;
+            const text = body ? (body.innerText || body.textContent || "") : "";
+            const lines = text.split(/\\n+/).map((line) => line.trim()).filter(Boolean);
+            const priceLines = lines.filter((line) => /\\$\\s*\\d+(?:\\.\\d{2})?/.test(line));
+            const matchedExpected = expected.filter((name) => name && text.toLowerCase().includes(name));
+            const itemLikeTexts = new Set();
+            for (const element of Array.from(document.querySelectorAll("*"))) {
+                const classText = String(element.className || "").toLowerCase();
+                const idText = String(element.id || "").toLowerCase();
+                if (!classText.includes("menu") && !classText.includes("item") && !classText.includes("card") && !idText.includes("menu") && !idText.includes("item")) {
+                    continue;
+                }
+                const value = String(element.innerText || "").trim();
+                if (value.length >= 3 && value.length <= 500) {
+                    itemLikeTexts.add(value);
+                }
+            }
+            return {
+                text,
+                line_count: lines.length,
+                price_line_count: priceLines.length,
+                expected_match_count: matchedExpected.length,
+                expected_matches: matchedExpected,
+                item_like_count: itemLikeTexts.size,
+                item_count: Math.max(priceLines.length, matchedExpected.length, itemLikeTexts.size),
+                ready_state: document.readyState,
+                scroll_height: Math.max(
+                    document.body ? document.body.scrollHeight : 0,
+                    document.documentElement ? document.documentElement.scrollHeight : 0
+                )
+            };
+            """,
+            expected_names,
+        )
+        return snapshot if isinstance(snapshot, dict) else {"text": ""}
+    except Exception as exc:
+        return {"text": "", "error": str(exc)}
+
+
+def scroll_browser_page_for_menu_content(driver, full=False):
+    try:
+        driver.set_script_timeout(20 if full else 8)
+        driver.execute_async_script(
+            """
+            const done = arguments[arguments.length - 1];
+            const full = Boolean(arguments[0]);
+            const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+            const pageHeight = () => Math.max(
+                document.body ? document.body.scrollHeight : 0,
+                document.documentElement ? document.documentElement.scrollHeight : 0
+            );
+            (async () => {
+                const step = Math.max(360, Math.floor(window.innerHeight * 0.75));
+                const passes = full ? 3 : 1;
+                for (let pass = 0; pass < passes; pass += 1) {
+                    const height = pageHeight();
+                    for (let y = 0; y <= height; y += step) {
+                        window.scrollTo(0, y);
+                        await sleep(full ? 220 : 100);
+                    }
+                    window.scrollTo(0, Math.max(0, pageHeight() - window.innerHeight));
+                    await sleep(full ? 450 : 180);
+                }
+                window.scrollTo(0, 0);
+                done({ ok: true, height: pageHeight() });
+            })().catch((error) => done({ ok: false, error: String(error) }));
+            """,
+            bool(full),
+        )
+    except Exception:
+        try:
+            driver.execute_script("window.scrollTo(0, document.body ? document.body.scrollHeight : 0);")
+            time.sleep(0.5)
+            driver.execute_script("window.scrollTo(0, 0);")
+        except Exception:
+            pass
+
+
+def wait_for_menu_source_content(
+    driver,
+    expected_names=None,
+    timeout_seconds=30,
+    min_item_count=MENU_SOURCE_PDF_MIN_ITEM_COUNT,
+    full_scroll=False,
+):
+    expected_names = expected_names if isinstance(expected_names, list) else []
+    deadline = time.monotonic() + max(1, int(timeout_seconds or 30))
+    last_validation = {}
+    last_snapshot = {}
+    scrolled = False
+
+    while time.monotonic() < deadline:
+        snapshot = browser_menu_source_snapshot(driver, expected_names)
+        validation = validate_menu_source_capture_text(
+            snapshot.get("text", ""),
+            expected_names=expected_names,
+            min_item_count=min_item_count,
+            detected_item_count=snapshot.get("item_count") or 0,
+        )
+        last_snapshot = snapshot
+        last_validation = validation
+        if validation.get("ok"):
+            return validation, snapshot
+
+        if not scrolled or full_scroll:
+            scroll_browser_page_for_menu_content(driver, full=full_scroll)
+            scrolled = True
+        time.sleep(0.45)
+
+    return last_validation, last_snapshot
+
+
+def validate_menu_source_pdf_file(pdf_path, html_text="", expected_names=None):
+    expected_names = expected_names if isinstance(expected_names, list) else []
+    pdf_text = ""
+    pdf_error = ""
+    try:
+        if Path(pdf_path).exists():
+            pdf_text = extract_text_from_pdf(pdf_path)
+    except Exception as exc:
+        pdf_error = str(exc)
+
+    pdf_validation = validate_menu_source_capture_text(
+        pdf_text,
+        expected_names=expected_names,
+    )
+    html_validation = validate_menu_source_capture_text(
+        html_text,
+        expected_names=expected_names,
+    )
+    ok = bool(pdf_validation.get("ok") or html_validation.get("ok"))
+    return {
+        "ok": ok,
+        "pdf_text_length": len(pdf_text or ""),
+        "pdf_error": pdf_error,
+        "pdf_validation": pdf_validation,
+        "html_validation": html_validation,
+        "matched_item_names": (
+            pdf_validation.get("matched_item_names")
+            or html_validation.get("matched_item_names")
+            or []
+        ),
+        "detected_item_count": max(
+            int(pdf_validation.get("detected_item_count") or 0),
+            int(html_validation.get("detected_item_count") or 0),
+        ),
+    }
+
+
+def write_menu_source_page_pdf(menu_url, pdf_path, expected_names=None):
+    driver = None
+    expected_names = expected_names if isinstance(expected_names, list) else []
+    last_error = ""
+    last_validation = {}
+
+    try:
+        driver = create_headless_chrome_driver(
+            window_size="1365,1600",
+            prefer_undetected=False,
+            page_load_strategy="normal",
+        )
+        driver.set_page_load_timeout(65)
+
+        for attempt in range(1, 3):
+            try:
+                driver.get(menu_url)
+            except Exception as exc:
+                page_source = driver.page_source or ""
+                if len(page_source) < 1000:
+                    last_error = str(exc)
+                    continue
+                print("Menu source PDF page load timed out after partial load; validating current page.")
+
+            wait_for_browser_document(driver, timeout_seconds=20 if attempt == 1 else 35)
+            validation, snapshot = wait_for_menu_source_content(
+                driver,
+                expected_names=expected_names,
+                timeout_seconds=24 if attempt == 1 else 55,
+                min_item_count=MENU_SOURCE_PDF_MIN_ITEM_COUNT,
+                full_scroll=attempt > 1,
+            )
+            last_validation = validation
+            html_snapshot = driver.page_source or ""
+            snapshot_path = RAW_FOLDER / f"{safe_filename(menu_url)}_MENU_SOURCE_PDF_ATTEMPT_{attempt}.html"
+            try:
+                snapshot_path.write_text(html_snapshot, encoding="utf-8")
+            except Exception:
+                pass
+
+            if not validation.get("ok"):
+                last_error = (
+                    "Menu content did not appear before PDF capture "
+                    f"(attempt={attempt}, matched={validation.get('matched_item_name_count')}, "
+                    f"items={validation.get('detected_item_count')})."
+                )
+                continue
+
+            prepare_page_for_pdf_print(driver)
+            print_current_browser_page_to_pdf(driver, pdf_path)
+            pdf_validation = validate_menu_source_pdf_file(
+                pdf_path,
+                html_text=html_snapshot,
+                expected_names=expected_names,
+            )
+            last_validation = pdf_validation
+            if pdf_validation.get("ok"):
+                return {
+                    "ok": True,
+                    "pdf_path": str(pdf_path),
+                    "attempt": attempt,
+                    "validation": pdf_validation,
+                    "browser_snapshot": snapshot,
+                    "html_snapshot_path": str(snapshot_path),
+                }
+
+            try:
+                Path(pdf_path).unlink(missing_ok=True)
+            except Exception:
+                pass
+            last_error = (
+                "Menu Source PDF validation failed "
+                f"(attempt={attempt}, matched={pdf_validation.get('matched_item_names')}, "
+                f"items={pdf_validation.get('detected_item_count')})."
+            )
+
+        return {
+            "ok": False,
+            "error": last_error or "Menu content was not captured in the Source PDF.",
+            "validation": last_validation,
+        }
+    finally:
+        if driver:
+            try:
+                driver.quit()
+            except Exception:
+                pass
+
+
+def guard_menu_source_pdf_creation(menu_source_url):
+    job_id = current_job_id()
+    guard_key = job_id or f"url:{menu_source_url}"
+
+    with _MENU_SOURCE_PDF_LOCK:
+        existing_url = _MENU_SOURCE_PDF_CREATED_BY_JOB.get(guard_key)
+        if existing_url and existing_url != menu_source_url:
+            message = (
+                "Menu import attempted to create more than one Source PDF "
+                f"job_id={job_id or 'n/a'} first_url={existing_url} next_url={menu_source_url}"
+            )
+            print(f"[recipe_import] action=menu_source_pdf_duplicate_warning {message}")
+            if _truthy_env("MENU_SOURCE_PDF_FAIL_ON_DUPLICATE"):
+                raise RuntimeError(message)
+        elif not existing_url:
+            _MENU_SOURCE_PDF_CREATED_BY_JOB[guard_key] = menu_source_url
+
+
+def create_menu_source_pdf(menu_url, sections=None, progress_callback=None, cancellation_check=None):
+    menu_source_url = canonical_menu_source_url(menu_url)
+    items = flatten_menu_sections(sections or [])
+    item_count = len(items)
+    expected_names = menu_source_pdf_expected_item_names(sections or [])
+
+    print(
+        "[recipe_import] action=menu_source_pdf_start "
+        f"menu_source_url={menu_source_url} item_count={item_count}"
+    )
+    if progress_callback:
+        progress_callback(
+            "Creating menu Source PDF",
+            f"Capturing one Source PDF for {item_count} menu item records.",
+        )
+
+    if not menu_source_url:
+        error = "Menu Source PDF URL is required."
+        print(f"[recipe_import] action=menu_source_pdf_failed error={error}")
+        return menu_source_pdf_metadata("", status="failed", error=error, item_count=item_count)
+
+    if os.getenv("DISABLE_RECIPE_PDF_ARCHIVE") == "1":
+        error = "Source PDF archive is disabled by DISABLE_RECIPE_PDF_ARCHIVE=1."
+        print(
+            "[recipe_import] action=menu_source_pdf_failed "
+            f"menu_source_url={menu_source_url} error={error}"
+        )
+        return menu_source_pdf_metadata(menu_source_url, status="skipped", error=error, item_count=item_count)
+
+    try:
+        run_cancellation_check(cancellation_check)
+        guard_menu_source_pdf_creation(menu_source_url)
+        pdf_path = recipe_archive_pdf_path(menu_source_url)
+        pdf_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            pdf_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+        capture_result = write_menu_source_page_pdf(
+            menu_source_url,
+            pdf_path,
+            expected_names=expected_names,
+        )
+        run_cancellation_check(cancellation_check)
+        if not capture_result.get("ok"):
+            try:
+                pdf_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+            error = capture_result.get("error") or "Menu Source PDF did not contain menu items."
+            print(
+                "[recipe_import] action=menu_source_pdf_failed "
+                f"menu_source_url={menu_source_url} source_pdf_path= "
+                f"source_cloudflare_pdf_url= item_count={item_count} error={error}"
+            )
+            return menu_source_pdf_metadata(
+                menu_source_url,
+                status="failed",
+                error=error,
+                validation=capture_result.get("validation"),
+                item_count=item_count,
+            )
+
+        upload_result = maybe_upload_recipe_archive_pdf_to_cloudflare(menu_source_url)
+        metadata = menu_source_pdf_metadata(
+            menu_source_url,
+            pdf_path=pdf_path,
+            upload_result=upload_result,
+            status="ready",
+            validation=capture_result.get("validation"),
+            item_count=item_count,
+        )
+        print(
+            "[recipe_import] action=menu_source_pdf_ready "
+            f"menu_source_url={menu_source_url} "
+            f"source_pdf_path={metadata.get('source_pdf_path') or ''} "
+            f"source_cloudflare_pdf_url={metadata.get('source_cloudflare_pdf_url') or ''} "
+            f"item_count={item_count}"
+        )
+        return metadata
+    except Exception as exc:
+        if is_job_cancelled_exception(exc):
+            raise
+        error = str(exc)
+        print(
+            "[recipe_import] action=menu_source_pdf_failed "
+            f"menu_source_url={menu_source_url} source_pdf_path= "
+            f"source_cloudflare_pdf_url= item_count={item_count} error={error}"
+        )
+        return menu_source_pdf_metadata(
+            menu_source_url,
+            status="failed",
+            error=error,
+            item_count=item_count,
+        )
+
+
 def count_pdf_pages_from_bytes(pdf_bytes):
     try:
         from PyPDF2 import PdfReader
@@ -7959,13 +8696,20 @@ def save_extracted_recipe_json(recipe_url, json_data):
     apply_recipe_scaling_metadata(json_data)
     apply_recipe_cover_image_metadata(json_data, recipe_url=recipe_url)
     apply_recipe_owner_metadata(json_data)
-    upload_result = maybe_upload_recipe_archive_pdf_to_cloudflare(recipe_url)
-    attach_cloudflare_pdf_metadata(
-        recipe_url,
-        json_data,
-        upload_result,
-        recipe_archive_pdf_path(recipe_url),
-    )
+
+    if recipe_has_shared_menu_source_pdf(json_data):
+        apply_menu_source_pdf_metadata(json_data, json_data)
+    elif recipe_is_menu_item_import(json_data):
+        clear_source_pdf_metadata(json_data)
+        json_data.setdefault("menu_source_pdf_status", "not_attached")
+    else:
+        upload_result = maybe_upload_recipe_archive_pdf_to_cloudflare(recipe_url)
+        attach_cloudflare_pdf_metadata(
+            recipe_url,
+            json_data,
+            upload_result,
+            recipe_archive_pdf_path(recipe_url),
+        )
 
     json_path = OUTPUT_FOLDER / f"{safe_filename(recipe_url)}.json"
     json_path.write_text(
@@ -9287,6 +10031,15 @@ def build_extract_result(recipe_url, json_data, extraction_method):
         "image_analysis_notes": json_data.get("image_analysis_notes"),
         "visible_ingredients": json_data.get("visible_ingredients") or [],
         "inferred_ingredients": json_data.get("inferred_ingredients") or [],
+        "menu_source_url": json_data.get("menu_source_url") or json_data.get("source_menu_url") or "",
+        "menu_source_pdf_status": json_data.get("menu_source_pdf_status") or "",
+        "menu_source_pdf_path": json_data.get("menu_source_pdf_path") or "",
+        "menu_source_cloudflare_pdf_url": json_data.get("menu_source_cloudflare_pdf_url") or "",
+        "source_pdf_path": json_data.get("source_pdf_path") or "",
+        "source_cloudflare_pdf_url": json_data.get("source_cloudflare_pdf_url") or "",
+        "source_cloudflare_pdf_path": json_data.get("source_cloudflare_pdf_path") or "",
+        "webpage_backup_pdf_path": json_data.get("webpage_backup_pdf_path") or "",
+        "webpage_backup_pdf_url": json_data.get("webpage_backup_pdf_url") or "",
         "extraction_method": extraction_method,
         "extraction_mode": json_data.get("extraction_mode") or extraction_method,
         "model_used": model_used,
@@ -11331,8 +12084,11 @@ def build_menu_stub_extract_result_from_items(
     cancellation_check=None,
     menu_snapshot=None,
     skip_cleanup=False,
+    menu_source_pdf=None,
 ):
+    source_url = canonical_menu_source_url(source_url) or str(source_url or "").strip()
     diagnostics = diagnostics if isinstance(diagnostics, dict) else {}
+    menu_source_pdf = menu_source_pdf_metadata_from_result(menu_source_pdf)
     menu_snapshot = menu_snapshot if isinstance(menu_snapshot, dict) else {}
     menu_snapshot_id = clean_recipe_text(
         menu_snapshot.get("id")
@@ -11348,6 +12104,10 @@ def build_menu_stub_extract_result_from_items(
         "menu_mega_snapshot_id": menu_snapshot_id,
         "parent_menu_snapshot_id": menu_snapshot_id,
         "item_records_unpacked": len(flatten_menu_sections(sections)),
+        "menu_source_url": source_url,
+        "menu_source_pdf_status": menu_source_pdf.get("menu_source_pdf_status", ""),
+        "menu_source_pdf_path": menu_source_pdf.get("menu_source_pdf_path", ""),
+        "menu_source_cloudflare_pdf_url": menu_source_pdf.get("menu_source_cloudflare_pdf_url", ""),
     })
 
     if not flatten_menu_sections(sections):
@@ -11432,9 +12192,11 @@ def build_menu_stub_extract_result_from_items(
             continue
 
         stub = normalize_menu_item_stub(source_url, menu_item, index, source_name=source_name)
+        apply_menu_source_pdf_metadata(stub, menu_source_pdf)
         recipe_url = stub["recipe_record_url"]
         save_extracted_recipe_json(recipe_url, stub)
         result = build_extract_result(recipe_url, stub, "menu_stub")
+        apply_menu_source_pdf_metadata(result, menu_source_pdf)
         result.update({
             "ok": True,
             "success": True,
@@ -11467,6 +12229,12 @@ def build_menu_stub_extract_result_from_items(
             "recipe_inference": stub.get("recipe_inference", default_recipe_inference()),
             "nutrition_inference": stub.get("nutrition_inference", default_nutrition_inference()),
             "pdf_generation": stub.get("pdf_generation", default_pdf_generation()),
+            "menu_source_url": source_url,
+            "menu_source_pdf_status": stub.get("menu_source_pdf_status", ""),
+            "menu_source_pdf_path": stub.get("menu_source_pdf_path", ""),
+            "menu_source_cloudflare_pdf_url": stub.get("menu_source_cloudflare_pdf_url", ""),
+            "source_pdf_path": stub.get("source_pdf_path", ""),
+            "source_cloudflare_pdf_url": stub.get("source_cloudflare_pdf_url", ""),
             "model": "",
             "model_used": "",
             "model_source": "deterministic",
@@ -11539,6 +12307,12 @@ def build_menu_stub_extract_result_from_items(
         "extracted_text": extracted_text,
         "menu_extract": True,
         "staged_import": True,
+        "menu_source_url": source_url,
+        "menu_source_pdf_status": menu_source_pdf.get("menu_source_pdf_status", ""),
+        "menu_source_pdf_path": menu_source_pdf.get("menu_source_pdf_path", ""),
+        "menu_source_cloudflare_pdf_url": menu_source_pdf.get("menu_source_cloudflare_pdf_url", ""),
+        "source_pdf_path": menu_source_pdf.get("source_pdf_path", ""),
+        "source_cloudflare_pdf_url": menu_source_pdf.get("source_cloudflare_pdf_url", ""),
         "recipes": recipes,
         "created_count": len(recipes),
         "stubs_created": stubs_created,
@@ -11891,8 +12665,11 @@ def build_menu_extract_result_from_items(
     diagnostics=None,
     progress_callback=None,
     cancellation_check=None,
+    menu_source_pdf=None,
 ):
+    source_url = canonical_menu_source_url(source_url) or str(source_url or "").strip()
     diagnostics = diagnostics if isinstance(diagnostics, dict) else {}
+    menu_source_pdf = menu_source_pdf_metadata_from_result(menu_source_pdf)
     menu_items = flatten_menu_sections(sections)
     model_resolution = menu_item_recipe_model_resolution()
     job_suffix = current_job_id()[:12]
@@ -11910,6 +12687,10 @@ def build_menu_extract_result_from_items(
         "recipe_schema_found": False,
         "model": model_resolution.model,
         "model_source": model_resolution.source,
+        "menu_source_url": source_url,
+        "menu_source_pdf_status": menu_source_pdf.get("menu_source_pdf_status", ""),
+        "menu_source_pdf_path": menu_source_pdf.get("menu_source_pdf_path", ""),
+        "menu_source_cloudflare_pdf_url": menu_source_pdf.get("menu_source_cloudflare_pdf_url", ""),
     })
 
     if not total_items:
@@ -12111,6 +12892,7 @@ def build_menu_extract_result_from_items(
         normalized["model"] = model_resolution.model
         normalized["model_used"] = model_resolution.model
         normalized["model_source"] = model_resolution.source
+        apply_menu_source_pdf_metadata(normalized, menu_source_pdf)
 
         if not structured_recipe_data_is_usable(normalized):
             failures.append({
@@ -12127,6 +12909,7 @@ def build_menu_extract_result_from_items(
         recipe_url = normalized.get("recipe_record_url") or menu_item_source_url(source_url, normalized.get("recipe_title"), index)
         save_extracted_recipe_json(recipe_url, normalized)
         result = build_extract_result(recipe_url, normalized, "menu_extract")
+        apply_menu_source_pdf_metadata(result, menu_source_pdf)
         result.update({
             "source_url": recipe_url,
             "menu_source_url": source_url,
@@ -12141,6 +12924,11 @@ def build_menu_extract_result_from_items(
             "menu_id": normalized.get("menu_id", ""),
             "menu_section_id": normalized.get("menu_section_id", ""),
             "menu_item_id": normalized.get("menu_item_id", ""),
+            "menu_source_pdf_status": normalized.get("menu_source_pdf_status", ""),
+            "menu_source_pdf_path": normalized.get("menu_source_pdf_path", ""),
+            "menu_source_cloudflare_pdf_url": normalized.get("menu_source_cloudflare_pdf_url", ""),
+            "source_pdf_path": normalized.get("source_pdf_path", ""),
+            "source_cloudflare_pdf_url": normalized.get("source_cloudflare_pdf_url", ""),
             "source_type": "menu_item_inferred",
             "ai_inferred": True,
             "model": model_resolution.model,
@@ -12198,6 +12986,12 @@ def build_menu_extract_result_from_items(
         "source_type": source_type,
         "extracted_text": extracted_text,
         "menu_extract": True,
+        "menu_source_url": source_url,
+        "menu_source_pdf_status": menu_source_pdf.get("menu_source_pdf_status", ""),
+        "menu_source_pdf_path": menu_source_pdf.get("menu_source_pdf_path", ""),
+        "menu_source_cloudflare_pdf_url": menu_source_pdf.get("menu_source_cloudflare_pdf_url", ""),
+        "source_pdf_path": menu_source_pdf.get("source_pdf_path", ""),
+        "source_cloudflare_pdf_url": menu_source_pdf.get("source_cloudflare_pdf_url", ""),
         "recipes": recipes,
         "created_count": len(recipes),
         "ingredients": [
@@ -12221,7 +13015,7 @@ def build_menu_extract_result_from_items(
 
 
 def extract_menu_sections_from_url(menu_url, progress_callback=None, cancellation_check=None):
-    menu_url = str(menu_url or "").strip()
+    menu_url = canonical_menu_source_url(menu_url)
     if not menu_url:
         return {
             "ok": False,
@@ -12444,7 +13238,7 @@ def extract_menu_stubs_from_url(
     cookbook_id="",
     cookbook_name="",
 ):
-    menu_url = str(menu_url or "").strip()
+    menu_url = canonical_menu_source_url(menu_url)
     if not menu_url:
         return {
             "ok": False,
@@ -12507,6 +13301,13 @@ def extract_menu_stubs_from_url(
             menu_snapshot.get("menu_mega_json") or mega_json,
             snapshot_id=menu_snapshot.get("id") or menu_snapshot.get("snapshot_id") or "",
         )
+        menu_source_pdf = create_menu_source_pdf(
+            menu_url,
+            sections,
+            progress_callback=progress_callback,
+            cancellation_check=cancellation_check,
+        )
+        run_cancellation_check(cancellation_check)
 
         result = build_menu_stub_extract_result_from_items(
             menu_url,
@@ -12518,6 +13319,7 @@ def extract_menu_stubs_from_url(
             progress_callback=progress_callback,
             cancellation_check=cancellation_check,
             menu_snapshot=menu_snapshot,
+            menu_source_pdf=menu_source_pdf,
         )
         cleanup_debug = (
             result.get("debug", {}).get("menu_cleanup")
@@ -12551,7 +13353,7 @@ def extract_menu_stubs_from_url(
 
 
 def extract_menu_recipes_from_url(menu_url, progress_callback=None, cancellation_check=None):
-    menu_url = str(menu_url or "").strip()
+    menu_url = canonical_menu_source_url(menu_url)
     if not menu_url:
         return {
             "ok": False,
@@ -12573,6 +13375,14 @@ def extract_menu_recipes_from_url(menu_url, progress_callback=None, cancellation
                 "created_count": 0,
             }
 
+        menu_source_pdf = create_menu_source_pdf(
+            menu_url,
+            section_result.get("sections") or [],
+            progress_callback=progress_callback,
+            cancellation_check=cancellation_check,
+        )
+        run_cancellation_check(cancellation_check)
+
         return build_menu_extract_result_from_items(
             menu_url,
             section_result.get("sections") or [],
@@ -12582,6 +13392,7 @@ def extract_menu_recipes_from_url(menu_url, progress_callback=None, cancellation
             diagnostics=section_result.get("diagnostics") or {},
             progress_callback=progress_callback,
             cancellation_check=cancellation_check,
+            menu_source_pdf=menu_source_pdf,
         )
     except Exception as exc:
         if is_job_cancelled_exception(exc):

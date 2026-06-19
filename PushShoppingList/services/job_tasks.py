@@ -1588,6 +1588,11 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
         "estimated_token_usage": {},
         "menu_sections_found": 0,
         "menu_items_found": 0,
+        "menu_source_pdf_statuses": [],
+        "menu_source_url": "",
+        "menu_source_pdf_status": "",
+        "menu_source_pdf_path": "",
+        "menu_source_cloudflare_pdf_url": "",
     }
     job_model = stored_job_model_metadata(job_id, model_metadata(
         resolve_menu_cleanup_model() if menu_extract else MODEL,
@@ -1698,6 +1703,21 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
                 if committed.get("menu_mega_json_saved"):
                     menu_job_stats["menu_mega_json_saved"] = True
                     menu_job_stats["menu_mega_json_snapshots_created"] += 1
+                if committed.get("menu_source_pdf_status"):
+                    menu_job_stats["menu_source_pdf_statuses"].append({
+                        "menu_source_url": committed.get("menu_source_url", ""),
+                        "status": committed.get("menu_source_pdf_status", ""),
+                        "source_pdf_path": committed.get("menu_source_pdf_path", ""),
+                        "source_cloudflare_pdf_url": committed.get("menu_source_cloudflare_pdf_url", ""),
+                    })
+                    for key in (
+                        "menu_source_url",
+                        "menu_source_pdf_status",
+                        "menu_source_pdf_path",
+                        "menu_source_cloudflare_pdf_url",
+                    ):
+                        if not menu_job_stats.get(key):
+                            menu_job_stats[key] = committed.get(key, "")
                 if snapshot_id and snapshot_id not in menu_job_stats["menu_mega_snapshot_ids"]:
                     menu_job_stats["menu_mega_snapshot_ids"].append(snapshot_id)
                 for key in (

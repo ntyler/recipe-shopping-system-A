@@ -13,6 +13,21 @@ def configure_menu_model_defaults(monkeypatch, tmp_path):
     monkeypatch.delenv("OPENAI_MENU_MODEL", raising=False)
 
 
+def shared_menu_source_pdf(url):
+    canonical_url = recipe_extract_service.canonical_menu_source_url(url)
+    return {
+        "ok": True,
+        "menu_source_url": canonical_url,
+        "menu_source_pdf_status": "ready",
+        "menu_source_pdf_path": "D:/shared/menu-source.pdf",
+        "menu_source_cloudflare_pdf_url": "https://public.example.com/recipe-pdfs/menu-source.pdf",
+        "source_pdf_path": "D:/shared/menu-source.pdf",
+        "source_cloudflare_pdf_url": "https://public.example.com/recipe-pdfs/menu-source.pdf",
+        "source_cloudflare_pdf_path": "https://public.example.com/recipe-pdfs/menu-source.pdf",
+        "item_count": 1,
+    }
+
+
 def test_default_menu_nutrition_inference_contains_full_nutrition_fields():
     inference = menu_mega_json_service.default_nutrition_inference()
 
@@ -46,6 +61,80 @@ def test_default_menu_nutrition_inference_contains_full_nutrition_fields():
     assert inference["carbs_g"] is None
     assert inference["fat_g"] is None
     assert inference["sodium_mg"] is None
+
+
+def test_canonical_menu_source_url_removes_menu_item_deep_link():
+    assert recipe_extract_service.canonical_menu_source_url(
+        "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-1-Spring_Roll"
+    ) == "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902"
+    assert recipe_extract_service.canonical_menu_source_url(
+        "https://www.velasiancuisine.com/rs/menuItem_home.action?resInput=RES4902&menuIdInput=MEN1&menuItemIdInput=MIT1&orderType=null"
+    ) == "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902"
+
+
+def test_save_menu_item_preserves_shared_source_pdf_without_per_item_attach(monkeypatch, tmp_path):
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+    monkeypatch.setattr(recipe_extract_service, "OUTPUT_FOLDER", output_dir)
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "maybe_upload_recipe_archive_pdf_to_cloudflare",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("Should not upload per-item Source PDF")),
+    )
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "attach_cloudflare_pdf_metadata",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("Should not attach per-item Source PDF")),
+    )
+
+    recipe_url = "https://example.com/menu_home.action?resInput=RES1&menu_item=menu-item-1-basil"
+    payload = {
+        "source_url": recipe_url,
+        "recipe_title": "Basil Chicken",
+        "source_type": "menu_item_inferred",
+        "ai_inferred": True,
+        "source_menu_url": "https://example.com/menu_home.action?resInput=RES1",
+        **shared_menu_source_pdf("https://example.com/menu_home.action?resInput=RES1"),
+    }
+
+    json_path = recipe_extract_service.save_extracted_recipe_json(recipe_url, payload)
+    saved = json.loads(json_path.read_text(encoding="utf-8"))
+
+    assert saved["source_pdf_path"] == "D:/shared/menu-source.pdf"
+    assert saved["source_cloudflare_pdf_url"] == "https://public.example.com/recipe-pdfs/menu-source.pdf"
+    assert saved["menu_source_pdf_status"] == "ready"
+
+
+def test_save_menu_item_without_valid_shared_pdf_does_not_attach_per_item_pdf(monkeypatch, tmp_path):
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+    monkeypatch.setattr(recipe_extract_service, "OUTPUT_FOLDER", output_dir)
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "maybe_upload_recipe_archive_pdf_to_cloudflare",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("Should not upload per-item Source PDF")),
+    )
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "attach_cloudflare_pdf_metadata",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("Should not attach per-item Source PDF")),
+    )
+
+    recipe_url = "https://example.com/menu_home.action?resInput=RES1&menu_item=menu-item-1-basil"
+    payload = {
+        "source_url": recipe_url,
+        "recipe_title": "Basil Chicken",
+        "source_type": "menu_item_inferred",
+        "ai_inferred": True,
+        "source_menu_url": "https://example.com/menu_home.action?resInput=RES1",
+    }
+
+    json_path = recipe_extract_service.save_extracted_recipe_json(recipe_url, payload)
+    saved = json.loads(json_path.read_text(encoding="utf-8"))
+
+    assert saved["source_pdf_path"] == ""
+    assert saved["source_cloudflare_pdf_url"] == ""
+    assert saved["menu_source_pdf_status"] == "not_attached"
 
 
 def test_menu_nutrition_inference_from_rows_maps_full_nutrition_fields(monkeypatch):
@@ -337,6 +426,15 @@ def test_menu_stub_url_import_saves_mega_snapshot_and_parent_traceability(monkey
     monkeypatch.setattr(recipe_extract_service, "fetch_cartana_menu_payload", lambda url, html, cancellation_check=None: (payload, {"ok": True}))
     monkeypatch.setattr(recipe_extract_service, "send_menu_cleanup_prompt_to_openai", fail_openai)
     monkeypatch.setattr(recipe_extract_service, "infer_menu_item_recipe", fail_openai)
+    source_pdf_calls = []
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "create_menu_source_pdf",
+        lambda url, sections, progress_callback=None, cancellation_check=None: (
+            source_pdf_calls.append((url, len(recipe_extract_service.flatten_menu_sections(sections)))),
+            shared_menu_source_pdf(url),
+        )[1],
+    )
     monkeypatch.setattr(
         recipe_extract_service,
         "save_extracted_recipe_json",
@@ -354,6 +452,10 @@ def test_menu_stub_url_import_saves_mega_snapshot_and_parent_traceability(monkey
     assert result["stubs_created"] == 1
     assert result["item_records_unpacked"] == 1
     assert result["openai_calls_used"] == 0
+    assert source_pdf_calls == [(source_url, 1)]
+    assert result["menu_source_pdf_status"] == "ready"
+    assert result["source_pdf_path"] == "D:/shared/menu-source.pdf"
+    assert result["source_cloudflare_pdf_url"] == "https://public.example.com/recipe-pdfs/menu-source.pdf"
     assert "Building mega menu JSON" in progress_messages
     assert "Saving mega menu JSON" in progress_messages
     assert "Unpacking mega menu JSON into item JSON records" in progress_messages
@@ -363,6 +465,9 @@ def test_menu_stub_url_import_saves_mega_snapshot_and_parent_traceability(monkey
     assert saved[0][1]["ai_inferred"] is True
     assert saved[0][1]["parent_menu_snapshot_id"] == snapshot["id"]
     assert saved[0][1]["source_metadata"]["parent_menu_snapshot_id"] == snapshot["id"]
+    assert saved[0][1]["source_pdf_path"] == "D:/shared/menu-source.pdf"
+    assert saved[0][1]["source_cloudflare_pdf_url"] == "https://public.example.com/recipe-pdfs/menu-source.pdf"
+    assert saved[0][1]["menu_source_pdf_path"] == "D:/shared/menu-source.pdf"
     assert saved[0][1]["recipe_inference"]["status"] == "not_generated"
     assert saved[0][1]["nutrition_inference"]["status"] == "not_generated"
     assert saved[0][1]["pdf_generation"]["status"] == "not_generated"
@@ -902,6 +1007,11 @@ def test_menu_stub_url_import_updates_snapshot_with_cookbook_and_cleanup(monkeyp
     monkeypatch.setattr(recipe_extract_service, "fetch_menu_page_html", fake_fetch_menu_page_html)
     monkeypatch.setattr(recipe_extract_service, "fetch_cartana_menu_payload", lambda url, html, cancellation_check=None: (payload, {"ok": True}))
     monkeypatch.setattr(recipe_extract_service, "send_menu_cleanup_prompt_to_openai", fake_cleanup)
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "create_menu_source_pdf",
+        lambda url, sections, progress_callback=None, cancellation_check=None: shared_menu_source_pdf(url),
+    )
     monkeypatch.setattr(recipe_extract_service, "save_extracted_recipe_json", lambda recipe_url, json_data: tmp_path / "stub.json")
 
     result = recipe_extract_service.extract_menu_stubs_from_url(
@@ -916,6 +1026,8 @@ def test_menu_stub_url_import_updates_snapshot_with_cookbook_and_cleanup(monkeyp
     assert snapshot["import_job_id"] == "job-123"
     assert snapshot["cookbook_id"] == "cb1"
     assert snapshot["cookbook_name"] == "Dinner"
+    assert result["menu_source_pdf_status"] == "ready"
+    assert result["source_pdf_path"] == "D:/shared/menu-source.pdf"
     assert snapshot["used_openai"] is True
     assert snapshot["openai_model"] == "gpt-4o-mini"
     assert item["name"] == "Spring Roll"
@@ -1017,3 +1129,86 @@ def test_commit_menu_import_stubs_skips_full_routine(monkeypatch, tmp_path):
     assert added_urls == [recipe_url]
     assert saved[0][1]["cookbook_id"] == "cb1"
     assert saved[0][1]["cookbook_name"] == "Dinner"
+
+
+def test_commit_menu_import_full_recipes_reuses_shared_source_pdf(monkeypatch, tmp_path):
+    source_url = "https://example.com/menu_home.action?resInput=RES1"
+    recipe_urls = [
+        source_url + "&menu_item=menu-item-1-basil",
+        source_url + "&menu_item=menu-item-2-curry",
+    ]
+    shared_pdf = shared_menu_source_pdf(source_url)
+    recipes = [
+        {
+            "ok": True,
+            "source_url": recipe_urls[0],
+            "display_name": "Basil Chicken",
+            "recipe_title": "Basil Chicken",
+            "source_type": "menu_item_inferred",
+            "ai_inferred": True,
+            "ingredients": ["chicken", "basil"],
+            "instructions": [{"instruction": "Stir fry."}],
+        },
+        {
+            "ok": True,
+            "source_url": recipe_urls[1],
+            "display_name": "Curry Chicken",
+            "recipe_title": "Curry Chicken",
+            "source_type": "menu_item_inferred",
+            "ai_inferred": True,
+            "ingredients": ["chicken", "curry paste"],
+            "instructions": [{"instruction": "Simmer."}],
+        },
+    ]
+    ingredient_metadata = []
+
+    def fail_source_pdf(*_args, **_kwargs):
+        raise AssertionError("Menu item loop must not create per-item Source PDFs")
+
+    monkeypatch.setattr(recipe_routes, "load_recipe_urls", lambda: [])
+    monkeypatch.setattr(recipe_routes, "add_items", lambda ingredients: None)
+    monkeypatch.setattr(
+        recipe_routes,
+        "save_ingredients_for_recipe",
+        lambda url, ingredients, result: ingredient_metadata.append((url, dict(result))),
+    )
+    monkeypatch.setattr(recipe_routes, "save_recipe_url_name", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(recipe_routes, "add_recipe_urls", lambda urls: None)
+    monkeypatch.setattr(recipe_routes, "save_import_cookbook_assignment", lambda *_args, **_kwargs: {"cookbook_id": "cb1", "cookbook_name": "Dinner"})
+    monkeypatch.setattr(recipe_routes, "record_recipe_import_activity", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(recipe_routes, "create_source_url_pdf", fail_source_pdf)
+    monkeypatch.setattr(
+        recipe_routes,
+        "run_generated_recipe_pdf_creation",
+        lambda url, context="menu-import": {
+            "ok": True,
+            "generated_pdf_path": f"D:/generated/{recipe_extract_service.safe_filename(url)}.pdf",
+            "generated_cloudflare_pdf_url": f"https://public.example.com/generated/{recipe_extract_service.safe_filename(url)}.pdf",
+        },
+    )
+    monkeypatch.setattr(
+        recipe_routes,
+        "apply_imported_recipe_category_routine",
+        lambda *_args, **_kwargs: {"ok": True, "status": "updated"},
+    )
+    monkeypatch.setattr(recipe_routes, "sort_ingredients", lambda: None)
+
+    result = recipe_routes.commit_menu_import_result(
+        {
+            "ok": True,
+            "recipes": recipes,
+            "menu_extract": True,
+            **shared_pdf,
+        },
+        {"id": "cb1", "name": "Dinner"},
+    )
+
+    assert result["ok"] is True
+    assert result["created_urls"] == recipe_urls
+    assert result["menu_source_pdf_status"] == "ready"
+    assert {row[1]["source_pdf_path"] for row in ingredient_metadata} == {"D:/shared/menu-source.pdf"}
+    assert {row[1]["source_cloudflare_pdf_url"] for row in ingredient_metadata} == {
+        "https://public.example.com/recipe-pdfs/menu-source.pdf"
+    }
+    assert [status["shared_source_pdf"] for status in result["source_pdf_statuses"]] == [True, True]
+    assert {status["source_pdf_path"] for status in result["source_pdf_statuses"]} == {"D:/shared/menu-source.pdf"}

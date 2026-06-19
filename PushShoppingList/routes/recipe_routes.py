@@ -59,6 +59,8 @@ from PushShoppingList.services.recipe_extract_service import get_openai_error_co
 from PushShoppingList.services.recipe_extract_service import get_openai_client
 from PushShoppingList.services.recipe_extract_service import build_extract_result
 from PushShoppingList.services.recipe_extract_service import build_menu_stub_extract_result_from_items
+from PushShoppingList.services.recipe_extract_service import apply_menu_source_pdf_metadata
+from PushShoppingList.services.recipe_extract_service import menu_source_pdf_metadata_from_result
 from PushShoppingList.services.recipe_extract_service import log_vision_debug_step
 from PushShoppingList.services.recipe_extract_service import send_image_prompt_to_openai
 from PushShoppingList.services.recipe_extract_service import supports_custom_temperature
@@ -1772,6 +1774,7 @@ def commit_menu_import_result(
     source_pdf_statuses = []
     commit_failures = []
     has_stubs = any(menu_import_result_is_stub(recipe_result) for recipe_result in recipes)
+    menu_source_pdf = menu_source_pdf_metadata_from_result(result)
 
     _menu_progress(
         progress_callback,
@@ -1797,6 +1800,7 @@ def commit_menu_import_result(
             continue
 
         recipe_url = str(recipe_result.get("source_url") or "").strip()
+        apply_menu_source_pdf_metadata(recipe_result, menu_source_pdf)
         ingredients = recipe_result.get("ingredients") if isinstance(recipe_result.get("ingredients"), list) else []
         is_stub = menu_import_result_is_stub(recipe_result)
         if not recipe_url or not recipe_result.get("ok") or (not ingredients and not is_stub):
@@ -1812,6 +1816,7 @@ def commit_menu_import_result(
 
         if is_stub:
             recipe_payload = menu_stub_recipe_payload(recipe_result, recipe_url, cookbook)
+            apply_menu_source_pdf_metadata(recipe_payload, menu_source_pdf)
             save_extracted_recipe_json(recipe_url, recipe_payload)
             recipe_result = {
                 **recipe_result,
@@ -1896,16 +1901,23 @@ def commit_menu_import_result(
         )
         for entry in new_recipe_entries:
             recipe_url = entry["url"]
-            try:
+            if menu_source_pdf:
                 source_pdf_statuses.append({
                     "recipe_url": recipe_url,
-                    "result": create_source_url_pdf(recipe_url),
+                    "shared_source_pdf": True,
+                    "ok": bool(menu_source_pdf.get("ok")),
+                    "status": menu_source_pdf.get("menu_source_pdf_status", ""),
+                    "source_pdf_path": menu_source_pdf.get("source_pdf_path", ""),
+                    "source_cloudflare_pdf_url": menu_source_pdf.get("source_cloudflare_pdf_url", ""),
+                    "result": menu_source_pdf,
                 })
-            except Exception as exc:
+            else:
                 source_pdf_statuses.append({
                     "recipe_url": recipe_url,
+                    "shared_source_pdf": True,
                     "ok": False,
-                    "error": str(exc),
+                    "status": "not_attached",
+                    "error": "Menu import did not provide a validated shared Source PDF.",
                 })
 
             _menu_progress(
@@ -1988,6 +2000,33 @@ def commit_menu_import_result(
         "ok": ok,
         "success": ok,
         "menu_extract": True,
+        "menu_source_url": (
+            menu_source_pdf.get("menu_source_url")
+            or result.get("menu_source_url")
+            or result.get("source_url")
+            or ""
+        ),
+        "menu_source_pdf_status": (
+            menu_source_pdf.get("menu_source_pdf_status")
+            or result.get("menu_source_pdf_status")
+            or ""
+        ),
+        "menu_source_pdf_path": (
+            menu_source_pdf.get("menu_source_pdf_path")
+            or result.get("menu_source_pdf_path")
+            or ""
+        ),
+        "menu_source_cloudflare_pdf_url": (
+            menu_source_pdf.get("menu_source_cloudflare_pdf_url")
+            or result.get("menu_source_cloudflare_pdf_url")
+            or ""
+        ),
+        "source_pdf_path": menu_source_pdf.get("source_pdf_path") or result.get("source_pdf_path") or "",
+        "source_cloudflare_pdf_url": (
+            menu_source_pdf.get("source_cloudflare_pdf_url")
+            or result.get("source_cloudflare_pdf_url")
+            or ""
+        ),
         "created_count": len(newly_created),
         "committed_count": len(committed),
         "stubs_created": len(new_stub_entries),
