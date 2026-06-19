@@ -9495,13 +9495,13 @@ def menu_item_inference_worker_count(total_items=None):
 
 def menu_item_batch_size_limits():
     try:
-        configured_max = int(os.getenv("MENU_ITEM_BATCH_INFERENCE_MAX_ITEMS", "25"))
+        configured_max = int(os.getenv("MENU_ITEM_BATCH_INFERENCE_MAX_ITEMS", "12"))
     except (TypeError, ValueError):
-        configured_max = 25
+        configured_max = 12
     try:
-        configured_min = int(os.getenv("MENU_ITEM_BATCH_INFERENCE_MIN_ITEMS", "10"))
+        configured_min = int(os.getenv("MENU_ITEM_BATCH_INFERENCE_MIN_ITEMS", "6"))
     except (TypeError, ValueError):
-        configured_min = 10
+        configured_min = 6
     max_items = max(1, min(25, configured_max))
     min_items = max(1, min(max_items, configured_min))
     return min_items, max_items
@@ -9509,9 +9509,15 @@ def menu_item_batch_size_limits():
 
 def menu_item_batch_target_chars():
     try:
-        return max(4000, int(os.getenv("MENU_ITEM_BATCH_INFERENCE_TARGET_CHARS", "18000")))
+        return max(4000, int(os.getenv("MENU_ITEM_BATCH_INFERENCE_TARGET_CHARS", "9000")))
     except (TypeError, ValueError):
-        return 18000
+        return 9000
+
+
+MENU_ITEM_BATCH_SPLITTABLE_ERROR_CODES = {
+    "OPENAI_TIMEOUT",
+    "OPENAI_CONNECTION_ERROR",
+}
 
 
 def menu_page_request_headers():
@@ -10236,7 +10242,7 @@ def _coerce_batch_inference_payload(payload):
     return {}
 
 
-def infer_menu_item_recipe_batch(entries, user_id=None):
+def _infer_menu_item_recipe_batch_once(entries, user_id=None):
     model_resolution = menu_item_recipe_model_resolution()
     action_name = "menu-item-recipe-batch-inference"
     try:
@@ -10270,6 +10276,7 @@ def infer_menu_item_recipe_batch(entries, user_id=None):
         return {
             "ok": False,
             "items": {},
+            "failures": {},
             "error_code": error_code,
             "error_message": error_message or str(exc),
             "technical_message": str(exc),
@@ -10279,6 +10286,124 @@ def infer_menu_item_recipe_batch(entries, user_id=None):
             "model": model_resolution.model,
             "model_source": model_resolution.source,
         }
+
+
+def menu_batch_entry_item_id(entry):
+    entry = entry if isinstance(entry, dict) else {}
+    menu_item = entry.get("menu_item") if isinstance(entry.get("menu_item"), dict) else {}
+    return clean_recipe_text(menu_item.get("menu_item_id") or entry.get("menu_item_id") or "")
+
+
+def menu_batch_failure_map(entries, batch_result):
+    batch_result = batch_result if isinstance(batch_result, dict) else {}
+    items = batch_result.get("items") if isinstance(batch_result.get("items"), dict) else {}
+    error = (
+        batch_result.get("error_message")
+        or batch_result.get("error")
+        or batch_result.get("technical_message")
+        or "Unable to infer this menu item batch."
+    )
+    failures = {}
+    for entry in entries or []:
+        item_id = menu_batch_entry_item_id(entry)
+        if item_id and isinstance(items.get(item_id), dict):
+            continue
+        failures[item_id or str(len(failures) + 1)] = {
+            "error": error,
+            "error_code": batch_result.get("error_code", ""),
+            "exception_type": batch_result.get("exception_type", ""),
+            "model": batch_result.get("model", ""),
+            "model_source": batch_result.get("model_source", ""),
+        }
+    return failures
+
+
+def menu_batch_result_can_split(batch_result):
+    batch_result = batch_result if isinstance(batch_result, dict) else {}
+    error_code = clean_recipe_text(batch_result.get("error_code"))
+    exception_type = clean_recipe_text(batch_result.get("exception_type")).lower()
+    error_text = clean_recipe_text(
+        batch_result.get("technical_message")
+        or batch_result.get("error_message")
+        or batch_result.get("error")
+    ).lower()
+    return bool(
+        error_code in MENU_ITEM_BATCH_SPLITTABLE_ERROR_CODES
+        or exception_type in {"apitimeouterror", "timeouterror", "apiconnectionerror"}
+        or "timed out" in error_text
+        or "timeout" in error_text
+    )
+
+
+def combine_menu_batch_results(results):
+    combined_items = {}
+    combined_failures = {}
+    model = ""
+    model_source = ""
+    error_messages = []
+
+    for result in results:
+        result = result if isinstance(result, dict) else {}
+        if not model:
+            model = result.get("model", "")
+        if not model_source:
+            model_source = result.get("model_source", "")
+        items = result.get("items") if isinstance(result.get("items"), dict) else {}
+        combined_items.update(items)
+        failures = result.get("failures") if isinstance(result.get("failures"), dict) else {}
+        combined_failures.update(failures)
+        if not result.get("ok"):
+            error_messages.append(
+                result.get("error_message")
+                or result.get("error")
+                or "Unable to infer part of this menu item batch."
+            )
+
+    for item_id in list(combined_failures.keys()):
+        if item_id and item_id in combined_items:
+            combined_failures.pop(item_id, None)
+
+    return {
+        "ok": not combined_failures,
+        "items": combined_items,
+        "failures": combined_failures,
+        "error_message": "; ".join(dict.fromkeys(error_messages)),
+        "model": model,
+        "model_source": model_source,
+    }
+
+
+def infer_menu_item_recipe_batch(entries, user_id=None):
+    entries = [entry for entry in entries or [] if isinstance(entry, dict)]
+    if not entries:
+        model_resolution = menu_item_recipe_model_resolution()
+        return {
+            "ok": True,
+            "items": {},
+            "failures": {},
+            "model": model_resolution.model,
+            "model_source": model_resolution.source,
+        }
+
+    result = _infer_menu_item_recipe_batch_once(entries, user_id=user_id)
+    if result.get("ok") or len(entries) <= 1 or not menu_batch_result_can_split(result):
+        if not result.get("ok"):
+            result["failures"] = menu_batch_failure_map(entries, result)
+        else:
+            result.setdefault("failures", {})
+        return result
+
+    midpoint = max(1, len(entries) // 2)
+    print(
+        "[OpenAI] action=menu-item-recipe-batch-inference_batch_split "
+        f"batch_size={len(entries)} left_size={midpoint} right_size={len(entries) - midpoint} "
+        f"error_code={result.get('error_code') or 'n/a'} "
+        f"exception_type={result.get('exception_type') or 'n/a'} "
+        f"model={result.get('model') or ''}"
+    )
+    left = infer_menu_item_recipe_batch(entries[:midpoint], user_id=user_id)
+    right = infer_menu_item_recipe_batch(entries[midpoint:], user_id=user_id)
+    return combine_menu_batch_results([left, right])
 
 
 def menu_item_source_url(menu_url, title, index):

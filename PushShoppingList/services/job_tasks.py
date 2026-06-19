@@ -405,12 +405,23 @@ def run_menu_generate_recipes_job(job_id, payload):
             ensure_not_cancelled(job_id)
             batch_result = infer_menu_item_recipe_batch(batch, user_id=active_user_id())
             result_items = batch_result.get("items") if isinstance(batch_result.get("items"), dict) else {}
+            failure_items = batch_result.get("failures") if isinstance(batch_result.get("failures"), dict) else {}
             missing_ids = [
                 str((entry.get("menu_item") or {}).get("menu_item_id") or "").strip()
                 for entry in batch
                 if str((entry.get("menu_item") or {}).get("menu_item_id") or "").strip() not in result_items
             ]
             if batch_result.get("ok") and not missing_ids:
+                break
+            if result_items:
+                append_job_warning(
+                    job_id,
+                    (
+                        f"Batch {batch_index}/{batch_total} returned partial recipe predictions; "
+                        f"{len(missing_ids or failure_items)} item(s) still need attention. "
+                        f"{batch_result.get('error_message') or ''}"
+                    ).strip(),
+                )
                 break
             if attempt == 0:
                 append_job_warning(
@@ -424,18 +435,28 @@ def run_menu_generate_recipes_job(job_id, payload):
                     batch_result = {**batch_result, "ok": False}
 
         result_items = batch_result.get("items") if isinstance(batch_result.get("items"), dict) else {}
+        failure_items = batch_result.get("failures") if isinstance(batch_result.get("failures"), dict) else {}
         missing_ids = [
             str((entry.get("menu_item") or {}).get("menu_item_id") or "").strip()
             for entry in batch
             if str((entry.get("menu_item") or {}).get("menu_item_id") or "").strip() not in result_items
         ]
-        if not batch_result.get("ok") or missing_ids:
+        if not result_items:
             failed_items += len(batch)
             append_job_warning(
                 job_id,
                 f"Batch {batch_index}/{batch_total}: {batch_result.get('error_message') or ('Missing menu_item_id: ' + ', '.join(missing_ids[:3]) if missing_ids else 'Unable to predict recipes.')}",
             )
             continue
+        if not batch_result.get("ok") or missing_ids:
+            append_job_warning(
+                job_id,
+                (
+                    f"Batch {batch_index}/{batch_total}: keeping {len(result_items)} predicted recipe(s); "
+                    f"{len(missing_ids)} item(s) failed. "
+                    f"{batch_result.get('error_message') or ''}"
+                ).strip(),
+            )
 
         for entry in batch:
             ensure_not_cancelled(job_id)
@@ -450,7 +471,14 @@ def run_menu_generate_recipes_job(job_id, payload):
             item_result = result_items.get(item_id)
             if not isinstance(item_result, dict):
                 failed_items += 1
-                append_job_warning(job_id, f"{recipe_url}: Batch response did not include menu_item_id {item_id}.")
+                failure = failure_items.get(item_id) if isinstance(failure_items.get(item_id), dict) else {}
+                append_job_warning(
+                    job_id,
+                    (
+                        f"{recipe_url}: "
+                        f"{failure.get('error') or f'Batch response did not include menu_item_id {item_id}.'}"
+                    ).strip(),
+                )
                 continue
 
             update_job_progress(

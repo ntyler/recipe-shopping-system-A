@@ -347,6 +347,110 @@ def test_menu_generate_job_runs_decide_all_categories_after_generation(monkeypat
     assert finished["result_payload"]["category_statuses"][0]["recipe_url"] == recipe_url
 
 
+def test_menu_generate_job_keeps_partial_batch_predictions(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    recipe_urls = [
+        "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=spring-roll",
+        "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=crab-wonton",
+    ]
+    stubs = {
+        recipe_urls[0]: {
+            "source_url": recipe_urls[0],
+            "recipe_title": "Spring Roll",
+            "display_name": "Spring Roll",
+            "needs_ai_recipe": True,
+            "recipe_status": "stub",
+            "menu_item_id": "item-1",
+            "cookbook_id": "cb1",
+            "cookbook_name": "Dinner",
+        },
+        recipe_urls[1]: {
+            "source_url": recipe_urls[1],
+            "recipe_title": "Crab Wonton",
+            "display_name": "Crab Wonton",
+            "needs_ai_recipe": True,
+            "recipe_status": "stub",
+            "menu_item_id": "item-2",
+            "cookbook_id": "cb1",
+            "cookbook_name": "Dinner",
+        },
+    }
+    saved_urls = []
+
+    monkeypatch.setattr(recipe_routes, "load_editable_recipe", lambda url: {"recipe": stubs[url]})
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "menu_batch_item_from_stub",
+        lambda url, loaded_stub, index: {
+            "menu_item_id": loaded_stub["menu_item_id"],
+            "item_name": loaded_stub["recipe_title"],
+            "menu_section": "Appetizers",
+        },
+    )
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "infer_menu_item_recipe_batch",
+        lambda batch, user_id=None: {
+            "ok": False,
+            "items": {"item-1": {"predicted_ingredients": ["rice paper"]}},
+            "failures": {"item-2": {"error": "Vision AI request timed out."}},
+            "error_message": "Vision AI request timed out.",
+            "model": "gpt-test",
+            "model_source": "test",
+        },
+    )
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "apply_menu_batch_inference_to_stub",
+        lambda url, loaded_stub, menu_item, inference, model="", model_source="": {
+            "ok": True,
+            "source_url": url,
+            "display_name": loaded_stub["display_name"],
+            "recipe_title": loaded_stub["recipe_title"],
+            "ingredients": [{"ingredient": "rice paper"}],
+            "instructions": [{"instruction": "Roll and serve."}],
+            "cookbook_id": loaded_stub.get("cookbook_id"),
+            "cookbook_name": loaded_stub.get("cookbook_name"),
+        },
+    )
+    monkeypatch.setattr(recipe_routes, "add_items", lambda ingredients: None)
+    monkeypatch.setattr(recipe_routes, "save_ingredients_for_recipe", lambda url, ingredients, result: saved_urls.append(url))
+    monkeypatch.setattr(recipe_routes, "save_recipe_url_name", lambda url, name: None)
+    monkeypatch.setattr(recipe_routes, "record_recipe_import_activity", lambda *args, **kwargs: None)
+    monkeypatch.setattr(recipe_extract_service, "menu_inference_batches", lambda entries: [entries])
+    monkeypatch.setattr(cookbook_service, "cookbook_recipe_assignment_for_url", lambda url: {
+        "cookbook_id": "cb1",
+        "cookbook_name": "Dinner",
+    })
+    monkeypatch.setattr("PushShoppingList.services.recipe_url_service.add_recipe_urls", lambda urls: None)
+    monkeypatch.setattr("PushShoppingList.scripts.sort_ingredients.main", lambda: None)
+    monkeypatch.setattr(
+        recipe_routes,
+        "apply_imported_recipe_category_routine",
+        lambda url, result, assignment, trigger_source="": {"ok": True, "status": "updated"},
+    )
+
+    job = job_service.create_job(
+        "menu-generate-recipes",
+        input_payload={
+            "recipe_urls": recipe_urls,
+            "run_deferred_heavy_tasks": False,
+        },
+        user_id="owner",
+        total_items=2,
+    )
+
+    finished = job_tasks.run_menu_generate_recipes_job(job["id"], job["input_payload"])
+
+    assert finished["status"] == "completed"
+    assert saved_urls == [recipe_urls[0]]
+    assert finished["result_payload"]["created_count"] == 1
+    assert finished["result_payload"]["failed_count"] == 1
+    assert finished["result_payload"]["generated_recipe_urls"] == [recipe_urls[0]]
+    assert any("keeping 1 predicted recipe" in warning for warning in finished["warning_messages"])
+    assert any("Vision AI request timed out." in warning for warning in finished["warning_messages"])
+
+
 def test_menu_deferred_heavy_task_route_uses_recipe_item_sources(monkeypatch, tmp_path):
     configure_job_paths(monkeypatch, tmp_path)
     recipe_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=spring-roll"

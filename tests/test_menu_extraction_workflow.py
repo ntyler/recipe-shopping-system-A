@@ -603,7 +603,7 @@ def test_menu_item_inference_uses_changed_override_file_without_restart(monkeypa
     changed = recipe_extract_service.menu_item_recipe_model_resolution()
 
     assert changed.model == "gpt-4o-mini"
-    assert changed.source == "environment:OPENAI_MENU_MODEL"
+    assert changed.source == "admin override:OPENAI_MENU_MODEL"
     assert recipe_extract_service.menu_item_inference_progress_message(changed) == (
         "Inferring recipes with gpt-4o-mini via OPENAI_MENU_MODEL"
     )
@@ -716,6 +716,60 @@ def test_menu_inference_batches_cap_batch_size(monkeypatch):
     batches = recipe_extract_service.menu_inference_batches(entries)
 
     assert [len(batch) for batch in batches] == [25, 25, 2]
+
+
+def test_menu_batch_inference_splits_timeout_and_combines_results(monkeypatch):
+    entries = [
+        {
+            "recipe_url": f"https://example.com/menu?menu_item={index}",
+            "menu_item": {
+                "menu_item_id": f"item-{index}",
+                "item_name": f"Item {index}",
+                "menu_section": "Entrees",
+            },
+        }
+        for index in range(4)
+    ]
+    calls = []
+
+    def fake_once(batch, user_id=None):
+        calls.append({"size": len(batch), "user_id": user_id})
+        if len(batch) > 1:
+            return {
+                "ok": False,
+                "items": {},
+                "failures": {},
+                "error_code": "OPENAI_TIMEOUT",
+                "error_message": "Vision AI request timed out.",
+                "technical_message": "Request timed out.",
+                "exception_type": "APITimeoutError",
+                "model": "menu-mini",
+                "model_source": "environment:OPENAI_MENU_MODEL",
+            }
+        item_id = batch[0]["menu_item"]["menu_item_id"]
+        return {
+            "ok": True,
+            "items": {
+                item_id: {
+                    "predicted_ingredients": [{"ingredient": item_id}],
+                    "predicted_equipment": ["skillet"],
+                    "predicted_instructions": ["Cook it."],
+                }
+            },
+            "failures": {},
+            "model": "menu-mini",
+            "model_source": "environment:OPENAI_MENU_MODEL",
+        }
+
+    monkeypatch.setattr(recipe_extract_service, "_infer_menu_item_recipe_batch_once", fake_once)
+
+    result = recipe_extract_service.infer_menu_item_recipe_batch(entries, user_id="owner")
+
+    assert result["ok"] is True
+    assert sorted(result["items"]) == ["item-0", "item-1", "item-2", "item-3"]
+    assert result["failures"] == {}
+    assert [call["size"] for call in calls] == [4, 2, 1, 1, 2, 1, 1]
+    assert all(call["user_id"] == "owner" for call in calls)
 
 
 def test_menu_stub_optional_cleanup_is_one_batch_call_and_skips_duplicate(monkeypatch, tmp_path):
