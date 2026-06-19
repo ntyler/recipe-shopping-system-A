@@ -21071,22 +21071,36 @@ img[data-deferred-src] {
         }
 
         .job-activity-row {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
-            gap: 10px;
-            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            overflow: visible;
             border: 1px solid #283241;
             border-radius: 8px;
             background: #111827;
         }
 
-        .job-activity-row.job-activity-primary-active.job-activity-row-details-collapsed {
+        .job-activity-row-header {
             position: sticky;
             top: var(--job-activity-sticky-row-top);
             z-index: 1175;
-            border-color: #2563eb;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(160px, 224px);
+            gap: 10px;
+            padding: 10px;
+            border-bottom: 1px solid #283241;
+            border-radius: 7px 7px 0 0;
+            background: #111827;
+            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.32);
+        }
+
+        .job-activity-row-details-collapsed .job-activity-row-header {
+            border-bottom: 0;
+            border-radius: 7px;
+        }
+
+        .job-activity-row.job-activity-active .job-activity-row-header {
+            border-bottom-color: #2563eb;
             background: #101927;
-            box-shadow: 0 10px 22px rgba(0, 0, 0, 0.38);
         }
 
         .job-activity-row-main {
@@ -21184,6 +21198,7 @@ img[data-deferred-src] {
             flex-direction: column;
             gap: 6px;
             min-width: 0;
+            padding: 0 10px 10px;
         }
 
         .job-activity-row-details-collapsed .job-activity-row-details {
@@ -21278,12 +21293,13 @@ img[data-deferred-src] {
         .job-activity-actions {
             display: flex;
             align-items: flex-start;
+            align-content: flex-start;
             flex-wrap: wrap;
             gap: 6px;
         }
 
         @media (max-width: 640px) {
-            .job-activity-row {
+            .job-activity-row-header {
                 grid-template-columns: 1fr;
             }
 

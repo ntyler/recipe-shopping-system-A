@@ -698,22 +698,22 @@ function renderJobActivityRow(job, index = 0) {
     const active = jobIsActive(job);
     const sourceCount = jobSourceItems(job).length;
     const jobId = String(job.id || job.job_id || "").trim();
-    const detailsCanCollapse = active || sourceCount > 8;
-    const detailsExpanded = !detailsCanCollapse || jobActivityExpandedRows.has(jobId);
+    const detailsExpanded = jobActivityExpandedRows.has(jobId);
     const rowClasses = [
         "job-activity-row",
         `job-activity-${escapeAttribute(job.status || "unknown")}`,
-        active && index === 0 ? "job-activity-primary-active" : "",
-        detailsCanCollapse && !detailsExpanded ? "job-activity-row-details-collapsed" : "",
+        active ? "job-activity-active" : "",
+        index === 0 ? "job-activity-primary-row" : "",
+        !detailsExpanded ? "job-activity-row-details-collapsed" : "",
     ].filter(Boolean).join(" ");
-    const detailsToggleButton = detailsCanCollapse
-        ? `<button type="button"
-                   class="job-activity-row-action job-activity-detail-toggle"
-                   aria-expanded="${detailsExpanded ? "true" : "false"}"
-                   onclick="return toggleJobActivityRowDetails(this)">
-               ${detailsExpanded ? "Hide Details" : "Show Details"}
-           </button>`
-        : "";
+    const detailsToggleButton = `
+        <button type="button"
+                class="job-activity-row-action job-activity-detail-toggle"
+                aria-expanded="${detailsExpanded ? "true" : "false"}"
+                onclick="return toggleJobActivityRowDetails(this)">
+            ${detailsExpanded ? "Hide Details" : "Show Details"}
+        </button>
+    `;
     const openProgressButton = jobCanOpenImportProgress(job)
         ? `<button type="button" class="job-activity-row-action" onclick="return openJobActivityImportProgress('${escapeAttribute(job.id || job.job_id || "")}')">Open Popup</button>`
         : "";
@@ -738,36 +738,39 @@ function renderJobActivityRow(job, index = 0) {
 
     return `
         <article class="${rowClasses}" data-job-id="${escapeAttribute(jobId)}">
-            <div class="job-activity-row-main">
-                <div class="job-activity-row-title">
-                    <span>${escapeHtml(jobTypeLabel(job.job_type))}</span>
-                    <span class="job-activity-status">${escapeHtml(jobStatusLabel(job.status))}</span>
+            <div class="job-activity-row-header">
+                <div class="job-activity-row-main">
+                    <div class="job-activity-row-title">
+                        <span>${escapeHtml(jobTypeLabel(job.job_type))}</span>
+                        <span class="job-activity-status">${escapeHtml(jobStatusLabel(job.status))}</span>
+                    </div>
+                    <div class="job-activity-step">${escapeHtml(job.current_step || "Queued")}</div>
+                    ${currentRecipeHtml}
+                    ${modelHtml}
+                    <div class="job-activity-progress" aria-label="${percent}% complete">
+                        <span style="width: ${percent}%"></span>
+                    </div>
+                    <div class="job-activity-meta">
+                        <span>${percent}%</span>
+                        ${countText ? `<span>${escapeHtml(countText)}</span>` : ""}
+                        ${sourceCount ? `<span>${escapeHtml(String(sourceCount))} source${sourceCount === 1 ? "" : "s"}</span>` : ""}
+                        ${links.length ? `<span>${escapeHtml(String(links.length))} result${links.length === 1 ? "" : "s"}</span>` : ""}
+                    </div>
+                    ${error ? `<div class="job-activity-error">${escapeHtml(error)}</div>` : ""}
+                    ${warningHtml}
                 </div>
-                <div class="job-activity-step">${escapeHtml(job.current_step || "Queued")}</div>
-                ${currentRecipeHtml}
-                ${modelHtml}
-                <div class="job-activity-progress" aria-label="${percent}% complete">
-                    <span style="width: ${percent}%"></span>
-                </div>
-                <div class="job-activity-meta">
-                    <span>${percent}%</span>
-                    ${countText ? `<span>${escapeHtml(countText)}</span>` : ""}
-                    ${sourceCount ? `<span>${escapeHtml(String(sourceCount))} source${sourceCount === 1 ? "" : "s"}</span>` : ""}
-                </div>
-                ${error ? `<div class="job-activity-error">${escapeHtml(error)}</div>` : ""}
-                ${warningHtml}
-                <div class="job-activity-row-details" data-job-activity-row-details>
-                    ${workerHtml}
-                    ${sourceHtml}
-                    ${stageCountsHtml}
-                    ${linkHtml}
+                <div class="job-activity-actions">
+                    ${detailsToggleButton}
+                    ${openProgressButton}
+                    ${cancelButton}
+                    ${retryButton}
                 </div>
             </div>
-            <div class="job-activity-actions">
-                ${detailsToggleButton}
-                ${openProgressButton}
-                ${cancelButton}
-                ${retryButton}
+            <div class="job-activity-row-details" data-job-activity-row-details>
+                ${workerHtml}
+                ${sourceHtml}
+                ${stageCountsHtml}
+                ${linkHtml}
             </div>
         </article>
     `;
