@@ -20,6 +20,7 @@ DEFAULT_JOB_RETENTION_HOURS = 168
 DEFAULT_GUEST_JOB_RETENTION_HOURS = 24
 DEFAULT_JOB_TIMEOUT_MINUTES = 180
 DEFAULT_QUEUED_LIMIT_PER_OWNER_TYPE = 5
+DEFAULT_MENU_GENERATE_MAX_DEFER_ATTEMPTS = 30
 ACTIVE_LIMITS_BY_KEY = {
     "menu-import": 1,
     "menu-ai": 3,
@@ -698,6 +699,173 @@ def retry_delay_for_attempts(attempts):
     return min(60, 5 + (attempts * 5))
 
 
+def max_defer_attempts_for_job(job_type):
+    job_type = normalize_job_type(job_type)
+    if job_type == "menu-generate-recipes":
+        return env_int(
+            "MENU_GENERATE_RECIPES_MAX_DEFER_ATTEMPTS",
+            DEFAULT_MENU_GENERATE_MAX_DEFER_ATTEMPTS,
+            minimum=1,
+        )
+    return 0
+
+
+def job_row_age_seconds(row, reference_time=None):
+    if not row:
+        return 0
+    reference_time = reference_time or utc_now()
+    started = parse_iso_datetime(row["started_at"] if "started_at" in row.keys() else "")
+    updated = parse_iso_datetime(row["updated_at"] if "updated_at" in row.keys() else "")
+    created = parse_iso_datetime(row["created_at"] if "created_at" in row.keys() else "")
+    origin = started or updated or created
+    if not origin:
+        return 0
+    return max(0, int((reference_time - origin).total_seconds()))
+
+
+def source_menu_import_wait_status(connection, row, payload):
+    job_type = normalize_job_type(row["job_type"] if row else "")
+    if job_type != "menu-generate-recipes":
+        return {}
+
+    source_job_id = str((payload or {}).get("source_job_id") or "").strip()
+    if not source_job_id:
+        return {}
+
+    source_row = connection.execute("SELECT * FROM jobs WHERE id = ?", (source_job_id,)).fetchone()
+    if not source_row:
+        return {
+            "source_job_id": source_job_id,
+            "source_job_status": "missing",
+            "waiting": False,
+        }
+
+    source_type = normalize_job_type(source_row["job_type"])
+    source_status = normalize_status(source_row["status"])
+    if source_type == "menu-import" and source_status in ACTIVE_JOB_STATUSES:
+        return {
+            "source_job_id": source_job_id,
+            "source_job_status": source_status,
+            "waiting": True,
+        }
+
+    return {
+        "source_job_id": source_job_id,
+        "source_job_status": source_status,
+        "waiting": False,
+    }
+
+
+def running_limit_blockers(connection, row, limit_key, exclude_job_id=""):
+    owner_clause, owner_args = owner_where_clause(row["user_id"] or "", row["guest_session_id"] or "")
+    rows = connection.execute(
+        f"""
+        SELECT *
+          FROM jobs
+         WHERE {owner_clause}
+           AND status = 'running'
+         ORDER BY started_at ASC, updated_at ASC, created_at ASC
+        """,
+        owner_args,
+    ).fetchall()
+    return [
+        blocker
+        for blocker in rows
+        if str(blocker["id"] or "") != str(exclude_job_id or "")
+        and _row_limit_key(blocker) == limit_key
+    ]
+
+
+def stale_lock_info_for_row(row, reference_time=None):
+    reference_time = reference_time or utc_now()
+    age_seconds = job_row_age_seconds(row, reference_time=reference_time)
+    status = normalize_status(row["status"] if row else "")
+    has_finished_marker = bool(row and (row["completed_at"] or row["finished_at"]))
+    timeout_seconds = max(60, job_timeout_minutes() * 60)
+    stale = bool(
+        not row
+        or status in TERMINAL_JOB_STATUSES
+        or has_finished_marker
+        or age_seconds >= timeout_seconds
+    )
+    return {
+        "lock_owner_job_id": str(row["id"] or "") if row else "",
+        "lock_age_seconds": age_seconds,
+        "lock_stale": stale,
+        "lock_owner_status": status,
+    }
+
+
+def cleanup_stale_limit_blockers(connection, blockers, reference_time=None):
+    reference_time = reference_time or utc_now()
+    active = []
+    cleaned = []
+    now = now_iso()
+    for blocker in blockers or []:
+        info = stale_lock_info_for_row(blocker, reference_time=reference_time)
+        if not info.get("lock_stale"):
+            active.append(blocker)
+            continue
+
+        status = normalize_status(blocker["status"])
+        if status == "running":
+            connection.execute(
+                """
+                UPDATE jobs
+                   SET status = 'failed',
+                       current_step = 'Stale job lock cleared',
+                       error_message = 'This job was marked failed because its running lock became stale.',
+                       completed_at = COALESCE(completed_at, ?),
+                       finished_at = COALESCE(finished_at, ?),
+                       updated_at = ?
+                 WHERE id = ?
+                   AND status = 'running'
+                """,
+                (now, now, now, blocker["id"]),
+            )
+        cleaned.append(info)
+    return active, cleaned
+
+
+def update_deferred_job_row(connection, job_id, message, attempts, queue_name, now):
+    connection.execute(
+        """
+        UPDATE jobs
+           SET current_step = ?,
+               attempts = ?,
+               queue_name = COALESCE(NULLIF(?, ''), queue_name),
+               updated_at = ?
+         WHERE id = ?
+        """,
+        (message, attempts, queue_name, now, job_id),
+    )
+    return connection.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
+
+
+def defer_limit_result(connection, row, attempts, defer_reason, message, queue_name, now, **details):
+    max_attempts = max_defer_attempts_for_job(row["job_type"])
+    if not max_attempts or attempts <= max_attempts:
+        return None
+
+    error = (
+        f"Job deferred too many times waiting for {defer_reason}. "
+        f"max_defer_attempts={max_attempts}"
+    )
+    updated = update_deferred_job_row(connection, row["id"], error, attempts, queue_name, now)
+    return {
+        "started": False,
+        "ok": False,
+        "defer_limit_exceeded": True,
+        "defer_reason": defer_reason,
+        "max_defer_attempts": max_attempts,
+        "attempts": attempts,
+        "error": error,
+        "message": message or error,
+        "job": row_to_job(updated),
+        **details,
+    }
+
+
 def try_start_job(
     job_id,
     current_step="Starting",
@@ -728,35 +896,82 @@ def try_start_job(
         active_limit = active_limit_for_job(row["job_type"], payload)
         attempts = int(row["attempts"] or 0) + 1
         now = now_iso()
+        reference_time = utc_now()
+
+        source_wait = source_menu_import_wait_status(connection, row, payload)
+        if source_wait.get("waiting"):
+            defer_reason = "waiting_for_menu_import"
+            message = "Waiting for the menu import job to finish before generating recipes."
+            limit_result = defer_limit_result(
+                connection,
+                row,
+                attempts,
+                defer_reason,
+                message,
+                queue_name,
+                now,
+                source_job_id=source_wait.get("source_job_id", ""),
+                source_job_status=source_wait.get("source_job_status", ""),
+            )
+            if limit_result:
+                return limit_result
+            updated = update_deferred_job_row(connection, row["id"], message, attempts, queue_name, now)
+            return {
+                "started": False,
+                "ok": True,
+                "deferred": True,
+                "defer_reason": defer_reason,
+                "source_job_id": source_wait.get("source_job_id", ""),
+                "source_job_status": source_wait.get("source_job_status", ""),
+                "delay_seconds": retry_delay_for_attempts(attempts),
+                "message": message,
+                "job": row_to_job(updated),
+            }
 
         if active_limit > 0:
-            running_count = owner_job_count_for_limit_key(
-                user_id=row["user_id"] or "",
-                guest_session_id=row["guest_session_id"] or "",
-                limit_key=limit_key,
-                statuses=["running"],
-                exclude_job_id=job_id,
-                connection=connection,
+            blockers = running_limit_blockers(connection, row, limit_key, exclude_job_id=job_id)
+            active_blockers, cleaned_blockers = cleanup_stale_limit_blockers(
+                connection,
+                blockers,
+                reference_time=reference_time,
             )
+            running_count = len(active_blockers)
             if running_count >= active_limit:
                 message = active_limit_wait_message(limit_key)
-                connection.execute(
-                    """
-                    UPDATE jobs
-                       SET current_step = ?,
-                           attempts = ?,
-                           queue_name = COALESCE(NULLIF(?, ''), queue_name),
-                           updated_at = ?
-                     WHERE id = ?
-                    """,
-                    (message, attempts, queue_name, now, job_id),
+                blocker_info = stale_lock_info_for_row(
+                    active_blockers[0] if active_blockers else None,
+                    reference_time=reference_time,
                 )
-                updated = connection.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
+                defer_reason = "running_lock"
+                lock_name = limit_key
+                limit_result = defer_limit_result(
+                    connection,
+                    row,
+                    attempts,
+                    defer_reason,
+                    message,
+                    queue_name,
+                    now,
+                    lock_name=lock_name,
+                    lock_owner_job_id=blocker_info.get("lock_owner_job_id", ""),
+                    lock_age_seconds=blocker_info.get("lock_age_seconds", 0),
+                    lock_stale=blocker_info.get("lock_stale", False),
+                    cleaned_stale_lock_count=len(cleaned_blockers),
+                )
+                if limit_result:
+                    return limit_result
+                updated = update_deferred_job_row(connection, row["id"], message, attempts, queue_name, now)
                 return {
                     "started": False,
                     "ok": True,
                     "deferred": True,
+                    "defer_reason": defer_reason,
                     "limit_key": limit_key,
+                    "lock_name": lock_name,
+                    "lock_owner_job_id": blocker_info.get("lock_owner_job_id", ""),
+                    "lock_age_seconds": blocker_info.get("lock_age_seconds", 0),
+                    "lock_stale": blocker_info.get("lock_stale", False),
+                    "cleaned_stale_lock_count": len(cleaned_blockers),
                     "delay_seconds": retry_delay_for_attempts(attempts),
                     "message": message,
                     "job": row_to_job(updated),

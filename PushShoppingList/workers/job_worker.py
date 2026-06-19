@@ -84,6 +84,20 @@ def run_job(job_id):
                 model_env_var_used=model_snapshot.get("model_env_var_used") or model_snapshot.get("model_env_var", ""),
                 worker_id=worker_label,
             )
+            if start_result.get("defer_limit_exceeded"):
+                defer_reason = start_result.get("defer_reason") or "unknown"
+                print(
+                    f"[Job Worker] action=defer_limit_exceeded job_id={job_id} type={job.get('job_type')} "
+                    f"queue={queue_name} worker={worker_label} defer_reason={defer_reason} "
+                    f"max_defer_attempts={start_result.get('max_defer_attempts') or 'n/a'} "
+                    f"attempts={start_result.get('attempts') or 'n/a'} "
+                    f"error={start_result.get('error') or 'Deferred too many times.'}"
+                )
+                return fail_job(
+                    job_id,
+                    start_result.get("error") or "Job deferred too many times.",
+                    current_step="Deferred too many times",
+                )
             if start_result.get("cancelled") or start_result.get("terminal"):
                 print(
                     f"[Job Worker] action=skip job_id={job_id} worker={worker_label} "
@@ -92,11 +106,27 @@ def run_job(job_id):
                 return {"ok": True, "skipped": True}
             if start_result.get("deferred"):
                 delay = max(1, int(start_result.get("delay_seconds") or 5))
+                defer_reason = start_result.get("defer_reason") or "unknown"
+                lock_fields = ""
+                if defer_reason == "running_lock":
+                    lock_fields = (
+                        f" lock_name={start_result.get('lock_name') or start_result.get('limit_key') or ''}"
+                        f" lock_owner_job_id={start_result.get('lock_owner_job_id') or ''}"
+                        f" lock_age_seconds={int(start_result.get('lock_age_seconds') or 0)}"
+                        f" lock_stale={bool(start_result.get('lock_stale'))}"
+                    )
+                if defer_reason == "waiting_for_menu_import":
+                    lock_fields = (
+                        f" source_job_id={start_result.get('source_job_id') or ''}"
+                        f" source_job_status={start_result.get('source_job_status') or ''}"
+                    )
                 print(
-                    f"[Job Worker] action=deferred job_id={job_id} queue={queue_name} "
-                    f"worker={worker_label} delay_seconds={delay}"
+                    f"[Job Worker] action=deferred job_id={job_id} type={job.get('job_type')} queue={queue_name} "
+                    f"worker={worker_label} delay_seconds={delay} defer_reason={defer_reason}{lock_fields}"
                 )
                 time.sleep(delay)
+                if execution == "local/thread":
+                    return run_job(job_id)
                 queue_result = enqueue_job(job_id, queue_name_override=queue_name)
                 if not queue_result.get("ok"):
                     fail_job(job_id, queue_result.get("error") or "Unable to requeue limited job.")

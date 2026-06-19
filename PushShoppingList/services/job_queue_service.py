@@ -28,6 +28,9 @@ ALL_QUEUE_NAMES = (
 )
 QUEUE_UNAVAILABLE_MESSAGE = "Job queue is unavailable. Check REDIS_URL and the RQ worker."
 _STARTUP_DIAGNOSTICS_LOGGED = False
+_REDIS_NOT_CONFIGURED_LOGGED = False
+_ACTIVE_THREAD_JOBS_LOCK = threading.RLock()
+_ACTIVE_THREAD_JOB_IDS = set()
 
 
 class JobQueueUnavailable(RuntimeError):
@@ -135,6 +138,14 @@ def _redis_connection_from_class(Redis):
     )
 
 
+def log_redis_not_configured_once():
+    global _REDIS_NOT_CONFIGURED_LOGGED
+    if _REDIS_NOT_CONFIGURED_LOGGED:
+        return
+    _REDIS_NOT_CONFIGURED_LOGGED = True
+    print("[Job Queue] Redis not configured. Using local thread fallback for development.")
+
+
 def _missing_dependency_error(module_name, package_name, install_name):
     return JobQueueUnavailable(
         f"missing_{module_name}_package",
@@ -201,6 +212,9 @@ def redis_queue_readiness(check_connection=True):
 
     if not redis_installed:
         readiness["reason"] = "missing_redis_package"
+    elif not redis_url_configured():
+        readiness["reason"] = "redis_not_configured"
+        readiness["redis_connection_checked"] = False
     elif check_connection:
         try:
             from redis import Redis
@@ -279,6 +293,8 @@ def log_job_queue_startup_diagnostics(force=False):
             f"reason={readiness['reason']} "
             f"error={readiness['redis_connection_error']}"
         )
+    elif readiness.get("reason") == "redis_not_configured" and readiness.get("thread_fallback_enabled"):
+        log_redis_not_configured_once()
     return readiness
 
 
@@ -341,6 +357,43 @@ def queue_name_for_existing_job(job_id, requested_queue_name=""):
     return queue_name_for_job(job.get("job_type"), job.get("input_payload") or {})
 
 
+def _start_thread_fallback(job_id, target_queue_name, reason="", detail=""):
+    with _ACTIVE_THREAD_JOBS_LOCK:
+        if job_id in _ACTIVE_THREAD_JOB_IDS:
+            print(
+                f"[Job Queue] action=thread_fallback_already_running job_id={job_id} "
+                f"queue={target_queue_name} reason={reason or 'already_running'}"
+            )
+            return {
+                "ok": True,
+                "mode": "thread",
+                "queue_name": target_queue_name,
+                "already_running": True,
+                "reason": reason or "already_running",
+            }
+        _ACTIVE_THREAD_JOB_IDS.add(job_id)
+
+    thread = threading.Thread(
+        target=_run_job_thread,
+        args=(job_id,),
+        name=f"job-worker-{job_id[:8]}",
+        daemon=True,
+    )
+    thread.start()
+    print(
+        f"[Job Queue] action=thread_fallback_started job_id={job_id} "
+        f"queue={target_queue_name} thread_name={thread.name} "
+        f"reason={reason or 'thread_fallback'} detail={detail or 'none'}"
+    )
+    return {
+        "ok": True,
+        "mode": "thread",
+        "queue_name": target_queue_name,
+        "warning": "Redis/RQ was unavailable; running in a local background thread.",
+        "reason": reason or "thread_fallback",
+    }
+
+
 def enqueue_job(job_id, queue_name_override=""):
     job_id = str(job_id or "").strip()
     if not job_id:
@@ -357,6 +410,28 @@ def enqueue_job(job_id, queue_name_override=""):
         run_job(job_id)
         print(f"[Job Queue] action=inline_done job_id={job_id} queue={target_queue_name}")
         return {"ok": True, "mode": "inline", "queue_name": target_queue_name}
+
+    if not redis_url_configured():
+        if thread_fallback_enabled():
+            log_redis_not_configured_once()
+            return _start_thread_fallback(
+                job_id,
+                target_queue_name,
+                reason="redis_not_configured",
+                detail="REDIS_URL is not configured",
+            )
+        fail_job(
+            job_id,
+            QUEUE_UNAVAILABLE_MESSAGE,
+            current_step="Queue unavailable",
+        )
+        return {
+            "ok": False,
+            "error": QUEUE_UNAVAILABLE_MESSAGE,
+            "details": "REDIS_URL is not configured and local thread fallback is disabled.",
+            "reason": "redis_not_configured",
+            "queue_name": target_queue_name,
+        }
 
     queue_unavailable = None
     try:
@@ -406,31 +481,22 @@ def enqueue_job(job_id, queue_name_override=""):
                 "queue_name": target_queue_name,
             }
 
-        thread = threading.Thread(
-            target=_run_job_thread,
-            args=(job_id,),
-            name=f"job-worker-{job_id[:8]}",
-            daemon=True,
+        return _start_thread_fallback(
+            job_id,
+            target_queue_name,
+            reason=queue_unavailable.reason,
+            detail=str(queue_unavailable),
         )
-        thread.start()
-        print(
-            f"[Job Queue] action=thread_fallback_started job_id={job_id} "
-            f"queue={target_queue_name} thread_name={thread.name} "
-            f"reason={queue_unavailable.reason} detail={queue_unavailable}"
-        )
-        return {
-            "ok": True,
-            "mode": "thread",
-            "queue_name": target_queue_name,
-            "warning": "Redis/RQ was unavailable; running in a local background thread.",
-            "reason": queue_unavailable.reason,
-        }
 
 
 def _run_job_thread(job_id):
     from PushShoppingList.workers.job_worker import run_job
 
-    run_job(job_id)
+    try:
+        run_job(job_id)
+    finally:
+        with _ACTIVE_THREAD_JOBS_LOCK:
+            _ACTIVE_THREAD_JOB_IDS.discard(str(job_id or "").strip())
 
 
 def cancel_queued_rq_job(rq_job_id):

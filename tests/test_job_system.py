@@ -1,3 +1,5 @@
+import threading
+
 import pytest
 
 from PushShoppingList.app import create_app
@@ -452,6 +454,116 @@ def test_menu_generate_job_keeps_partial_batch_predictions(monkeypatch, tmp_path
     assert any("Crab Wonton" in warning for warning in finished["warning_messages"])
 
 
+def test_menu_generate_job_predicts_batches_in_parallel(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    monkeypatch.setenv("MENU_ITEM_BATCH_INFERENCE_WORKERS", "2")
+    recipe_urls = [
+        "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=spring-roll",
+        "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=pad-thai",
+    ]
+    stubs = {
+        recipe_urls[0]: {
+            "source_url": recipe_urls[0],
+            "recipe_title": "Spring Roll",
+            "display_name": "Spring Roll",
+            "needs_ai_recipe": True,
+            "recipe_status": "stub",
+            "menu_item_id": "item-1",
+            "cookbook_id": "cb1",
+            "cookbook_name": "Dinner",
+        },
+        recipe_urls[1]: {
+            "source_url": recipe_urls[1],
+            "recipe_title": "Pad Thai",
+            "display_name": "Pad Thai",
+            "needs_ai_recipe": True,
+            "recipe_status": "stub",
+            "menu_item_id": "item-2",
+            "cookbook_id": "cb1",
+            "cookbook_name": "Dinner",
+        },
+    }
+    started_item_ids = []
+    started_lock = threading.Lock()
+    both_started = threading.Event()
+    saved_urls = []
+
+    monkeypatch.setattr(recipe_routes, "load_editable_recipe", lambda url: {"recipe": stubs[url]})
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "menu_batch_item_from_stub",
+        lambda url, loaded_stub, index: {
+            "menu_item_id": loaded_stub["menu_item_id"],
+            "item_name": loaded_stub["recipe_title"],
+            "menu_section": "Entrees",
+        },
+    )
+    monkeypatch.setattr(recipe_extract_service, "menu_inference_batches", lambda entries: [[entry] for entry in entries])
+
+    def fake_infer_batch(batch, user_id=None):
+        item_id = batch[0]["menu_item"]["menu_item_id"]
+        with started_lock:
+            started_item_ids.append(item_id)
+            if len(started_item_ids) == 2:
+                both_started.set()
+        assert both_started.wait(2), "menu prediction batches did not overlap"
+        return {
+            "ok": True,
+            "items": {item_id: {"predicted_ingredients": [{"ingredient": item_id}]}},
+            "failures": {},
+            "model": "gpt-test",
+            "model_source": "test",
+        }
+
+    monkeypatch.setattr(recipe_extract_service, "infer_menu_item_recipe_batch", fake_infer_batch)
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "apply_menu_batch_inference_to_stub",
+        lambda url, loaded_stub, menu_item, inference, model="", model_source="": {
+            "ok": True,
+            "source_url": url,
+            "display_name": loaded_stub["display_name"],
+            "recipe_title": loaded_stub["recipe_title"],
+            "ingredients": [{"ingredient": "test ingredient"}],
+            "instructions": [{"instruction": "Cook."}],
+            "cookbook_id": loaded_stub.get("cookbook_id"),
+            "cookbook_name": loaded_stub.get("cookbook_name"),
+        },
+    )
+    monkeypatch.setattr(recipe_routes, "add_items", lambda ingredients: None)
+    monkeypatch.setattr(recipe_routes, "save_ingredients_for_recipe", lambda url, ingredients, result: saved_urls.append(url))
+    monkeypatch.setattr(recipe_routes, "save_recipe_url_name", lambda url, name: None)
+    monkeypatch.setattr(recipe_routes, "record_recipe_import_activity", lambda *args, **kwargs: None)
+    monkeypatch.setattr(cookbook_service, "cookbook_recipe_assignment_for_url", lambda url: {
+        "cookbook_id": "cb1",
+        "cookbook_name": "Dinner",
+    })
+    monkeypatch.setattr("PushShoppingList.services.recipe_url_service.add_recipe_urls", lambda urls: None)
+    monkeypatch.setattr("PushShoppingList.scripts.sort_ingredients.main", lambda: None)
+    monkeypatch.setattr(
+        recipe_routes,
+        "apply_imported_recipe_category_routine",
+        lambda url, result, assignment, trigger_source="": {"ok": True, "status": "updated"},
+    )
+
+    job = job_service.create_job(
+        "menu-generate-recipes",
+        input_payload={
+            "recipe_urls": recipe_urls,
+            "run_deferred_heavy_tasks": False,
+        },
+        user_id="owner",
+        total_items=2,
+    )
+
+    finished = job_tasks.run_menu_generate_recipes_job(job["id"], job["input_payload"])
+
+    assert finished["status"] == "completed"
+    assert started_item_ids == ["item-1", "item-2"]
+    assert saved_urls == recipe_urls
+    assert finished["result_payload"]["batch_workers"] == 2
+
+
 def test_menu_deferred_heavy_task_route_uses_recipe_item_sources(monkeypatch, tmp_path):
     configure_job_paths(monkeypatch, tmp_path)
     recipe_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=spring-roll"
@@ -754,6 +866,7 @@ def test_job_queue_readiness_reports_missing_redis_dependency(monkeypatch):
 def test_menu_import_enqueues_to_rq_menu_queue_when_redis_ready(monkeypatch, tmp_path):
     configure_job_paths(monkeypatch, tmp_path)
     monkeypatch.delenv("JOB_QUEUE_MODE", raising=False)
+    monkeypatch.setenv("REDIS_URL", "redis://example.test:6379/0")
     enqueued = {}
 
     class FakeQueue:
@@ -866,6 +979,172 @@ def test_worker_start_defers_when_user_active_limit_is_reached(monkeypatch, tmp_
     assert deferred["status"] == "queued"
     assert "Queued behind your active menu import" in deferred["current_step"]
     assert deferred["attempts"] == 1
+
+
+def test_menu_generate_waits_for_source_menu_import_then_starts(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    source = job_service.create_job(
+        "menu-import",
+        input_payload={"urls": ["https://example.com/menu"], "extraction_mode": "menu_extract"},
+        user_id="owner",
+        queue_name="ai-pantry-menu",
+    )
+    job_service.update_job(source["id"], status="running", started_at=job_service.now_iso())
+    queued = job_service.create_job(
+        "menu-generate-recipes",
+        input_payload={
+            "recipe_urls": ["https://example.com/menu?menu_item=spring-roll"],
+            "source_job_id": source["id"],
+        },
+        user_id="owner",
+        queue_name="ai-pantry-menu",
+    )
+
+    waiting = job_service.try_start_job(queued["id"], queue_name="ai-pantry-menu")
+
+    assert waiting["deferred"] is True
+    assert waiting["defer_reason"] == "waiting_for_menu_import"
+    assert waiting["source_job_id"] == source["id"]
+    assert waiting["source_job_status"] == "running"
+
+    job_service.complete_job(source["id"], result_payload={"ok": True})
+    started = job_service.try_start_job(queued["id"], queue_name="ai-pantry-menu")
+
+    assert started["started"] is True
+    assert job_service.get_job(queued["id"])["status"] == "running"
+
+
+def test_try_start_job_reports_running_lock_details(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    blockers = []
+    for index in range(3):
+        blocker = job_service.create_job(
+            "menu-generate-recipes",
+            input_payload={"recipe_urls": [f"https://example.com/menu?menu_item={index}"]},
+            user_id="owner",
+            queue_name="ai-pantry-menu",
+        )
+        job_service.update_job(blocker["id"], status="running", started_at=job_service.now_iso())
+        blockers.append(blocker)
+    queued = job_service.create_job(
+        "menu-generate-recipes",
+        input_payload={"recipe_urls": ["https://example.com/menu?menu_item=new"]},
+        user_id="owner",
+        queue_name="ai-pantry-menu",
+    )
+
+    result = job_service.try_start_job(queued["id"], queue_name="ai-pantry-menu")
+
+    assert result["deferred"] is True
+    assert result["defer_reason"] == "running_lock"
+    assert result["lock_name"] == "menu-ai"
+    assert result["lock_owner_job_id"] == blockers[0]["id"]
+    assert isinstance(result["lock_age_seconds"], int)
+    assert result["lock_stale"] is False
+
+
+def test_try_start_job_cleans_stale_running_lock(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    blockers = []
+    for index in range(3):
+        blocker = job_service.create_job(
+            "menu-generate-recipes",
+            input_payload={"recipe_urls": [f"https://example.com/menu?menu_item={index}"]},
+            user_id="owner",
+            queue_name="ai-pantry-menu",
+        )
+        job_service.update_job(
+            blocker["id"],
+            status="running",
+            started_at=job_service.now_iso(),
+            completed_at=job_service.now_iso(),
+        )
+        blockers.append(blocker)
+    queued = job_service.create_job(
+        "menu-generate-recipes",
+        input_payload={"recipe_urls": ["https://example.com/menu?menu_item=new"]},
+        user_id="owner",
+        queue_name="ai-pantry-menu",
+    )
+
+    result = job_service.try_start_job(queued["id"], queue_name="ai-pantry-menu")
+
+    assert result["started"] is True
+    assert job_service.get_job(queued["id"])["status"] == "running"
+    assert job_service.get_job(blockers[0]["id"])["status"] == "failed"
+    assert "Stale job lock cleared" in job_service.get_job(blockers[0]["id"])["current_step"]
+
+
+def test_menu_generate_defer_limit_exceeded(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    monkeypatch.setenv("MENU_GENERATE_RECIPES_MAX_DEFER_ATTEMPTS", "1")
+    source = job_service.create_job(
+        "menu-import",
+        input_payload={"urls": ["https://example.com/menu"], "extraction_mode": "menu_extract"},
+        user_id="owner",
+        queue_name="ai-pantry-menu",
+    )
+    job_service.update_job(source["id"], status="running", started_at=job_service.now_iso())
+    queued = job_service.create_job(
+        "menu-generate-recipes",
+        input_payload={
+            "recipe_urls": ["https://example.com/menu?menu_item=spring-roll"],
+            "source_job_id": source["id"],
+        },
+        user_id="owner",
+        queue_name="ai-pantry-menu",
+    )
+
+    first = job_service.try_start_job(queued["id"], queue_name="ai-pantry-menu")
+    second = job_service.try_start_job(queued["id"], queue_name="ai-pantry-menu")
+
+    assert first["deferred"] is True
+    assert second["ok"] is False
+    assert second["defer_limit_exceeded"] is True
+    assert second["defer_reason"] == "waiting_for_menu_import"
+    assert "max_defer_attempts=1" in second["error"]
+
+
+def test_enqueue_without_redis_uses_single_local_thread(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    monkeypatch.delenv("REDIS_URL", raising=False)
+    monkeypatch.setenv("JOB_QUEUE_THREAD_FALLBACK", "1")
+    monkeypatch.setattr(
+        job_queue_service,
+        "redis_queue_connection",
+        lambda: (_ for _ in ()).throw(AssertionError("Redis should not be contacted without REDIS_URL")),
+    )
+    monkeypatch.setattr(job_queue_service, "_ACTIVE_THREAD_JOB_IDS", set())
+    monkeypatch.setattr(job_queue_service, "_REDIS_NOT_CONFIGURED_LOGGED", False)
+    started_threads = []
+
+    class FakeThread:
+        def __init__(self, target, args=(), name="", daemon=False):
+            self.target = target
+            self.args = args
+            self.name = name
+            self.daemon = daemon
+
+        def start(self):
+            started_threads.append(self.name)
+
+    monkeypatch.setattr(job_queue_service.threading, "Thread", FakeThread)
+    job = job_service.create_job(
+        "menu-generate-recipes",
+        input_payload={"recipe_urls": ["https://example.com/menu?menu_item=spring-roll"]},
+        user_id="owner",
+        queue_name="ai-pantry-menu",
+    )
+
+    first = job_queue_service.enqueue_job(job["id"])
+    second = job_queue_service.enqueue_job(job["id"])
+
+    assert first["ok"] is True
+    assert first["mode"] == "thread"
+    assert first["reason"] == "redis_not_configured"
+    assert second["ok"] is True
+    assert second["already_running"] is True
+    assert started_threads == [f"job-worker-{job['id'][:8]}"]
 
 
 def test_worker_start_records_queue_model_and_worker(monkeypatch, tmp_path):

@@ -1,9 +1,13 @@
 import os
 import re
+from concurrent.futures import FIRST_COMPLETED
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import wait
 from pathlib import Path
 
 from werkzeug.datastructures import FileStorage
 
+from PushShoppingList.services.job_runtime_context import job_context
 from PushShoppingList.services.job_service import append_job_warning
 from PushShoppingList.services.job_service import complete_job
 from PushShoppingList.services.job_service import fail_job
@@ -67,6 +71,17 @@ def bounded_percent(index, total, start=0, end=100):
     total = max(1, int(total or 1))
     index = max(0, min(total, int(index or 0)))
     return int(start + ((end - start) * (index / total)))
+
+
+def menu_item_batch_inference_worker_count(batch_total=None):
+    try:
+        configured = int(os.getenv("MENU_ITEM_BATCH_INFERENCE_WORKERS") or "3")
+    except (TypeError, ValueError):
+        configured = 3
+    configured = max(1, min(6, configured))
+    if batch_total:
+        return max(1, min(configured, int(batch_total)))
+    return configured
 
 
 def model_metadata(model_used="", model_source="", model_env_var=""):
@@ -380,13 +395,72 @@ def run_menu_generate_recipes_job(job_id, payload):
     batches = menu_inference_batches(pending_entries)
     batch_total = len(batches)
     completed_batches = 0
+    predicted_batches_completed = 0
+    batch_worker_count = menu_item_batch_inference_worker_count(batch_total)
+    job_record = get_job(job_id) or {}
+    inference_user_id = str(job_record.get("user_id") or active_user_id() or "").strip()
+    job_queue_name = str(job_record.get("queue_name") or "ai-pantry-menu").strip() or "ai-pantry-menu"
 
-    for batch_index, batch in enumerate(batches, start=1):
-        ensure_not_cancelled(job_id)
+    print(
+        "[MenuRecipeGeneration] action=start "
+        f"job_id={job_id} total_items={total} pending_items={len(pending_entries)}"
+    )
+    if batch_total:
+        print(
+            "[Job Worker] action=menu-item-recipe-batch-parallel-start "
+            f"job_id={job_id} batch_count={batch_total} worker_count={batch_worker_count} "
+            f"item_count={len(pending_entries)}"
+        )
+
+    def run_prediction_batch(batch_index, batch):
+        with job_context(
+            job_id=job_id,
+            queue_name=job_queue_name,
+            model_used=model_info.get("model_used"),
+            model_source=model_info.get("model_source"),
+            model_env_var_used=model_info.get("model_env_var_used"),
+        ):
+            print(
+                "[Job Worker] action=menu-item-recipe-batch-worker-start "
+                f"job_id={job_id} batch_index={batch_index} batch_count={batch_total} "
+                f"batch_size={len(batch or [])}"
+            )
+            print(
+                "[MenuRecipeGeneration] action=batch_start "
+                f"job_id={job_id} batch_index={batch_index} batch_size={len(batch or [])}"
+            )
+            result = infer_menu_item_recipe_batch(batch, user_id=inference_user_id)
+            print(
+                "[Job Worker] action=menu-item-recipe-batch-worker-ready "
+                f"job_id={job_id} batch_index={batch_index} batch_count={batch_total} "
+                f"ok={bool(result.get('ok') if isinstance(result, dict) else False)}"
+            )
+            return result
+
+    def failed_batch_result(batch_index, exc):
+        print(
+            "[Job Worker] action=menu-item-recipe-batch-worker-error "
+            f"job_id={job_id} batch_index={batch_index} batch_count={batch_total} "
+            f"exception_type={type(exc).__name__} error={exc}"
+        )
+        return {
+            "ok": False,
+            "items": {},
+            "failures": {},
+            "error_message": str(exc) or "Unable to predict recipes.",
+            "technical_message": str(exc),
+            "exception_type": type(exc).__name__,
+            "model": model_info.get("model_used") or "",
+            "model_source": model_info.get("model_source") or "",
+        }
+
+    def record_prediction_result(batch_index, batch_result):
+        nonlocal predicted_batches_completed
+        predicted_batches_completed += 1
         update_job_progress(
             job_id,
-            current_step=f"Predicting recipes ({batch_index}/{batch_total})",
-            progress_percent=bounded_percent(batch_index - 1, max(1, batch_total), 10, 82),
+            current_step=f"Predicting recipes ({predicted_batches_completed}/{batch_total})",
+            progress_percent=bounded_percent(predicted_batches_completed, max(1, batch_total), 10, 82),
             completed_items=len(created_urls) + len(skipped_urls),
             failed_items=failed_items,
             result_payload={
@@ -394,47 +468,22 @@ def run_menu_generate_recipes_job(job_id, payload):
                 "stage": "Predicting recipes",
                 "total_items": total,
                 "recipe_inference_completed": len(created_urls),
+                "recipe_prediction_batches_completed": predicted_batches_completed,
                 "skipped_count": len(skipped_urls),
                 "failed_items": failed_items,
                 "batch_count": batch_total,
                 "batch_index": batch_index,
+                "batch_workers": batch_worker_count,
             },
         )
+        return batch_result
 
-        batch_result = {}
-        for attempt in range(2):
-            ensure_not_cancelled(job_id)
-            batch_result = infer_menu_item_recipe_batch(batch, user_id=active_user_id())
-            result_items = batch_result.get("items") if isinstance(batch_result.get("items"), dict) else {}
-            failure_items = batch_result.get("failures") if isinstance(batch_result.get("failures"), dict) else {}
-            missing_ids = [
-                str((entry.get("menu_item") or {}).get("menu_item_id") or "").strip()
-                for entry in batch
-                if str((entry.get("menu_item") or {}).get("menu_item_id") or "").strip() not in result_items
-            ]
-            if batch_result.get("ok") and not missing_ids:
-                break
-            if result_items:
-                append_job_warning(
-                    job_id,
-                    (
-                        f"Batch {batch_index}/{batch_total} returned partial recipe predictions; "
-                        f"{len(missing_ids or failure_items)} item(s) still need attention. "
-                        f"{batch_result.get('error_message') or ''}"
-                    ).strip(),
-                )
-                break
-            if attempt == 0:
-                append_job_warning(
-                    job_id,
-                    (
-                        f"Batch {batch_index}/{batch_total} failed once; retrying. "
-                        f"{batch_result.get('error_message') or ('Missing menu_item_id: ' + ', '.join(missing_ids[:3]) if missing_ids else '')}"
-                    ).strip(),
-                )
-                if batch_result.get("ok") and missing_ids:
-                    batch_result = {**batch_result, "ok": False}
+    def process_predicted_batch(batch_index, batch, batch_result):
+        nonlocal category_success_count
+        nonlocal completed_batches
+        nonlocal failed_items
 
+        batch_result = batch_result if isinstance(batch_result, dict) else {}
         result_items = batch_result.get("items") if isinstance(batch_result.get("items"), dict) else {}
         failure_items = batch_result.get("failures") if isinstance(batch_result.get("failures"), dict) else {}
         missing_ids = [
@@ -464,7 +513,8 @@ def run_menu_generate_recipes_job(job_id, payload):
                     f"Failed item names: {failed_names_text}"
                 ).strip(),
             )
-            continue
+            completed_batches += 1
+            return
         if not batch_result.get("ok") or missing_ids:
             append_job_warning(
                 job_id,
@@ -510,6 +560,8 @@ def run_menu_generate_recipes_job(job_id, payload):
                     "stage": "Saving predicted recipes",
                     "total_items": total,
                     "recipe_inference_completed": len(created_urls),
+                    "recipe_prediction_batches_completed": predicted_batches_completed,
+                    "batch_workers": batch_worker_count,
                     "skipped_count": len(skipped_urls),
                     "category_success_count": category_success_count,
                     "failed_items": failed_items,
@@ -558,6 +610,8 @@ def run_menu_generate_recipes_job(job_id, payload):
                     "stage": "Generating categories",
                     "total_items": total,
                     "recipe_inference_completed": len(created_urls),
+                    "recipe_prediction_batches_completed": predicted_batches_completed,
+                    "batch_workers": batch_worker_count,
                     "category_success_count": category_success_count,
                     "failed_items": failed_items,
                     **cookbook_recipe_progress_payload(
@@ -607,6 +661,82 @@ def run_menu_generate_recipes_job(job_id, payload):
             created_urls.append(recipe_url)
 
         completed_batches += 1
+
+    batch_results = {}
+    futures = {}
+    next_batch_to_submit = 0
+    next_batch_to_process = 1
+
+    def submit_available_batches(executor):
+        nonlocal next_batch_to_submit
+        while next_batch_to_submit < batch_total:
+            batch_index = next_batch_to_submit + 1
+            future = executor.submit(run_prediction_batch, batch_index, batches[next_batch_to_submit])
+            futures[future] = batch_index
+            next_batch_to_submit += 1
+
+    if batch_total:
+        update_job_progress(
+            job_id,
+            current_step=f"Predicting recipes (0/{batch_total})",
+            progress_percent=10,
+            completed_items=len(created_urls) + len(skipped_urls),
+            failed_items=failed_items,
+            result_payload={
+                **model_info,
+                "stage": "Predicting recipes",
+                "total_items": total,
+                "recipe_inference_completed": len(created_urls),
+                "recipe_prediction_batches_completed": 0,
+                "skipped_count": len(skipped_urls),
+                "failed_items": failed_items,
+                "batch_count": batch_total,
+                "batch_index": 0,
+                "batch_workers": batch_worker_count,
+            },
+        )
+
+    with ThreadPoolExecutor(
+        max_workers=batch_worker_count,
+        thread_name_prefix="menu-recipe-batch",
+    ) as executor:
+        submit_available_batches(executor)
+        try:
+            while next_batch_to_process <= batch_total:
+                ensure_not_cancelled(job_id)
+                while next_batch_to_process not in batch_results:
+                    ensure_not_cancelled(job_id)
+                    if not futures:
+                        break
+                    done, _pending = wait(
+                        list(futures.keys()),
+                        timeout=0.5,
+                        return_when=FIRST_COMPLETED,
+                    )
+                    if not done:
+                        continue
+                    for future in done:
+                        batch_index = futures.pop(future)
+                        try:
+                            batch_result = future.result()
+                        except Exception as exc:
+                            batch_result = failed_batch_result(batch_index, exc)
+                        batch_results[batch_index] = record_prediction_result(batch_index, batch_result)
+                    submit_available_batches(executor)
+
+                while next_batch_to_process in batch_results:
+                    batch_result = batch_results.pop(next_batch_to_process)
+                    process_predicted_batch(
+                        next_batch_to_process,
+                        batches[next_batch_to_process - 1],
+                        batch_result,
+                    )
+                    next_batch_to_process += 1
+                    ensure_not_cancelled(job_id)
+        except JobCancelled:
+            for future in list(futures.keys()):
+                future.cancel()
+            raise
 
     ensure_not_cancelled(job_id)
     if created_urls:
@@ -674,6 +804,8 @@ def run_menu_generate_recipes_job(job_id, payload):
         "categories_generated": category_success_count,
         "batch_count": batch_total,
         "batches_completed": completed_batches,
+        "recipe_prediction_batches_completed": predicted_batches_completed,
+        "batch_workers": batch_worker_count,
         "deferred_heavy_tasks_job": heavy_job,
         "deferred_heavy_tasks_job_id": heavy_job.get("job_id", ""),
         "stage": "Complete",
