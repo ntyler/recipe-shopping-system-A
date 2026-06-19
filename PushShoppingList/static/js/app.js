@@ -296,7 +296,7 @@ function jobTypeLabel(jobType) {
     return ({
         "menu-import": "Menu Import",
         "menu-generate-recipes": "Generate Menu Recipes",
-        "menu-deferred-heavy-tasks": "Menu Nutrition / PDFs",
+        "menu-deferred-heavy-tasks": "Menu Nutrition / Categories",
         "cookbook-infer-missing-details": "Cookbook Details Routine",
         "recipe-import": "Recipe Import",
         "doc-photo-import": "Doc / Photo Import",

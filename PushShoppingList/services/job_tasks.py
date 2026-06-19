@@ -33,7 +33,7 @@ def run_job_task(job_id):
     handlers = {
         "menu-import": run_menu_import_job,
         "menu-generate-recipes": run_menu_generate_recipes_job,
-        "menu-deferred-heavy-tasks": run_menu_deferred_heavy_tasks_job,
+        "menu-deferred-heavy-tasks": run_menu_deferred_enrichment_job,
         "cookbook-infer-missing-details": run_cookbook_infer_missing_details_job,
         "recipe-import": run_recipe_import_job,
         "doc-photo-import": run_doc_photo_import_job,
@@ -275,6 +275,50 @@ def payload_bool(payload, key, default=False):
     if isinstance(value, bool):
         return value
     return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def env_bool(name, default=False):
+    raw_value = os.getenv(str(name or ""), None)
+    if raw_value is None:
+        return bool(default)
+    return str(raw_value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def env_int(name, default=0, minimum=None, maximum=None):
+    try:
+        value = int(os.getenv(str(name or "")) or int(default or 0))
+    except (TypeError, ValueError):
+        value = int(default or 0)
+    if minimum is not None:
+        value = max(int(minimum), value)
+    if maximum is not None:
+        value = min(int(maximum), value)
+    return value
+
+
+def menu_inline_enrichment_max_items():
+    return env_int("MENU_INLINE_ENRICHMENT_MAX_ITEMS", 25, minimum=0, maximum=10000)
+
+
+def menu_deferred_enrichment_enabled(payload, total):
+    payload = payload if isinstance(payload, dict) else {}
+    if not payload_bool(payload, "run_deferred_heavy_tasks", True):
+        return False
+    if payload_bool(payload, "inline_enrichment", False):
+        return False
+    if "defer_enrichment" in payload:
+        return payload_bool(payload, "defer_enrichment", True)
+    if os.getenv("MENU_DEFER_ENRICHMENT", "").strip():
+        return env_bool("MENU_DEFER_ENRICHMENT", False)
+    return int(total or 0) > menu_inline_enrichment_max_items()
+
+
+def menu_generated_pdfs_enabled(payload, total=None):
+    payload = payload if isinstance(payload, dict) else {}
+    for key in ("run_generated_pdfs", "generate_recipe_pdfs", "run_recipe_pdfs"):
+        if key in payload:
+            return payload_bool(payload, key, False)
+    return env_bool("MENU_DEFERRED_GENERATED_PDFS", False)
 
 
 def enqueue_followup_job(job_type, payload, total_items=0):
@@ -911,6 +955,100 @@ def run_menu_generate_recipes_job(job_id, payload):
         with workspace_write_lock("recipe-imports"):
             sort_ingredients()
 
+    if created_urls and menu_deferred_enrichment_enabled(payload, len(created_urls)):
+        run_generated_pdfs = menu_generated_pdfs_enabled(payload, len(created_urls))
+        print(
+            "[MenuRecipeGeneration] action=defer_enrichment_start "
+            f"job_id={job_id} total_items={len(created_urls)} "
+            f"inline_enrichment_max_items={menu_inline_enrichment_max_items()} "
+            f"run_generated_pdfs={bool(run_generated_pdfs)}"
+        )
+        update_job_progress(
+            job_id,
+            current_step="Queueing menu nutrition and categories",
+            progress_percent=96,
+            completed_items=len(created_urls) + len(skipped_urls),
+            failed_items=failed_items,
+            result_payload={
+                **model_info,
+                "stage": "Queueing menu nutrition and categories",
+                "total_items": total,
+                "recipe_inference_completed": len(created_urls),
+                "recipe_prediction_batches_completed": predicted_batches_completed,
+                "batch_workers": batch_worker_count,
+                "skipped_count": len(skipped_urls),
+                "failed_items": failed_items,
+                "failed_recipe_items": failed_recipe_items,
+                "enrichment_deferred": True,
+                "run_generated_pdfs": bool(run_generated_pdfs),
+            },
+        )
+        heavy_job = enqueue_followup_job(
+            "menu-deferred-heavy-tasks",
+            {
+                "recipe_urls": created_urls,
+                "force_reprocess": force_reprocess,
+                "source_job_id": job_id,
+                "context": "menu-batch-generation",
+                "run_categories": True,
+                "run_generated_pdfs": bool(run_generated_pdfs),
+            },
+            total_items=len(created_urls),
+        )
+        if not heavy_job.get("queued"):
+            append_job_warning(job_id, heavy_job.get("error") or "Menu nutrition/category enrichment was not queued.")
+        print(
+            "[MenuRecipeGeneration] action=defer_enrichment_ready "
+            f"job_id={job_id} followup_job_id={heavy_job.get('job_id', '')} "
+            f"queued={bool(heavy_job.get('queued'))} total_items={len(created_urls)} "
+            f"run_generated_pdfs={bool(run_generated_pdfs)}"
+        )
+        result_payload = {
+            "ok": True,
+            "created_count": len(created_urls),
+            "generated_count": len(created_urls),
+            "full_recipes_generated": len(created_urls),
+            "recipe_inference_completed": len(created_urls),
+            "skipped_count": len(skipped_urls),
+            "failed_count": failed_items,
+            "failed_items": failed_items,
+            "recipe_urls": created_urls + skipped_urls,
+            "generated_recipe_urls": created_urls,
+            "skipped_recipe_urls": skipped_urls,
+            "links": recipe_links(created_urls + skipped_urls),
+            "nutrition_estimates_completed": 0,
+            "nutrition_completed": 0,
+            "nutrition_failed": 0,
+            "nutrition_statuses": [],
+            "failed_recipe_items": failed_recipe_items,
+            "pdfs_created": 0,
+            "pdfs_completed": 0,
+            "category_statuses": [],
+            "category_success_count": 0,
+            "categories_generated": 0,
+            "batch_count": batch_total,
+            "batches_completed": completed_batches,
+            "recipe_prediction_batches_completed": predicted_batches_completed,
+            "batch_workers": batch_worker_count,
+            "deferred_heavy_tasks_job": heavy_job,
+            "deferred_heavy_tasks_job_id": heavy_job.get("job_id", ""),
+            "enrichment_deferred": True,
+            "run_generated_pdfs": bool(run_generated_pdfs),
+            "stage": "Complete",
+            **model_info,
+            **clear_cookbook_recipe_progress_payload(),
+        }
+        update_job_progress(
+            job_id,
+            current_step="Recipe generation complete; menu nutrition and categories queued",
+            progress_percent=99,
+            total_items=total,
+            completed_items=len(created_urls) + len(skipped_urls),
+            failed_items=failed_items,
+            result_payload=result_payload,
+        )
+        return complete_job(job_id, result_payload=result_payload)
+
     nutrition_ok_by_url = {}
     nutrition_worker_count = menu_nutrition_worker_count(len(created_urls)) if created_urls else 1
 
@@ -1317,14 +1455,14 @@ def run_menu_generate_recipes_job(job_id, payload):
                     raise
 
     heavy_job = {}
-    if run_heavy_tasks and created_urls:
+    if run_heavy_tasks and created_urls and menu_generated_pdfs_enabled(payload, len(created_urls)):
         update_job_progress(
             job_id,
-            current_step="Queueing deferred heavy tasks",
+            current_step="Queueing generated recipe PDFs",
             progress_percent=98,
             result_payload={
                 **model_info,
-                "stage": "Queueing deferred heavy tasks",
+                "stage": "Queueing generated recipe PDFs",
                 "recipe_inference_completed": len(created_urls),
                 "nutrition_completed": nutrition_success_count,
                 "nutrition_failed": nutrition_failed_count,
@@ -1340,11 +1478,14 @@ def run_menu_generate_recipes_job(job_id, payload):
                 "force_reprocess": force_reprocess,
                 "source_job_id": job_id,
                 "context": "menu-batch-generation",
+                "run_nutrition": False,
+                "run_categories": False,
+                "run_generated_pdfs": True,
             },
             total_items=len(created_urls),
         )
         if not heavy_job.get("queued"):
-            append_job_warning(job_id, heavy_job.get("error") or "Deferred heavy tasks were not queued.")
+            append_job_warning(job_id, heavy_job.get("error") or "Generated recipe PDF tasks were not queued.")
 
     total_failed_items = failed_items + nutrition_failed_count
     result_payload = {
@@ -1392,6 +1533,602 @@ def run_menu_generate_recipes_job(job_id, payload):
     if created_urls or skipped_urls:
         return complete_job(job_id, result_payload=result_payload)
     return fail_job(job_id, "No menu item stubs were generated.", result_payload=result_payload)
+
+
+def run_menu_deferred_enrichment_job(job_id, payload):
+    from PushShoppingList.routes.recipe_routes import MODEL
+    from PushShoppingList.routes.recipe_routes import apply_imported_recipe_category_routine
+    from PushShoppingList.routes.recipe_routes import ensure_menu_recipe_serving_basis_estimate
+    from PushShoppingList.routes.recipe_routes import load_editable_recipe
+    from PushShoppingList.routes.recipe_routes import record_recipe_import_activity
+    from PushShoppingList.services.cookbook_service import cookbook_recipe_assignment_for_url
+    from PushShoppingList.services.recipe_edit_service import generate_editable_recipe_pdf_file
+    from PushShoppingList.services.recipe_edit_service import upload_recipe_pdf_to_cloudflare
+    from PushShoppingList.services.recipe_extract_service import mark_menu_recipe_import_failure
+
+    payload = payload if isinstance(payload, dict) else {}
+    raw_urls = payload.get("recipe_urls") or payload.get("urls")
+    if isinstance(raw_urls, str):
+        raw_urls = [line.strip() for line in raw_urls.splitlines() if line.strip()]
+    if not isinstance(raw_urls, list):
+        raw_urls = [payload.get("recipe_url") or payload.get("url") or payload.get("source_url") or ""]
+    recipe_urls = [str(url or "").strip() for url in raw_urls if str(url or "").strip()]
+    recipe_urls = list(dict.fromkeys(recipe_urls))
+    if not recipe_urls:
+        return fail_job(job_id, "At least one recipe URL is required.")
+
+    total = len(recipe_urls)
+    force_reprocess = payload_bool(payload, "force_reprocess", False)
+    run_nutrition = payload_bool(payload, "run_nutrition", True)
+    run_categories = payload_bool(payload, "run_categories", True)
+    run_generated_pdfs = menu_generated_pdfs_enabled(payload, total)
+    job_record = get_job(job_id) or {}
+    job_queue_name = str(job_record.get("queue_name") or "ai-pantry-light").strip() or "ai-pantry-light"
+    nutrition_model_info = stored_job_model_metadata(
+        job_id,
+        active_model_metadata(
+            "OPENAI_NUTRITION_MODEL",
+            MODEL,
+            "fallback:OPENAI_RECIPE_MODEL",
+        ),
+    )
+    category_model_info = active_model_metadata(
+        "OPENAI_RECIPE_CATEGORY_MODEL",
+        MODEL,
+        "fallback:OPENAI_RECIPE_MODEL",
+    )
+    category_payload = {
+        "category_model_used": category_model_info.get("model_used", ""),
+        "category_model_source": category_model_info.get("model_source", ""),
+        "category_model_env_var": category_model_info.get("model_env_var_used", ""),
+    }
+    followup_progress_every = menu_followup_progress_update_every()
+    nutrition_worker_count = menu_nutrition_worker_count(total)
+    category_worker_count = menu_category_worker_count(total)
+    nutrition_completed = 0
+    nutrition_failed = 0
+    categories_completed = 0
+    categories_failed = 0
+    pdfs_completed = 0
+    uploads_completed = 0
+    failed_items = 0
+    nutrition_statuses = []
+    category_statuses = []
+    failed_recipe_items = []
+    nutrition_ready_urls = []
+    category_ready_urls = []
+    pdf_ready_urls = []
+
+    def record_failed_recipe_item(recipe_url, recipe_name="", stage="", error=""):
+        recipe_url = str(recipe_url or "").strip()
+        if not recipe_url:
+            return
+        item = {
+            "recipe_url": recipe_url,
+            "recipe_name": str(recipe_name or "").strip(),
+            "stage": str(stage or "").strip(),
+            "error": str(error or "").strip(),
+        }
+        failed_recipe_items.append(item)
+        try:
+            mark_menu_recipe_import_failure(recipe_url, item["recipe_name"], item["stage"], item["error"])
+        except Exception as exc:
+            print(
+                "[MenuDeferredEnrichment] action=failed_item_flag_save_failed "
+                f"job_id={job_id} recipe_url={recipe_url} error={exc}"
+            )
+
+    base_payload = {
+        **nutrition_model_info,
+        **category_payload,
+        "total_items": total,
+        "nutrition_completed": 0,
+        "nutrition_failed": 0,
+        "categories_completed": 0,
+        "categories_failed": 0,
+        "pdfs_completed": 0,
+        "pdf_uploads_completed": 0,
+        "failed_items": 0,
+        "failed_recipe_items": failed_recipe_items,
+        "run_nutrition": bool(run_nutrition),
+        "run_categories": bool(run_categories),
+        "run_generated_pdfs": bool(run_generated_pdfs),
+    }
+    update_job_progress(
+        job_id,
+        current_step="Estimating nutrition" if run_nutrition else "Preparing menu enrichment",
+        total_items=total,
+        progress_percent=5,
+        result_payload={
+            **base_payload,
+            "stage": "Estimating nutrition" if run_nutrition else "Preparing menu enrichment",
+        },
+    )
+    print(
+        "[MenuDeferredEnrichment] action=start "
+        f"job_id={job_id} total_items={total} run_nutrition={bool(run_nutrition)} "
+        f"run_categories={bool(run_categories)} run_generated_pdfs={bool(run_generated_pdfs)}"
+    )
+
+    def run_nutrition_for_recipe(index, recipe_url):
+        recipe_name = cookbook_recipe_display_name(recipe_url)
+        with job_context(
+            job_id=job_id,
+            queue_name=job_queue_name,
+            worker_id=(get_job(job_id) or {}).get("worker_id") or "",
+        ):
+            print(
+                "[MenuDeferredEnrichment] action=nutrition_start "
+                f"job_id={job_id} recipe_url={recipe_url} recipe_name={recipe_name}"
+            )
+            try:
+                status = ensure_menu_recipe_serving_basis_estimate(recipe_url, {})
+            except Exception as exc:
+                status = {
+                    "ok": False,
+                    "recipe_url": recipe_url,
+                    "error": str(exc) or "Unable to estimate serving basis.",
+                }
+        status = status if isinstance(status, dict) else {
+            "ok": False,
+            "recipe_url": recipe_url,
+            "error": "Invalid serving basis result.",
+        }
+        return {
+            "index": index,
+            "recipe_url": recipe_url,
+            "recipe_name": recipe_name,
+            "status": status,
+        }
+
+    if run_nutrition:
+        print(
+            "[MenuDeferredEnrichment] action=nutrition_parallel_start "
+            f"job_id={job_id} total_items={total} worker_count={nutrition_worker_count}"
+        )
+        nutrition_seen = 0
+        nutrition_futures = {}
+        with ThreadPoolExecutor(
+            max_workers=nutrition_worker_count,
+            thread_name_prefix="menu-deferred-nutrition",
+        ) as executor:
+            try:
+                for index, recipe_url in enumerate(recipe_urls):
+                    nutrition_task = copy_current_request_context_if_available(
+                        lambda index=index, recipe_url=recipe_url: run_nutrition_for_recipe(index, recipe_url)
+                    )
+                    nutrition_futures[executor.submit(nutrition_task)] = (index, recipe_url)
+                while nutrition_futures:
+                    ensure_not_cancelled(job_id)
+                    done, _pending = wait(
+                        list(nutrition_futures.keys()),
+                        timeout=0.5,
+                        return_when=FIRST_COMPLETED,
+                    )
+                    if not done:
+                        continue
+                    for future in done:
+                        index, recipe_url = nutrition_futures.pop(future)
+                        recipe_name = cookbook_recipe_display_name(recipe_url)
+                        try:
+                            worker_result = future.result()
+                        except Exception as exc:
+                            worker_result = {
+                                "index": index,
+                                "recipe_url": recipe_url,
+                                "recipe_name": recipe_name,
+                                "status": {
+                                    "ok": False,
+                                    "recipe_url": recipe_url,
+                                    "error": str(exc) or "Unable to estimate serving basis.",
+                                },
+                            }
+                        nutrition_seen += 1
+                        recipe_name = worker_result.get("recipe_name") or recipe_name
+                        status = worker_result.get("status") if isinstance(worker_result.get("status"), dict) else {
+                            "ok": False,
+                            "recipe_url": recipe_url,
+                            "error": "Invalid serving basis result.",
+                        }
+                        nutrition_statuses.append({
+                            "ok": bool(status.get("ok")),
+                            "recipe_url": recipe_url,
+                            "already_complete": bool(status.get("already_complete")),
+                            "estimated": bool(status.get("estimated")),
+                            "error": str(status.get("error") or ""),
+                            "model_used": str(status.get("model_used") or nutrition_model_info.get("model_used") or ""),
+                        })
+                        if status.get("ok"):
+                            nutrition_completed += 1
+                            nutrition_ready_urls.append(recipe_url)
+                            print(
+                                "[MenuDeferredEnrichment] action=nutrition_ready "
+                                f"job_id={job_id} recipe_url={recipe_url} recipe_name={recipe_name} "
+                                f"already_complete={bool(status.get('already_complete'))}"
+                            )
+                        else:
+                            nutrition_failed += 1
+                            failed_items += 1
+                            error = status.get("error") or "Unable to estimate serving basis."
+                            record_failed_recipe_item(recipe_url, recipe_name, "Nutrition", error)
+                            append_job_warning(job_id, f"{recipe_name} ({recipe_url}): {error}")
+                            print(
+                                "[MenuDeferredEnrichment] action=nutrition_failed "
+                                f"job_id={job_id} recipe_url={recipe_url} recipe_name={recipe_name} error={error}"
+                            )
+                        if (
+                            nutrition_seen <= 1
+                            or nutrition_seen >= total
+                            or nutrition_seen % followup_progress_every == 0
+                        ):
+                            update_job_progress(
+                                job_id,
+                                current_step=f"Estimating nutrition ({nutrition_seen}/{total})",
+                                progress_percent=bounded_percent(nutrition_seen, total, 5, 45),
+                                completed_items=nutrition_completed,
+                                failed_items=failed_items,
+                                result_payload={
+                                    **base_payload,
+                                    "stage": "Estimating nutrition",
+                                    "nutrition_completed": nutrition_completed,
+                                    "nutrition_failed": nutrition_failed,
+                                    "failed_items": failed_items,
+                                    "failed_recipe_items": failed_recipe_items,
+                                    "nutrition_statuses": nutrition_statuses,
+                                    "nutrition_workers": nutrition_worker_count,
+                                    **cookbook_recipe_progress_payload(
+                                        "nutrition",
+                                        "Finished nutrition for",
+                                        recipe_url,
+                                        recipe_name,
+                                        nutrition_seen,
+                                        total,
+                                        event="completed" if status.get("ok") else "failed",
+                                    ),
+                                },
+                            )
+            except JobCancelled:
+                for future in list(nutrition_futures.keys()):
+                    future.cancel()
+                raise
+    else:
+        nutrition_ready_urls = list(recipe_urls)
+
+    def run_category_for_recipe(index, recipe_url):
+        loaded_recipe = load_editable_recipe(recipe_url) or {}
+        recipe = loaded_recipe.get("recipe") if isinstance(loaded_recipe, dict) else {}
+        recipe = recipe if isinstance(recipe, dict) else {}
+        recipe_name = cookbook_recipe_display_name(recipe_url, recipe)
+        with job_context(
+            job_id=job_id,
+            queue_name=job_queue_name,
+            worker_id=(get_job(job_id) or {}).get("worker_id") or "",
+        ):
+            print(
+                "[MenuDeferredEnrichment] action=category_start "
+                f"job_id={job_id} recipe_url={recipe_url} recipe_name={recipe_name}"
+            )
+            if not recipe:
+                status = {
+                    "ok": False,
+                    "recipe_url": recipe_url,
+                    "error": "Recipe was not found for category decision.",
+                }
+            else:
+                assignment = cookbook_recipe_assignment_for_url(recipe_url) or {}
+                assignment = {
+                    **assignment,
+                    "cookbook_id": assignment.get("cookbook_id") or payload.get("cookbook_id") or "",
+                    "cookbook_name": assignment.get("cookbook_name") or payload.get("cookbook_name") or "",
+                }
+                try:
+                    status = apply_imported_recipe_category_routine(
+                        recipe_url,
+                        recipe,
+                        assignment,
+                        trigger_source="menu_deferred_enrichment:all",
+                    )
+                except Exception as exc:
+                    status = {
+                        "ok": False,
+                        "recipe_url": recipe_url,
+                        "error": str(exc) or "Unable to decide categories.",
+                    }
+        status = status if isinstance(status, dict) else {
+            "ok": False,
+            "recipe_url": recipe_url,
+            "error": "Invalid category result.",
+        }
+        return {
+            "index": index,
+            "recipe_url": recipe_url,
+            "recipe_name": recipe_name,
+            "recipe": recipe,
+            "status": status,
+        }
+
+    if run_categories and nutrition_ready_urls:
+        update_job_progress(
+            job_id,
+            current_step="Nutrition complete; generating categories",
+            progress_percent=47,
+            completed_items=nutrition_completed,
+            failed_items=failed_items,
+            result_payload={
+                **base_payload,
+                "stage": "Generating categories",
+                "nutrition_completed": nutrition_completed,
+                "nutrition_failed": nutrition_failed,
+                "failed_items": failed_items,
+                "failed_recipe_items": failed_recipe_items,
+            },
+        )
+        category_total = len(nutrition_ready_urls)
+        category_worker_count = menu_category_worker_count(category_total)
+        print(
+            "[MenuDeferredEnrichment] action=category_parallel_start "
+            f"job_id={job_id} total_items={category_total} worker_count={category_worker_count}"
+        )
+        category_seen = 0
+        category_futures = {}
+        with ThreadPoolExecutor(
+            max_workers=category_worker_count,
+            thread_name_prefix="menu-deferred-category",
+        ) as executor:
+            try:
+                for index, recipe_url in enumerate(nutrition_ready_urls):
+                    category_task = copy_current_request_context_if_available(
+                        lambda index=index, recipe_url=recipe_url: run_category_for_recipe(index, recipe_url)
+                    )
+                    category_futures[executor.submit(category_task)] = (index, recipe_url)
+                while category_futures:
+                    ensure_not_cancelled(job_id)
+                    done, _pending = wait(
+                        list(category_futures.keys()),
+                        timeout=0.5,
+                        return_when=FIRST_COMPLETED,
+                    )
+                    if not done:
+                        continue
+                    for future in done:
+                        index, recipe_url = category_futures.pop(future)
+                        recipe_name = cookbook_recipe_display_name(recipe_url)
+                        try:
+                            worker_result = future.result()
+                        except Exception as exc:
+                            worker_result = {
+                                "index": index,
+                                "recipe_url": recipe_url,
+                                "recipe_name": recipe_name,
+                                "recipe": {},
+                                "status": {
+                                    "ok": False,
+                                    "recipe_url": recipe_url,
+                                    "error": str(exc) or "Unable to decide categories.",
+                                },
+                            }
+                        category_seen += 1
+                        recipe_name = worker_result.get("recipe_name") or recipe_name
+                        recipe = worker_result.get("recipe") if isinstance(worker_result.get("recipe"), dict) else {}
+                        status = worker_result.get("status") if isinstance(worker_result.get("status"), dict) else {
+                            "ok": False,
+                            "recipe_url": recipe_url,
+                            "error": "Invalid category result.",
+                        }
+                        category_statuses.append({
+                            **status,
+                            "recipe_url": recipe_url,
+                        })
+                        if status.get("ok"):
+                            categories_completed += 1
+                            category_ready_urls.append(recipe_url)
+                        else:
+                            categories_failed += 1
+                            failed_items += 1
+                            error = status.get("error") or "Unable to decide categories."
+                            record_failed_recipe_item(recipe_url, recipe_name, "Categories", error)
+                            append_job_warning(job_id, f"{recipe_name} ({recipe_url}): {error}")
+                            print(
+                                "[MenuDeferredEnrichment] action=category_failed "
+                                f"job_id={job_id} recipe_url={recipe_url} recipe_name={recipe_name} error={error}"
+                            )
+                        record_recipe_import_activity(
+                            recipe_url,
+                            {
+                                **recipe,
+                                "import_category_status": status,
+                                "category_status": status,
+                            },
+                            "menu-deferred-enrichment",
+                        )
+                        if (
+                            category_seen <= 1
+                            or category_seen >= category_total
+                            or category_seen % followup_progress_every == 0
+                        ):
+                            update_job_progress(
+                                job_id,
+                                current_step=f"Generating categories ({category_seen}/{category_total})",
+                                progress_percent=bounded_percent(category_seen, category_total, 47, 72),
+                                completed_items=max(nutrition_completed, categories_completed),
+                                failed_items=failed_items,
+                                result_payload={
+                                    **base_payload,
+                                    "stage": "Generating categories",
+                                    "nutrition_completed": nutrition_completed,
+                                    "nutrition_failed": nutrition_failed,
+                                    "categories_completed": categories_completed,
+                                    "categories_failed": categories_failed,
+                                    "category_statuses": category_statuses,
+                                    "failed_items": failed_items,
+                                    "failed_recipe_items": failed_recipe_items,
+                                    "category_workers": category_worker_count,
+                                    **cookbook_recipe_progress_payload(
+                                        "categories",
+                                        "Finished category decision for",
+                                        recipe_url,
+                                        recipe_name,
+                                        category_seen,
+                                        category_total,
+                                        event="completed" if status.get("ok") else "failed",
+                                    ),
+                                },
+                            )
+            except JobCancelled:
+                for future in list(category_futures.keys()):
+                    future.cancel()
+                raise
+    elif run_categories:
+        update_job_progress(
+            job_id,
+            current_step="Categories skipped because no recipes finished nutrition",
+            progress_percent=72,
+            failed_items=failed_items,
+            result_payload={
+                **base_payload,
+                "stage": "Categories skipped",
+                "nutrition_completed": nutrition_completed,
+                "nutrition_failed": nutrition_failed,
+                "failed_items": failed_items,
+                "failed_recipe_items": failed_recipe_items,
+            },
+        )
+    else:
+        category_ready_urls = list(nutrition_ready_urls)
+
+    if run_generated_pdfs:
+        pdf_candidate_urls = category_ready_urls if run_categories else nutrition_ready_urls
+        update_job_progress(
+            job_id,
+            current_step="Generating PDFs",
+            progress_percent=74,
+            completed_items=max(nutrition_completed, categories_completed),
+            failed_items=failed_items,
+            result_payload={
+                **base_payload,
+                "stage": "Generating PDFs",
+                "nutrition_completed": nutrition_completed,
+                "nutrition_failed": nutrition_failed,
+                "categories_completed": categories_completed,
+                "categories_failed": categories_failed,
+                "failed_items": failed_items,
+                "failed_recipe_items": failed_recipe_items,
+            },
+        )
+        pdf_total = max(1, len(pdf_candidate_urls))
+        for index, recipe_url in enumerate(pdf_candidate_urls):
+            ensure_not_cancelled(job_id)
+            recipe_name = cookbook_recipe_display_name(recipe_url)
+            try:
+                with workspace_write_lock("recipe-pdfs"):
+                    pdf_result = generate_editable_recipe_pdf_file(recipe_url)
+            except Exception as exc:
+                pdf_result = {"ok": False, "error": str(exc)}
+            if pdf_result.get("ok"):
+                pdfs_completed += 1
+                pdf_ready_urls.append(recipe_url)
+            else:
+                failed_items += 1
+                error = pdf_result.get("error") or "Unable to create recipe PDF."
+                record_failed_recipe_item(recipe_url, recipe_name, "Generated PDF", error)
+                append_job_warning(job_id, f"{recipe_url}: {error}")
+            if index == 0 or index + 1 >= len(pdf_candidate_urls) or (index + 1) % followup_progress_every == 0:
+                update_job_progress(
+                    job_id,
+                    current_step=f"Generating PDFs ({index + 1}/{len(pdf_candidate_urls)})",
+                    progress_percent=bounded_percent(index + 1, pdf_total, 74, 88),
+                    completed_items=pdfs_completed,
+                    failed_items=failed_items,
+                    result_payload={
+                        **base_payload,
+                        "stage": "Generating PDFs",
+                        "nutrition_completed": nutrition_completed,
+                        "categories_completed": categories_completed,
+                        "pdfs_completed": pdfs_completed,
+                        "failed_items": failed_items,
+                        "failed_recipe_items": failed_recipe_items,
+                    },
+                )
+
+        upload_total = max(1, len(pdf_ready_urls))
+        for index, recipe_url in enumerate(pdf_ready_urls):
+            ensure_not_cancelled(job_id)
+            try:
+                with workspace_write_lock("recipe-pdfs"):
+                    upload_result = upload_recipe_pdf_to_cloudflare(recipe_url, pdf_kind="generated_recipe")
+            except Exception as exc:
+                upload_result = {"ok": False, "error": str(exc)}
+            if upload_result.get("ok"):
+                uploads_completed += 1
+            else:
+                failed_items += 1
+                recipe_name = cookbook_recipe_display_name(recipe_url)
+                error = upload_result.get("error") or "Unable to upload generated PDF."
+                record_failed_recipe_item(recipe_url, recipe_name, "Generated PDF Upload", error)
+                append_job_warning(job_id, f"{recipe_url}: {error}")
+            if index == 0 or index + 1 >= len(pdf_ready_urls) or (index + 1) % followup_progress_every == 0:
+                update_job_progress(
+                    job_id,
+                    current_step=f"Uploading PDFs ({index + 1}/{len(pdf_ready_urls)})",
+                    progress_percent=bounded_percent(index + 1, upload_total, 89, 96),
+                    completed_items=uploads_completed,
+                    failed_items=failed_items,
+                    result_payload={
+                        **base_payload,
+                        "stage": "Uploading PDFs",
+                        "nutrition_completed": nutrition_completed,
+                        "categories_completed": categories_completed,
+                        "pdfs_completed": pdfs_completed,
+                        "pdf_uploads_completed": uploads_completed,
+                        "failed_items": failed_items,
+                        "failed_recipe_items": failed_recipe_items,
+                    },
+                )
+
+    result_payload = {
+        **nutrition_model_info,
+        **category_payload,
+        "ok": bool(nutrition_completed or categories_completed or pdfs_completed or uploads_completed or not (run_nutrition or run_categories or run_generated_pdfs)),
+        "created_count": total,
+        "recipe_urls": recipe_urls,
+        "links": recipe_links(recipe_urls),
+        "nutrition_estimates_completed": nutrition_completed,
+        "nutrition_completed": nutrition_completed,
+        "nutrition_failed": nutrition_failed,
+        "nutrition_statuses": nutrition_statuses,
+        "categories_generated": categories_completed,
+        "categories_completed": categories_completed,
+        "categories_failed": categories_failed,
+        "category_statuses": category_statuses,
+        "pdfs_created": pdfs_completed,
+        "pdfs_completed": pdfs_completed,
+        "pdf_uploads_completed": uploads_completed,
+        "failed_count": failed_items,
+        "failed_items": failed_items,
+        "failed_recipe_items": failed_recipe_items,
+        "run_nutrition": bool(run_nutrition),
+        "run_categories": bool(run_categories),
+        "run_generated_pdfs": bool(run_generated_pdfs),
+        "stage": "Complete",
+        **clear_cookbook_recipe_progress_payload(),
+    }
+    update_job_progress(
+        job_id,
+        current_step="Complete",
+        progress_percent=98,
+        total_items=total,
+        completed_items=max(nutrition_completed, categories_completed, pdfs_completed, uploads_completed),
+        failed_items=failed_items,
+        result_payload=result_payload,
+    )
+    print(
+        "[MenuDeferredEnrichment] action=complete "
+        f"job_id={job_id} total_items={total} nutrition_completed={nutrition_completed} "
+        f"categories_completed={categories_completed} pdfs_completed={pdfs_completed} failed_items={failed_items}"
+    )
+    if result_payload["ok"]:
+        return complete_job(job_id, result_payload=result_payload)
+    return fail_job(job_id, "No deferred menu enrichment completed.", result_payload=result_payload)
 
 
 def run_menu_deferred_heavy_tasks_job(job_id, payload):
