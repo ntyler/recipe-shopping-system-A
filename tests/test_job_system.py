@@ -449,6 +449,7 @@ def test_menu_generate_job_keeps_partial_batch_predictions(monkeypatch, tmp_path
     assert finished["result_payload"]["generated_recipe_urls"] == [recipe_urls[0]]
     assert any("keeping 1 predicted recipe" in warning for warning in finished["warning_messages"])
     assert any("Vision AI request timed out." in warning for warning in finished["warning_messages"])
+    assert any("Crab Wonton" in warning for warning in finished["warning_messages"])
 
 
 def test_menu_deferred_heavy_task_route_uses_recipe_item_sources(monkeypatch, tmp_path):

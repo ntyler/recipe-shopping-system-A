@@ -296,6 +296,7 @@ def run_menu_generate_recipes_job(job_id, payload):
     from PushShoppingList.routes.recipe_routes import save_recipe_url_name
     from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
     from PushShoppingList.services.recipe_extract_service import apply_menu_batch_inference_to_stub
+    from PushShoppingList.services.recipe_extract_service import menu_batch_entry_item_name
     from PushShoppingList.services.recipe_extract_service import infer_menu_item_recipe_batch
     from PushShoppingList.services.recipe_extract_service import menu_batch_item_from_stub
     from PushShoppingList.services.recipe_extract_service import menu_inference_batches
@@ -441,11 +442,27 @@ def run_menu_generate_recipes_job(job_id, payload):
             for entry in batch
             if str((entry.get("menu_item") or {}).get("menu_item_id") or "").strip() not in result_items
         ]
+        failed_names = [
+            menu_batch_entry_item_name(entry)
+            for entry in batch
+            if str((entry.get("menu_item") or {}).get("menu_item_id") or "").strip() in missing_ids
+        ]
+        failed_names_text = ", ".join(name for name in failed_names[:12] if name)
+        if failed_names:
+            print(
+                "[Job Worker] action=menu-item-recipe-batch-final-failed-items "
+                f"job_id={job_id} batch_index={batch_index} batch_count={batch_total} "
+                f"failed_count={len(failed_names)} failed_item_names={failed_names_text}"
+            )
         if not result_items:
             failed_items += len(batch)
             append_job_warning(
                 job_id,
-                f"Batch {batch_index}/{batch_total}: {batch_result.get('error_message') or ('Missing menu_item_id: ' + ', '.join(missing_ids[:3]) if missing_ids else 'Unable to predict recipes.')}",
+                (
+                    f"Batch {batch_index}/{batch_total}: "
+                    f"{batch_result.get('error_message') or ('Missing menu_item_id: ' + ', '.join(missing_ids[:3]) if missing_ids else 'Unable to predict recipes.')} "
+                    f"Failed item names: {failed_names_text}"
+                ).strip(),
             )
             continue
         if not batch_result.get("ok") or missing_ids:
@@ -454,6 +471,7 @@ def run_menu_generate_recipes_job(job_id, payload):
                 (
                     f"Batch {batch_index}/{batch_total}: keeping {len(result_items)} predicted recipe(s); "
                     f"{len(missing_ids)} item(s) failed. "
+                    f"Failed item names: {failed_names_text}. "
                     f"{batch_result.get('error_message') or ''}"
                 ).strip(),
             )
@@ -475,7 +493,7 @@ def run_menu_generate_recipes_job(job_id, payload):
                 append_job_warning(
                     job_id,
                     (
-                        f"{recipe_url}: "
+                        f"{recipe_name} ({recipe_url}): "
                         f"{failure.get('error') or f'Batch response did not include menu_item_id {item_id}.'}"
                     ).strip(),
                 )

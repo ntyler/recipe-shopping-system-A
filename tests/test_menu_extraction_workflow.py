@@ -72,6 +72,61 @@ def test_canonical_menu_source_url_removes_menu_item_deep_link():
     ) == "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902"
 
 
+def test_menu_source_pdf_validation_checks_full_item_name_set():
+    sections = [
+        {
+            "section_name": "Appetizers",
+            "items": [
+                {"item_name": "Spring Roll"},
+                {"item_name": "Crab Wonton (5)"},
+                {"item_name": "Shrimp Shumai"},
+            ],
+        },
+        {
+            "section_name": "Noodles",
+            "items": [
+                {"item_name": f"Placeholder Item {index}"}
+                for index in range(30)
+            ] + [
+                {"item_name": "Pad Thai"},
+            ],
+        },
+    ]
+
+    expected_names = recipe_extract_service.menu_source_pdf_expected_item_names(sections)
+    validation = recipe_extract_service.validate_menu_source_capture_text(
+        "Menu Info Cartana LLC Spring Roll Crab Wonton (5) Shrimp Shumai Pad Thai",
+        expected_names=expected_names,
+    )
+
+    assert "Spring Roll" in expected_names
+    assert "Crab Wonton (5)" in expected_names
+    assert "Shrimp Shumai" in expected_names
+    assert "Pad Thai" in expected_names
+    assert validation["ok"] is True
+    assert "Pad Thai" in validation["matched_item_names"]
+
+
+def test_menu_source_pdf_validation_rejects_html_only_success(monkeypatch, tmp_path):
+    pdf_path = tmp_path / "menu-source.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4\n")
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "extract_text_from_pdf",
+        lambda _path: "Info Like Menu Today Terms and Privacy Policy Cartana LLC",
+    )
+
+    result = recipe_extract_service.validate_menu_source_pdf_file(
+        pdf_path,
+        html_text="Spring Roll Crab Wonton Shrimp Shumai Pad Thai $12.00",
+        expected_names=["Spring Roll", "Crab Wonton", "Shrimp Shumai", "Pad Thai"],
+    )
+
+    assert result["ok"] is False
+    assert result["pdf_validation"]["shell_only"] is True
+    assert result["html_validation"]["ok"] is True
+
+
 def test_save_menu_item_preserves_shared_source_pdf_without_per_item_attach(monkeypatch, tmp_path):
     output_dir = tmp_path / "output"
     output_dir.mkdir()
@@ -806,6 +861,7 @@ def test_menu_stub_import_skips_blank_divider_items(monkeypatch, tmp_path):
 
 def test_menu_inference_batches_cap_batch_size(monkeypatch):
     monkeypatch.setenv("MENU_ITEM_BATCH_INFERENCE_MAX_ITEMS", "25")
+    monkeypatch.setenv("MENU_ITEM_BATCH_INFERENCE_TARGET_CHARS", "999999")
     entries = [
         {
             "recipe_url": f"https://example.com/menu?menu_item={index}",
@@ -823,7 +879,35 @@ def test_menu_inference_batches_cap_batch_size(monkeypatch):
     assert [len(batch) for batch in batches] == [25, 25, 2]
 
 
+def test_menu_inference_batches_use_smaller_gpt_4o_mini_defaults(monkeypatch):
+    monkeypatch.delenv("MENU_ITEM_BATCH_INFERENCE_MAX_ITEMS", raising=False)
+    monkeypatch.delenv("MENU_ITEM_BATCH_INFERENCE_MIN_ITEMS", raising=False)
+    monkeypatch.delenv("MENU_ITEM_BATCH_INFERENCE_TARGET_CHARS", raising=False)
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "menu_item_recipe_model_resolution",
+        lambda: recipe_extract_service.OpenAIModelResolution("gpt-4o-mini", "test", "menu"),
+    )
+    entries = [
+        {
+            "recipe_url": f"https://example.com/menu?menu_item={index}",
+            "menu_item": {
+                "menu_item_id": f"item-{index}",
+                "item_name": f"Item {index}",
+                "menu_section": "Entrees",
+            },
+        }
+        for index in range(17)
+    ]
+
+    batches = recipe_extract_service.menu_inference_batches(entries)
+
+    assert recipe_extract_service.menu_item_batch_size_limits() == (4, 8)
+    assert [len(batch) for batch in batches] == [8, 8, 1]
+
+
 def test_menu_batch_inference_splits_timeout_and_combines_results(monkeypatch):
+    monkeypatch.setenv("MENU_ITEM_BATCH_INFERENCE_RETRY_ATTEMPTS", "1")
     entries = [
         {
             "recipe_url": f"https://example.com/menu?menu_item={index}",
@@ -875,6 +959,92 @@ def test_menu_batch_inference_splits_timeout_and_combines_results(monkeypatch):
     assert result["failures"] == {}
     assert [call["size"] for call in calls] == [4, 2, 1, 1, 2, 1, 1]
     assert all(call["user_id"] == "owner" for call in calls)
+
+
+def test_menu_batch_inference_retries_with_backoff_before_success(monkeypatch):
+    monkeypatch.setenv("MENU_ITEM_BATCH_INFERENCE_RETRY_ATTEMPTS", "2")
+    monkeypatch.setenv("MENU_ITEM_BATCH_INFERENCE_RETRY_BACKOFF_SECONDS", "1.5")
+    monkeypatch.setenv("MENU_ITEM_BATCH_INFERENCE_RETRY_MAX_BACKOFF_SECONDS", "2")
+    sleeps = []
+    entries = [
+        {
+            "recipe_url": "https://example.com/menu?menu_item=pad-thai",
+            "menu_item": {
+                "menu_item_id": "item-pad-thai",
+                "item_name": "Pad Thai",
+                "menu_section": "Noodles",
+            },
+        }
+    ]
+    calls = []
+
+    def fake_once(batch, user_id=None):
+        calls.append({"size": len(batch), "user_id": user_id})
+        if len(calls) == 1:
+            return {
+                "ok": False,
+                "items": {},
+                "failures": {},
+                "error_code": "OPENAI_TIMEOUT",
+                "error_message": "Vision AI request timed out.",
+                "technical_message": "Request timed out.",
+                "exception_type": "APITimeoutError",
+                "model": "gpt-4o-mini",
+                "model_source": "test",
+            }
+        return {
+            "ok": True,
+            "items": {"item-pad-thai": {"predicted_ingredients": [{"ingredient": "rice noodles"}]}},
+            "failures": {},
+            "model": "gpt-4o-mini",
+            "model_source": "test",
+        }
+
+    monkeypatch.setattr(recipe_extract_service, "_infer_menu_item_recipe_batch_once", fake_once)
+    monkeypatch.setattr(recipe_extract_service.time, "sleep", lambda seconds: sleeps.append(seconds))
+
+    result = recipe_extract_service.infer_menu_item_recipe_batch(entries, user_id="owner")
+
+    assert result["ok"] is True
+    assert calls == [{"size": 1, "user_id": "owner"}, {"size": 1, "user_id": "owner"}]
+    assert sleeps == [1.5]
+
+
+def test_menu_batch_inference_logs_final_failed_item_names(monkeypatch, capsys):
+    monkeypatch.setenv("MENU_ITEM_BATCH_INFERENCE_RETRY_ATTEMPTS", "1")
+    entries = [
+        {
+            "recipe_url": "https://example.com/menu?menu_item=pad-thai",
+            "menu_item": {
+                "menu_item_id": "item-pad-thai",
+                "item_name": "Pad Thai",
+                "menu_section": "Noodles",
+            },
+        }
+    ]
+
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "_infer_menu_item_recipe_batch_once",
+        lambda batch, user_id=None: {
+            "ok": False,
+            "items": {},
+            "failures": {},
+            "error_code": "BAD_RESPONSE",
+            "error_message": "Unable to parse response.",
+            "technical_message": "Unable to parse response.",
+            "exception_type": "ValueError",
+            "model": "gpt-4o-mini",
+            "model_source": "test",
+        },
+    )
+
+    result = recipe_extract_service.infer_menu_item_recipe_batch(entries, user_id="owner")
+    output = capsys.readouterr().out
+
+    assert result["ok"] is False
+    assert "action=menu-item-recipe-batch-inference_final_failures" in output
+    assert "Pad Thai" in output
 
 
 def test_menu_stub_optional_cleanup_is_one_batch_call_and_skips_duplicate(monkeypatch, tmp_path):

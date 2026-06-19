@@ -1089,7 +1089,7 @@ MENU_SOURCE_ITEM_QUERY_KEYS = {
     "ordertype",
 }
 MENU_SOURCE_PDF_MIN_ITEM_COUNT = 20
-MENU_SOURCE_PDF_MATCH_LIMIT = 24
+MENU_SOURCE_PDF_MATCH_LIMIT = 0
 MENU_SOURCE_PDF_SHELL_MARKERS = (
     "Info",
     "Like",
@@ -1382,6 +1382,10 @@ def apply_menu_source_pdf_metadata(recipe, metadata):
 
 def menu_source_pdf_expected_item_names(sections, limit=MENU_SOURCE_PDF_MATCH_LIMIT):
     names = []
+    try:
+        max_names = int(limit or 0)
+    except (TypeError, ValueError):
+        max_names = 0
     for item in flatten_menu_sections(sections):
         if not isinstance(item, dict):
             continue
@@ -1393,7 +1397,7 @@ def menu_source_pdf_expected_item_names(sections, limit=MENU_SOURCE_PDF_MATCH_LI
         )
         if name and len(name) > 2 and name.lower() not in {value.lower() for value in names}:
             names.append(name)
-        if len(names) >= limit:
+        if max_names > 0 and len(names) >= max_names:
             break
     return names
 
@@ -5317,7 +5321,7 @@ def validate_menu_source_pdf_file(pdf_path, html_text="", expected_names=None):
         html_text,
         expected_names=expected_names,
     )
-    ok = bool(pdf_validation.get("ok") or html_validation.get("ok"))
+    ok = bool(pdf_validation.get("ok"))
     return {
         "ok": ok,
         "pdf_text_length": len(pdf_text or ""),
@@ -5516,12 +5520,17 @@ def create_menu_source_pdf(menu_url, sections=None, progress_callback=None, canc
             validation=capture_result.get("validation"),
             item_count=item_count,
         )
+        validation = capture_result.get("validation") if isinstance(capture_result.get("validation"), dict) else {}
+        matched_names = validation.get("matched_item_names") if isinstance(validation.get("matched_item_names"), list) else []
+        matched_names_text = ",".join(str(name) for name in matched_names[:8])
         print(
             "[recipe_import] action=menu_source_pdf_ready "
             f"menu_source_url={menu_source_url} "
             f"source_pdf_path={metadata.get('source_pdf_path') or ''} "
             f"source_cloudflare_pdf_url={metadata.get('source_cloudflare_pdf_url') or ''} "
-            f"item_count={item_count}"
+            f"item_count={item_count} "
+            f"detected_item_count={validation.get('detected_item_count') or 0} "
+            f"matched_item_names={matched_names_text}"
         )
         return metadata
     except Exception as exc:
@@ -10246,30 +10255,44 @@ def menu_item_inference_worker_count(total_items=None):
     return configured
 
 
+def menu_item_batch_size_defaults(model_name=None):
+    model = clean_recipe_text(model_name or menu_item_recipe_model_resolution().model).lower()
+    if model == "gpt-4o-mini":
+        return 4, 8
+    return 6, 12
+
+
 def menu_item_batch_size_limits():
+    default_min, default_max = menu_item_batch_size_defaults()
     try:
-        configured_max = int(os.getenv("MENU_ITEM_BATCH_INFERENCE_MAX_ITEMS", "12"))
+        configured_max = int(os.getenv("MENU_ITEM_BATCH_INFERENCE_MAX_ITEMS") or default_max)
     except (TypeError, ValueError):
-        configured_max = 12
+        configured_max = default_max
     try:
-        configured_min = int(os.getenv("MENU_ITEM_BATCH_INFERENCE_MIN_ITEMS", "6"))
+        configured_min = int(os.getenv("MENU_ITEM_BATCH_INFERENCE_MIN_ITEMS") or default_min)
     except (TypeError, ValueError):
-        configured_min = 6
+        configured_min = default_min
     max_items = max(1, min(25, configured_max))
     min_items = max(1, min(max_items, configured_min))
     return min_items, max_items
 
 
 def menu_item_batch_target_chars():
+    model = clean_recipe_text(menu_item_recipe_model_resolution().model).lower()
+    default_target = 6500 if model == "gpt-4o-mini" else 9000
     try:
-        return max(4000, int(os.getenv("MENU_ITEM_BATCH_INFERENCE_TARGET_CHARS", "9000")))
+        return max(3000, int(os.getenv("MENU_ITEM_BATCH_INFERENCE_TARGET_CHARS") or default_target))
     except (TypeError, ValueError):
-        return 9000
+        return default_target
 
 
 MENU_ITEM_BATCH_SPLITTABLE_ERROR_CODES = {
     "OPENAI_TIMEOUT",
     "OPENAI_CONNECTION_ERROR",
+}
+MENU_ITEM_BATCH_RETRYABLE_ERROR_CODES = {
+    *MENU_ITEM_BATCH_SPLITTABLE_ERROR_CODES,
+    "OPENAI_RATE_LIMIT_ERROR",
 }
 
 
@@ -11047,6 +11070,19 @@ def menu_batch_entry_item_id(entry):
     return clean_recipe_text(menu_item.get("menu_item_id") or entry.get("menu_item_id") or "")
 
 
+def menu_batch_entry_item_name(entry):
+    entry = entry if isinstance(entry, dict) else {}
+    menu_item = entry.get("menu_item") if isinstance(entry.get("menu_item"), dict) else {}
+    stub = entry.get("stub") if isinstance(entry.get("stub"), dict) else {}
+    return clean_recipe_text(
+        menu_item.get("item_name")
+        or stub.get("display_name")
+        or stub.get("recipe_title")
+        or entry.get("recipe_url")
+        or menu_batch_entry_item_id(entry)
+    )
+
+
 def menu_batch_failure_map(entries, batch_result):
     batch_result = batch_result if isinstance(batch_result, dict) else {}
     items = batch_result.get("items") if isinstance(batch_result.get("items"), dict) else {}
@@ -11088,6 +11124,102 @@ def menu_batch_result_can_split(batch_result):
     )
 
 
+def menu_batch_result_can_retry(batch_result):
+    batch_result = batch_result if isinstance(batch_result, dict) else {}
+    error_code = clean_recipe_text(batch_result.get("error_code"))
+    exception_type = clean_recipe_text(batch_result.get("exception_type")).lower()
+    error_text = clean_recipe_text(
+        batch_result.get("technical_message")
+        or batch_result.get("error_message")
+        or batch_result.get("error")
+    ).lower()
+    return bool(
+        menu_batch_result_can_split(batch_result)
+        or error_code in MENU_ITEM_BATCH_RETRYABLE_ERROR_CODES
+        or exception_type in {"ratelimiterror"}
+        or "rate limit" in error_text
+        or "temporarily unavailable" in error_text
+    )
+
+
+def menu_item_batch_retry_config():
+    try:
+        attempts = int(os.getenv("MENU_ITEM_BATCH_INFERENCE_RETRY_ATTEMPTS") or "2")
+    except (TypeError, ValueError):
+        attempts = 2
+    try:
+        base_delay = float(os.getenv("MENU_ITEM_BATCH_INFERENCE_RETRY_BACKOFF_SECONDS") or "1.25")
+    except (TypeError, ValueError):
+        base_delay = 1.25
+    try:
+        max_delay = float(os.getenv("MENU_ITEM_BATCH_INFERENCE_RETRY_MAX_BACKOFF_SECONDS") or "8")
+    except (TypeError, ValueError):
+        max_delay = 8
+    attempts = max(1, min(5, attempts))
+    base_delay = max(0, base_delay)
+    max_delay = max(base_delay, max_delay)
+    return attempts, base_delay, max_delay
+
+
+def menu_item_batch_retry_delay(attempt_index, base_delay, max_delay):
+    try:
+        delay = float(base_delay) * (2 ** max(0, int(attempt_index) - 1))
+    except (TypeError, ValueError):
+        delay = 0
+    return min(max(0, delay), max(0, float(max_delay or 0)))
+
+
+def infer_menu_item_recipe_batch_once_with_retries(entries, user_id=None):
+    attempts, base_delay, max_delay = menu_item_batch_retry_config()
+    last_result = {}
+    for attempt_index in range(1, attempts + 1):
+        result = _infer_menu_item_recipe_batch_once(entries, user_id=user_id)
+        last_result = result
+        if result.get("ok") or attempt_index >= attempts or not menu_batch_result_can_retry(result):
+            return result
+
+        delay = menu_item_batch_retry_delay(attempt_index, base_delay, max_delay)
+        failed_names = [
+            menu_batch_entry_item_name(entry)
+            for entry in entries
+            if menu_batch_entry_item_name(entry)
+        ]
+        print(
+            "[OpenAI] action=menu-item-recipe-batch-inference_retry "
+            f"batch_size={len(entries or [])} attempt={attempt_index} next_attempt={attempt_index + 1} "
+            f"delay_seconds={delay:.2f} error_code={result.get('error_code') or 'n/a'} "
+            f"exception_type={result.get('exception_type') or 'n/a'} "
+            f"item_names={json.dumps(failed_names[:12], ensure_ascii=True)}"
+        )
+        if delay > 0:
+            time.sleep(delay)
+
+    return last_result
+
+
+def log_menu_item_batch_final_failures(entries, batch_result):
+    batch_result = batch_result if isinstance(batch_result, dict) else {}
+    result_items = batch_result.get("items") if isinstance(batch_result.get("items"), dict) else {}
+    failure_names = []
+    for entry in entries or []:
+        item_id = menu_batch_entry_item_id(entry)
+        if item_id and item_id in result_items:
+            continue
+        name = menu_batch_entry_item_name(entry)
+        if name:
+            failure_names.append(name)
+    if not failure_names:
+        return
+    print(
+        "[OpenAI] action=menu-item-recipe-batch-inference_final_failures "
+        f"failed_count={len(failure_names)} "
+        f"failed_item_names={json.dumps(failure_names[:40], ensure_ascii=True)} "
+        f"error_code={batch_result.get('error_code') or 'n/a'} "
+        f"exception_type={batch_result.get('exception_type') or 'n/a'} "
+        f"model={batch_result.get('model') or ''}"
+    )
+
+
 def combine_menu_batch_results(results):
     combined_items = {}
     combined_failures = {}
@@ -11126,7 +11258,7 @@ def combine_menu_batch_results(results):
     }
 
 
-def infer_menu_item_recipe_batch(entries, user_id=None):
+def infer_menu_item_recipe_batch(entries, user_id=None, _depth=0):
     entries = [entry for entry in entries or [] if isinstance(entry, dict)]
     if not entries:
         model_resolution = menu_item_recipe_model_resolution()
@@ -11138,10 +11270,12 @@ def infer_menu_item_recipe_batch(entries, user_id=None):
             "model_source": model_resolution.source,
         }
 
-    result = _infer_menu_item_recipe_batch_once(entries, user_id=user_id)
+    result = infer_menu_item_recipe_batch_once_with_retries(entries, user_id=user_id)
     if result.get("ok") or len(entries) <= 1 or not menu_batch_result_can_split(result):
         if not result.get("ok"):
             result["failures"] = menu_batch_failure_map(entries, result)
+            if _depth == 0:
+                log_menu_item_batch_final_failures(entries, result)
         else:
             result.setdefault("failures", {})
         return result
@@ -11154,9 +11288,12 @@ def infer_menu_item_recipe_batch(entries, user_id=None):
         f"exception_type={result.get('exception_type') or 'n/a'} "
         f"model={result.get('model') or ''}"
     )
-    left = infer_menu_item_recipe_batch(entries[:midpoint], user_id=user_id)
-    right = infer_menu_item_recipe_batch(entries[midpoint:], user_id=user_id)
-    return combine_menu_batch_results([left, right])
+    left = infer_menu_item_recipe_batch(entries[:midpoint], user_id=user_id, _depth=_depth + 1)
+    right = infer_menu_item_recipe_batch(entries[midpoint:], user_id=user_id, _depth=_depth + 1)
+    combined = combine_menu_batch_results([left, right])
+    if _depth == 0 and combined.get("failures"):
+        log_menu_item_batch_final_failures(entries, combined)
+    return combined
 
 
 def menu_item_source_url(menu_url, title, index):
