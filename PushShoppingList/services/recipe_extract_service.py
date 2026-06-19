@@ -1270,7 +1270,7 @@ def recipe_is_menu_item_import(json_data):
     json_data = json_data if isinstance(json_data, dict) else {}
     source_type = str(json_data.get("source_type") or "").strip().lower()
     return bool(
-        source_type == "menu_item_inferred"
+        source_type in {"menu_item_inferred", "menu_item_stub"}
         or json_data.get("ai_inferred") and (json_data.get("source_menu_url") or json_data.get("menu_source_url"))
         or json_data.get("menu_item_name")
         or json_data.get("menu_item_id")
@@ -8728,6 +8728,70 @@ def save_extracted_recipe_json(recipe_url, json_data):
     return json_path
 
 
+def normalized_menu_import_failure(recipe_url, recipe_name="", stage="", error=""):
+    stage = clean_recipe_text(stage or "Import")
+    error = clean_recipe_text(error or "This item failed during import.")
+    return {
+        "recipe_url": str(recipe_url or "").strip(),
+        "recipe_name": clean_recipe_text(recipe_name or ""),
+        "stage": stage,
+        "error": error,
+        "failed_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+    }
+
+
+def apply_menu_import_failure_metadata(json_data, recipe_url, recipe_name="", stage="", error=""):
+    json_data = json_data if isinstance(json_data, dict) else {}
+    failure = normalized_menu_import_failure(recipe_url, recipe_name, stage, error)
+    failure_stage = str(failure.get("stage") or "").strip().lower()
+    existing_failures = json_data.get("menu_import_failures")
+    if not isinstance(existing_failures, list):
+        existing_failures = []
+    failures = [
+        item
+        for item in existing_failures
+        if isinstance(item, dict) and str(item.get("stage") or "").strip().lower() != failure_stage
+    ]
+    failures.append(failure)
+    json_data["menu_import_failed"] = True
+    json_data["menu_import_failures"] = failures
+    json_data["menu_import_failure_stage"] = failure.get("stage", "")
+    json_data["menu_import_failure_error"] = failure.get("error", "")
+    json_data["menu_import_failure_at"] = failure.get("failed_at", "")
+    return json_data
+
+
+def clear_menu_import_failure_metadata(json_data):
+    json_data = json_data if isinstance(json_data, dict) else {}
+    json_data["menu_import_failed"] = False
+    json_data["menu_import_failures"] = []
+    json_data["menu_import_failure_stage"] = ""
+    json_data["menu_import_failure_error"] = ""
+    json_data["menu_import_failure_at"] = ""
+    return json_data
+
+
+def mark_menu_recipe_import_failure(recipe_url, recipe_name="", stage="", error=""):
+    recipe_url = str(recipe_url or "").strip()
+    if not recipe_url:
+        return {"ok": False, "error": "Recipe URL is required."}
+
+    json_path = OUTPUT_FOLDER / f"{safe_filename(recipe_url)}.json"
+    try:
+        json_data = json.loads(json_path.read_text(encoding="utf-8")) if json_path.exists() else {}
+    except Exception:
+        json_data = {}
+    json_data["source_url"] = json_data.get("source_url") or recipe_url
+    json_data.setdefault("recipe_title", clean_recipe_text(recipe_name or recipe_url))
+    json_data.setdefault("display_name", clean_recipe_text(recipe_name or json_data.get("recipe_title") or recipe_url))
+    json_data.setdefault("source_type", "menu_item_stub")
+    json_data.setdefault("recipe_status", "stub")
+    json_data.setdefault("needs_ai_recipe", True)
+    apply_menu_import_failure_metadata(json_data, recipe_url, recipe_name, stage, error)
+    save_extracted_recipe_json(recipe_url, json_data)
+    return {"ok": True, "recipe_url": recipe_url}
+
+
 def extract_menu_recipes_from_upload(file_storage):
     filename = Path(file_storage.filename or "uploaded-menu").name
     safe_name = f"{uuid.uuid4().hex}_{safe_filename(filename)}"
@@ -11722,6 +11786,7 @@ def build_menu_batch_inference_result(recipe_url, stub, menu_item, inference, mo
     normalized["recipe_inference"] = recipe["recipe_inference"]
     normalized["nutrition_inference"] = recipe["nutrition_inference"]
     normalized["pdf_generation"] = recipe["pdf_generation"]
+    clear_menu_import_failure_metadata(normalized)
     normalize_extracted_recipe_identity(normalized)
     normalize_extracted_ingredient_fields(normalized)
     normalize_extracted_equipment_fields(normalized)

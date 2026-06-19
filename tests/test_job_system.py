@@ -1,3 +1,4 @@
+import json
 import threading
 from datetime import timedelta
 
@@ -628,6 +629,12 @@ def test_menu_generate_job_keeps_partial_batch_predictions(monkeypatch, tmp_path
     assert any("keeping 1 predicted recipe" in warning for warning in finished["warning_messages"])
     assert any("Vision AI request timed out." in warning for warning in finished["warning_messages"])
     assert any("Crab Wonton" in warning for warning in finished["warning_messages"])
+    failed_recipe_path = recipe_extract_service.OUTPUT_FOLDER / f"{recipe_extract_service.safe_filename(recipe_urls[1])}.json"
+    failed_recipe_json = json.loads(failed_recipe_path.read_text(encoding="utf-8"))
+    assert failed_recipe_json["menu_import_failed"] is True
+    assert failed_recipe_json["menu_import_failure_stage"] == "Recipe generation"
+    assert failed_recipe_json["menu_import_failure_error"] == "Vision AI request timed out."
+    assert failed_recipe_json["menu_import_failures"][0]["recipe_name"] == "Crab Wonton"
 
 
 def test_menu_generate_job_predicts_batches_in_parallel(monkeypatch, tmp_path):

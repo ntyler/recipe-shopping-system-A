@@ -195,16 +195,23 @@
                                 Recipe {{ recipe.number }}:
                             </a>
                             <span class="recipe-view-name-group">
-                                <a class="recipe-view-name recipe-view-name-link"
-                                   href="{{ recipe.url or recipe.source_display_url }}"
-                                   target="_blank"
-                                   rel="noopener noreferrer"
-                                   title="{{ recipe.source_display_url }}">
-                                    {{ recipe.name }}
-                                </a>
-                                {% if recipe.needs_ai_recipe or recipe.source_type == "menu_item_stub" %}
-                                    <span class="menu-recipe-status-badge menu-recipe-status-stub">
-                                        Menu Stub - AI recipe not generated yet
+                                 <a class="recipe-view-name recipe-view-name-link"
+                                    href="{{ recipe.url or recipe.source_display_url }}"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title="{{ recipe.source_display_url }}">
+                                     {{ recipe.name }}
+                                 </a>
+                                 {% if recipe.import_failure_status and recipe.import_failure_status.failed %}
+                                     <span class="menu-recipe-status-badge menu-recipe-status-failed"
+                                           title="{{ recipe.import_failure_status.title }}"
+                                           aria-label="{{ recipe.import_failure_status.title }}">
+                                         {{ recipe.import_failure_status.label }}
+                                     </span>
+                                 {% endif %}
+                                 {% if recipe.needs_ai_recipe or recipe.source_type == "menu_item_stub" %}
+                                     <span class="menu-recipe-status-badge menu-recipe-status-stub">
+                                         Menu Stub - AI recipe not generated yet
                                     </span>
                                     <button type="button"
                                             class="menu-recipe-generate-inline"

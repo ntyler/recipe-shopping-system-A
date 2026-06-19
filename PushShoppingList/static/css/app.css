@@ -21452,6 +21452,12 @@ img[data-deferred-src] {
             color: #22543d;
         }
 
+        .menu-recipe-status-failed {
+            border: 1px solid #c53030;
+            background: #fff5f5;
+            color: #9b2c2c;
+        }
+
         .menu-recipe-generate-inline {
             display: inline-flex;
             align-items: center;

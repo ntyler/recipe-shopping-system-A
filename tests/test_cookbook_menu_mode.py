@@ -64,6 +64,10 @@ def test_cookbook_menu_mode_static_hooks_are_present():
     assert ".cookbook-menu-recipe-card" in css
     assert ".cookbook-recipe-log-view" in css
     assert ".cookbook-category-grid" in css
+    assert ".menu-recipe-status-failed" in css
+    assert "menu-recipe-status-failed" in template
+    assert "menu-recipe-status-failed" in read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    assert "menu-recipe-status-failed" in read_text("PushShoppingList/templates/sections/items.html")
 
 
 def test_cookbook_infer_controls_live_inside_cookbook_submenu():
@@ -422,6 +426,52 @@ def test_cookbook_view_generated_recipe_clears_stale_stub_state(monkeypatch):
     assert recipe["source_type"] == "menu_item_inferred"
     assert recipe["recipe_status"] == "generated"
     assert recipe["needs_ai_recipe"] is False
+
+
+def test_menu_import_failure_status_reaches_recipe_and_cookbook_rows(monkeypatch):
+    recipe_url = "menu-item://vel-asain-cuisine/crab-wonton"
+    failed_recipe = {
+        "source_url": recipe_url,
+        "source_type": "menu_item_inferred",
+        "ai_inferred": True,
+        "recipe_status": "generated",
+        "recipe_title": "Crab Wonton",
+        "menu_import_failed": True,
+        "menu_import_failures": [{
+            "stage": "Nutrition",
+            "error": "Unable to estimate serving basis.",
+        }],
+        "ingredients": [{"ingredient": "cream cheese"}],
+        "instructions": [{"instruction": "Fill and fry."}],
+        "nutrition": {},
+    }
+    monkeypatch.setattr(main_routes, "load_saved_recipe_output", lambda url: failed_recipe if url == recipe_url else {})
+    monkeypatch.setattr(main_routes, "load_recipe_ingredients", lambda: {})
+
+    recipe_rows = main_routes.recipe_view_rows([{"url": recipe_url, "name": "Crab Wonton"}])
+    log_rows = main_routes.recipe_url_log_rows([{"url": recipe_url, "name": "Crab Wonton", "quantity": 1}])
+
+    assert recipe_rows[0]["import_failure_status"]["failed"] is True
+    assert recipe_rows[0]["import_failure_status"]["label"] == "Failed: Nutrition"
+    assert "Unable to estimate serving basis." in log_rows[0]["import_failure_status"]["title"]
+
+    with TemporaryDirectory() as temp_dir, patch.object(
+        cookbook_service,
+        "COOKBOOKS_FILE",
+        Path(temp_dir) / "cookbooks.json",
+    ):
+        cookbook_service.save_cookbooks({
+            "cookbooks": [{
+                "id": "vel-asain-cuisine",
+                "name": "Vel Asain Cuisine",
+                "recipes": [{"url": recipe_url, "name": "Crab Wonton"}],
+            }],
+        })
+        view = main_routes.cookbook_view_for_render([])
+
+    cookbook_recipe = view["cookbooks"][0]["recipes"][0]
+    assert cookbook_recipe["import_failure_status"]["failed"] is True
+    assert cookbook_recipe["import_failure_status"]["stage"] == "Nutrition"
 
 
 def test_unclassified_cookbook_menu_keeps_cookbook_management_protected():

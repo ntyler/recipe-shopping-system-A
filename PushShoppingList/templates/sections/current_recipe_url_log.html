@@ -142,6 +142,13 @@
                                            title="{{ recipe.source_display_url }}"
                                            onclick="event.stopPropagation()"
                                            data-recipe-url="{{ recipe.url }}">{{ recipe.name }}</a>
+                                        {% if recipe.import_failure_status and recipe.import_failure_status.failed %}
+                                            <span class="menu-recipe-status-badge menu-recipe-status-failed"
+                                                  title="{{ recipe.import_failure_status.title }}"
+                                                  aria-label="{{ recipe.import_failure_status.title }}">
+                                                {{ recipe.import_failure_status.label }}
+                                            </span>
+                                        {% endif %}
                                         {% set recipe_needs_food_review = recipe.food_rule_status.needs_review %}
                                         {% if recipe.needs_ai_recipe or recipe.source_type == "menu_item_stub" %}
                                             <span class="menu-recipe-status-badge menu-recipe-status-stub">

@@ -491,9 +491,16 @@
                                                                            rel="noopener noreferrer"
                                                                            title="{{ recipe.source_display_url }}"
                                                                            onclick="event.stopPropagation()">
-                                                                            {{ recipe.name }}
-                                                                        </a>
-                                                                        {% if recipe.rating %}
+                                                                             {{ recipe.name }}
+                                                                         </a>
+                                                                         {% if recipe.import_failure_status and recipe.import_failure_status.failed %}
+                                                                             <span class="menu-recipe-status-badge menu-recipe-status-failed"
+                                                                                   title="{{ recipe.import_failure_status.title }}"
+                                                                                   aria-label="{{ recipe.import_failure_status.title }}">
+                                                                                 {{ recipe.import_failure_status.label }}
+                                                                             </span>
+                                                                         {% endif %}
+                                                                         {% if recipe.rating %}
                                                                             <span class="recipe-rating-display"
                                                                                   aria-label="{{ recipe.rating }} out of 5 stars"
                                                                                   title="{{ recipe.rating }} out of 5 stars">

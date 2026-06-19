@@ -363,6 +363,7 @@ def run_menu_generate_recipes_job(job_id, payload):
     from PushShoppingList.services.recipe_extract_service import menu_batch_item_from_stub
     from PushShoppingList.services.recipe_extract_service import menu_inference_batches
     from PushShoppingList.services.recipe_extract_service import menu_item_name_is_blank_divider
+    from PushShoppingList.services.recipe_extract_service import mark_menu_recipe_import_failure
     from PushShoppingList.services.recipe_extract_service import save_menu_batch_inference_results
     from PushShoppingList.services.recipe_url_service import add_recipe_urls
     from PushShoppingList.services.recipe_url_service import save_recipe_url_names
@@ -409,6 +410,13 @@ def run_menu_generate_recipes_job(job_id, payload):
             "stage": str(stage or "").strip(),
             "error": str(error or "").strip(),
         })
+        try:
+            mark_menu_recipe_import_failure(recipe_url, recipe_name, stage, error)
+        except Exception as exc:
+            print(
+                "[MenuRecipeGeneration] action=failed_item_flag_save_failed "
+                f"job_id={job_id} recipe_url={recipe_url} error={exc}"
+            )
 
     update_job_progress(
         job_id,

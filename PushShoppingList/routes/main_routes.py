@@ -726,6 +726,7 @@ def recipe_view_rows(recipe_urls, food_rules=None, image_variants=None, include_
             "scaling_options": recipe_log_scaling_options(recipe_data, recipe_quantity),
             "archive_pdf_available": recipe_archive_pdf_exists(recipe["url"]),
             "food_rule_status": recipe_food_rule_status(recipe_data, food_rules=food_rules),
+            "import_failure_status": recipe_import_failure_status(recipe_data),
             "rating": recipe_rating_for_view(recipe_data),
             "rating_stars": recipe_rating_stars_for_view(recipe_data),
             "base_servings": recipe_data.get("servings"),
@@ -769,6 +770,58 @@ def recipe_description_for_view(recipe_data):
             return value
 
     return ""
+
+
+def recipe_import_failure_status(recipe_data):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    failures = recipe_data.get("menu_import_failures")
+    normalized = []
+    if isinstance(failures, list):
+        for failure in failures:
+            if not isinstance(failure, dict):
+                continue
+            stage = clean_display_text(failure.get("stage"))
+            error = clean_display_text(failure.get("error") or failure.get("message"))
+            if stage or error:
+                normalized.append({
+                    "stage": stage,
+                    "error": error,
+                    "failed_at": clean_display_text(failure.get("failed_at")),
+                })
+
+    if not normalized and (
+        recipe_data.get("menu_import_failed")
+        or recipe_data.get("menu_import_failure_error")
+        or recipe_data.get("menu_import_failure_stage")
+    ):
+        normalized.append({
+            "stage": clean_display_text(recipe_data.get("menu_import_failure_stage")),
+            "error": clean_display_text(recipe_data.get("menu_import_failure_error")),
+            "failed_at": clean_display_text(recipe_data.get("menu_import_failure_at")),
+        })
+
+    if not normalized:
+        return {
+            "failed": False,
+            "label": "",
+            "title": "",
+            "stage": "",
+            "error": "",
+            "failures": [],
+        }
+
+    latest = normalized[-1]
+    stage = latest.get("stage") or "Import"
+    error = latest.get("error") or "This item failed during import."
+    label = f"Failed: {stage}" if stage else "Failed"
+    return {
+        "failed": True,
+        "label": label,
+        "title": f"{stage}: {error}" if stage and error else error or label,
+        "stage": stage,
+        "error": error,
+        "failures": normalized,
+    }
 
 
 def recipe_menu_snapshot_id(recipe_data):
@@ -857,6 +910,7 @@ def recipe_url_log_rows(recipe_urls, cookbook_assignments=None, food_rules=None,
             "cook_time": recipe_data.get("cook_time", ""),
             "total_time": recipe_data.get("total_time", ""),
             "food_rule_status": recipe_food_rule_status(recipe_data, food_rules=food_rules),
+            "import_failure_status": recipe_import_failure_status(recipe_data),
             "rating": recipe_rating_for_view(recipe_data),
             "rating_stars": recipe_rating_stars_for_view(recipe_data),
             "archive_pdf_available": recipe_archive_pdf_exists(recipe["url"]),
@@ -1019,6 +1073,7 @@ def cookbook_view_for_render(recipe_rows, food_rules=None, image_variants=None):
             recipe["total_time"] = recipe.get("total_time") or recipe_data.get("total_time", "")
             recipe["scaling_options"] = recipe_log_scaling_options(recipe_data, recipe_quantity)
             recipe["food_rule_status"] = recipe_food_rule_status(recipe_data, food_rules=food_rules)
+            recipe["import_failure_status"] = recipe_import_failure_status(recipe_data)
             recipe["rating"] = recipe_rating_for_view(recipe_data)
             recipe["rating_stars"] = recipe_rating_stars_for_view(recipe_data)
             recipe["pdf_public_url"] = recipe_pdf_public_url(recipe_url)
