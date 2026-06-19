@@ -11602,7 +11602,7 @@ def _normalize_inference_confidence(value):
     return max(0.0, min(1.0, confidence))
 
 
-def apply_menu_batch_inference_to_stub(recipe_url, stub, menu_item, inference, model="", model_source=""):
+def build_menu_batch_inference_result(recipe_url, stub, menu_item, inference, model="", model_source=""):
     recipe_url = str(recipe_url or "").strip()
     stub = stub if isinstance(stub, dict) else {}
     menu_item = menu_item if isinstance(menu_item, dict) else {}
@@ -11725,7 +11725,6 @@ def apply_menu_batch_inference_to_stub(recipe_url, stub, menu_item, inference, m
     normalize_extracted_recipe_identity(normalized)
     normalize_extracted_ingredient_fields(normalized)
     normalize_extracted_equipment_fields(normalized)
-    save_extracted_recipe_json(recipe_url, normalized)
     result = build_extract_result(recipe_url, normalized, "menu_batch_inference")
     result.update({
         "ok": True,
@@ -11751,6 +11750,67 @@ def apply_menu_batch_inference_to_stub(recipe_url, stub, menu_item, inference, m
         "raw": normalized,
         "inference": inference,
     })
+    return result
+
+
+def save_menu_batch_inference_results(results):
+    results = results if isinstance(results, list) else []
+    statuses = []
+    for result in results:
+        result = result if isinstance(result, dict) else {}
+        recipe_url = str(result.get("recipe_url") or result.get("source_url") or "").strip()
+        recipe_name = str(result.get("display_name") or result.get("recipe_title") or recipe_url).strip()
+        raw = result.get("raw") if isinstance(result.get("raw"), dict) else {}
+        if not recipe_url or not raw:
+            statuses.append({
+                "ok": False,
+                "recipe_url": recipe_url,
+                "recipe_name": recipe_name,
+                "error": "Prepared menu recipe result is missing saved JSON data.",
+            })
+            continue
+        try:
+            json_path = save_extracted_recipe_json(recipe_url, raw)
+        except Exception as exc:
+            statuses.append({
+                "ok": False,
+                "recipe_url": recipe_url,
+                "recipe_name": recipe_name,
+                "error": str(exc) or "Unable to save predicted recipe.",
+                "exception_type": type(exc).__name__,
+            })
+            continue
+        statuses.append({
+            "ok": True,
+            "recipe_url": recipe_url,
+            "recipe_name": recipe_name,
+            "json_path": str(json_path),
+            "result": result,
+        })
+    return statuses
+
+
+def apply_menu_batch_inference_to_stub(recipe_url, stub, menu_item, inference, model="", model_source=""):
+    result = build_menu_batch_inference_result(
+        recipe_url,
+        stub,
+        menu_item,
+        inference,
+        model=model,
+        model_source=model_source,
+    )
+    save_statuses = save_menu_batch_inference_results([result])
+    save_status = save_statuses[0] if save_statuses else {}
+    if not save_status.get("ok"):
+        return {
+            "ok": False,
+            "success": False,
+            "source_url": result.get("source_url") or recipe_url,
+            "recipe_url": result.get("recipe_url") or recipe_url,
+            "display_name": result.get("display_name") or result.get("recipe_title") or recipe_url,
+            "recipe_title": result.get("recipe_title") or result.get("display_name") or recipe_url,
+            "error": save_status.get("error") or "Unable to save predicted recipe.",
+        }
     return result
 
 

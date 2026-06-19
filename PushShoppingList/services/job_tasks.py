@@ -103,6 +103,14 @@ def menu_category_worker_count(total=None):
     return menu_followup_worker_count(total, "MENU_CATEGORY_WORKERS", default=4)
 
 
+def menu_save_progress_update_every():
+    try:
+        configured = int(os.getenv("MENU_SAVE_PROGRESS_EVERY") or "10")
+    except (TypeError, ValueError):
+        configured = 10
+    return max(1, min(50, configured))
+
+
 def copy_current_request_context_if_available(callback):
     try:
         from flask import copy_current_request_context
@@ -341,12 +349,13 @@ def run_menu_generate_recipes_job(job_id, payload):
     from PushShoppingList.routes.recipe_routes import resolve_menu_model_source
     from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
     from PushShoppingList.services.recipe_ingredient_service import save_ingredients_for_recipes
-    from PushShoppingList.services.recipe_extract_service import apply_menu_batch_inference_to_stub
+    from PushShoppingList.services.recipe_extract_service import build_menu_batch_inference_result
     from PushShoppingList.services.recipe_extract_service import menu_batch_entry_item_name
     from PushShoppingList.services.recipe_extract_service import infer_menu_item_recipe_batch
     from PushShoppingList.services.recipe_extract_service import menu_batch_item_from_stub
     from PushShoppingList.services.recipe_extract_service import menu_inference_batches
     from PushShoppingList.services.recipe_extract_service import menu_item_name_is_blank_divider
+    from PushShoppingList.services.recipe_extract_service import save_menu_batch_inference_results
     from PushShoppingList.services.recipe_url_service import add_recipe_urls
     from PushShoppingList.services.recipe_url_service import save_recipe_url_names
     from PushShoppingList.services.storage_service import active_user_id
@@ -447,6 +456,7 @@ def run_menu_generate_recipes_job(job_id, payload):
     completed_batches = 0
     predicted_batches_completed = 0
     batch_worker_count = menu_item_batch_inference_worker_count(batch_total)
+    save_progress_every = menu_save_progress_update_every()
     job_record = get_job(job_id) or {}
     inference_user_id = str(job_record.get("user_id") or active_user_id() or "").strip()
     job_queue_name = str(job_record.get("queue_name") or "ai-pantry-menu").strip() or "ai-pantry-menu"
@@ -592,6 +602,8 @@ def run_menu_generate_recipes_job(job_id, payload):
                 ).strip(),
             )
 
+        prepared_save_results = []
+        prepared_save_entries = []
         for entry in batch:
             ensure_not_cancelled(job_id)
             recipe_url = entry["recipe_url"]
@@ -600,7 +612,10 @@ def run_menu_generate_recipes_job(job_id, payload):
                 recipe_url,
                 {"name": menu_item.get("item_name")},
             )
-            recipe_position = min(total, len(created_urls) + len(skipped_urls) + failed_items + 1)
+            recipe_position = min(
+                total,
+                len(created_urls) + len(skipped_urls) + failed_items + len(prepared_save_results) + 1,
+            )
             item_id = str(menu_item.get("menu_item_id") or "").strip()
             item_result = result_items.get(item_id)
             if not isinstance(item_result, dict):
@@ -617,73 +632,160 @@ def run_menu_generate_recipes_job(job_id, payload):
                 )
                 continue
 
-            update_job_progress(
-                job_id,
-                current_step=f"Saving predicted recipe for {recipe_name} ({recipe_position}/{total})",
-                progress_percent=bounded_percent(len(created_urls), total, 82, 88),
-                completed_items=len(created_urls) + len(skipped_urls),
-                failed_items=failed_items,
-                result_payload={
-                    **model_info,
-                    "stage": "Saving predicted recipes",
-                    "total_items": total,
-                    "recipe_inference_completed": len(created_urls),
-                    "recipe_prediction_batches_completed": predicted_batches_completed,
-                    "batch_workers": batch_worker_count,
-                    "skipped_count": len(skipped_urls),
-                    "nutrition_completed": nutrition_success_count,
-                    "nutrition_failed": nutrition_failed_count,
-                    "category_success_count": category_success_count,
-                    "failed_items": failed_items,
-                    "failed_recipe_items": failed_recipe_items,
-                    **cookbook_recipe_progress_payload(
-                        "recipe_generation",
-                        "Saving predicted recipe for",
-                        recipe_url,
-                        recipe_name,
-                        recipe_position,
-                        total,
-                        event="started",
-                    ),
-                },
-            )
+            if (
+                recipe_position <= 1
+                or recipe_position >= total
+                or recipe_position % save_progress_every == 0
+            ):
+                update_job_progress(
+                    job_id,
+                    current_step=f"Preparing predicted recipe save for {recipe_name} ({recipe_position}/{total})",
+                    progress_percent=bounded_percent(len(created_urls), total, 82, 88),
+                    completed_items=len(created_urls) + len(skipped_urls),
+                    failed_items=failed_items,
+                    result_payload={
+                        **model_info,
+                        "stage": "Saving predicted recipes",
+                        "total_items": total,
+                        "recipe_inference_completed": len(created_urls),
+                        "recipe_prediction_batches_completed": predicted_batches_completed,
+                        "batch_workers": batch_worker_count,
+                        "save_progress_every": save_progress_every,
+                        "skipped_count": len(skipped_urls),
+                        "nutrition_completed": nutrition_success_count,
+                        "nutrition_failed": nutrition_failed_count,
+                        "category_success_count": category_success_count,
+                        "failed_items": failed_items,
+                        "failed_recipe_items": failed_recipe_items,
+                        **cookbook_recipe_progress_payload(
+                            "recipe_generation",
+                            "Saving predicted recipe for",
+                            recipe_url,
+                            recipe_name,
+                            recipe_position,
+                            total,
+                            event="started",
+                        ),
+                    },
+                )
 
-            result = apply_menu_batch_inference_to_stub(
-                recipe_url,
-                entry.get("stub") or {},
-                menu_item,
-                item_result,
-                model=batch_result.get("model") or model_info.get("model_used"),
-                model_source=batch_result.get("model_source") or model_info.get("model_source"),
-            )
+            try:
+                result = build_menu_batch_inference_result(
+                    recipe_url,
+                    entry.get("stub") or {},
+                    menu_item,
+                    item_result,
+                    model=batch_result.get("model") or model_info.get("model_used"),
+                    model_source=batch_result.get("model_source") or model_info.get("model_source"),
+                )
+            except Exception as exc:
+                result = {
+                    "ok": False,
+                    "error": str(exc) or "Unable to prepare predicted recipe.",
+                    "exception_type": type(exc).__name__,
+                }
             if not result.get("ok"):
                 failed_items += 1
-                save_error = result.get("error") or "Unable to save predicted recipe."
+                save_error = result.get("error") or "Unable to prepare predicted recipe."
                 record_failed_recipe_item(recipe_url, recipe_name, "Recipe generation", save_error)
                 append_job_warning(job_id, f"{recipe_url}: {save_error}")
                 continue
 
-            ingredients = result.get("ingredients") if isinstance(result.get("ingredients"), list) else []
-            if ingredients:
-                batch_shopping_items.extend(ingredients)
-                batch_ingredient_records.append({
-                    "url": recipe_url,
-                    "ingredients": ingredients,
-                    "recipe_metadata": result,
-                })
-            if result.get("display_name") or result.get("recipe_title"):
-                batch_name_records.append({
-                    "url": recipe_url,
-                    "name": result.get("display_name") or result.get("recipe_title"),
-                })
-            batch_recipe_urls.append(recipe_url)
+            prepared_save_results.append(result)
+            prepared_save_entries.append({
+                "recipe_url": recipe_url,
+                "recipe_name": recipe_name,
+                "recipe_position": recipe_position,
+            })
 
-            generated_recipe_results[recipe_url] = result
+        if prepared_save_results:
             print(
-                "[recipe_import] action=menu_stub_generated_batch "
-                f"title={import_recipe_title(result, recipe_url)} url={recipe_url}"
+                "[MenuRecipeGeneration] action=bulk_save_start "
+                f"job_id={job_id} batch_index={batch_index} batch_size={len(prepared_save_results)} "
+                f"progress_update_every={save_progress_every}"
             )
-            created_urls.append(recipe_url)
+            save_statuses = save_menu_batch_inference_results(prepared_save_results)
+            saved_count = 0
+            save_failed_count = 0
+            for index, prepared in enumerate(prepared_save_entries):
+                ensure_not_cancelled(job_id)
+                save_status = save_statuses[index] if index < len(save_statuses) else {}
+                recipe_url = prepared["recipe_url"]
+                recipe_name = prepared["recipe_name"]
+                recipe_position = prepared["recipe_position"]
+                result = prepared_save_results[index]
+                if not save_status.get("ok"):
+                    failed_items += 1
+                    save_failed_count += 1
+                    save_error = save_status.get("error") or "Unable to save predicted recipe."
+                    record_failed_recipe_item(recipe_url, recipe_name, "Recipe generation", save_error)
+                    append_job_warning(job_id, f"{recipe_url}: {save_error}")
+                    continue
+
+                saved_count += 1
+                ingredients = result.get("ingredients") if isinstance(result.get("ingredients"), list) else []
+                if ingredients:
+                    batch_shopping_items.extend(ingredients)
+                    batch_ingredient_records.append({
+                        "url": recipe_url,
+                        "ingredients": ingredients,
+                        "recipe_metadata": result,
+                    })
+                if result.get("display_name") or result.get("recipe_title"):
+                    batch_name_records.append({
+                        "url": recipe_url,
+                        "name": result.get("display_name") or result.get("recipe_title"),
+                    })
+                batch_recipe_urls.append(recipe_url)
+
+                generated_recipe_results[recipe_url] = result
+                print(
+                    "[recipe_import] action=menu_stub_generated_batch "
+                    f"title={import_recipe_title(result, recipe_url)} url={recipe_url}"
+                )
+                created_urls.append(recipe_url)
+
+                if (
+                    recipe_position >= total
+                    or recipe_position % save_progress_every == 0
+                    or index == len(prepared_save_entries) - 1
+                ):
+                    update_job_progress(
+                        job_id,
+                        current_step=f"Saving predicted recipes ({len(created_urls)}/{total})",
+                        progress_percent=bounded_percent(len(created_urls), total, 82, 88),
+                        completed_items=len(created_urls) + len(skipped_urls),
+                        failed_items=failed_items,
+                        result_payload={
+                            **model_info,
+                            "stage": "Saving predicted recipes",
+                            "total_items": total,
+                            "recipe_inference_completed": len(created_urls),
+                            "recipe_prediction_batches_completed": predicted_batches_completed,
+                            "batch_workers": batch_worker_count,
+                            "save_progress_every": save_progress_every,
+                            "skipped_count": len(skipped_urls),
+                            "nutrition_completed": nutrition_success_count,
+                            "nutrition_failed": nutrition_failed_count,
+                            "category_success_count": category_success_count,
+                            "failed_items": failed_items,
+                            "failed_recipe_items": failed_recipe_items,
+                            **cookbook_recipe_progress_payload(
+                                "recipe_generation",
+                                "Saving predicted recipes",
+                                recipe_url,
+                                recipe_name,
+                                recipe_position,
+                                total,
+                                event="completed",
+                            ),
+                        },
+                    )
+            print(
+                "[MenuRecipeGeneration] action=bulk_save_ready "
+                f"job_id={job_id} batch_index={batch_index} saved_count={saved_count} "
+                f"failed_count={save_failed_count}"
+            )
 
         if batch_recipe_urls:
             with workspace_write_lock("recipe-imports"):

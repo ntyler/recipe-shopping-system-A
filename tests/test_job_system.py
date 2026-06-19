@@ -12,7 +12,9 @@ from PushShoppingList.services import guest_session_service
 from PushShoppingList.services import job_queue_service
 from PushShoppingList.services import job_service
 from PushShoppingList.services import job_tasks
+from PushShoppingList.services import recipe_ingredient_service
 from PushShoppingList.services import recipe_extract_service
+from PushShoppingList.services import recipe_url_service
 from PushShoppingList.services import storage_service
 
 
@@ -21,6 +23,12 @@ def configure_job_paths(monkeypatch, tmp_path):
     monkeypatch.setattr(storage_service, "USER_DATA_DIR", tmp_path / "users")
     monkeypatch.setattr(storage_service, "GUEST_DATA_DIR", tmp_path / "guests")
     monkeypatch.setattr(guest_session_service, "GUEST_DATA_DIR", tmp_path / "guests")
+    output_folder = tmp_path / "extractor" / "output"
+    output_folder.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(recipe_extract_service, "OUTPUT_FOLDER", output_folder)
+    monkeypatch.setattr(recipe_ingredient_service, "OUTPUT_FOLDER", output_folder)
+    monkeypatch.setattr(recipe_ingredient_service, "RECIPE_INGREDIENTS_FILE", tmp_path / "extractor" / "recipe_ingredients.json")
+    monkeypatch.setattr(recipe_url_service, "RECIPE_INGREDIENTS_FILE", tmp_path / "extractor" / "recipe_urls.json")
 
 
 def successful_menu_serving_basis(recipe_url, result):
@@ -740,6 +748,106 @@ def test_menu_generate_job_predicts_batches_in_parallel(monkeypatch, tmp_path):
     assert started_item_ids == ["item-1", "item-2"]
     assert saved_urls == recipe_urls
     assert finished["result_payload"]["batch_workers"] == 2
+
+
+def test_menu_generate_job_bulk_saves_predicted_recipes_with_throttled_progress(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    monkeypatch.setenv("MENU_SAVE_PROGRESS_EVERY", "10")
+    recipe_urls = [
+        f"https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=item-{index}"
+        for index in range(12)
+    ]
+    stubs = {
+        url: {
+            "source_url": url,
+            "recipe_title": f"Menu Item {index + 1}",
+            "display_name": f"Menu Item {index + 1}",
+            "needs_ai_recipe": True,
+            "recipe_status": "stub",
+            "menu_item_id": f"item-{index}",
+            "cookbook_id": "cb1",
+            "cookbook_name": "Dinner",
+        }
+        for index, url in enumerate(recipe_urls)
+    }
+    progress_updates = []
+    saved_url_batches = []
+    real_update_progress = job_tasks.update_job_progress
+
+    def recording_update_progress(*args, **kwargs):
+        progress_updates.append(kwargs)
+        return real_update_progress(*args, **kwargs)
+
+    monkeypatch.setattr(job_tasks, "update_job_progress", recording_update_progress)
+    monkeypatch.setattr(recipe_routes, "load_editable_recipe", lambda url: {"recipe": stubs[url]})
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "menu_batch_item_from_stub",
+        lambda url, loaded_stub, index: {
+            "menu_item_id": loaded_stub["menu_item_id"],
+            "item_name": loaded_stub["recipe_title"],
+            "menu_section": "Entrees",
+        },
+    )
+    monkeypatch.setattr(recipe_extract_service, "menu_inference_batches", lambda entries: [entries])
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "infer_menu_item_recipe_batch",
+        lambda batch, user_id=None: {
+            "ok": True,
+            "items": {
+                entry["menu_item"]["menu_item_id"]: {
+                    "predicted_ingredients": [f"ingredient {index + 1}"],
+                    "predicted_instructions": ["Cook and serve."],
+                }
+                for index, entry in enumerate(batch)
+            },
+            "model": "gpt-test",
+            "model_source": "test",
+        },
+    )
+    monkeypatch.setattr(recipe_routes, "add_items", lambda ingredients: None)
+    monkeypatch.setattr(
+        "PushShoppingList.services.recipe_ingredient_service.save_ingredients_for_recipes",
+        lambda records: saved_url_batches.append([record["url"] for record in records]),
+    )
+    monkeypatch.setattr("PushShoppingList.services.recipe_url_service.save_recipe_url_names", lambda records: None)
+    monkeypatch.setattr("PushShoppingList.services.recipe_url_service.add_recipe_urls", lambda urls: None)
+    monkeypatch.setattr("PushShoppingList.scripts.sort_ingredients.main", lambda: None)
+    monkeypatch.setattr(recipe_routes, "record_recipe_import_activity", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        cookbook_service,
+        "cookbook_recipe_assignment_for_url",
+        lambda url: {"cookbook_id": "cb1", "cookbook_name": "Dinner"},
+    )
+    monkeypatch.setattr(recipe_routes, "ensure_menu_recipe_serving_basis_estimate", successful_menu_serving_basis)
+    monkeypatch.setattr(
+        recipe_routes,
+        "apply_imported_recipe_category_routine",
+        lambda url, result, assignment, trigger_source="": {"ok": True, "status": "updated"},
+    )
+
+    job = job_service.create_job(
+        "menu-generate-recipes",
+        input_payload={
+            "recipe_urls": recipe_urls,
+            "run_deferred_heavy_tasks": False,
+        },
+        user_id="owner",
+        total_items=len(recipe_urls),
+    )
+
+    finished = job_tasks.run_menu_generate_recipes_job(job["id"], job["input_payload"])
+
+    save_updates = [
+        update for update in progress_updates
+        if (update.get("result_payload") or {}).get("stage") == "Saving predicted recipes"
+    ]
+    assert finished["status"] == "completed"
+    assert finished["result_payload"]["created_count"] == len(recipe_urls)
+    assert saved_url_batches == [recipe_urls]
+    assert len(save_updates) < len(recipe_urls)
+    assert save_updates[-1]["result_payload"]["save_progress_every"] == 10
 
 
 def test_menu_import_queues_recipe_generation_after_source_completed(monkeypatch, tmp_path):
