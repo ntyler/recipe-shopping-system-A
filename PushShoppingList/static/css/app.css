@@ -21188,6 +21188,10 @@ img[data-deferred-src] {
             background: #101927;
         }
 
+        .job-activity-row.job-activity-has-failures {
+            border-color: #7f1d1d;
+        }
+
         .job-activity-row-main {
             min-width: 0;
             display: flex;
@@ -21331,6 +21335,29 @@ img[data-deferred-src] {
             font-size: 0.78rem;
         }
 
+        .job-activity-source-failed {
+            padding: 6px;
+            border: 1px solid rgba(248, 113, 113, 0.45);
+            border-radius: 6px;
+            background: rgba(127, 29, 29, 0.2);
+        }
+
+        .job-activity-source-failed input {
+            accent-color: #ef4444;
+        }
+
+        .job-activity-source-failed a {
+            color: #fecaca;
+        }
+
+        .job-activity-source-failure {
+            display: block;
+            margin-top: 3px;
+            color: #fecaca;
+            font-size: 0.78rem;
+            font-weight: 700;
+        }
+
         .job-activity-progress {
             height: 8px;
             overflow: hidden;
@@ -21368,6 +21395,93 @@ img[data-deferred-src] {
 
         .job-activity-warning {
             color: #fde68a;
+        }
+
+        .job-activity-failures {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+            margin-top: 2px;
+            padding: 8px;
+            border: 1px solid rgba(248, 113, 113, 0.5);
+            border-radius: 6px;
+            background: rgba(127, 29, 29, 0.22);
+        }
+
+        .job-activity-failures-title {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            color: #fecaca;
+            font-size: 0.84rem;
+            line-height: 1.3;
+        }
+
+        .job-activity-failures-title strong {
+            color: #fee2e2;
+            font-weight: 800;
+        }
+
+        .job-activity-failures-title span {
+            color: #fca5a5;
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .job-activity-failure-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 6px;
+        }
+
+        .job-activity-failure-card {
+            min-width: 0;
+            padding: 7px;
+            border: 1px solid rgba(248, 113, 113, 0.35);
+            border-radius: 6px;
+            background: rgba(15, 23, 42, 0.66);
+        }
+
+        .job-activity-failure-heading {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+            color: #fee2e2;
+            font-size: 0.86rem;
+            font-weight: 800;
+            line-height: 1.25;
+        }
+
+        .job-activity-failure-heading a {
+            color: #fecaca;
+        }
+
+        .job-activity-failure-stage {
+            border: 1px solid rgba(248, 113, 113, 0.45);
+            border-radius: 999px;
+            padding: 1px 6px;
+            color: #fecaca;
+            font-size: 0.72rem;
+            font-weight: 800;
+        }
+
+        .job-activity-failure-message,
+        .job-activity-failure-more {
+            margin-top: 5px;
+            color: #fee2e2;
+            font-size: 0.8rem;
+            line-height: 1.35;
+            overflow-wrap: anywhere;
+        }
+
+        .job-activity-failure-more {
+            margin-top: 0;
+            align-self: center;
+            color: #fca5a5;
+            font-weight: 700;
         }
 
         .job-activity-links a {

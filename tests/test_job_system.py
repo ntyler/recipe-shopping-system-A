@@ -243,7 +243,7 @@ def test_menu_generate_job_sources_link_to_recipe_item_editor(monkeypatch, tmp_p
     assert payload["source_items"] == [
         {
             "type": "recipe",
-            "label": recipe_url,
+            "label": "Spring Roll",
             "detail": "menu item",
             "url": "/recipe/edit?url=https%3A%2F%2Fwww.velasiancuisine.com%2Frs%2Fmenu_home.action%3FresInput%3DRES4902%26menu_item%3Dspring-roll",
             "recipe_url": recipe_url,
@@ -693,6 +693,48 @@ def test_menu_deferred_enrichment_runs_all_nutrition_before_categories(monkeypat
     assert finished["result_payload"]["pdfs_completed"] == 0
 
 
+def test_menu_deferred_enrichment_failure_uses_menu_item_name(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    recipe_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-251-Drinks"
+    error = "Add at least one ingredient before estimating nutrition."
+    saved_failures = []
+
+    monkeypatch.setattr(
+        recipe_routes,
+        "ensure_menu_recipe_serving_basis_estimate",
+        lambda url, result: {"ok": False, "recipe_url": url, "error": error},
+    )
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "mark_menu_recipe_import_failure",
+        lambda *args, **kwargs: saved_failures.append(args),
+    )
+
+    job = job_service.create_job(
+        "menu-deferred-heavy-tasks",
+        input_payload={
+            "recipe_urls": [recipe_url],
+            "run_categories": False,
+            "run_generated_pdfs": False,
+        },
+        user_id="owner",
+        total_items=1,
+    )
+
+    finished = job_tasks.run_menu_deferred_enrichment_job(job["id"], job["input_payload"])
+
+    assert finished["status"] == "failed"
+    assert finished["result_payload"]["failed_recipe_items"] == [{
+        "recipe_url": recipe_url,
+        "recipe_name": "Drinks",
+        "stage": "Nutrition",
+        "error": error,
+    }]
+    assert finished["result_payload"]["nutrition_statuses"][0]["recipe_name"] == "Drinks"
+    assert any(f"Drinks ({recipe_url}): {error}" == warning for warning in finished["warning_messages"])
+    assert saved_failures[0] == (recipe_url, "Drinks", "Nutrition", error)
+
+
 def test_menu_generate_job_keeps_partial_batch_predictions(monkeypatch, tmp_path):
     configure_job_paths(monkeypatch, tmp_path)
     recipe_urls = [
@@ -1128,6 +1170,7 @@ def test_menu_deferred_heavy_task_route_uses_recipe_item_sources(monkeypatch, tm
     assert data["job"]["job_type"] == "menu-deferred-heavy-tasks"
     assert data["job"]["queue_name"] == "ai-pantry-light"
     assert data["job"]["model_env_var"] == "OPENAI_NUTRITION_MODEL"
+    assert data["job"]["source_items"][0]["label"] == "Spring Roll"
     assert data["job"]["source_items"][0]["detail"] == "menu item"
     assert data["job"]["source_items"][0]["recipe_url"] == recipe_url
 

@@ -3,7 +3,9 @@ import os
 import sqlite3
 import threading
 import uuid
+from urllib.parse import parse_qs
 from urllib.parse import quote
+from urllib.parse import unquote
 from urllib.parse import urlparse
 from contextlib import contextmanager
 from datetime import datetime
@@ -362,6 +364,56 @@ def _safe_source_label(value):
     return Path(text).name or text
 
 
+def _humanized_menu_item_token(token):
+    text = unquote(str(token or "").strip())
+    if not text:
+        return ""
+
+    prefix = "menu-item-"
+    if text.lower().startswith(prefix):
+        remainder = text[len(prefix):]
+        parts = remainder.split("-", 1)
+        if len(parts) == 2 and parts[0].isdigit():
+            text = parts[1]
+        else:
+            text = remainder
+
+    text = " ".join(text.replace("_", " ").replace("-", " ").split())
+    if not text:
+        return ""
+
+    words = [
+        word[:1].upper() + word[1:] if word.islower() else word
+        for word in text.split(" ")
+    ]
+    return " ".join(words).strip()
+
+
+def menu_item_label_from_url(value):
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    try:
+        parsed = urlparse(text)
+    except ValueError:
+        return ""
+
+    query = parse_qs(parsed.query or "")
+    for key in ("menu_item", "menuItemIdInput", "menu_item_id"):
+        values = query.get(key) or []
+        if values:
+            label = _humanized_menu_item_token(values[0])
+            if label:
+                return label
+
+    if parsed.scheme == "menu-item":
+        label = _humanized_menu_item_token(Path(parsed.path).name or parsed.netloc)
+        if label:
+            return label
+
+    return ""
+
+
 def _append_source_item(items, seen, source_type, value, detail=""):
     label = _safe_source_label(value)
     if not label:
@@ -383,7 +435,7 @@ def _append_source_item(items, seen, source_type, value, detail=""):
 
 
 def _append_recipe_source_item(items, seen, value, detail="menu item", label=None):
-    label = _safe_source_label(label) or _safe_source_label(value)
+    label = _safe_source_label(label) or menu_item_label_from_url(value) or _safe_source_label(value)
     if not label:
         return
 

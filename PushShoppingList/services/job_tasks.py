@@ -13,6 +13,7 @@ from PushShoppingList.services.job_service import complete_job
 from PushShoppingList.services.job_service import fail_job
 from PushShoppingList.services.job_service import get_job
 from PushShoppingList.services.job_service import job_cancelled
+from PushShoppingList.services.job_service import menu_item_label_from_url
 from PushShoppingList.services.job_service import update_job_progress
 from PushShoppingList.services.file_lock_service import workspace_write_lock
 from PushShoppingList.services.openai_model_service import model_value_for_env as active_model_value_for_env
@@ -1161,6 +1162,7 @@ def run_menu_generate_recipes_job(job_id, payload):
                         nutrition_statuses.append({
                             "ok": bool(nutrition_status.get("ok")),
                             "recipe_url": recipe_url,
+                            "recipe_name": recipe_name,
                             "already_complete": bool(nutrition_status.get("already_complete")),
                             "estimated": bool(nutrition_status.get("estimated")),
                             "error": str(nutrition_status.get("error") or ""),
@@ -1393,6 +1395,7 @@ def run_menu_generate_recipes_job(job_id, payload):
                             category_statuses.append({
                                 **category_status,
                                 "recipe_url": recipe_url,
+                                "recipe_name": recipe_name,
                             })
                             recipe_name = worker_result.get("recipe_name") or recipe_name
                             result = worker_result.get("result") if isinstance(worker_result.get("result"), dict) else result
@@ -1733,6 +1736,7 @@ def run_menu_deferred_enrichment_job(job_id, payload):
                         nutrition_statuses.append({
                             "ok": bool(status.get("ok")),
                             "recipe_url": recipe_url,
+                            "recipe_name": recipe_name,
                             "already_complete": bool(status.get("already_complete")),
                             "estimated": bool(status.get("estimated")),
                             "error": str(status.get("error") or ""),
@@ -1918,6 +1922,7 @@ def run_menu_deferred_enrichment_job(job_id, payload):
                         category_statuses.append({
                             **status,
                             "recipe_url": recipe_url,
+                            "recipe_name": recipe_name,
                         })
                         if status.get("ok"):
                             categories_completed += 1
@@ -2511,6 +2516,7 @@ def cookbook_recipe_display_name(recipe_url, recipe=None, recipe_names=None):
         recipe.get("menu_item_name"),
         recipe.get("name"),
         recipe_names.get(recipe_url),
+        menu_item_label_from_url(recipe_url),
         recipe_url,
     ):
         text = str(value or "").strip()

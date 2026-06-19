@@ -238,6 +238,12 @@ def test_job_activity_section_has_clear_collapse_control():
     assert "function openJobActivityPanel()" in script
     assert "function closeJobActivityPanel()" in script
     assert "function clearJobActivityLog" in script
+    assert "function menuItemDisplayNameFromUrl" in script
+    assert "function renderJobFailureSummary" in script
+    assert "job-activity-failure-card" in script
+    assert "job-activity-source-failed" in script
+    assert ".job-activity-failures" in css
+    assert ".job-activity-source-failed" in css
     assert 'method: "DELETE"' in script
     assert ".job-activity-toolbar" in css
     assert ".job-activity-clear" in css

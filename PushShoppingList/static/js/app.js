@@ -349,23 +349,35 @@ function renderJobSourceList(job) {
     if (!sources.length) {
         return "";
     }
+    const failureMap = menuFailureMapFromJob(job);
 
     return `
         <div class="job-activity-sources" aria-label="Job sources">
             ${sources.map((source, index) => {
                 const href = String(source.url || "").trim();
                 const label = String(source.label || href || "Source").trim();
+                const displayLabel = menuRecipeDisplayName(source) || label;
                 const detail = String(source.detail || source.type || "").trim();
-                const checked = jobSourceIsChecked(job, index, sources.length) ? " checked" : "";
+                const failure = menuFailureForSource(source, failureMap);
+                const checked = !failure && jobSourceIsChecked(job, index, sources.length) ? " checked" : "";
+                const sourceClasses = [
+                    "job-activity-source",
+                    failure ? "job-activity-source-failed" : "",
+                ].filter(Boolean).join(" ");
+                const title = label && label !== displayLabel ? ` title="${escapeAttribute(label)}"` : "";
                 const labelHtml = href
-                    ? `<a href="${escapeAttribute(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`
-                    : `<span>${escapeHtml(label)}</span>`;
+                    ? `<a href="${escapeAttribute(href)}" target="_blank" rel="noopener noreferrer"${title}>${escapeHtml(displayLabel)}</a>`
+                    : `<span${title}>${escapeHtml(displayLabel)}</span>`;
+                const failureText = failure
+                    ? `${menuFailureLabel(failure)}${failure.error ? `: ${failure.error}` : ""}`
+                    : "";
                 return `
-                    <label class="job-activity-source">
+                    <label class="${sourceClasses}">
                         <input type="checkbox" disabled${checked}>
                         <span class="job-activity-source-text">
                             ${labelHtml}
                             ${detail ? `<span class="job-activity-source-detail">${escapeHtml(detail)}</span>` : ""}
+                            ${failureText ? `<span class="job-activity-source-failure">${escapeHtml(failureText)}</span>` : ""}
                         </span>
                     </label>
                 `;
@@ -514,6 +526,93 @@ function menuRecipeEditTargetUrl(value) {
     return "";
 }
 
+function menuRecipeValueLooksLikeUrl(value) {
+    const text = String(value || "").trim();
+    return /^https?:\/\//i.test(text) || /^\/recipe\/edit\b/i.test(text) || /^menu-item:\/\//i.test(text);
+}
+
+function menuRecipeHumanizeToken(value) {
+    let text = String(value || "").trim();
+    if (!text) {
+        return "";
+    }
+    try {
+        text = decodeURIComponent(text);
+    } catch (err) {
+        // Keep the raw token if it is not URI-encoded.
+    }
+    text = text.replace(/^menu-item-\d+[-_]?/i, "");
+    text = text.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+    if (!text) {
+        return "";
+    }
+    return text.split(" ").map(word => {
+        return /^[a-z]+$/.test(word) ? word.charAt(0).toUpperCase() + word.slice(1) : word;
+    }).join(" ");
+}
+
+function menuItemDisplayNameFromUrl(value) {
+    const text = String(value || "").trim();
+    if (!text) {
+        return "";
+    }
+
+    const editTarget = menuRecipeEditTargetUrl(text);
+    const candidate = editTarget || text;
+
+    try {
+        const parsed = new URL(candidate, window.location.origin);
+        const token = parsed.searchParams.get("menu_item")
+            || parsed.searchParams.get("menuItemIdInput")
+            || parsed.searchParams.get("menu_item_id");
+        const label = menuRecipeHumanizeToken(token);
+        if (label) {
+            return label;
+        }
+        if (parsed.protocol === "menu-item:") {
+            return menuRecipeHumanizeToken(parsed.pathname.split("/").filter(Boolean).pop() || parsed.hostname);
+        }
+    } catch (err) {
+        return "";
+    }
+
+    return "";
+}
+
+function menuRecipeDisplayName(...values) {
+    for (const value of values) {
+        if (value && typeof value === "object") {
+            const nested = menuRecipeDisplayName(
+                value.recipe_name,
+                value.display_name,
+                value.recipe_title,
+                value.item_name,
+                value.name,
+                value.recipe_url,
+                value.source_url,
+                value.url,
+                value.label
+            );
+            if (nested) {
+                return nested;
+            }
+            continue;
+        }
+        const text = String(value || "").trim();
+        if (!text) {
+            continue;
+        }
+        if (!menuRecipeValueLooksLikeUrl(text)) {
+            return text;
+        }
+        const label = menuItemDisplayNameFromUrl(text);
+        if (label) {
+            return label;
+        }
+    }
+    return "";
+}
+
 function menuRecipeIdentityCandidates(...values) {
     const candidates = [];
     values.forEach(value => {
@@ -547,9 +646,43 @@ function menuFailureMessage(record, fallback = "This item failed during import."
     return String(record.error || record.message || record.status || fallback).trim() || fallback;
 }
 
+function menuWarningFailureRecordFromText(value) {
+    const text = String(value || "").trim();
+    if (!text || /^Batch\s+\d+\s*\//i.test(text)) {
+        return null;
+    }
+
+    let match = text.match(/^(.+?)\s+\((https?:\/\/[^)]+)\):\s*(.+)$/i);
+    if (match) {
+        return {
+            recipe_name: match[1].trim(),
+            recipe_url: match[2].trim(),
+            error: match[3].trim(),
+        };
+    }
+
+    match = text.match(/^(https?:\/\/.+?)\s*:\s+(.+)$/i);
+    if (match) {
+        return {
+            recipe_url: match[1].trim(),
+            error: match[2].trim(),
+        };
+    }
+
+    return null;
+}
+
+function menuFailureRecordsFromWarnings(job) {
+    const warnings = Array.isArray(job && job.warning_messages) ? job.warning_messages : [];
+    return warnings
+        .map(menuWarningFailureRecordFromText)
+        .filter(Boolean);
+}
+
 function menuFailureRecordsFromJob(job) {
     const result = jobResultPayload(job || {});
     const records = [];
+    const seen = new Set();
     const addRecord = (record, defaultStage = "") => {
         if (!record || typeof record !== "object") {
             return;
@@ -561,12 +694,19 @@ function menuFailureRecordsFromJob(job) {
         if (!recipeUrl && !recipeName) {
             return;
         }
-        records.push({
+        const normalized = {
             recipe_url: recipeUrl,
             recipe_name: recipeName,
             stage,
             error: message,
-        });
+        };
+        const identity = menuRecipeIdentityCandidates(recipeUrl, recipeName)[0] || menuRecipeFailureKey(menuRecipeDisplayName(normalized));
+        const key = `${identity}|${message.toLowerCase()}`;
+        if (seen.has(key)) {
+            return;
+        }
+        seen.add(key);
+        records.push(normalized);
     };
 
     if (Array.isArray(result.failed_recipe_items)) {
@@ -582,14 +722,19 @@ function menuFailureRecordsFromJob(job) {
             .filter(record => record && record.ok === false)
             .forEach(record => addRecord(record, "Categories"));
     }
+    menuFailureRecordsFromWarnings(job).forEach(record => addRecord(record));
 
     return records;
 }
 
-function menuFailureMapFromJob(job) {
+function menuFailureMapFromRecords(records) {
     const failureMap = new Map();
-    menuFailureRecordsFromJob(job).forEach(record => {
-        menuRecipeIdentityCandidates(record.recipe_url, record.recipe_name).forEach(key => {
+    (records || []).forEach(record => {
+        menuRecipeIdentityCandidates(
+            record.recipe_url,
+            record.recipe_name,
+            menuRecipeDisplayName(record)
+        ).forEach(key => {
             if (!failureMap.has(key)) {
                 failureMap.set(key, record);
             }
@@ -598,11 +743,21 @@ function menuFailureMapFromJob(job) {
     return failureMap;
 }
 
+function menuFailureMapFromJob(job) {
+    return menuFailureMapFromRecords(menuFailureRecordsFromJob(job));
+}
+
 function menuFailureForSource(source, failureMap) {
     if (!source || !failureMap || typeof failureMap.get !== "function") {
         return null;
     }
-    const keys = menuRecipeIdentityCandidates(source.recipe_url, source.url, source.label, source.name);
+    const keys = menuRecipeIdentityCandidates(
+        source.recipe_url,
+        source.url,
+        source.label,
+        source.name,
+        menuRecipeDisplayName(source)
+    );
     for (const key of keys) {
         if (failureMap.has(key)) {
             return failureMap.get(key);
@@ -617,6 +772,46 @@ function menuFailureLabel(failure) {
     }
     const stage = String(failure.stage || "").trim();
     return stage ? `Failed: ${stage}` : "Failed";
+}
+
+function renderJobFailureSummary(job) {
+    const failures = menuFailureRecordsFromJob(job);
+    if (!failures.length) {
+        return "";
+    }
+
+    const shownFailures = failures.slice(0, 8);
+    const remainingCount = Math.max(0, failures.length - shownFailures.length);
+    return `
+        <div class="job-activity-failures" aria-label="Failed items">
+            <div class="job-activity-failures-title">
+                <strong>${escapeHtml(String(failures.length))} failed item${failures.length === 1 ? "" : "s"}</strong>
+                <span>Failure details</span>
+            </div>
+            <div class="job-activity-failure-list">
+                ${shownFailures.map(failure => {
+                    const recipeUrl = String(failure.recipe_url || failure.source_url || failure.url || "").trim();
+                    const editUrl = recipeUrl ? `/recipe/edit?url=${encodeURIComponent(recipeUrl)}` : "";
+                    const title = menuRecipeDisplayName(failure) || recipeUrl || "Menu item";
+                    const titleHtml = editUrl
+                        ? `<a href="${escapeAttribute(editUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(title)}</a>`
+                        : `<span>${escapeHtml(title)}</span>`;
+                    const stage = String(failure.stage || "").trim();
+                    const message = menuFailureMessage(failure);
+                    return `
+                        <div class="job-activity-failure-card">
+                            <div class="job-activity-failure-heading">
+                                ${titleHtml}
+                                ${stage ? `<span class="job-activity-failure-stage">${escapeHtml(stage)}</span>` : ""}
+                            </div>
+                            <div class="job-activity-failure-message">${escapeHtml(message)}</div>
+                        </div>
+                    `;
+                }).join("")}
+                ${remainingCount ? `<div class="job-activity-failure-more">${escapeHtml(String(remainingCount))} more failed item${remainingCount === 1 ? "" : "s"}</div>` : ""}
+            </div>
+        </div>
+    `;
 }
 
 function jobCanOpenImportProgress(job) {
@@ -973,8 +1168,15 @@ function renderJobActivityRow(job, index = 0) {
     const countText = total ? `${completed}/${total}${failed ? `, ${failed} failed` : ""}` : "";
     const error = String(job.error_message || "").trim();
     const warnings = Array.isArray(job.warning_messages) ? job.warning_messages.filter(Boolean) : [];
+    const itemFailureWarnings = new Set(
+        warnings
+            .filter(warning => menuWarningFailureRecordFromText(warning))
+            .map(warning => String(warning || ""))
+    );
+    const nonItemWarnings = warnings.filter(warning => !itemFailureWarnings.has(String(warning || "")));
     const links = jobResultLinks(job);
     const sourceHtml = renderJobSourceList(job);
+    const failureSummaryHtml = renderJobFailureSummary(job);
     const modelHtml = renderJobModelDetails(job);
     const workerHtml = renderJobWorkerDetails(job);
     const stageCountsHtml = renderJobStageCounts(job);
@@ -988,6 +1190,7 @@ function renderJobActivityRow(job, index = 0) {
         `job-activity-${escapeAttribute(job.status || "unknown")}`,
         active ? "job-activity-active" : "",
         index === 0 ? "job-activity-primary-row" : "",
+        failureSummaryHtml ? "job-activity-has-failures" : "",
         !detailsExpanded ? "job-activity-row-details-collapsed" : "",
     ].filter(Boolean).join(" ");
     const detailsToggleButton = `
@@ -1016,8 +1219,9 @@ function renderJobActivityRow(job, index = 0) {
                 : "";
         }).join("")}</div>`
         : "";
-    const warningHtml = warnings.length
-        ? `<div class="job-activity-warning">${escapeHtml(warnings.slice(0, 2).join(" "))}</div>`
+    const displayedWarnings = failureSummaryHtml ? nonItemWarnings : warnings;
+    const warningHtml = displayedWarnings.length
+        ? `<div class="job-activity-warning">${escapeHtml(displayedWarnings.slice(0, 2).join(" "))}</div>`
         : "";
 
     return `
@@ -1041,6 +1245,7 @@ function renderJobActivityRow(job, index = 0) {
                         ${links.length ? `<span>${escapeHtml(String(links.length))} result${links.length === 1 ? "" : "s"}</span>` : ""}
                     </div>
                     ${error ? `<div class="job-activity-error">${escapeHtml(error)}</div>` : ""}
+                    ${failureSummaryHtml}
                     ${warningHtml}
                 </div>
                 <div class="job-activity-actions">
