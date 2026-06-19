@@ -1,4 +1,5 @@
 import threading
+from datetime import timedelta
 
 import pytest
 
@@ -564,6 +565,56 @@ def test_menu_generate_job_predicts_batches_in_parallel(monkeypatch, tmp_path):
     assert finished["result_payload"]["batch_workers"] == 2
 
 
+def test_menu_import_queues_recipe_generation_after_source_completed(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    menu_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902"
+    recipe_urls = [
+        f"{menu_url}&menu_item=menu-item-1-Spring_Roll",
+        f"{menu_url}&menu_item=menu-item-2-Crab_Wonton_5",
+    ]
+    job = job_service.create_job(
+        "menu-import",
+        input_payload={"urls": [menu_url], "extraction_mode": "menu_extract"},
+        user_id="owner",
+        total_items=1,
+        queue_name="ai-pantry-menu",
+    )
+    job_service.update_job(job["id"], status="running", started_at=job_service.now_iso())
+    observed_source_statuses = []
+
+    monkeypatch.setattr(recipe_routes, "extract_menu_stubs_from_url", lambda *args, **kwargs: {"ok": True})
+    monkeypatch.setattr(
+        recipe_routes,
+        "commit_menu_import_result",
+        lambda *args, **kwargs: {
+            "ok": True,
+            "created_urls": recipe_urls,
+            "stubs_created": len(recipe_urls),
+            "item_records_unpacked": len(recipe_urls),
+            "menu_items_found": len(recipe_urls),
+            "menu_sections_found": 1,
+            "menu_source_url": menu_url,
+            "menu_source_pdf_status": "ready",
+            "menu_source_pdf_path": "velasiancuisine_com_rs_menu_home_action_resInput_RES4902.pdf",
+            "menu_source_cloudflare_pdf_url": "https://cdn.example/menu.pdf",
+        },
+    )
+    monkeypatch.setattr("PushShoppingList.scripts.sort_ingredients.main", lambda: None)
+
+    def fake_enqueue_followup(job_type, payload, total_items=0):
+        observed_source_statuses.append(job_service.get_job(payload["source_job_id"])["status"])
+        return {"queued": True, "job_id": "followup-job", "queue": {"mode": "test"}}
+
+    monkeypatch.setattr(job_tasks, "enqueue_followup_job", fake_enqueue_followup)
+
+    finished = job_tasks.run_import_urls_job(job["id"], job["input_payload"], menu_extract=True)
+
+    assert observed_source_statuses == ["completed"]
+    assert finished["status"] == "completed"
+    assert finished["result_payload"]["recipe_inference_job_id"] == "followup-job"
+    assert finished["result_payload"]["recipe_inference_job"]["queued"] is True
+
+
 def test_menu_deferred_heavy_task_route_uses_recipe_item_sources(monkeypatch, tmp_path):
     configure_job_paths(monkeypatch, tmp_path)
     recipe_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=spring-roll"
@@ -1073,6 +1124,44 @@ def test_try_start_job_cleans_stale_running_lock(monkeypatch, tmp_path):
     assert job_service.get_job(queued["id"])["status"] == "running"
     assert job_service.get_job(blockers[0]["id"])["status"] == "failed"
     assert "Stale job lock cleared" in job_service.get_job(blockers[0]["id"])["current_step"]
+
+
+def test_try_start_job_cleans_idle_menu_ai_lock_after_menu_timeout(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    monkeypatch.setenv("MENU_AI_LOCK_STALE_MINUTES", "1")
+    real_now_iso = job_service.now_iso
+    old_iso = (job_service.utc_now() - timedelta(minutes=2)).isoformat() + "Z"
+    blockers = []
+
+    monkeypatch.setattr(job_service, "now_iso", lambda: old_iso)
+    for index in range(3):
+        blocker = job_service.create_job(
+            "menu-generate-recipes",
+            input_payload={"recipe_urls": [f"https://example.com/menu?menu_item={index}"]},
+            user_id="owner",
+            queue_name="ai-pantry-menu",
+        )
+        job_service.update_job(
+            blocker["id"],
+            status="running",
+            started_at=old_iso,
+            worker_id="test-worker",
+        )
+        blockers.append(blocker)
+    monkeypatch.setattr(job_service, "now_iso", real_now_iso)
+
+    queued = job_service.create_job(
+        "menu-generate-recipes",
+        input_payload={"recipe_urls": ["https://example.com/menu?menu_item=new"]},
+        user_id="owner",
+        queue_name="ai-pantry-menu",
+    )
+
+    result = job_service.try_start_job(queued["id"], queue_name="ai-pantry-menu")
+
+    assert result["started"] is True
+    assert job_service.get_job(queued["id"])["status"] == "running"
+    assert all(job_service.get_job(blocker["id"])["status"] == "failed" for blocker in blockers)
 
 
 def test_menu_generate_defer_limit_exceeded(monkeypatch, tmp_path):

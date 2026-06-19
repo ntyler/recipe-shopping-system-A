@@ -1965,21 +1965,11 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
         "links": recipe_links(created_urls),
         **job_model,
     }
+    should_enqueue_recipe_inference = False
     if menu_extract:
-        inference_job = {}
-        if created_urls and payload_bool(payload, "auto_generate_recipes", True):
-            inference_job = enqueue_followup_job(
-                "menu-generate-recipes",
-                {
-                    "recipe_urls": created_urls,
-                    "source_job_id": job_id,
-                    "run_deferred_heavy_tasks": True,
-                    "force_reprocess": False,
-                },
-                total_items=len(created_urls),
-            )
-            if not inference_job.get("queued"):
-                append_job_warning(job_id, inference_job.get("error") or "Recipe inference was not queued.")
+        should_enqueue_recipe_inference = bool(
+            created_urls and payload_bool(payload, "auto_generate_recipes", True)
+        )
         result_payload.update(menu_job_stats)
         result_payload.update({
             "stage": "Complete",
@@ -1987,8 +1977,8 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
             "recipe_inference_completed": 0,
             "nutrition_completed": 0,
             "pdfs_completed": 0,
-            "recipe_inference_job": inference_job,
-            "recipe_inference_job_id": inference_job.get("job_id", ""),
+            "recipe_inference_job": {},
+            "recipe_inference_job_id": "",
         })
     update_job_progress(
         job_id,
@@ -2000,7 +1990,40 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
 
     if not created_urls:
         return fail_job(job_id, "No recipes were imported.", result_payload=result_payload)
-    return complete_job(job_id, result_payload=result_payload)
+
+    completed_job = complete_job(job_id, result_payload=result_payload)
+    if should_enqueue_recipe_inference:
+        try:
+            inference_job = enqueue_followup_job(
+                "menu-generate-recipes",
+                {
+                    "recipe_urls": created_urls,
+                    "source_job_id": job_id,
+                    "run_deferred_heavy_tasks": True,
+                    "force_reprocess": False,
+                },
+                total_items=len(created_urls),
+            )
+        except Exception as exc:
+            inference_job = {
+                "queued": False,
+                "job_id": "",
+                "error": str(exc) or "Recipe inference was not queued.",
+            }
+        if not inference_job.get("queued"):
+            append_job_warning(job_id, inference_job.get("error") or "Recipe inference was not queued.")
+        print(
+            f"[MenuRecipeGeneration] action=enqueue_after_menu_import_complete "
+            f"source_job_id={job_id} followup_job_id={inference_job.get('job_id', '')} "
+            f"queued={bool(inference_job.get('queued'))} total_items={len(created_urls)}"
+        )
+        result_payload.update({
+            "recipe_inference_job": inference_job,
+            "recipe_inference_job_id": inference_job.get("job_id", ""),
+        })
+        update_job_progress(job_id, result_payload=result_payload)
+        return get_job(job_id) or completed_job
+    return completed_job
 
 
 def run_doc_photo_import_job(job_id, payload):

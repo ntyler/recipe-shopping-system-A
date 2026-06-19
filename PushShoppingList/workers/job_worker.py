@@ -114,6 +114,7 @@ def run_job(job_id):
                         f" lock_owner_job_id={start_result.get('lock_owner_job_id') or ''}"
                         f" lock_age_seconds={int(start_result.get('lock_age_seconds') or 0)}"
                         f" lock_stale={bool(start_result.get('lock_stale'))}"
+                        f" lock_stale_after_seconds={int(start_result.get('lock_stale_after_seconds') or 0)}"
                     )
                 if defer_reason == "waiting_for_menu_import":
                     lock_fields = (

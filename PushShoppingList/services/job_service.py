@@ -19,6 +19,7 @@ TERMINAL_JOB_STATUSES = {"completed", "failed", "cancelled"}
 DEFAULT_JOB_RETENTION_HOURS = 168
 DEFAULT_GUEST_JOB_RETENTION_HOURS = 24
 DEFAULT_JOB_TIMEOUT_MINUTES = 180
+DEFAULT_MENU_AI_LOCK_STALE_MINUTES = 30
 DEFAULT_QUEUED_LIMIT_PER_OWNER_TYPE = 5
 DEFAULT_MENU_GENERATE_MAX_DEFER_ATTEMPTS = 30
 ACTIVE_LIMITS_BY_KEY = {
@@ -78,6 +79,17 @@ def job_retention_hours(guest=False):
 
 def job_timeout_minutes():
     return env_int("JOB_TIMEOUT_MINUTES", DEFAULT_JOB_TIMEOUT_MINUTES)
+
+
+def menu_ai_lock_stale_minutes():
+    return env_int("MENU_AI_LOCK_STALE_MINUTES", DEFAULT_MENU_AI_LOCK_STALE_MINUTES)
+
+
+def stale_lock_timeout_seconds(limit_key=""):
+    limit_key = str(limit_key or "").strip()
+    if limit_key == "menu-ai":
+        return max(60, menu_ai_lock_stale_minutes() * 60)
+    return max(60, job_timeout_minutes() * 60)
 
 
 def json_dumps(value):
@@ -723,6 +735,19 @@ def job_row_age_seconds(row, reference_time=None):
     return max(0, int((reference_time - origin).total_seconds()))
 
 
+def job_lock_age_seconds(row, reference_time=None):
+    if not row:
+        return 0
+    reference_time = reference_time or utc_now()
+    updated = parse_iso_datetime(row["updated_at"] if "updated_at" in row.keys() else "")
+    started = parse_iso_datetime(row["started_at"] if "started_at" in row.keys() else "")
+    created = parse_iso_datetime(row["created_at"] if "created_at" in row.keys() else "")
+    origin = updated or started or created
+    if not origin:
+        return 0
+    return max(0, int((reference_time - origin).total_seconds()))
+
+
 def source_menu_import_wait_status(connection, row, payload):
     job_type = normalize_job_type(row["job_type"] if row else "")
     if job_type != "menu-generate-recipes":
@@ -778,10 +803,11 @@ def running_limit_blockers(connection, row, limit_key, exclude_job_id=""):
 
 def stale_lock_info_for_row(row, reference_time=None):
     reference_time = reference_time or utc_now()
-    age_seconds = job_row_age_seconds(row, reference_time=reference_time)
+    limit_key = _row_limit_key(row) if row else ""
+    age_seconds = job_lock_age_seconds(row, reference_time=reference_time)
     status = normalize_status(row["status"] if row else "")
     has_finished_marker = bool(row and (row["completed_at"] or row["finished_at"]))
-    timeout_seconds = max(60, job_timeout_minutes() * 60)
+    timeout_seconds = stale_lock_timeout_seconds(limit_key)
     stale = bool(
         not row
         or status in TERMINAL_JOB_STATUSES
@@ -793,6 +819,7 @@ def stale_lock_info_for_row(row, reference_time=None):
         "lock_age_seconds": age_seconds,
         "lock_stale": stale,
         "lock_owner_status": status,
+        "lock_stale_after_seconds": timeout_seconds,
     }
 
 
@@ -956,6 +983,7 @@ def try_start_job(
                     lock_owner_job_id=blocker_info.get("lock_owner_job_id", ""),
                     lock_age_seconds=blocker_info.get("lock_age_seconds", 0),
                     lock_stale=blocker_info.get("lock_stale", False),
+                    lock_stale_after_seconds=blocker_info.get("lock_stale_after_seconds", 0),
                     cleaned_stale_lock_count=len(cleaned_blockers),
                 )
                 if limit_result:
@@ -971,6 +999,7 @@ def try_start_job(
                     "lock_owner_job_id": blocker_info.get("lock_owner_job_id", ""),
                     "lock_age_seconds": blocker_info.get("lock_age_seconds", 0),
                     "lock_stale": blocker_info.get("lock_stale", False),
+                    "lock_stale_after_seconds": blocker_info.get("lock_stale_after_seconds", 0),
                     "cleaned_stale_lock_count": len(cleaned_blockers),
                     "delay_seconds": retry_delay_for_attempts(attempts),
                     "message": message,
