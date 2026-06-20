@@ -3082,6 +3082,110 @@ def save_recipe_cover_image_upload(original_url, uploaded_file, source_url="", f
     }
 
 
+def generate_recipe_cover_image(payload):
+    payload = payload if isinstance(payload, dict) else {}
+    url = str(payload.get("url") or payload.get("recipe_url") or "").strip()
+    overwrite = bool(payload.get("overwrite") or payload.get("force"))
+
+    if not url:
+        return {"ok": False, "error": "Recipe URL is required."}
+
+    recipe_data = load_recipe_output(url)
+    if not recipe_data:
+        return {"ok": False, "error": "Recipe data was not found."}
+
+    recipe_source_url = str(recipe_data.get("source_url") or url).strip() or url
+    fallback_alt = str(
+        payload.get("alt")
+        or recipe_data.get("recipe_title")
+        or recipe_data.get("display_name")
+        or "Recipe title image"
+    ).strip()
+
+    existing_cover_image = editable_recipe_cover_image(recipe_source_url, recipe_data)
+    if existing_cover_image and not overwrite:
+        return {
+            "ok": False,
+            "error": "This recipe already has a title image. Use Regenerate title image to replace it.",
+            "cover_image": existing_cover_image,
+        }
+
+    if not os.getenv("OPENAI_API_KEY"):
+        return {"ok": False, "error": "Image generation is not set up yet."}
+
+    recipe_title = str(recipe_data.get("recipe_title") or recipe_data.get("display_name") or "").strip()
+    if not recipe_title:
+        return {"ok": False, "error": "Add a recipe title before generating a title image."}
+
+    prompt = build_recipe_cover_image_prompt(recipe_data, recipe_title)
+
+    try:
+        image_bytes = request_recipe_title_image_bytes(prompt)
+    except TimeoutError:
+        return {
+            "ok": False,
+            "error": "Title image generation timed out. Please try again.",
+        }
+    except Exception:
+        return {
+            "ok": False,
+            "error": "Title image generation failed. Please try again.",
+        }
+
+    if not image_bytes:
+        return {
+            "ok": False,
+            "error": "Title image generation did not return an image. Please try again.",
+        }
+
+    generated_at = datetime.now(timezone.utc).isoformat()
+    COVER_IMAGE_UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
+    image_filename = f"{safe_filename(recipe_source_url)}_title_ai_{uuid.uuid4().hex[:12]}.png"
+    image_path = COVER_IMAGE_UPLOAD_FOLDER / image_filename
+    image_path.write_bytes(image_bytes)
+
+    cover_image = extract_recipe_cover_image_from_upload(
+        image_path,
+        "image/png",
+        image_filename,
+        recipe_source_url,
+        fallback_alt=fallback_alt,
+    )
+
+    if not cover_image:
+        try:
+            image_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        return {"ok": False, "error": "Unable to save the generated title image."}
+
+    cover_image["source"] = "ai_generated_image"
+    recipe_data["source_url"] = recipe_source_url
+    recipe_data["cover_image"] = cover_image
+    recipe_data["cover_image_generated_at"] = generated_at
+    save_recipe_output(recipe_source_url, recipe_data)
+
+    recipe_meta = load_recipe_ingredients().get(normalize_recipe_url_key(recipe_source_url), {})
+    quantity = normalize_recipe_quantity(recipe_meta.get("quantity", 1))
+    update_recipe_ingredient_record(recipe_source_url, quantity, recipe_data)
+
+    loaded = load_editable_recipe(recipe_source_url)
+    response_recipe = loaded.get("recipe", {})
+    response_cover_image = response_recipe.get("cover_image") or editable_recipe_cover_image(
+        recipe_source_url,
+        recipe_data,
+        recipe_meta,
+    )
+
+    return {
+        "ok": True,
+        "url": recipe_source_url,
+        "cover_image": response_cover_image,
+        "recipe": response_recipe,
+        "cover_image_generated_at": generated_at,
+    }
+
+
 def save_recipe_detail_image_upload(original_url, kind, target, uploaded_file):
     original_url = str(original_url or "").strip()
     image_kind = "equipment" if str(kind or "").strip().lower() == "equipment" else "step"
@@ -4059,6 +4163,51 @@ Visual requirements:
 """
 
 
+def build_recipe_cover_image_prompt(recipe_data, recipe_title):
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    servings = str(recipe_data.get("servings") or "").strip()
+    cuisine = ", ".join(normalize_text_rows(recipe_data.get("cuisine_tags") or recipe_data.get("cuisine")))
+    description = str(
+        recipe_data.get("description")
+        or recipe_data.get("summary")
+        or recipe_data.get("notes")
+        or ""
+    ).strip()
+    menu_section = str(recipe_data.get("menu_section") or recipe_data.get("section") or "").strip()
+    ingredients = recipe_step_image_prompt_ingredients(recipe_data.get("ingredients", []))
+
+    return f"""Generate a realistic finished-dish title image for this recipe.
+
+Recipe title:
+{recipe_title}
+
+Servings:
+{servings or "Not specified"}
+
+Cuisine or menu tags:
+{cuisine or "Not specified"}
+
+Menu section:
+{menu_section or "Not specified"}
+
+Description:
+{description or "Not specified"}
+
+Ingredients:
+{ingredients or "Not specified"}
+
+Visual requirements:
+- Show the finished dish, plated and ready to eat
+- Use the actual recipe ingredients and likely cuisine style
+- Bright natural light with appetizing color and texture
+- High-end cookbook food photography
+- Clean table or kitchen background
+- Do not include text, captions, labels, menus, logos, watermarks, or branded packaging
+- Do not pretend this is an actual restaurant photo
+- Avoid extra side dishes unless they are clearly implied by the recipe
+"""
+
+
 def recipe_step_image_prompt_ingredients(ingredients):
     if not isinstance(ingredients, list):
         return ""
@@ -4130,6 +4279,75 @@ def request_recipe_step_image_bytes(prompt):
             model,
             exc,
             "OPENAI_TIMEOUT" if is_timeout else "RECIPE_STEP_IMAGE_FAILED",
+        )
+        if is_timeout:
+            raise TimeoutError() from exc
+        raise
+
+    image_record = first_openai_image_record(response)
+    if not image_record:
+        return b""
+
+    b64_json = openai_image_field(image_record, "b64_json")
+    if b64_json:
+        encoded = str(b64_json).split(",", 1)[-1]
+        return base64.b64decode(encoded)
+
+    image_url = openai_image_field(image_record, "url")
+    if image_url:
+        try:
+            result = requests.get(image_url, timeout=timeout_seconds)
+            result.raise_for_status()
+        except requests.Timeout as exc:
+            raise TimeoutError() from exc
+        return result.content
+
+    return b""
+
+
+def request_recipe_title_image_bytes(prompt):
+    timeout_seconds = int(os.getenv("OPENAI_RECIPE_TITLE_IMAGE_TIMEOUT_SECONDS", "90"))
+    model = os.getenv(
+        "OPENAI_RECIPE_TITLE_IMAGE_MODEL",
+        os.getenv("OPENAI_STEP_IMAGE_MODEL", "gpt-image-1"),
+    )
+    size = os.getenv("OPENAI_RECIPE_TITLE_IMAGE_SIZE", os.getenv("OPENAI_STEP_IMAGE_SIZE", "1024x1024"))
+    quality = os.getenv("OPENAI_RECIPE_TITLE_IMAGE_QUALITY", os.getenv("OPENAI_STEP_IMAGE_QUALITY", "medium"))
+
+    client = get_openai_client()
+    if hasattr(client, "with_options"):
+        client = client.with_options(timeout=timeout_seconds)
+
+    try:
+        print(
+            f"[OpenAI] action=recipe-title-image model={model} "
+            "temperature_included=False"
+        )
+        response = throttled_image_generation(
+            client,
+            {
+                "model": model,
+                "prompt": prompt,
+                "size": size,
+                "quality": quality,
+                "n": 1,
+            },
+            action_name="recipe-title-image",
+            model=model,
+        )
+        record_openai_usage(
+            response,
+            "recipe-title-image",
+            model=model,
+            metadata={"size": size, "quality": quality},
+        )
+    except Exception as exc:
+        is_timeout = "timeout" in str(exc).lower() or "timed out" in str(exc).lower()
+        log_recipe_edit_openai_exception(
+            "recipe-title-image",
+            model,
+            exc,
+            "OPENAI_TIMEOUT" if is_timeout else "RECIPE_TITLE_IMAGE_FAILED",
         )
         if is_timeout:
             raise TimeoutError() from exc

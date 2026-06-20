@@ -590,14 +590,14 @@ def test_usage_dashboard_refreshes_after_openai_routines():
     product_routes = (ROOT / "PushShoppingList/routes/product_routes.py").read_text(encoding="utf-8")
     main_routes = (ROOT / "PushShoppingList/routes/main_routes.py").read_text(encoding="utf-8")
 
-    assert script.count("syncOpenAiUsageDashboardFromResponse(data)") >= 8
+    assert script.count("syncOpenAiUsageDashboardFromResponse(data)") >= 9
     assert "scheduleOpenAiUsageDashboardRefresh(0)" in script
     assert "recipeImageProgressUsageRefreshKeys" in script
     assert "scheduleOpenAiUsageDashboardRefresh(250)" in script
     for endpoint in (
-        "/api/extract_recipe",
         "/api/recipe_nutrition_estimate",
         "/api/recipe_note_feedback",
+        "/api/recipe_cover_image/generate",
         "/api/recipe_step_image",
         "/api/recipe_equipment_image",
         "/api/food_review_alternatives",
@@ -610,6 +610,19 @@ def test_usage_dashboard_refreshes_after_openai_routines():
     assert '"openai_usage_dashboard": openai_usage_dashboard_for_user(current_user())' in recipe_routes
     assert '"openai_usage_dashboard": openai_usage_dashboard_for_user(current_user())' in product_routes
     assert '"openai_usage_dashboard": openai_usage_dashboard_for_user(current_public_user())' in main_routes
+
+
+def test_recipe_editor_has_generate_title_image_action():
+    template = (ROOT / "PushShoppingList/templates/sections/current_recipe_url_log.html").read_text(encoding="utf-8")
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    routes = (ROOT / "PushShoppingList/routes/recipe_routes.py").read_text(encoding="utf-8")
+
+    assert 'id="recipeEditCoverGenerate"' in template
+    assert 'id="recipeEditCoverGenerateLabel">Generate title image' in template
+    assert "generateRecipeCoverImage(this)" in template
+    assert "function generateRecipeCoverImage(button)" in script
+    assert 'fetch("/api/recipe_cover_image/generate"' in script
+    assert '@recipe_bp.route("/api/recipe_cover_image/generate", methods=["POST"])' in routes
 
 
 def test_mobile_account_dates_stack_left_aligned():

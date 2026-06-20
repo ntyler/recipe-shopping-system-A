@@ -18,6 +18,6 @@
     "OPENAI_COOKBOOK_ITEM_MODEL": "gpt-4o-mini",
     "OPENAI_MENU_RECIPE_MODEL": "gpt-5.5",
     "OPENAI_MENU_FAILED_ITEM_MODEL": "gpt-5.4-mini",
-    "OPENAI_MENU_FAST_RECIPE_MODEL": "gpt-5.5"
+    "OPENAI_MENU_FAST_RECIPE_MODEL": "gpt-5.4-mini"
   }
 }

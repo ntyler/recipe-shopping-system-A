@@ -205,6 +205,95 @@ def test_generate_recipe_from_image_commits_estimate(monkeypatch, tmp_path):
         ]
 
 
+def test_generate_recipe_cover_image_saves_ai_cover(monkeypatch, tmp_path):
+    url = "https://example.com/spicy-noodles"
+    recipe_data = {
+        "source_url": url,
+        "recipe_title": "Spicy Noodles",
+        "servings": "2",
+        "ingredients": [
+            {"quantity": "8", "unit": "oz", "ingredient": "noodles"},
+            {"quantity": "2", "unit": "tbsp", "ingredient": "chili crisp"},
+        ],
+    }
+    saved = {}
+    updated = {}
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(recipe_edit_service, "COVER_IMAGE_UPLOAD_FOLDER", tmp_path / "recipe_covers")
+    monkeypatch.setattr(recipe_edit_service, "load_recipe_output", lambda requested_url: recipe_data if requested_url == url else None)
+    monkeypatch.setattr(recipe_edit_service, "request_recipe_title_image_bytes", lambda prompt: b"generated-png")
+
+    def fake_extract(upload_path, mime_type, filename, recipe_url, fallback_alt=""):
+        assert upload_path.read_bytes() == b"generated-png"
+        assert mime_type == "image/png"
+        assert recipe_url == url
+        return {
+            "path": "data/uploads/recipe_covers/generated.png",
+            "mime_type": mime_type,
+            "alt": fallback_alt,
+            "source": "uploaded_image",
+        }
+
+    def fake_save(recipe_url, data):
+        saved["url"] = recipe_url
+        saved["data"] = data.copy()
+
+    def fake_update(recipe_url, quantity, data):
+        updated["url"] = recipe_url
+        updated["quantity"] = quantity
+        updated["cover_image"] = data.get("cover_image", {}).copy()
+
+    monkeypatch.setattr(recipe_edit_service, "extract_recipe_cover_image_from_upload", fake_extract)
+    monkeypatch.setattr(recipe_edit_service, "save_recipe_output", fake_save)
+    monkeypatch.setattr(recipe_edit_service, "load_recipe_ingredients", lambda: {})
+    monkeypatch.setattr(recipe_edit_service, "update_recipe_ingredient_record", fake_update)
+    monkeypatch.setattr(
+        recipe_edit_service,
+        "load_editable_recipe",
+        lambda recipe_url: {"recipe": {"cover_image": saved["data"]["cover_image"]}},
+    )
+
+    result = recipe_edit_service.generate_recipe_cover_image({"url": url})
+
+    assert result["ok"] is True
+    assert saved["url"] == url
+    assert saved["data"]["cover_image"]["source"] == "ai_generated_image"
+    assert saved["data"]["cover_image_generated_at"]
+    assert updated["url"] == url
+    assert updated["cover_image"]["source"] == "ai_generated_image"
+    assert result["cover_image"]["path"] == "data/uploads/recipe_covers/generated.png"
+
+
+def test_generate_recipe_cover_image_route_uses_openai_usage_wrapper(monkeypatch):
+    app = create_app()
+
+    monkeypatch.setattr(
+        recipe_routes,
+        "generate_recipe_cover_image",
+        lambda data: {
+            "ok": True,
+            "cover_image": {
+                "path": "data/uploads/recipe_covers/generated.png",
+                "source": "ai_generated_image",
+            },
+        },
+    )
+
+    with app.test_client() as client:
+        seed_signed_in_user(client)
+        response = client.post(
+            "/api/recipe_cover_image/generate",
+            json={"url": "https://example.com/spicy-noodles"},
+        )
+
+    payload = response.get_json()
+    assert response.status_code == 200
+    assert payload["ok"] is True
+    assert payload["cover_image"]["source"] == "ai_generated_image"
+    assert "openai_usage_dashboard" in payload
+
+
 def test_generate_recipe_from_image_passes_description_hint(monkeypatch, tmp_path):
     user_id, user_data_dir = configure_image_user(monkeypatch, tmp_path)
     monkeypatch.setenv("JOB_QUEUE_MODE", "inline")

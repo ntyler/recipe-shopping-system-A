@@ -19119,6 +19119,8 @@ function setRecipeEditorCoverImage(coverImage = {}, fallbackAlt = "") {
     const empty = document.getElementById("recipeEditCoverEmpty");
     const status = document.getElementById("recipeEditCoverStatus");
     const uploadLabel = document.getElementById("recipeEditCoverUploadLabel");
+    const generateLabel = document.getElementById("recipeEditCoverGenerateLabel");
+    const generateButton = document.getElementById("recipeEditCoverGenerate");
     const alt = normalized.alt || fallbackAlt || "Recipe title image";
     const src = normalized.src || normalized.url || "";
     const displaySrc = normalized.card_url || normalized.thumb_url || src;
@@ -19168,6 +19170,14 @@ function setRecipeEditorCoverImage(coverImage = {}, fallbackAlt = "") {
 
     if (uploadLabel) {
         uploadLabel.textContent = hasImage ? "Replace title image" : "Upload title image";
+    }
+
+    if (generateLabel) {
+        generateLabel.textContent = hasImage ? "Regenerate title image" : "Generate title image";
+    }
+
+    if (generateButton) {
+        generateButton.dataset.hasCoverImage = hasImage ? "true" : "false";
     }
 
     setValue("recipeEditCoverPath", normalized.path || "");
@@ -19297,6 +19307,97 @@ async function uploadRecipeCoverImage(input) {
     } finally {
         if (input) {
             input.value = "";
+        }
+    }
+
+    return false;
+}
+
+async function generateRecipeCoverImage(button) {
+    const originalUrl = recipeEditorCurrentUrl();
+    const titleInput = document.getElementById("recipeEditTitleInput");
+    const displayInput = document.getElementById("recipeEditDisplayName");
+    const fallbackAlt = (titleInput ? titleInput.value.trim() : "")
+        || (displayInput ? displayInput.value.trim() : "")
+        || "Recipe title image";
+    const currentCoverImage = collectRecipeEditorCoverImage();
+    const hasCoverImage = Boolean(currentCoverImage.path || currentCoverImage.url);
+
+    if (!originalUrl) {
+        setRecipeEditStatus("Unable to generate title image: missing recipe URL.", true);
+        return false;
+    }
+
+    if (hasCoverImage && !window.confirm("Regenerate this recipe title image? This will replace the current title image.")) {
+        return false;
+    }
+
+    const buttonLabel = document.getElementById("recipeEditCoverGenerateLabel");
+    const originalText = buttonLabel
+        ? buttonLabel.textContent
+        : (button ? button.textContent : "");
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 150000);
+
+    try {
+        if (button) {
+            button.disabled = true;
+            if (buttonLabel) {
+                buttonLabel.textContent = hasCoverImage ? "Regenerating..." : "Generating...";
+            } else {
+                button.textContent = hasCoverImage ? "Regenerating..." : "Generating...";
+            }
+        }
+        setRecipeEditStatus(hasCoverImage ? "Regenerating title image..." : "Generating title image...");
+
+        const response = await fetch("/api/recipe_cover_image/generate", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                url: originalUrl,
+                alt: fallbackAlt,
+                overwrite: hasCoverImage,
+            }),
+            signal: controller.signal,
+        });
+        let data = {};
+        try {
+            data = await response.json();
+        } catch (err) {
+            data = {};
+        }
+        syncOpenAiUsageDashboardFromResponse(data);
+
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to generate title image.");
+        }
+
+        const coverImage = normalizeRecipeEditorCoverImage(data.cover_image || {});
+        if (coverImage.src) {
+            coverImage.src = cacheBustRecipeCoverSrc(coverImage.src);
+        }
+
+        setRecipeEditorCoverImage(coverImage, fallbackAlt);
+        setRecipeEditStatus("Title image generated. Save Recipe to keep any other edits.");
+        showRecipeQuantityUpdatedMessage("", "", "", "Recipe title image generated.");
+    } catch (err) {
+        const timedOut = err && err.name === "AbortError";
+        const message = timedOut
+            ? "Title image generation timed out. Please try again."
+            : (err.message || "Unable to generate title image.");
+        console.warn("Unable to generate recipe title image.", err);
+        setRecipeEditStatus(message, true);
+    } finally {
+        window.clearTimeout(timeout);
+        if (button) {
+            button.disabled = false;
+            if (buttonLabel) {
+                buttonLabel.textContent = originalText || (hasCoverImage ? "Regenerate title image" : "Generate title image");
+            } else {
+                button.textContent = originalText || (hasCoverImage ? "Regenerate title image" : "Generate title image");
+            }
         }
     }
 

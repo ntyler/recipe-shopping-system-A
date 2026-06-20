@@ -104,6 +104,7 @@ from PushShoppingList.services.recipe_edit_service import create_editable_recipe
 from PushShoppingList.services.recipe_edit_service import delete_editable_recipe_pdf
 from PushShoppingList.services.recipe_edit_service import decide_recipe_categories_with_chatgpt
 from PushShoppingList.services.recipe_edit_service import estimate_recipe_nutrition
+from PushShoppingList.services.recipe_edit_service import generate_recipe_cover_image
 from PushShoppingList.services.recipe_edit_service import generate_recipe_equipment_image
 from PushShoppingList.services.recipe_edit_service import generate_recipe_step_image
 from PushShoppingList.services.recipe_edit_service import load_editable_recipe
@@ -3708,6 +3709,15 @@ def api_recipe_cover_image_route():
     status = 200 if result.get("ok") else 400
 
     return jsonify(result), status
+
+
+@recipe_bp.route("/api/recipe_cover_image/generate", methods=["POST"])
+def api_generate_recipe_cover_image_route():
+    data = request.get_json(silent=True) or {}
+    result = generate_recipe_cover_image(data)
+    status = 200 if result.get("ok") else 400
+
+    return jsonify(with_openai_usage_dashboard(result)), status
 
 
 @recipe_bp.route("/api/recipe_detail_image", methods=["POST"])
