@@ -1091,6 +1091,79 @@ def test_menu_batch_payload_uses_embedded_menu_item_id_when_outer_key_is_name():
     assert items["item-2"]["predicted_ingredients"][0]["ingredient"] == "rice noodles"
 
 
+def test_menu_batch_prompt_includes_compact_category_prediction_rules():
+    prompt = recipe_extract_service.build_menu_item_recipe_batch_prompt([
+        {
+            "menu_item": {
+                "menu_item_id": "item-pad-thai",
+                "item_name": "Pad Thai",
+                "menu_section": "Noodles",
+                "description": "Rice noodles with egg and peanuts.",
+            },
+        }
+    ])
+
+    assert "recipe_category: category enum string" in prompt
+    assert "category_confidence: high, medium, or low" in prompt
+    assert "Category prediction:" in prompt
+    assert "Do not return nutrition estimates." in prompt
+    assert "NOODLE_DISH" in prompt
+    assert "For each ingredient, include section as one of:" in prompt
+
+
+def test_menu_batch_inference_result_preserves_category_prediction_metadata():
+    result = recipe_extract_service.build_menu_batch_inference_result(
+        "https://example.com/menu?menu_item=pad-thai",
+        {
+            "recipe_title": "Pad Thai",
+            "source_menu_url": "https://example.com/menu",
+        },
+        {
+            "menu_item_id": "item-pad-thai",
+            "item_name": "Pad Thai",
+            "menu_section": "Noodles",
+            "description": "Rice noodles with egg and peanuts.",
+        },
+        {
+            "predicted_ingredients": [
+                {
+                    "quantity": "8",
+                    "unit": "oz",
+                    "ingredient": "rice noodles",
+                    "section": "noodle",
+                },
+                {
+                    "ingredient": "tamarind sauce",
+                    "section": "sauce",
+                },
+            ],
+            "predicted_equipment": [{"name": "wok", "category": "cookware"}],
+            "predicted_instructions": [{"step": 1, "instruction": "Stir-fry the noodles."}],
+            "recipe_category": "noodle dish",
+            "recipe_subcategory": "noodles",
+            "recipe_course": "entree",
+            "cuisine": "Thai",
+            "category_confidence": "High",
+            "category_review_required": False,
+            "category_prediction_reason": "Title contains Pad Thai.",
+            "confidence": 0.8,
+        },
+        model="gpt-test",
+        model_source="test",
+    )
+
+    raw = result["raw"]
+    assert result["recipe_category"] == "NOODLE_DISH"
+    assert result["recipe_course"] == "entree"
+    assert result["category_confidence"] == "high"
+    assert result["category_review_required"] is False
+    assert raw["cuisine"] == "Thai"
+    assert raw["category_prediction_reason"] == "Title contains Pad Thai."
+    assert raw["ingredients"][0]["section"] == "noodle"
+    assert raw["ingredients"][1]["section"] == "sauce"
+    assert raw["recipe_inference"]["category_metadata"]["recipe_category"] == "NOODLE_DISH"
+
+
 def test_menu_batch_inference_retries_with_backoff_before_success(monkeypatch):
     monkeypatch.setenv("MENU_ITEM_BATCH_INFERENCE_RETRY_ATTEMPTS", "2")
     monkeypatch.setenv("MENU_ITEM_BATCH_INFERENCE_RETRY_BACKOFF_SECONDS", "1.5")

@@ -145,6 +145,81 @@ OPENAI_MENU_CLEANUP_MODEL_ENV_VAR = "OPENAI_MENU_CLEANUP_MODEL"
 OPENAI_MENU_FAILED_ITEM_MODEL_DEFAULT = "gpt-5.4-mini"
 OPENAI_MENU_FAILED_ITEM_MODEL_ENV_VAR = "OPENAI_MENU_FAILED_ITEM_MODEL"
 OPENAI_PING_TEXT_MODEL = os.getenv("OPENAI_PING_TEXT_MODEL", "gpt-4o-mini")
+MENU_RECIPE_CATEGORY_VALUES = {
+    "APPETIZER",
+    "SOUP",
+    "SALAD",
+    "MAIN",
+    "SIDE",
+    "DESSERT",
+    "DRINK",
+    "SAUCE",
+    "CONDIMENT",
+    "SUSHI",
+    "NOODLE_DISH",
+    "RICE_DISH",
+    "CURRY",
+    "STIR_FRY",
+    "COMBO",
+    "LUNCH_SPECIAL",
+    "KIDS",
+    "MISC",
+}
+MENU_RECIPE_COURSE_VALUES = {
+    "appetizer",
+    "soup",
+    "salad",
+    "entree",
+    "side",
+    "dessert",
+    "drink",
+    "sauce",
+    "condiment",
+    "combo",
+    "unknown",
+}
+MENU_RECIPE_INGREDIENT_SECTION_VALUES = {
+    "main",
+    "protein",
+    "vegetable",
+    "starch",
+    "noodle",
+    "rice",
+    "sauce",
+    "broth",
+    "seasoning",
+    "garnish",
+    "wrapper",
+    "topping",
+    "filling",
+    "marinade",
+    "batter",
+    "drink",
+    "dessert",
+    "misc",
+}
+MENU_RECIPE_CATEGORY_METADATA_FIELDS = (
+    "recipe_category",
+    "recipe_subcategory",
+    "recipe_course",
+    "cuisine",
+    "category_confidence",
+    "category_prediction_reason",
+    "category_review_required",
+)
+MENU_RECIPE_CATEGORY_PREDICTION_RULES = """
+Category prediction:
+- Predict category fields from menu section, item title, description, and restaurant/menu context only.
+- Preserve source wording; do not add ingredients, nutrition, or instructions just to support a category.
+- Return recipe_category as one of: APPETIZER, SOUP, SALAD, MAIN, SIDE, DESSERT, DRINK, SAUCE, CONDIMENT, SUSHI, NOODLE_DISH, RICE_DISH, CURRY, STIR_FRY, COMBO, LUNCH_SPECIAL, KIDS, MISC.
+- Return recipe_course as one of: appetizer, soup, salad, entree, side, dessert, drink, sauce, condiment, combo, unknown.
+- Return cuisine only when supported by restaurant/menu/title/description evidence; otherwise use Unknown.
+- Preserve menu_section exactly as provided.
+- Return category_confidence as high, medium, or low; set category_review_required true when confidence is low.
+- Return category_prediction_reason as one short sentence.
+- For each ingredient, include section as one of: main, protein, vegetable, starch, noodle, rice, sauce, broth, seasoning, garnish, wrapper, topping, filling, marinade, batter, drink, dessert, misc.
+- For each equipment item, include category when clear: appliance, cookware, utensil, or prep.
+""".strip()
 MENU_ITEM_INFERENCE_WORKERS = _safe_int(
     os.getenv("MENU_ITEM_INFERENCE_WORKERS", "8"),
     8,
@@ -11175,6 +11250,14 @@ For each menu_item_id return:
 - predicted_ingredients: array of ingredient objects with quantity, unit, ingredient, preparation, original_text
 - predicted_equipment: array of equipment objects with name
 - predicted_instructions: array of instruction objects with step and instruction
+- recipe_category: category enum string
+- recipe_subcategory: short protein/style/detail string or empty string
+- recipe_course: course enum string
+- cuisine: cuisine string or Unknown
+- menu_section: exact source menu section
+- category_confidence: high, medium, or low
+- category_review_required: boolean
+- category_prediction_reason: short string
 - servings: number or short string
 - prep_time: short string
 - cook_time: short string
@@ -11190,6 +11273,8 @@ Rules:
 - Keep instructions brief and practical.
 - Skip no items in the response; every provided menu_item_id must have one result.
 - If an item is vague, return conservative plausible ingredients/instructions with lower confidence.
+
+{MENU_RECIPE_CATEGORY_PREDICTION_RULES}
 
 Menu items:
 {json.dumps({"items": compact_items}, ensure_ascii=False)}
@@ -12082,6 +12167,70 @@ def attach_menu_item_metadata(recipe, menu_item):
     return recipe
 
 
+def _normalize_menu_recipe_token(value, default=""):
+    text = clean_recipe_text(value or "")
+    if not text:
+        return default
+    return re.sub(r"[\s-]+", "_", text).strip("_")
+
+
+def _normalize_menu_recipe_category(value):
+    category = _normalize_menu_recipe_token(value).upper()
+    return category if category in MENU_RECIPE_CATEGORY_VALUES else "MISC"
+
+
+def _normalize_menu_recipe_course(value):
+    course = _normalize_menu_recipe_token(value).lower()
+    return course if course in MENU_RECIPE_COURSE_VALUES else "unknown"
+
+
+def _normalize_menu_recipe_confidence(value):
+    confidence = clean_recipe_text(value or "").lower()
+    return confidence if confidence in {"high", "medium", "low"} else "low"
+
+
+def _normalize_menu_recipe_bool(value, default=False):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    text = clean_recipe_text(value).lower()
+    if text in {"1", "true", "yes", "y", "review", "required"}:
+        return True
+    if text in {"0", "false", "no", "n", "none"}:
+        return False
+    return bool(default)
+
+
+def _normalize_menu_ingredient_section(value):
+    section = _normalize_menu_recipe_token(value).lower()
+    return section if section in MENU_RECIPE_INGREDIENT_SECTION_VALUES else "misc"
+
+
+def _menu_recipe_category_metadata(inference, menu_item):
+    inference = inference if isinstance(inference, dict) else {}
+    menu_item = menu_item if isinstance(menu_item, dict) else {}
+    confidence = _normalize_menu_recipe_confidence(inference.get("category_confidence"))
+    metadata = {
+        "recipe_category": _normalize_menu_recipe_category(inference.get("recipe_category")),
+        "recipe_subcategory": clean_recipe_text(inference.get("recipe_subcategory") or ""),
+        "recipe_course": _normalize_menu_recipe_course(inference.get("recipe_course")),
+        "cuisine": clean_recipe_text(inference.get("cuisine") or "Unknown") or "Unknown",
+        "category_confidence": confidence,
+        "category_prediction_reason": clean_recipe_text(inference.get("category_prediction_reason") or ""),
+        "category_review_required": _normalize_menu_recipe_bool(
+            inference.get("category_review_required"),
+            default=confidence == "low",
+        ),
+    }
+    if not metadata["category_prediction_reason"]:
+        item_name = clean_recipe_text(menu_item.get("item_name") or "")
+        section = clean_recipe_text(menu_item.get("menu_section") or "")
+        if item_name or section:
+            metadata["category_prediction_reason"] = "Category inferred from menu item context."
+    return metadata
+
+
 def _normalize_predicted_ingredients(value):
     rows = []
     source = value if isinstance(value, list) else []
@@ -12098,6 +12247,7 @@ def _normalize_predicted_ingredients(value):
                 "ingredient": name or original_text,
                 "preparation": clean_recipe_text(item.get("preparation") or ""),
                 "original_text": original_text or name,
+                "section": _normalize_menu_ingredient_section(item.get("section")),
             })
         else:
             text = clean_recipe_text(item)
@@ -12108,6 +12258,7 @@ def _normalize_predicted_ingredients(value):
                     "ingredient": text,
                     "preparation": "",
                     "original_text": text,
+                    "section": "misc",
                 })
     return rows
 
@@ -12203,6 +12354,7 @@ def build_menu_batch_inference_result(recipe_url, stub, menu_item, inference, mo
         or stub.get("difficulty_level")
         or ""
     )
+    category_metadata = _menu_recipe_category_metadata(inference, menu_item)
 
     recipe = {
         **stub,
@@ -12242,6 +12394,7 @@ def build_menu_batch_inference_result(recipe_url, stub, menu_item, inference, mo
         "model_used": model or resolve_menu_model(),
         "model_source": model_source or resolve_menu_model_source(),
         "extraction_confidence": confidence if confidence is not None else stub.get("extraction_confidence"),
+        **category_metadata,
         "confidence_notes": notes or [
             "AI-inferred from a restaurant menu item, not an exact restaurant recipe.",
         ],
@@ -12265,6 +12418,7 @@ def build_menu_batch_inference_result(recipe_url, stub, menu_item, inference, mo
         "model": model or resolve_menu_model(),
         "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         "notes": notes,
+        "category_metadata": category_metadata,
     }
     recipe["nutrition_inference"] = {
         **default_nutrition_inference(),
@@ -12320,6 +12474,10 @@ def build_menu_batch_inference_result(recipe_url, stub, menu_item, inference, mo
         "model_source": normalized.get("model_source", ""),
         "raw": normalized,
         "inference": inference,
+        **{
+            field: normalized.get(field)
+            for field in MENU_RECIPE_CATEGORY_METADATA_FIELDS
+        },
     })
     return result
 
