@@ -263,6 +263,9 @@ def test_job_activity_section_has_clear_collapse_control():
     assert "function setJobActivityDateFilter" in script
     assert "function clearJobActivityDateFilter" in script
     assert "function jobPassesDateFilter" in script
+    assert "function jobActivityDateRangeForJob" in script
+    assert "jobRange.end < jobActivityDateFrom" in script
+    assert "jobRange.start > jobActivityDateTo" in script
     assert "function jobPassesItemFilter" in script
     assert "function menuItemDisplayNameFromUrl" in script
     assert "function renderJobFailureSummary" in script

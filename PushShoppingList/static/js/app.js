@@ -1390,29 +1390,43 @@ function jobActivityDateString(value) {
     return `${year}-${month}-${day}`;
 }
 
-function jobActivityDateForJob(job) {
-    return jobActivityDateString(
+function jobActivityDateRangeForJob(job) {
+    const startDate = jobActivityDateString(
+        job && (
+            job.created_at
+            || job.started_at
+            || job.updated_at
+            || job.finished_at
+            || job.completed_at
+        )
+    );
+    const endDate = jobActivityDateString(
         job && (
             job.finished_at
             || job.completed_at
             || job.updated_at
+            || job.started_at
             || job.created_at
         )
     );
+    return {
+        start: startDate || endDate,
+        end: endDate || startDate,
+    };
 }
 
 function jobPassesDateFilter(job) {
     if (!jobActivityDateFrom && !jobActivityDateTo) {
         return true;
     }
-    const jobDate = jobActivityDateForJob(job);
-    if (!jobDate) {
+    const jobRange = jobActivityDateRangeForJob(job);
+    if (!jobRange.start && !jobRange.end) {
         return false;
     }
-    if (jobActivityDateFrom && jobDate < jobActivityDateFrom) {
+    if (jobActivityDateFrom && jobRange.end < jobActivityDateFrom) {
         return false;
     }
-    if (jobActivityDateTo && jobDate > jobActivityDateTo) {
+    if (jobActivityDateTo && jobRange.start > jobActivityDateTo) {
         return false;
     }
     return true;
