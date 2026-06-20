@@ -813,9 +813,11 @@ def test_menu_stub_result_is_deterministic_without_openai(monkeypatch, tmp_path)
     assert result["stubs_created"] == 1
     assert result["openai_calls_used"] == 0
     assert result["recipes"][0]["source_type"] == "menu_item_inferred"
+    assert result["recipes"][0]["source_import_type"] == "menu_url_import"
     assert result["recipes"][0]["ai_inferred"] is True
     assert result["recipes"][0]["needs_ai_recipe"] is True
     assert result["recipes"][0]["recipe_status"] == "stub"
+    assert result["recipes"][0]["import_status"] == "imported_basic"
     assert result["recipes"][0]["ingredients"] == []
     assert result["recipes"][0]["recipe_inference"]["status"] == "not_generated"
     assert result["recipes"][0]["nutrition_inference"]["status"] == "not_generated"

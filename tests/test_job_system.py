@@ -1131,8 +1131,9 @@ def test_menu_generate_job_bulk_saves_predicted_recipes_with_throttled_progress(
     assert category_updates[-1]["result_payload"]["followup_progress_every"] == 10
 
 
-def test_menu_import_queues_recipe_generation_after_source_completed(monkeypatch, tmp_path):
+def test_menu_import_does_not_auto_queue_recipe_generation_by_default(monkeypatch, tmp_path, capsys):
     configure_job_paths(monkeypatch, tmp_path)
+    monkeypatch.delenv("IMPORT_MENU_URL_AUTO_ENRICH", raising=False)
     menu_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902"
     recipe_urls = [
         f"{menu_url}&menu_item=menu-item-1-Spring_Roll",
@@ -1147,8 +1148,13 @@ def test_menu_import_queues_recipe_generation_after_source_completed(monkeypatch
     )
     job_service.update_job(job["id"], status="running", started_at=job_service.now_iso())
     observed_source_statuses = []
+    extract_calls = []
 
-    monkeypatch.setattr(recipe_routes, "extract_menu_stubs_from_url", lambda *args, **kwargs: {"ok": True})
+    def fake_extract_menu_stubs(*args, **kwargs):
+        extract_calls.append(kwargs)
+        return {"ok": True}
+
+    monkeypatch.setattr(recipe_routes, "extract_menu_stubs_from_url", fake_extract_menu_stubs)
     monkeypatch.setattr(
         recipe_routes,
         "commit_menu_import_result",
@@ -1168,6 +1174,67 @@ def test_menu_import_queues_recipe_generation_after_source_completed(monkeypatch
     monkeypatch.setattr("PushShoppingList.scripts.sort_ingredients.main", lambda: None)
 
     def fake_enqueue_followup(job_type, payload, total_items=0):
+        observed_source_statuses.append((job_type, payload, total_items))
+        pytest.fail("Import Menu URL should not auto-queue recipe generation by default")
+
+    monkeypatch.setattr(job_tasks, "enqueue_followup_job", fake_enqueue_followup)
+
+    finished = job_tasks.run_import_urls_job(job["id"], job["input_payload"], menu_extract=True)
+    output = capsys.readouterr().out
+
+    assert observed_source_statuses == []
+    assert finished["status"] == "completed"
+    assert finished["current_step"] == "Import complete"
+    assert extract_calls[0]["create_source_pdf"] is False
+    assert finished["result_payload"]["auto_enrich"] is False
+    assert finished["result_payload"]["recipe_inference_job_id"] == ""
+    assert finished["result_payload"]["background_enrichment_status"] == "not_started"
+    assert "manual enrichment later" in finished["result_payload"]["summary_message"]
+    assert "[Import Menu URL] stage=start" in output
+    assert "[Import Menu URL] stage=save_basic_items" in output
+    assert "[Import Menu URL] stage=complete" in output
+
+
+def test_menu_import_auto_enrich_env_queues_recipe_generation_after_source_completed(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    monkeypatch.setenv("IMPORT_MENU_URL_AUTO_ENRICH", "true")
+    menu_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902"
+    recipe_urls = [
+        f"{menu_url}&menu_item=menu-item-1-Spring_Roll",
+        f"{menu_url}&menu_item=menu-item-2-Crab_Wonton_5",
+    ]
+    job = job_service.create_job(
+        "menu-import",
+        input_payload={"urls": [menu_url], "extraction_mode": "menu_extract"},
+        user_id="owner",
+        total_items=1,
+        queue_name="ai-pantry-menu",
+    )
+    job_service.update_job(job["id"], status="running", started_at=job_service.now_iso())
+    observed_source_statuses = []
+    extract_calls = []
+
+    def fake_extract_menu_stubs(*args, **kwargs):
+        extract_calls.append(kwargs)
+        return {"ok": True}
+
+    monkeypatch.setattr(recipe_routes, "extract_menu_stubs_from_url", fake_extract_menu_stubs)
+    monkeypatch.setattr(
+        recipe_routes,
+        "commit_menu_import_result",
+        lambda *args, **kwargs: {
+            "ok": True,
+            "created_urls": recipe_urls,
+            "stubs_created": len(recipe_urls),
+            "item_records_unpacked": len(recipe_urls),
+            "menu_items_found": len(recipe_urls),
+            "menu_sections_found": 1,
+            "menu_source_url": menu_url,
+        },
+    )
+    monkeypatch.setattr("PushShoppingList.scripts.sort_ingredients.main", lambda: None)
+
+    def fake_enqueue_followup(job_type, payload, total_items=0):
         observed_source_statuses.append(job_service.get_job(payload["source_job_id"])["status"])
         return {"queued": True, "job_id": "followup-job", "queue": {"mode": "test"}}
 
@@ -1177,8 +1244,12 @@ def test_menu_import_queues_recipe_generation_after_source_completed(monkeypatch
 
     assert observed_source_statuses == ["completed"]
     assert finished["status"] == "completed"
+    assert extract_calls[0]["create_source_pdf"] is False
+    assert finished["result_payload"]["auto_enrich"] is True
     assert finished["result_payload"]["recipe_inference_job_id"] == "followup-job"
     assert finished["result_payload"]["recipe_inference_job"]["queued"] is True
+    assert finished["result_payload"]["background_enrichment_status"] == "queued"
+    assert "queued for background enrichment" in finished["result_payload"]["summary_message"]
 
 
 def test_menu_deferred_heavy_task_route_uses_recipe_item_sources(monkeypatch, tmp_path):

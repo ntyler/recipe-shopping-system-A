@@ -207,7 +207,11 @@ def test_job_activity_can_reopen_import_progress_overlay():
     assert "Open Popup" in script
     assert "hiddenExtractJobId = null" in script
     assert "renderExtractionProgress(importJobToExtractionProgress(job, urls, isMenuExtract, {" in script
-    assert "followMenuImportJobChain(finishedJob, urls)" in script
+    assert "followMenuImportJobChain(finishedJob, urls)" not in script
+    assert "Menu basic import complete" in script
+    assert '"menu-import": "Import Menu URL / Basic Import"' in script
+    assert '"menu-generate-recipes": "Generate Menu Recipes / Background Enrichment"' in script
+    assert '"menu-deferred-heavy-tasks": "Menu Nutrition / Categories / Background Enrichment"' in script
     assert "\"menu-import\", \"recipe-import\", \"menu-generate-recipes\", \"menu-deferred-heavy-tasks\"" in script
 
 

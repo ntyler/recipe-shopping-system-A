@@ -1,5 +1,6 @@
 import os
 import re
+import time
 from concurrent.futures import FIRST_COMPLETED
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import wait
@@ -297,6 +298,48 @@ def env_int(name, default=0, minimum=None, maximum=None):
     return value
 
 
+def import_menu_url_auto_enrich_enabled(payload=None):
+    payload = payload if isinstance(payload, dict) else {}
+    for key in ("auto_generate_recipes", "auto_enrich", "run_background_enrichment"):
+        if key in payload:
+            return payload_bool(payload, key, False)
+    return env_bool("IMPORT_MENU_URL_AUTO_ENRICH", False)
+
+
+def import_menu_url_create_source_pdf_enabled(payload=None):
+    payload = payload if isinstance(payload, dict) else {}
+    for key in ("create_source_pdf", "create_menu_source_pdf", "run_source_pdf"):
+        if key in payload:
+            return payload_bool(payload, key, False)
+    return env_bool("IMPORT_MENU_URL_CREATE_SOURCE_PDF", False)
+
+
+def import_menu_url_target_seconds():
+    return env_int("IMPORT_MENU_URL_TARGET_SECONDS", 60, minimum=1, maximum=3600)
+
+
+def import_menu_url_elapsed_seconds(start_time):
+    return max(0.0, time.perf_counter() - float(start_time or time.perf_counter()))
+
+
+def format_import_menu_url_elapsed(seconds):
+    seconds = max(0.0, float(seconds or 0))
+    if seconds < 60:
+        return f"{seconds:.0f} seconds"
+    minutes = int(seconds // 60)
+    remaining = int(seconds % 60)
+    return f"{minutes}m {remaining}s"
+
+
+def log_import_menu_url_stage(stage, **fields):
+    parts = [f"[Import Menu URL] stage={stage}"]
+    for key, value in fields.items():
+        if value is None:
+            continue
+        parts.append(f"{key}={value}")
+    print(" ".join(parts))
+
+
 def menu_inline_enrichment_max_items():
     return env_int("MENU_INLINE_ENRICHMENT_MAX_ITEMS", 25, minimum=0, maximum=10000)
 
@@ -383,7 +426,12 @@ def enqueue_followup_job(job_type, payload, total_items=0):
 
 def run_menu_import_job(job_id, payload):
     payload = payload if isinstance(payload, dict) else {}
-    payload = {**payload, "extraction_mode": "menu_extract"}
+    payload = {
+        **payload,
+        "extraction_mode": "menu_extract",
+        "auto_generate_recipes": import_menu_url_auto_enrich_enabled(payload),
+        "create_source_pdf": import_menu_url_create_source_pdf_enabled(payload),
+    }
     return run_import_urls_job(job_id, payload, menu_extract=True)
 
 
@@ -3031,6 +3079,10 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
         return fail_job(job_id, "At least one URL is required.")
 
     total = len(urls)
+    menu_import_started_at = time.perf_counter() if menu_extract else None
+    menu_auto_enrich = import_menu_url_auto_enrich_enabled(payload) if menu_extract else False
+    menu_create_source_pdf = import_menu_url_create_source_pdf_enabled(payload) if menu_extract else False
+    menu_target_seconds = import_menu_url_target_seconds() if menu_extract else 0
     cookbook = selected_cookbook_from_payload(payload)
     created_urls = []
     failed_items = 0
@@ -3075,12 +3127,23 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
                 "nutrition_completed": 0,
                 "pdfs_completed": 0,
                 "failed_items": 0,
+                "auto_enrich": bool(menu_auto_enrich),
+                "background_enrichment_enabled": bool(menu_auto_enrich),
+                "target_seconds": menu_target_seconds,
             } if menu_extract else {}),
         },
     )
 
     for index, url in enumerate(urls):
         ensure_not_cancelled(job_id)
+        if menu_extract:
+            log_import_menu_url_stage(
+                "start",
+                url=url,
+                auto_enrich=str(bool(menu_auto_enrich)).lower(),
+                target_seconds=menu_target_seconds,
+                source_pdf=str(bool(menu_create_source_pdf)).lower(),
+            )
         step = "Fetching menu" if menu_extract else "Reading source URL"
         update_job_progress(
             job_id,
@@ -3116,6 +3179,7 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
                     import_job_id=job_id,
                     cookbook_id=cookbook.get("id", "") if isinstance(cookbook, dict) else "",
                     cookbook_name=cookbook.get("name", "") if isinstance(cookbook, dict) else "",
+                    create_source_pdf=menu_create_source_pdf,
                 )
             else:
                 result = extract_recipe_from_url(url, progress_callback=progress_callback)
@@ -3136,11 +3200,11 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
 
             update_job_progress(
                 job_id,
-                current_step="Creating recipe shells",
+                current_step="Saving menu items",
                 progress_percent=bounded_percent(index, total, 65, 90),
                 result_payload={
                     **job_model,
-                    "stage": "Creating recipe shells",
+                    "stage": "Saving menu items",
                     "recipe_shells_created": len(created_urls),
                     "recipe_inference_completed": 0,
                     "nutrition_completed": 0,
@@ -3216,9 +3280,27 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
                 if committed.get("partial_failure"):
                     failed_items += 1
                     append_job_warning(job_id, committed.get("error") or "Some menu items failed.")
+                committed_count = int(committed.get("committed_count") or len(committed_urls) or 0)
+                created_count = int(committed.get("created_count") or 0)
+                skipped_count = int(committed.get("duplicates_skipped") or 0)
+                updated_count = max(0, committed_count - created_count)
+                log_import_menu_url_stage(
+                    "save_basic_items",
+                    created=created_count,
+                    skipped=skipped_count,
+                    updated=updated_count,
+                    elapsed=f"{import_menu_url_elapsed_seconds(menu_import_started_at):.2f}s",
+                )
             else:
                 failed_items += 1
                 append_job_warning(job_id, f"{url}: {committed.get('error') or 'No menu item recipes were created.'}")
+                log_import_menu_url_stage(
+                    "save_basic_items",
+                    created=0,
+                    skipped=0,
+                    updated=0,
+                    elapsed=f"{import_menu_url_elapsed_seconds(menu_import_started_at):.2f}s",
+                )
             continue
 
         ingredients = result.get("ingredients", [])
@@ -3266,7 +3348,15 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
         with workspace_write_lock("recipe-imports"):
             sort_ingredients()
 
+    visible_elapsed = import_menu_url_elapsed_seconds(menu_import_started_at) if menu_extract else 0
     final_total = max(total, len(created_urls) + failed_items) if menu_extract else total
+    menu_imported_count = len(created_urls)
+    menu_elapsed_text = format_import_menu_url_elapsed(visible_elapsed)
+    menu_enrichment_message = (
+        "Recipe details are queued for background enrichment."
+        if menu_auto_enrich
+        else "Recipe details are ready for manual enrichment later."
+    )
     result_payload = {
         "ok": bool(created_urls),
         "created_count": len(created_urls),
@@ -3278,18 +3368,29 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
     }
     should_enqueue_recipe_inference = False
     if menu_extract:
-        should_enqueue_recipe_inference = bool(
-            created_urls and payload_bool(payload, "auto_generate_recipes", True)
-        )
+        should_enqueue_recipe_inference = bool(created_urls and menu_auto_enrich)
         result_payload.update(menu_job_stats)
         result_payload.update({
-            "stage": "Complete",
+            "stage": "Import complete",
+            "basic_import_complete": True,
+            "basic_import_status": "imported_basic",
+            "auto_enrich": bool(menu_auto_enrich),
+            "background_enrichment_enabled": bool(menu_auto_enrich),
+            "background_enrichment_status": "queue_pending" if should_enqueue_recipe_inference else "not_started",
+            "target_seconds": menu_target_seconds,
+            "import_duration_seconds": round(visible_elapsed, 2),
+            "target_seconds_exceeded": bool(visible_elapsed > menu_target_seconds),
             "recipe_shells_created": len(created_urls),
             "recipe_inference_completed": 0,
             "nutrition_completed": 0,
             "pdfs_completed": 0,
             "recipe_inference_job": {},
             "recipe_inference_job_id": "",
+            "summary_message": (
+                f"Imported {menu_imported_count} menu item"
+                f"{'' if menu_imported_count == 1 else 's'} in {menu_elapsed_text}. "
+                f"{menu_enrichment_message}"
+            ),
         })
     update_job_progress(
         job_id,
@@ -3302,7 +3403,29 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
     if not created_urls:
         return fail_job(job_id, "No recipes were imported.", result_payload=result_payload)
 
-    completed_job = complete_job(job_id, result_payload=result_payload)
+    if menu_extract and visible_elapsed > menu_target_seconds:
+        warning = (
+            f"Import Menu URL exceeded target: {visible_elapsed:.2f}s "
+            f"> {menu_target_seconds}s."
+        )
+        append_job_warning(job_id, warning)
+        log_import_menu_url_stage(
+            "warning",
+            total_elapsed=f"{visible_elapsed:.2f}s",
+            target_seconds=menu_target_seconds,
+        )
+
+    completed_job = complete_job(
+        job_id,
+        result_payload=result_payload,
+        current_step="Import complete" if menu_extract else "Completed",
+    )
+    if menu_extract:
+        log_import_menu_url_stage(
+            "complete",
+            total_elapsed=f"{visible_elapsed:.2f}s",
+            auto_enrich=str(bool(menu_auto_enrich)).lower(),
+        )
     if should_enqueue_recipe_inference:
         try:
             inference_job = enqueue_followup_job(
@@ -3328,11 +3451,29 @@ def run_import_urls_job(job_id, payload, menu_extract=False):
             f"source_job_id={job_id} followup_job_id={inference_job.get('job_id', '')} "
             f"queued={bool(inference_job.get('queued'))} total_items={len(created_urls)}"
         )
+        enrichment_status = "queued" if inference_job.get("queued") else "queue_failed"
+        enrichment_message = (
+            "Recipe details are queued for background enrichment."
+            if inference_job.get("queued")
+            else "Background enrichment was requested but could not be queued."
+        )
         result_payload.update({
             "recipe_inference_job": inference_job,
             "recipe_inference_job_id": inference_job.get("job_id", ""),
+            "background_enrichment_status": enrichment_status,
+            "enrichment_auto_started": bool(inference_job.get("queued")),
+            "summary_message": (
+                f"Imported {menu_imported_count} menu item"
+                f"{'' if menu_imported_count == 1 else 's'} in {menu_elapsed_text}. "
+                f"{enrichment_message}"
+            ),
         })
         update_job_progress(job_id, result_payload=result_payload)
+        log_import_menu_url_stage(
+            "enrichment_queued",
+            followup_job_id=inference_job.get("job_id", ""),
+            queued=str(bool(inference_job.get("queued"))).lower(),
+        )
         return get_job(job_id) or completed_job
     return completed_job
 

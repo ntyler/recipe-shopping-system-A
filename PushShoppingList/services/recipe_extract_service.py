@@ -12459,9 +12459,12 @@ def normalize_menu_item_stub(menu_url, menu_item, index, source_name=""):
         "inactive_time": "",
         "cook_time": "",
         "source_type": "menu_item_inferred",
+        "source_import_type": "menu_url_import",
         "ai_inferred": True,
         "needs_ai_recipe": True,
         "recipe_status": "stub",
+        "import_status": "imported_basic",
+        "basic_import_status": "imported_basic",
         "ingredients": [],
         "equipment": predicted_equipment,
         "instructions": [],
@@ -12524,6 +12527,7 @@ def normalize_menu_item_stub(menu_url, menu_item, index, source_name=""):
     recipe["source_metadata"] = {
         **(recipe.get("source_metadata") if isinstance(recipe.get("source_metadata"), dict) else {}),
         "source_type": "restaurant_menu",
+        "source_import_type": "menu_url_import",
         "source_url": recipe_url,
         "source_menu_url": str(menu_url or "").strip(),
         "menu_order_url": menu_order_url,
@@ -12553,6 +12557,8 @@ def normalize_menu_item_stub(menu_url, menu_item, index, source_name=""):
         "cleanup_confidence": recipe["cleanup_confidence"],
         "cleanup_notes": recipe["cleanup_notes"],
         "predicted_equipment": predicted_equipment,
+        "import_status": "imported_basic",
+        "basic_import_status": "imported_basic",
         "tags": recipe["tags"],
         "options": recipe["options"],
         "modifiers": recipe["modifiers"],
@@ -12723,9 +12729,12 @@ def build_menu_stub_extract_result_from_items(
             "parent_menu_snapshot_id": stub.get("parent_menu_snapshot_id", ""),
             "menu_mega_snapshot_id": stub.get("menu_mega_snapshot_id", ""),
             "source_type": "menu_item_inferred",
+            "source_import_type": "menu_url_import",
             "ai_inferred": True,
             "needs_ai_recipe": True,
             "recipe_status": "stub",
+            "import_status": "imported_basic",
+            "basic_import_status": "imported_basic",
             "recipe_inference": stub.get("recipe_inference", default_recipe_inference()),
             "nutrition_inference": stub.get("nutrition_inference", default_nutrition_inference()),
             "pdf_generation": stub.get("pdf_generation", default_pdf_generation()),
@@ -12745,7 +12754,7 @@ def build_menu_stub_extract_result_from_items(
 
     if progress_callback:
         progress_callback(
-            "Creating menu stubs",
+            "Saving menu items",
             f"Created {stubs_created} lightweight menu item stubs.",
         )
 
@@ -13525,6 +13534,7 @@ def extract_menu_sections_from_url(menu_url, progress_callback=None, cancellatio
             "extracted_text": "",
         }
 
+    started_at = time.perf_counter()
     try:
         def check_cancelled():
             run_cancellation_check(cancellation_check)
@@ -13548,7 +13558,7 @@ def extract_menu_sections_from_url(menu_url, progress_callback=None, cancellatio
         sections = []
 
         report(
-            "Fetching menu page",
+            "Fetching menu",
             "Opening the restaurant menu page.",
         )
         try:
@@ -13581,9 +13591,15 @@ def extract_menu_sections_from_url(menu_url, progress_callback=None, cancellatio
                 raise
             diagnostics["menu_fetch_error"] = str(exc)
             print(f"[recipe_import] action=menu_page_fetch_failed url={menu_url} error={exc}")
+        print(
+            "[Import Menu URL] stage=fetch_html "
+            f"elapsed={time.perf_counter() - started_at:.2f}s "
+            f"http_status={diagnostics.get('http_status', '')} "
+            f"content_type={diagnostics.get('content_type', '')}"
+        )
 
         report(
-            "Extracting menu items without AI",
+            "Parsing menu",
             "Reading visible menu sections and items directly from the page.",
         )
         if html_text:
@@ -13616,7 +13632,7 @@ def extract_menu_sections_from_url(menu_url, progress_callback=None, cancellatio
         check_cancelled()
         if not flatten_menu_sections(sections) and os.getenv("DISABLE_BROWSER_RECIPE_FETCH") != "1":
             report(
-                "Fetching menu page",
+                "Fetching menu",
                 "The raw page did not expose menu items, so Chrome is rendering the menu.",
             )
             try:
@@ -13645,6 +13661,13 @@ def extract_menu_sections_from_url(menu_url, progress_callback=None, cancellatio
         check_cancelled()
         diagnostics["html_snapshot_path"] = html_snapshot_path
         diagnostics["restaurant"] = extract_menu_restaurant_metadata_from_html(menu_url, html_text, page_text)
+        print(
+            "[Import Menu URL] stage=parse_menu "
+            f"sections={len(sections or [])} "
+            f"items={len(flatten_menu_sections(sections))} "
+            f"elapsed={time.perf_counter() - started_at:.2f}s "
+            f"source={diagnostics.get('menu_extraction_source', '')}"
+        )
         return {
             "ok": True,
             "success": True,
@@ -13737,6 +13760,7 @@ def extract_menu_stubs_from_url(
     import_job_id="",
     cookbook_id="",
     cookbook_name="",
+    create_source_pdf=True,
 ):
     menu_url = canonical_menu_source_url(menu_url)
     if not menu_url:
@@ -13801,12 +13825,20 @@ def extract_menu_stubs_from_url(
             menu_snapshot.get("menu_mega_json") or mega_json,
             snapshot_id=menu_snapshot.get("id") or menu_snapshot.get("snapshot_id") or "",
         )
-        menu_source_pdf = create_menu_source_pdf(
-            menu_url,
-            sections,
-            progress_callback=progress_callback,
-            cancellation_check=cancellation_check,
-        )
+        if create_source_pdf:
+            menu_source_pdf = create_menu_source_pdf(
+                menu_url,
+                sections,
+                progress_callback=progress_callback,
+                cancellation_check=cancellation_check,
+            )
+        else:
+            menu_source_pdf = menu_source_pdf_metadata(
+                menu_url,
+                status="deferred",
+                error="Menu Source PDF capture is deferred for the fast Import Menu URL path.",
+                item_count=len(flatten_menu_sections(sections)),
+            )
         run_cancellation_check(cancellation_check)
 
         result = build_menu_stub_extract_result_from_items(

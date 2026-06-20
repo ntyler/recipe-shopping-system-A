@@ -926,9 +926,12 @@ def menu_stub_recipe_payload(recipe_result, recipe_url, cookbook):
         "source_url": recipe_url,
         "recipe_record_url": recipe_url,
         "source_type": "menu_item_inferred",
+        "source_import_type": "menu_url_import",
         "ai_inferred": True,
         "needs_ai_recipe": True,
         "recipe_status": "stub",
+        "import_status": "imported_basic",
+        "basic_import_status": "imported_basic",
         "cookbook_id": cookbook.get("id", ""),
         "cookbook_name": cookbook.get("name", ""),
     })
@@ -1781,7 +1784,7 @@ def commit_menu_import_result(
 
     _menu_progress(
         progress_callback,
-        "Saving menu item stubs" if has_stubs else "Predicting ingredients",
+        "Saving menu items" if has_stubs else "Predicting ingredients",
         (
             "Saving lightweight menu item stubs without full AI generation."
             if has_stubs
@@ -1825,9 +1828,12 @@ def commit_menu_import_result(
                 **recipe_result,
                 "raw": recipe_payload,
                 "source_type": "menu_item_inferred",
+                "source_import_type": "menu_url_import",
                 "ai_inferred": True,
                 "needs_ai_recipe": True,
                 "recipe_status": "stub",
+                "import_status": "imported_basic",
+                "basic_import_status": "imported_basic",
                 "ingredients": [],
                 "equipment": recipe_payload.get("equipment", []),
                 "instructions": recipe_payload.get("instructions", []),

@@ -318,9 +318,9 @@ function jobIsFinished(job) {
 
 function jobTypeLabel(jobType) {
     return ({
-        "menu-import": "Menu Import",
-        "menu-generate-recipes": "Generate Menu Recipes",
-        "menu-deferred-heavy-tasks": "Menu Nutrition / Categories",
+        "menu-import": "Import Menu URL / Basic Import",
+        "menu-generate-recipes": "Generate Menu Recipes / Background Enrichment",
+        "menu-deferred-heavy-tasks": "Menu Nutrition / Categories / Background Enrichment",
         "cookbook-infer-missing-details": "Cookbook Details Routine",
         "recipe-import": "Recipe Import",
         "doc-photo-import": "Doc / Photo Import",
@@ -1095,7 +1095,7 @@ function menuImportActivityFromJob(job, isMenuExtract) {
     return {
         job_label: jobTypeLabel(job.job_type),
         stage: followupLabel && status === "completed"
-            ? `${stage}. Waiting for ${followupLabel}.`
+            ? `${stage}. Background ${followupLabel} queued.`
             : stage,
         detail,
         counts: menuJobCountItems(job),
@@ -2077,11 +2077,6 @@ async function reopenImportProgressFromJob(jobId) {
                 pollMs: 1500,
                 timeoutMs: IMPORT_JOB_COMPLETION_TIMEOUT_MS,
             }).then(finishedJob => {
-                if (isMenuExtract) {
-                    return followMenuImportJobChain(finishedJob, urls).then(chainedJob => chainedJob || finishedJob);
-                }
-                return finishedJob;
-            }).then(finishedJob => {
                 const finalUrls = jobSourceUrls(finishedJob).length ? jobSourceUrls(finishedJob) : urls;
                 renderExtractionProgress(importJobToExtractionProgress(finishedJob, finalUrls, isMenuExtract));
                 syncOpenAiUsageDashboardFromResponse(jobResultPayload(finishedJob));
@@ -2104,12 +2099,7 @@ async function reopenImportProgressFromJob(jobId) {
                 });
             });
         } else if (isMenuExtract) {
-            const chainedJob = await followMenuImportJobChain(job, urls);
-            if (chainedJob) {
-                renderExtractionProgress(importJobToExtractionProgress(chainedJob, jobSourceUrls(chainedJob), true));
-            } else {
-                renderExtractionProgress(importJobToExtractionProgress(job, urls, true));
-            }
+            renderExtractionProgress(importJobToExtractionProgress(job, urls, true));
         }
     } catch (err) {
         const summary = jobActivitySummaryElement();
@@ -27994,15 +27984,16 @@ function importJobToExtractionProgress(job, urls, isMenuExtract, options = {}) {
         : "Import is running in the background.";
     const menuActivity = menuImportActivityFromJob(job, isMenuExtract);
     const followupLabel = menuActivity && menuActivity.followup_label ? menuActivity.followup_label : "";
+    const resultSummary = String(result.summary_message || "").trim();
     const summary = completed
-        ? (
+        ? (resultSummary || (
             followupLabel
-                ? `Menu shell import complete. Waiting for ${followupLabel} to start.`
+                ? `Menu basic import complete. Background ${followupLabel} queued.`
                 :
             isMenuExtract && (stubCount || megaSnapshotCount)
-                ? `Menu import complete. Created ${megaSnapshotCount || 1} mega menu JSON snapshot${(megaSnapshotCount || 1) === 1 ? "" : "s"} and unpacked ${unpackedCount || stubCount} menu item${(unpackedCount || stubCount) === 1 ? "" : "s"} into lightweight recipe shells.`
+                ? `Menu basic import complete. Created ${megaSnapshotCount || 1} mega menu JSON snapshot${(megaSnapshotCount || 1) === 1 ? "" : "s"} and saved ${unpackedCount || stubCount} menu item${(unpackedCount || stubCount) === 1 ? "" : "s"} as lightweight recipe shells.`
                 : `Imported ${displayedCount} recipe${displayedCount === 1 ? "" : "s"}.`
-        )
+        ))
         : failed
             ? ((job && job.error_message) || "Import finished with errors.")
             : (isMenuExtract && active ? runningSummary : ((job && job.current_step) || "Import is running in the background."));
@@ -28080,7 +28071,7 @@ async function startRecipeExtractionUrls(urls, options = {}) {
         ? `Downloading ${urls.length} menu page${urls.length === 1 ? "" : "s"}...`
         : `Downloading ${urls.length} recipe${urls.length === 1 ? "" : "s"}...`;
     summary.textContent = isMenuExtract
-        ? "Fetching menu pages, building mega menu JSON snapshots, and saving lightweight stubs."
+        ? "Fetching menu, parsing structured items, and saving lightweight menu records."
         : "Fetching recipe pages and extracting ingredients.";
     if (bar) {
         bar.style.width = "10%";
@@ -28122,10 +28113,7 @@ async function startRecipeExtractionUrls(urls, options = {}) {
             pollMs: 1500,
             timeoutMs: IMPORT_JOB_COMPLETION_TIMEOUT_MS,
         });
-        const chainedJob = isMenuExtract
-            ? await followMenuImportJobChain(finishedJob, urls)
-            : null;
-        const finalJob = chainedJob || finishedJob;
+        const finalJob = finishedJob;
         const finalUrls = jobSourceUrls(finalJob).length ? jobSourceUrls(finalJob) : urls;
         const finalProgress = importJobToExtractionProgress(finalJob, finalUrls, isMenuExtract);
         renderExtractionProgress(finalProgress);
@@ -29441,7 +29429,7 @@ function renderExtractionProgress(progress, options = {}) {
     status.textContent = progressStatusText(progress);
     summary.textContent = progress.summary || (
         isMenuExtract
-            ? "Fetching menu pages, building mega menu JSON snapshots, and saving lightweight recipe shells."
+            ? "Fetching menu, parsing structured items, and saving lightweight menu records."
             : "Fetching recipe pages and extracting ingredients."
     );
     bar.style.width = `${Math.max(0, Math.min(100, progress.percent || 0))}%`;
@@ -29469,7 +29457,7 @@ function progressStatusText(progress) {
     const activity = isMenuExtract && progress.menu_activity ? progress.menu_activity : null;
 
     if (!progress.active && progress.status === "complete") {
-        return isMenuExtract ? "Menu import complete." : "Extraction complete.";
+        return isMenuExtract ? "Menu basic import complete." : "Extraction complete.";
     }
 
     if (!progress.active && progress.status === "failed") {
