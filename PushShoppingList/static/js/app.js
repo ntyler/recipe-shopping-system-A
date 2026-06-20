@@ -1566,10 +1566,12 @@ function renderJobActivityPanel(jobs) {
     });
 
     if (clearButton) {
-        clearButton.disabled = finishedCount === 0;
+        clearButton.disabled = sortedJobs.length === 0;
         clearButton.title = finishedCount
             ? `Clear ${finishedCount} finished job ${finishedCount === 1 ? "entry" : "entries"}`
-            : "No finished job activity to clear";
+            : activeCount
+                ? "Active and stopping jobs stay visible until they finish"
+                : "No job activity to clear";
     }
     if (cancelAllButton) {
         cancelAllButton.disabled = cancellableCount === 0;
@@ -2137,7 +2139,10 @@ async function clearJobActivityLog(button) {
     if (!finishedCount) {
         const summary = jobActivitySummaryElement();
         if (summary) {
-            summary.textContent = "No finished job activity to clear.";
+            const activeCount = lastJobActivityJobs.filter(jobIsActive).length;
+            summary.textContent = activeCount
+                ? "No finished job activity to clear. Active and stopping jobs stay visible until they finish."
+                : "No job activity to clear.";
         }
         return false;
     }
@@ -2192,7 +2197,7 @@ async function clearJobActivityLog(button) {
     } finally {
         if (button) {
             button.textContent = originalText || "Clear Log";
-            button.disabled = lastJobActivityJobs.filter(jobIsFinished).length === 0;
+            button.disabled = lastJobActivityJobs.length === 0;
         }
     }
 
