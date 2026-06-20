@@ -10,6 +10,7 @@ from werkzeug.datastructures import FileStorage
 
 from PushShoppingList.services.job_runtime_context import job_context
 from PushShoppingList.services.job_service import append_job_warning
+from PushShoppingList.services.job_service import cancel_job
 from PushShoppingList.services.job_service import complete_job
 from PushShoppingList.services.job_service import fail_job
 from PushShoppingList.services.job_service import get_job
@@ -32,8 +33,6 @@ def run_job_task(job_id):
     if not job:
         return {"ok": False, "error": "Job not found."}
     if job_cancelled(job_id):
-        from PushShoppingList.services.job_service import cancel_job
-
         return cancel_job(job_id, "Cancelled")
 
     handlers = {
@@ -57,13 +56,9 @@ def run_job_task(job_id):
     try:
         result = handler(job_id, job.get("input_payload") or {})
         if job_cancelled(job_id):
-            from PushShoppingList.services.job_service import cancel_job
-
             return cancel_job(job_id, "Cancelled")
         return result
     except JobCancelled:
-        from PushShoppingList.services.job_service import cancel_job
-
         return cancel_job(job_id, "Cancelled")
     except Exception as exc:
         print(f"[job_tasks] job_id={job_id} error={exc}")
@@ -93,6 +88,7 @@ def log_job_cancel_stop(job_id, task="job", stage="checkpoint", **fields):
 
 def raise_if_job_cancelled(job_id, task="job", stage="checkpoint", **fields):
     if job_cancelled(job_id):
+        cancel_job(job_id, "Cancelled")
         log_job_cancel_stop(job_id, task=task, stage=stage, **fields)
         raise JobCancelled()
 
@@ -1310,10 +1306,12 @@ def run_menu_generate_recipes_job(job_id, payload):
             },
         )
 
-    with ThreadPoolExecutor(
+    executor = ThreadPoolExecutor(
         max_workers=batch_worker_count,
         thread_name_prefix="menu-recipe-batch",
-    ) as executor:
+    )
+    executor_shutdown = False
+    try:
         raise_if_menu_enrichment_cancelled("before_openai_batches")
         submit_available_batches(executor)
         try:
@@ -1368,7 +1366,12 @@ def run_menu_generate_recipes_job(job_id, payload):
         except JobCancelled:
             for future in list(futures.keys()):
                 future.cancel()
+            executor.shutdown(wait=False, cancel_futures=True)
+            executor_shutdown = True
             raise
+    finally:
+        if not executor_shutdown:
+            executor.shutdown(wait=True)
 
     raise_if_menu_enrichment_cancelled("after_openai_batches")
     if created_urls:

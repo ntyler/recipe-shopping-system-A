@@ -1,6 +1,7 @@
 import json
 import threading
 from datetime import timedelta
+from pathlib import Path
 
 import pytest
 
@@ -19,6 +20,9 @@ from PushShoppingList.services import recipe_ingredient_service
 from PushShoppingList.services import recipe_extract_service
 from PushShoppingList.services import recipe_url_service
 from PushShoppingList.services import storage_service
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def configure_job_paths(monkeypatch, tmp_path):
@@ -1155,6 +1159,12 @@ def test_menu_generate_fast_mode_batches_256_items_by_6_and_skips_heavy_work(mon
     monkeypatch.delenv("MENU_RECIPE_FAST_BATCH_SIZE", raising=False)
     monkeypatch.delenv("MENU_RECIPE_FAST_BATCH_TARGET_CHARS", raising=False)
     monkeypatch.setenv("MENU_ITEM_BATCH_INFERENCE_WORKERS", "1")
+    monkeypatch.setattr(recipe_extract_service, "model_snapshot_for_env", lambda env_var: None)
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "model_value_for_env",
+        lambda env_var, default_model=None: (default_model, "default"),
+    )
     recipe_urls = [
         f"https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=item-{index}"
         for index in range(256)
@@ -1652,6 +1662,41 @@ def test_running_job_cancel_is_request_until_worker_confirms(monkeypatch, tmp_pa
     assert progress["current_step"] == "Cancel requested..."
     assert confirmed["status"] == "cancelled"
     assert confirmed["current_step"] == "Cancelled"
+
+
+def test_menu_generate_cancel_checkpoint_confirms_cancelled(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    job = job_service.create_job(
+        "menu-generate-recipes",
+        input_payload={"recipe_urls": ["https://example.com/menu?menu_item=1"]},
+        user_id="owner",
+        total_items=1,
+    )
+    job_service.update_job(job["id"], status="running", started_at=job_service.now_iso())
+    job_service.cancel_job(job["id"])
+
+    with pytest.raises(job_tasks.JobCancelled):
+        job_tasks.raise_if_job_cancelled(
+            job["id"],
+            task="menu_enrichment",
+            stage="save_predicted_recipe_loop",
+            batch="1/1",
+        )
+
+    refreshed = job_service.get_job(job["id"])
+    assert refreshed["status"] == "cancelled"
+    assert refreshed["current_step"] == "Cancelled"
+    assert refreshed["finished_at"]
+
+
+def test_menu_generate_cancel_uses_non_waiting_batch_executor_shutdown():
+    source = (ROOT / "PushShoppingList/services/job_tasks.py").read_text(encoding="utf-8")
+    start = source.index('thread_name_prefix="menu-recipe-batch"')
+    end = source.index('raise_if_menu_enrichment_cancelled("after_openai_batches")')
+    batch_executor_block = source[start:end]
+
+    assert "executor.shutdown(wait=False, cancel_futures=True)" in batch_executor_block
+    assert "with ThreadPoolExecutor(" not in batch_executor_block
 
 
 def test_cancelled_menu_generate_job_does_not_start_openai(monkeypatch, tmp_path):
