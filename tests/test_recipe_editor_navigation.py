@@ -163,7 +163,7 @@ def test_food_review_badges_open_active_review_flow():
 
     assert recipe_view.count("openRecipeFoodReviewFromRecipeView(this, event)") == 1
     assert current_recipes.count("openRecipeFoodReviewFromRecipeView(this, event)") >= 1
-    assert "{% elif recipe_needs_food_review %}" in current_recipes
+    assert "recipe-url-summary-status-row" in current_recipes
     assert cookbooks.count("openRecipeFoodReviewFromRecipeView(this, event)") >= 1
     assert "openIngredientFoodReviewFromRecipeView(this, event)" in recipe_view
 

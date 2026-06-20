@@ -9166,6 +9166,17 @@ body {
             column-gap: 8px;
         }
 
+        .recipe-url-summary-status-row {
+            grid-column: 1 / -1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: flex-start;
+            flex-wrap: wrap;
+            gap: 5px 6px;
+            min-width: 0;
+            margin-top: 2px;
+        }
+
         .recipe-url-summary-heading {
             display: flex;
             align-items: baseline;
@@ -9191,32 +9202,6 @@ body {
             display: grid;
             gap: 5px;
             margin-top: 2px;
-        }
-
-        .recipe-url-summary-menu-status {
-            display: grid;
-            grid-template-columns: var(--recipe-meta-label-width) minmax(0, 1fr);
-            align-items: start;
-            justify-items: start;
-            gap: 6px 8px;
-            max-width: min(360px, 100%);
-            margin: 0 0 2px 0;
-        }
-
-        .recipe-url-summary-menu-status .menu-recipe-status-badge,
-        .recipe-url-summary-menu-status .menu-recipe-generate-inline,
-        .recipe-url-summary-menu-status .recipe-url-summary-food-review {
-            width: fit-content;
-            max-width: 100%;
-            justify-self: start;
-            white-space: normal;
-            text-align: center;
-        }
-
-        .recipe-url-summary-menu-status .menu-recipe-status-badge,
-        .recipe-url-summary-menu-status .menu-recipe-generate-inline {
-            justify-content: center;
-            overflow-wrap: anywhere;
         }
 
         .recipe-url-summary-main {
@@ -9473,7 +9458,6 @@ body {
             word-break: normal;
         }
 
-        .recipe-url-summary-food-review-row,
         .recipe-url-summary-servings,
         .recipe-url-summary-serving-basis,
         .recipe-url-summary-calories,
@@ -9485,12 +9469,6 @@ body {
             color: #aaa;
             font-size: 14px;
             font-weight: 400;
-        }
-
-        .recipe-url-summary-food-review-value {
-            display: inline-flex;
-            align-items: center;
-            min-height: 22px;
         }
 
         .recipe-url-summary-meta-value {
@@ -9542,14 +9520,6 @@ body {
             justify-self: start;
             margin: 0;
             cursor: pointer;
-        }
-
-        #cookbooksCard .cookbook-recipe-card .recipe-url-summary-food-review-collapsed {
-            display: none;
-        }
-
-        #cookbooksCard .cookbook-recipe-card.recipe-url-summary-collapsed .recipe-url-summary-food-review-collapsed {
-            display: inline-flex;
         }
 
         .recipe-url-summary-actions {
@@ -18884,8 +18854,7 @@ body {
     white-space: nowrap;
 }
 
-#cookbooksCard .cookbook-recipe-card .recipe-rating-display,
-#cookbooksCard .cookbook-recipe-card .recipe-url-summary-title-line > .recipe-url-summary-food-review {
+#cookbooksCard .cookbook-recipe-card .recipe-rating-display {
     grid-column: 2;
     justify-self: start;
     margin-left: 0;
@@ -19039,8 +19008,7 @@ body {
     #cookbooksCard .cookbook-recipe-card .recipe-url-summary-number,
     #cookbooksCard .cookbook-recipe-card .recipe-url-summary-name,
     #cookbooksCard .cookbook-recipe-menu-price-badge,
-    #cookbooksCard .cookbook-recipe-card .recipe-rating-display,
-    #cookbooksCard .cookbook-recipe-card .recipe-url-summary-title-line > .recipe-url-summary-food-review {
+    #cookbooksCard .cookbook-recipe-card .recipe-rating-display {
         grid-column: 1;
     }
 
@@ -21831,9 +21799,19 @@ img[data-deferred-src] {
         }
 
         .menu-recipe-status-generated {
-            border: 1px solid #2f855a;
-            background: #e8f5ee;
-            color: #22543d;
+            border: 1px solid rgba(45, 212, 191, 0.42);
+            background: rgba(20, 184, 166, 0.1);
+            color: #bfffee;
+            white-space: nowrap;
+        }
+
+        .recipe-url-summary-status-row .menu-recipe-status-generated {
+            min-height: 20px;
+            padding: 1px 7px;
+            border-radius: 999px;
+            font-size: 0.68rem;
+            font-weight: 800;
+            line-height: 1.1;
         }
 
         .menu-recipe-status-failed {

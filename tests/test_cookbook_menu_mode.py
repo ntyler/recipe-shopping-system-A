@@ -288,10 +288,6 @@ def test_cookbook_recipe_rows_match_current_recipe_summary_layout():
         '<span class="recipe-url-summary-title-line">',
         recipe_card_start,
     )
-    title_food_review_index = template.index(
-        "recipe-url-summary-food-review-collapsed",
-        recipe_card_start,
-    )
     summary_body_index = template.index(
         '<div class="recipe-url-summary-body">',
         title_line_start,
@@ -300,36 +296,27 @@ def test_cookbook_recipe_rows_match_current_recipe_summary_layout():
         '<div class="recipe-url-summary-meta">',
         summary_body_index,
     )
-    amount_index = template.index(
-        '<div class="recipe-url-summary-amount">',
+    servings_index = template.index(
+        '<div class="recipe-url-summary-servings">',
         meta_index,
     )
     title_block = template[title_line_start:summary_body_index]
-    menu_status_block = template[meta_index:amount_index]
-    food_review_row_index = menu_status_block.index('<div class="recipe-url-summary-food-review-row">')
-    servings_index = menu_status_block.index('<div class="recipe-url-summary-servings">')
-    menu_controls_block = menu_status_block[:food_review_row_index]
-    inferred_branch_start = menu_controls_block.index('{% elif recipe.source_type == "menu_item_inferred" or recipe.ai_inferred %}')
-    stub_status_block = menu_controls_block[:inferred_branch_start]
-    inferred_status_block = menu_controls_block[inferred_branch_start:]
+    meta_block = template[meta_index:servings_index]
+    status_row_index = title_block.index("recipe-url-summary-status-row cookbook-recipe-status-row")
 
-    assert "menu-recipe-status-stub" not in title_block
-    assert title_line_start < title_food_review_index < summary_body_index
-    assert "recipe-url-summary-food-review-collapsed" in title_block
-    assert stub_status_block.index("menu-recipe-status-stub") < stub_status_block.index("Generate Fast Recipe")
-    assert stub_status_block.index("Generate Fast Recipe") < stub_status_block.index("Generate Fast Section")
-    assert stub_status_block.index("Generate Fast Section") < stub_status_block.index("Generate Full Section")
-    assert stub_status_block.index("Generate Full Section") < stub_status_block.index("View Mega Menu JSON")
-    assert "recipe-url-summary-food-review" not in stub_status_block
-    assert inferred_status_block.index("menu-recipe-status-generated") < inferred_status_block.index("View Mega Menu JSON")
-    assert "recipe-url-summary-food-review" not in inferred_status_block
-    assert food_review_row_index < servings_index
-    assert "recipe-url-summary-food-review-value recipe-url-summary-meta-value" in menu_status_block
-    assert 'data-menu-snapshot-id="{{ recipe.parent_menu_snapshot_id or recipe.menu_mega_snapshot_id }}"' in menu_status_block
-    assert ".recipe-url-summary-menu-status" in css
-    assert ".recipe-url-summary-food-review-row" in css
-    assert "#cookbooksCard .cookbook-recipe-card .recipe-url-summary-food-review-collapsed" in css
-    assert "#cookbooksCard .cookbook-recipe-card.recipe-url-summary-collapsed .recipe-url-summary-food-review-collapsed" in css
+    assert title_block.index("menu-recipe-status-stub") < title_block.index("recipe-url-summary-food-review")
+    assert title_block.index("menu-recipe-status-generated") < title_block.index("recipe-url-summary-food-review")
+    assert title_block.index("recipe-url-summary-food-review") < title_block.index("Generate Fast Recipe")
+    assert title_block.index("Generate Fast Recipe") < title_block.index("Generate Fast Section")
+    assert title_block.index("Generate Fast Section") < title_block.index("Generate Full Section")
+    assert title_block.index("Generate Full Section") < title_block.index("View Mega Menu JSON")
+    assert status_row_index < title_block.index("View Mega Menu JSON")
+    assert "recipe-url-summary-food-review-collapsed" not in title_block
+    assert "recipe-url-summary-food-review-row" not in template
+    assert "cookbook-recipe-menu-status" not in template
+    assert "menu-recipe-status-badge" not in meta_block
+    assert ".recipe-url-summary-status-row" in css
+    assert "#cookbooksCard .cookbook-recipe-card .recipe-url-summary-food-review-collapsed" not in css
     assert "recipe-url-summary-row" in template
     assert 'class="recipe-url-summary-header"' in template
     assert 'class="recipe-batch-select cookbook-restore-checkbox cookbook-recipe-restore-checkbox"' in template
@@ -431,15 +418,15 @@ def test_cookbook_recipe_view_renders_menu_stub_actions_above_amount():
     amount_index = card_html.index('<div class="recipe-url-summary-amount">')
     cookbook_index = card_html.index('<div class="recipe-url-summary-cookbook">')
     title_block = card_html[title_line_start:summary_body_index]
-    menu_status_block = card_html[summary_body_index:amount_index]
+    meta_before_amount_block = card_html[summary_body_index:amount_index]
 
     assert "Spring Roll" in title_block
-    assert "menu-recipe-status-stub" not in title_block
-    assert "Generate Fast Recipe" not in title_block
-    assert menu_status_block.index("menu-recipe-status-stub") < menu_status_block.index("Generate Fast Recipe")
-    assert menu_status_block.index("Generate Fast Recipe") < menu_status_block.index("Generate Fast Section")
-    assert menu_status_block.index("Generate Fast Section") < menu_status_block.index("Generate Full Section")
-    assert menu_status_block.index("Generate Full Section") < menu_status_block.index("View Mega Menu JSON")
+    assert "recipe-url-summary-status-row cookbook-recipe-status-row" in title_block
+    assert title_block.index("menu-recipe-status-stub") < title_block.index("Generate Fast Recipe")
+    assert title_block.index("Generate Fast Recipe") < title_block.index("Generate Fast Section")
+    assert title_block.index("Generate Fast Section") < title_block.index("Generate Full Section")
+    assert title_block.index("Generate Full Section") < title_block.index("View Mega Menu JSON")
+    assert "menu-recipe-status-stub" not in meta_before_amount_block
     assert summary_body_index < amount_index < cookbook_index
     assert 'data-cookbook-menu-section-id="section-003"' in card_html
     assert "Vel Asain Cuisine" in card_html[cookbook_index:]
