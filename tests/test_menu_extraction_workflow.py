@@ -2,6 +2,8 @@ import json
 import time
 from pathlib import Path
 
+import pytest
+
 from PushShoppingList.routes import recipe_routes
 from PushShoppingList.services import menu_mega_json_service
 from PushShoppingList.services import openai_model_service
@@ -1114,6 +1116,139 @@ def test_menu_batch_inference_retries_with_backoff_before_success(monkeypatch):
     assert result["ok"] is True
     assert calls == [{"size": 1, "user_id": "owner"}, {"size": 1, "user_id": "owner"}]
     assert sleeps == [1.5]
+
+
+def test_menu_batch_inference_cancel_during_retry_prevents_retry(monkeypatch):
+    monkeypatch.setenv("MENU_ITEM_BATCH_INFERENCE_RETRY_ATTEMPTS", "2")
+    entries = [
+        {
+            "recipe_url": "https://example.com/menu?menu_item=pad-thai",
+            "menu_item": {
+                "menu_item_id": "item-pad-thai",
+                "item_name": "Pad Thai",
+                "menu_section": "Noodles",
+            },
+        }
+    ]
+    calls = []
+
+    class Cancelled(Exception):
+        pass
+
+    def fake_once(batch, user_id=None):
+        calls.append({"size": len(batch), "user_id": user_id})
+        return {
+            "ok": False,
+            "items": {},
+            "failures": {},
+            "error_code": "OPENAI_TIMEOUT",
+            "error_message": "Vision AI request timed out.",
+            "technical_message": "Request timed out.",
+            "exception_type": "APITimeoutError",
+            "model": "gpt-4o-mini",
+            "model_source": "test",
+        }
+
+    def cancellation_check():
+        if calls:
+            raise Cancelled()
+
+    monkeypatch.setattr(recipe_extract_service, "_infer_menu_item_recipe_batch_once", fake_once)
+
+    with pytest.raises(Cancelled):
+        recipe_extract_service.infer_menu_item_recipe_batch(
+            entries,
+            user_id="owner",
+            cancellation_check=cancellation_check,
+        )
+
+    assert calls == [{"size": 1, "user_id": "owner"}]
+
+
+def test_menu_batch_inference_cancel_before_split_prevents_split(monkeypatch, capsys):
+    monkeypatch.setenv("MENU_ITEM_BATCH_INFERENCE_RETRY_ATTEMPTS", "1")
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "menu_failed_item_model_resolution",
+        lambda: recipe_extract_service.OpenAIModelResolution("", "disabled", "menu_failed_item"),
+    )
+    entries = [
+        {
+            "recipe_url": f"https://example.com/menu?menu_item={index}",
+            "menu_item": {
+                "menu_item_id": f"item-{index}",
+                "item_name": f"Item {index}",
+                "menu_section": "Entrees",
+            },
+        }
+        for index in range(4)
+    ]
+    calls = []
+    checks = {"count": 0}
+
+    class Cancelled(Exception):
+        pass
+
+    def fake_once(batch, user_id=None):
+        calls.append(len(batch))
+        return {
+            "ok": False,
+            "items": {},
+            "failures": {},
+            "error_code": "OPENAI_TIMEOUT",
+            "error_message": "Vision AI request timed out.",
+            "technical_message": "Request timed out.",
+            "exception_type": "APITimeoutError",
+            "model": "gpt-4o-mini",
+            "model_source": "test",
+        }
+
+    def cancellation_check():
+        checks["count"] += 1
+        if checks["count"] >= 5:
+            raise Cancelled()
+
+    monkeypatch.setattr(recipe_extract_service, "_infer_menu_item_recipe_batch_once", fake_once)
+
+    with pytest.raises(Cancelled):
+        recipe_extract_service.infer_menu_item_recipe_batch(
+            entries,
+            user_id="owner",
+            allow_fallback=False,
+            cancellation_check=cancellation_check,
+        )
+    output = capsys.readouterr().out
+
+    assert calls == [4]
+    assert "menu-item-recipe-batch-inference_batch_split" not in output
+
+
+def test_menu_batch_save_cancellation_stops_remaining_saves(monkeypatch, tmp_path):
+    saved_urls = []
+
+    class Cancelled(Exception):
+        pass
+
+    def fake_save(recipe_url, raw):
+        saved_urls.append(recipe_url)
+        return tmp_path / f"{len(saved_urls)}.json"
+
+    def cancellation_check():
+        if saved_urls:
+            raise Cancelled()
+
+    monkeypatch.setattr(recipe_extract_service, "save_extracted_recipe_json", fake_save)
+
+    with pytest.raises(Cancelled):
+        recipe_extract_service.save_menu_batch_inference_results(
+            [
+                {"recipe_url": "https://example.com/a", "recipe_title": "A", "raw": {"recipe_title": "A"}},
+                {"recipe_url": "https://example.com/b", "recipe_title": "B", "raw": {"recipe_title": "B"}},
+            ],
+            cancellation_check=cancellation_check,
+        )
+
+    assert saved_urls == ["https://example.com/a"]
 
 
 def test_menu_batch_inference_logs_final_failed_item_names(monkeypatch, capsys):

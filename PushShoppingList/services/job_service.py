@@ -15,9 +15,10 @@ from pathlib import Path
 from PushShoppingList.services.storage_service import PACKAGE_DIR
 
 
-JOB_STATUSES = {"queued", "running", "completed", "failed", "cancelled"}
-ACTIVE_JOB_STATUSES = {"queued", "running"}
+JOB_STATUSES = {"queued", "running", "cancel_requested", "completed", "failed", "cancelled"}
+ACTIVE_JOB_STATUSES = {"queued", "running", "cancel_requested"}
 TERMINAL_JOB_STATUSES = {"completed", "failed", "cancelled"}
+CANCEL_REQUESTED_JOB_STATUSES = {"cancel_requested", "cancelled"}
 DEFAULT_JOB_RETENTION_HOURS = 168
 DEFAULT_GUEST_JOB_RETENTION_HOURS = 24
 DEFAULT_JOB_TIMEOUT_MINUTES = 180
@@ -875,7 +876,7 @@ def running_limit_blockers(connection, row, limit_key, exclude_job_id=""):
         SELECT *
           FROM jobs
          WHERE {owner_clause}
-           AND status = 'running'
+           AND status IN ('running', 'cancel_requested')
          ORDER BY started_at ASC, updated_at ASC, created_at ASC
         """,
         owner_args,
@@ -922,7 +923,7 @@ def cleanup_stale_limit_blockers(connection, blockers, reference_time=None):
             continue
 
         status = normalize_status(blocker["status"])
-        if status == "running":
+        if status in {"running", "cancel_requested"}:
             connection.execute(
                 """
                 UPDATE jobs
@@ -933,7 +934,7 @@ def cleanup_stale_limit_blockers(connection, blockers, reference_time=None):
                        finished_at = COALESCE(finished_at, ?),
                        updated_at = ?
                  WHERE id = ?
-                   AND status = 'running'
+                   AND status IN ('running', 'cancel_requested')
                 """,
                 (now, now, now, blocker["id"]),
             )
@@ -998,7 +999,7 @@ def try_start_job(
         if not row:
             return {"started": False, "ok": False, "error": "Job not found."}
 
-        if row["status"] == "cancelled":
+        if row["status"] in CANCEL_REQUESTED_JOB_STATUSES:
             return {"started": False, "ok": True, "cancelled": True, "job": row_to_job(row)}
         if row["status"] in TERMINAL_JOB_STATUSES:
             return {"started": False, "ok": True, "terminal": True, "job": row_to_job(row)}
@@ -1206,6 +1207,31 @@ def fail_job(job_id, error_message, result_payload=None, current_step="Failed"):
 
 
 def cancel_job(job_id, message="Cancelled"):
+    job = get_job(job_id)
+    if not job:
+        return None
+
+    status = normalize_status(job.get("status"))
+    if status == "cancel_requested":
+        finished_at = now_iso()
+        return update_job(
+            job_id,
+            status="cancelled",
+            current_step=message or "Cancelled",
+            completed_at=finished_at,
+            finished_at=finished_at,
+        )
+
+    if status == "running":
+        return update_job(
+            job_id,
+            status="cancel_requested",
+            current_step=message if message and message != "Cancelled" else "Cancel requested...",
+        )
+
+    if status in TERMINAL_JOB_STATUSES:
+        return job
+
     finished_at = now_iso()
     return update_job(
         job_id,
@@ -1218,7 +1244,7 @@ def cancel_job(job_id, message="Cancelled"):
 
 def job_cancelled(job_id):
     job = get_job(job_id)
-    return bool(job and job.get("status") == "cancelled")
+    return bool(job and normalize_status(job.get("status")) in CANCEL_REQUESTED_JOB_STATUSES)
 
 
 def cleanup_expired_jobs():
@@ -1271,13 +1297,22 @@ def mark_stuck_jobs():
         connection.execute(
             """
             UPDATE jobs
-               SET status = 'failed',
-                   current_step = 'Timed out',
-                   error_message = 'This job stopped updating and timed out.',
+               SET status = CASE
+                       WHEN status = 'cancel_requested' THEN 'cancelled'
+                       ELSE 'failed'
+                   END,
+                   current_step = CASE
+                       WHEN status = 'cancel_requested' THEN 'Cancelled'
+                       ELSE 'Timed out'
+                   END,
+                   error_message = CASE
+                       WHEN status = 'cancel_requested' THEN ''
+                       ELSE 'This job stopped updating and timed out.'
+                   END,
                    completed_at = ?,
                    finished_at = ?,
                    updated_at = ?
-             WHERE status IN ('queued', 'running')
+             WHERE status IN ('queued', 'running', 'cancel_requested')
                AND updated_at <= ?
             """,
             (now_iso(), now_iso(), now_iso(), cutoff_iso),

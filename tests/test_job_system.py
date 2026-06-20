@@ -1613,6 +1613,147 @@ def test_cancelled_job_cannot_be_revived_by_worker_updates(monkeypatch, tmp_path
     assert job_service.get_job(job["id"])["current_step"] == "Cancelled"
 
 
+def test_running_job_cancel_is_request_until_worker_confirms(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    job = job_service.create_job(
+        "menu-generate-recipes",
+        input_payload={"recipe_urls": ["https://example.com/menu?menu_item=1"]},
+        user_id="owner",
+        total_items=1,
+    )
+    job_service.update_job(job["id"], status="running", started_at=job_service.now_iso())
+
+    requested = job_service.cancel_job(job["id"])
+    progress = job_service.update_job_progress(
+        job["id"],
+        current_step="This should not overwrite cancel requested.",
+        progress_percent=75,
+    )
+    confirmed = job_service.cancel_job(job["id"], "Cancelled")
+
+    assert requested["status"] == "cancel_requested"
+    assert requested["current_step"] == "Cancel requested..."
+    assert progress["status"] == "cancel_requested"
+    assert progress["current_step"] == "Cancel requested..."
+    assert confirmed["status"] == "cancelled"
+    assert confirmed["current_step"] == "Cancelled"
+
+
+def test_cancelled_menu_generate_job_does_not_start_openai(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    recipe_url = "https://example.com/menu?menu_item=pad-thai"
+    job = job_service.create_job(
+        "menu-generate-recipes",
+        input_payload={"recipe_urls": [recipe_url]},
+        user_id="owner",
+        total_items=1,
+    )
+    job_service.cancel_job(job["id"])
+
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "infer_menu_item_recipe_batch",
+        lambda *args, **kwargs: pytest.fail("cancelled jobs should not call OpenAI"),
+    )
+
+    finished = job_tasks.run_job_task(job["id"])
+
+    assert finished["status"] == "cancelled"
+
+
+def test_menu_generate_cancel_before_deferred_followup_does_not_enqueue(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    recipe_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=pad-thai"
+    stub = {
+        "source_url": recipe_url,
+        "recipe_title": "Pad Thai",
+        "display_name": "Pad Thai",
+        "needs_ai_recipe": True,
+        "recipe_status": "stub",
+        "menu_item_id": "pad-thai",
+        "cookbook_id": "cb1",
+        "cookbook_name": "Dinner",
+    }
+    enqueued = []
+
+    monkeypatch.setattr(recipe_routes, "load_editable_recipe", lambda url: {"recipe": stub})
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "menu_batch_item_from_stub",
+        lambda url, loaded_stub, index: {
+            "menu_item_id": loaded_stub["menu_item_id"],
+            "item_name": loaded_stub["recipe_title"],
+            "menu_section": "Entrees",
+            "recipe_url": url,
+        },
+    )
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "infer_menu_item_recipe_batch",
+        lambda batch, **kwargs: {
+            "ok": True,
+            "items": {
+                "pad-thai": {
+                    "predicted_ingredients": [{"ingredient": "rice noodles"}],
+                    "predicted_instructions": [{"instruction": "Stir fry."}],
+                    "predicted_equipment": [{"name": "Wok"}],
+                    "servings": 2,
+                    "prep_time": "10 min",
+                    "cook_time": "10 min",
+                    "total_time": "20 min",
+                    "difficulty_level": "easy",
+                    "confidence": 0.8,
+                }
+            },
+            "failures": {},
+            "model": "gpt-test",
+            "model_source": "test",
+        },
+    )
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "save_menu_batch_inference_results",
+        lambda results, cancellation_check=None: [
+            {
+                "ok": True,
+                "recipe_url": result.get("recipe_url"),
+                "recipe_name": result.get("recipe_title"),
+                "json_path": "skipped-in-test",
+                "result": result,
+            }
+            for result in results
+        ],
+    )
+    monkeypatch.setattr(recipe_routes, "add_items", lambda ingredients: None)
+    monkeypatch.setattr("PushShoppingList.services.recipe_ingredient_service.save_ingredients_for_recipes", lambda records: None)
+    monkeypatch.setattr("PushShoppingList.services.recipe_url_service.save_recipe_url_names", lambda records: None)
+    monkeypatch.setattr("PushShoppingList.services.recipe_url_service.add_recipe_urls", lambda urls: None)
+    monkeypatch.setattr("PushShoppingList.scripts.sort_ingredients.main", lambda: None)
+    monkeypatch.setattr(recipe_routes, "record_recipe_import_activity", lambda *args, **kwargs: None)
+    monkeypatch.setattr(job_tasks, "enqueue_followup_job", lambda *args, **kwargs: enqueued.append((args, kwargs)))
+
+    def cancel_before_defer(payload, total):
+        job_service.cancel_job(active_job["id"])
+        return True
+
+    monkeypatch.setattr(job_tasks, "menu_deferred_enrichment_enabled", cancel_before_defer)
+    active_job = job_service.create_job(
+        "menu-generate-recipes",
+        input_payload={
+            "recipe_urls": [recipe_url],
+            "menu_enrichment_mode": "full",
+            "defer_enrichment": True,
+        },
+        user_id="owner",
+        total_items=1,
+    )
+
+    finished = job_tasks.run_job_task(active_job["id"])
+
+    assert finished["status"] == "cancelled"
+    assert enqueued == []
+
+
 def test_menu_item_inference_bubbles_job_cancellation(monkeypatch, tmp_path):
     class JobCancelled(Exception):
         pass

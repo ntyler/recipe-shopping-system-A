@@ -309,7 +309,13 @@ function jobActivityDateClearButton() {
 }
 
 function jobIsActive(job) {
-    return job && (job.status === "queued" || job.status === "running");
+    const status = String((job && job.status) || "").trim().toLowerCase();
+    return status === "queued" || status === "running" || status === "cancel_requested";
+}
+
+function jobCanCancel(job) {
+    const status = String((job && job.status) || "").trim().toLowerCase();
+    return status === "queued" || status === "running";
 }
 
 function jobIsFinished(job) {
@@ -335,6 +341,9 @@ function jobTypeLabel(jobType) {
 
 function jobStatusLabel(status) {
     const normalized = String(status || "").trim().toLowerCase();
+    if (normalized === "cancel_requested") {
+        return "Cancel requested";
+    }
     return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : "Unknown";
 }
 
@@ -1515,6 +1524,7 @@ function renderJobActivityPanel(jobs) {
     const sortedJobs = jobActivitySort(jobs);
     const visibleJobs = filteredJobActivityJobs(sortedJobs);
     const activeCount = sortedJobs.filter(jobIsActive).length;
+    const cancellableCount = sortedJobs.filter(jobCanCancel).length;
     const finishedCount = sortedJobs.filter(jobIsFinished).length;
     const visibleJobIds = new Set(sortedJobs.map(job => String(job.id || job.job_id || "").trim()).filter(Boolean));
     lastJobActivityJobs = sortedJobs;
@@ -1531,9 +1541,9 @@ function renderJobActivityPanel(jobs) {
             : "No finished job activity to clear";
     }
     if (cancelAllButton) {
-        cancelAllButton.disabled = activeCount === 0;
-        cancelAllButton.title = activeCount
-            ? `Cancel ${activeCount} active job${activeCount === 1 ? "" : "s"}`
+        cancelAllButton.disabled = cancellableCount === 0;
+        cancelAllButton.title = cancellableCount
+            ? `Cancel ${cancellableCount} active job${cancellableCount === 1 ? "" : "s"}`
             : "No active jobs to cancel";
     }
     if (activeFilterButton) {
@@ -1569,7 +1579,9 @@ function renderJobActivityPanel(jobs) {
         const filterParts = jobActivityFilterSummaryParts();
         const filterText = filterParts.length ? ` (${filterParts.join(", ")})` : "";
         if (activeCount) {
-            summary.textContent = `${visibleJobs.length} shown${filterText}. ${activeCount} active job${activeCount === 1 ? "" : "s"} running in recent activity.`;
+            const stoppingCount = visibleJobs.filter(job => String(job.status || "").trim().toLowerCase() === "cancel_requested").length;
+            const stoppingText = stoppingCount ? ` ${stoppingCount} stopping.` : "";
+            summary.textContent = `${visibleJobs.length} shown${filterText}. ${activeCount} active job${activeCount === 1 ? "" : "s"} in recent activity.${stoppingText}`;
         } else {
             summary.textContent = `${visibleJobs.length} shown${filterText}. ${completedCount} completed, ${failedCount} failed in recent activity.`;
         }
@@ -1709,7 +1721,7 @@ async function startMenuEnrichmentFromJobActivity(jobId, button, enrichmentMode 
 }
 
 async function cancelAllJobActivityJobs(button) {
-    const activeJobs = lastJobActivityJobs.filter(job => jobIsActive(job) && jobActivityJobId(job));
+    const activeJobs = lastJobActivityJobs.filter(job => jobCanCancel(job) && jobActivityJobId(job));
     const summary = jobActivitySummaryElement();
     if (!activeJobs.length) {
         if (summary) {
@@ -1762,14 +1774,14 @@ async function cancelAllJobActivityJobs(button) {
     if (updatedSummary) {
         if (failedResults.length) {
             const names = failedResults.map(result => result.name || result.id).filter(Boolean).slice(0, 3).join(", ");
-            updatedSummary.textContent = `Cancelled ${results.length - failedResults.length} active job${results.length - failedResults.length === 1 ? "" : "s"}. ${failedResults.length} failed${names ? `: ${names}` : ""}.`;
+            updatedSummary.textContent = `Requested cancellation for ${results.length - failedResults.length} active job${results.length - failedResults.length === 1 ? "" : "s"}. ${failedResults.length} failed${names ? `: ${names}` : ""}.`;
         } else {
-            updatedSummary.textContent = `Cancelled ${results.length} active job${results.length === 1 ? "" : "s"}.`;
+            updatedSummary.textContent = `Requested cancellation for ${results.length} active job${results.length === 1 ? "" : "s"}.`;
         }
     }
     if (button) {
         button.textContent = originalText || "Cancel All Active";
-        button.disabled = lastJobActivityJobs.filter(jobIsActive).length === 0;
+        button.disabled = lastJobActivityJobs.filter(jobCanCancel).length === 0;
     }
     scheduleJobActivityPolling(500);
     return false;
@@ -1831,7 +1843,7 @@ function renderJobActivityRow(job, index = 0) {
     const retryButton = job.status === "failed"
         ? `<button type="button" class="job-activity-row-action" onclick="return retryJobActivityJob('${escapeAttribute(job.id || job.job_id || "")}')">Retry</button>`
         : "";
-    const cancelButton = active
+    const cancelButton = jobCanCancel(job)
         ? `<button type="button" class="job-activity-row-action danger" onclick="return cancelJobActivityJob('${escapeAttribute(job.id || job.job_id || "")}')">Cancel</button>`
         : "";
     const linkHtml = links.length
@@ -28061,7 +28073,8 @@ async function startRecipeExtraction(event) {
 
 function importJobToExtractionProgress(job, urls, isMenuExtract, options = {}) {
     const jobStatus = String((job && job.status) || "queued").toLowerCase();
-    const active = jobStatus === "queued" || jobStatus === "running";
+    const cancelRequested = jobStatus === "cancel_requested";
+    const active = jobStatus === "queued" || jobStatus === "running" || cancelRequested;
     const failed = jobStatus === "failed";
     const cancelled = jobStatus === "cancelled";
     const completed = jobStatus === "completed";
@@ -28097,6 +28110,9 @@ function importJobToExtractionProgress(job, urls, isMenuExtract, options = {}) {
         } else if (cancelled) {
             state = "cancelled";
             message = "Cancelled";
+        } else if (cancelRequested) {
+            state = "running";
+            message = "Cancel requested...";
         } else if (!isMenuExtract && index < completedItems) {
             state = "done";
             message = "Completed";
@@ -28158,7 +28174,7 @@ function importJobToExtractionProgress(job, urls, isMenuExtract, options = {}) {
         job_id: (job && (job.id || job.job_id)) || lastRenderedExtractJobId || "",
         progress_source: "job",
         defer_refresh: Boolean(options.deferRefresh),
-        status: completed ? "complete" : failed ? "failed" : cancelled ? "cancelled" : "running",
+        status: completed ? "complete" : failed ? "failed" : cancelled ? "cancelled" : cancelRequested ? "cancel_requested" : "running",
         extraction_mode: isMenuExtract ? "menu_extract" : "recipe",
         total: sourceRecords.length,
         percent: Math.max(0, Math.min(100, Number((job && job.progress_percent) || 0))),
@@ -29682,6 +29698,10 @@ function progressStatusText(progress) {
         return isMenuExtract ? "Menu import cancelled." : "Extraction cancelled.";
     }
 
+    if (progress.status === "cancel_requested") {
+        return isMenuExtract ? "Menu import cancellation requested..." : "Extraction cancellation requested...";
+    }
+
     const total = progress.total || 0;
 
     if (!total) {
@@ -29706,8 +29726,14 @@ function updateExtractionActionButtons(progress) {
     const redoBtn = document.getElementById("redoMissingExtractBtn");
 
     if (cancelBtn) {
+        const cancelRequested = progress && progress.status === "cancel_requested";
         cancelBtn.style.display = progress && progress.active ? "inline-flex" : "none";
-        cancelBtn.disabled = !progress || !progress.active;
+        cancelBtn.disabled = !progress || !progress.active || cancelRequested;
+        if (cancelRequested) {
+            cancelBtn.textContent = "Cancel requested...";
+        } else {
+            cancelBtn.textContent = "Cancel";
+        }
     }
 
     if (redoBtn) {

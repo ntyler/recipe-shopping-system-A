@@ -10435,7 +10435,12 @@ def menu_item_batch_target_chars(model_name=None):
 
 
 def menu_item_batch_openai_timeout_seconds():
-    return max(5, min(120, _safe_int(os.getenv("MENU_ITEM_BATCH_OPENAI_TIMEOUT_SECONDS", "45"), 45)))
+    configured = (
+        os.getenv("OPENAI_MENU_ENRICHMENT_TIMEOUT_SECONDS")
+        or os.getenv("MENU_ITEM_BATCH_OPENAI_TIMEOUT_SECONDS")
+        or "15"
+    )
+    return max(5, min(120, _safe_int(configured, 15)))
 
 
 def menu_cleanup_openai_timeout_seconds():
@@ -11207,7 +11212,31 @@ def _coerce_batch_inference_payload(payload):
     return {}
 
 
-def _infer_menu_item_recipe_batch_once(entries, user_id=None, model_resolution=None):
+def _run_menu_batch_cancellation_check(cancellation_check):
+    if cancellation_check:
+        cancellation_check()
+
+
+def _sleep_with_menu_batch_cancellation(delay, cancellation_check=None):
+    delay = max(0, float(delay or 0))
+    if delay <= 0:
+        _run_menu_batch_cancellation_check(cancellation_check)
+        return
+
+    if not cancellation_check:
+        time.sleep(delay)
+        return
+
+    deadline = time.monotonic() + delay
+    while True:
+        _run_menu_batch_cancellation_check(cancellation_check)
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return
+        time.sleep(min(0.2, remaining))
+
+
+def _infer_menu_item_recipe_batch_once(entries, user_id=None, model_resolution=None, cancellation_check=None):
     model_resolution = model_resolution or menu_item_recipe_model_resolution()
     action_name = "menu-item-recipe-batch-inference"
     context = current_job_context()
@@ -11216,6 +11245,7 @@ def _infer_menu_item_recipe_batch_once(entries, user_id=None, model_resolution=N
     batch_count = context.get("batch_count")
     batch_size = context.get("batch_size") or len(entries or [])
     try:
+        _run_menu_batch_cancellation_check(cancellation_check)
         request_started = time.perf_counter()
         print(
             "[Menu Enrichment] "
@@ -11229,6 +11259,7 @@ def _infer_menu_item_recipe_batch_once(entries, user_id=None, model_resolution=N
             user_id=user_id,
             model_resolution=model_resolution,
         )
+        _run_menu_batch_cancellation_check(cancellation_check)
         request_elapsed = time.perf_counter() - request_started
         print(
             "[Menu Enrichment] "
@@ -11238,6 +11269,7 @@ def _infer_menu_item_recipe_batch_once(entries, user_id=None, model_resolution=N
         )
         parse_started = time.perf_counter()
         payload = json.loads(clean_json_response(response_text))
+        _run_menu_batch_cancellation_check(cancellation_check)
         items = _coerce_batch_inference_payload(payload)
         if not items:
             raise ValueError("Menu batch inference did not return item results.")
@@ -11255,6 +11287,7 @@ def _infer_menu_item_recipe_batch_once(entries, user_id=None, model_resolution=N
             "raw_response": response_text,
         }
     except Exception as exc:
+        _run_menu_batch_cancellation_check(cancellation_check)
         error_code, error_message = classify_vision_ai_exception(exc)
         openai_error_code, openai_error_param = get_openai_error_code_and_param(exc)
         print(
@@ -11385,29 +11418,44 @@ def menu_item_batch_retry_delay(attempt_index, base_delay, max_delay):
     return min(max(0, delay), max(0, float(max_delay or 0)))
 
 
-def call_infer_menu_item_recipe_batch_once(entries, user_id=None, model_resolution=None):
+def call_infer_menu_item_recipe_batch_once(entries, user_id=None, model_resolution=None, cancellation_check=None):
     try:
         return _infer_menu_item_recipe_batch_once(
             entries,
             user_id=user_id,
             model_resolution=model_resolution,
+            cancellation_check=cancellation_check,
         )
     except TypeError as exc:
+        if "cancellation_check" in str(exc):
+            try:
+                return _infer_menu_item_recipe_batch_once(
+                    entries,
+                    user_id=user_id,
+                    model_resolution=model_resolution,
+                )
+            except TypeError as fallback_exc:
+                if "model_resolution" not in str(fallback_exc):
+                    raise
+                return _infer_menu_item_recipe_batch_once(entries, user_id=user_id)
         if "model_resolution" not in str(exc):
             raise
         # Some tests monkeypatch the older 2-arg shape.
         return _infer_menu_item_recipe_batch_once(entries, user_id=user_id)
 
 
-def infer_menu_item_recipe_batch_once_with_retries(entries, user_id=None, model_resolution=None):
+def infer_menu_item_recipe_batch_once_with_retries(entries, user_id=None, model_resolution=None, cancellation_check=None):
     attempts, base_delay, max_delay = menu_item_batch_retry_config()
     last_result = {}
     for attempt_index in range(1, attempts + 1):
+        _run_menu_batch_cancellation_check(cancellation_check)
         result = call_infer_menu_item_recipe_batch_once(
             entries,
             user_id=user_id,
             model_resolution=model_resolution,
+            cancellation_check=cancellation_check,
         )
+        _run_menu_batch_cancellation_check(cancellation_check)
         last_result = result
         if result.get("ok") or attempt_index >= attempts or not menu_batch_result_can_retry(result):
             return result
@@ -11426,7 +11474,7 @@ def infer_menu_item_recipe_batch_once_with_retries(entries, user_id=None, model_
             f"item_names={json.dumps(failed_names[:12], ensure_ascii=True)}"
         )
         if delay > 0:
-            time.sleep(delay)
+            _sleep_with_menu_batch_cancellation(delay, cancellation_check)
 
     return last_result
 
@@ -11552,7 +11600,8 @@ def chunk_menu_entries(entries, chunk_size):
         yield entries[index:index + chunk_size]
 
 
-def retry_menu_batch_failures_with_fallback(entries, result, user_id=None, primary_model_resolution=None):
+def retry_menu_batch_failures_with_fallback(entries, result, user_id=None, primary_model_resolution=None, cancellation_check=None):
+    _run_menu_batch_cancellation_check(cancellation_check)
     result = result if isinstance(result, dict) else {}
     failures = result.get("failures") if isinstance(result.get("failures"), dict) else {}
     failed_entries = menu_entries_for_failures(entries, failures)
@@ -11596,6 +11645,7 @@ def retry_menu_batch_failures_with_fallback(entries, result, user_id=None, prima
     fallback_results = []
     batch_size = menu_failed_item_fallback_batch_size()
     for fallback_index, fallback_entries in enumerate(chunk_menu_entries(failed_entries, batch_size), start=1):
+        _run_menu_batch_cancellation_check(cancellation_check)
         print(
             "[OpenAI] action=menu-item-recipe-failed-item-fallback_batch_start "
             f"batch_index={fallback_index} batch_size={len(fallback_entries)} "
@@ -11608,8 +11658,10 @@ def retry_menu_batch_failures_with_fallback(entries, result, user_id=None, prima
                 _depth=1,
                 model_resolution=fallback_resolution,
                 allow_fallback=False,
+                cancellation_check=cancellation_check,
             )
         )
+        _run_menu_batch_cancellation_check(cancellation_check)
 
     fallback_combined = combine_menu_batch_results(fallback_results)
     merged = combine_menu_batch_results([result, fallback_combined])
@@ -11626,9 +11678,10 @@ def retry_menu_batch_failures_with_fallback(entries, result, user_id=None, prima
     return merged
 
 
-def infer_menu_item_recipe_batch(entries, user_id=None, _depth=0, model_resolution=None, allow_fallback=True):
+def infer_menu_item_recipe_batch(entries, user_id=None, _depth=0, model_resolution=None, allow_fallback=True, cancellation_check=None):
     entries = [entry for entry in entries or [] if isinstance(entry, dict)]
     model_resolution = model_resolution or menu_item_recipe_model_resolution()
+    _run_menu_batch_cancellation_check(cancellation_check)
     if not entries:
         return {
             "ok": True,
@@ -11642,14 +11695,18 @@ def infer_menu_item_recipe_batch(entries, user_id=None, _depth=0, model_resoluti
         entries,
         user_id=user_id,
         model_resolution=model_resolution,
+        cancellation_check=cancellation_check,
     )
+    _run_menu_batch_cancellation_check(cancellation_check)
     result = mark_menu_batch_missing_items(entries, result)
     if not result.get("ok") and _depth == 0 and allow_fallback:
+        _run_menu_batch_cancellation_check(cancellation_check)
         result = retry_menu_batch_failures_with_fallback(
             entries,
             result,
             user_id=user_id,
             primary_model_resolution=model_resolution,
+            cancellation_check=cancellation_check,
         )
         if result.get("fallback_used"):
             if result.get("failures"):
@@ -11667,6 +11724,7 @@ def infer_menu_item_recipe_batch(entries, user_id=None, _depth=0, model_resoluti
         return result
 
     midpoint = max(1, len(entries) // 2)
+    _run_menu_batch_cancellation_check(cancellation_check)
     print(
         "[OpenAI] action=menu-item-recipe-batch-inference_batch_split "
         f"batch_size={len(entries)} left_size={midpoint} right_size={len(entries) - midpoint} "
@@ -11680,21 +11738,26 @@ def infer_menu_item_recipe_batch(entries, user_id=None, _depth=0, model_resoluti
         _depth=_depth + 1,
         model_resolution=model_resolution,
         allow_fallback=allow_fallback,
+        cancellation_check=cancellation_check,
     )
+    _run_menu_batch_cancellation_check(cancellation_check)
     right = infer_menu_item_recipe_batch(
         entries[midpoint:],
         user_id=user_id,
         _depth=_depth + 1,
         model_resolution=model_resolution,
         allow_fallback=allow_fallback,
+        cancellation_check=cancellation_check,
     )
     combined = combine_menu_batch_results([left, right])
     if _depth == 0 and combined.get("failures") and allow_fallback:
+        _run_menu_batch_cancellation_check(cancellation_check)
         combined = retry_menu_batch_failures_with_fallback(
             entries,
             combined,
             user_id=user_id,
             primary_model_resolution=model_resolution,
+            cancellation_check=cancellation_check,
         )
     if _depth == 0 and combined.get("failures"):
         log_menu_item_batch_final_failures(entries, combined)
@@ -12177,10 +12240,12 @@ def build_menu_batch_inference_result(recipe_url, stub, menu_item, inference, mo
     return result
 
 
-def save_menu_batch_inference_results(results):
+def save_menu_batch_inference_results(results, cancellation_check=None):
     results = results if isinstance(results, list) else []
     statuses = []
     for result in results:
+        if cancellation_check:
+            cancellation_check()
         result = result if isinstance(result, dict) else {}
         recipe_url = str(result.get("recipe_url") or result.get("source_url") or "").strip()
         recipe_name = str(result.get("display_name") or result.get("recipe_title") or recipe_url).strip()
@@ -12211,6 +12276,8 @@ def save_menu_batch_inference_results(results):
             "json_path": str(json_path),
             "result": result,
         })
+        if cancellation_check:
+            cancellation_check()
     return statuses
 
 

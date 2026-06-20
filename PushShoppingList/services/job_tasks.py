@@ -31,6 +31,10 @@ def run_job_task(job_id):
     job = get_job(job_id)
     if not job:
         return {"ok": False, "error": "Job not found."}
+    if job_cancelled(job_id):
+        from PushShoppingList.services.job_service import cancel_job
+
+        return cancel_job(job_id, "Cancelled")
 
     handlers = {
         "menu-import": run_menu_import_job,
@@ -53,7 +57,9 @@ def run_job_task(job_id):
     try:
         result = handler(job_id, job.get("input_payload") or {})
         if job_cancelled(job_id):
-            return get_job(job_id)
+            from PushShoppingList.services.job_service import cancel_job
+
+            return cancel_job(job_id, "Cancelled")
         return result
     except JobCancelled:
         from PushShoppingList.services.job_service import cancel_job
@@ -66,6 +72,28 @@ def run_job_task(job_id):
 
 def ensure_not_cancelled(job_id):
     if job_cancelled(job_id):
+        raise JobCancelled()
+
+
+def log_job_cancel_stop(job_id, task="job", stage="checkpoint", **fields):
+    parts = [
+        "[Job Cancel]",
+        f"job_id={job_id}",
+        f"task={str(task or 'job').strip() or 'job'}",
+        f"stage={str(stage or 'checkpoint').strip() or 'checkpoint'}",
+    ]
+    for key, value in fields.items():
+        if value in (None, ""):
+            continue
+        parts.append(f"{key}={value}")
+    parts.append("action=stop")
+    parts.append("reason=user_cancelled")
+    print(" ".join(parts))
+
+
+def raise_if_job_cancelled(job_id, task="job", stage="checkpoint", **fields):
+    if job_cancelled(job_id):
+        log_job_cancel_stop(job_id, task=task, stage=stage, **fields)
         raise JobCancelled()
 
 
@@ -590,6 +618,10 @@ def run_menu_generate_recipes_job(job_id, payload):
                 f"job_id={job_id} recipe_url={recipe_url} error={exc}"
             )
 
+    def raise_if_menu_enrichment_cancelled(stage="checkpoint", **fields):
+        raise_if_job_cancelled(job_id, task="menu_enrichment", stage=stage, **fields)
+
+    raise_if_menu_enrichment_cancelled("start")
     update_menu_progress(
         "start",
         current_step="Predicting recipes",
@@ -614,7 +646,7 @@ def run_menu_generate_recipes_job(job_id, payload):
 
     load_started = time.perf_counter()
     for index, recipe_url in enumerate(recipe_urls):
-        ensure_not_cancelled(job_id)
+        raise_if_menu_enrichment_cancelled("load_menu_stubs", item=index + 1, total=total)
         loaded_recipe = load_editable_recipe(recipe_url) or {}
         stub = loaded_recipe.get("recipe") if isinstance(loaded_recipe, dict) else {}
         stub = stub if isinstance(stub, dict) else {}
@@ -653,6 +685,7 @@ def run_menu_generate_recipes_job(job_id, payload):
         failed=failed_items,
         elapsed=f"{time.perf_counter() - load_started:.3f}s",
     )
+    raise_if_menu_enrichment_cancelled("before_prepare_ai_input_batches")
     prepare_started = time.perf_counter()
     try:
         batches = menu_inference_batches(
@@ -710,6 +743,10 @@ def run_menu_generate_recipes_job(job_id, payload):
             batch_count=batch_total,
             batch_size=len(batch or []),
         ):
+            raise_if_menu_enrichment_cancelled(
+                "before_openai_batch",
+                batch=f"{batch_index}/{batch_total}",
+            )
             print(
                 "[Job Worker] action=menu-item-recipe-batch-worker-start "
                 f"job_id={job_id} batch_index={batch_index} batch_count={batch_total} "
@@ -734,11 +771,31 @@ def run_menu_generate_recipes_job(job_id, payload):
                     batch,
                     user_id=inference_user_id,
                     allow_fallback=allow_failed_item_fallback,
+                    cancellation_check=lambda: raise_if_menu_enrichment_cancelled(
+                        "openai_batch_checkpoint",
+                        batch=f"{batch_index}/{batch_total}",
+                    ),
                 )
             except TypeError as exc:
-                if "allow_fallback" not in str(exc):
+                if "cancellation_check" in str(exc):
+                    try:
+                        result = infer_menu_item_recipe_batch(
+                            batch,
+                            user_id=inference_user_id,
+                            allow_fallback=allow_failed_item_fallback,
+                        )
+                    except TypeError as fallback_exc:
+                        if "allow_fallback" not in str(fallback_exc):
+                            raise
+                        result = infer_menu_item_recipe_batch(batch, user_id=inference_user_id)
+                elif "allow_fallback" in str(exc):
+                    result = infer_menu_item_recipe_batch(batch, user_id=inference_user_id)
+                else:
                     raise
-                result = infer_menu_item_recipe_batch(batch, user_id=inference_user_id)
+            raise_if_menu_enrichment_cancelled(
+                "after_openai_batch",
+                batch=f"{batch_index}/{batch_total}",
+            )
             log_menu_enrichment_stage(
                 "openai_batch",
                 job_id=job_id,
@@ -777,6 +834,10 @@ def run_menu_generate_recipes_job(job_id, payload):
 
     def record_prediction_result(batch_index, batch_result):
         nonlocal predicted_batches_completed
+        raise_if_menu_enrichment_cancelled(
+            "record_prediction_result",
+            batch=f"{batch_index}/{batch_total}",
+        )
         predicted_batches_completed += 1
         update_menu_progress(
             "ai_generation",
@@ -807,6 +868,10 @@ def run_menu_generate_recipes_job(job_id, payload):
         nonlocal completed_batches
         nonlocal failed_items
 
+        raise_if_menu_enrichment_cancelled(
+            "before_save_predicted_recipes",
+            batch=f"{batch_index}/{batch_total}",
+        )
         batch_ingredient_records = []
         batch_name_records = []
         batch_recipe_urls = []
@@ -881,7 +946,10 @@ def run_menu_generate_recipes_job(job_id, payload):
         prepared_save_entries = []
         save_prepare_started = time.perf_counter()
         for entry in batch:
-            ensure_not_cancelled(job_id)
+            raise_if_menu_enrichment_cancelled(
+                "prepare_predicted_recipe_save",
+                batch=f"{batch_index}/{batch_total}",
+            )
             recipe_url = entry["recipe_url"]
             menu_item = entry.get("menu_item") if isinstance(entry.get("menu_item"), dict) else {}
             recipe_name = cookbook_recipe_display_name(
@@ -987,13 +1055,36 @@ def run_menu_generate_recipes_job(job_id, payload):
         )
 
         if prepared_save_results:
+            raise_if_menu_enrichment_cancelled(
+                "before_bulk_save_predicted_recipes",
+                batch=f"{batch_index}/{batch_total}",
+            )
             print(
                 "[MenuRecipeGeneration] action=bulk_save_start "
                 f"job_id={job_id} batch_index={batch_index} batch_size={len(prepared_save_results)} "
                 f"progress_update_every={save_progress_every}"
             )
             write_started = time.perf_counter()
-            save_statuses = save_menu_batch_inference_results(prepared_save_results)
+            try:
+                save_statuses = save_menu_batch_inference_results(
+                    prepared_save_results,
+                    cancellation_check=lambda: raise_if_menu_enrichment_cancelled(
+                        "save_predicted_recipe_loop",
+                        batch=f"{batch_index}/{batch_total}",
+                    ),
+                )
+            except TypeError as exc:
+                if "cancellation_check" not in str(exc):
+                    raise
+                raise_if_menu_enrichment_cancelled(
+                    "before_bulk_save_predicted_recipes",
+                    batch=f"{batch_index}/{batch_total}",
+                )
+                save_statuses = save_menu_batch_inference_results(prepared_save_results)
+                raise_if_menu_enrichment_cancelled(
+                    "after_bulk_save_predicted_recipes",
+                    batch=f"{batch_index}/{batch_total}",
+                )
             log_menu_enrichment_stage(
                 "write_recipe_json",
                 job_id=job_id,
@@ -1005,7 +1096,10 @@ def run_menu_generate_recipes_job(job_id, payload):
             saved_count = 0
             save_failed_count = 0
             for index, prepared in enumerate(prepared_save_entries):
-                ensure_not_cancelled(job_id)
+                raise_if_menu_enrichment_cancelled(
+                    "save_status_loop",
+                    batch=f"{batch_index}/{batch_total}",
+                )
                 save_status = save_statuses[index] if index < len(save_statuses) else {}
                 recipe_url = prepared["recipe_url"]
                 recipe_name = prepared["recipe_name"]
@@ -1087,6 +1181,10 @@ def run_menu_generate_recipes_job(job_id, payload):
             )
 
         if batch_recipe_urls:
+            raise_if_menu_enrichment_cancelled(
+                "before_update_indexes",
+                batch=f"{batch_index}/{batch_total}",
+            )
             index_started = time.perf_counter()
             with workspace_write_lock("recipe-imports"):
                 if batch_shopping_items:
@@ -1116,7 +1214,11 @@ def run_menu_generate_recipes_job(job_id, payload):
 
     def submit_available_batches(executor):
         nonlocal next_batch_to_submit
-        while next_batch_to_submit < batch_total:
+        while next_batch_to_submit < batch_total and len(futures) < batch_worker_count:
+            raise_if_menu_enrichment_cancelled(
+                "before_submit_openai_batch",
+                batch=f"{next_batch_to_submit + 1}/{batch_total}",
+            )
             batch_index = next_batch_to_submit + 1
             future = executor.submit(run_prediction_batch, batch_index, batches[next_batch_to_submit])
             futures[future] = batch_index
@@ -1150,12 +1252,19 @@ def run_menu_generate_recipes_job(job_id, payload):
         max_workers=batch_worker_count,
         thread_name_prefix="menu-recipe-batch",
     ) as executor:
+        raise_if_menu_enrichment_cancelled("before_openai_batches")
         submit_available_batches(executor)
         try:
             while next_batch_to_process <= batch_total:
-                ensure_not_cancelled(job_id)
+                raise_if_menu_enrichment_cancelled(
+                    "openai_batch_wait",
+                    batch=f"{next_batch_to_process}/{batch_total}",
+                )
                 while next_batch_to_process not in batch_results:
-                    ensure_not_cancelled(job_id)
+                    raise_if_menu_enrichment_cancelled(
+                        "openai_batch_wait",
+                        batch=f"{next_batch_to_process}/{batch_total}",
+                    )
                     if not futures:
                         break
                     done, _pending = wait(
@@ -1167,6 +1276,10 @@ def run_menu_generate_recipes_job(job_id, payload):
                         continue
                     for future in done:
                         batch_index = futures.pop(future)
+                        raise_if_menu_enrichment_cancelled(
+                            "before_collect_openai_batch",
+                            batch=f"{batch_index}/{batch_total}",
+                        )
                         try:
                             batch_result = future.result()
                         except Exception as exc:
@@ -1175,6 +1288,10 @@ def run_menu_generate_recipes_job(job_id, payload):
                     submit_available_batches(executor)
 
                 while next_batch_to_process in batch_results:
+                    raise_if_menu_enrichment_cancelled(
+                        "before_process_openai_batch",
+                        batch=f"{next_batch_to_process}/{batch_total}",
+                    )
                     batch_result = batch_results.pop(next_batch_to_process)
                     process_predicted_batch(
                         next_batch_to_process,
@@ -1182,13 +1299,16 @@ def run_menu_generate_recipes_job(job_id, payload):
                         batch_result,
                     )
                     next_batch_to_process += 1
-                    ensure_not_cancelled(job_id)
+                    raise_if_menu_enrichment_cancelled(
+                        "after_process_openai_batch",
+                        batch=f"{next_batch_to_process - 1}/{batch_total}",
+                    )
         except JobCancelled:
             for future in list(futures.keys()):
                 future.cancel()
             raise
 
-    ensure_not_cancelled(job_id)
+    raise_if_menu_enrichment_cancelled("after_openai_batches")
     if created_urls:
         update_menu_progress(
             "finalize_recipe_generation",
@@ -1207,6 +1327,7 @@ def run_menu_generate_recipes_job(job_id, payload):
             },
         )
         sort_started = time.perf_counter()
+        raise_if_menu_enrichment_cancelled("before_sort_ingredients")
         with workspace_write_lock("recipe-imports"):
             sort_ingredients()
         log_menu_enrichment_stage(
@@ -1217,6 +1338,7 @@ def run_menu_generate_recipes_job(job_id, payload):
             elapsed=f"{time.perf_counter() - sort_started:.3f}s",
         )
 
+    raise_if_menu_enrichment_cancelled("before_complete_or_followup")
     if fast_mode and (created_urls or skipped_urls):
         total_failed_items = failed_items
         retry_failed_recipe_urls = [
@@ -1286,6 +1408,7 @@ def run_menu_generate_recipes_job(job_id, payload):
         )
         return complete_job(job_id, result_payload=result_payload)
 
+    raise_if_menu_enrichment_cancelled("before_enqueue_deferred_enrichment")
     if created_urls and menu_deferred_enrichment_enabled(payload, len(created_urls)):
         run_generated_pdfs = menu_generated_pdfs_enabled(payload, len(created_urls))
         print(
@@ -1317,6 +1440,7 @@ def run_menu_generate_recipes_job(job_id, payload):
             },
         )
         enqueue_started = time.perf_counter()
+        raise_if_menu_enrichment_cancelled("before_enqueue_deferred_enrichment")
         heavy_job = enqueue_followup_job(
             "menu-deferred-heavy-tasks",
             {
@@ -1409,6 +1533,7 @@ def run_menu_generate_recipes_job(job_id, payload):
     nutrition_worker_count = menu_nutrition_worker_count(len(created_urls)) if created_urls else 1
 
     def run_nutrition_for_recipe(index, recipe_url):
+        raise_if_menu_enrichment_cancelled("before_nutrition_recipe", item=index + 1)
         result = dict(generated_recipe_results.get(recipe_url) if isinstance(generated_recipe_results.get(recipe_url), dict) else {})
         recipe_name = cookbook_recipe_display_name(recipe_url, result)
         with job_context(
@@ -1442,6 +1567,7 @@ def run_menu_generate_recipes_job(job_id, payload):
         }
 
     if created_urls:
+        raise_if_menu_enrichment_cancelled("before_nutrition")
         update_job_progress(
             job_id,
             current_step=f"Estimating per serving basis (0/{len(created_urls)})",
@@ -1475,12 +1601,13 @@ def run_menu_generate_recipes_job(job_id, payload):
         ) as executor:
             try:
                 for index, recipe_url in enumerate(created_urls):
+                    raise_if_menu_enrichment_cancelled("before_submit_nutrition", item=index + 1)
                     nutrition_task = copy_current_request_context_if_available(
                         lambda index=index, recipe_url=recipe_url: run_nutrition_for_recipe(index, recipe_url)
                     )
                     nutrition_futures[executor.submit(nutrition_task)] = (index, recipe_url)
                 while nutrition_futures:
-                    ensure_not_cancelled(job_id)
+                    raise_if_menu_enrichment_cancelled("nutrition_wait")
                     done, _pending = wait(
                         list(nutrition_futures.keys()),
                         timeout=0.5,
@@ -1600,6 +1727,7 @@ def run_menu_generate_recipes_job(job_id, payload):
     category_worker_count = menu_category_worker_count(len(created_urls)) if created_urls else 1
 
     def run_category_for_recipe(index, recipe_url):
+        raise_if_menu_enrichment_cancelled("before_category_recipe", item=index + 1)
         result = dict(generated_recipe_results.get(recipe_url) if isinstance(generated_recipe_results.get(recipe_url), dict) else {})
         recipe_name = cookbook_recipe_display_name(recipe_url, result)
         with job_context(
@@ -1643,6 +1771,7 @@ def run_menu_generate_recipes_job(job_id, payload):
         }
 
     if created_urls:
+        raise_if_menu_enrichment_cancelled("before_categories")
         update_job_progress(
             job_id,
             current_step="Nutrition complete; generating categories",
@@ -1668,6 +1797,7 @@ def run_menu_generate_recipes_job(job_id, payload):
         category_targets = []
         category_completed_count = 0
         for index, recipe_url in enumerate(created_urls):
+            raise_if_menu_enrichment_cancelled("prepare_category_targets", item=index + 1)
             result = generated_recipe_results.get(recipe_url) if isinstance(generated_recipe_results.get(recipe_url), dict) else {}
             recipe_name = cookbook_recipe_display_name(recipe_url, result)
             if nutrition_ok_by_url.get(recipe_url):
@@ -1710,12 +1840,13 @@ def run_menu_generate_recipes_job(job_id, payload):
             ) as executor:
                 try:
                     for index, recipe_url in category_targets:
+                        raise_if_menu_enrichment_cancelled("before_submit_category", item=index + 1)
                         category_task = copy_current_request_context_if_available(
                             lambda index=index, recipe_url=recipe_url: run_category_for_recipe(index, recipe_url)
                         )
                         category_futures[executor.submit(category_task)] = (index, recipe_url)
                     while category_futures:
-                        ensure_not_cancelled(job_id)
+                        raise_if_menu_enrichment_cancelled("category_wait")
                         done, _pending = wait(
                             list(category_futures.keys()),
                             timeout=0.5,
@@ -1813,6 +1944,7 @@ def run_menu_generate_recipes_job(job_id, payload):
                     raise
 
     heavy_job = {}
+    raise_if_menu_enrichment_cancelled("before_enqueue_generated_pdfs")
     if run_heavy_tasks and created_urls and menu_generated_pdfs_enabled(payload, len(created_urls)):
         update_job_progress(
             job_id,
@@ -1829,6 +1961,7 @@ def run_menu_generate_recipes_job(job_id, payload):
                 "failed_recipe_items": failed_recipe_items,
             },
         )
+        raise_if_menu_enrichment_cancelled("before_enqueue_generated_pdfs")
         heavy_job = enqueue_followup_job(
             "menu-deferred-heavy-tasks",
             {
