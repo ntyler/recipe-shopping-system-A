@@ -132,7 +132,7 @@ def test_job_queue_debug_route_returns_readiness(monkeypatch, tmp_path):
     assert data["job_queue"]["menu_queue"] == "ai-pantry-menu"
 
 
-def test_clear_recent_jobs_removes_finished_owner_jobs_only(monkeypatch, tmp_path):
+def test_clear_recent_jobs_removes_finished_and_stopping_owner_jobs_only(monkeypatch, tmp_path):
     configure_job_paths(monkeypatch, tmp_path)
     app = create_app()
     app.config.update(TESTING=True)
@@ -155,6 +155,12 @@ def test_clear_recent_jobs_removes_finished_owner_jobs_only(monkeypatch, tmp_pat
         user_id="owner",
         total_items=1,
     )
+    stopping = job_service.create_job(
+        "menu-generate-recipes",
+        input_payload={"recipe_urls": ["https://example.com/stopping"]},
+        user_id="owner",
+        total_items=1,
+    )
     other = job_service.create_job(
         "recipe-import",
         input_payload={"urls": ["https://example.com/other"]},
@@ -165,6 +171,8 @@ def test_clear_recent_jobs_removes_finished_owner_jobs_only(monkeypatch, tmp_pat
     job_service.complete_job(completed["id"])
     job_service.fail_job(failed["id"], "Nope")
     job_service.update_job(running["id"], status="running", started_at=job_service.now_iso())
+    job_service.update_job(stopping["id"], status="running", started_at=job_service.now_iso())
+    job_service.cancel_job(stopping["id"])
     job_service.complete_job(other["id"])
 
     with app.test_client() as client:
@@ -180,12 +188,29 @@ def test_clear_recent_jobs_removes_finished_owner_jobs_only(monkeypatch, tmp_pat
 
     assert response.status_code == 200
     assert data["ok"] is True
-    assert data["deleted_count"] == 2
+    assert data["deleted_count"] == 3
     assert [job["id"] for job in data["jobs"]] == [running["id"]]
     assert job_service.get_job(completed["id"]) is None
     assert job_service.get_job(failed["id"]) is None
+    assert job_service.get_job(stopping["id"]) is None
     assert job_service.get_job(running["id"]) is not None
     assert job_service.get_job(other["id"]) is not None
+
+
+def test_missing_job_row_counts_as_cancelled_for_worker_checks(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    job = job_service.create_job(
+        "menu-generate-recipes",
+        input_payload={"recipe_urls": ["https://example.com/stopping"]},
+        user_id="owner",
+        total_items=1,
+    )
+    job_service.update_job(job["id"], status="running", started_at=job_service.now_iso())
+    job_service.cancel_job(job["id"])
+
+    assert job_service.clear_recent_jobs(user_id="owner") == 1
+    assert job_service.get_job(job["id"]) is None
+    assert job_service.job_cancelled(job["id"]) is True
 
 
 def test_job_for_client_shows_safe_sources_and_model_metadata(monkeypatch, tmp_path):

@@ -322,6 +322,11 @@ function jobIsFinished(job) {
     return job && ["completed", "failed", "cancelled"].includes(String(job.status || "").trim().toLowerCase());
 }
 
+function jobCanClearActivity(job) {
+    const status = String((job && job.status) || "").trim().toLowerCase();
+    return jobIsFinished(job) || status === "cancel_requested";
+}
+
 function jobTypeLabel(jobType) {
     return ({
         "menu-import": "Import Menu URL / Basic Import",
@@ -1557,6 +1562,7 @@ function renderJobActivityPanel(jobs) {
     const activeCount = sortedJobs.filter(jobIsActive).length;
     const cancellableCount = sortedJobs.filter(jobCanCancel).length;
     const finishedCount = sortedJobs.filter(jobIsFinished).length;
+    const clearableCount = sortedJobs.filter(jobCanClearActivity).length;
     const visibleJobIds = new Set(sortedJobs.map(job => String(job.id || job.job_id || "").trim()).filter(Boolean));
     lastJobActivityJobs = sortedJobs;
     Array.from(jobActivityExpandedRows).forEach(jobId => {
@@ -1566,11 +1572,11 @@ function renderJobActivityPanel(jobs) {
     });
 
     if (clearButton) {
-        clearButton.disabled = sortedJobs.length === 0;
-        clearButton.title = finishedCount
-            ? `Clear ${finishedCount} finished job ${finishedCount === 1 ? "entry" : "entries"}`
+        clearButton.disabled = clearableCount === 0;
+        clearButton.title = clearableCount
+            ? `Clear ${clearableCount} finished or stopping job ${clearableCount === 1 ? "entry" : "entries"}`
             : activeCount
-                ? "Active and stopping jobs stay visible until they finish"
+                ? "Running and queued jobs cannot be cleared yet"
                 : "No job activity to clear";
     }
     if (cancelAllButton) {
@@ -2135,13 +2141,13 @@ async function clearJobActivityLog(button) {
         return false;
     }
 
-    const finishedCount = lastJobActivityJobs.filter(jobIsFinished).length;
-    if (!finishedCount) {
+    const clearableCount = lastJobActivityJobs.filter(jobCanClearActivity).length;
+    if (!clearableCount) {
         const summary = jobActivitySummaryElement();
         if (summary) {
             const activeCount = lastJobActivityJobs.filter(jobIsActive).length;
             summary.textContent = activeCount
-                ? "No finished job activity to clear. Active and stopping jobs stay visible until they finish."
+                ? "No finished or stopping job activity to clear. Running and queued jobs cannot be cleared yet."
                 : "No job activity to clear.";
         }
         return false;
@@ -2149,8 +2155,8 @@ async function clearJobActivityLog(button) {
 
     const activeCount = lastJobActivityJobs.filter(jobIsActive).length;
     const confirmation = activeCount
-        ? `Clear ${finishedCount} finished job ${finishedCount === 1 ? "entry" : "entries"}? Active jobs will stay visible.`
-        : `Clear ${finishedCount} finished job ${finishedCount === 1 ? "entry" : "entries"}?`;
+        ? `Clear ${clearableCount} finished or stopping job ${clearableCount === 1 ? "entry" : "entries"}? Running and queued jobs will stay visible.`
+        : `Clear ${clearableCount} finished or stopping job ${clearableCount === 1 ? "entry" : "entries"}?`;
     if (!window.confirm(confirmation)) {
         return false;
     }
@@ -2185,8 +2191,8 @@ async function clearJobActivityLog(button) {
         if (summary) {
             const deletedCount = Number(data.deleted_count || 0);
             summary.textContent = deletedCount
-                ? `Cleared ${deletedCount} finished job ${deletedCount === 1 ? "entry" : "entries"}.`
-                : "No finished job activity to clear.";
+                ? `Cleared ${deletedCount} finished or stopping job ${deletedCount === 1 ? "entry" : "entries"}.`
+                : "No finished or stopping job activity to clear.";
         }
         scheduleJobActivityPolling((data.jobs || []).some(jobIsActive) ? 1500 : 8000);
     } catch (err) {
@@ -2197,7 +2203,7 @@ async function clearJobActivityLog(button) {
     } finally {
         if (button) {
             button.textContent = originalText || "Clear Log";
-            button.disabled = lastJobActivityJobs.length === 0;
+            button.disabled = lastJobActivityJobs.filter(jobCanClearActivity).length === 0;
         }
     }
 

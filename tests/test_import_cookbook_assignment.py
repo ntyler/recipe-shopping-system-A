@@ -259,8 +259,10 @@ def test_job_activity_section_has_clear_collapse_control():
     assert "function openJobActivityPanel()" in script
     assert "function closeJobActivityPanel()" in script
     assert "function clearJobActivityLog" in script
-    assert "clearButton.disabled = sortedJobs.length === 0" in script
-    assert "Active and stopping jobs stay visible until they finish" in script
+    assert "function jobCanClearActivity" in script
+    assert "clearButton.disabled = clearableCount === 0" in script
+    assert "finished or stopping job" in script
+    assert "Running and queued jobs cannot be cleared yet" in script
     assert "function setJobActivityItemFilter" in script
     assert "function setJobActivityDateFilter" in script
     assert "function clearJobActivityDateFilter" in script

@@ -1245,8 +1245,13 @@ def cancel_job(job_id, message="Cancelled"):
 
 
 def job_cancelled(job_id):
+    job_id = str(job_id or "").strip()
+    if not job_id:
+        return False
     job = get_job(job_id)
-    return bool(job and normalize_status(job.get("status")) in CANCEL_REQUESTED_JOB_STATUSES)
+    if not job:
+        return True
+    return normalize_status(job.get("status")) in CANCEL_REQUESTED_JOB_STATUSES
 
 
 def cleanup_expired_jobs():
@@ -1272,7 +1277,7 @@ def clear_recent_jobs(user_id="", guest_session_id="", include_all=False):
     cleanup_expired_jobs()
     mark_stuck_jobs()
 
-    statuses = sorted(TERMINAL_JOB_STATUSES)
+    statuses = sorted(TERMINAL_JOB_STATUSES | {"cancel_requested"})
     placeholders = ", ".join("?" for _ in statuses)
     user_id = str(user_id or "").strip()
     guest_session_id = str(guest_session_id or "").strip()
