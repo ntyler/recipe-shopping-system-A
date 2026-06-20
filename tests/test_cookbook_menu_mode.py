@@ -186,6 +186,41 @@ def test_cookbook_submenu_has_selection_and_bulk_move_controls():
     assert "promptCookbookOverwrite(err.data.conflicts || [], targetCookbookName)" in script
 
 
+def test_cookbook_submenus_have_food_rule_reapply_controls():
+    template = read_text("PushShoppingList/templates/sections/cookbooks.html")
+    editor_template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    script = read_text("PushShoppingList/static/js/app.js")
+    routes = read_text("PushShoppingList/routes/main_routes.py")
+
+    menu_start = template.index('<div class="recipe-edit-row-menu cookbook-card-menu" hidden>')
+    browser_start = template.index('<div class="cookbook-menu-browser"', menu_start)
+    cookbook_menu_block = template[menu_start:browser_start]
+
+    recipe_menu_start = template.index(
+        '<div class="recipe-edit-row-menu overflow-menu cookbook-recipe-menu" hidden>'
+    )
+    danger_section_start = template.index(
+        '<div class="overflow-menu-section recipe-view-menu-section recipe-view-menu-section-danger">',
+        recipe_menu_start,
+    )
+    recipe_menu_block = template[recipe_menu_start:danger_section_start]
+
+    assert "Food Rules" in cookbook_menu_block
+    assert "Re-apply Food Rules to Cookbook" in cookbook_menu_block
+    assert "reapplyFoodRulesForCookbook(this, event)" in cookbook_menu_block
+    assert "Re-apply Food Rules to This Recipe" in recipe_menu_block
+    assert "reapplyFoodRulesForCookbookRecipe(this, event)" in recipe_menu_block
+    assert "Re-apply Food Rules to Ingredients" in editor_template
+    assert "reapplyFoodRulesForRecipeIngredients(this)" in editor_template
+    assert "Re-apply Food Rules" in script
+    assert "function reapplyFoodRulesForCookbook" in script
+    assert "function reapplyFoodRulesForCookbookRecipe" in script
+    assert "function reapplyFoodRulesForRecipeIngredients" in script
+    assert "function reapplyFoodRulesForIngredient" in script
+    assert "/api/cookbooks/<cookbook_id>/reapply_food_rules" in routes
+    assert "/api/recipes/reapply_food_rules" in routes
+
+
 def test_cookbook_recipe_submenu_has_menu_ai_controls_before_recipe_actions():
     template = read_text("PushShoppingList/templates/sections/cookbooks.html")
     script = read_text("PushShoppingList/static/js/app.js")

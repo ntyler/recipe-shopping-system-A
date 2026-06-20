@@ -33,6 +33,7 @@ def configure_job_paths(monkeypatch, tmp_path):
     output_folder = tmp_path / "extractor" / "output"
     output_folder.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(recipe_extract_service, "OUTPUT_FOLDER", output_folder)
+    monkeypatch.setattr(recipe_edit_service, "OUTPUT_FOLDER", output_folder)
     monkeypatch.setattr(recipe_ingredient_service, "OUTPUT_FOLDER", output_folder)
     monkeypatch.setattr(recipe_ingredient_service, "RECIPE_INGREDIENTS_FILE", tmp_path / "extractor" / "recipe_ingredients.json")
     monkeypatch.setattr(recipe_url_service, "RECIPE_INGREDIENTS_FILE", tmp_path / "extractor" / "recipe_urls.json")
@@ -357,6 +358,121 @@ def test_menu_generate_route_returns_trigger_item_source_link(monkeypatch, tmp_p
     assert data["job"]["source_items"][0]["detail"] == "menu item"
     assert data["job"]["source_items"][0]["url"].startswith("/recipe/edit?url=")
     assert data["job"]["source_items"][0]["recipe_url"] == recipe_url
+
+
+def test_cancelled_menu_generate_job_resume_queues_only_remaining_urls(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    recipe_urls = [
+        "https://example.com/menu?menu_item=spring-roll",
+        "https://example.com/menu?menu_item=crab-wonton",
+        "https://example.com/menu?menu_item=shrimp-shumai",
+    ]
+    enqueued = {}
+    monkeypatch.setattr(
+        job_routes,
+        "enqueue_job",
+        lambda job_id, **kwargs: enqueued.update({"job_id": job_id, **kwargs}) or {
+            "ok": True,
+            "mode": "test",
+            "job_id": job_id,
+            **kwargs,
+        },
+    )
+    recipe_edit_service.save_recipe_output(
+        recipe_urls[1],
+        {
+            "source_url": recipe_urls[1],
+            "recipe_status": "generated",
+            "needs_ai_recipe": False,
+            "recipe_inference": {"status": "generated"},
+        },
+    )
+    job = job_service.create_job(
+        "menu-generate-recipes",
+        input_payload={
+            "recipe_urls": recipe_urls,
+            "menu_enrichment_mode": "fast",
+            "force_reprocess": True,
+            "source_job_id": "basic-import-job",
+            "recipe_names": {
+                recipe_urls[0]: "Spring Roll",
+                recipe_urls[1]: "Crab Wonton",
+                recipe_urls[2]: "Shrimp Shumai",
+            },
+        },
+        user_id="owner",
+        total_items=3,
+        queue_name="ai-pantry-menu",
+    )
+    job_service.update_job(
+        job["id"],
+        status="cancelled",
+        result_payload={
+            "generated_recipe_urls": [recipe_urls[0]],
+            "resume_remaining_count": 2,
+        },
+        completed_items=1,
+        finished_at=job_service.now_iso(),
+        completed_at=job_service.now_iso(),
+    )
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["user_id"] = "owner"
+        response = client.post(
+            f"/api/jobs/{job['id']}/resume",
+            headers={"X-Requested-With": "fetch"},
+        )
+        data = response.get_json()
+
+    resumed = job_service.get_job(data["job_id"])
+
+    assert response.status_code == 202
+    assert data["remaining_count"] == 1
+    assert enqueued["job_id"] == data["job_id"]
+    assert enqueued["queue_name_override"] == "ai-pantry-menu"
+    assert resumed["retry_of"] == job["id"]
+    assert resumed["total_items"] == 1
+    assert resumed["input_payload"]["recipe_urls"] == [recipe_urls[2]]
+    assert resumed["input_payload"]["force_reprocess"] is False
+    assert resumed["input_payload"]["resume_of_job_id"] == job["id"]
+    assert resumed["input_payload"]["source_job_id"] == "basic-import-job"
+    assert resumed["input_payload"]["recipe_names"] == {recipe_urls[2]: "Shrimp Shumai"}
+    assert data["job"]["source_items"][0]["recipe_url"] == recipe_urls[2]
+
+
+def test_cancel_requested_menu_generate_job_resume_waits_for_worker_stop(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        job_routes,
+        "enqueue_job",
+        lambda *args, **kwargs: pytest.fail("cancel_requested jobs should not queue a continuation"),
+    )
+    job = job_service.create_job(
+        "menu-generate-recipes",
+        input_payload={"recipe_urls": ["https://example.com/menu?menu_item=spring-roll"]},
+        user_id="owner",
+        total_items=1,
+    )
+    job_service.update_job(job["id"], status="running", started_at=job_service.now_iso())
+    job_service.cancel_job(job["id"])
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["user_id"] = "owner"
+        response = client.post(
+            f"/api/jobs/{job['id']}/resume",
+            headers={"X-Requested-With": "fetch"},
+        )
+        data = response.get_json()
+
+    assert response.status_code == 409
+    assert data["ok"] is False
+    assert "worker to stop" in data["error"]
 
 
 def test_menu_generate_job_runs_decide_all_categories_after_generation(monkeypatch, tmp_path):

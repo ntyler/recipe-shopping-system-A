@@ -21249,6 +21249,12 @@ img[data-deferred-src] {
             color: #bbf7d0;
         }
 
+        .job-activity-resume-action {
+            border-color: #22c55e;
+            color: #dcfce7;
+            background: rgba(22, 101, 52, 0.3);
+        }
+
         .job-activity-content {
             display: flex;
             flex-direction: column;

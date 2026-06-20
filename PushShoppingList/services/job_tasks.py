@@ -833,6 +833,21 @@ def run_menu_generate_recipes_job(job_id, payload):
     def raise_if_menu_enrichment_cancelled(stage="checkpoint", **fields):
         raise_if_job_cancelled(job_id, task="menu_enrichment", stage=stage, **fields)
 
+    def menu_resume_progress_payload():
+        completed_urls = list(dict.fromkeys(created_urls + skipped_urls))
+        completed_keys = set(completed_urls)
+        return {
+            "recipe_urls": completed_urls,
+            "generated_recipe_urls": list(created_urls),
+            "skipped_recipe_urls": list(skipped_urls),
+            "resume_remaining_recipe_urls": [
+                url
+                for url in recipe_urls
+                if url not in completed_keys
+            ],
+            "resume_remaining_count": max(0, total - len(completed_keys)),
+        }
+
     def load_menu_enrichment_stub(recipe_url):
         if fast_mode:
             raw_stub = load_recipe_output(recipe_url)
@@ -859,6 +874,8 @@ def run_menu_generate_recipes_job(job_id, payload):
             "recipe_inference_completed": 0,
             "nutrition_completed": 0,
             "nutrition_failed": 0,
+            "resume_remaining_recipe_urls": recipe_urls,
+            "resume_remaining_count": total,
             "failed_recipe_items": [],
             "pdfs_completed": 0,
             "failed_items": 0,
@@ -1278,6 +1295,7 @@ def run_menu_generate_recipes_job(job_id, payload):
                         "category_success_count": category_success_count,
                         "failed_items": failed_items,
                         "failed_recipe_items": failed_recipe_items,
+                        **menu_resume_progress_payload(),
                         **cookbook_recipe_progress_payload(
                             "recipe_generation",
                             "Saving predicted recipe for",
@@ -1438,6 +1456,7 @@ def run_menu_generate_recipes_job(job_id, payload):
                             "category_success_count": category_success_count,
                             "failed_items": failed_items,
                             "failed_recipe_items": failed_recipe_items,
+                            **menu_resume_progress_payload(),
                             **cookbook_recipe_progress_payload(
                                 "recipe_generation",
                                 "Saving predicted recipes",

@@ -40,6 +40,7 @@ from PushShoppingList.services.openai_model_service import model_value_for_env a
 from PushShoppingList.services.storage_service import active_guest_session_id
 from PushShoppingList.services.storage_service import active_user_id
 from PushShoppingList.services.storage_service import workspace_data_root
+from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
 from PushShoppingList.services.user_account_service import current_user
 from PushShoppingList.services.user_account_service import is_admin_user
 
@@ -274,6 +275,223 @@ def start_menu_generate_recipes_job_route():
         model_env_var=recipe_model_env_var,
     )
     return create_and_enqueue("menu-generate-recipes", payload, total_items=len(urls))
+
+
+def menu_generate_recipe_urls_from_payload(payload):
+    payload = payload if isinstance(payload, dict) else {}
+    urls = []
+    for key in ("recipe_urls", "urls"):
+        values = payload.get(key)
+        if isinstance(values, str):
+            values = [line.strip() for line in values.splitlines() if line.strip()]
+        if isinstance(values, list):
+            urls.extend(str(url or "").strip() for url in values if str(url or "").strip())
+    for key in ("recipe_url", "url", "source_url"):
+        value = str(payload.get(key) or "").strip()
+        if value:
+            urls.append(value)
+
+    seen = set()
+    deduped = []
+    for url in urls:
+        key = normalize_recipe_url_key(url) or url
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(url)
+    return deduped
+
+
+def menu_generate_result_urls(result, *keys):
+    result = result if isinstance(result, dict) else {}
+    urls = []
+    for key in keys:
+        values = result.get(key)
+        if isinstance(values, str):
+            values = [line.strip() for line in values.splitlines() if line.strip()]
+        if isinstance(values, list):
+            urls.extend(str(url or "").strip() for url in values if str(url or "").strip())
+
+    links = result.get("links")
+    if isinstance(links, list):
+        urls.extend(
+            str((link or {}).get("recipe_url") or "").strip()
+            for link in links
+            if isinstance(link, dict) and str((link or {}).get("recipe_url") or "").strip()
+        )
+    return menu_generate_recipe_urls_from_payload({"recipe_urls": urls})
+
+
+def menu_generate_recipe_already_generated(recipe_url):
+    from PushShoppingList.services.recipe_edit_service import load_recipe_output
+
+    try:
+        recipe_data = load_recipe_output(recipe_url)
+    except Exception:
+        recipe_data = {}
+    recipe_data = recipe_data if isinstance(recipe_data, dict) else {}
+    inference = recipe_data.get("recipe_inference") if isinstance(recipe_data.get("recipe_inference"), dict) else {}
+    recipe_status = str(recipe_data.get("recipe_status") or "").strip().lower()
+    inference_status = str(inference.get("status") or "").strip().lower()
+    return bool(
+        (recipe_status == "generated" and not recipe_data.get("needs_ai_recipe"))
+        or inference_status == "generated"
+    )
+
+
+def menu_generate_resume_urls(job):
+    job = job if isinstance(job, dict) else {}
+    payload = job.get("input_payload") if isinstance(job.get("input_payload"), dict) else {}
+    result = job.get("result_payload") if isinstance(job.get("result_payload"), dict) else {}
+    original_urls = menu_generate_recipe_urls_from_payload(payload)
+    completed_urls = menu_generate_result_urls(
+        result,
+        "generated_recipe_urls",
+        "skipped_recipe_urls",
+        "recipe_urls",
+        "created_urls",
+        "committed_recipe_urls",
+    )
+    completed_keys = {
+        normalize_recipe_url_key(url) or url
+        for url in completed_urls
+        if str(url or "").strip()
+    }
+
+    remaining_urls = []
+    for recipe_url in original_urls:
+        key = normalize_recipe_url_key(recipe_url) or recipe_url
+        if key in completed_keys:
+            continue
+        if menu_generate_recipe_already_generated(recipe_url):
+            completed_keys.add(key)
+            continue
+        remaining_urls.append(recipe_url)
+
+    return remaining_urls
+
+
+@job_bp.route("/api/jobs/<job_id>/resume", methods=["POST"])
+def resume_job_route(job_id):
+    job, error_response = job_access_or_404(job_id)
+    if error_response:
+        return error_response
+
+    job_type = str(job.get("job_type") or "").strip()
+    status = str(job.get("status") or "").strip().lower()
+    if job_type != "menu-generate-recipes":
+        return jsonify({
+            "ok": False,
+            "error": "Only menu recipe generation jobs can continue from a cancelled run right now.",
+        }), 400
+    if status in {"queued", "running", "cancel_requested"}:
+        return jsonify({
+            "ok": False,
+            "error": "Wait for the current worker to stop before continuing this job.",
+        }), 409
+    if status not in {"cancelled", "failed"}:
+        return jsonify({
+            "ok": False,
+            "error": "Only cancelled or failed menu recipe generation jobs can be continued.",
+        }), 400
+
+    remaining_urls = menu_generate_resume_urls(job)
+    if not remaining_urls:
+        return jsonify({
+            "ok": False,
+            "error": "No remaining menu recipes were found to continue.",
+            "remaining_count": 0,
+        }), 400
+
+    original_payload = job.get("input_payload") if isinstance(job.get("input_payload"), dict) else {}
+    enrichment_mode = str(
+        original_payload.get("menu_enrichment_mode")
+        or original_payload.get("enrichment_mode")
+        or ""
+    ).strip().lower()
+    if enrichment_mode not in {"fast", "full"}:
+        enrichment_mode = "fast"
+    recipe_model_resolution = menu_item_recipe_model_resolution(enrichment_mode)
+    recipe_model_env_var = (
+        OPENAI_MENU_FAST_RECIPE_MODEL_ENV_VAR
+        if enrichment_mode == "fast"
+        else OPENAI_MENU_RECIPE_MODEL_ENV_VAR
+    )
+    payload = with_model_metadata(
+        {
+            **original_payload,
+            "recipe_urls": remaining_urls,
+            "force_reprocess": False,
+            "menu_enrichment_mode": enrichment_mode,
+            "resume_of_job_id": job_id,
+            "resume_original_total_items": len(menu_generate_recipe_urls_from_payload(original_payload)),
+            "resume_remaining_count": len(remaining_urls),
+        },
+        model_used=recipe_model_resolution.model,
+        model_source=recipe_model_resolution.source,
+        model_env_var=recipe_model_env_var,
+    )
+    recipe_names = payload.get("recipe_names") if isinstance(payload.get("recipe_names"), dict) else {}
+    if recipe_names:
+        remaining_keys = {normalize_recipe_url_key(url) or url for url in remaining_urls}
+        payload["recipe_names"] = {
+            url: name
+            for url, name in recipe_names.items()
+            if (normalize_recipe_url_key(url) or url) in remaining_keys
+        }
+
+    queue_name = job.get("queue_name") or queue_name_for_job("menu-generate-recipes", payload)
+    queued_status = queued_limit_status(
+        user_id=job.get("user_id") or "",
+        guest_session_id=job.get("guest_session_id") or "",
+        job_type="menu-generate-recipes",
+        input_payload=payload,
+    )
+    if not queued_status.get("ok"):
+        return jsonify({
+            "ok": False,
+            "error": queued_status.get("message") or "Too many queued jobs for this import type.",
+            "limit": queued_status.get("limit"),
+            "queued_count": queued_status.get("queued_count"),
+            "job_type": "menu-generate-recipes",
+            "queue_name": queue_name,
+        }), 429
+
+    limit_key = job_limit_key("menu-generate-recipes", payload)
+    active_limit = active_limit_for_job("menu-generate-recipes", payload)
+    active_count = owner_job_count_for_limit_key(
+        user_id=job.get("user_id") or "",
+        guest_session_id=job.get("guest_session_id") or "",
+        limit_key=limit_key,
+        statuses=["running"],
+    ) if active_limit else 0
+    resumed = create_job(
+        "menu-generate-recipes",
+        input_payload=payload,
+        user_id=job.get("user_id") or "",
+        guest_session_id=job.get("guest_session_id") or "",
+        total_items=len(remaining_urls),
+        retry_of=job_id,
+        queue_name=queue_name,
+    )
+    if active_limit and active_count >= active_limit:
+        resumed = update_job(resumed["id"], current_step=active_limit_wait_message(limit_key), queue_name=queue_name) or resumed
+
+    queue_result = enqueue_job(resumed["id"], queue_name_override=queue_name)
+    resumed = get_job(resumed["id"]) or resumed
+    status_code = 202 if queue_result.get("ok") else 503
+    return jsonify({
+        "ok": bool(queue_result.get("ok")),
+        "job_id": resumed["id"],
+        "job": job_for_client(resumed),
+        "remaining_count": len(remaining_urls),
+        "resumed_from_job_id": job_id,
+        "queue": {
+            key: value
+            for key, value in queue_result.items()
+            if key not in {"details"}
+        },
+    }), status_code
 
 
 @job_bp.route("/api/jobs/menu-deferred-heavy-tasks", methods=["POST"])

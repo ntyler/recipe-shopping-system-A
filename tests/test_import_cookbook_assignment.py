@@ -286,6 +286,13 @@ def test_job_activity_section_has_clear_collapse_control():
     assert "function renderJobActivityTimestamps" in script
     assert "Pending worker stop" in script
     assert "job-activity-enrichment-action" in script
+    assert "function jobCanResumeMenuGeneration" in script
+    assert "function resumeJobActivityJob" in script
+    assert "/resume" in script
+    assert "job-activity-resume-action" in script
+    assert "${workerHtml}" in script
+    assert "Worker: <strong>" in script
+    assert "Not assigned yet" in script
     assert "menuEnrichmentAlreadyQueuedForJob(job)" in script
     assert "${timestampHtml}" in script
     assert "Initiated" in script
@@ -307,6 +314,7 @@ def test_job_activity_section_has_clear_collapse_control():
     assert ".job-activity-cancel_requested .job-activity-status" in css
     assert ".job-activity-timestamp" in css
     assert ".job-activity-enrichment-action" in css
+    assert ".job-activity-resume-action" in css
     assert 'method: "DELETE"' in script
     assert ".job-activity-toolbar" in css
     assert ".job-activity-clear" in css

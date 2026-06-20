@@ -191,6 +191,16 @@
                                                             Infer Missing Details for Cookbook
                                                         </button>
                                                     </div>
+                                                    <div class="overflow-menu-section cookbook-food-rules-menu-section">
+                                                        <div class="overflow-menu-section-title">Food Rules</div>
+                                                        <button type="button"
+                                                                data-cookbook-id="{{ cookbook.id }}"
+                                                                data-cookbook-name="{{ cookbook.name }}"
+                                                                data-cookbook-recipe-count="{{ cookbook.recipes | length }}"
+                                                                onclick="return reapplyFoodRulesForCookbook(this, event)">
+                                                            Re-apply Food Rules to Cookbook
+                                                        </button>
+                                                    </div>
                                                 {% endif %}
                                                 {% if cookbook.recipes %}
                                                     <div class="overflow-menu-section cookbook-selection-menu-section">
@@ -763,6 +773,17 @@
                                                                                 data-cookbook-name="{{ cookbook.name }}"
                                                                                 onclick="return inferMissingCookbookRecipeDetails(this, event)">
                                                                             Infer Details for This Recipe
+                                                                        </button>
+                                                                    </div>
+                                                                    <div class="overflow-menu-section recipe-view-menu-section cookbook-food-rules-menu-section">
+                                                                        <div class="overflow-menu-section-title recipe-view-menu-section-title">Food Rules</div>
+                                                                        <button type="button"
+                                                                                data-recipe-url="{{ recipe.url }}"
+                                                                                data-recipe-name="{{ recipe.name }}"
+                                                                                data-cookbook-id="{{ cookbook.id }}"
+                                                                                data-cookbook-name="{{ cookbook.name }}"
+                                                                                onclick="return reapplyFoodRulesForCookbookRecipe(this, event)">
+                                                                            Re-apply Food Rules to This Recipe
                                                                         </button>
                                                                     </div>
                                                                     <div class="overflow-menu-section recipe-view-menu-section">

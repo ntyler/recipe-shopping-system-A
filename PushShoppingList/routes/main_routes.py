@@ -2,6 +2,8 @@ import html
 import json
 import os
 import re
+from datetime import datetime
+from datetime import timezone
 from fractions import Fraction
 
 import requests
@@ -95,6 +97,7 @@ from PushShoppingList.services.recipe_edit_service import is_shareable_pdf_publi
 from PushShoppingList.services.recipe_edit_service import PDF_KIND_GENERATED_RECIPE
 from PushShoppingList.services.recipe_edit_service import PDF_KIND_WEBPAGE_BACKUP
 from PushShoppingList.services.recipe_edit_service import normalize_recipe_pdf_storage_metadata
+from PushShoppingList.services.recipe_edit_service import save_recipe_output
 from PushShoppingList.services.product_selection_service import product_choices_by_item
 from PushShoppingList.services.product_selection_service import store_price_cells_for_item
 from PushShoppingList.services.rules_display_service import load_rules_display
@@ -1187,6 +1190,79 @@ def recipe_food_rule_status(recipe_data, food_rules=None):
         "marker": "Food rule review: " + "; ".join(unique_items) if unique_items else "",
         "count": len(unique_items),
     }
+
+
+def recipe_food_rule_ingredient_has_text(ingredient):
+    if isinstance(ingredient, dict):
+        return bool(" ".join([
+            str(ingredient.get("ingredient") or ""),
+            str(ingredient.get("original_text") or ""),
+            str(ingredient.get("preparation") or ""),
+        ]).strip())
+
+    return bool(str(ingredient or "").strip())
+
+
+def recipe_food_rule_checked_ingredient_count(recipe_data):
+    return sum(
+        1
+        for ingredient in recipe_data.get("ingredients", []) or []
+        if recipe_food_rule_ingredient_has_text(ingredient)
+    )
+
+
+def recipe_food_rule_apply_summary(recipe_url, recipe_data, food_rules=None):
+    status = recipe_food_rule_status(recipe_data, food_rules=food_rules)
+    return {
+        "recipe_url": recipe_url,
+        "recipe_name": (
+            recipe_data.get("display_name")
+            or recipe_data.get("recipe_title")
+            or recipe_url
+        ),
+        "checked_ingredients": recipe_food_rule_checked_ingredient_count(recipe_data),
+        "flagged_ingredients": status.get("count", 0),
+        "needs_review": bool(status.get("needs_review")),
+        "marker": status.get("marker", ""),
+    }
+
+
+def apply_food_rules_to_saved_recipe(recipe_url, food_rules=None):
+    recipe_url = str(recipe_url or "").strip()
+
+    if not recipe_url:
+        return {"ok": False, "error": "Recipe URL is required."}
+
+    recipe_data = load_saved_recipe_output(recipe_url)
+    if not recipe_data:
+        return {"ok": False, "error": "Recipe was not found."}
+
+    rules = food_rules if food_rules is not None else load_food_rules()
+    source_url = str(recipe_data.get("source_url") or recipe_url).strip() or recipe_url
+    applied_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    summary = recipe_food_rule_apply_summary(source_url, recipe_data, food_rules=rules)
+    recipe_data["food_rules_last_applied_at"] = applied_at
+    recipe_data["food_rules_last_applied"] = {
+        **summary,
+        "applied_at": applied_at,
+    }
+    save_recipe_output(recipe_url, recipe_data)
+
+    return {
+        "ok": True,
+        **summary,
+        "applied_at": applied_at,
+    }
+
+
+def cookbook_for_food_rule_apply(cookbook_id):
+    cookbook_id = str(cookbook_id or "").strip()
+
+    for cookbook in load_cookbooks().get("cookbooks", []):
+        if str(cookbook.get("id") or "").strip() == cookbook_id:
+            return cookbook
+
+    return {}
 
 
 def recipe_quantity_lookup(recipe_rows):
@@ -2370,6 +2446,77 @@ def infer_cookbook_missing_details_route(cookbook_id):
         **result,
         "openai_usage_dashboard": openai_usage_dashboard_for_user(current_public_user()),
     }), 200 if result.get("ok") else 400
+
+
+@main_bp.route("/api/recipes/reapply_food_rules", methods=["POST"])
+def reapply_recipe_food_rules_route():
+    data = request.get_json(silent=True) or {}
+    recipe_url = ""
+    if isinstance(data, dict):
+        recipe_url = str(
+            data.get("recipe_url")
+            or data.get("url")
+            or data.get("source_url")
+            or ""
+        ).strip()
+    recipe_url = recipe_url or str(request.form.get("recipe_url") or request.form.get("url") or "").strip()
+
+    result = apply_food_rules_to_saved_recipe(recipe_url)
+    status = 200 if result.get("ok") else (404 if "not found" in str(result.get("error", "")).lower() else 400)
+    return jsonify(result), status
+
+
+@main_bp.route("/api/cookbooks/<cookbook_id>/reapply_food_rules", methods=["POST"])
+def reapply_cookbook_food_rules_route(cookbook_id):
+    cookbook = cookbook_for_food_rule_apply(cookbook_id)
+    if not cookbook:
+        return jsonify({"ok": False, "error": "Cookbook was not found."}), 404
+
+    food_rules = load_food_rules()
+    seen_recipe_keys = set()
+    results = []
+
+    for recipe in cookbook.get("recipes", []) or []:
+        recipe_url = str(recipe.get("url") if isinstance(recipe, dict) else "").strip()
+        recipe_key = normalize_recipe_url_key(recipe_url)
+
+        if not recipe_url or not recipe_key or recipe_key in seen_recipe_keys:
+            continue
+
+        seen_recipe_keys.add(recipe_key)
+        results.append(apply_food_rules_to_saved_recipe(recipe_url, food_rules=food_rules))
+
+    checked_results = [result for result in results if result.get("ok")]
+    skipped_results = [result for result in results if not result.get("ok")]
+    flagged_recipe_count = sum(1 for result in checked_results if result.get("needs_review"))
+    flagged_ingredient_count = sum(int(result.get("flagged_ingredients") or 0) for result in checked_results)
+    checked_ingredient_count = sum(int(result.get("checked_ingredients") or 0) for result in checked_results)
+    cookbook_name = cookbook.get("name") or "this cookbook"
+    summary_message = (
+        f"Food rules reapplied to {len(checked_results)} recipe"
+        f"{'' if len(checked_results) == 1 else 's'} in {cookbook_name}. "
+        f"{flagged_ingredient_count} ingredient"
+        f"{'' if flagged_ingredient_count == 1 else 's'} need review."
+    )
+    if skipped_results:
+        summary_message += (
+            f" {len(skipped_results)} recipe"
+            f"{'' if len(skipped_results) == 1 else 's'} skipped."
+        )
+
+    return jsonify({
+        "ok": True,
+        "cookbook_id": cookbook_id,
+        "cookbook_name": cookbook_name,
+        "recipe_count": len(results),
+        "checked_recipe_count": len(checked_results),
+        "skipped_recipe_count": len(skipped_results),
+        "flagged_recipe_count": flagged_recipe_count,
+        "checked_ingredient_count": checked_ingredient_count,
+        "flagged_ingredient_count": flagged_ingredient_count,
+        "summary_message": summary_message,
+        "results": results,
+    })
 
 
 @main_bp.route("/api/cookbooks/restore_recipes", methods=["POST"])

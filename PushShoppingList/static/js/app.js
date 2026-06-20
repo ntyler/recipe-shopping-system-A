@@ -550,19 +550,17 @@ function renderJobWorkerDetails(job) {
     const worker = String((job && job.worker_id) || "").trim();
     const queue = String((job && job.queue_name) || "").trim();
     const rqJobId = String((job && job.rq_job_id) || "").trim();
+    const execution = rqJobId ? "redis/rq" : (worker ? "local/thread" : "not started");
     const parts = [];
 
-    if (worker) {
-        parts.push(`<span>Worker: <strong>${escapeHtml(worker)}</strong></span>`);
-    }
+    parts.push(`<span>Worker: <strong>${escapeHtml(worker || "Not assigned yet")}</strong></span>`);
     if (queue) {
         parts.push(`<span>Queue: <strong>${escapeHtml(queue)}</strong></span>`);
     }
     if (rqJobId) {
         parts.push(`<span>RQ Job: <strong>${escapeHtml(rqJobId)}</strong></span>`);
-    } else if (worker) {
-        parts.push(`<span>Execution: <strong>local/thread</strong></span>`);
     }
+    parts.push(`<span>Execution: <strong>${escapeHtml(execution)}</strong></span>`);
 
     return parts.length ? `<div class="job-activity-worker">${parts.join("")}</div>` : "";
 }
@@ -1117,6 +1115,14 @@ function jobCanStartMenuEnrichment(job) {
         && menuEnrichmentRecipeUrls(job).length > 0
         && !menuImportFollowupBlocksEnrichment(job)
         && !menuEnrichmentAlreadyQueuedForJob(job);
+}
+
+function jobCanResumeMenuGeneration(job) {
+    const jobType = String((job && job.job_type) || "").trim();
+    const status = String((job && job.status) || "").trim().toLowerCase();
+    return jobType === "menu-generate-recipes"
+        && ["cancelled", "failed"].includes(status)
+        && jobSourceUrls(job).length > 0;
 }
 
 function menuJobCountItems(job) {
@@ -1774,6 +1780,54 @@ async function startMenuEnrichmentFromJobActivity(jobId, button, enrichmentMode 
     return false;
 }
 
+async function resumeJobActivityJob(jobId, button) {
+    jobId = String(jobId || "").trim();
+    const summary = jobActivitySummaryElement();
+    if (!jobId) {
+        if (summary) {
+            summary.textContent = "Job is missing.";
+        }
+        return false;
+    }
+
+    const originalText = button ? button.textContent : "";
+    try {
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Continuing...";
+        }
+        const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/resume`, {
+            method: "POST",
+            headers: {
+                "Accept": "application/json",
+                "X-Requested-With": "fetch",
+            },
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) {
+            throw new Error((data && data.error) || "Unable to continue job.");
+        }
+        if (data.job) {
+            renderJobActivityPanel([data.job, ...lastJobActivityJobs]);
+        }
+        if (summary) {
+            const remaining = Number(data.remaining_count || 0);
+            summary.textContent = `Queued continuation for ${remaining || "remaining"} menu item${remaining === 1 ? "" : "s"}.`;
+        }
+        scheduleJobActivityPolling(500);
+    } catch (err) {
+        if (summary) {
+            summary.textContent = err.message || "Unable to continue job.";
+        }
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = originalText || "Continue";
+        }
+    }
+    return false;
+}
+
 async function cancelAllJobActivityJobs(button) {
     const activeJobs = lastJobActivityJobs.filter(job => jobCanCancel(job) && jobActivityJobId(job));
     const summary = jobActivitySummaryElement();
@@ -1897,6 +1951,9 @@ function renderJobActivityRow(job, index = 0) {
     const retryButton = job.status === "failed"
         ? `<button type="button" class="job-activity-row-action" onclick="return retryJobActivityJob('${escapeAttribute(job.id || job.job_id || "")}')">Retry</button>`
         : "";
+    const resumeButton = jobCanResumeMenuGeneration(job)
+        ? `<button type="button" class="job-activity-row-action job-activity-resume-action" onclick="return resumeJobActivityJob('${escapeAttribute(job.id || job.job_id || "")}', this)">Continue</button>`
+        : "";
     const cancelButton = jobCanCancel(job)
         ? `<button type="button" class="job-activity-row-action danger" onclick="return cancelJobActivityJob('${escapeAttribute(job.id || job.job_id || "")}')">Cancel</button>`
         : "";
@@ -1925,6 +1982,7 @@ function renderJobActivityRow(job, index = 0) {
                     <div class="job-activity-step">${escapeHtml(job.current_step || "Queued")}</div>
                     ${currentRecipeHtml}
                     ${modelHtml}
+                    ${workerHtml}
                     <div class="job-activity-progress" aria-label="${percent}% complete">
                         <span style="width: ${percent}%"></span>
                     </div>
@@ -1946,11 +2004,11 @@ function renderJobActivityRow(job, index = 0) {
                     ${openProgressButton}
                     ${startEnrichmentButton}
                     ${cancelButton}
+                    ${resumeButton}
                     ${retryButton}
                 </div>
             </div>
             <div class="job-activity-row-details" data-job-activity-row-details>
-                ${workerHtml}
                 ${sourceHtml}
                 ${stageCountsHtml}
                 ${linkHtml}
@@ -8266,6 +8324,120 @@ async function inferMissingCookbookRecipeDetails(button, event = null) {
         overwriteAiFields,
         previewOnly,
     });
+
+    return false;
+}
+
+async function submitJsonApi(url, payload = {}) {
+    const response = await fetch(url, {
+        method: "POST",
+        headers: {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "X-Requested-With": "fetch",
+        },
+        body: JSON.stringify(payload || {}),
+    });
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+        const error = new Error((data && data.error) || "Request failed.");
+        error.status = response.status;
+        error.data = data;
+        throw error;
+    }
+
+    return data;
+}
+
+function recipeFoodRulesSummary(data = {}) {
+    const checked = Number(data.checked_ingredients || 0);
+    const flagged = Number(data.flagged_ingredients || 0);
+    const name = data.recipe_name || "Recipe";
+    return `${name}: food rules reapplied to ${checked} ingredient${checked === 1 ? "" : "s"}. ${flagged} need review.`;
+}
+
+async function reapplyFoodRulesForCookbook(button, event = null) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const cookbookId = button && button.dataset ? button.dataset.cookbookId || "" : "";
+    const cookbookName = button && button.dataset ? button.dataset.cookbookName || "this cookbook" : "this cookbook";
+    const recipeCount = Number(button && button.dataset ? button.dataset.cookbookRecipeCount || 0 : 0);
+    const originalText = button ? button.textContent : "";
+
+    if (!cookbookId) {
+        setCookbookStatus("Cookbook is required before re-applying food rules.", true);
+        return false;
+    }
+
+    try {
+        closeRecipeEditRowMenus();
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Re-applying...";
+        }
+        const recipeCountText = recipeCount
+            ? `${recipeCount} recipe${recipeCount === 1 ? "" : "s"}`
+            : "recipes";
+        setCookbookStatus(`Re-applying food rules to ${recipeCountText} in ${cookbookName}...`);
+        const data = await submitJsonApi(`/api/cookbooks/${encodeURIComponent(cookbookId)}/reapply_food_rules`);
+        await refreshStoreMarkup({ cacheBust: true });
+        const message = data.summary_message || `Food rules reapplied to ${cookbookName}.`;
+        setCookbookStatus(message);
+        showRecipeQuantityUpdatedMessage("", "", "", message);
+    } catch (err) {
+        console.warn("Unable to re-apply cookbook food rules.", err);
+        setCookbookStatus(err.message || "Unable to re-apply food rules.", true);
+        window.alert(err.message || "Unable to re-apply food rules.");
+    } finally {
+        if (button && button.isConnected) {
+            button.disabled = false;
+            button.textContent = originalText || "Re-apply Food Rules to Cookbook";
+        }
+    }
+
+    return false;
+}
+
+async function reapplyFoodRulesForCookbookRecipe(button, event = null) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const recipeUrl = button && button.dataset ? button.dataset.recipeUrl || "" : "";
+    const originalText = button ? button.textContent : "";
+
+    if (!recipeUrl) {
+        setCookbookStatus("Recipe URL is required before re-applying food rules.", true);
+        return false;
+    }
+
+    try {
+        closeRecipeEditRowMenus();
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Re-applying...";
+        }
+        setCookbookStatus("Re-applying food rules to recipe...");
+        const data = await submitJsonApi("/api/recipes/reapply_food_rules", { recipe_url: recipeUrl });
+        await refreshStoreMarkup({ cacheBust: true });
+        const message = recipeFoodRulesSummary(data);
+        setCookbookStatus(message);
+        showRecipeQuantityUpdatedMessage("", "", "", message);
+    } catch (err) {
+        console.warn("Unable to re-apply recipe food rules.", err);
+        setCookbookStatus(err.message || "Unable to re-apply food rules to this recipe.", true);
+        window.alert(err.message || "Unable to re-apply food rules to this recipe.");
+    } finally {
+        if (button && button.isConnected) {
+            button.disabled = false;
+            button.textContent = originalText || "Re-apply Food Rules to This Recipe";
+        }
+    }
 
     return false;
 }
@@ -20181,6 +20353,7 @@ function addRecipeIngredientRow(item = {}) {
                 <span aria-hidden="true"></span>
             </button>
             <div class="recipe-edit-row-menu" hidden>
+                <button type="button" onclick="return reapplyFoodRulesForIngredient(this)">Re-apply Food Rules</button>
                 <button type="button" onclick="duplicateRecipeIngredientRow(this)">Duplicate ingredient</button>
                 <button type="button" class="recipe-edit-row-collapse-toggle" onclick="toggleRecipeIngredientRowCollapsed(this)">Collapse ingredient</button>
                 <button type="button" onclick="moveRecipeEditRow(this, -1)">Move ingredient up</button>
@@ -21672,6 +21845,94 @@ function recipeIngredientFromChoiceButton(button, sourceRow) {
         store_section: storeSection,
         optional: false,
     };
+}
+
+async function refreshRecipeEditFoodRules() {
+    const response = await fetch("/api/food_rules", {
+        headers: {
+            "Accept": "application/json",
+            "X-Requested-With": "fetch",
+        },
+    });
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+        throw new Error((data && data.error) || "Unable to load food rules.");
+    }
+
+    recipeEditFoodRules = data.food_rules || { require: [], avoid: [] };
+    return recipeEditFoodRules;
+}
+
+function recipeIngredientFoodRuleMarkerCount(rows) {
+    return rows.filter(row => {
+        const marker = row.querySelector(".recipe-edit-food-warning:not([hidden])");
+        return marker && marker.dataset.reviewKind === "food_rule";
+    }).length;
+}
+
+async function reapplyFoodRulesForRecipeIngredients(button) {
+    const rows = [...document.querySelectorAll("#recipeEditIngredients .recipe-edit-ingredient-row")];
+    const originalText = button ? button.textContent : "";
+
+    try {
+        closeRecipeEditRowMenus();
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Re-applying...";
+        }
+        setRecipeEditStatus("Re-applying food rules to ingredients...");
+        await refreshRecipeEditFoodRules();
+        rows.forEach(row => updateRecipeIngredientFoodRuleWarning(row));
+        const flagged = recipeIngredientFoodRuleMarkerCount(rows);
+        setRecipeEditStatus(
+            `Food rules reapplied to ${rows.length} ingredient${rows.length === 1 ? "" : "s"}. ${flagged} need review.`
+        );
+    } catch (err) {
+        console.warn("Unable to re-apply ingredient food rules.", err);
+        setRecipeEditStatus(err.message || "Unable to re-apply food rules.", true);
+    } finally {
+        if (button && button.isConnected) {
+            button.disabled = false;
+            button.textContent = originalText || "Re-apply Food Rules to Ingredients";
+        }
+    }
+
+    return false;
+}
+
+async function reapplyFoodRulesForIngredient(button) {
+    const row = button ? button.closest(".recipe-edit-ingredient-row") : null;
+    const originalText = button ? button.textContent : "";
+
+    if (!row) {
+        closeRecipeEditRowMenus();
+        setRecipeEditStatus("Ingredient row was not found.", true);
+        return false;
+    }
+
+    try {
+        closeRecipeEditRowMenus();
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Re-applying...";
+        }
+        setRecipeEditStatus("Re-applying food rules to ingredient...");
+        await refreshRecipeEditFoodRules();
+        updateRecipeIngredientFoodRuleWarning(row);
+        const flagged = recipeIngredientFoodRuleMarkerCount([row]);
+        setRecipeEditStatus(flagged ? "Food rules reapplied. This ingredient needs review." : "Food rules reapplied. No food-rule review needed.");
+    } catch (err) {
+        console.warn("Unable to re-apply food rules to ingredient.", err);
+        setRecipeEditStatus(err.message || "Unable to re-apply food rules to ingredient.", true);
+    } finally {
+        if (button && button.isConnected) {
+            button.disabled = false;
+            button.textContent = originalText || "Re-apply Food Rules";
+        }
+    }
+
+    return false;
 }
 
 function recipeFoodRuleIssues(text) {
