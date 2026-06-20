@@ -114,6 +114,23 @@ def menu_item_batch_inference_worker_count(batch_total=None):
     return configured
 
 
+def menu_recipe_batch_worker_count(mode="fast", batch_total=None):
+    mode = "full" if str(mode or "").strip().lower() == "full" else "fast"
+    env_name = "MENU_RECIPE_FULL_BATCH_WORKERS" if mode == "full" else "MENU_RECIPE_FAST_BATCH_WORKERS"
+    legacy_value = os.getenv("MENU_ITEM_BATCH_INFERENCE_WORKERS")
+    default = 8 if mode == "full" else 2
+    raw_value = os.getenv(env_name) or legacy_value or str(default)
+    try:
+        configured = int(raw_value)
+    except (TypeError, ValueError):
+        configured = default
+    maximum = 12 if mode == "full" else 4
+    configured = max(1, min(maximum, configured))
+    if batch_total:
+        return max(1, min(configured, int(batch_total)))
+    return configured
+
+
 def menu_followup_worker_count(total=None, env_var="", default=4):
     try:
         configured = int(os.getenv(env_var) or str(default))
@@ -177,6 +194,7 @@ def active_model_metadata(env_var, default_model="", default_source=""):
 
 def job_start_metadata(job):
     from PushShoppingList.services.recipe_extract_service import MODEL
+    from PushShoppingList.services.recipe_extract_service import OPENAI_MENU_FAST_RECIPE_MODEL_ENV_VAR
     from PushShoppingList.services.recipe_extract_service import OPENAI_MENU_RECIPE_MODEL_ENV_VAR
     from PushShoppingList.services.recipe_extract_service import menu_item_recipe_model_resolution
     from PushShoppingList.services.recipe_extract_service import resolve_menu_cleanup_model
@@ -200,11 +218,17 @@ def job_start_metadata(job):
     )
 
     if job_type == "menu-generate-recipes":
-        model_resolution = menu_item_recipe_model_resolution()
+        enrichment_mode = menu_enrichment_mode(payload)
+        model_resolution = menu_item_recipe_model_resolution(enrichment_mode)
+        model_env_var = (
+            OPENAI_MENU_FAST_RECIPE_MODEL_ENV_VAR
+            if enrichment_mode == "fast"
+            else OPENAI_MENU_RECIPE_MODEL_ENV_VAR
+        )
         return model_metadata(
             model_resolution.model,
             model_resolution.source,
-            OPENAI_MENU_RECIPE_MODEL_ENV_VAR,
+            model_env_var,
         )
 
     if job_type == "menu-deferred-heavy-tasks":
@@ -389,14 +413,15 @@ def menu_enrichment_mode(payload=None):
 def menu_recipe_batch_size(mode="fast"):
     mode = "full" if str(mode or "").strip().lower() == "full" else "fast"
     env_name = "MENU_RECIPE_FULL_BATCH_SIZE" if mode == "full" else "MENU_RECIPE_FAST_BATCH_SIZE"
-    default = 8 if mode == "full" else 32
-    return env_int(env_name, default, minimum=1, maximum=50)
+    default = 8 if mode == "full" else 6
+    maximum = 50 if mode == "full" else 12
+    return env_int(env_name, default, minimum=1, maximum=maximum)
 
 
 def menu_recipe_batch_target_chars(mode="fast"):
     mode = "full" if str(mode or "").strip().lower() == "full" else "fast"
     env_name = "MENU_RECIPE_FULL_BATCH_TARGET_CHARS" if mode == "full" else "MENU_RECIPE_FAST_BATCH_TARGET_CHARS"
-    default = 12000 if mode == "full" else 48000
+    default = 12000 if mode == "full" else 9000
     return env_int(env_name, default, minimum=3000, maximum=100000)
 
 
@@ -532,6 +557,8 @@ def run_menu_generate_recipes_job(job_id, payload):
     from PushShoppingList.routes.recipe_routes import record_recipe_import_activity
     from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
     from PushShoppingList.services.recipe_ingredient_service import save_ingredients_for_recipes
+    from PushShoppingList.services.recipe_edit_service import load_recipe_output
+    from PushShoppingList.services.recipe_extract_service import OPENAI_MENU_FAST_RECIPE_MODEL_ENV_VAR
     from PushShoppingList.services.recipe_extract_service import OPENAI_MENU_RECIPE_MODEL_ENV_VAR
     from PushShoppingList.services.recipe_extract_service import build_menu_batch_inference_result
     from PushShoppingList.services.recipe_extract_service import menu_batch_entry_item_name
@@ -566,11 +593,16 @@ def run_menu_generate_recipes_job(job_id, payload):
         return fail_job(job_id, "At least one menu item stub URL is required.")
 
     total = len(recipe_urls)
-    recipe_model_resolution = menu_item_recipe_model_resolution()
+    recipe_model_resolution = menu_item_recipe_model_resolution(enrichment_mode)
+    recipe_model_env_var = (
+        OPENAI_MENU_FAST_RECIPE_MODEL_ENV_VAR
+        if fast_mode
+        else OPENAI_MENU_RECIPE_MODEL_ENV_VAR
+    )
     model_info = stored_job_model_metadata(job_id, model_metadata(
         recipe_model_resolution.model,
         recipe_model_resolution.source,
-        OPENAI_MENU_RECIPE_MODEL_ENV_VAR,
+        recipe_model_env_var,
     ))
     created_urls = []
     skipped_urls = []
@@ -621,6 +653,15 @@ def run_menu_generate_recipes_job(job_id, payload):
     def raise_if_menu_enrichment_cancelled(stage="checkpoint", **fields):
         raise_if_job_cancelled(job_id, task="menu_enrichment", stage=stage, **fields)
 
+    def load_menu_enrichment_stub(recipe_url):
+        if fast_mode:
+            raw_stub = load_recipe_output(recipe_url)
+            if isinstance(raw_stub, dict) and raw_stub:
+                return raw_stub
+
+        loaded_recipe = load_editable_recipe(recipe_url) or {}
+        return loaded_recipe.get("recipe") if isinstance(loaded_recipe, dict) else {}
+
     raise_if_menu_enrichment_cancelled("start")
     update_menu_progress(
         "start",
@@ -647,8 +688,7 @@ def run_menu_generate_recipes_job(job_id, payload):
     load_started = time.perf_counter()
     for index, recipe_url in enumerate(recipe_urls):
         raise_if_menu_enrichment_cancelled("load_menu_stubs", item=index + 1, total=total)
-        loaded_recipe = load_editable_recipe(recipe_url) or {}
-        stub = loaded_recipe.get("recipe") if isinstance(loaded_recipe, dict) else {}
+        stub = load_menu_enrichment_stub(recipe_url)
         stub = stub if isinstance(stub, dict) else {}
         if not stub:
             failed_items += 1
@@ -701,7 +741,7 @@ def run_menu_generate_recipes_job(job_id, payload):
     batch_total = len(batches)
     completed_batches = 0
     predicted_batches_completed = 0
-    batch_worker_count = menu_item_batch_inference_worker_count(batch_total)
+    batch_worker_count = menu_recipe_batch_worker_count(enrichment_mode, batch_total)
     save_progress_every = menu_save_progress_update_every()
     followup_progress_every = menu_followup_progress_update_every()
     job_record = get_job(job_id) or {}
@@ -717,13 +757,17 @@ def run_menu_generate_recipes_job(job_id, payload):
         batch_count=batch_total,
         batch_size=recipe_batch_size,
         target_chars=recipe_batch_target_chars,
+        batch_workers=batch_worker_count,
+        model=recipe_model_resolution.model,
+        model_source=recipe_model_resolution.source,
         elapsed=f"{time.perf_counter() - prepare_started:.3f}s",
     )
 
     print(
         "[MenuRecipeGeneration] action=start "
         f"job_id={job_id} total_items={total} pending_items={len(pending_entries)} "
-        f"mode={enrichment_mode} batch_size={recipe_batch_size}"
+        f"mode={enrichment_mode} batch_size={recipe_batch_size} "
+        f"batch_workers={batch_worker_count} model={recipe_model_resolution.model}"
     )
     if batch_total:
         print(
@@ -731,6 +775,43 @@ def run_menu_generate_recipes_job(job_id, payload):
             f"job_id={job_id} batch_count={batch_total} worker_count={batch_worker_count} "
             f"item_count={len(pending_entries)}"
         )
+
+    def call_infer_prediction_batch(batch, cancellation_check):
+        variants = [
+            {
+                "user_id": inference_user_id,
+                "model_resolution": recipe_model_resolution,
+                "allow_fallback": allow_failed_item_fallback,
+                "cancellation_check": cancellation_check,
+            },
+            {
+                "user_id": inference_user_id,
+                "model_resolution": recipe_model_resolution,
+                "allow_fallback": allow_failed_item_fallback,
+            },
+            {
+                "user_id": inference_user_id,
+                "model_resolution": recipe_model_resolution,
+            },
+            {
+                "user_id": inference_user_id,
+                "allow_fallback": allow_failed_item_fallback,
+            },
+            {
+                "user_id": inference_user_id,
+            },
+        ]
+        last_type_error = None
+        for kwargs in variants:
+            try:
+                return infer_menu_item_recipe_batch(batch, **kwargs)
+            except TypeError as exc:
+                if not any(name in str(exc) for name in ("cancellation_check", "model_resolution", "allow_fallback")):
+                    raise
+                last_type_error = exc
+        if last_type_error:
+            raise last_type_error
+        return infer_menu_item_recipe_batch(batch, user_id=inference_user_id)
 
     def run_prediction_batch(batch_index, batch):
         with job_context(
@@ -766,32 +847,13 @@ def run_menu_generate_recipes_job(job_id, payload):
                 model=model_info.get("model_used") or "",
                 allow_failed_item_fallback=allow_failed_item_fallback,
             )
-            try:
-                result = infer_menu_item_recipe_batch(
-                    batch,
-                    user_id=inference_user_id,
-                    allow_fallback=allow_failed_item_fallback,
-                    cancellation_check=lambda: raise_if_menu_enrichment_cancelled(
-                        "openai_batch_checkpoint",
-                        batch=f"{batch_index}/{batch_total}",
-                    ),
-                )
-            except TypeError as exc:
-                if "cancellation_check" in str(exc):
-                    try:
-                        result = infer_menu_item_recipe_batch(
-                            batch,
-                            user_id=inference_user_id,
-                            allow_fallback=allow_failed_item_fallback,
-                        )
-                    except TypeError as fallback_exc:
-                        if "allow_fallback" not in str(fallback_exc):
-                            raise
-                        result = infer_menu_item_recipe_batch(batch, user_id=inference_user_id)
-                elif "allow_fallback" in str(exc):
-                    result = infer_menu_item_recipe_batch(batch, user_id=inference_user_id)
-                else:
-                    raise
+            result = call_infer_prediction_batch(
+                batch,
+                lambda: raise_if_menu_enrichment_cancelled(
+                    "openai_batch_checkpoint",
+                    batch=f"{batch_index}/{batch_total}",
+                ),
+            )
             raise_if_menu_enrichment_cancelled(
                 "after_openai_batch",
                 batch=f"{batch_index}/{batch_total}",

@@ -14,6 +14,7 @@ from PushShoppingList.services import job_queue_service
 from PushShoppingList.services import job_service
 from PushShoppingList.services import job_tasks
 from PushShoppingList.services import openai_model_service
+from PushShoppingList.services import recipe_edit_service
 from PushShoppingList.services import recipe_ingredient_service
 from PushShoppingList.services import recipe_extract_service
 from PushShoppingList.services import recipe_url_service
@@ -298,6 +299,7 @@ def test_menu_generate_route_returns_trigger_item_source_link(monkeypatch, tmp_p
     configure_job_paths(monkeypatch, tmp_path)
     monkeypatch.setattr(openai_model_service, "MODEL_OVERRIDES_FILE", tmp_path / "openai_model_overrides.json")
     monkeypatch.delenv("OPENAI_MENU_RECIPE_MODEL", raising=False)
+    monkeypatch.delenv("OPENAI_MENU_FAST_RECIPE_MODEL", raising=False)
     recipe_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=spring-roll"
     monkeypatch.setattr(
         job_routes,
@@ -320,9 +322,9 @@ def test_menu_generate_route_returns_trigger_item_source_link(monkeypatch, tmp_p
 
     assert response.status_code == 202
     assert data["job"]["job_type"] == "menu-generate-recipes"
-    assert data["job"]["model_used"] == "gpt-5.5"
-    assert data["job"]["model_source"] == "default:OPENAI_MENU_RECIPE_MODEL"
-    assert data["job"]["model_env_var"] == "OPENAI_MENU_RECIPE_MODEL"
+    assert data["job"]["model_used"] == "gpt-4o-mini"
+    assert data["job"]["model_source"] == "default:OPENAI_MENU_FAST_RECIPE_MODEL"
+    assert data["job"]["model_env_var"] == "OPENAI_MENU_FAST_RECIPE_MODEL"
     assert data["job"]["source_items"][0]["detail"] == "menu item"
     assert data["job"]["source_items"][0]["url"].startswith("/recipe/edit?url=")
     assert data["job"]["source_items"][0]["recipe_url"] == recipe_url
@@ -1147,8 +1149,9 @@ def test_menu_generate_job_bulk_saves_predicted_recipes_with_throttled_progress(
     assert category_updates[-1]["result_payload"]["followup_progress_every"] == 10
 
 
-def test_menu_generate_fast_mode_batches_256_items_by_32_and_skips_heavy_work(monkeypatch, tmp_path, capsys):
+def test_menu_generate_fast_mode_batches_256_items_by_6_and_skips_heavy_work(monkeypatch, tmp_path, capsys):
     configure_job_paths(monkeypatch, tmp_path)
+    monkeypatch.setattr(recipe_edit_service, "OUTPUT_FOLDER", recipe_extract_service.OUTPUT_FOLDER)
     monkeypatch.delenv("MENU_RECIPE_FAST_BATCH_SIZE", raising=False)
     monkeypatch.delenv("MENU_RECIPE_FAST_BATCH_TARGET_CHARS", raising=False)
     monkeypatch.setenv("MENU_ITEM_BATCH_INFERENCE_WORKERS", "1")
@@ -1171,8 +1174,16 @@ def test_menu_generate_fast_mode_batches_256_items_by_32_and_skips_heavy_work(mo
     }
     batch_lengths = []
     allow_fallback_values = []
+    model_values = []
 
-    monkeypatch.setattr(recipe_routes, "load_editable_recipe", lambda url: {"recipe": stubs[url]})
+    for url, stub in stubs.items():
+        recipe_extract_service.save_extracted_recipe_json(url, stub)
+
+    monkeypatch.setattr(
+        recipe_routes,
+        "load_editable_recipe",
+        lambda url: pytest.fail("fast mode should read raw menu stubs without editor/PDF hydration"),
+    )
     monkeypatch.setattr(
         recipe_extract_service,
         "menu_batch_item_from_stub",
@@ -1184,9 +1195,10 @@ def test_menu_generate_fast_mode_batches_256_items_by_32_and_skips_heavy_work(mo
         },
     )
 
-    def fake_infer_batch(batch, user_id=None, allow_fallback=True):
+    def fake_infer_batch(batch, user_id=None, model_resolution=None, allow_fallback=True, cancellation_check=None):
         batch_lengths.append(len(batch))
         allow_fallback_values.append(allow_fallback)
+        model_values.append(getattr(model_resolution, "model", ""))
         return {
             "ok": True,
             "items": {
@@ -1251,10 +1263,13 @@ def test_menu_generate_fast_mode_batches_256_items_by_32_and_skips_heavy_work(mo
     output = capsys.readouterr().out
 
     assert finished["status"] == "completed"
-    assert batch_lengths == [32] * 8
-    assert allow_fallback_values == [False] * 8
+    assert batch_lengths == ([6] * 42) + [4]
+    assert allow_fallback_values == [False] * 43
+    assert model_values == ["gpt-4o-mini"] * 43
     assert finished["result_payload"]["menu_enrichment_mode"] == "fast"
-    assert finished["result_payload"]["recipe_batch_size"] == 32
+    assert finished["result_payload"]["recipe_batch_size"] == 6
+    assert finished["result_payload"]["model_used"] == "gpt-4o-mini"
+    assert finished["result_payload"]["model_env_var"] == "OPENAI_MENU_FAST_RECIPE_MODEL"
     assert finished["result_payload"]["nutrition_completed"] == 0
     assert finished["result_payload"]["category_success_count"] == 0
     assert finished["result_payload"]["pdfs_completed"] == 0

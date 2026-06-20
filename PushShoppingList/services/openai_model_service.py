@@ -54,9 +54,15 @@ OPENAI_MODEL_SETTINGS = (
     },
     {
         "env_var": "OPENAI_MENU_RECIPE_MODEL",
-        "feature": "Menu Recipe Generation",
+        "feature": "Menu Recipe Generation (Full)",
         "default_model": "gpt-5.5",
-        "description": "Background enrichment that turns imported menu item stubs into full AI-inferred recipes.",
+        "description": "Full background enrichment that turns imported menu item stubs into detailed AI-inferred recipes.",
+    },
+    {
+        "env_var": "OPENAI_MENU_FAST_RECIPE_MODEL",
+        "feature": "Menu Recipe Generation (Fast)",
+        "default_model": "gpt-4o-mini",
+        "description": "Fast background enrichment model for smaller menu-item recipe batches.",
     },
     {
         "env_var": "OPENAI_MENU_FAILED_ITEM_MODEL",
@@ -154,6 +160,7 @@ DEFAULT_RECOMMENDED_MODEL_BY_ENV = {
     "OPENAI_MENU_MODEL": "gpt-5.5",
     "OPENAI_MENU_CLEANUP_MODEL": "gpt-5.4-mini",
     "OPENAI_MENU_RECIPE_MODEL": "gpt-5.5",
+    "OPENAI_MENU_FAST_RECIPE_MODEL": "gpt-4o-mini",
     "OPENAI_MENU_FAILED_ITEM_MODEL": "gpt-5.4-mini",
     "OPENAI_VISION_MODEL": "gpt-5.5",
     "OPENAI_RECIPE_MODEL": "gpt-5.5-mini",
@@ -175,6 +182,7 @@ LOWEST_VIABLE_MODEL_BY_ENV = {
     "OPENAI_MENU_MODEL": "gpt-5.4-mini",
     "OPENAI_MENU_CLEANUP_MODEL": "gpt-5.4-nano",
     "OPENAI_MENU_RECIPE_MODEL": "gpt-5.4-mini",
+    "OPENAI_MENU_FAST_RECIPE_MODEL": "gpt-4o-mini",
     "OPENAI_MENU_FAILED_ITEM_MODEL": "gpt-5.4-mini",
     "OPENAI_VISION_MODEL": "gpt-5.4-mini",
     "OPENAI_RECIPE_MODEL": "gpt-5.4-nano",

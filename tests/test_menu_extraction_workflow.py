@@ -14,6 +14,7 @@ def configure_menu_model_defaults(monkeypatch, tmp_path):
     monkeypatch.setattr(openai_model_service, "MODEL_OVERRIDES_FILE", tmp_path / "openai_model_overrides.json")
     monkeypatch.delenv("OPENAI_MENU_MODEL", raising=False)
     monkeypatch.delenv("OPENAI_MENU_RECIPE_MODEL", raising=False)
+    monkeypatch.delenv("OPENAI_MENU_FAST_RECIPE_MODEL", raising=False)
 
 
 def shared_menu_source_pdf(url):
@@ -777,6 +778,27 @@ def test_menu_item_inference_uses_changed_override_file_without_restart(monkeypa
     )
 
 
+def test_fast_menu_recipe_resolution_uses_fast_model_env(monkeypatch, tmp_path):
+    configure_menu_model_defaults(monkeypatch, tmp_path)
+
+    initial = recipe_extract_service.menu_item_recipe_model_resolution("fast")
+    assert initial.model == "gpt-4o-mini"
+    assert initial.source == "default:OPENAI_MENU_FAST_RECIPE_MODEL"
+    assert recipe_extract_service.menu_item_inference_progress_message(initial) == (
+        "Inferring recipes with gpt-4o-mini via OPENAI_MENU_FAST_RECIPE_MODEL"
+    )
+
+    openai_model_service.MODEL_OVERRIDES_FILE.write_text(
+        json.dumps({"models": {"OPENAI_MENU_FAST_RECIPE_MODEL": "gpt-5.4-nano"}}),
+        encoding="utf-8",
+    )
+
+    changed = recipe_extract_service.menu_item_recipe_model_resolution("fast")
+
+    assert changed.model == "gpt-5.4-nano"
+    assert changed.source == "admin override:OPENAI_MENU_FAST_RECIPE_MODEL"
+
+
 def test_menu_stub_result_is_deterministic_without_openai(monkeypatch, tmp_path):
     monkeypatch.delenv("OPENAI_MENU_CLEANUP_ENABLED", raising=False)
     source_url = "https://example.com/menu_home.action?resInput=RES1"
@@ -1221,6 +1243,63 @@ def test_menu_batch_inference_cancel_before_split_prevents_split(monkeypatch, ca
 
     assert calls == [4]
     assert "menu-item-recipe-batch-inference_batch_split" not in output
+
+
+def test_fast_menu_batch_timeout_split_stops_at_max_depth(monkeypatch, capsys):
+    monkeypatch.setenv("MENU_ITEM_BATCH_INFERENCE_RETRY_ATTEMPTS", "1")
+    monkeypatch.delenv("MENU_FAST_RECIPE_BATCH_SPLIT_MAX_DEPTH", raising=False)
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "menu_failed_item_model_resolution",
+        lambda: recipe_extract_service.OpenAIModelResolution("", "disabled", "menu_failed_item"),
+    )
+    entries = [
+        {
+            "recipe_url": f"https://example.com/menu?menu_item={index}",
+            "menu_item": {
+                "menu_item_id": f"item-{index}",
+                "item_name": f"Item {index}",
+                "menu_section": "Entrees",
+            },
+        }
+        for index in range(6)
+    ]
+    calls = []
+
+    def fake_once(batch, user_id=None, model_resolution=None):
+        calls.append(len(batch))
+        return {
+            "ok": False,
+            "items": {},
+            "failures": {},
+            "error_code": "OPENAI_TIMEOUT",
+            "error_message": "OpenAI request timed out.",
+            "technical_message": "Request timed out.",
+            "exception_type": "APITimeoutError",
+            "model": "gpt-4o-mini",
+            "model_source": "test",
+        }
+
+    monkeypatch.setattr(recipe_extract_service, "_infer_menu_item_recipe_batch_once", fake_once)
+
+    result = recipe_extract_service.infer_menu_item_recipe_batch(
+        entries,
+        user_id="owner",
+        model_resolution=recipe_extract_service.OpenAIModelResolution(
+            "gpt-4o-mini",
+            "test",
+            "menu_fast_recipe",
+        ),
+        allow_fallback=False,
+    )
+    output = capsys.readouterr().out
+
+    assert result["ok"] is False
+    assert len(result["failures"]) == 6
+    assert calls == [6, 3, 3]
+    assert "menu-item-recipe-batch-inference_batch_split " in output
+    assert "menu-item-recipe-batch-inference_batch_split_skipped" in output
+    assert "max_depth=1" in output
 
 
 def test_menu_batch_save_cancellation_stops_remaining_saves(monkeypatch, tmp_path):

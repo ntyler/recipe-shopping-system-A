@@ -60,8 +60,8 @@ COMMON_CUISINE_TAGS = (
 )
 
 
-def menu_recipe_generation_model():
-    resolution = menu_item_recipe_model_resolution()
+def menu_recipe_generation_model(mode="fast"):
+    resolution = menu_item_recipe_model_resolution(mode)
     return {
         "model": resolution.model,
         "model_source": resolution.source,

@@ -138,6 +138,8 @@ OPENAI_MENU_MODEL_DEFAULT = "gpt-5.5"
 OPENAI_MENU_MODEL_ENV_VAR = "OPENAI_MENU_MODEL"
 OPENAI_MENU_RECIPE_MODEL_DEFAULT = "gpt-5.5"
 OPENAI_MENU_RECIPE_MODEL_ENV_VAR = "OPENAI_MENU_RECIPE_MODEL"
+OPENAI_MENU_FAST_RECIPE_MODEL_DEFAULT = "gpt-4o-mini"
+OPENAI_MENU_FAST_RECIPE_MODEL_ENV_VAR = "OPENAI_MENU_FAST_RECIPE_MODEL"
 OPENAI_MENU_CLEANUP_MODEL_DEFAULT = "gpt-4o-mini"
 OPENAI_MENU_CLEANUP_MODEL_ENV_VAR = "OPENAI_MENU_CLEANUP_MODEL"
 OPENAI_MENU_FAILED_ITEM_MODEL_DEFAULT = "gpt-5.4-mini"
@@ -167,6 +169,7 @@ print(f"[Recipe AI] OPENAI_API_KEY present: {'yes' if bool(os.getenv('OPENAI_API
 print(f"[Recipe AI] Recipe model: {os.getenv('OPENAI_RECIPE_MODEL') or OPENAI_RECIPE_MODEL_DEFAULT}")
 print(f"[Recipe AI] Menu model: {os.getenv('OPENAI_MENU_MODEL') or OPENAI_MENU_MODEL_DEFAULT}")
 print(f"[Recipe AI] Menu recipe model: {os.getenv(OPENAI_MENU_RECIPE_MODEL_ENV_VAR) or OPENAI_MENU_RECIPE_MODEL_DEFAULT}")
+print(f"[Recipe AI] Menu fast recipe model: {os.getenv(OPENAI_MENU_FAST_RECIPE_MODEL_ENV_VAR) or OPENAI_MENU_FAST_RECIPE_MODEL_DEFAULT}")
 print(f"[Recipe AI] Menu cleanup model: {os.getenv('OPENAI_MENU_CLEANUP_MODEL') or OPENAI_MENU_CLEANUP_MODEL_DEFAULT}")
 print(f"[Recipe AI] Menu failed-item retry model: {os.getenv('OPENAI_MENU_FAILED_ITEM_MODEL') or OPENAI_MENU_FAILED_ITEM_MODEL_DEFAULT}")
 print(f"[Recipe AI] Vision model: {os.getenv('OPENAI_VISION_MODEL') or VISION_MODEL_DEFAULT}")
@@ -341,6 +344,31 @@ def resolve_openai_model(purpose="recipe", preferred_model=None, fallback=False)
         return OpenAIModelResolution(
             model=OPENAI_MENU_RECIPE_MODEL_DEFAULT,
             source=f"default:{OPENAI_MENU_RECIPE_MODEL_DEFAULT}",
+            purpose=purpose,
+        )
+
+    if purpose == "menu_fast_recipe":
+        snapshot = model_snapshot_for_env(OPENAI_MENU_FAST_RECIPE_MODEL_ENV_VAR)
+        if snapshot:
+            return OpenAIModelResolution(
+                model=snapshot["model"],
+                source=snapshot["source"],
+                purpose=purpose,
+            )
+        env_model, env_source = model_value_for_env(
+            OPENAI_MENU_FAST_RECIPE_MODEL_ENV_VAR,
+            OPENAI_MENU_FAST_RECIPE_MODEL_DEFAULT,
+        )
+        env_model = clean_recipe_text(env_model)
+        if env_model:
+            return OpenAIModelResolution(
+                model=env_model,
+                source=f"{env_source}:{OPENAI_MENU_FAST_RECIPE_MODEL_ENV_VAR}",
+                purpose=purpose,
+            )
+        return OpenAIModelResolution(
+            model=OPENAI_MENU_FAST_RECIPE_MODEL_DEFAULT,
+            source=f"default:{OPENAI_MENU_FAST_RECIPE_MODEL_DEFAULT}",
             purpose=purpose,
         )
 
@@ -872,6 +900,7 @@ def openai_runtime_diagnostics(debug_mode=None, reloader_mode=None):
     recipe_resolution = resolve_openai_model("recipe")
     menu_resolution = resolve_openai_model("menu")
     menu_recipe_resolution = resolve_openai_model("menu_recipe")
+    menu_fast_recipe_resolution = resolve_openai_model("menu_fast_recipe")
     vision_resolution = resolve_openai_model("vision")
     return {
         "sys.executable": sys.executable,
@@ -883,6 +912,7 @@ def openai_runtime_diagnostics(debug_mode=None, reloader_mode=None):
         "OPENAI_RECIPE_MODEL": os.getenv("OPENAI_RECIPE_MODEL", ""),
         "OPENAI_MENU_MODEL": os.getenv("OPENAI_MENU_MODEL", ""),
         OPENAI_MENU_RECIPE_MODEL_ENV_VAR: os.getenv(OPENAI_MENU_RECIPE_MODEL_ENV_VAR, ""),
+        OPENAI_MENU_FAST_RECIPE_MODEL_ENV_VAR: os.getenv(OPENAI_MENU_FAST_RECIPE_MODEL_ENV_VAR, ""),
         "OPENAI_VISION_MODEL": os.getenv("OPENAI_VISION_MODEL", ""),
         "resolved_recipe_model": recipe_resolution.model,
         "resolved_recipe_model_source": recipe_resolution.source,
@@ -890,6 +920,8 @@ def openai_runtime_diagnostics(debug_mode=None, reloader_mode=None):
         "resolved_menu_model_source": menu_resolution.source,
         "resolved_menu_recipe_model": menu_recipe_resolution.model,
         "resolved_menu_recipe_model_source": menu_recipe_resolution.source,
+        "resolved_menu_fast_recipe_model": menu_fast_recipe_resolution.model,
+        "resolved_menu_fast_recipe_model_source": menu_fast_recipe_resolution.source,
         "resolved_vision_model": vision_resolution.model,
         "resolved_vision_model_source": vision_resolution.source,
         "flask_debug": bool(debug_mode) if debug_mode is not None else "",
@@ -10373,7 +10405,10 @@ def send_menu_file_prompt_to_openai(prompt_text, file_path, mime_type, filename)
     return response.choices[0].message.content
 
 
-def menu_item_recipe_model_resolution():
+def menu_item_recipe_model_resolution(mode=None):
+    mode = str(mode or "").strip().lower()
+    if mode == "fast":
+        return resolve_openai_model("menu_fast_recipe")
     return resolve_openai_model("menu_recipe")
 
 
@@ -10384,7 +10419,12 @@ def menu_failed_item_model_resolution():
 def menu_model_progress_label(model_resolution):
     model_resolution = model_resolution or menu_item_recipe_model_resolution()
     model = str(getattr(model_resolution, "model", "") or resolve_menu_model()).strip()
-    return f"{model} via {OPENAI_MENU_RECIPE_MODEL_ENV_VAR}"
+    env_var = (
+        OPENAI_MENU_FAST_RECIPE_MODEL_ENV_VAR
+        if getattr(model_resolution, "purpose", "") == "menu_fast_recipe"
+        else OPENAI_MENU_RECIPE_MODEL_ENV_VAR
+    )
+    return f"{model} via {env_var}"
 
 
 def menu_item_inference_progress_message(model_resolution, completed_items=None, total_items=None):
@@ -10403,15 +10443,22 @@ def menu_item_inference_worker_count(total_items=None):
     return configured
 
 
-def menu_item_batch_size_defaults(model_name=None):
-    model = clean_recipe_text(model_name or menu_item_recipe_model_resolution().model).lower()
+def menu_item_batch_size_defaults(model_name=None, mode=None):
+    mode = str(mode or "").strip().lower()
+    if model_name:
+        model = clean_recipe_text(model_name).lower()
+    else:
+        model_resolution = menu_item_recipe_model_resolution(mode) if mode else menu_item_recipe_model_resolution()
+        model = clean_recipe_text(model_resolution.model).lower()
+    if mode == "fast":
+        return 3, 6
     if model == "gpt-4o-mini":
         return 2, 4
     return 6, 12
 
 
-def menu_item_batch_size_limits():
-    default_min, default_max = menu_item_batch_size_defaults()
+def menu_item_batch_size_limits(mode=None, model_name=None):
+    default_min, default_max = menu_item_batch_size_defaults(model_name=model_name, mode=mode)
     try:
         configured_max = int(os.getenv("MENU_ITEM_BATCH_INFERENCE_MAX_ITEMS") or default_max)
     except (TypeError, ValueError):
@@ -10425,9 +10472,14 @@ def menu_item_batch_size_limits():
     return min_items, max_items
 
 
-def menu_item_batch_target_chars(model_name=None):
-    model = clean_recipe_text(model_name or menu_item_recipe_model_resolution().model).lower()
-    default_target = 6500 if model == "gpt-4o-mini" else 9000
+def menu_item_batch_target_chars(model_name=None, mode=None):
+    mode = str(mode or "").strip().lower()
+    if model_name:
+        model = clean_recipe_text(model_name).lower()
+    else:
+        model_resolution = menu_item_recipe_model_resolution(mode) if mode else menu_item_recipe_model_resolution()
+        model = clean_recipe_text(model_resolution.model).lower()
+    default_target = 9000 if mode == "fast" else 6500 if model == "gpt-4o-mini" else 9000
     try:
         return max(3000, int(os.getenv("MENU_ITEM_BATCH_INFERENCE_TARGET_CHARS") or default_target))
     except (TypeError, ValueError):
@@ -10438,9 +10490,9 @@ def menu_item_batch_openai_timeout_seconds():
     configured = (
         os.getenv("OPENAI_MENU_ENRICHMENT_TIMEOUT_SECONDS")
         or os.getenv("MENU_ITEM_BATCH_OPENAI_TIMEOUT_SECONDS")
-        or "15"
+        or "45"
     )
-    return max(5, min(120, _safe_int(configured, 15)))
+    return max(5, min(120, _safe_int(configured, 45)))
 
 
 def menu_cleanup_openai_timeout_seconds():
@@ -11418,6 +11470,17 @@ def menu_item_batch_retry_delay(attempt_index, base_delay, max_delay):
     return min(max(0, delay), max(0, float(max_delay or 0)))
 
 
+def menu_item_batch_split_max_depth(model_resolution=None):
+    is_fast = getattr(model_resolution, "purpose", "") == "menu_fast_recipe"
+    env_name = (
+        "MENU_FAST_RECIPE_BATCH_SPLIT_MAX_DEPTH"
+        if is_fast
+        else "MENU_ITEM_BATCH_INFERENCE_SPLIT_MAX_DEPTH"
+    )
+    default = 1 if is_fast else 4
+    return max(0, min(8, _safe_int(os.getenv(env_name, str(default)), default)))
+
+
 def call_infer_menu_item_recipe_batch_once(entries, user_id=None, model_resolution=None, cancellation_check=None):
     try:
         return _infer_menu_item_recipe_batch_once(
@@ -11723,11 +11786,32 @@ def infer_menu_item_recipe_batch(entries, user_id=None, _depth=0, model_resoluti
             result.setdefault("failures", {})
         return result
 
+    split_max_depth = menu_item_batch_split_max_depth(model_resolution)
+    if _depth >= split_max_depth:
+        result["failures"] = menu_batch_failure_map(entries, result)
+        failed_names = [
+            menu_batch_entry_item_name(entry)
+            for entry in entries
+            if menu_batch_entry_item_name(entry)
+        ]
+        print(
+            "[OpenAI] action=menu-item-recipe-batch-inference_batch_split_skipped "
+            f"batch_size={len(entries)} depth={_depth} max_depth={split_max_depth} "
+            f"reason=max_depth error_code={result.get('error_code') or 'n/a'} "
+            f"exception_type={result.get('exception_type') or 'n/a'} "
+            f"model={result.get('model') or getattr(model_resolution, 'model', '') or ''} "
+            f"failed_item_names={json.dumps(failed_names[:20], ensure_ascii=True)}"
+        )
+        if _depth == 0:
+            log_menu_item_batch_final_failures(entries, result)
+        return result
+
     midpoint = max(1, len(entries) // 2)
     _run_menu_batch_cancellation_check(cancellation_check)
     print(
         "[OpenAI] action=menu-item-recipe-batch-inference_batch_split "
-        f"batch_size={len(entries)} left_size={midpoint} right_size={len(entries) - midpoint} "
+        f"batch_size={len(entries)} depth={_depth} max_depth={split_max_depth} "
+        f"left_size={midpoint} right_size={len(entries) - midpoint} "
         f"error_code={result.get('error_code') or 'n/a'} "
         f"exception_type={result.get('exception_type') or 'n/a'} "
         f"model={result.get('model') or ''}"
