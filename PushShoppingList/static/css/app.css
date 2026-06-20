@@ -9473,6 +9473,7 @@ body {
             word-break: normal;
         }
 
+        .recipe-url-summary-food-review-row,
         .recipe-url-summary-servings,
         .recipe-url-summary-serving-basis,
         .recipe-url-summary-calories,
@@ -9484,6 +9485,12 @@ body {
             color: #aaa;
             font-size: 14px;
             font-weight: 400;
+        }
+
+        .recipe-url-summary-food-review-value {
+            display: inline-flex;
+            align-items: center;
+            min-height: 22px;
         }
 
         .recipe-url-summary-meta-value {
