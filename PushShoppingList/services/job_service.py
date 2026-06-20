@@ -585,6 +585,7 @@ def job_for_client(job, include_input=False):
     if not job:
         return None
 
+    input_payload = job.get("input_payload") if isinstance(job.get("input_payload"), dict) else {}
     model_details = job_model_details(job)
     duration_details = job_duration_details(job)
     payload = {
@@ -613,6 +614,7 @@ def job_for_client(job, include_input=False):
         "attempts": int(job.get("attempts") or 0),
         "retry_count": int(job.get("attempts") or 0),
         "worker_id": job.get("worker_id") or "",
+        "source_job_id": str(input_payload.get("source_job_id") or "").strip(),
         "queued_position": queued_position(job),
         "retry_of": job.get("retry_of") or "",
         "source_items": job_source_items(job),

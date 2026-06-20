@@ -21219,6 +21219,11 @@ img[data-deferred-src] {
             color: #fecaca;
         }
 
+        .job-activity-enrichment-action {
+            border-color: #047857;
+            color: #bbf7d0;
+        }
+
         .job-activity-content {
             display: flex;
             flex-direction: column;
@@ -21336,6 +21341,35 @@ img[data-deferred-src] {
         .job-activity-duration strong {
             color: #fff7ed;
             font-weight: 800;
+        }
+
+        .job-activity-timestamps {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 14px;
+            margin-top: 4px;
+            color: #bfdbfe;
+            font-size: 0.78rem;
+            line-height: 1.35;
+        }
+
+        .job-activity-timestamp {
+            display: inline-flex;
+            gap: 4px;
+            align-items: baseline;
+            white-space: nowrap;
+        }
+
+        .job-activity-timestamp span {
+            color: #93c5fd;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0;
+        }
+
+        .job-activity-timestamp strong {
+            color: #e0f2fe;
+            font-weight: 700;
         }
 
         .job-activity-current-recipe {

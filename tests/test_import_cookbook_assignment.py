@@ -204,7 +204,15 @@ def test_job_activity_can_reopen_import_progress_overlay():
 
     assert "function openJobActivityImportProgress(jobId)" in script
     assert "function reopenImportProgressFromJob(jobId)" in script
+    assert "function menuEnrichmentRecipeUrls(job)" in script
+    assert "function menuEnrichmentAlreadyQueuedForJob(job)" in script
+    assert "function jobCanStartMenuEnrichment(job)" in script
+    assert "function startMenuEnrichmentFromJobActivity(jobId, button)" in script
     assert "Open Popup" in script
+    assert "Start Enrichment" in script
+    assert "waitForCompletion: false" in script
+    assert "sourceJobId: jobId" in script
+    assert 'source_job_id: options.sourceJobId || ""' in script
     assert "hiddenExtractJobId = null" in script
     assert "renderExtractionProgress(importJobToExtractionProgress(job, urls, isMenuExtract, {" in script
     assert "followMenuImportJobChain(finishedJob, urls)" not in script
@@ -259,9 +267,17 @@ def test_job_activity_section_has_clear_collapse_control():
     assert "function renderJobPassedSummary" in script
     assert "function formatJobDurationSeconds" in script
     assert "function renderJobDuration" in script
+    assert "function formatJobActivityDateTime" in script
+    assert "function renderJobActivityTimestamps" in script
+    assert "job-activity-enrichment-action" in script
+    assert "menuEnrichmentAlreadyQueuedForJob(job)" in script
+    assert "${timestampHtml}" in script
+    assert "Initiated" in script
+    assert "Finished" in script
     assert "job-activity-failure-card" in script
     assert "job-activity-source-failed" in script
     assert "job-activity-duration" in script
+    assert "job-activity-timestamps" in script
     assert "job-activity-passed-card" in script
     assert ".job-activity-failures" in css
     assert ".job-activity-filters" in css
@@ -271,6 +287,9 @@ def test_job_activity_section_has_clear_collapse_control():
     assert ".job-activity-passed-items" in css
     assert ".job-activity-source-failed" in css
     assert ".job-activity-duration" in css
+    assert ".job-activity-timestamps" in css
+    assert ".job-activity-timestamp" in css
+    assert ".job-activity-enrichment-action" in css
     assert 'method: "DELETE"' in script
     assert ".job-activity-toolbar" in css
     assert ".job-activity-clear" in css

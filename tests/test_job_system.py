@@ -270,13 +270,18 @@ def test_menu_generate_job_sources_link_to_recipe_item_editor(monkeypatch, tmp_p
 
     job = job_service.create_job(
         "menu-generate-recipes",
-        input_payload={"recipe_urls": [recipe_url]},
+        input_payload={
+            "recipe_urls": [recipe_url],
+            "source_job_id": "job-source-123",
+        },
         user_id="owner",
         total_items=1,
     )
 
     payload = job_service.job_for_client(job)
 
+    assert payload["source_job_id"] == "job-source-123"
+    assert "input_payload" not in payload
     assert payload["source_items"] == [
         {
             "type": "recipe",

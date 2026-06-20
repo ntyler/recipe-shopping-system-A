@@ -1045,6 +1045,51 @@ function menuImportFollowupLabel(job) {
     return "";
 }
 
+function menuEnrichmentRecipeUrls(job) {
+    const result = jobResultPayload(job);
+    const candidates = [
+        result.created_recipe_urls,
+        result.created_urls,
+        result.recipe_urls,
+        result.committed_recipe_urls,
+        jobResultLinks(job).map(link => link && link.recipe_url),
+    ];
+    return uniqueRecipeUrls(candidates.flatMap(items => Array.isArray(items) ? items : []));
+}
+
+function menuEnrichmentAlreadyQueuedForJob(job) {
+    const sourceJobId = jobActivityJobId(job);
+    if (!sourceJobId) {
+        return false;
+    }
+
+    return lastJobActivityJobs.some(candidate => {
+        const jobType = String((candidate && candidate.job_type) || "").trim();
+        const linkedSourceJobId = String((candidate && candidate.source_job_id) || "").trim();
+        return linkedSourceJobId === sourceJobId
+            && ["menu-generate-recipes", "menu-deferred-heavy-tasks"].includes(jobType);
+    });
+}
+
+function jobCanStartMenuEnrichment(job) {
+    const result = jobResultPayload(job);
+    const jobType = String((job && job.job_type) || "").trim();
+    const status = String((job && job.status) || "").trim().toLowerCase();
+    const hasBasicImport = Boolean(
+        result.basic_import_complete
+        || result.staged_import
+        || result.recipe_shells_created
+        || result.stubs_created
+    );
+
+    return jobType === "menu-import"
+        && status === "completed"
+        && hasBasicImport
+        && menuEnrichmentRecipeUrls(job).length > 0
+        && !menuImportFollowupJobId(job)
+        && !menuEnrichmentAlreadyQueuedForJob(job);
+}
+
 function menuJobCountItems(job) {
     const result = jobResultPayload(job);
     const countItems = [
@@ -1267,6 +1312,61 @@ function renderJobDuration(job) {
             ${escapeHtml(summary.label)}: <strong>${escapeHtml(summary.value)}</strong>
         </span>
     `;
+}
+
+function formatJobActivityDateTime(value) {
+    const millis = jobTimestampMillis(value);
+    if (millis === null) {
+        return "";
+    }
+    return new Date(millis).toLocaleString([], {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+    });
+}
+
+function renderJobActivityTimestamps(job) {
+    const initiated = formatJobActivityDateTime(job && (job.created_at || job.started_at));
+    const finishedSource = job && (
+        job.finished_at
+        || job.completed_at
+        || (jobIsFinished(job) ? job.updated_at : "")
+    );
+    const finished = formatJobActivityDateTime(finishedSource);
+    const started = formatJobActivityDateTime(job && job.started_at);
+
+    if (!initiated && !finished && !started) {
+        return "";
+    }
+
+    const items = [];
+    if (initiated) {
+        items.push(`
+            <span class="job-activity-timestamp">
+                <span>Initiated</span>
+                <strong>${escapeHtml(initiated)}</strong>
+            </span>
+        `);
+    }
+    if (started && started !== initiated) {
+        items.push(`
+            <span class="job-activity-timestamp">
+                <span>Started</span>
+                <strong>${escapeHtml(started)}</strong>
+            </span>
+        `);
+    }
+    items.push(`
+        <span class="job-activity-timestamp">
+            <span>Finished</span>
+            <strong>${escapeHtml(finished || "Not finished yet")}</strong>
+        </span>
+    `);
+
+    return `<div class="job-activity-timestamps">${items.join("")}</div>`;
 }
 
 function jobActivityDateString(value) {
@@ -1566,6 +1666,45 @@ function mergeJobActivityUpdates(updatedJobs, existingJobs = lastJobActivityJobs
     ]);
 }
 
+async function startMenuEnrichmentFromJobActivity(jobId, button) {
+    jobId = String(jobId || "").trim();
+    const summary = jobActivitySummaryElement();
+    if (!jobId) {
+        if (summary) {
+            summary.textContent = "Menu import job is missing.";
+        }
+        return false;
+    }
+
+    try {
+        let sourceJob = lastJobActivityJobs.find(job => jobActivityJobId(job) === jobId) || null;
+        if (!sourceJob) {
+            sourceJob = await fetchJobStatus(jobId);
+        }
+        const recipeUrls = menuEnrichmentRecipeUrls(sourceJob);
+        if (!recipeUrls.length) {
+            throw new Error("This menu import does not have saved recipe shells to enrich.");
+        }
+
+        await startMenuRecipeGeneration(recipeUrls, button, {
+            waitForCompletion: false,
+            runDeferredHeavyTasks: true,
+            sourceJobId: jobId,
+        });
+
+        if (summary) {
+            summary.textContent = `Queued background enrichment for ${recipeUrls.length} menu item${recipeUrls.length === 1 ? "" : "s"}.`;
+        }
+        await refreshJobActivityPanel();
+    } catch (err) {
+        if (summary) {
+            summary.textContent = err.message || "Unable to start background enrichment.";
+        }
+    }
+
+    return false;
+}
+
 async function cancelAllJobActivityJobs(button) {
     const activeJobs = lastJobActivityJobs.filter(job => jobIsActive(job) && jobActivityJobId(job));
     const summary = jobActivitySummaryElement();
@@ -1657,6 +1796,7 @@ function renderJobActivityRow(job, index = 0) {
     const stageCountsHtml = renderJobStageCounts(job);
     const currentRecipeHtml = renderJobCurrentRecipe(job);
     const durationHtml = renderJobDuration(job);
+    const timestampHtml = renderJobActivityTimestamps(job);
     const active = jobIsActive(job);
     const sourceCount = jobSourceItems(job).length;
     const jobId = String(job.id || job.job_id || "").trim();
@@ -1680,6 +1820,9 @@ function renderJobActivityRow(job, index = 0) {
     `;
     const openProgressButton = jobCanOpenImportProgress(job)
         ? `<button type="button" class="job-activity-row-action" onclick="return openJobActivityImportProgress('${escapeAttribute(job.id || job.job_id || "")}')">Open Popup</button>`
+        : "";
+    const startEnrichmentButton = jobCanStartMenuEnrichment(job)
+        ? `<button type="button" class="job-activity-row-action job-activity-enrichment-action" onclick="return startMenuEnrichmentFromJobActivity('${escapeAttribute(job.id || job.job_id || "")}', this)">Start Enrichment</button>`
         : "";
     const retryButton = job.status === "failed"
         ? `<button type="button" class="job-activity-row-action" onclick="return retryJobActivityJob('${escapeAttribute(job.id || job.job_id || "")}')">Retry</button>`
@@ -1722,6 +1865,7 @@ function renderJobActivityRow(job, index = 0) {
                         ${sourceCount ? `<span>${escapeHtml(String(sourceCount))} source${sourceCount === 1 ? "" : "s"}</span>` : ""}
                         ${links.length ? `<span>${escapeHtml(String(links.length))} result${links.length === 1 ? "" : "s"}</span>` : ""}
                     </div>
+                    ${timestampHtml}
                     ${error ? `<div class="job-activity-error">${escapeHtml(error)}</div>` : ""}
                     ${failureSummaryHtml}
                     ${passedSummaryHtml}
@@ -1730,6 +1874,7 @@ function renderJobActivityRow(job, index = 0) {
                 <div class="job-activity-actions">
                     ${detailsToggleButton}
                     ${openProgressButton}
+                    ${startEnrichmentButton}
                     ${cancelButton}
                     ${retryButton}
                 </div>
@@ -28932,10 +29077,15 @@ async function startMenuRecipeGeneration(urls, button, options = {}) {
             recipe_urls: urls,
             force_reprocess: forceReprocess,
             run_deferred_heavy_tasks: options.runDeferredHeavyTasks !== false,
+            source_job_id: options.sourceJobId || "",
         },
     });
     if (!startData || !startData.job_id) {
         throw new Error("Unable to start menu recipe generation.");
+    }
+    if (options.waitForCompletion === false) {
+        syncOpenAiUsageDashboardFromResponse(startData);
+        return true;
     }
 
     const finishedJob = await waitForJobCompletion(startData.job_id, {
