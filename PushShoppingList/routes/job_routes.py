@@ -27,6 +27,8 @@ from PushShoppingList.services.job_service import retryable_job_type
 from PushShoppingList.services.job_service import update_job
 from PushShoppingList.services.job_service import user_can_access_job
 from PushShoppingList.services.recipe_extract_service import MODEL
+from PushShoppingList.services.recipe_extract_service import OPENAI_MENU_RECIPE_MODEL_ENV_VAR
+from PushShoppingList.services.recipe_extract_service import menu_item_recipe_model_resolution
 from PushShoppingList.services.recipe_extract_service import resolve_menu_cleanup_model
 from PushShoppingList.services.recipe_extract_service import resolve_menu_cleanup_model_source
 from PushShoppingList.services.recipe_extract_service import resolve_menu_model
@@ -257,11 +259,12 @@ def start_menu_generate_recipes_job_route():
     }
     if enrichment_mode:
         payload["menu_enrichment_mode"] = enrichment_mode
+    recipe_model_resolution = menu_item_recipe_model_resolution()
     payload = with_model_metadata(
         payload,
-        model_used=resolve_menu_model(),
-        model_source=resolve_menu_model_source(),
-        model_env_var="OPENAI_MENU_MODEL",
+        model_used=recipe_model_resolution.model,
+        model_source=recipe_model_resolution.source,
+        model_env_var=OPENAI_MENU_RECIPE_MODEL_ENV_VAR,
     )
     return create_and_enqueue("menu-generate-recipes", payload, total_items=len(urls))
 

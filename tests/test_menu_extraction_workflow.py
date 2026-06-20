@@ -11,6 +11,7 @@ from PushShoppingList.services import recipe_extract_service
 def configure_menu_model_defaults(monkeypatch, tmp_path):
     monkeypatch.setattr(openai_model_service, "MODEL_OVERRIDES_FILE", tmp_path / "openai_model_overrides.json")
     monkeypatch.delenv("OPENAI_MENU_MODEL", raising=False)
+    monkeypatch.delenv("OPENAI_MENU_RECIPE_MODEL", raising=False)
 
 
 def shared_menu_source_pdf(url):
@@ -610,8 +611,8 @@ def test_menu_item_result_preserves_original_menu_url_and_unique_record_url(monk
     assert result["menu_sections_found"] == 1
     assert result["menu_items_found"] == 1
     assert result["recipes_created"] == 1
-    assert result["model_used"] == "gpt-5.5"
-    assert result["model_source"] == "default:gpt-5.5"
+    assert result["model_used"] == "gpt-5.5-mini"
+    assert result["model_source"] == "default:OPENAI_MENU_RECIPE_MODEL"
     assert result["recipes"][0]["source_url"].startswith(source_url + "&menu_item=")
     assert saved[0][1]["source_url"] == source_url
     assert saved[0][1]["recipe_record_url"].startswith(source_url + "&menu_item=")
@@ -693,9 +694,9 @@ def test_menu_item_parallel_inference_preserves_original_menu_order(monkeypatch,
     ]
 
 
-def test_menu_item_inference_progress_shows_openai_menu_model_env_var(monkeypatch, tmp_path):
+def test_menu_item_inference_progress_shows_openai_menu_recipe_model_env_var(monkeypatch, tmp_path):
     configure_menu_model_defaults(monkeypatch, tmp_path)
-    monkeypatch.setenv("OPENAI_MENU_MODEL", "gpt-4o-mini")
+    monkeypatch.setenv("OPENAI_MENU_RECIPE_MODEL", "gpt-5.5-mini")
     source_url = "https://example.com/menu_home.action?resInput=RES1"
     sections = [
         {
@@ -747,30 +748,30 @@ def test_menu_item_inference_progress_shows_openai_menu_model_env_var(monkeypatc
     )
 
     assert result["ok"] is True
-    assert result["model_used"] == "gpt-4o-mini"
-    assert result["model_source"] == "environment:OPENAI_MENU_MODEL"
-    assert progress_messages[0] == "Inferring recipes with gpt-4o-mini via OPENAI_MENU_MODEL"
-    assert progress_messages[-1] == "Inferring recipes with gpt-4o-mini via OPENAI_MENU_MODEL (1/1)"
+    assert result["model_used"] == "gpt-5.5-mini"
+    assert result["model_source"] == "environment:OPENAI_MENU_RECIPE_MODEL"
+    assert progress_messages[0] == "Inferring recipes with gpt-5.5-mini via OPENAI_MENU_RECIPE_MODEL"
+    assert progress_messages[-1] == "Inferring recipes with gpt-5.5-mini via OPENAI_MENU_RECIPE_MODEL (1/1)"
 
 
 def test_menu_item_inference_uses_changed_override_file_without_restart(monkeypatch, tmp_path):
     configure_menu_model_defaults(monkeypatch, tmp_path)
 
     initial = recipe_extract_service.menu_item_recipe_model_resolution()
-    assert initial.model == "gpt-5.5"
-    assert initial.source == "default:gpt-5.5"
+    assert initial.model == "gpt-5.5-mini"
+    assert initial.source == "default:OPENAI_MENU_RECIPE_MODEL"
 
     openai_model_service.MODEL_OVERRIDES_FILE.write_text(
-        json.dumps({"models": {"OPENAI_MENU_MODEL": "gpt-4o-mini"}}),
+        json.dumps({"models": {"OPENAI_MENU_RECIPE_MODEL": "gpt-5.5"}}),
         encoding="utf-8",
     )
 
     changed = recipe_extract_service.menu_item_recipe_model_resolution()
 
-    assert changed.model == "gpt-4o-mini"
-    assert changed.source == "admin override:OPENAI_MENU_MODEL"
+    assert changed.model == "gpt-5.5"
+    assert changed.source == "admin override:OPENAI_MENU_RECIPE_MODEL"
     assert recipe_extract_service.menu_item_inference_progress_message(changed) == (
-        "Inferring recipes with gpt-4o-mini via OPENAI_MENU_MODEL"
+        "Inferring recipes with gpt-5.5 via OPENAI_MENU_RECIPE_MODEL"
     )
 
 
@@ -1045,6 +1046,25 @@ def test_menu_batch_inference_uses_failed_item_fallback_model(monkeypatch, capsy
     ]
     assert "action=menu-item-recipe-failed-item-fallback_start" in output
     assert "action=menu-item-recipe-failed-item-fallback_ready" in output
+
+
+def test_menu_batch_payload_uses_embedded_menu_item_id_when_outer_key_is_name():
+    payload = {
+        "Spring Roll": {
+            "menu_item_id": "item-1",
+            "predicted_ingredients": [{"ingredient": "rice paper"}],
+        },
+        "Pad Thai": {
+            "id": "item-2",
+            "predicted_ingredients": [{"ingredient": "rice noodles"}],
+        },
+    }
+
+    items = recipe_extract_service._coerce_batch_inference_payload(payload)
+
+    assert sorted(items) == ["item-1", "item-2"]
+    assert items["item-1"]["predicted_ingredients"][0]["ingredient"] == "rice paper"
+    assert items["item-2"]["predicted_ingredients"][0]["ingredient"] == "rice noodles"
 
 
 def test_menu_batch_inference_retries_with_backoff_before_success(monkeypatch):

@@ -77,10 +77,10 @@ def bounded_percent(index, total, start=0, end=100):
 
 def menu_item_batch_inference_worker_count(batch_total=None):
     try:
-        configured = int(os.getenv("MENU_ITEM_BATCH_INFERENCE_WORKERS") or "3")
+        configured = int(os.getenv("MENU_ITEM_BATCH_INFERENCE_WORKERS") or "6")
     except (TypeError, ValueError):
-        configured = 3
-    configured = max(1, min(6, configured))
+        configured = 6
+    configured = max(1, min(12, configured))
     if batch_total:
         return max(1, min(configured, int(batch_total)))
     return configured
@@ -149,6 +149,8 @@ def active_model_metadata(env_var, default_model="", default_source=""):
 
 def job_start_metadata(job):
     from PushShoppingList.services.recipe_extract_service import MODEL
+    from PushShoppingList.services.recipe_extract_service import OPENAI_MENU_RECIPE_MODEL_ENV_VAR
+    from PushShoppingList.services.recipe_extract_service import menu_item_recipe_model_resolution
     from PushShoppingList.services.recipe_extract_service import resolve_menu_cleanup_model
     from PushShoppingList.services.recipe_extract_service import resolve_menu_cleanup_model_source
     from PushShoppingList.services.recipe_extract_service import resolve_menu_model
@@ -170,7 +172,12 @@ def job_start_metadata(job):
     )
 
     if job_type == "menu-generate-recipes":
-        return model_metadata(resolve_menu_model(), resolve_menu_model_source(), "OPENAI_MENU_MODEL")
+        model_resolution = menu_item_recipe_model_resolution()
+        return model_metadata(
+            model_resolution.model,
+            model_resolution.source,
+            OPENAI_MENU_RECIPE_MODEL_ENV_VAR,
+        )
 
     if job_type == "menu-deferred-heavy-tasks":
         return active_model_metadata(
@@ -369,6 +376,13 @@ def menu_recipe_fast_target_seconds():
     return env_int("MENU_RECIPE_FAST_TARGET_SECONDS", 120, minimum=1, maximum=7200)
 
 
+def menu_recipe_failed_item_fallback_enabled(mode="fast"):
+    mode = "full" if str(mode or "").strip().lower() == "full" else "fast"
+    if mode == "full":
+        return env_bool("MENU_RECIPE_FULL_USE_FAILED_ITEM_FALLBACK", True)
+    return env_bool("MENU_RECIPE_FAST_USE_FAILED_ITEM_FALLBACK", False)
+
+
 def log_menu_enrichment_stage(stage, **fields):
     parts = ["[Menu Enrichment]"]
     job_id = fields.pop("job_id", "")
@@ -488,13 +502,13 @@ def run_menu_generate_recipes_job(job_id, payload):
     from PushShoppingList.routes.recipe_routes import import_recipe_title
     from PushShoppingList.routes.recipe_routes import load_editable_recipe
     from PushShoppingList.routes.recipe_routes import record_recipe_import_activity
-    from PushShoppingList.routes.recipe_routes import resolve_menu_model
-    from PushShoppingList.routes.recipe_routes import resolve_menu_model_source
     from PushShoppingList.scripts.sort_ingredients import main as sort_ingredients
     from PushShoppingList.services.recipe_ingredient_service import save_ingredients_for_recipes
+    from PushShoppingList.services.recipe_extract_service import OPENAI_MENU_RECIPE_MODEL_ENV_VAR
     from PushShoppingList.services.recipe_extract_service import build_menu_batch_inference_result
     from PushShoppingList.services.recipe_extract_service import menu_batch_entry_item_name
     from PushShoppingList.services.recipe_extract_service import infer_menu_item_recipe_batch
+    from PushShoppingList.services.recipe_extract_service import menu_item_recipe_model_resolution
     from PushShoppingList.services.recipe_extract_service import menu_batch_item_from_stub
     from PushShoppingList.services.recipe_extract_service import menu_inference_batches
     from PushShoppingList.services.recipe_extract_service import menu_item_name_is_blank_divider
@@ -513,6 +527,7 @@ def run_menu_generate_recipes_job(job_id, payload):
     run_heavy_tasks = (not fast_mode) and payload_bool(payload, "run_deferred_heavy_tasks", True)
     recipe_batch_size = menu_recipe_batch_size(enrichment_mode)
     recipe_batch_target_chars = menu_recipe_batch_target_chars(enrichment_mode)
+    allow_failed_item_fallback = menu_recipe_failed_item_fallback_enabled(enrichment_mode)
     raw_urls = payload.get("recipe_urls") or payload.get("urls")
     if isinstance(raw_urls, str):
         raw_urls = [line.strip() for line in raw_urls.splitlines() if line.strip()]
@@ -523,10 +538,11 @@ def run_menu_generate_recipes_job(job_id, payload):
         return fail_job(job_id, "At least one menu item stub URL is required.")
 
     total = len(recipe_urls)
+    recipe_model_resolution = menu_item_recipe_model_resolution()
     model_info = stored_job_model_metadata(job_id, model_metadata(
-        resolve_menu_model(),
-        resolve_menu_model_source(),
-        "OPENAI_MENU_MODEL",
+        recipe_model_resolution.model,
+        recipe_model_resolution.source,
+        OPENAI_MENU_RECIPE_MODEL_ENV_VAR,
     ))
     created_urls = []
     skipped_urls = []
@@ -711,8 +727,18 @@ def run_menu_generate_recipes_job(job_id, payload):
                 batch=f"{batch_index}/{batch_total}",
                 size=len(batch or []),
                 model=model_info.get("model_used") or "",
+                allow_failed_item_fallback=allow_failed_item_fallback,
             )
-            result = infer_menu_item_recipe_batch(batch, user_id=inference_user_id)
+            try:
+                result = infer_menu_item_recipe_batch(
+                    batch,
+                    user_id=inference_user_id,
+                    allow_fallback=allow_failed_item_fallback,
+                )
+            except TypeError as exc:
+                if "allow_fallback" not in str(exc):
+                    raise
+                result = infer_menu_item_recipe_batch(batch, user_id=inference_user_id)
             log_menu_enrichment_stage(
                 "openai_batch",
                 job_id=job_id,

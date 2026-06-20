@@ -53,6 +53,12 @@ OPENAI_MODEL_SETTINGS = (
         "description": "One-call menu item normalization plus likely equipment prediction before lightweight menu stubs are saved.",
     },
     {
+        "env_var": "OPENAI_MENU_RECIPE_MODEL",
+        "feature": "Menu Recipe Generation",
+        "default_model": "gpt-5.5-mini",
+        "description": "Background enrichment that turns imported menu item stubs into full AI-inferred recipes.",
+    },
+    {
         "env_var": "OPENAI_MENU_FAILED_ITEM_MODEL",
         "feature": "Failed Menu Item Retry",
         "default_model": "gpt-5.4-mini",
@@ -147,6 +153,7 @@ OPENAI_MODEL_SETTINGS = (
 DEFAULT_RECOMMENDED_MODEL_BY_ENV = {
     "OPENAI_MENU_MODEL": "gpt-5.5",
     "OPENAI_MENU_CLEANUP_MODEL": "gpt-5.5-mini",
+    "OPENAI_MENU_RECIPE_MODEL": "gpt-5.5-mini",
     "OPENAI_MENU_FAILED_ITEM_MODEL": "gpt-5.5-mini",
     "OPENAI_VISION_MODEL": "gpt-5.5",
     "OPENAI_RECIPE_MODEL": "gpt-5.5-mini",
@@ -167,6 +174,7 @@ DEFAULT_RECOMMENDED_MODEL_BY_ENV = {
 LOWEST_VIABLE_MODEL_BY_ENV = {
     "OPENAI_MENU_MODEL": "gpt-5.4-mini",
     "OPENAI_MENU_CLEANUP_MODEL": "gpt-5.4-nano",
+    "OPENAI_MENU_RECIPE_MODEL": "gpt-5.4-mini",
     "OPENAI_MENU_FAILED_ITEM_MODEL": "gpt-5.4-mini",
     "OPENAI_VISION_MODEL": "gpt-5.4-mini",
     "OPENAI_RECIPE_MODEL": "gpt-5.4-nano",

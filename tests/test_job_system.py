@@ -13,6 +13,7 @@ from PushShoppingList.services import guest_session_service
 from PushShoppingList.services import job_queue_service
 from PushShoppingList.services import job_service
 from PushShoppingList.services import job_tasks
+from PushShoppingList.services import openai_model_service
 from PushShoppingList.services import recipe_ingredient_service
 from PushShoppingList.services import recipe_extract_service
 from PushShoppingList.services import recipe_url_service
@@ -295,6 +296,8 @@ def test_menu_generate_job_sources_link_to_recipe_item_editor(monkeypatch, tmp_p
 
 def test_menu_generate_route_returns_trigger_item_source_link(monkeypatch, tmp_path):
     configure_job_paths(monkeypatch, tmp_path)
+    monkeypatch.setattr(openai_model_service, "MODEL_OVERRIDES_FILE", tmp_path / "openai_model_overrides.json")
+    monkeypatch.delenv("OPENAI_MENU_RECIPE_MODEL", raising=False)
     recipe_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=spring-roll"
     monkeypatch.setattr(
         job_routes,
@@ -317,6 +320,9 @@ def test_menu_generate_route_returns_trigger_item_source_link(monkeypatch, tmp_p
 
     assert response.status_code == 202
     assert data["job"]["job_type"] == "menu-generate-recipes"
+    assert data["job"]["model_used"] == "gpt-5.5-mini"
+    assert data["job"]["model_source"] == "default:OPENAI_MENU_RECIPE_MODEL"
+    assert data["job"]["model_env_var"] == "OPENAI_MENU_RECIPE_MODEL"
     assert data["job"]["source_items"][0]["detail"] == "menu item"
     assert data["job"]["source_items"][0]["url"].startswith("/recipe/edit?url=")
     assert data["job"]["source_items"][0]["recipe_url"] == recipe_url
@@ -1143,8 +1149,8 @@ def test_menu_generate_job_bulk_saves_predicted_recipes_with_throttled_progress(
 
 def test_menu_generate_fast_mode_batches_256_items_by_16_and_skips_heavy_work(monkeypatch, tmp_path, capsys):
     configure_job_paths(monkeypatch, tmp_path)
-    monkeypatch.setenv("MENU_RECIPE_FAST_BATCH_SIZE", "16")
-    monkeypatch.setenv("MENU_RECIPE_FAST_BATCH_TARGET_CHARS", "100000")
+    monkeypatch.delenv("MENU_RECIPE_FAST_BATCH_SIZE", raising=False)
+    monkeypatch.delenv("MENU_RECIPE_FAST_BATCH_TARGET_CHARS", raising=False)
     monkeypatch.setenv("MENU_ITEM_BATCH_INFERENCE_WORKERS", "1")
     recipe_urls = [
         f"https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=item-{index}"
@@ -1164,6 +1170,7 @@ def test_menu_generate_fast_mode_batches_256_items_by_16_and_skips_heavy_work(mo
         for index, url in enumerate(recipe_urls)
     }
     batch_lengths = []
+    allow_fallback_values = []
 
     monkeypatch.setattr(recipe_routes, "load_editable_recipe", lambda url: {"recipe": stubs[url]})
     monkeypatch.setattr(
@@ -1177,8 +1184,9 @@ def test_menu_generate_fast_mode_batches_256_items_by_16_and_skips_heavy_work(mo
         },
     )
 
-    def fake_infer_batch(batch, user_id=None):
+    def fake_infer_batch(batch, user_id=None, allow_fallback=True):
         batch_lengths.append(len(batch))
+        allow_fallback_values.append(allow_fallback)
         return {
             "ok": True,
             "items": {
@@ -1244,6 +1252,7 @@ def test_menu_generate_fast_mode_batches_256_items_by_16_and_skips_heavy_work(mo
 
     assert finished["status"] == "completed"
     assert batch_lengths == [16] * 16
+    assert allow_fallback_values == [False] * 16
     assert finished["result_payload"]["menu_enrichment_mode"] == "fast"
     assert finished["result_payload"]["recipe_batch_size"] == 16
     assert finished["result_payload"]["nutrition_completed"] == 0

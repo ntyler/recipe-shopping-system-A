@@ -99,6 +99,13 @@ def _safe_float(value, default):
         return float(default)
 
 
+def env_flag(name, default=False):
+    value = os.getenv(name)
+    if value is None or str(value).strip() == "":
+        return bool(default)
+    return str(value).strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
 def is_job_cancelled_exception(exc):
     return exc.__class__.__name__ == "JobCancelled"
 
@@ -129,6 +136,8 @@ VISION_MODEL_FALLBACK = "gpt-4o-mini"
 OPENAI_RECIPE_MODEL_DEFAULT = "gpt-4o-mini"
 OPENAI_MENU_MODEL_DEFAULT = "gpt-5.5"
 OPENAI_MENU_MODEL_ENV_VAR = "OPENAI_MENU_MODEL"
+OPENAI_MENU_RECIPE_MODEL_DEFAULT = "gpt-5.5-mini"
+OPENAI_MENU_RECIPE_MODEL_ENV_VAR = "OPENAI_MENU_RECIPE_MODEL"
 OPENAI_MENU_CLEANUP_MODEL_DEFAULT = "gpt-4o-mini"
 OPENAI_MENU_CLEANUP_MODEL_ENV_VAR = "OPENAI_MENU_CLEANUP_MODEL"
 OPENAI_MENU_FAILED_ITEM_MODEL_DEFAULT = "gpt-5.4-mini"
@@ -157,6 +166,7 @@ VISION_MAX_RETRIES = _safe_int(
 print(f"[Recipe AI] OPENAI_API_KEY present: {'yes' if bool(os.getenv('OPENAI_API_KEY')) else 'no'}")
 print(f"[Recipe AI] Recipe model: {os.getenv('OPENAI_RECIPE_MODEL') or OPENAI_RECIPE_MODEL_DEFAULT}")
 print(f"[Recipe AI] Menu model: {os.getenv('OPENAI_MENU_MODEL') or OPENAI_MENU_MODEL_DEFAULT}")
+print(f"[Recipe AI] Menu recipe model: {os.getenv(OPENAI_MENU_RECIPE_MODEL_ENV_VAR) or OPENAI_MENU_RECIPE_MODEL_DEFAULT}")
 print(f"[Recipe AI] Menu cleanup model: {os.getenv('OPENAI_MENU_CLEANUP_MODEL') or OPENAI_MENU_CLEANUP_MODEL_DEFAULT}")
 print(f"[Recipe AI] Menu failed-item retry model: {os.getenv('OPENAI_MENU_FAILED_ITEM_MODEL') or OPENAI_MENU_FAILED_ITEM_MODEL_DEFAULT}")
 print(f"[Recipe AI] Vision model: {os.getenv('OPENAI_VISION_MODEL') or VISION_MODEL_DEFAULT}")
@@ -306,6 +316,31 @@ def resolve_openai_model(purpose="recipe", preferred_model=None, fallback=False)
         return OpenAIModelResolution(
             model=OPENAI_MENU_MODEL_DEFAULT,
             source="default:gpt-5.5",
+            purpose=purpose,
+        )
+
+    if purpose == "menu_recipe":
+        snapshot = model_snapshot_for_env(OPENAI_MENU_RECIPE_MODEL_ENV_VAR)
+        if snapshot:
+            return OpenAIModelResolution(
+                model=snapshot["model"],
+                source=snapshot["source"],
+                purpose=purpose,
+            )
+        env_model, env_source = model_value_for_env(
+            OPENAI_MENU_RECIPE_MODEL_ENV_VAR,
+            OPENAI_MENU_RECIPE_MODEL_DEFAULT,
+        )
+        env_model = clean_recipe_text(env_model)
+        if env_model:
+            return OpenAIModelResolution(
+                model=env_model,
+                source=f"{env_source}:{OPENAI_MENU_RECIPE_MODEL_ENV_VAR}",
+                purpose=purpose,
+            )
+        return OpenAIModelResolution(
+            model=OPENAI_MENU_RECIPE_MODEL_DEFAULT,
+            source=f"default:{OPENAI_MENU_RECIPE_MODEL_DEFAULT}",
             purpose=purpose,
         )
 
@@ -835,6 +870,8 @@ def build_vision_debug(uploaded_file_path="", filename="", mime_type=""):
 
 def openai_runtime_diagnostics(debug_mode=None, reloader_mode=None):
     recipe_resolution = resolve_openai_model("recipe")
+    menu_resolution = resolve_openai_model("menu")
+    menu_recipe_resolution = resolve_openai_model("menu_recipe")
     vision_resolution = resolve_openai_model("vision")
     return {
         "sys.executable": sys.executable,
@@ -845,11 +882,14 @@ def openai_runtime_diagnostics(debug_mode=None, reloader_mode=None):
         "OPENAI_API_KEY_present": "yes" if bool(os.getenv("OPENAI_API_KEY")) else "no",
         "OPENAI_RECIPE_MODEL": os.getenv("OPENAI_RECIPE_MODEL", ""),
         "OPENAI_MENU_MODEL": os.getenv("OPENAI_MENU_MODEL", ""),
+        OPENAI_MENU_RECIPE_MODEL_ENV_VAR: os.getenv(OPENAI_MENU_RECIPE_MODEL_ENV_VAR, ""),
         "OPENAI_VISION_MODEL": os.getenv("OPENAI_VISION_MODEL", ""),
         "resolved_recipe_model": recipe_resolution.model,
         "resolved_recipe_model_source": recipe_resolution.source,
-        "resolved_menu_model": resolve_openai_model("menu").model,
-        "resolved_menu_model_source": resolve_openai_model("menu").source,
+        "resolved_menu_model": menu_resolution.model,
+        "resolved_menu_model_source": menu_resolution.source,
+        "resolved_menu_recipe_model": menu_recipe_resolution.model,
+        "resolved_menu_recipe_model_source": menu_recipe_resolution.source,
         "resolved_vision_model": vision_resolution.model,
         "resolved_vision_model_source": vision_resolution.source,
         "flask_debug": bool(debug_mode) if debug_mode is not None else "",
@@ -10334,7 +10374,7 @@ def send_menu_file_prompt_to_openai(prompt_text, file_path, mime_type, filename)
 
 
 def menu_item_recipe_model_resolution():
-    return resolve_openai_model("menu")
+    return resolve_openai_model("menu_recipe")
 
 
 def menu_failed_item_model_resolution():
@@ -10344,7 +10384,7 @@ def menu_failed_item_model_resolution():
 def menu_model_progress_label(model_resolution):
     model_resolution = model_resolution or menu_item_recipe_model_resolution()
     model = str(getattr(model_resolution, "model", "") or resolve_menu_model()).strip()
-    return f"{model} via {OPENAI_MENU_MODEL_ENV_VAR}"
+    return f"{model} via {OPENAI_MENU_RECIPE_MODEL_ENV_VAR}"
 
 
 def menu_item_inference_progress_message(model_resolution, completed_items=None, total_items=None):
@@ -10404,6 +10444,14 @@ def menu_cleanup_openai_timeout_seconds():
 
 def menu_failed_item_fallback_batch_size():
     return max(1, min(8, _safe_int(os.getenv("MENU_FAILED_ITEM_FALLBACK_BATCH_SIZE", "4"), 4)))
+
+
+def menu_failed_item_fallback_max_items():
+    return max(0, min(50, _safe_int(os.getenv("MENU_FAILED_ITEM_FALLBACK_MAX_ITEMS", "4"), 4)))
+
+
+def menu_failed_item_fallback_enabled():
+    return env_flag("MENU_FAILED_ITEM_FALLBACK_ENABLED", True)
 
 
 MENU_ITEM_BATCH_SPLITTABLE_ERROR_CODES = {
@@ -11148,11 +11196,14 @@ def _coerce_batch_inference_payload(payload):
                 keyed[item_id] = item
         return keyed
     if isinstance(candidates, dict):
-        return {
-            clean_recipe_text(key): value
-            for key, value in candidates.items()
-            if clean_recipe_text(key) and isinstance(value, dict)
-        }
+        keyed = {}
+        for key, value in candidates.items():
+            if not isinstance(value, dict):
+                continue
+            item_id = clean_recipe_text(value.get("menu_item_id") or value.get("id") or key)
+            if item_id:
+                keyed[item_id] = value
+        return keyed
     return {}
 
 
@@ -11463,6 +11514,9 @@ def mark_menu_batch_missing_items(entries, result):
 
 
 def menu_failed_item_fallback_is_available(primary_model_resolution=None):
+    if not menu_failed_item_fallback_enabled():
+        return False, OpenAIModelResolution("", "disabled:MENU_FAILED_ITEM_FALLBACK_ENABLED", "menu_failed_item")
+
     fallback_resolution = menu_failed_item_model_resolution()
     fallback_model = clean_recipe_text(getattr(fallback_resolution, "model", ""))
     if not fallback_model:
@@ -11512,6 +11566,17 @@ def retry_menu_batch_failures_with_fallback(entries, result, user_id=None, prima
             f"failed_count={len(failed_entries)} "
             f"primary_model={getattr(primary_model_resolution, 'model', '') or result.get('model') or ''} "
             f"fallback_model={getattr(fallback_resolution, 'model', '') or 'disabled'}"
+        )
+        return result
+
+    max_items = menu_failed_item_fallback_max_items()
+    if max_items and len(failed_entries) > max_items:
+        print(
+            "[OpenAI] action=menu-item-recipe-failed-item-fallback_skipped "
+            f"failed_count={len(failed_entries)} "
+            f"max_items={max_items} reason=too_many_failed_items "
+            f"primary_model={getattr(primary_model_resolution, 'model', '') or result.get('model') or ''} "
+            f"fallback_model={fallback_resolution.model}"
         )
         return result
 
