@@ -2777,6 +2777,7 @@ function afterDynamicMarkupLoaded(options = {}) {
     bindRecipeQuantityInputs();
     bindRecipeNameInputs();
     bindCookbooks();
+    bindRecipeEditorPrefetch();
     bindImportCookbookSelector();
     bindStoreButtons();
     bindSectionHeaderToggles();
@@ -16805,6 +16806,9 @@ let recipeEditPointerDrag = null;
 let recipeEditPdfRefreshTimer = null;
 let recipeEditPdfRefreshToken = 0;
 let recipeEditReturnState = null;
+let recipeEditorPrefetchBound = false;
+const RECIPE_EDITOR_CACHE_TTL_MS = 60 * 1000;
+const recipeEditorDataCache = new Map();
 const RECIPE_EDIT_CATEGORY_FIELD_NAMES = CATEGORY_FIELD_NAMES;
 const RECIPE_EDIT_CATEGORY_ALL_FIELD_NAMES = CATEGORY_ALL_FIELD_NAMES;
 const RECIPE_EDIT_PDF_FIELD_ALIASES = {
@@ -16862,7 +16866,58 @@ const RECIPE_EDIT_MENU_METADATA_URL_LINKS = [
 ];
 let recipeEditMenuSourceOptions = [];
 
-async function fetchRecipeEditorData(url) {
+function normalizedRecipeEditorCacheKey(url) {
+    return String(url || "").trim();
+}
+
+function recipeEditorCacheEntryIsFresh(entry) {
+    return Boolean(
+        entry
+        && entry.recipe
+        && Number.isFinite(entry.savedAt)
+        && Date.now() - entry.savedAt < RECIPE_EDITOR_CACHE_TTL_MS
+    );
+}
+
+function rememberRecipeEditorData(url, data) {
+    const key = normalizedRecipeEditorCacheKey(url);
+    const recipe = data && data.recipe ? data.recipe : data;
+
+    if (!key || !recipe || typeof recipe !== "object") {
+        return recipe || {};
+    }
+
+    recipeEditorDataCache.set(key, {
+        savedAt: Date.now(),
+        recipe,
+        storeSections: Array.isArray(data && data.store_sections) ? data.store_sections : recipeEditStoreSections,
+        foodRules: data && data.food_rules ? data.food_rules : recipeEditFoodRules,
+    });
+
+    return recipe;
+}
+
+function applyRecipeEditorDataContext(entry) {
+    if (!entry) {
+        return;
+    }
+
+    recipeEditStoreSections = Array.isArray(entry.storeSections) ? entry.storeSections : [];
+    recipeEditFoodRules = entry.foodRules || { require: [], avoid: [] };
+}
+
+function invalidateRecipeEditorCache(url = "") {
+    const key = normalizedRecipeEditorCacheKey(url);
+
+    if (key) {
+        recipeEditorDataCache.delete(key);
+        return;
+    }
+
+    recipeEditorDataCache.clear();
+}
+
+async function fetchRecipeEditorDataFromServer(url) {
     const response = await fetch(`/api/recipe?url=${encodeURIComponent(url)}`, {
         cache: "no-store",
     });
@@ -16872,9 +16927,85 @@ async function fetchRecipeEditorData(url) {
         throw new Error((data && data.error) || "Unable to load recipe.");
     }
 
-    recipeEditStoreSections = data.store_sections || [];
-    recipeEditFoodRules = data.food_rules || { require: [], avoid: [] };
-    return data.recipe || {};
+    return data;
+}
+
+async function fetchRecipeEditorData(url, options = {}) {
+    const key = normalizedRecipeEditorCacheKey(url);
+    const useCache = options.useCache !== false;
+    const cached = useCache ? recipeEditorDataCache.get(key) : null;
+
+    if (recipeEditorCacheEntryIsFresh(cached)) {
+        applyRecipeEditorDataContext(cached);
+        return cached.recipe;
+    }
+    if (useCache && cached && cached.promise) {
+        await cached.promise;
+        const fresh = recipeEditorDataCache.get(key);
+        if (recipeEditorCacheEntryIsFresh(fresh)) {
+            applyRecipeEditorDataContext(fresh);
+            return fresh.recipe;
+        }
+    }
+
+    const data = await fetchRecipeEditorDataFromServer(key);
+    const recipe = rememberRecipeEditorData(key, data);
+    const fresh = recipeEditorDataCache.get(key);
+    applyRecipeEditorDataContext(fresh);
+    return recipe;
+}
+
+function prefetchRecipeEditorData(url) {
+    const key = normalizedRecipeEditorCacheKey(url);
+    const cached = recipeEditorDataCache.get(key);
+
+    if (!key || recipeEditorCacheEntryIsFresh(cached) || (cached && cached.promise)) {
+        return;
+    }
+
+    const promise = fetchRecipeEditorDataFromServer(key)
+        .then(data => {
+            rememberRecipeEditorData(key, data);
+        })
+        .catch(err => {
+            recipeEditorDataCache.delete(key);
+            console.debug("Recipe editor prefetch skipped.", err);
+        });
+
+    recipeEditorDataCache.set(key, {
+        savedAt: Date.now(),
+        promise,
+    });
+}
+
+function prefetchRecipeEditorDataFromTarget(target) {
+    const trigger = target && target.closest
+        ? target.closest(
+            "[data-recipe-url][onclick*='openRecipeEditor'], "
+            + "[data-recipe-url][onclick*='openRecipeFoodReviewFromRecipeView'], "
+            + "[data-recipe-url][onclick*='openIngredientFoodReviewFromRecipeView'], "
+            + "[data-recipe-url][onclick*='openRecipeEditPageFromMenu']"
+        )
+        : null;
+    const recipeUrl = trigger ? trigger.dataset.recipeUrl || "" : "";
+
+    if (recipeUrl) {
+        prefetchRecipeEditorData(recipeUrl);
+    }
+}
+
+function bindRecipeEditorPrefetch() {
+    if (recipeEditorPrefetchBound || !document.body) {
+        return;
+    }
+
+    recipeEditorPrefetchBound = true;
+    document.body.addEventListener("pointerover", event => {
+        prefetchRecipeEditorDataFromTarget(event.target);
+    }, { passive: true });
+    document.body.addEventListener("focusin", event => {
+        prefetchRecipeEditorDataFromTarget(event.target);
+    });
 }
 
 function recipeEditCategoryValuesFromRecipe(recipe = {}) {
@@ -22358,6 +22489,14 @@ async function saveRecipeEditor(event) {
         if (!response.ok || !data.ok) {
             throw new Error((data && data.error) || "Unable to save recipe.");
         }
+        invalidateRecipeEditorCache(payload.original_url);
+        if (data.recipe) {
+            rememberRecipeEditorData(data.recipe.source_url || payload.recipe.source_url || payload.original_url, {
+                recipe: data.recipe,
+                store_sections: recipeEditStoreSections,
+                food_rules: recipeEditFoodRules,
+            });
+        }
 
         updateRecipeSaveProgressItem(0, "done", "Saved");
         updateRecipeSaveProgressItem(1, "done", "Updated");
@@ -22595,6 +22734,16 @@ async function inferMissingRecipeDetails(button) {
         if (!response.ok || !data.ok) {
             throw new Error((data && data.error) || "Unable to infer missing recipe details.");
         }
+        if (!previewOnly) {
+            invalidateRecipeEditorCache(recipeUrl);
+            if (data.recipe) {
+                rememberRecipeEditorData(data.recipe.source_url || data.recipe_url || recipeUrl, {
+                    recipe: data.recipe,
+                    store_sections: recipeEditStoreSections,
+                    food_rules: recipeEditFoodRules,
+                });
+            }
+        }
 
         syncOpenAiUsageDashboardFromResponse(data);
         if (!previewOnly) {
@@ -22678,12 +22827,20 @@ async function createRecipeEditorPdf(button) {
         if (!saveResponse.ok || !saveData.ok) {
             throw new Error((saveData && saveData.error) || "Unable to save recipe.");
         }
+        invalidateRecipeEditorCache(payload.original_url);
 
         const sourceUrl = (
             saveData.recipe && saveData.recipe.source_url
                 ? saveData.recipe.source_url
                 : payload.recipe.source_url || payload.original_url
         );
+        if (saveData.recipe) {
+            rememberRecipeEditorData(sourceUrl, {
+                recipe: saveData.recipe,
+                store_sections: recipeEditStoreSections,
+                food_rules: recipeEditFoodRules,
+            });
+        }
 
         const recipeForPdfCheck = saveData.recipe && typeof saveData.recipe === "object"
             ? saveData.recipe
