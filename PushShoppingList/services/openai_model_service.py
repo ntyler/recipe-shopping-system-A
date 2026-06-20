@@ -55,7 +55,7 @@ OPENAI_MODEL_SETTINGS = (
     {
         "env_var": "OPENAI_MENU_RECIPE_MODEL",
         "feature": "Menu Recipe Generation",
-        "default_model": "gpt-5.5-mini",
+        "default_model": "gpt-5.5",
         "description": "Background enrichment that turns imported menu item stubs into full AI-inferred recipes.",
     },
     {
@@ -152,9 +152,9 @@ OPENAI_MODEL_SETTINGS = (
 
 DEFAULT_RECOMMENDED_MODEL_BY_ENV = {
     "OPENAI_MENU_MODEL": "gpt-5.5",
-    "OPENAI_MENU_CLEANUP_MODEL": "gpt-5.5-mini",
-    "OPENAI_MENU_RECIPE_MODEL": "gpt-5.5-mini",
-    "OPENAI_MENU_FAILED_ITEM_MODEL": "gpt-5.5-mini",
+    "OPENAI_MENU_CLEANUP_MODEL": "gpt-5.4-mini",
+    "OPENAI_MENU_RECIPE_MODEL": "gpt-5.5",
+    "OPENAI_MENU_FAILED_ITEM_MODEL": "gpt-5.4-mini",
     "OPENAI_VISION_MODEL": "gpt-5.5",
     "OPENAI_RECIPE_MODEL": "gpt-5.5-mini",
     "OPENAI_COOKBOOK_ITEM_MODEL": "gpt-5.5-mini",

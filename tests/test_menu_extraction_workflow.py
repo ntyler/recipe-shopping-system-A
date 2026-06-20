@@ -611,7 +611,7 @@ def test_menu_item_result_preserves_original_menu_url_and_unique_record_url(monk
     assert result["menu_sections_found"] == 1
     assert result["menu_items_found"] == 1
     assert result["recipes_created"] == 1
-    assert result["model_used"] == "gpt-5.5-mini"
+    assert result["model_used"] == "gpt-5.5"
     assert result["model_source"] == "default:OPENAI_MENU_RECIPE_MODEL"
     assert result["recipes"][0]["source_url"].startswith(source_url + "&menu_item=")
     assert saved[0][1]["source_url"] == source_url
@@ -696,7 +696,7 @@ def test_menu_item_parallel_inference_preserves_original_menu_order(monkeypatch,
 
 def test_menu_item_inference_progress_shows_openai_menu_recipe_model_env_var(monkeypatch, tmp_path):
     configure_menu_model_defaults(monkeypatch, tmp_path)
-    monkeypatch.setenv("OPENAI_MENU_RECIPE_MODEL", "gpt-5.5-mini")
+    monkeypatch.setenv("OPENAI_MENU_RECIPE_MODEL", "gpt-5.5")
     source_url = "https://example.com/menu_home.action?resInput=RES1"
     sections = [
         {
@@ -748,30 +748,30 @@ def test_menu_item_inference_progress_shows_openai_menu_recipe_model_env_var(mon
     )
 
     assert result["ok"] is True
-    assert result["model_used"] == "gpt-5.5-mini"
+    assert result["model_used"] == "gpt-5.5"
     assert result["model_source"] == "environment:OPENAI_MENU_RECIPE_MODEL"
-    assert progress_messages[0] == "Inferring recipes with gpt-5.5-mini via OPENAI_MENU_RECIPE_MODEL"
-    assert progress_messages[-1] == "Inferring recipes with gpt-5.5-mini via OPENAI_MENU_RECIPE_MODEL (1/1)"
+    assert progress_messages[0] == "Inferring recipes with gpt-5.5 via OPENAI_MENU_RECIPE_MODEL"
+    assert progress_messages[-1] == "Inferring recipes with gpt-5.5 via OPENAI_MENU_RECIPE_MODEL (1/1)"
 
 
 def test_menu_item_inference_uses_changed_override_file_without_restart(monkeypatch, tmp_path):
     configure_menu_model_defaults(monkeypatch, tmp_path)
 
     initial = recipe_extract_service.menu_item_recipe_model_resolution()
-    assert initial.model == "gpt-5.5-mini"
+    assert initial.model == "gpt-5.5"
     assert initial.source == "default:OPENAI_MENU_RECIPE_MODEL"
 
     openai_model_service.MODEL_OVERRIDES_FILE.write_text(
-        json.dumps({"models": {"OPENAI_MENU_RECIPE_MODEL": "gpt-5.5"}}),
+        json.dumps({"models": {"OPENAI_MENU_RECIPE_MODEL": "gpt-5.4-mini"}}),
         encoding="utf-8",
     )
 
     changed = recipe_extract_service.menu_item_recipe_model_resolution()
 
-    assert changed.model == "gpt-5.5"
+    assert changed.model == "gpt-5.4-mini"
     assert changed.source == "admin override:OPENAI_MENU_RECIPE_MODEL"
     assert recipe_extract_service.menu_item_inference_progress_message(changed) == (
-        "Inferring recipes with gpt-5.5 via OPENAI_MENU_RECIPE_MODEL"
+        "Inferring recipes with gpt-5.4-mini via OPENAI_MENU_RECIPE_MODEL"
     )
 
 

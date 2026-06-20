@@ -77,9 +77,9 @@ def bounded_percent(index, total, start=0, end=100):
 
 def menu_item_batch_inference_worker_count(batch_total=None):
     try:
-        configured = int(os.getenv("MENU_ITEM_BATCH_INFERENCE_WORKERS") or "6")
+        configured = int(os.getenv("MENU_ITEM_BATCH_INFERENCE_WORKERS") or "8")
     except (TypeError, ValueError):
-        configured = 6
+        configured = 8
     configured = max(1, min(12, configured))
     if batch_total:
         return max(1, min(configured, int(batch_total)))
@@ -361,14 +361,14 @@ def menu_enrichment_mode(payload=None):
 def menu_recipe_batch_size(mode="fast"):
     mode = "full" if str(mode or "").strip().lower() == "full" else "fast"
     env_name = "MENU_RECIPE_FULL_BATCH_SIZE" if mode == "full" else "MENU_RECIPE_FAST_BATCH_SIZE"
-    default = 8 if mode == "full" else 16
+    default = 8 if mode == "full" else 32
     return env_int(env_name, default, minimum=1, maximum=50)
 
 
 def menu_recipe_batch_target_chars(mode="fast"):
     mode = "full" if str(mode or "").strip().lower() == "full" else "fast"
     env_name = "MENU_RECIPE_FULL_BATCH_TARGET_CHARS" if mode == "full" else "MENU_RECIPE_FAST_BATCH_TARGET_CHARS"
-    default = 12000 if mode == "full" else 24000
+    default = 12000 if mode == "full" else 48000
     return env_int(env_name, default, minimum=3000, maximum=100000)
 
 

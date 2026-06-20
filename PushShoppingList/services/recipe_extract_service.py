@@ -136,7 +136,7 @@ VISION_MODEL_FALLBACK = "gpt-4o-mini"
 OPENAI_RECIPE_MODEL_DEFAULT = "gpt-4o-mini"
 OPENAI_MENU_MODEL_DEFAULT = "gpt-5.5"
 OPENAI_MENU_MODEL_ENV_VAR = "OPENAI_MENU_MODEL"
-OPENAI_MENU_RECIPE_MODEL_DEFAULT = "gpt-5.5-mini"
+OPENAI_MENU_RECIPE_MODEL_DEFAULT = "gpt-5.5"
 OPENAI_MENU_RECIPE_MODEL_ENV_VAR = "OPENAI_MENU_RECIPE_MODEL"
 OPENAI_MENU_CLEANUP_MODEL_DEFAULT = "gpt-4o-mini"
 OPENAI_MENU_CLEANUP_MODEL_ENV_VAR = "OPENAI_MENU_CLEANUP_MODEL"
@@ -10435,7 +10435,7 @@ def menu_item_batch_target_chars(model_name=None):
 
 
 def menu_item_batch_openai_timeout_seconds():
-    return max(5, min(120, _safe_int(os.getenv("MENU_ITEM_BATCH_OPENAI_TIMEOUT_SECONDS", "18"), 18)))
+    return max(5, min(120, _safe_int(os.getenv("MENU_ITEM_BATCH_OPENAI_TIMEOUT_SECONDS", "45"), 45)))
 
 
 def menu_cleanup_openai_timeout_seconds():

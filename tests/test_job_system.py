@@ -320,7 +320,7 @@ def test_menu_generate_route_returns_trigger_item_source_link(monkeypatch, tmp_p
 
     assert response.status_code == 202
     assert data["job"]["job_type"] == "menu-generate-recipes"
-    assert data["job"]["model_used"] == "gpt-5.5-mini"
+    assert data["job"]["model_used"] == "gpt-5.5"
     assert data["job"]["model_source"] == "default:OPENAI_MENU_RECIPE_MODEL"
     assert data["job"]["model_env_var"] == "OPENAI_MENU_RECIPE_MODEL"
     assert data["job"]["source_items"][0]["detail"] == "menu item"
@@ -1147,7 +1147,7 @@ def test_menu_generate_job_bulk_saves_predicted_recipes_with_throttled_progress(
     assert category_updates[-1]["result_payload"]["followup_progress_every"] == 10
 
 
-def test_menu_generate_fast_mode_batches_256_items_by_16_and_skips_heavy_work(monkeypatch, tmp_path, capsys):
+def test_menu_generate_fast_mode_batches_256_items_by_32_and_skips_heavy_work(monkeypatch, tmp_path, capsys):
     configure_job_paths(monkeypatch, tmp_path)
     monkeypatch.delenv("MENU_RECIPE_FAST_BATCH_SIZE", raising=False)
     monkeypatch.delenv("MENU_RECIPE_FAST_BATCH_TARGET_CHARS", raising=False)
@@ -1251,10 +1251,10 @@ def test_menu_generate_fast_mode_batches_256_items_by_16_and_skips_heavy_work(mo
     output = capsys.readouterr().out
 
     assert finished["status"] == "completed"
-    assert batch_lengths == [16] * 16
-    assert allow_fallback_values == [False] * 16
+    assert batch_lengths == [32] * 8
+    assert allow_fallback_values == [False] * 8
     assert finished["result_payload"]["menu_enrichment_mode"] == "fast"
-    assert finished["result_payload"]["recipe_batch_size"] == 16
+    assert finished["result_payload"]["recipe_batch_size"] == 32
     assert finished["result_payload"]["nutrition_completed"] == 0
     assert finished["result_payload"]["category_success_count"] == 0
     assert finished["result_payload"]["pdfs_completed"] == 0
