@@ -1666,8 +1666,9 @@ function mergeJobActivityUpdates(updatedJobs, existingJobs = lastJobActivityJobs
     ]);
 }
 
-async function startMenuEnrichmentFromJobActivity(jobId, button) {
+async function startMenuEnrichmentFromJobActivity(jobId, button, enrichmentMode = "fast") {
     jobId = String(jobId || "").trim();
+    enrichmentMode = String(enrichmentMode || "").trim().toLowerCase() === "full" ? "full" : "fast";
     const summary = jobActivitySummaryElement();
     if (!jobId) {
         if (summary) {
@@ -1688,12 +1689,14 @@ async function startMenuEnrichmentFromJobActivity(jobId, button) {
 
         await startMenuRecipeGeneration(recipeUrls, button, {
             waitForCompletion: false,
-            runDeferredHeavyTasks: true,
+            enrichmentMode,
+            runDeferredHeavyTasks: enrichmentMode === "full",
             sourceJobId: jobId,
         });
 
         if (summary) {
-            summary.textContent = `Queued background enrichment for ${recipeUrls.length} menu item${recipeUrls.length === 1 ? "" : "s"}.`;
+            const label = enrichmentMode === "full" ? "full recipe enrichment" : "fast recipe generation";
+            summary.textContent = `Queued ${label} for ${recipeUrls.length} menu item${recipeUrls.length === 1 ? "" : "s"}.`;
         }
         await refreshJobActivityPanel();
     } catch (err) {
@@ -1822,7 +1825,8 @@ function renderJobActivityRow(job, index = 0) {
         ? `<button type="button" class="job-activity-row-action" onclick="return openJobActivityImportProgress('${escapeAttribute(job.id || job.job_id || "")}')">Open Popup</button>`
         : "";
     const startEnrichmentButton = jobCanStartMenuEnrichment(job)
-        ? `<button type="button" class="job-activity-row-action job-activity-enrichment-action" onclick="return startMenuEnrichmentFromJobActivity('${escapeAttribute(job.id || job.job_id || "")}', this)">Start Enrichment</button>`
+        ? `<button type="button" class="job-activity-row-action job-activity-enrichment-action" onclick="return startMenuEnrichmentFromJobActivity('${escapeAttribute(job.id || job.job_id || "")}', this, 'fast')">Generate Fast Recipes</button>
+           <button type="button" class="job-activity-row-action job-activity-enrichment-action" onclick="return startMenuEnrichmentFromJobActivity('${escapeAttribute(job.id || job.job_id || "")}', this, 'full')">Generate Full Recipes</button>`
         : "";
     const retryButton = job.status === "failed"
         ? `<button type="button" class="job-activity-row-action" onclick="return retryJobActivityJob('${escapeAttribute(job.id || job.job_id || "")}')">Retry</button>`
@@ -29065,8 +29069,10 @@ async function startMenuRecipeGeneration(urls, button, options = {}) {
         alert("Select at least one menu recipe.");
         return false;
     }
+    const enrichmentMode = String(options.enrichmentMode || "fast").trim().toLowerCase() === "full" ? "full" : "fast";
     const forceReprocess = Boolean(options.forceReprocess);
-    if (urls.length > 25 && !window.confirm(`This will run batched AI inference for ${urls.length} menu items and may increase API cost. Continue?`)) {
+    const modeLabel = enrichmentMode === "full" ? "full recipe enrichment" : "fast recipe generation";
+    if (urls.length > 25 && !window.confirm(`This will run ${modeLabel} for ${urls.length} menu items and may increase API cost. Continue?`)) {
         return false;
     }
 
@@ -29076,7 +29082,8 @@ async function startMenuRecipeGeneration(urls, button, options = {}) {
         payload: {
             recipe_urls: urls,
             force_reprocess: forceReprocess,
-            run_deferred_heavy_tasks: options.runDeferredHeavyTasks !== false,
+            menu_enrichment_mode: enrichmentMode,
+            run_deferred_heavy_tasks: enrichmentMode === "full" && options.runDeferredHeavyTasks !== false,
             source_job_id: options.sourceJobId || "",
         },
     });
@@ -29114,6 +29121,9 @@ async function startMenuDeferredHeavyTasks(urls, button, options = {}) {
         payload: {
             recipe_urls: urls,
             force_reprocess: Boolean(options.forceReprocess),
+            run_nutrition: options.runNutrition !== false,
+            run_categories: options.runCategories !== false,
+            run_generated_pdfs: Boolean(options.runGeneratedPdfs),
         },
     });
     if (!startData || !startData.job_id) {
@@ -29294,6 +29304,18 @@ async function generateMenuStubRecipe(button, event) {
     return false;
 }
 
+async function generateMenuStubFullRecipe(button, event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    const recipeUrl = recipeUrlFromElement(button);
+    if (!recipeUrl) {
+        return false;
+    }
+    return runFullRoutineForMenuRecipeUrls([recipeUrl], [recipeUrl], button, "Select at least one menu recipe.");
+}
+
 async function generateMenuStubSection(button, event) {
     if (event) {
         event.preventDefault();
@@ -29306,6 +29328,20 @@ async function generateMenuStubSection(button, event) {
         alert(err.message || "Unable to generate menu section.");
     }
     return false;
+}
+
+async function generateMenuStubFullSection(button, event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    const sectionName = button && button.dataset ? button.dataset.menuSection || "" : "";
+    return runFullRoutineForMenuRecipeUrls(
+        menuRecipeUrlsForSection(sectionName),
+        menuStubRecipeUrlsForSection(sectionName),
+        button,
+        "No menu recipes were found for this section."
+    );
 }
 
 async function generateSelectedMenuStubRecipes(button) {
@@ -29386,7 +29422,24 @@ function estimateNutritionForSelectedRecipes(button) {
     return false;
 }
 
+function runNutritionCategoriesForSelectedRecipes(button) {
+    startMenuDeferredHeavyTasks(
+        selectedRecipeBatchUrls(),
+        button,
+        {
+            runNutrition: true,
+            runCategories: true,
+            runGeneratedPdfs: false,
+        }
+    ).catch(err => alert(err.message || "Unable to run nutrition/categories."));
+    return false;
+}
+
 function createPdfsForSelectedRecipes(button) {
+    return generatePdfsForSelectedRecipes(button);
+}
+
+function generatePdfsForSelectedRecipes(button) {
     runRecipeUrlJobSequence(
         selectedRecipeBatchUrls(),
         "/api/jobs/create-recipe-pdf",
@@ -29418,11 +29471,22 @@ async function runFullRoutineForMenuRecipeUrls(urls, stubUrls, button, emptyMess
     }
     try {
         if (selectedStubs.length) {
-            await startMenuRecipeGeneration(selectedStubs, button);
+            await startMenuRecipeGeneration(selectedStubs, button, {
+                enrichmentMode: "full",
+                runDeferredHeavyTasks: true,
+            });
         }
         const generatedOnlyUrls = selectedUrls.filter(url => !selectedStubs.includes(url));
         if (generatedOnlyUrls.length) {
-            await startMenuDeferredHeavyTasks(generatedOnlyUrls, selectedStubs.length ? null : button);
+            await startMenuDeferredHeavyTasks(
+                generatedOnlyUrls,
+                selectedStubs.length ? null : button,
+                {
+                    runNutrition: true,
+                    runCategories: true,
+                    runGeneratedPdfs: true,
+                }
+            );
         }
     } catch (err) {
         alert(err.message || "Unable to run full routine.");
@@ -29435,13 +29499,7 @@ async function runFullRoutineForMenuSection(button, event) {
         event.preventDefault();
         event.stopPropagation();
     }
-    const sectionName = button && button.dataset ? button.dataset.menuSection || "" : "";
-    return runFullRoutineForMenuRecipeUrls(
-        menuRecipeUrlsForSection(sectionName),
-        menuStubRecipeUrlsForSection(sectionName),
-        button,
-        "No menu recipes were found for this section."
-    );
+    return generateMenuStubFullSection(button, event);
 }
 
 async function runFullRoutineForAllMenuRecipes(button) {

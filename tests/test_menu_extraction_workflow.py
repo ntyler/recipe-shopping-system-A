@@ -539,12 +539,17 @@ def test_mega_menu_json_viewer_static_hooks_are_present():
     assert "downloadMegaMenuJson" in script
     assert "runFullRoutineForMenuSection" in script
     assert "runFullRoutineForAllMenuRecipes" in script
+    assert "generateMenuStubFullSection" in script
+    assert "runNutritionCategoriesForSelectedRecipes" in script
+    assert "generatePdfsForSelectedRecipes" in script
     assert "/api/menu_mega_json_snapshots/" in script
     assert "/api/menu_mega_json_snapshots/<snapshot_id>/download" in routes
     assert "/api/menu_mega_json_snapshots/<snapshot_id>/retry-unpack" in routes
     assert "api_menu_mega_json_snapshot_route" in routes
-    assert "Run Full Routine for All" in template
-    assert "Run Section Routine" in template
+    assert "Generate Full Recipes for All" in template
+    assert "Generate Full Section" in template
+    assert "Run Nutrition / Categories" in template
+    assert "Generate PDFs" in template
 
 
 def test_menu_item_result_preserves_original_menu_url_and_unique_record_url(monkeypatch, tmp_path):

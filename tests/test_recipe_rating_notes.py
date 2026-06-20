@@ -126,7 +126,7 @@ def test_current_recipe_food_review_badge_sits_with_menu_status_badges():
     assert inferred_block.index("menu-recipe-status-generated") < inferred_block.index("recipe-url-summary-food-review")
     assert inferred_block.index("recipe-url-summary-food-review") < inferred_block.index("View Mega Menu JSON")
     assert stub_block.index("menu-recipe-status-stub") < stub_block.index("recipe-url-summary-food-review")
-    assert stub_block.index("recipe-url-summary-food-review") < stub_block.index("Generate Recipe")
+    assert stub_block.index("recipe-url-summary-food-review") < stub_block.index("Generate Fast Recipe")
     assert "justify-self: start;" in css
 
 

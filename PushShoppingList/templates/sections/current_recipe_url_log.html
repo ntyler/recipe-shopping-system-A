@@ -59,25 +59,25 @@
                 </label>
                 <div class="recipe-url-summary-cookbook-menu-label">Menu AI</div>
                 <button type="button" onclick="return generateSelectedMenuStubRecipes(this)">
-                    Generate Selected Recipes
+                    Generate Fast Recipes
                 </button>
                 <button type="button" onclick="return forceReprocessSelectedMenuRecipes(this)">
                     Force Reprocess Selected
                 </button>
                 <button type="button" onclick="return generateAllMenuStubRecipes(this)">
-                    Generate All Full Recipes
-                </button>
-                <button type="button" onclick="return estimateNutritionForSelectedRecipes(this)">
-                    Estimate Nutrition for Selected
-                </button>
-                <button type="button" onclick="return createPdfsForSelectedRecipes(this)">
-                    Create PDFs for Selected
+                    Generate Fast Recipes for All
                 </button>
                 <button type="button" onclick="return runFullRoutineForSelectedRecipes(this)">
-                    Run Full Routine for Selected
+                    Generate Full Recipes
                 </button>
                 <button type="button" onclick="return runFullRoutineForAllMenuRecipes(this)">
-                    Run Full Routine for All
+                    Generate Full Recipes for All
+                </button>
+                <button type="button" onclick="return runNutritionCategoriesForSelectedRecipes(this)">
+                    Run Nutrition / Categories
+                </button>
+                <button type="button" onclick="return generatePdfsForSelectedRecipes(this)">
+                    Generate PDFs
                 </button>
             </div>
         </div>
@@ -168,20 +168,20 @@
                                                     class="menu-recipe-generate-inline"
                                                     data-recipe-url="{{ recipe.url }}"
                                                     onclick="return generateMenuStubRecipe(this, event)">
-                                                Generate Recipe
+                                                Generate Fast Recipe
                                             </button>
                                             {% if recipe.menu_section %}
                                                 <button type="button"
                                                         class="menu-recipe-generate-inline"
                                                         data-menu-section="{{ recipe.menu_section }}"
                                                         onclick="return generateMenuStubSection(this, event)">
-                                                    Generate Section
+                                                    Generate Fast Section
                                                 </button>
                                                 <button type="button"
                                                         class="menu-recipe-generate-inline"
                                                         data-menu-section="{{ recipe.menu_section }}"
-                                                        onclick="return runFullRoutineForMenuSection(this, event)">
-                                                    Run Section Routine
+                                                        onclick="return generateMenuStubFullSection(this, event)">
+                                                    Generate Full Section
                                                 </button>
                                             {% endif %}
                                             {% if recipe.parent_menu_snapshot_id or recipe.menu_mega_snapshot_id %}

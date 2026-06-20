@@ -280,11 +280,11 @@ def test_cookbook_recipe_rows_match_current_recipe_summary_layout():
     assert title_line_start < title_food_review_index < summary_body_index
     assert "recipe-url-summary-food-review-collapsed" in title_block
     assert stub_status_block.index("menu-recipe-status-stub") < stub_status_block.index("recipe-url-summary-food-review")
-    assert stub_status_block.index("recipe-url-summary-food-review") < stub_status_block.index("Generate Recipe")
-    assert stub_status_block.index("menu-recipe-status-stub") < stub_status_block.index("Generate Recipe")
-    assert stub_status_block.index("Generate Recipe") < stub_status_block.index("Generate Section")
-    assert stub_status_block.index("Generate Section") < stub_status_block.index("Run Section Routine")
-    assert stub_status_block.index("Run Section Routine") < stub_status_block.index("View Mega Menu JSON")
+    assert stub_status_block.index("recipe-url-summary-food-review") < stub_status_block.index("Generate Fast Recipe")
+    assert stub_status_block.index("menu-recipe-status-stub") < stub_status_block.index("Generate Fast Recipe")
+    assert stub_status_block.index("Generate Fast Recipe") < stub_status_block.index("Generate Fast Section")
+    assert stub_status_block.index("Generate Fast Section") < stub_status_block.index("Generate Full Section")
+    assert stub_status_block.index("Generate Full Section") < stub_status_block.index("View Mega Menu JSON")
     assert inferred_status_block.index("menu-recipe-status-generated") < inferred_status_block.index("recipe-url-summary-food-review")
     assert inferred_status_block.index("recipe-url-summary-food-review") < inferred_status_block.index("View Mega Menu JSON")
     assert standard_review_block.index("recipe-url-summary-food-review") < standard_review_block.index("recipe-url-summary-servings")
@@ -397,11 +397,11 @@ def test_cookbook_recipe_view_renders_menu_stub_actions_above_amount():
 
     assert "Spring Roll" in title_block
     assert "menu-recipe-status-stub" not in title_block
-    assert "Generate Recipe" not in title_block
-    assert menu_status_block.index("menu-recipe-status-stub") < menu_status_block.index("Generate Recipe")
-    assert menu_status_block.index("Generate Recipe") < menu_status_block.index("Generate Section")
-    assert menu_status_block.index("Generate Section") < menu_status_block.index("Run Section Routine")
-    assert menu_status_block.index("Run Section Routine") < menu_status_block.index("View Mega Menu JSON")
+    assert "Generate Fast Recipe" not in title_block
+    assert menu_status_block.index("menu-recipe-status-stub") < menu_status_block.index("Generate Fast Recipe")
+    assert menu_status_block.index("Generate Fast Recipe") < menu_status_block.index("Generate Fast Section")
+    assert menu_status_block.index("Generate Fast Section") < menu_status_block.index("Generate Full Section")
+    assert menu_status_block.index("Generate Full Section") < menu_status_block.index("View Mega Menu JSON")
     assert summary_body_index < amount_index < cookbook_index
     assert 'data-cookbook-menu-section-id="section-003"' in card_html
     assert "Vel Asain Cuisine" in card_html[cookbook_index:]

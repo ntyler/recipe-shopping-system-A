@@ -217,20 +217,20 @@
                                             class="menu-recipe-generate-inline"
                                             data-recipe-url="{{ recipe.url }}"
                                             onclick="return generateMenuStubRecipe(this, event)">
-                                        Generate Recipe
+                                        Generate Fast Recipe
                                     </button>
                                     {% if recipe.menu_section %}
                                         <button type="button"
                                                 class="menu-recipe-generate-inline"
                                                 data-menu-section="{{ recipe.menu_section }}"
                                                 onclick="return generateMenuStubSection(this, event)">
-                                            Generate Section
+                                            Generate Fast Section
                                         </button>
                                         <button type="button"
                                                 class="menu-recipe-generate-inline"
                                                 data-menu-section="{{ recipe.menu_section }}"
-                                                onclick="return runFullRoutineForMenuSection(this, event)">
-                                            Run Section Routine
+                                                onclick="return generateMenuStubFullSection(this, event)">
+                                            Generate Full Section
                                         </button>
                                     {% endif %}
                                 {% elif recipe.source_type == "menu_item_inferred" or recipe.ai_inferred %}

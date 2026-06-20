@@ -406,6 +406,7 @@ def test_menu_generate_job_runs_decide_all_categories_after_generation(monkeypat
         "menu-generate-recipes",
         input_payload={
             "recipe_urls": [recipe_url],
+            "menu_enrichment_mode": "full",
             "run_deferred_heavy_tasks": False,
         },
         user_id="owner",
@@ -533,6 +534,7 @@ def test_menu_generate_job_finishes_all_nutrition_before_categories(monkeypatch,
         "menu-generate-recipes",
         input_payload={
             "recipe_urls": recipe_urls,
+            "menu_enrichment_mode": "full",
             "run_deferred_heavy_tasks": False,
         },
         user_id="owner",
@@ -654,6 +656,7 @@ def test_large_menu_generate_defers_enrichment_after_prediction_save(monkeypatch
         "menu-generate-recipes",
         input_payload={
             "recipe_urls": recipe_urls,
+            "menu_enrichment_mode": "full",
             "run_deferred_heavy_tasks": True,
         },
         user_id="owner",
@@ -887,6 +890,7 @@ def test_menu_generate_job_keeps_partial_batch_predictions(monkeypatch, tmp_path
     assert finished["result_payload"]["created_count"] == 1
     assert finished["result_payload"]["failed_count"] == 1
     assert finished["result_payload"]["generated_recipe_urls"] == [recipe_urls[0]]
+    assert finished["result_payload"]["retry_failed_recipe_urls"] == [recipe_urls[1]]
     assert finished["result_payload"]["failed_recipe_items"] == [{
         "recipe_url": recipe_urls[1],
         "recipe_name": "Crab Wonton",
@@ -1105,6 +1109,7 @@ def test_menu_generate_job_bulk_saves_predicted_recipes_with_throttled_progress(
         "menu-generate-recipes",
         input_payload={
             "recipe_urls": recipe_urls,
+            "menu_enrichment_mode": "full",
             "run_deferred_heavy_tasks": False,
         },
         user_id="owner",
@@ -1134,6 +1139,125 @@ def test_menu_generate_job_bulk_saves_predicted_recipes_with_throttled_progress(
     assert len(category_updates) < len(recipe_urls)
     assert nutrition_updates[-1]["result_payload"]["followup_progress_every"] == 10
     assert category_updates[-1]["result_payload"]["followup_progress_every"] == 10
+
+
+def test_menu_generate_fast_mode_batches_256_items_by_16_and_skips_heavy_work(monkeypatch, tmp_path, capsys):
+    configure_job_paths(monkeypatch, tmp_path)
+    monkeypatch.setenv("MENU_RECIPE_FAST_BATCH_SIZE", "16")
+    monkeypatch.setenv("MENU_RECIPE_FAST_BATCH_TARGET_CHARS", "100000")
+    monkeypatch.setenv("MENU_ITEM_BATCH_INFERENCE_WORKERS", "1")
+    recipe_urls = [
+        f"https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=item-{index}"
+        for index in range(256)
+    ]
+    stubs = {
+        url: {
+            "source_url": url,
+            "recipe_title": f"Menu Item {index}",
+            "display_name": f"Menu Item {index}",
+            "needs_ai_recipe": True,
+            "recipe_status": "stub",
+            "menu_item_id": f"item-{index}",
+            "cookbook_id": "cb1",
+            "cookbook_name": "Dinner",
+        }
+        for index, url in enumerate(recipe_urls)
+    }
+    batch_lengths = []
+
+    monkeypatch.setattr(recipe_routes, "load_editable_recipe", lambda url: {"recipe": stubs[url]})
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "menu_batch_item_from_stub",
+        lambda url, loaded_stub, index: {
+            "menu_item_id": loaded_stub["menu_item_id"],
+            "item_name": loaded_stub["recipe_title"],
+            "menu_section": "Entrees",
+            "recipe_url": url,
+        },
+    )
+
+    def fake_infer_batch(batch, user_id=None):
+        batch_lengths.append(len(batch))
+        return {
+            "ok": True,
+            "items": {
+                entry["menu_item"]["menu_item_id"]: {
+                    "predicted_ingredients": [{"ingredient": "test ingredient"}],
+                    "predicted_instructions": [{"instruction": "Cook briefly."}],
+                    "predicted_equipment": [{"name": "Skillet"}],
+                    "servings": 2,
+                    "prep_time": "10 min",
+                    "cook_time": "10 min",
+                    "total_time": "20 min",
+                    "difficulty_level": "easy",
+                    "confidence": 0.7,
+                }
+                for entry in batch
+            },
+            "failures": {},
+            "model": "gpt-test",
+            "model_source": "test",
+        }
+
+    monkeypatch.setattr(recipe_extract_service, "infer_menu_item_recipe_batch", fake_infer_batch)
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "save_menu_batch_inference_results",
+        lambda results: [
+            {
+                "ok": True,
+                "recipe_url": result.get("recipe_url"),
+                "recipe_name": result.get("recipe_title"),
+                "json_path": "skipped-in-test",
+                "result": result,
+            }
+            for result in results
+        ],
+    )
+    monkeypatch.setattr(recipe_routes, "add_items", lambda ingredients: None)
+    monkeypatch.setattr("PushShoppingList.services.recipe_ingredient_service.save_ingredients_for_recipes", lambda records: None)
+    monkeypatch.setattr("PushShoppingList.services.recipe_url_service.save_recipe_url_names", lambda records: None)
+    monkeypatch.setattr("PushShoppingList.services.recipe_url_service.add_recipe_urls", lambda urls: None)
+    monkeypatch.setattr("PushShoppingList.scripts.sort_ingredients.main", lambda: None)
+    monkeypatch.setattr(recipe_routes, "record_recipe_import_activity", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        recipe_routes,
+        "ensure_menu_recipe_serving_basis_estimate",
+        lambda *args, **kwargs: pytest.fail("fast mode should not generate nutrition"),
+    )
+    monkeypatch.setattr(
+        recipe_routes,
+        "apply_imported_recipe_category_routine",
+        lambda *args, **kwargs: pytest.fail("fast mode should not generate categories"),
+    )
+
+    job = job_service.create_job(
+        "menu-generate-recipes",
+        input_payload={"recipe_urls": recipe_urls},
+        user_id="owner",
+        total_items=len(recipe_urls),
+    )
+
+    finished = job_tasks.run_menu_generate_recipes_job(job["id"], job["input_payload"])
+    output = capsys.readouterr().out
+
+    assert finished["status"] == "completed"
+    assert batch_lengths == [16] * 16
+    assert finished["result_payload"]["menu_enrichment_mode"] == "fast"
+    assert finished["result_payload"]["recipe_batch_size"] == 16
+    assert finished["result_payload"]["nutrition_completed"] == 0
+    assert finished["result_payload"]["category_success_count"] == 0
+    assert finished["result_payload"]["pdfs_completed"] == 0
+    assert finished["result_payload"]["enrichment_deferred"] is False
+    assert "[Menu Enrichment] job_id=" in output
+    assert "stage=load_menu_stubs" in output
+    assert "stage=prepare_ai_input_batches" in output
+    assert "stage=openai_batch" in output
+    assert "stage=validate_item_id_mapping" in output
+    assert "stage=write_recipe_json" in output
+    assert "stage=update_indexes" in output
+    assert "stage=complete" in output
 
 
 def test_menu_import_does_not_auto_queue_recipe_generation_by_default(monkeypatch, tmp_path, capsys):

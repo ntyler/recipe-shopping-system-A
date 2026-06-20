@@ -242,11 +242,21 @@ def start_menu_generate_recipes_job_route():
     if not urls:
         return jsonify({"ok": False, "error": "At least one menu item stub URL is required."}), 400
 
+    enrichment_mode = str(
+        payload.get("menu_enrichment_mode")
+        or payload.get("enrichment_mode")
+        or ""
+    ).strip().lower()
+    if enrichment_mode not in {"fast", "full"}:
+        enrichment_mode = ""
+
     payload = {
         **payload,
         "recipe_urls": urls,
         "force_reprocess": payload_truthy(payload, "force_reprocess", False),
     }
+    if enrichment_mode:
+        payload["menu_enrichment_mode"] = enrichment_mode
     payload = with_model_metadata(
         payload,
         model_used=resolve_menu_model(),

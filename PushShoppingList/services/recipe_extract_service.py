@@ -58,6 +58,7 @@ except Exception:  # pragma: no cover
 
 from PushShoppingList.services import cloudflare_r2_storage
 from PushShoppingList.services.image_variant_service import ensure_webp_variants
+from PushShoppingList.services.job_runtime_context import current_job_context
 from PushShoppingList.services.job_runtime_context import current_job_id
 from PushShoppingList.services.job_runtime_context import model_snapshot_for_env
 from PushShoppingList.services.menu_mega_json_service import build_mega_menu_json
@@ -11009,9 +11010,16 @@ def compact_menu_batch_item(item):
     }
 
 
-def menu_inference_batches(entries):
-    min_items, max_items = menu_item_batch_size_limits()
-    target_chars = menu_item_batch_target_chars()
+def menu_inference_batches(entries, min_items=None, max_items=None, target_chars=None):
+    default_min_items, default_max_items = menu_item_batch_size_limits()
+    if max_items is None:
+        max_items = default_max_items
+    if min_items is None:
+        min_items = min(default_min_items, max_items)
+    max_items = max(1, min(50, int(max_items or default_max_items)))
+    min_items = max(1, min(max_items, int(min_items or default_min_items)))
+    target_chars = target_chars if target_chars is not None else menu_item_batch_target_chars()
+    target_chars = max(3000, int(target_chars or menu_item_batch_target_chars()))
     batches = []
     current = []
     current_chars = 0
@@ -11063,6 +11071,10 @@ For each menu_item_id return:
 - predicted_equipment: array of equipment objects with name
 - predicted_instructions: array of instruction objects with step and instruction
 - servings: number or short string
+- prep_time: short string
+- cook_time: short string
+- total_time: short string
+- difficulty_level: short string such as easy, medium, or hard
 - confidence: number from 0 to 1
 - notes: array of short strings explaining uncertainty
 
@@ -11070,6 +11082,7 @@ Rules:
 - Use the existing predicted_equipment only when it fits the inferred recipe.
 - Do not return nutrition estimates.
 - Do not create PDFs.
+- Keep instructions brief and practical.
 - Skip no items in the response; every provided menu_item_id must have one result.
 - If an item is vague, return conservative plausible ingredients/instructions with lower confidence.
 
@@ -11146,17 +11159,43 @@ def _coerce_batch_inference_payload(payload):
 def _infer_menu_item_recipe_batch_once(entries, user_id=None, model_resolution=None):
     model_resolution = model_resolution or menu_item_recipe_model_resolution()
     action_name = "menu-item-recipe-batch-inference"
+    context = current_job_context()
+    job_id = current_job_id()
+    batch_index = context.get("batch_index")
+    batch_count = context.get("batch_count")
+    batch_size = context.get("batch_size") or len(entries or [])
     try:
+        request_started = time.perf_counter()
+        print(
+            "[Menu Enrichment] "
+            f"job_id={job_id or 'n/a'} stage=openai_batch_request_start "
+            f"batch={batch_index or 'n/a'}/{batch_count or 'n/a'} size={batch_size} "
+            f"model={model_resolution.model}"
+        )
         response_text = send_menu_item_recipe_batch_prompt_to_openai(
             build_menu_item_recipe_batch_prompt(entries),
             action_name=action_name,
             user_id=user_id,
             model_resolution=model_resolution,
         )
+        request_elapsed = time.perf_counter() - request_started
+        print(
+            "[Menu Enrichment] "
+            f"job_id={job_id or 'n/a'} stage=openai_batch_request "
+            f"batch={batch_index or 'n/a'}/{batch_count or 'n/a'} size={batch_size} "
+            f"model={model_resolution.model} elapsed={request_elapsed:.3f}s"
+        )
+        parse_started = time.perf_counter()
         payload = json.loads(clean_json_response(response_text))
         items = _coerce_batch_inference_payload(payload)
         if not items:
             raise ValueError("Menu batch inference did not return item results.")
+        print(
+            "[Menu Enrichment] "
+            f"job_id={job_id or 'n/a'} stage=parse_batch "
+            f"batch={batch_index or 'n/a'}/{batch_count or 'n/a'} "
+            f"items={len(items)} elapsed={time.perf_counter() - parse_started:.3f}s"
+        )
         return {
             "ok": True,
             "items": items,
@@ -11942,6 +11981,16 @@ def build_menu_batch_inference_result(recipe_url, stub, menu_item, inference, mo
     )
     notes = _normalize_inference_notes(inference.get("notes") or inference.get("confidence_notes"))
     confidence = _normalize_inference_confidence(inference.get("confidence"))
+    prep_time = clean_recipe_text(inference.get("prep_time") or stub.get("prep_time") or "")
+    cook_time = clean_recipe_text(inference.get("cook_time") or stub.get("cook_time") or "")
+    total_time = clean_recipe_text(inference.get("total_time") or stub.get("total_time") or "")
+    difficulty_level = clean_recipe_text(
+        inference.get("difficulty_level")
+        or inference.get("difficulty")
+        or stub.get("level")
+        or stub.get("difficulty_level")
+        or ""
+    )
 
     recipe = {
         **stub,
@@ -11949,6 +11998,10 @@ def build_menu_batch_inference_result(recipe_url, stub, menu_item, inference, mo
         "recipe_title": clean_recipe_text(stub.get("recipe_title") or item_name or recipe_url),
         "recipe_amount": clean_recipe_text(stub.get("recipe_amount") or "1 batch"),
         "servings": inference.get("servings") or stub.get("servings") or None,
+        "prep_time": prep_time,
+        "cook_time": cook_time,
+        "total_time": total_time,
+        "level": difficulty_level or clean_recipe_text(stub.get("level") or ""),
         "source_type": "menu_item_inferred",
         "ai_inferred": True,
         "needs_ai_recipe": False,
@@ -11992,6 +12045,10 @@ def build_menu_batch_inference_result(recipe_url, stub, menu_item, inference, mo
         "equipment": equipment,
         "instructions": instructions,
         "servings": recipe.get("servings"),
+        "prep_time": prep_time,
+        "cook_time": cook_time,
+        "total_time": total_time,
+        "difficulty_level": difficulty_level,
         "confidence": confidence,
         "model": model or resolve_menu_model(),
         "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),

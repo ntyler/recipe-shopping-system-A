@@ -207,10 +207,12 @@ def test_job_activity_can_reopen_import_progress_overlay():
     assert "function menuEnrichmentRecipeUrls(job)" in script
     assert "function menuEnrichmentAlreadyQueuedForJob(job)" in script
     assert "function jobCanStartMenuEnrichment(job)" in script
-    assert "function startMenuEnrichmentFromJobActivity(jobId, button)" in script
+    assert "function startMenuEnrichmentFromJobActivity(jobId, button, enrichmentMode = \"fast\")" in script
     assert "Open Popup" in script
-    assert "Start Enrichment" in script
+    assert "Generate Fast Recipes" in script
+    assert "Generate Full Recipes" in script
     assert "waitForCompletion: false" in script
+    assert 'menu_enrichment_mode: enrichmentMode' in script
     assert "sourceJobId: jobId" in script
     assert 'source_job_id: options.sourceJobId || ""' in script
     assert "hiddenExtractJobId = null" in script

@@ -340,6 +340,48 @@ def log_import_menu_url_stage(stage, **fields):
     print(" ".join(parts))
 
 
+def menu_enrichment_mode(payload=None):
+    payload = payload if isinstance(payload, dict) else {}
+    value = str(
+        payload.get("menu_enrichment_mode")
+        or payload.get("enrichment_mode")
+        or os.getenv("MENU_ENRICHMENT_MODE")
+        or "fast"
+    ).strip().lower()
+    return "full" if value == "full" else "fast"
+
+
+def menu_recipe_batch_size(mode="fast"):
+    mode = "full" if str(mode or "").strip().lower() == "full" else "fast"
+    env_name = "MENU_RECIPE_FULL_BATCH_SIZE" if mode == "full" else "MENU_RECIPE_FAST_BATCH_SIZE"
+    default = 8 if mode == "full" else 16
+    return env_int(env_name, default, minimum=1, maximum=50)
+
+
+def menu_recipe_batch_target_chars(mode="fast"):
+    mode = "full" if str(mode or "").strip().lower() == "full" else "fast"
+    env_name = "MENU_RECIPE_FULL_BATCH_TARGET_CHARS" if mode == "full" else "MENU_RECIPE_FAST_BATCH_TARGET_CHARS"
+    default = 12000 if mode == "full" else 24000
+    return env_int(env_name, default, minimum=3000, maximum=100000)
+
+
+def menu_recipe_fast_target_seconds():
+    return env_int("MENU_RECIPE_FAST_TARGET_SECONDS", 120, minimum=1, maximum=7200)
+
+
+def log_menu_enrichment_stage(stage, **fields):
+    parts = ["[Menu Enrichment]"]
+    job_id = fields.pop("job_id", "")
+    if job_id:
+        parts.append(f"job_id={job_id}")
+    parts.append(f"stage={stage}")
+    for key, value in fields.items():
+        if value is None:
+            continue
+        parts.append(f"{key}={value}")
+    print(" ".join(parts))
+
+
 def menu_inline_enrichment_max_items():
     return env_int("MENU_INLINE_ENRICHMENT_MAX_ITEMS", 25, minimum=0, maximum=10000)
 
@@ -464,8 +506,13 @@ def run_menu_generate_recipes_job(job_id, payload):
     from PushShoppingList.services.cookbook_service import cookbook_recipe_assignment_for_url
 
     payload = payload if isinstance(payload, dict) else {}
+    job_started_at = time.perf_counter()
+    enrichment_mode = menu_enrichment_mode(payload)
+    fast_mode = enrichment_mode == "fast"
     force_reprocess = payload_bool(payload, "force_reprocess", False)
-    run_heavy_tasks = payload_bool(payload, "run_deferred_heavy_tasks", True)
+    run_heavy_tasks = (not fast_mode) and payload_bool(payload, "run_deferred_heavy_tasks", True)
+    recipe_batch_size = menu_recipe_batch_size(enrichment_mode)
+    recipe_batch_target_chars = menu_recipe_batch_target_chars(enrichment_mode)
     raw_urls = payload.get("recipe_urls") or payload.get("urls")
     if isinstance(raw_urls, str):
         raw_urls = [line.strip() for line in raw_urls.splitlines() if line.strip()]
@@ -493,6 +540,22 @@ def run_menu_generate_recipes_job(job_id, payload):
     generated_recipe_results = {}
     failed_recipe_items = []
 
+    def elapsed_seconds():
+        return max(0.0, time.perf_counter() - job_started_at)
+
+    def update_menu_progress(progress_stage, **kwargs):
+        progress_started = time.perf_counter()
+        result = update_job_progress(job_id, **kwargs)
+        log_menu_enrichment_stage(
+            "progress_update",
+            job_id=job_id,
+            mode=enrichment_mode,
+            progress_stage=str(progress_stage or "").replace(" ", "_"),
+            progress=kwargs.get("progress_percent"),
+            elapsed=f"{time.perf_counter() - progress_started:.3f}s",
+        )
+        return result
+
     def record_failed_recipe_item(recipe_url, recipe_name="", stage="", error=""):
         recipe_url = str(recipe_url or "").strip()
         if not recipe_url:
@@ -511,14 +574,17 @@ def run_menu_generate_recipes_job(job_id, payload):
                 f"job_id={job_id} recipe_url={recipe_url} error={exc}"
             )
 
-    update_job_progress(
-        job_id,
+    update_menu_progress(
+        "start",
         current_step="Predicting recipes",
         total_items=total,
         progress_percent=5,
         result_payload={
             **model_info,
             "stage": "Predicting recipes",
+            "stage_detail": "Loading menu stubs",
+            "menu_enrichment_mode": enrichment_mode,
+            "recipe_batch_size": recipe_batch_size,
             "total_items": total,
             "recipe_shells_created": total,
             "recipe_inference_completed": 0,
@@ -530,6 +596,7 @@ def run_menu_generate_recipes_job(job_id, payload):
         },
     )
 
+    load_started = time.perf_counter()
     for index, recipe_url in enumerate(recipe_urls):
         ensure_not_cancelled(job_id)
         loaded_recipe = load_editable_recipe(recipe_url) or {}
@@ -560,7 +627,28 @@ def run_menu_generate_recipes_job(job_id, payload):
             "menu_item": menu_item,
         })
 
-    batches = menu_inference_batches(pending_entries)
+    log_menu_enrichment_stage(
+        "load_menu_stubs",
+        job_id=job_id,
+        mode=enrichment_mode,
+        total=total,
+        pending=len(pending_entries),
+        skipped=len(skipped_urls),
+        failed=failed_items,
+        elapsed=f"{time.perf_counter() - load_started:.3f}s",
+    )
+    prepare_started = time.perf_counter()
+    try:
+        batches = menu_inference_batches(
+            pending_entries,
+            min_items=recipe_batch_size,
+            max_items=recipe_batch_size,
+            target_chars=recipe_batch_target_chars,
+        )
+    except TypeError as exc:
+        if "min_items" not in str(exc) and "max_items" not in str(exc) and "target_chars" not in str(exc):
+            raise
+        batches = menu_inference_batches(pending_entries)
     batch_total = len(batches)
     completed_batches = 0
     predicted_batches_completed = 0
@@ -571,9 +659,22 @@ def run_menu_generate_recipes_job(job_id, payload):
     inference_user_id = str(job_record.get("user_id") or active_user_id() or "").strip()
     job_queue_name = str(job_record.get("queue_name") or "ai-pantry-menu").strip() or "ai-pantry-menu"
 
+    log_menu_enrichment_stage(
+        "prepare_ai_input_batches",
+        job_id=job_id,
+        mode=enrichment_mode,
+        total=total,
+        pending=len(pending_entries),
+        batch_count=batch_total,
+        batch_size=recipe_batch_size,
+        target_chars=recipe_batch_target_chars,
+        elapsed=f"{time.perf_counter() - prepare_started:.3f}s",
+    )
+
     print(
         "[MenuRecipeGeneration] action=start "
-        f"job_id={job_id} total_items={total} pending_items={len(pending_entries)}"
+        f"job_id={job_id} total_items={total} pending_items={len(pending_entries)} "
+        f"mode={enrichment_mode} batch_size={recipe_batch_size}"
     )
     if batch_total:
         print(
@@ -589,6 +690,9 @@ def run_menu_generate_recipes_job(job_id, payload):
             model_used=model_info.get("model_used"),
             model_source=model_info.get("model_source"),
             model_env_var_used=model_info.get("model_env_var_used"),
+            batch_index=batch_index,
+            batch_count=batch_total,
+            batch_size=len(batch or []),
         ):
             print(
                 "[Job Worker] action=menu-item-recipe-batch-worker-start "
@@ -599,7 +703,28 @@ def run_menu_generate_recipes_job(job_id, payload):
                 "[MenuRecipeGeneration] action=batch_start "
                 f"job_id={job_id} batch_index={batch_index} batch_size={len(batch or [])}"
             )
+            batch_started = time.perf_counter()
+            log_menu_enrichment_stage(
+                "openai_batch_start",
+                job_id=job_id,
+                mode=enrichment_mode,
+                batch=f"{batch_index}/{batch_total}",
+                size=len(batch or []),
+                model=model_info.get("model_used") or "",
+            )
             result = infer_menu_item_recipe_batch(batch, user_id=inference_user_id)
+            log_menu_enrichment_stage(
+                "openai_batch",
+                job_id=job_id,
+                mode=enrichment_mode,
+                batch=f"{batch_index}/{batch_total}",
+                size=len(batch or []),
+                model=(result.get("model") if isinstance(result, dict) else "") or model_info.get("model_used") or "",
+                ok=bool(result.get("ok") if isinstance(result, dict) else False),
+                result_items=len(result.get("items") or {}) if isinstance(result, dict) else 0,
+                failed_items=len(result.get("failures") or {}) if isinstance(result, dict) else len(batch or []),
+                elapsed=f"{time.perf_counter() - batch_started:.3f}s",
+            )
             print(
                 "[Job Worker] action=menu-item-recipe-batch-worker-ready "
                 f"job_id={job_id} batch_index={batch_index} batch_count={batch_total} "
@@ -627,15 +752,17 @@ def run_menu_generate_recipes_job(job_id, payload):
     def record_prediction_result(batch_index, batch_result):
         nonlocal predicted_batches_completed
         predicted_batches_completed += 1
-        update_job_progress(
-            job_id,
-            current_step=f"Predicting recipes ({predicted_batches_completed}/{batch_total})",
+        update_menu_progress(
+            "ai_generation",
+            current_step=f"AI generation: batch {predicted_batches_completed} of {batch_total}",
             progress_percent=bounded_percent(predicted_batches_completed, max(1, batch_total), 10, 82),
             completed_items=len(created_urls) + len(skipped_urls),
             failed_items=failed_items,
             result_payload={
                 **model_info,
                 "stage": "Predicting recipes",
+                "stage_detail": f"AI generation batch {predicted_batches_completed} of {batch_total}",
+                "menu_enrichment_mode": enrichment_mode,
                 "total_items": total,
                 "recipe_inference_completed": len(created_urls),
                 "recipe_prediction_batches_completed": predicted_batches_completed,
@@ -645,6 +772,7 @@ def run_menu_generate_recipes_job(job_id, payload):
                 "batch_count": batch_total,
                 "batch_index": batch_index,
                 "batch_workers": batch_worker_count,
+                "recipe_batch_size": recipe_batch_size,
             },
         )
         return batch_result
@@ -658,6 +786,7 @@ def run_menu_generate_recipes_job(job_id, payload):
         batch_recipe_urls = []
         batch_shopping_items = []
         batch_result = batch_result if isinstance(batch_result, dict) else {}
+        validate_started = time.perf_counter()
         result_items = batch_result.get("items") if isinstance(batch_result.get("items"), dict) else {}
         failure_items = batch_result.get("failures") if isinstance(batch_result.get("failures"), dict) else {}
         missing_ids = [
@@ -670,6 +799,16 @@ def run_menu_generate_recipes_job(job_id, payload):
             for entry in batch
             if str((entry.get("menu_item") or {}).get("menu_item_id") or "").strip() in missing_ids
         ]
+        log_menu_enrichment_stage(
+            "validate_item_id_mapping",
+            job_id=job_id,
+            mode=enrichment_mode,
+            batch=f"{batch_index}/{batch_total}",
+            expected=len(batch or []),
+            matched=len(result_items),
+            missing=len(missing_ids),
+            elapsed=f"{time.perf_counter() - validate_started:.3f}s",
+        )
         failed_names_text = ", ".join(name for name in failed_names[:12] if name)
         if failed_names:
             print(
@@ -714,6 +853,7 @@ def run_menu_generate_recipes_job(job_id, payload):
 
         prepared_save_results = []
         prepared_save_entries = []
+        save_prepare_started = time.perf_counter()
         for entry in batch:
             ensure_not_cancelled(job_id)
             recipe_url = entry["recipe_url"]
@@ -747,15 +887,17 @@ def run_menu_generate_recipes_job(job_id, payload):
                 or recipe_position >= total
                 or recipe_position % save_progress_every == 0
             ):
-                update_job_progress(
-                    job_id,
-                    current_step=f"Preparing predicted recipe save for {recipe_name} ({recipe_position}/{total})",
+                update_menu_progress(
+                    "save_prepare",
+                    current_step=f"Saving recipes: preparing item {recipe_position} of {total}",
                     progress_percent=bounded_percent(len(created_urls), total, 82, 88),
                     completed_items=len(created_urls) + len(skipped_urls),
                     failed_items=failed_items,
                     result_payload={
                         **model_info,
                         "stage": "Saving predicted recipes",
+                        "stage_detail": f"Preparing recipe save item {recipe_position} of {total}",
+                        "menu_enrichment_mode": enrichment_mode,
                         "total_items": total,
                         "recipe_inference_completed": len(created_urls),
                         "recipe_prediction_batches_completed": predicted_batches_completed,
@@ -808,13 +950,32 @@ def run_menu_generate_recipes_job(job_id, payload):
                 "recipe_position": recipe_position,
             })
 
+        log_menu_enrichment_stage(
+            "save_predicted_recipes",
+            job_id=job_id,
+            mode=enrichment_mode,
+            batch=f"{batch_index}/{batch_total}",
+            prepared=len(prepared_save_results),
+            failed=failed_items,
+            elapsed=f"{time.perf_counter() - save_prepare_started:.3f}s",
+        )
+
         if prepared_save_results:
             print(
                 "[MenuRecipeGeneration] action=bulk_save_start "
                 f"job_id={job_id} batch_index={batch_index} batch_size={len(prepared_save_results)} "
                 f"progress_update_every={save_progress_every}"
             )
+            write_started = time.perf_counter()
             save_statuses = save_menu_batch_inference_results(prepared_save_results)
+            log_menu_enrichment_stage(
+                "write_recipe_json",
+                job_id=job_id,
+                mode=enrichment_mode,
+                batch=f"{batch_index}/{batch_total}",
+                requested=len(prepared_save_results),
+                elapsed=f"{time.perf_counter() - write_started:.3f}s",
+            )
             saved_count = 0
             save_failed_count = 0
             for index, prepared in enumerate(prepared_save_entries):
@@ -860,15 +1021,17 @@ def run_menu_generate_recipes_job(job_id, payload):
                     or recipe_position % save_progress_every == 0
                     or index == len(prepared_save_entries) - 1
                 ):
-                    update_job_progress(
-                        job_id,
-                        current_step=f"Saving predicted recipes ({len(created_urls)}/{total})",
+                    update_menu_progress(
+                        "save_batch",
+                        current_step=f"Saving recipes: item {len(created_urls)} of {total}",
                         progress_percent=bounded_percent(len(created_urls), total, 82, 88),
                         completed_items=len(created_urls) + len(skipped_urls),
                         failed_items=failed_items,
                         result_payload={
                             **model_info,
                             "stage": "Saving predicted recipes",
+                            "stage_detail": f"Saving recipes item {len(created_urls)} of {total}",
+                            "menu_enrichment_mode": enrichment_mode,
                             "total_items": total,
                             "recipe_inference_completed": len(created_urls),
                             "recipe_prediction_batches_completed": predicted_batches_completed,
@@ -898,6 +1061,7 @@ def run_menu_generate_recipes_job(job_id, payload):
             )
 
         if batch_recipe_urls:
+            index_started = time.perf_counter()
             with workspace_write_lock("recipe-imports"):
                 if batch_shopping_items:
                     add_items(batch_shopping_items)
@@ -906,6 +1070,16 @@ def run_menu_generate_recipes_job(job_id, payload):
                 if batch_name_records:
                     save_recipe_url_names(batch_name_records)
                 add_recipe_urls(batch_recipe_urls)
+            log_menu_enrichment_stage(
+                "update_indexes",
+                job_id=job_id,
+                mode=enrichment_mode,
+                batch=f"{batch_index}/{batch_total}",
+                recipes=len(batch_recipe_urls),
+                ingredients=len(batch_ingredient_records),
+                names=len(batch_name_records),
+                elapsed=f"{time.perf_counter() - index_started:.3f}s",
+            )
 
         completed_batches += 1
 
@@ -923,15 +1097,17 @@ def run_menu_generate_recipes_job(job_id, payload):
             next_batch_to_submit += 1
 
     if batch_total:
-        update_job_progress(
-            job_id,
-            current_step=f"Predicting recipes (0/{batch_total})",
+        update_menu_progress(
+            "ai_generation_start",
+            current_step=f"AI generation: batch 0 of {batch_total}",
             progress_percent=10,
             completed_items=len(created_urls) + len(skipped_urls),
             failed_items=failed_items,
             result_payload={
                 **model_info,
                 "stage": "Predicting recipes",
+                "stage_detail": f"AI generation batch 0 of {batch_total}",
+                "menu_enrichment_mode": enrichment_mode,
                 "total_items": total,
                 "recipe_inference_completed": len(created_urls),
                 "recipe_prediction_batches_completed": 0,
@@ -940,6 +1116,7 @@ def run_menu_generate_recipes_job(job_id, payload):
                 "batch_count": batch_total,
                 "batch_index": 0,
                 "batch_workers": batch_worker_count,
+                "recipe_batch_size": recipe_batch_size,
             },
         )
 
@@ -987,13 +1164,15 @@ def run_menu_generate_recipes_job(job_id, payload):
 
     ensure_not_cancelled(job_id)
     if created_urls:
-        update_job_progress(
-            job_id,
+        update_menu_progress(
+            "finalize_recipe_generation",
             current_step="Finalizing predicted recipes",
             progress_percent=88,
             result_payload={
                 **model_info,
                 "stage": "Predicting recipes",
+                "stage_detail": "Finalizing predicted recipes",
+                "menu_enrichment_mode": enrichment_mode,
                 "recipe_inference_completed": len(created_urls),
                 "nutrition_completed": nutrition_success_count,
                 "nutrition_failed": nutrition_failed_count,
@@ -1001,8 +1180,85 @@ def run_menu_generate_recipes_job(job_id, payload):
                 "failed_recipe_items": failed_recipe_items,
             },
         )
+        sort_started = time.perf_counter()
         with workspace_write_lock("recipe-imports"):
             sort_ingredients()
+        log_menu_enrichment_stage(
+            "update_indexes",
+            job_id=job_id,
+            mode=enrichment_mode,
+            operation="sort_ingredients",
+            elapsed=f"{time.perf_counter() - sort_started:.3f}s",
+        )
+
+    if fast_mode and (created_urls or skipped_urls):
+        total_failed_items = failed_items
+        retry_failed_recipe_urls = [
+            item.get("recipe_url", "")
+            for item in failed_recipe_items
+            if item.get("recipe_url")
+        ]
+        result_payload = {
+            "ok": True,
+            "created_count": len(created_urls),
+            "generated_count": len(created_urls),
+            "full_recipes_generated": len(created_urls),
+            "recipe_inference_completed": len(created_urls),
+            "skipped_count": len(skipped_urls),
+            "failed_count": total_failed_items,
+            "failed_items": total_failed_items,
+            "recipe_urls": created_urls + skipped_urls,
+            "generated_recipe_urls": created_urls,
+            "skipped_recipe_urls": skipped_urls,
+            "retry_failed_recipe_urls": retry_failed_recipe_urls,
+            "links": recipe_links(created_urls + skipped_urls),
+            "nutrition_estimates_completed": 0,
+            "nutrition_completed": 0,
+            "nutrition_failed": 0,
+            "nutrition_statuses": [],
+            "failed_recipe_items": failed_recipe_items,
+            "pdfs_created": 0,
+            "pdfs_completed": 0,
+            "category_statuses": [],
+            "category_success_count": 0,
+            "categories_generated": 0,
+            "batch_count": batch_total,
+            "batches_completed": completed_batches,
+            "recipe_prediction_batches_completed": predicted_batches_completed,
+            "batch_workers": batch_worker_count,
+            "recipe_batch_size": recipe_batch_size,
+            "menu_enrichment_mode": enrichment_mode,
+            "enrichment_deferred": False,
+            "run_generated_pdfs": False,
+            "stage": "Complete",
+            "stage_detail": "Fast recipe generation complete",
+            **model_info,
+            **clear_cookbook_recipe_progress_payload(),
+        }
+        update_menu_progress(
+            "complete",
+            current_step="Fast recipe generation complete",
+            progress_percent=99,
+            total_items=total,
+            completed_items=len(created_urls) + len(skipped_urls),
+            failed_items=total_failed_items,
+            result_payload=result_payload,
+        )
+        total_elapsed = elapsed_seconds()
+        target_seconds = menu_recipe_fast_target_seconds()
+        warning = "target_exceeded" if total_elapsed > target_seconds else None
+        log_menu_enrichment_stage(
+            "complete",
+            job_id=job_id,
+            mode=enrichment_mode,
+            total_elapsed=f"{total_elapsed:.3f}s",
+            target=target_seconds,
+            warning=warning,
+            created=len(created_urls),
+            skipped=len(skipped_urls),
+            failed=total_failed_items,
+        )
+        return complete_job(job_id, result_payload=result_payload)
 
     if created_urls and menu_deferred_enrichment_enabled(payload, len(created_urls)):
         run_generated_pdfs = menu_generated_pdfs_enabled(payload, len(created_urls))
@@ -1012,8 +1268,8 @@ def run_menu_generate_recipes_job(job_id, payload):
             f"inline_enrichment_max_items={menu_inline_enrichment_max_items()} "
             f"run_generated_pdfs={bool(run_generated_pdfs)}"
         )
-        update_job_progress(
-            job_id,
+        update_menu_progress(
+            "enqueue_next_jobs_start",
             current_step="Queueing menu nutrition and categories",
             progress_percent=96,
             completed_items=len(created_urls) + len(skipped_urls),
@@ -1021,6 +1277,8 @@ def run_menu_generate_recipes_job(job_id, payload):
             result_payload={
                 **model_info,
                 "stage": "Queueing menu nutrition and categories",
+                "stage_detail": "Queueing nutrition/categories follow-up",
+                "menu_enrichment_mode": enrichment_mode,
                 "total_items": total,
                 "recipe_inference_completed": len(created_urls),
                 "recipe_prediction_batches_completed": predicted_batches_completed,
@@ -1032,6 +1290,7 @@ def run_menu_generate_recipes_job(job_id, payload):
                 "run_generated_pdfs": bool(run_generated_pdfs),
             },
         )
+        enqueue_started = time.perf_counter()
         heavy_job = enqueue_followup_job(
             "menu-deferred-heavy-tasks",
             {
@@ -1043,6 +1302,15 @@ def run_menu_generate_recipes_job(job_id, payload):
                 "run_generated_pdfs": bool(run_generated_pdfs),
             },
             total_items=len(created_urls),
+        )
+        log_menu_enrichment_stage(
+            "enqueue_next_jobs",
+            job_id=job_id,
+            mode=enrichment_mode,
+            job_type="menu-deferred-heavy-tasks",
+            queued=bool(heavy_job.get("queued")),
+            followup_job_id=heavy_job.get("job_id", ""),
+            elapsed=f"{time.perf_counter() - enqueue_started:.3f}s",
         )
         if not heavy_job.get("queued"):
             append_job_warning(job_id, heavy_job.get("error") or "Menu nutrition/category enrichment was not queued.")
@@ -1079,22 +1347,35 @@ def run_menu_generate_recipes_job(job_id, payload):
             "batches_completed": completed_batches,
             "recipe_prediction_batches_completed": predicted_batches_completed,
             "batch_workers": batch_worker_count,
+            "recipe_batch_size": recipe_batch_size,
+            "menu_enrichment_mode": enrichment_mode,
             "deferred_heavy_tasks_job": heavy_job,
             "deferred_heavy_tasks_job_id": heavy_job.get("job_id", ""),
             "enrichment_deferred": True,
             "run_generated_pdfs": bool(run_generated_pdfs),
             "stage": "Complete",
+            "stage_detail": "Recipe generation complete; nutrition/categories queued",
             **model_info,
             **clear_cookbook_recipe_progress_payload(),
         }
-        update_job_progress(
-            job_id,
+        update_menu_progress(
+            "complete",
             current_step="Recipe generation complete; menu nutrition and categories queued",
             progress_percent=99,
             total_items=total,
             completed_items=len(created_urls) + len(skipped_urls),
             failed_items=failed_items,
             result_payload=result_payload,
+        )
+        log_menu_enrichment_stage(
+            "complete",
+            job_id=job_id,
+            mode=enrichment_mode,
+            total_elapsed=f"{elapsed_seconds():.3f}s",
+            created=len(created_urls),
+            skipped=len(skipped_urls),
+            failed=failed_items,
+            followup_job_id=heavy_job.get("job_id", ""),
         )
         return complete_job(job_id, result_payload=result_payload)
 
@@ -1566,19 +1847,31 @@ def run_menu_generate_recipes_job(job_id, payload):
         "batches_completed": completed_batches,
         "recipe_prediction_batches_completed": predicted_batches_completed,
         "batch_workers": batch_worker_count,
+        "recipe_batch_size": recipe_batch_size,
+        "menu_enrichment_mode": enrichment_mode,
         "deferred_heavy_tasks_job": heavy_job,
         "deferred_heavy_tasks_job_id": heavy_job.get("job_id", ""),
         "stage": "Complete",
+        "stage_detail": "Full recipe generation complete",
         **model_info,
     }
-    update_job_progress(
-        job_id,
+    update_menu_progress(
+        "complete",
         current_step="Finalizing results",
         progress_percent=99,
         total_items=total,
         completed_items=len(created_urls) + len(skipped_urls),
         failed_items=total_failed_items,
         result_payload=result_payload,
+    )
+    log_menu_enrichment_stage(
+        "complete",
+        job_id=job_id,
+        mode=enrichment_mode,
+        total_elapsed=f"{elapsed_seconds():.3f}s",
+        created=len(created_urls),
+        skipped=len(skipped_urls),
+        failed=total_failed_items,
     )
 
     if created_urls or skipped_urls:
