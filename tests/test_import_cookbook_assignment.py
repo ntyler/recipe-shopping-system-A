@@ -206,6 +206,9 @@ def test_job_activity_can_reopen_import_progress_overlay():
     assert "function reopenImportProgressFromJob(jobId)" in script
     assert "function menuEnrichmentRecipeUrls(job)" in script
     assert "function menuEnrichmentAlreadyQueuedForJob(job)" in script
+    assert "function jobBlocksMenuEnrichmentAction(job)" in script
+    assert '["queued", "running", "cancel_requested", "completed"].includes(status)' in script
+    assert "function menuImportFollowupBlocksEnrichment(job)" in script
     assert "function jobCanStartMenuEnrichment(job)" in script
     assert "function startMenuEnrichmentFromJobActivity(jobId, button, enrichmentMode = \"fast\")" in script
     assert "Open Popup" in script
@@ -215,6 +218,8 @@ def test_job_activity_can_reopen_import_progress_overlay():
     assert 'menu_enrichment_mode: enrichmentMode' in script
     assert "sourceJobId: jobId" in script
     assert 'source_job_id: options.sourceJobId || ""' in script
+    assert "!menuImportFollowupBlocksEnrichment(job)" in script
+    assert "&& jobBlocksMenuEnrichmentAction(candidate)" in script
     assert "hiddenExtractJobId = null" in script
     assert "renderExtractionProgress(importJobToExtractionProgress(job, urls, isMenuExtract, {" in script
     assert "followMenuImportJobChain(finishedJob, urls)" not in script

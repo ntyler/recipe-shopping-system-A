@@ -1048,6 +1048,20 @@ function menuImportFollowupJobId(job) {
     return String(candidates.find(value => String(value || "").trim()) || "").trim();
 }
 
+function jobBlocksMenuEnrichmentAction(job) {
+    const status = String((job && job.status) || "").trim().toLowerCase();
+    return ["queued", "running", "cancel_requested", "completed"].includes(status);
+}
+
+function menuImportFollowupBlocksEnrichment(job) {
+    const followupJobId = menuImportFollowupJobId(job);
+    if (!followupJobId) {
+        return false;
+    }
+    const followupJob = lastJobActivityJobs.find(candidate => jobActivityJobId(candidate) === followupJobId);
+    return followupJob ? jobBlocksMenuEnrichmentAction(followupJob) : false;
+}
+
 function menuImportFollowupLabel(job) {
     const result = jobResultPayload(job);
     if (result.recipe_inference_job_id || (result.recipe_inference_job && result.recipe_inference_job.job_id)) {
@@ -1081,7 +1095,8 @@ function menuEnrichmentAlreadyQueuedForJob(job) {
         const jobType = String((candidate && candidate.job_type) || "").trim();
         const linkedSourceJobId = String((candidate && candidate.source_job_id) || "").trim();
         return linkedSourceJobId === sourceJobId
-            && ["menu-generate-recipes", "menu-deferred-heavy-tasks"].includes(jobType);
+            && ["menu-generate-recipes", "menu-deferred-heavy-tasks"].includes(jobType)
+            && jobBlocksMenuEnrichmentAction(candidate);
     });
 }
 
@@ -1100,7 +1115,7 @@ function jobCanStartMenuEnrichment(job) {
         && status === "completed"
         && hasBasicImport
         && menuEnrichmentRecipeUrls(job).length > 0
-        && !menuImportFollowupJobId(job)
+        && !menuImportFollowupBlocksEnrichment(job)
         && !menuEnrichmentAlreadyQueuedForJob(job);
 }
 
