@@ -550,7 +550,7 @@ def test_unclassified_cookbook_menu_keeps_cookbook_management_protected():
     assert 'data-cookbook-unclassified="1"' in unclassified_header
     assert "Rename cookbook" not in unclassified_header
     assert "Delete cookbook, keep recipes" not in unclassified_header
-    assert "Delete and purge all recipes in cookbook" not in unclassified_header
+    assert "Delete cookbook and purge recipes" not in unclassified_header
     assert "deleteCookbook(this)" not in unclassified_header
     assert "purgeCookbook(this)" not in unclassified_header
     assert "Remove selected recipes" in unclassified_header
@@ -560,8 +560,9 @@ def test_unclassified_cookbook_menu_keeps_cookbook_management_protected():
     assert 'data-cookbook-unclassified="0"' in dinner_header
     assert "Rename cookbook" in dinner_header
     assert "Delete selected recipes" in dinner_header
+    assert "Delete and purge all recipes" in dinner_header
     assert "Delete cookbook, keep recipes" in dinner_header
-    assert "Delete and purge all recipes in cookbook" in dinner_header
+    assert "Delete cookbook and purge recipes" in dinner_header
 
 
 def test_remove_selected_cookbook_recipes_moves_them_to_unclassified():

@@ -35,8 +35,8 @@ from PushShoppingList.services.cookbook_service import delete_cookbook_and_purge
 from PushShoppingList.services.cookbook_service import ensure_unclassified_cookbook_for_recipes
 from PushShoppingList.services.cookbook_service import move_recipes_to_cookbook
 from PushShoppingList.services.cookbook_service import prepare_cookbook_menu_view
+from PushShoppingList.services.cookbook_service import purge_cookbook_recipe_urls
 from PushShoppingList.services.cookbook_service import purge_selected_cookbook_recipe_urls
-from PushShoppingList.services.cookbook_service import purge_unclassified_cookbook_recipe_urls
 from PushShoppingList.services.cookbook_service import recipe_ingredients_for_record
 from PushShoppingList.services.cookbook_service import recipe_cookbook_assignments
 from PushShoppingList.services.cookbook_service import remove_recipe_from_cookbook
@@ -2134,7 +2134,7 @@ def purge_cookbook_route(cookbook_id):
 
 
 @main_bp.route("/api/cookbooks/<cookbook_id>/purge_recipes", methods=["POST"])
-def purge_unclassified_cookbook_recipes_route(cookbook_id):
+def purge_cookbook_recipes_route(cookbook_id):
     data = request.get_json(silent=True) or {}
     if not isinstance(data, dict):
         data = {}
@@ -2143,11 +2143,11 @@ def purge_unclassified_cookbook_recipes_route(cookbook_id):
     if str(confirmation or "").strip().upper() != "PURGE":
         return jsonify({
             "ok": False,
-            "error": "Type PURGE to confirm purging unclassified recipes.",
+            "error": "Type PURGE to confirm purging cookbook recipes.",
         }), 400
 
     try:
-        recipe_urls = purge_unclassified_cookbook_recipe_urls(cookbook_id)
+        recipe_urls = purge_cookbook_recipe_urls(cookbook_id)
         for recipe_url in recipe_urls:
             remove_recipe_and_unused_ingredients(recipe_url)
             remove_recipe_url(recipe_url)
@@ -2157,7 +2157,7 @@ def purge_unclassified_cookbook_recipes_route(cookbook_id):
     except Exception as exc:
         return jsonify({
             "ok": False,
-            "error": str(exc) or "Unable to purge unclassified recipes.",
+            "error": str(exc) or "Unable to purge cookbook recipes.",
         }), 500
 
     return jsonify({

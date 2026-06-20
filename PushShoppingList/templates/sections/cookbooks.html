@@ -300,17 +300,15 @@
                                                                 aria-label="{% if cookbook.is_unclassified %}Purge selected recipes from {{ cookbook.name }}{% else %}Delete and purge selected recipes from {{ cookbook.name }}{% endif %}">
                                                             {% if cookbook.is_unclassified %}Purge selected recipes{% else %}Delete and purge selected recipes{% endif %}
                                                         </button>
-                                                    {% endif %}
-                                                    {% if cookbook.is_unclassified and cookbook.recipes %}
                                                         <button type="button"
                                                                 class="delete"
                                                                 data-cookbook-id="{{ cookbook.id }}"
                                                                 data-cookbook-name="{{ cookbook.name }}"
-                                                                data-cookbook-unclassified="1"
+                                                                data-cookbook-unclassified="{% if cookbook.is_unclassified %}1{% else %}0{% endif %}"
                                                                 data-cookbook-recipe-count="{{ cookbook.recipes | length }}"
-                                                                onclick="closeRecipeEditRowMenus(); purgeUnclassifiedCookbookRecipes(this); return false;"
-                                                                aria-label="Purge all unclassified recipes from {{ cookbook.name }}">
-                                                            Purge all unclassified recipes
+                                                                onclick="closeRecipeEditRowMenus(); purgeAllCookbookRecipes(this); return false;"
+                                                                aria-label="{% if cookbook.is_unclassified %}Purge all unclassified recipes from {{ cookbook.name }}{% else %}Delete and purge all recipes from {{ cookbook.name }}{% endif %}">
+                                                            {% if cookbook.is_unclassified %}Purge all unclassified recipes{% else %}Delete and purge all recipes{% endif %}
                                                         </button>
                                                     {% endif %}
                                                     {% if not cookbook.is_unclassified %}
@@ -331,8 +329,8 @@
                                                                 data-cookbook-unclassified="0"
                                                                 data-cookbook-recipe-count="{{ cookbook.recipes | length }}"
                                                                 onclick="closeRecipeEditRowMenus(); purgeCookbook(this); return false;"
-                                                                aria-label="Delete {{ cookbook.name }} and purge all recipes in cookbook">
-                                                            Delete and purge all recipes in cookbook
+                                                                aria-label="Delete {{ cookbook.name }} cookbook and purge its recipes">
+                                                            Delete cookbook and purge recipes
                                                         </button>
                                                     {% endif %}
                                                 </div>
