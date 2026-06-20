@@ -1664,6 +1664,23 @@ def test_running_job_cancel_is_request_until_worker_confirms(monkeypatch, tmp_pa
     assert confirmed["current_step"] == "Cancelled"
 
 
+def test_cancel_requested_job_duration_freezes_at_cancel_request():
+    details = job_service.job_duration_details(
+        {
+            "status": "cancel_requested",
+            "created_at": "2026-06-20T00:00:00+00:00",
+            "started_at": "2026-06-20T00:01:00+00:00",
+            "updated_at": "2026-06-20T00:05:00+00:00",
+        },
+        reference_time=job_service.parse_iso_datetime("2026-06-20T00:30:00+00:00"),
+    )
+
+    assert details["duration_seconds"] is None
+    assert details["elapsed_seconds"] == 300
+    assert details["runtime_seconds"] == 240
+    assert details["queue_wait_seconds"] == 60
+
+
 def test_menu_generate_cancel_checkpoint_confirms_cancelled(monkeypatch, tmp_path):
     configure_job_paths(monkeypatch, tmp_path)
     job = job_service.create_job(

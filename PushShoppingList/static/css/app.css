@@ -21316,6 +21316,11 @@ img[data-deferred-src] {
             color: #bfdbfe;
         }
 
+        .job-activity-cancel_requested .job-activity-status {
+            border-color: #a16207;
+            color: #fde68a;
+        }
+
         .job-activity-completed .job-activity-status {
             border-color: #047857;
             color: #a7f3d0;

@@ -272,8 +272,10 @@ def test_job_activity_section_has_clear_collapse_control():
     assert "function renderJobPassedSummary" in script
     assert "function formatJobDurationSeconds" in script
     assert "function renderJobDuration" in script
+    assert "Ran before cancel" in script
     assert "function formatJobActivityDateTime" in script
     assert "function renderJobActivityTimestamps" in script
+    assert "Pending worker stop" in script
     assert "job-activity-enrichment-action" in script
     assert "menuEnrichmentAlreadyQueuedForJob(job)" in script
     assert "${timestampHtml}" in script
@@ -293,6 +295,7 @@ def test_job_activity_section_has_clear_collapse_control():
     assert ".job-activity-source-failed" in css
     assert ".job-activity-duration" in css
     assert ".job-activity-timestamps" in css
+    assert ".job-activity-cancel_requested .job-activity-status" in css
     assert ".job-activity-timestamp" in css
     assert ".job-activity-enrichment-action" in css
     assert 'method: "DELETE"' in script

@@ -1263,31 +1263,37 @@ function firstJobDurationSeconds(...values) {
 function jobDurationSummary(job) {
     const status = String((job && job.status) || "").trim().toLowerCase();
     const terminal = ["completed", "failed", "cancelled"].includes(status);
+    const cancelRequested = status === "cancel_requested";
     const now = Date.now();
     const finishedAt = String((job && (job.finished_at || job.completed_at)) || "").trim();
+    const cancelRequestedAt = String((job && job.updated_at) || "").trim();
     const fallbackEnd = terminal
         ? (finishedAt || String((job && job.updated_at) || "").trim())
+        : cancelRequested
+            ? (cancelRequestedAt || String((job && (job.started_at || job.created_at)) || "").trim())
         : now;
     const durationSeconds = firstJobDurationSeconds(
-        job && job.duration_seconds,
-        terminal ? jobSecondsBetween(job && job.created_at, fallbackEnd) : null
+        terminal ? job && job.duration_seconds : null,
+        (terminal || cancelRequested) ? jobSecondsBetween(job && job.created_at, fallbackEnd) : null
     );
     const elapsedSeconds = firstJobDurationSeconds(
-        job && job.elapsed_seconds,
+        cancelRequested ? null : job && job.elapsed_seconds,
         jobSecondsBetween(job && job.created_at, fallbackEnd)
     );
     const runtimeSeconds = firstJobDurationSeconds(
-        job && job.runtime_seconds,
+        cancelRequested ? null : job && job.runtime_seconds,
         jobSecondsBetween(job && job.started_at, fallbackEnd)
     );
     const queueWaitSeconds = firstJobDurationSeconds(
         job && job.queue_wait_seconds,
         jobSecondsBetween(job && job.created_at, job && job.started_at)
     );
-    const label = terminal ? "Duration" : (status === "queued" ? "Queued" : "Elapsed");
+    const label = terminal ? "Duration" : (cancelRequested ? "Ran before cancel" : (status === "queued" ? "Queued" : "Elapsed"));
     const seconds = terminal
         ? firstJobDurationSeconds(durationSeconds, runtimeSeconds, elapsedSeconds)
-        : (status === "queued" ? elapsedSeconds : firstJobDurationSeconds(runtimeSeconds, elapsedSeconds));
+        : (cancelRequested
+            ? firstJobDurationSeconds(runtimeSeconds, elapsedSeconds)
+            : (status === "queued" ? elapsedSeconds : firstJobDurationSeconds(runtimeSeconds, elapsedSeconds)));
     const value = formatJobDurationSeconds(seconds);
     if (!value) {
         return null;
@@ -1338,6 +1344,8 @@ function formatJobActivityDateTime(value) {
 }
 
 function renderJobActivityTimestamps(job) {
+    const status = String((job && job.status) || "").trim().toLowerCase();
+    const cancelRequested = status === "cancel_requested";
     const initiated = formatJobActivityDateTime(job && (job.created_at || job.started_at));
     const finishedSource = job && (
         job.finished_at
@@ -1346,8 +1354,9 @@ function renderJobActivityTimestamps(job) {
     );
     const finished = formatJobActivityDateTime(finishedSource);
     const started = formatJobActivityDateTime(job && job.started_at);
+    const cancelRequestedAt = formatJobActivityDateTime(job && job.updated_at);
 
-    if (!initiated && !finished && !started) {
+    if (!initiated && !finished && !started && !cancelRequestedAt) {
         return "";
     }
 
@@ -1368,10 +1377,18 @@ function renderJobActivityTimestamps(job) {
             </span>
         `);
     }
+    if (cancelRequested && cancelRequestedAt) {
+        items.push(`
+            <span class="job-activity-timestamp">
+                <span>Cancel requested</span>
+                <strong>${escapeHtml(cancelRequestedAt)}</strong>
+            </span>
+        `);
+    }
     items.push(`
         <span class="job-activity-timestamp">
             <span>Finished</span>
-            <strong>${escapeHtml(finished || "Not finished yet")}</strong>
+            <strong>${escapeHtml(finished || (cancelRequested ? "Pending worker stop" : "Not finished yet"))}</strong>
         </span>
     `);
 

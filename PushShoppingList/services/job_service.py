@@ -569,7 +569,9 @@ def job_duration_details(job, reference_time=None):
         or ""
     )
     status = normalize_status(job.get("status"))
-    end = finished or reference_time
+    cancel_requested = status == "cancel_requested"
+    cancel_requested_at = parse_iso_datetime(job.get("updated_at") or "") if cancel_requested else None
+    end = finished or cancel_requested_at or reference_time
     elapsed_seconds = duration_seconds_between(created, end)
     runtime_seconds = duration_seconds_between(started, end)
     queue_wait_seconds = duration_seconds_between(created, started)
