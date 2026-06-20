@@ -1,6 +1,8 @@
+import json
 import os
 import re
 import time
+from collections import deque
 from concurrent.futures import FIRST_COMPLETED
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import wait
@@ -353,6 +355,18 @@ def env_int(name, default=0, minimum=None, maximum=None):
     return value
 
 
+def env_float(name, default=0.0, minimum=None, maximum=None):
+    try:
+        value = float(os.getenv(str(name or "")) or float(default or 0.0))
+    except (TypeError, ValueError):
+        value = float(default or 0.0)
+    if minimum is not None:
+        value = max(float(minimum), value)
+    if maximum is not None:
+        value = min(float(maximum), value)
+    return value
+
+
 def import_menu_url_auto_enrich_enabled(payload=None):
     payload = payload if isinstance(payload, dict) else {}
     for key in ("auto_generate_recipes", "auto_enrich", "run_background_enrichment"):
@@ -430,6 +444,176 @@ def menu_recipe_failed_item_fallback_enabled(mode="fast"):
     if mode == "full":
         return env_bool("MENU_RECIPE_FULL_USE_FAILED_ITEM_FALLBACK", True)
     return env_bool("MENU_RECIPE_FAST_USE_FAILED_ITEM_FALLBACK", False)
+
+
+def menu_recipe_batch_processor_enabled(payload=None):
+    payload = payload if isinstance(payload, dict) else {}
+    for key in ("rate_limited_processor", "batch_rate_limited_processor", "use_parallel_processor"):
+        if key in payload:
+            return payload_bool(payload, key, True)
+    return env_bool("MENU_RECIPE_BATCH_PROCESSOR_ENABLED", True)
+
+
+def menu_recipe_batch_limit_env(mode, suffix):
+    mode = "full" if str(mode or "").strip().lower() == "full" else "fast"
+    prefix = "MENU_RECIPE_FULL" if mode == "full" else "MENU_RECIPE_FAST"
+    return f"{prefix}_{suffix}"
+
+
+def menu_recipe_batch_max_requests_per_minute(mode="fast"):
+    mode_env = menu_recipe_batch_limit_env(mode, "MAX_REQUESTS_PER_MINUTE")
+    raw_value = (
+        os.getenv(mode_env)
+        or os.getenv("MENU_RECIPE_MAX_REQUESTS_PER_MINUTE")
+        or os.getenv("OPENAI_GLOBAL_MAX_REQUESTS_PER_MINUTE")
+        or "0"
+    )
+    try:
+        value = float(raw_value)
+    except (TypeError, ValueError):
+        value = 0.0
+    return max(0.0, value * menu_recipe_batch_rate_limit_headroom())
+
+
+def menu_recipe_batch_max_tokens_per_minute(mode="fast"):
+    mode_env = menu_recipe_batch_limit_env(mode, "MAX_TOKENS_PER_MINUTE")
+    raw_value = (
+        os.getenv(mode_env)
+        or os.getenv("MENU_RECIPE_MAX_TOKENS_PER_MINUTE")
+        or os.getenv("OPENAI_GLOBAL_MAX_TOKENS_PER_MINUTE")
+        or "0"
+    )
+    try:
+        value = float(raw_value)
+    except (TypeError, ValueError):
+        value = 0.0
+    return max(0.0, value * menu_recipe_batch_rate_limit_headroom())
+
+
+def menu_recipe_batch_rate_limit_headroom():
+    return env_float("MENU_RECIPE_RATE_LIMIT_HEADROOM", 1.0, minimum=0.1, maximum=1.0)
+
+
+def menu_recipe_batch_estimated_response_tokens_per_item(mode="fast"):
+    mode = "full" if str(mode or "").strip().lower() == "full" else "fast"
+    env_name = "MENU_RECIPE_FULL_ESTIMATED_RESPONSE_TOKENS_PER_ITEM" if mode == "full" else "MENU_RECIPE_FAST_ESTIMATED_RESPONSE_TOKENS_PER_ITEM"
+    default = 2200 if mode == "full" else 1200
+    return env_int(env_name, default, minimum=100, maximum=20000)
+
+
+def estimate_menu_recipe_batch_tokens(batch, response_tokens_per_item=None):
+    response_tokens_per_item = int(response_tokens_per_item or menu_recipe_batch_estimated_response_tokens_per_item())
+    compact_items = []
+    for entry in batch or []:
+        if not isinstance(entry, dict):
+            continue
+        menu_item = entry.get("menu_item") if isinstance(entry.get("menu_item"), dict) else {}
+        compact_items.append(menu_item)
+    try:
+        request_chars = len(json.dumps({"items": compact_items}, ensure_ascii=False))
+    except Exception:
+        request_chars = sum(len(str(item or "")) for item in compact_items)
+    request_tokens = max(1, int(request_chars / 4) + 512)
+    response_tokens = max(0, response_tokens_per_item) * len(compact_items)
+    return max(1, request_tokens + response_tokens)
+
+
+class MenuRecipeBatchDispatchLimiter:
+    def __init__(
+        self,
+        max_requests_per_minute=0,
+        max_tokens_per_minute=0,
+        cancellation_check=None,
+        log_wait=None,
+        clock=None,
+        sleep_func=None,
+        window_seconds=60.0,
+    ):
+        self.max_requests_per_minute = max(0.0, float(max_requests_per_minute or 0))
+        self.max_tokens_per_minute = max(0.0, float(max_tokens_per_minute or 0))
+        self.cancellation_check = cancellation_check
+        self.log_wait = log_wait
+        self.clock = clock or time.monotonic
+        self.sleep_func = sleep_func or time.sleep
+        self.window_seconds = max(0.01, float(window_seconds or 60.0))
+        self.request_events = deque()
+        self.token_events = deque()
+        self.total_wait_seconds = 0.0
+        self.wait_event_count = 0
+
+    @property
+    def enabled(self):
+        return bool(self.max_requests_per_minute or self.max_tokens_per_minute)
+
+    def _check_cancelled(self):
+        if self.cancellation_check:
+            self.cancellation_check()
+
+    def _prune(self, now):
+        cutoff = now - self.window_seconds
+        while self.request_events and self.request_events[0] <= cutoff:
+            self.request_events.popleft()
+        while self.token_events and self.token_events[0][0] <= cutoff:
+            self.token_events.popleft()
+
+    def _current_token_count(self):
+        return sum(tokens for _timestamp, tokens in self.token_events)
+
+    def wait_seconds_for_capacity(self, estimated_tokens):
+        if not self.enabled:
+            return 0.0
+
+        now = self.clock()
+        self._prune(now)
+        waits = []
+        if self.max_requests_per_minute and len(self.request_events) >= self.max_requests_per_minute:
+            waits.append(max(0.0, self.request_events[0] + self.window_seconds - now))
+
+        estimated_tokens = max(1, int(estimated_tokens or 1))
+        if self.max_tokens_per_minute:
+            current_tokens = self._current_token_count()
+            if current_tokens + estimated_tokens > self.max_tokens_per_minute and self.token_events:
+                waits.append(max(0.0, self.token_events[0][0] + self.window_seconds - now))
+
+        return max(waits) if waits else 0.0
+
+    def _record_dispatch(self, estimated_tokens):
+        now = self.clock()
+        self._prune(now)
+        self.request_events.append(now)
+        self.token_events.append((now, max(1, int(estimated_tokens or 1))))
+
+    def acquire_or_sleep(self, estimated_tokens, can_sleep=True, batch_label=""):
+        estimated_tokens = max(1, int(estimated_tokens or 1))
+        while True:
+            self._check_cancelled()
+            wait_seconds = self.wait_seconds_for_capacity(estimated_tokens)
+            if wait_seconds <= 0:
+                self._record_dispatch(estimated_tokens)
+                return True
+            if not can_sleep:
+                return False
+            self.wait_event_count += 1
+            if self.log_wait:
+                self.log_wait(wait_seconds, estimated_tokens, batch_label)
+            remaining = wait_seconds
+            while remaining > 0:
+                self._check_cancelled()
+                sleep_for = min(0.5, remaining)
+                started = self.clock()
+                self.sleep_func(sleep_for)
+                elapsed = max(0.0, self.clock() - started)
+                self.total_wait_seconds += sleep_for if elapsed <= 0 else elapsed
+                remaining -= sleep_for
+
+    def summary_payload(self):
+        return {
+            "batch_rate_limited_processor": True,
+            "batch_max_requests_per_minute": self.max_requests_per_minute,
+            "batch_max_tokens_per_minute": self.max_tokens_per_minute,
+            "batch_dispatch_wait_seconds": round(self.total_wait_seconds, 3),
+            "batch_dispatch_wait_events": self.wait_event_count,
+        }
 
 
 def log_menu_enrichment_stage(stage, **fields):
@@ -738,11 +922,35 @@ def run_menu_generate_recipes_job(job_id, payload):
     completed_batches = 0
     predicted_batches_completed = 0
     batch_worker_count = menu_recipe_batch_worker_count(enrichment_mode, batch_total)
+    batch_processor_enabled = menu_recipe_batch_processor_enabled(payload)
+    batch_response_tokens_per_item = menu_recipe_batch_estimated_response_tokens_per_item(enrichment_mode)
     save_progress_every = menu_save_progress_update_every()
     followup_progress_every = menu_followup_progress_update_every()
     job_record = get_job(job_id) or {}
     inference_user_id = str(job_record.get("user_id") or active_user_id() or "").strip()
     job_queue_name = str(job_record.get("queue_name") or "ai-pantry-menu").strip() or "ai-pantry-menu"
+
+    def log_batch_dispatch_wait(wait_seconds, estimated_tokens, batch_label):
+        log_menu_enrichment_stage(
+            "batch_dispatch_wait",
+            job_id=job_id,
+            mode=enrichment_mode,
+            batch=batch_label,
+            wait_seconds=f"{wait_seconds:.3f}",
+            estimated_tokens=estimated_tokens,
+        )
+
+    batch_dispatch_limiter = MenuRecipeBatchDispatchLimiter(
+        max_requests_per_minute=menu_recipe_batch_max_requests_per_minute(enrichment_mode) if batch_processor_enabled else 0,
+        max_tokens_per_minute=menu_recipe_batch_max_tokens_per_minute(enrichment_mode) if batch_processor_enabled else 0,
+        cancellation_check=lambda: raise_if_menu_enrichment_cancelled("batch_dispatch_wait"),
+        log_wait=log_batch_dispatch_wait,
+    )
+
+    def batch_dispatch_payload():
+        if not batch_processor_enabled:
+            return {"batch_rate_limited_processor": False}
+        return batch_dispatch_limiter.summary_payload()
 
     log_menu_enrichment_stage(
         "prepare_ai_input_batches",
@@ -754,6 +962,10 @@ def run_menu_generate_recipes_job(job_id, payload):
         batch_size=recipe_batch_size,
         target_chars=recipe_batch_target_chars,
         batch_workers=batch_worker_count,
+        batch_rate_limited_processor=batch_processor_enabled,
+        batch_max_requests_per_minute=batch_dispatch_limiter.max_requests_per_minute,
+        batch_max_tokens_per_minute=batch_dispatch_limiter.max_tokens_per_minute,
+        batch_estimated_response_tokens_per_item=batch_response_tokens_per_item,
         model=recipe_model_resolution.model,
         model_source=recipe_model_resolution.source,
         elapsed=f"{time.perf_counter() - prepare_started:.3f}s",
@@ -763,7 +975,11 @@ def run_menu_generate_recipes_job(job_id, payload):
         "[MenuRecipeGeneration] action=start "
         f"job_id={job_id} total_items={total} pending_items={len(pending_entries)} "
         f"mode={enrichment_mode} batch_size={recipe_batch_size} "
-        f"batch_workers={batch_worker_count} model={recipe_model_resolution.model}"
+        f"batch_workers={batch_worker_count} "
+        f"batch_rate_limited_processor={batch_processor_enabled} "
+        f"batch_max_requests_per_minute={batch_dispatch_limiter.max_requests_per_minute:g} "
+        f"batch_max_tokens_per_minute={batch_dispatch_limiter.max_tokens_per_minute:g} "
+        f"model={recipe_model_resolution.model}"
     )
     if batch_total:
         print(
@@ -918,6 +1134,7 @@ def run_menu_generate_recipes_job(job_id, payload):
                 "batch_index": batch_index,
                 "batch_workers": batch_worker_count,
                 "recipe_batch_size": recipe_batch_size,
+                **batch_dispatch_payload(),
             },
         )
         return batch_result
@@ -1278,7 +1495,31 @@ def run_menu_generate_recipes_job(job_id, payload):
                 batch=f"{next_batch_to_submit + 1}/{batch_total}",
             )
             batch_index = next_batch_to_submit + 1
-            future = executor.submit(run_prediction_batch, batch_index, batches[next_batch_to_submit])
+            batch = batches[next_batch_to_submit]
+            estimated_tokens = estimate_menu_recipe_batch_tokens(
+                batch,
+                response_tokens_per_item=batch_response_tokens_per_item,
+            )
+            if batch_processor_enabled:
+                acquired_capacity = batch_dispatch_limiter.acquire_or_sleep(
+                    estimated_tokens,
+                    can_sleep=not futures and not batch_results,
+                    batch_label=f"{batch_index}/{batch_total}",
+                )
+                if not acquired_capacity:
+                    break
+            log_menu_enrichment_stage(
+                "batch_dispatch",
+                job_id=job_id,
+                mode=enrichment_mode,
+                batch=f"{batch_index}/{batch_total}",
+                size=len(batch or []),
+                estimated_tokens=estimated_tokens,
+                in_flight=len(futures) + 1,
+                batch_workers=batch_worker_count,
+                **batch_dispatch_payload(),
+            )
+            future = executor.submit(run_prediction_batch, batch_index, batch)
             futures[future] = batch_index
             next_batch_to_submit += 1
 
@@ -1303,6 +1544,7 @@ def run_menu_generate_recipes_job(job_id, payload):
                 "batch_index": 0,
                 "batch_workers": batch_worker_count,
                 "recipe_batch_size": recipe_batch_size,
+                **batch_dispatch_payload(),
             },
         )
 
@@ -1440,6 +1682,7 @@ def run_menu_generate_recipes_job(job_id, payload):
             "recipe_prediction_batches_completed": predicted_batches_completed,
             "batch_workers": batch_worker_count,
             "recipe_batch_size": recipe_batch_size,
+            **batch_dispatch_payload(),
             "menu_enrichment_mode": enrichment_mode,
             "enrichment_deferred": False,
             "run_generated_pdfs": False,
@@ -2072,6 +2315,7 @@ def run_menu_generate_recipes_job(job_id, payload):
         "recipe_prediction_batches_completed": predicted_batches_completed,
         "batch_workers": batch_worker_count,
         "recipe_batch_size": recipe_batch_size,
+        **batch_dispatch_payload(),
         "menu_enrichment_mode": enrichment_mode,
         "deferred_heavy_tasks_job": heavy_job,
         "deferred_heavy_tasks_job_id": heavy_job.get("job_id", ""),

@@ -1065,6 +1065,56 @@ def test_menu_generate_job_predicts_batches_in_parallel(monkeypatch, tmp_path):
     assert finished["result_payload"]["batch_workers"] == 2
 
 
+def test_menu_recipe_batch_dispatch_limiter_waits_for_request_capacity():
+    current_time = [0.0]
+    sleep_calls = []
+
+    def fake_sleep(seconds):
+        sleep_calls.append(seconds)
+        current_time[0] += seconds
+
+    limiter = job_tasks.MenuRecipeBatchDispatchLimiter(
+        max_requests_per_minute=1,
+        max_tokens_per_minute=0,
+        clock=lambda: current_time[0],
+        sleep_func=fake_sleep,
+        window_seconds=1.0,
+    )
+
+    assert limiter.acquire_or_sleep(estimated_tokens=100, can_sleep=False) is True
+    assert limiter.acquire_or_sleep(estimated_tokens=100, can_sleep=False) is False
+    assert limiter.acquire_or_sleep(estimated_tokens=100, can_sleep=True) is True
+
+    assert sleep_calls
+    assert sum(sleep_calls) >= 1.0
+    assert limiter.summary_payload()["batch_dispatch_wait_seconds"] >= 1.0
+    assert limiter.summary_payload()["batch_dispatch_wait_events"] == 1
+
+
+def test_menu_recipe_batch_dispatch_limiter_waits_for_token_capacity():
+    current_time = [0.0]
+    sleep_calls = []
+
+    def fake_sleep(seconds):
+        sleep_calls.append(seconds)
+        current_time[0] += seconds
+
+    limiter = job_tasks.MenuRecipeBatchDispatchLimiter(
+        max_requests_per_minute=0,
+        max_tokens_per_minute=100,
+        clock=lambda: current_time[0],
+        sleep_func=fake_sleep,
+        window_seconds=1.0,
+    )
+
+    assert limiter.acquire_or_sleep(estimated_tokens=80, can_sleep=False) is True
+    assert limiter.acquire_or_sleep(estimated_tokens=30, can_sleep=False) is False
+    assert limiter.acquire_or_sleep(estimated_tokens=30, can_sleep=True) is True
+
+    assert sleep_calls
+    assert limiter.summary_payload()["batch_dispatch_wait_events"] == 1
+
+
 def test_menu_generate_job_bulk_saves_predicted_recipes_with_throttled_progress(monkeypatch, tmp_path):
     configure_job_paths(monkeypatch, tmp_path)
     monkeypatch.setenv("MENU_SAVE_PROGRESS_EVERY", "10")
@@ -1303,6 +1353,8 @@ def test_menu_generate_fast_mode_batches_256_items_by_6_and_skips_heavy_work(mon
     assert model_values == ["gpt-4o-mini"] * 43
     assert finished["result_payload"]["menu_enrichment_mode"] == "fast"
     assert finished["result_payload"]["recipe_batch_size"] == 6
+    assert finished["result_payload"]["batch_rate_limited_processor"] is True
+    assert "batch_dispatch_wait_seconds" in finished["result_payload"]
     assert finished["result_payload"]["model_used"] == "gpt-4o-mini"
     assert finished["result_payload"]["model_env_var"] == "OPENAI_MENU_FAST_RECIPE_MODEL"
     assert finished["result_payload"]["nutrition_completed"] == 0

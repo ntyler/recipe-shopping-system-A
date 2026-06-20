@@ -179,6 +179,10 @@ $env:OPENAI_GLOBAL_MAX_REQUESTS_PER_MINUTE="120"
 $env:OPENAI_GLOBAL_MAX_TOKENS_PER_MINUTE="200000"
 $env:OPENAI_MENU_MAX_CONCURRENT_CALLS="8"
 $env:OPENAI_VISION_MAX_CONCURRENT_CALLS="2"
+$env:MENU_RECIPE_BATCH_PROCESSOR_ENABLED="1"
+$env:MENU_RECIPE_FAST_MAX_REQUESTS_PER_MINUTE="60"
+$env:MENU_RECIPE_FAST_MAX_TOKENS_PER_MINUTE="120000"
+$env:MENU_RECIPE_RATE_LIMIT_HEADROOM="0.75"
 ```
 
 Long-running AI Pantry workflows create persistent job records in a local SQLite job table and enqueue the work through RQ. `SHOPPING_APP_JOBS_DB` defaults to `PushShoppingList/user_data/jobs.sqlite3` when unset. `REDIS_URL` is used only by the Flask server and worker process; never expose it to browser code. `JOB_RETENTION_HOURS` controls signed-in user job history, and `GUEST_JOB_RETENTION_HOURS` controls guest demo job history. Guest job records are removed during demo cleanup. Set `JOB_QUEUE_THREAD_FALLBACK=0` for production-style runs so Redis/RQ outages fail safely instead of running jobs inside Flask. If Redis or RQ is unavailable in local development, `JOB_QUEUE_THREAD_FALLBACK=1` lets Flask run jobs in a background thread so the progress UI can still be tested. Set `JOB_QUEUE_MODE=inline` only for targeted debugging or tests where the request should run the job synchronously.
@@ -190,6 +194,7 @@ Notes:
 - Leave `DISABLE_RECIPE_PDF_ARCHIVE` unset if you want each extracted recipe page saved as a PDF for later review.
 - Set `FORCE_OPENAI_RECIPE_EXTRACTION=1` only when you want the OpenAI extractor used even if recipe-card HTML already has enough structured data.
 - `MENU_ITEM_INFERENCE_WORKERS` controls how many restaurant menu item recipe predictions run at once during Menu Extract imports. The default is `8`, and the app clamps it between `1` and `32`.
+- `MENU_RECIPE_BATCH_PROCESSOR_ENABLED=1` keeps Generate Menu Recipes on the app's local parallel batch dispatcher. Set `MENU_RECIPE_FAST_MAX_REQUESTS_PER_MINUTE` / `MENU_RECIPE_FULL_MAX_REQUESTS_PER_MINUTE` and `MENU_RECIPE_FAST_MAX_TOKENS_PER_MINUTE` / `MENU_RECIPE_FULL_MAX_TOKENS_PER_MINUTE` to throttle how quickly a single menu generation job starts OpenAI batches. If those are unset, the dispatcher falls back to the global OpenAI RPM/TPM env vars; `MENU_RECIPE_RATE_LIMIT_HEADROOM` can reserve extra room below the configured limit.
 - Leave `SHOPPING_APP_PORT` unset when running `C:\Python39\python.exe app.py` directly and you want the default port `5000`. The included `start_app.bat` currently sets `SHOPPING_APP_PORT=5083`.
 - `C:\Python39\python.exe app.py` serves through Waitress by default. Set `SHOPPING_APP_SERVER=flask-dev` only if you intentionally need Flask's development server for local debugging.
 - Set `SHOPPING_APP_PASSWORD_RESET_BASE_URL` to the address users should open from password reset emails and signed-in two-factor disable verification emails, such as your LAN, Tailscale, or public HTTPS URL. If unset, reset emails use the current request host.
