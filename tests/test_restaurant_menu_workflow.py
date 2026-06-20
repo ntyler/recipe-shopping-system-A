@@ -88,6 +88,33 @@ def test_menu_reimport_same_source_updates_without_duplicate_records(monkeypatch
     assert len(store["items"]) == 3
 
 
+def test_menu_reimport_same_source_with_typo_reuses_existing_source(monkeypatch, tmp_path):
+    monkeypatch.setattr(menu_store_service, "MENU_STORE_FILE", tmp_path / "restaurant_menus.json")
+    facts = sample_menu_facts("https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902")
+
+    first = menu_store_service.upsert_menu_from_facts(
+        facts,
+        cookbook_id="vel-asian-cuisine",
+        cookbook_name="Vel Asian Cuisine",
+    )
+    typo_facts = sample_menu_facts("https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902")
+    typo_facts["restaurant"]["restaurant_name"] = "Vel Asian Cusine"
+    typo_facts["menu"]["menu_title"] = "Vel Asian Cusine Menu"
+    second = menu_store_service.upsert_menu_from_facts(
+        typo_facts,
+        cookbook_id="vel-asian-cusine",
+        cookbook_name="Vel Asian Cusine",
+    )
+    store = menu_store_service.load_menu_store()
+
+    assert second["restaurant"]["id"] == first["restaurant"]["id"]
+    assert second["menu"]["id"] == first["menu"]["id"]
+    assert len(store["restaurants"]) == 1
+    assert len(store["menus"]) == 1
+    assert store["restaurants"][0]["restaurant_name"] == "Vel Asian Cuisine"
+    assert store["menus"][0]["cookbook_id"] == "vel-asian-cuisine"
+
+
 def test_selected_menu_items_keep_restaurant_menu_section_and_item_ids(monkeypatch, tmp_path):
     monkeypatch.setattr(menu_store_service, "MENU_STORE_FILE", tmp_path / "restaurant_menus.json")
     detail = menu_store_service.upsert_menu_from_facts(sample_menu_facts(), cookbook_id="dinner")

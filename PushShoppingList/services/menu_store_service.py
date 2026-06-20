@@ -5,12 +5,23 @@ import uuid
 from datetime import datetime
 from datetime import timezone
 from pathlib import Path
+from urllib.parse import parse_qsl
+from urllib.parse import urlencode
+from urllib.parse import urlparse
+from urllib.parse import urlunparse
 
 from PushShoppingList.services.storage_service import scoped_package_path
 
 
 MENU_STORE_FILE = scoped_package_path("restaurant_menus.json")
 MENU_STORE_LOCK = threading.RLock()
+MENU_SOURCE_ITEM_QUERY_KEYS = {
+    "menu_item",
+    "menu_item_id",
+    "menuidinput",
+    "menuitemidinput",
+    "ordertype",
+}
 
 
 def utc_now_iso():
@@ -115,8 +126,67 @@ def restaurant_name_key(value):
     return re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).strip()
 
 
-def menu_identity_key(menu):
+def menu_source_query_key_is_item_specific(key):
+    return str(key or "").strip().lower() in MENU_SOURCE_ITEM_QUERY_KEYS
+
+
+def canonical_menu_source_url(menu_url):
+    menu_url = clean_text(menu_url)
+    if not menu_url:
+        return ""
+
+    try:
+        parsed = urlparse(menu_url)
+    except ValueError:
+        return menu_url.split("#", 1)[0].strip()
+
+    path = parsed.path or ""
+    if path.endswith("menuItem_home.action"):
+        path = path.rsplit("/", 1)[0] + "/menu_home.action"
+
+    query_pairs = [
+        (key, value)
+        for key, value in parse_qsl(parsed.query or "", keep_blank_values=True)
+        if not menu_source_query_key_is_item_specific(key)
+    ]
+    return urlunparse((
+        parsed.scheme.lower(),
+        parsed.netloc.lower(),
+        path,
+        parsed.params,
+        urlencode(query_pairs, doseq=True),
+        "",
+    )).strip()
+
+
+def menu_source_identity_key(value):
+    canonical = canonical_menu_source_url(value)
+    return canonical.lower() if canonical else ""
+
+
+def restaurant_source_identity_key(restaurant):
+    restaurant = restaurant if isinstance(restaurant, dict) else {}
+    return menu_source_identity_key(restaurant.get("source_menu_url"))
+
+
+def restaurant_name_quality_score(value):
+    text = clean_text(value)
+    if not text:
+        return 0
+    generic_penalty = 0 if text.lower() in {"restaurant menu", "menu"} else 1000
+    return generic_penalty + len(text)
+
+
+def menu_identity_key(menu, restaurant=None):
     menu = menu if isinstance(menu, dict) else {}
+    restaurant = restaurant if isinstance(restaurant, dict) else {}
+    source_key = menu_source_identity_key(
+        menu.get("source_url")
+        or menu.get("source_menu_url")
+        or restaurant.get("source_menu_url")
+    )
+    if source_key:
+        return f"source:{source_key}"
     return "|".join([
         clean_text(menu.get("source_type")),
         clean_text(menu.get("source_url")),
@@ -129,11 +199,17 @@ def find_restaurant(payload, restaurant_name="", website_url="", source_url=""):
     name_key = restaurant_name_key(restaurant_name)
     website_url = clean_text(website_url)
     source_url = clean_text(source_url)
+    source_key = menu_source_identity_key(source_url)
+
+    if source_key:
+        for restaurant in payload.get("restaurants", []):
+            if restaurant_source_identity_key(restaurant) == source_key:
+                return restaurant
 
     for restaurant in payload.get("restaurants", []):
         if website_url and clean_text(restaurant.get("restaurant_website_url")) == website_url:
             return restaurant
-        if source_url and clean_text(restaurant.get("source_menu_url")) == source_url:
+        if source_url and menu_source_identity_key(restaurant.get("source_menu_url")) == source_key:
             return restaurant
         if name_key and restaurant_name_key(restaurant.get("restaurant_name")) == name_key:
             return restaurant
@@ -156,13 +232,14 @@ def find_menu_pdf_log(payload, log_id):
     return next((log for log in payload.get("pdf_logs", []) if log.get("id") == log_id), None)
 
 
-def find_existing_menu(payload, candidate):
-    target_key = menu_identity_key(candidate)
+def find_existing_menu(payload, candidate, restaurant=None):
+    target_key = menu_identity_key(candidate, restaurant)
     if not target_key.strip("|"):
         return None
 
     for menu in payload.get("menus", []):
-        if menu_identity_key(menu) == target_key:
+        menu_restaurant = restaurant_for(payload, menu.get("restaurant_id"))
+        if menu_identity_key(menu, menu_restaurant) == target_key:
             return menu
 
     return None
@@ -215,7 +292,16 @@ def upsert_restaurant(payload, raw_restaurant, source_url=""):
     )
 
     if restaurant:
+        existing_name = clean_text(restaurant.get("restaurant_name"))
+        incoming_name = clean_text(normalized.get("restaurant_name"))
         apply_nonempty_fields(restaurant, normalized)
+        if (
+            existing_name
+            and incoming_name
+            and restaurant_name_key(existing_name) != restaurant_name_key(incoming_name)
+            and restaurant_name_quality_score(existing_name) >= restaurant_name_quality_score(incoming_name)
+        ):
+            restaurant["restaurant_name"] = existing_name
         restaurant["updated_at"] = now
         restaurant["last_seen_at"] = now
         return restaurant
@@ -342,12 +428,12 @@ def replace_menu_sections_and_items(payload, menu, sections):
 def upsert_menu_from_facts(facts, cookbook_id="", cookbook_name=""):
     facts = facts if isinstance(facts, dict) else {}
     now = utc_now_iso()
-    source_url = clean_text(facts.get("source_url"))
+    raw_menu = facts.get("menu") if isinstance(facts.get("menu"), dict) else {}
+    raw_restaurant = facts.get("restaurant") if isinstance(facts.get("restaurant"), dict) else {}
+    source_url = clean_text(facts.get("source_url") or raw_restaurant.get("source_menu_url"))
     uploaded_path = clean_text(facts.get("source_uploaded_file_path") or facts.get("uploaded_file_path"))
     source_type = clean_text(facts.get("menu_source_type") or facts.get("source_type") or "imported_menu")
     menu_source_type = source_type if source_type in {"ai_generated_menu", "cookbook_generated_menu"} else "imported_menu"
-    raw_menu = facts.get("menu") if isinstance(facts.get("menu"), dict) else {}
-    raw_restaurant = facts.get("restaurant") if isinstance(facts.get("restaurant"), dict) else {}
     sections = facts.get("sections") if isinstance(facts.get("sections"), list) else []
 
     with MENU_STORE_LOCK:
@@ -359,7 +445,7 @@ def upsert_menu_from_facts(facts, cookbook_id="", cookbook_name=""):
             "source_uploaded_file_path": uploaded_path,
             "cookbook_id": clean_text(cookbook_id),
         }
-        menu = None if menu_source_type == "ai_generated_menu" else find_existing_menu(payload, candidate)
+        menu = None if menu_source_type == "ai_generated_menu" else find_existing_menu(payload, candidate, restaurant)
         if menu:
             menu["updated_at"] = now
         else:
@@ -371,8 +457,8 @@ def upsert_menu_from_facts(facts, cookbook_id="", cookbook_name=""):
 
         menu.update({
             "restaurant_id": restaurant.get("id"),
-            "cookbook_id": clean_text(cookbook_id),
-            "cookbook_name": clean_text(cookbook_name),
+            "cookbook_id": clean_text(menu.get("cookbook_id")) or clean_text(cookbook_id),
+            "cookbook_name": clean_text(menu.get("cookbook_name")) or clean_text(cookbook_name),
             "menu_title": clean_text(raw_menu.get("menu_title") or raw_menu.get("title") or f"{restaurant.get('restaurant_name')} Menu"),
             "menu_subtitle": clean_nullable_text(raw_menu.get("menu_subtitle") or raw_menu.get("subtitle")),
             "menu_description": clean_nullable_text(raw_menu.get("menu_description") or raw_menu.get("description")),
@@ -383,7 +469,7 @@ def upsert_menu_from_facts(facts, cookbook_id="", cookbook_name=""):
             "source_url": source_url,
             "source_uploaded_file_path": uploaded_path,
             "source_name": clean_text(facts.get("source_name")),
-            "created_from_cookbook_id": clean_text(facts.get("created_from_cookbook_id") or cookbook_id),
+            "created_from_cookbook_id": clean_text(menu.get("created_from_cookbook_id")) or clean_text(facts.get("created_from_cookbook_id") or cookbook_id),
             "is_public": clean_bool(raw_menu.get("is_public") or facts.get("is_public")),
             "generated_by_model": clean_text(facts.get("generated_by_model") or facts.get("model_used") or facts.get("model")),
             "model_source": clean_text(facts.get("model_source")),

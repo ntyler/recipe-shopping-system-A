@@ -985,6 +985,59 @@ def editable_menu_source_option_from_records(restaurant, menu):
     }
 
 
+def editable_menu_source_option_identity(option):
+    option = option if isinstance(option, dict) else {}
+    source_menu_url = first_recipe_menu_text(
+        option.get("source_menu_url"),
+        option.get("menu_source_url"),
+    )
+    source_menu_url = recipe_menu_source_url_from_item_url(source_menu_url) or source_menu_url
+    source_key = normalize_recipe_url_key(source_menu_url)
+    if source_key:
+        return f"source:{source_key}"
+
+    website_key = normalize_recipe_url_key(option.get("restaurant_website_url"))
+    address_key = recipe_menu_match_text(option.get("restaurant_address"))
+    name_key = recipe_menu_match_text(option.get("restaurant_name") or option.get("label"))
+    if website_key:
+        return f"website:{website_key}|{address_key or name_key}"
+    if name_key and address_key:
+        return f"place:{name_key}|{address_key}"
+    return f"value:{clean_recipe_menu_text(option.get('value'))}"
+
+
+def editable_menu_source_option_rank(option):
+    option = option if isinstance(option, dict) else {}
+    return (
+        1 if clean_recipe_menu_text(option.get("menu_id")) else 0,
+        1 if clean_recipe_menu_text(option.get("source_menu_url")) else 0,
+        1 if clean_recipe_menu_text(option.get("restaurant_website_url")) else 0,
+        len(clean_recipe_menu_text(option.get("label"))),
+    )
+
+
+def dedupe_editable_menu_source_options(options):
+    deduped = []
+    positions = {}
+
+    for option in options or []:
+        option = option if isinstance(option, dict) else {}
+        identity = editable_menu_source_option_identity(option)
+        if not identity or identity == "value:":
+            continue
+        if identity not in positions:
+            positions[identity] = len(deduped)
+            deduped.append(option)
+            continue
+
+        current_index = positions[identity]
+        current = deduped[current_index]
+        if editable_menu_source_option_rank(option) > editable_menu_source_option_rank(current):
+            deduped[current_index] = option
+
+    return deduped
+
+
 def editable_menu_source_options():
     payload = menu_store_service.load_menu_store()
     restaurants = {
@@ -993,28 +1046,84 @@ def editable_menu_source_options():
         if restaurant.get("id")
     }
     options = []
-    seen = set()
 
     for menu in payload.get("menus", []):
         restaurant = restaurants.get(menu.get("restaurant_id"), {})
         option = editable_menu_source_option_from_records(restaurant, menu)
-        value = option.get("value")
-        if value and value not in seen:
+        if option.get("value"):
             options.append(option)
-            seen.add(value)
 
     for restaurant in payload.get("restaurants", []):
         option = editable_menu_source_option_from_records(restaurant, {})
-        value = option.get("value")
-        if value and value not in seen:
+        if option.get("value"):
             options.append(option)
-            seen.add(value)
 
-    return sorted(options, key=lambda option: (
+    return sorted(dedupe_editable_menu_source_options(options), key=lambda option: (
         recipe_menu_match_text(option.get("restaurant_name")),
         recipe_menu_match_text(option.get("source_menu_url")),
         recipe_menu_match_text(option.get("menu_title")),
     ))
+
+
+def editable_menu_source_option_for_recipe(menu_metadata, options):
+    menu_metadata = menu_metadata if isinstance(menu_metadata, dict) else {}
+    selected_value = editable_menu_source_option_value(
+        menu_metadata.get("restaurant_id"),
+        menu_metadata.get("menu_id"),
+    )
+    for option in options or []:
+        if clean_recipe_menu_text(option.get("value")) == selected_value:
+            return option
+
+    current_option = {
+        "value": selected_value,
+        "restaurant_id": menu_metadata.get("restaurant_id", ""),
+        "menu_id": menu_metadata.get("menu_id", ""),
+        "label": menu_metadata.get("restaurant_name", ""),
+        "restaurant_name": menu_metadata.get("restaurant_name", ""),
+        "restaurant_website_url": menu_metadata.get("restaurant_website_url", ""),
+        "source_menu_url": menu_metadata.get("source_menu_url", ""),
+        "restaurant_address": menu_metadata.get("restaurant_address", ""),
+    }
+    current_identity = editable_menu_source_option_identity(current_option)
+    if not current_identity or current_identity == "value:":
+        return {}
+
+    return next(
+        (
+            option for option in options or []
+            if editable_menu_source_option_identity(option) == current_identity
+        ),
+        {},
+    )
+
+
+def apply_editable_menu_source_option(menu_metadata, option):
+    menu_metadata = dict(menu_metadata) if isinstance(menu_metadata, dict) else {}
+    option = option if isinstance(option, dict) else {}
+    if not option:
+        return menu_metadata
+
+    for field in (
+        "restaurant_id",
+        "menu_id",
+        "restaurant_name",
+        "restaurant_website_url",
+        "source_menu_url",
+        "restaurant_cuisine_tags",
+        "restaurant_phone",
+        "restaurant_address",
+        "restaurant_hours_text",
+        "restaurant_current_status",
+        "restaurant_promotions",
+        "restaurant_online_payment_available",
+        "restaurant_delivery_available",
+    ):
+        value = option.get(field)
+        if clean_recipe_menu_text(value):
+            menu_metadata[field] = value
+
+    return menu_metadata
 
 
 def recipe_has_menu_metadata(recipe_data):
@@ -1393,6 +1502,9 @@ def load_editable_recipe(url):
     hydrate_source_pdf_assets_from_url(recipe_data, source_url)
     menu_metadata = editable_recipe_menu_metadata(recipe_data)
     menu_source_options = editable_menu_source_options()
+    menu_source_option = editable_menu_source_option_for_recipe(menu_metadata, menu_source_options)
+    if menu_source_option:
+        menu_metadata = apply_editable_menu_source_option(menu_metadata, menu_source_option)
     menu_source_value = editable_menu_source_option_value(
         menu_metadata.get("restaurant_id"),
         menu_metadata.get("menu_id"),

@@ -383,6 +383,117 @@ def test_menu_derived_recipe_loads_restaurant_and_menu_item_metadata(monkeypatch
     assert loaded["menu_description"] == "Two veggie golden crispy rolls."
 
 
+def test_menu_source_options_dedupe_same_source_records_and_prefer_menu_option(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    source_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902"
+    menu_store_service.save_menu_store({
+        "restaurants": [
+            {
+                "id": "restaurant-primary",
+                "restaurant_name": "Vel Asian Cuisine",
+                "source_menu_url": source_url,
+                "full_address": "912 LOVELAND MADEIRA RD, LOVELAND, OH 45140",
+            },
+            {
+                "id": "restaurant-typo",
+                "restaurant_name": "Vel Asian Cusine",
+                "source_menu_url": source_url,
+                "full_address": "912 LOVELAND MADEIRA RD, LOVELAND, OH 45140",
+            },
+        ],
+        "menus": [
+            {
+                "id": "menu-primary",
+                "restaurant_id": "restaurant-primary",
+                "menu_title": "Vel Asian Cuisine Menu",
+                "source_url": "",
+                "source_type": "cookbook_generated_menu",
+                "cookbook_id": "vel-asian-cuisine",
+            },
+            {
+                "id": "menu-typo",
+                "restaurant_id": "restaurant-typo",
+                "menu_title": "Vel Asian Cusine Menu",
+                "source_url": "",
+                "source_type": "cookbook_generated_menu",
+                "cookbook_id": "vel-asian-cusine",
+            },
+        ],
+        "sections": [],
+        "items": [],
+        "pdf_logs": [],
+    })
+
+    options = recipe_edit_service.editable_menu_source_options()
+
+    assert len(options) == 1
+    assert options[0]["restaurant_id"] == "restaurant-primary"
+    assert options[0]["menu_id"] == "menu-primary"
+    assert options[0]["restaurant_name"] == "Vel Asian Cuisine"
+    assert options[0]["source_menu_url"] == source_url
+
+
+def test_menu_derived_recipe_loads_canonical_source_for_duplicate_source_ids(monkeypatch, tmp_path):
+    configure_editor_recipe_storage(monkeypatch, tmp_path)
+    source_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902"
+    recipe_url = f"{source_url}&menu_item=menu-item-1-Spring_Roll"
+    menu_store_service.save_menu_store({
+        "restaurants": [
+            {
+                "id": "restaurant-primary",
+                "restaurant_name": "Vel Asian Cuisine",
+                "source_menu_url": source_url,
+                "full_address": "912 LOVELAND MADEIRA RD, LOVELAND, OH 45140",
+            },
+            {
+                "id": "restaurant-typo",
+                "restaurant_name": "Vel Asian Cusine",
+                "source_menu_url": source_url,
+                "full_address": "912 LOVELAND MADEIRA RD, LOVELAND, OH 45140",
+            },
+        ],
+        "menus": [
+            {
+                "id": "menu-primary",
+                "restaurant_id": "restaurant-primary",
+                "menu_title": "Vel Asian Cuisine Menu",
+                "source_url": "",
+                "source_type": "cookbook_generated_menu",
+            },
+            {
+                "id": "menu-typo",
+                "restaurant_id": "restaurant-typo",
+                "menu_title": "Vel Asian Cusine Menu",
+                "source_url": "",
+                "source_type": "cookbook_generated_menu",
+            },
+        ],
+        "sections": [],
+        "items": [],
+        "pdf_logs": [],
+    })
+    recipe_edit_service.save_recipe_output(recipe_url, {
+        "source_url": recipe_url,
+        "source_type": "menu_item_inferred",
+        "ai_inferred": True,
+        "restaurant_id": "restaurant-typo",
+        "menu_id": "menu-typo",
+        "restaurant_name": "Vel Asian Cusine",
+        "source_menu_url": source_url,
+        "recipe_title": "Spring Roll",
+        "ingredients": [{"ingredient": "cabbage", "quantity": "1", "unit": "cup"}],
+        "instructions": [{"instruction": "Roll and fry until golden."}],
+    })
+
+    loaded = recipe_edit_service.load_editable_recipe(recipe_url)["recipe"]
+
+    assert len(loaded["menu_source_options"]) == 1
+    assert loaded["menu_source_value"] == "restaurant-primary|menu-primary"
+    assert loaded["restaurant_id"] == "restaurant-primary"
+    assert loaded["menu_id"] == "menu-primary"
+    assert loaded["restaurant_name"] == "Vel Asian Cuisine"
+
+
 def test_menu_metadata_can_resolve_from_section_link(monkeypatch, tmp_path):
     configure_editor_recipe_storage(monkeypatch, tmp_path)
     url, detail = seed_menu_derived_recipe()
