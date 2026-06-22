@@ -8780,8 +8780,14 @@ function cookbookRecipeMenuPriceLabel(card) {
 }
 
 function cookbookRecipeMenuSectionOrder(card) {
-    const value = String(card && card.dataset ? card.dataset.cookbookMenuSectionId || "" : "").trim();
-    const match = value.match(/(\d+)(?!.*\d)/);
+    const customOrder = Number.parseInt(card && card.dataset ? card.dataset.cookbookMenuSectionOrder : "", 10);
+
+    if (Number.isFinite(customOrder)) {
+        return customOrder;
+    }
+
+    const sectionId = String(card && card.dataset ? card.dataset.cookbookMenuSectionId || "" : "").trim();
+    const match = sectionId.match(/(\d+)(?!.*\d)/);
     const order = match ? Number.parseInt(match[1], 10) : Number.NaN;
     return Number.isFinite(order) ? order : Number.POSITIVE_INFINITY;
 }
@@ -19128,6 +19134,93 @@ function recipeEditorMenuSectionKey(value = "") {
     return String(value || "").trim().toLowerCase();
 }
 
+function recipeEditorMenuSectionRowFromControl(control) {
+    return control && typeof control.closest === "function"
+        ? control.closest("[data-recipe-edit-menu-section-row]")
+        : null;
+}
+
+function recipeEditorMenuSectionRowKey(row) {
+    return recipeEditorMenuSectionKey(row && row.dataset ? row.dataset.menuSection || "" : "");
+}
+
+function recipeEditorMenuSectionRowOrderAnchor(menu) {
+    return menu ? menu.querySelector("[data-recipe-edit-menu-section-empty]") : null;
+}
+
+function recipeEditorMenuSectionVisibleRows(field = recipeEditorMenuSectionField(), cookbookId = currentRecipeEditorCookbookId()) {
+    const activeCookbookId = String(cookbookId || "").trim();
+
+    return recipeEditorMenuSectionMenus(field).flatMap(menu => {
+        return Array.from(menu.querySelectorAll("[data-recipe-edit-menu-section-row]")).filter(row => {
+            return row
+                && !row.hidden
+                && String(row.dataset.cookbookId || "").trim() === activeCookbookId
+                && String(row.dataset.menuSection || "").trim();
+        });
+    });
+}
+
+function updateRecipeEditorMenuSectionMoveButtons(field = recipeEditorMenuSectionField(), cookbookId = currentRecipeEditorCookbookId()) {
+    const rows = recipeEditorMenuSectionVisibleRows(field, cookbookId);
+
+    rows.forEach((row, index) => {
+        row.querySelectorAll("[data-recipe-edit-menu-section-move]").forEach(button => {
+            const direction = Number.parseInt(button.dataset.direction || "0", 10);
+            button.disabled = (direction < 0 && index === 0)
+                || (direction > 0 && index === rows.length - 1)
+                || rows.length < 2;
+        });
+    });
+}
+
+function createRecipeEditorMenuSectionOptionRow(section, cookbookId) {
+    const row = document.createElement("div");
+    row.className = "recipe-edit-menu-section-option-row";
+    row.dataset.recipeEditMenuSectionRow = "";
+    row.dataset.cookbookId = cookbookId;
+    row.dataset.menuSection = section;
+
+    const option = document.createElement("button");
+    option.type = "button";
+    option.className = "recipe-edit-menu-section-option";
+    option.dataset.recipeEditMenuSectionOption = "";
+    option.dataset.cookbookId = cookbookId;
+    option.dataset.menuSection = section;
+    option.textContent = section;
+    option.onclick = function () {
+        return selectRecipeEditMenuSection(this);
+    };
+    row.appendChild(option);
+
+    const actions = document.createElement("div");
+    actions.className = "recipe-edit-menu-section-order-actions";
+
+    [-1, 1].forEach(direction => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "recipe-edit-menu-section-order-btn";
+        button.dataset.recipeEditMenuSectionMove = "";
+        button.dataset.cookbookId = cookbookId;
+        button.dataset.menuSection = section;
+        button.dataset.direction = String(direction);
+        button.setAttribute("aria-label", `Move ${section} ${direction < 0 ? "up" : "down"}`);
+        button.title = direction < 0 ? "Move section up" : "Move section down";
+        button.onclick = function () {
+            return moveRecipeEditMenuSection(this, direction);
+        };
+
+        const icon = document.createElement("span");
+        icon.className = `recipe-edit-menu-section-order-icon recipe-edit-menu-section-order-icon-${direction < 0 ? "up" : "down"}`;
+        icon.setAttribute("aria-hidden", "true");
+        button.appendChild(icon);
+        actions.appendChild(button);
+    });
+
+    row.appendChild(actions);
+    return row;
+}
+
 function currentRecipeEditorMenuSectionValue() {
     const input = recipeEditorMenuSectionInput();
     return input ? String(input.value || "").trim() : "";
@@ -19190,8 +19283,12 @@ function updateRecipeEditorMenuSectionOptions(cookbookId = currentRecipeEditorCo
         const section = String(button.dataset.menuSection || button.textContent || "").trim();
         const optionKey = `${optionCookbookId}|${recipeEditorMenuSectionKey(section)}`;
         const visible = Boolean(activeCookbookId && optionCookbookId === activeCookbookId && section && !seen.has(optionKey));
+        const row = recipeEditorMenuSectionRowFromControl(button);
 
         button.hidden = !visible;
+        if (row) {
+            row.hidden = !visible;
+        }
         button.classList.toggle("is-selected", visible && recipeEditorMenuSectionKey(section) === activeKey);
         button.setAttribute("aria-current", visible && recipeEditorMenuSectionKey(section) === activeKey ? "true" : "false");
 
@@ -19205,6 +19302,7 @@ function updateRecipeEditorMenuSectionOptions(cookbookId = currentRecipeEditorCo
         label.hidden = visibleCount > 0;
     });
 
+    updateRecipeEditorMenuSectionMoveButtons(field, activeCookbookId);
     updateRecipeEditorMenuSectionDisplay(currentSection);
 }
 
@@ -19226,18 +19324,9 @@ function ensureRecipeEditorMenuSectionOption(value, cookbookId = currentRecipeEd
             return;
         }
 
-        const button = document.createElement("button");
-        button.type = "button";
-        button.dataset.recipeEditMenuSectionOption = "";
-        button.dataset.cookbookId = activeCookbookId;
-        button.dataset.menuSection = section;
-        button.textContent = section;
-        button.onclick = function () {
-            return selectRecipeEditMenuSection(this);
-        };
-
+        const row = createRecipeEditorMenuSectionOptionRow(section, activeCookbookId);
         const empty = menu.querySelector("[data-recipe-edit-menu-section-empty]");
-        menu.insertBefore(button, empty || null);
+        menu.insertBefore(row, empty || null);
     });
 }
 
@@ -19260,6 +19349,158 @@ function editRecipeEditMenuSection(button) {
 
     closeRecipeEditRowMenus();
     setRecipeEditorMenuSectionValue(nextValue, { userSelected: true });
+    return false;
+}
+
+function recipeEditorMenuSectionOrderFromRows(cookbookId = currentRecipeEditorCookbookId()) {
+    const activeCookbookId = String(cookbookId || "").trim();
+    const sections = [];
+    const seen = new Set();
+
+    recipeEditorMenuSectionVisibleRows(recipeEditorMenuSectionField(), activeCookbookId).forEach(row => {
+        const section = String(row.dataset.menuSection || "").trim();
+        const key = recipeEditorMenuSectionKey(section);
+
+        if (section && !seen.has(key)) {
+            sections.push(section);
+            seen.add(key);
+        }
+    });
+
+    return sections;
+}
+
+function reorderRecipeEditorMenuSectionRows(cookbookId, orderedSections = []) {
+    const activeCookbookId = String(cookbookId || "").trim();
+    const orderedKeys = new Map(
+        orderedSections.map((section, index) => [recipeEditorMenuSectionKey(section), index])
+    );
+
+    recipeEditorMenuSectionMenus().forEach(menu => {
+        const rows = Array.from(menu.querySelectorAll("[data-recipe-edit-menu-section-row]"))
+            .filter(row => String(row.dataset.cookbookId || "").trim() === activeCookbookId)
+            .map((row, index) => ({ row, index }));
+        const anchor = recipeEditorMenuSectionRowOrderAnchor(menu);
+
+        rows
+            .sort((left, right) => {
+                const leftOrder = orderedKeys.has(recipeEditorMenuSectionRowKey(left.row))
+                    ? orderedKeys.get(recipeEditorMenuSectionRowKey(left.row))
+                    : Number.POSITIVE_INFINITY;
+                const rightOrder = orderedKeys.has(recipeEditorMenuSectionRowKey(right.row))
+                    ? orderedKeys.get(recipeEditorMenuSectionRowKey(right.row))
+                    : Number.POSITIVE_INFINITY;
+
+                return (leftOrder - rightOrder) || (left.index - right.index);
+            })
+            .forEach(({ row }) => {
+                menu.insertBefore(row, anchor || null);
+            });
+    });
+
+    updateRecipeEditorMenuSectionOptions(activeCookbookId, currentRecipeEditorMenuSectionValue());
+}
+
+function updateCookbookMenuSectionOrderData(cookbookId, orderedSections = []) {
+    const activeCookbookId = String(cookbookId || "").trim();
+    const orderedKeys = new Map(
+        orderedSections.map((section, index) => [recipeEditorMenuSectionKey(section), index])
+    );
+
+    document.querySelectorAll("[data-cookbook-menu-section]").forEach(card => {
+        if (String(card.dataset.cookbookId || "").trim() !== activeCookbookId) {
+            return;
+        }
+
+        const key = recipeEditorMenuSectionKey(card.dataset.cookbookMenuSection || "");
+        if (orderedKeys.has(key)) {
+            card.dataset.cookbookMenuSectionOrder = String(orderedKeys.get(key));
+        } else {
+            card.dataset.cookbookMenuSectionOrder = String(orderedSections.length);
+        }
+    });
+
+    document.querySelectorAll("[data-cookbook-card]").forEach(card => {
+        if (
+            String(card.dataset.cookbookId || "").trim() === activeCookbookId
+            && card.dataset.cookbookSortKey === "menu_section"
+            && card.dataset.cookbookSortDirection
+        ) {
+            applyCookbookRecipeSort(card, "menu_section", {
+                direction: card.dataset.cookbookSortDirection,
+                persist: false,
+            });
+            applyCookbookRecipeSearch();
+        }
+    });
+}
+
+async function moveRecipeEditMenuSection(button, direction) {
+    const row = recipeEditorMenuSectionRowFromControl(button);
+    const field = recipeEditorMenuSectionField();
+    const cookbookId = String(
+        (button && button.dataset ? button.dataset.cookbookId : "")
+        || (row && row.dataset ? row.dataset.cookbookId : "")
+        || currentRecipeEditorCookbookId()
+        || ""
+    ).trim();
+    const section = String(
+        (button && button.dataset ? button.dataset.menuSection : "")
+        || (row && row.dataset ? row.dataset.menuSection : "")
+        || ""
+    ).trim();
+    const numericDirection = Number.parseInt(direction, 10);
+    const movingUp = numericDirection < 0;
+    const visibleRows = recipeEditorMenuSectionVisibleRows(field, cookbookId);
+    const currentIndex = visibleRows.indexOf(row);
+    const originalTitle = button ? button.title : "";
+
+    if (!cookbookId || !section) {
+        setRecipeEditStatus("Choose a cookbook section before moving it.", true);
+        return false;
+    }
+
+    if (currentIndex < 0 || (movingUp && currentIndex === 0) || (!movingUp && currentIndex === visibleRows.length - 1)) {
+        setRecipeEditStatus(`Menu section is already at the ${movingUp ? "top" : "bottom"}.`);
+        updateRecipeEditorMenuSectionMoveButtons(field, cookbookId);
+        return false;
+    }
+
+    try {
+        if (button) {
+            button.disabled = true;
+            button.title = movingUp ? "Moving section up..." : "Moving section down...";
+        }
+
+        setRecipeEditStatus(movingUp ? "Moving menu section up..." : "Moving menu section down...");
+
+        const formData = new FormData();
+        formData.set("menu_section", section);
+        formData.set("direction", movingUp ? "-1" : "1");
+        const data = await submitCookbookApi(
+            `/api/cookbooks/${encodeURIComponent(cookbookId)}/menu_sections/reorder`,
+            formData,
+        );
+        const orderedSections = Array.isArray(data.menu_section_order)
+            ? data.menu_section_order
+            : recipeEditorMenuSectionOrderFromRows(cookbookId);
+
+        reorderRecipeEditorMenuSectionRows(cookbookId, orderedSections);
+        updateCookbookMenuSectionOrderData(cookbookId, orderedSections);
+        setRecipeEditStatus(movingUp ? "Menu section moved up." : "Menu section moved down.");
+        showRecipeQuantityUpdatedMessage("", "", "", movingUp ? "Menu section moved up." : "Menu section moved down.");
+    } catch (err) {
+        console.warn("Unable to move menu section.", err);
+        setRecipeEditStatus(err.message || "Unable to move menu section.", true);
+        window.alert(err.message || "Unable to move menu section.");
+    } finally {
+        if (button && button.isConnected) {
+            button.disabled = false;
+            button.title = originalTitle || (movingUp ? "Move section up" : "Move section down");
+        }
+        updateRecipeEditorMenuSectionMoveButtons(field, cookbookId);
+    }
+
     return false;
 }
 

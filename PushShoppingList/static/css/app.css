@@ -17756,6 +17756,50 @@ body {
     color: #dbeafe;
 }
 
+.recipe-edit-menu-section-option-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: stretch;
+}
+
+.recipe-edit-row-menu .recipe-edit-menu-section-option-row[hidden] {
+    display: none !important;
+}
+
+.recipe-edit-row-menu .recipe-edit-menu-section-option {
+    min-width: 0;
+}
+
+.recipe-edit-menu-section-order-actions {
+    display: grid;
+    grid-template-columns: repeat(2, 30px);
+    align-items: stretch;
+    border-left: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.recipe-edit-row-menu .recipe-edit-menu-section-order-btn {
+    justify-content: center;
+    width: 30px;
+    min-width: 30px;
+    min-height: 36px;
+    padding: 0;
+}
+
+.recipe-edit-menu-section-order-icon {
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+}
+
+.recipe-edit-menu-section-order-icon-up {
+    border-bottom: 6px solid currentColor;
+}
+
+.recipe-edit-menu-section-order-icon-down {
+    border-top: 6px solid currentColor;
+}
+
 .recipe-edit-row-menu button:disabled {
     opacity: 0.55;
     cursor: not-allowed;

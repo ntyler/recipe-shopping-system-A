@@ -53,12 +53,15 @@ def test_cookbook_menu_mode_static_hooks_are_present():
     assert "Add Ingredients to Shopping List" in template
     assert "cookbookCategoryEditorModal" in template
     assert "/api/cookbooks/<cookbook_id>/recipe_categories" in routes
+    assert "/api/cookbooks/<cookbook_id>/menu_sections/reorder" in routes
     assert "function openCookbookCategoryEditor" in script
     assert "function applyCookbookViewMode" in script
     assert "COOKBOOK_VIEW_MODE_SESSION_KEY" in script
     assert "function saveCookbookCategories" in script
+    assert "function moveRecipeEditMenuSection" in script
     assert "function inferMissingCookbookRecipeDetails" in script
     assert "cookbook_category_overwrite" in script
+    assert "reorder_cookbook_menu_section" in service
     assert "Infer Details for This Recipe" in template
     assert "data-cookbook-search-text" in template
     assert ".cookbook-menu-recipe-card" in css
@@ -281,6 +284,8 @@ def test_cookbook_recipe_infer_button_uses_recipe_editor_inference_flow():
 
 def test_recipe_editor_cookbook_dropdown_updates_portaled_menu_options():
     script = read_text("PushShoppingList/static/js/app.js")
+    editor_template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    css = read_text("PushShoppingList/static/css/app.css")
     action_data_block = script[
         script.index("function recipeLogCookbookActionData"):
         script.index("async function moveRecipeUrlToCookbook")
@@ -298,6 +303,20 @@ def test_recipe_editor_cookbook_dropdown_updates_portaled_menu_options():
     assert 'recipeEditorCookbookMenuButtons(field, "[data-recipe-edit-cookbook-action]")' in cookbook_setter_block
     assert 'recipeEditorCookbookMenuButtons(field, "[data-recipe-edit-cookbook-option]")' in cookbook_setter_block
     assert 'recipeEditorCookbookMenuButtons(field, "[data-recipe-edit-cookbook-delete]")' in cookbook_setter_block
+    assert "data-recipe-edit-menu-section-row" in editor_template
+    assert "data-recipe-edit-menu-section-move" in editor_template
+    assert "moveRecipeEditMenuSection(this, -1)" in editor_template
+    assert "moveRecipeEditMenuSection(this, 1)" in editor_template
+    assert "function createRecipeEditorMenuSectionOptionRow" in script
+    assert "function reorderRecipeEditorMenuSectionRows" in script
+    assert "function updateCookbookMenuSectionOrderData" in script
+    assert "function moveRecipeEditMenuSection" in script
+    assert 'formData.set("menu_section", section)' in script
+    assert '`/api/cookbooks/${encodeURIComponent(cookbookId)}/menu_sections/reorder`' in script
+    assert "data-cookbook-menu-section-order" in read_text("PushShoppingList/templates/sections/cookbooks.html")
+    assert "dataset.cookbookMenuSectionOrder" in script
+    assert ".recipe-edit-menu-section-option-row" in css
+    assert ".recipe-edit-menu-section-order-btn" in css
 
 
 def test_cookbook_recipe_rows_match_current_recipe_summary_layout():
@@ -842,6 +861,63 @@ def test_cookbook_recipe_move_can_insert_before_and_after_saved_recipes():
         "https://example.com/bravo",
         "https://example.com/alpha",
     ]
+
+
+def test_cookbook_menu_section_order_can_be_saved_and_rendered():
+    with TemporaryDirectory() as temp_dir, patch.object(
+        cookbook_service,
+        "COOKBOOKS_FILE",
+        Path(temp_dir) / "cookbooks.json",
+    ):
+        cookbook_service.save_cookbooks({
+            "cookbooks": [{
+                "id": "dinner",
+                "name": "Dinner",
+                "recipes": [
+                    {
+                        "url": "https://example.com/dumpling",
+                        "name": "Dumpling",
+                        "menu_section": "Kitchen Appetizers",
+                    },
+                    {
+                        "url": "https://example.com/ramen",
+                        "name": "Ramen",
+                        "menu_section": "Ramen",
+                    },
+                    {
+                        "url": "https://example.com/mochi",
+                        "name": "Mochi",
+                        "menu_section": "Dessert",
+                    },
+                ],
+            }],
+        })
+
+        saved = cookbook_service.load_cookbooks()
+        assert saved["cookbooks"][0]["menu_section_order"] == [
+            "Kitchen Appetizers",
+            "Ramen",
+            "Dessert",
+        ]
+
+        section_order = cookbook_service.reorder_cookbook_menu_section(
+            "dinner",
+            "Ramen",
+            -1,
+        )
+        view = cookbook_service.cookbook_view([])
+
+    dinner = view["cookbooks"][0]
+    recipes_by_name = {
+        recipe["name"]: recipe
+        for recipe in dinner["recipes"]
+    }
+
+    assert section_order == ["Ramen", "Kitchen Appetizers", "Dessert"]
+    assert dinner["menu_section_choices"] == ["Ramen", "Kitchen Appetizers", "Dessert"]
+    assert recipes_by_name["Ramen"]["menu_section_order"] == 0
+    assert recipes_by_name["Dumpling"]["menu_section_order"] == 1
+    assert recipes_by_name["Mochi"]["menu_section_order"] == 2
 
 
 def test_cookbook_category_update_requires_confirmation_before_overwriting_manual_values():

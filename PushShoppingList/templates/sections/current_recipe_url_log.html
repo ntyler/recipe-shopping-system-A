@@ -1056,13 +1056,43 @@
                                         {% if cookbook_view and cookbook_view.cookbooks %}
                                             {% for cookbook in cookbook_view.cookbooks %}
                                                 {% for section in cookbook.menu_section_choices or [] %}
-                                                    <button type="button"
-                                                            data-recipe-edit-menu-section-option
-                                                            data-cookbook-id="{{ cookbook.id }}"
-                                                            data-menu-section="{{ section }}"
-                                                            onclick="return selectRecipeEditMenuSection(this)">
-                                                        {{ section }}
-                                                    </button>
+                                                    <div class="recipe-edit-menu-section-option-row"
+                                                         data-recipe-edit-menu-section-row
+                                                         data-cookbook-id="{{ cookbook.id }}"
+                                                         data-menu-section="{{ section }}">
+                                                        <button type="button"
+                                                                class="recipe-edit-menu-section-option"
+                                                                data-recipe-edit-menu-section-option
+                                                                data-cookbook-id="{{ cookbook.id }}"
+                                                                data-menu-section="{{ section }}"
+                                                                onclick="return selectRecipeEditMenuSection(this)">
+                                                            {{ section }}
+                                                        </button>
+                                                        <div class="recipe-edit-menu-section-order-actions">
+                                                            <button type="button"
+                                                                    class="recipe-edit-menu-section-order-btn"
+                                                                    data-recipe-edit-menu-section-move
+                                                                    data-cookbook-id="{{ cookbook.id }}"
+                                                                    data-menu-section="{{ section }}"
+                                                                    data-direction="-1"
+                                                                    aria-label="Move {{ section }} up"
+                                                                    title="Move section up"
+                                                                    onclick="return moveRecipeEditMenuSection(this, -1)">
+                                                                <span class="recipe-edit-menu-section-order-icon recipe-edit-menu-section-order-icon-up" aria-hidden="true"></span>
+                                                            </button>
+                                                            <button type="button"
+                                                                    class="recipe-edit-menu-section-order-btn"
+                                                                    data-recipe-edit-menu-section-move
+                                                                    data-cookbook-id="{{ cookbook.id }}"
+                                                                    data-menu-section="{{ section }}"
+                                                                    data-direction="1"
+                                                                    aria-label="Move {{ section }} down"
+                                                                    title="Move section down"
+                                                                    onclick="return moveRecipeEditMenuSection(this, 1)">
+                                                                <span class="recipe-edit-menu-section-order-icon recipe-edit-menu-section-order-icon-down" aria-hidden="true"></span>
+                                                            </button>
+                                                        </div>
+                                                    </div>
                                                 {% endfor %}
                                             {% endfor %}
                                         {% endif %}

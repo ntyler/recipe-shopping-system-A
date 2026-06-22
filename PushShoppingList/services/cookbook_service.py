@@ -297,6 +297,19 @@ def clean_text_list(value):
     return items
 
 
+def clean_menu_section_order(value):
+    ordered_sections = []
+    seen = set()
+
+    for section in clean_text_list(value):
+        key = section.lower()
+        if key not in seen:
+            ordered_sections.append(section)
+            seen.add(key)
+
+    return ordered_sections
+
+
 def clean_custom_categories(value):
     def split_categories(text):
         return [
@@ -1237,7 +1250,7 @@ def cookbook_menu_sections(recipes):
     return sections_by_mode
 
 
-def cookbook_menu_section_choices(recipes):
+def cookbook_menu_section_choices(recipes, section_order=None):
     choices = []
     seen = set()
 
@@ -1248,7 +1261,44 @@ def cookbook_menu_section_choices(recipes):
             choices.append(section)
             seen.add(key)
 
-    return choices
+    if not section_order:
+        return choices
+
+    labels_by_key = {
+        label.lower(): label
+        for label in choices
+    }
+    ordered_choices = []
+    ordered_seen = set()
+
+    for section in clean_menu_section_order(section_order):
+        key = section.lower()
+        if key in labels_by_key and key not in ordered_seen:
+            ordered_choices.append(labels_by_key[key])
+            ordered_seen.add(key)
+
+    for section in choices:
+        key = section.lower()
+        if key not in ordered_seen:
+            ordered_choices.append(section)
+            ordered_seen.add(key)
+
+    return ordered_choices
+
+
+def ordered_cookbook_menu_sections(cookbook):
+    cookbook = cookbook if isinstance(cookbook, dict) else {}
+    return cookbook_menu_section_choices(
+        cookbook.get("recipes", []),
+        cookbook.get("menu_section_order", []),
+    )
+
+
+def cookbook_menu_section_order_index(section_order):
+    return {
+        section.lower(): index
+        for index, section in enumerate(clean_menu_section_order(section_order))
+    }
 
 
 def menu_store_url_keys(row):
@@ -1385,8 +1435,17 @@ def prepare_cookbook_menu_view(view):
             apply_menu_store_metadata_to_recipe(recipe, menu_store, cookbook.get("id", ""))
             apply_recipe_menu_metadata(recipe)
 
+        menu_section_choices = ordered_cookbook_menu_sections(cookbook)
+        menu_section_order = cookbook_menu_section_order_index(menu_section_choices)
+
+        for recipe in cookbook.get("recipes", []):
+            recipe["menu_section_order"] = menu_section_order.get(
+                clean_text(recipe.get("menu_section")).lower(),
+                len(menu_section_choices),
+            )
+
         cookbook["menu_sections"] = cookbook_menu_sections(cookbook.get("recipes", []))
-        cookbook["menu_section_choices"] = cookbook_menu_section_choices(cookbook.get("recipes", []))
+        cookbook["menu_section_choices"] = menu_section_choices
 
     for recipe in view.get("recipes", []):
         apply_menu_store_metadata_to_recipe(recipe, menu_store, recipe.get("cookbook_id", ""))
@@ -1427,11 +1486,20 @@ def normalize_cookbooks_payload(payload):
                 recipes.append(record)
                 seen_recipes.add(key)
 
-        cookbooks.append({
+        menu_section_order = cookbook_menu_section_choices(
+            recipes,
+            cookbook.get("menu_section_order", []),
+        )
+        normalized_cookbook = {
             "id": cookbook_id,
             "name": name,
             "recipes": recipes,
-        })
+        }
+
+        if menu_section_order:
+            normalized_cookbook["menu_section_order"] = menu_section_order
+
+        cookbooks.append(normalized_cookbook)
 
     return {"cookbooks": cookbooks}
 
@@ -1907,6 +1975,55 @@ def reorder_cookbooks(cookbook_ids):
 
         payload["cookbooks"] = ordered_cookbooks
         return save_cookbooks(payload).get("cookbooks", [])
+
+
+def reorder_cookbook_menu_section(cookbook_id, menu_section, direction):
+    cookbook_id = clean_text(cookbook_id)
+    section = clean_text(menu_section)
+
+    try:
+        direction = int(direction)
+    except (TypeError, ValueError):
+        direction = 0
+
+    if not cookbook_id:
+        raise ValueError("Cookbook is required.")
+    if not section:
+        raise ValueError("Menu section is required.")
+    if direction == 0:
+        raise ValueError("Menu section direction is required.")
+
+    with COOKBOOKS_LOCK:
+        payload = load_cookbooks()
+        target = find_cookbook(payload, cookbook_id)
+
+        if target is None:
+            raise ValueError("Cookbook was not found.")
+
+        order = ordered_cookbook_menu_sections(target)
+        section_key = section.lower()
+        current_index = next(
+            (
+                index
+                for index, label in enumerate(order)
+                if label.lower() == section_key
+            ),
+            -1,
+        )
+
+        if current_index < 0:
+            raise ValueError("Menu section was not found in this cookbook.")
+
+        target_index = current_index - 1 if direction < 0 else current_index + 1
+        if target_index < 0 or target_index >= len(order):
+            edge = "top" if direction < 0 else "bottom"
+            raise ValueError(f"Menu section is already at the {edge}.")
+
+        order[current_index], order[target_index] = order[target_index], order[current_index]
+        target["menu_section_order"] = order
+        saved = save_cookbooks(payload)
+        saved_target = find_cookbook(saved, cookbook_id) or target
+        return ordered_cookbook_menu_sections(saved_target)
 
 
 def move_recipes_to_cookbook(

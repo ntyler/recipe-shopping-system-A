@@ -45,6 +45,7 @@ from PushShoppingList.services.cookbook_service import remove_recipe_from_cookbo
 from PushShoppingList.services.cookbook_service import remove_recipes_from_cookbook
 from PushShoppingList.services.cookbook_service import rename_cookbook
 from PushShoppingList.services.cookbook_service import reorder_cookbooks
+from PushShoppingList.services.cookbook_service import reorder_cookbook_menu_section
 from PushShoppingList.services.cookbook_service import update_cookbook_recipe_categories
 from PushShoppingList.services.cookbook_item_inference_service import infer_missing_details_for_cookbook
 from PushShoppingList.services.home_address_service import load_home_address
@@ -2437,6 +2438,23 @@ def update_cookbook_recipe_categories_route(cookbook_id):
         return jsonify({"ok": False, "error": str(err)}), 400
 
     return jsonify({"ok": True})
+
+
+@main_bp.route("/api/cookbooks/<cookbook_id>/menu_sections/reorder", methods=["POST"])
+def reorder_cookbook_menu_section_route(cookbook_id):
+    try:
+        section_order = reorder_cookbook_menu_section(
+            cookbook_id,
+            request.form.get("menu_section", ""),
+            request.form.get("direction", ""),
+        )
+    except ValueError as err:
+        return jsonify({"ok": False, "error": str(err)}), 400
+
+    return jsonify({
+        "ok": True,
+        "menu_section_order": section_order,
+    })
 
 
 @main_bp.route("/api/cookbooks/<cookbook_id>/infer_missing_details", methods=["POST"])
