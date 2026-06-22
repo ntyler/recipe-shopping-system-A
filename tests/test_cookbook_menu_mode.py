@@ -279,6 +279,27 @@ def test_cookbook_recipe_infer_button_uses_recipe_editor_inference_flow():
     assert 'fetch("/api/recipe/infer_missing_details"' not in block
 
 
+def test_recipe_editor_cookbook_dropdown_updates_portaled_menu_options():
+    script = read_text("PushShoppingList/static/js/app.js")
+    action_data_block = script[
+        script.index("function recipeLogCookbookActionData"):
+        script.index("async function moveRecipeUrlToCookbook")
+    ]
+    cookbook_setter_block = script[
+        script.index("function setRecipeEditorCookbook"):
+        script.index("function updateRecipeEditorPdfControls")
+    ]
+
+    assert "recipeEditMenuAnchorButtonFromButton(button)" in action_data_block
+    assert 'anchorButton.closest(".recipe-url-summary-row, .recipe-view-card, .recipe-edit-cookbook-field")' in action_data_block
+    assert "function recipeEditorCookbookMenus" in cookbook_setter_block
+    assert '.recipe-edit-cookbook-menu[data-recipe-edit-portaled=\'1\']' in cookbook_setter_block
+    assert 'menu.recipeEditAnchorButton.closest("#recipeEditCookbookField")' in cookbook_setter_block
+    assert 'recipeEditorCookbookMenuButtons(field, "[data-recipe-edit-cookbook-action]")' in cookbook_setter_block
+    assert 'recipeEditorCookbookMenuButtons(field, "[data-recipe-edit-cookbook-option]")' in cookbook_setter_block
+    assert 'recipeEditorCookbookMenuButtons(field, "[data-recipe-edit-cookbook-delete]")' in cookbook_setter_block
+
+
 def test_cookbook_recipe_rows_match_current_recipe_summary_layout():
     template = read_text("PushShoppingList/templates/sections/cookbooks.html")
     css = read_text("PushShoppingList/static/css/app.css")
@@ -430,6 +451,63 @@ def test_cookbook_recipe_view_renders_menu_stub_actions_above_amount():
     assert summary_body_index < amount_index < cookbook_index
     assert 'data-cookbook-menu-section-id="section-003"' in card_html
     assert "Vel Asain Cuisine" in card_html[cookbook_index:]
+
+
+def test_uploaded_recipe_without_archive_pdf_does_not_render_dead_source_link(monkeypatch):
+    app = create_app()
+    app.config.update(TESTING=True)
+    recipe_url = "uploaded://meal.png"
+    recipe_data = {
+        "source_url": recipe_url,
+        "recipe_title": "Photo Rice Bowl",
+        "ingredients": [{"ingredient": "rice"}],
+        "instructions": [{"instruction": "Serve."}],
+        "nutrition": {},
+    }
+
+    monkeypatch.setattr(main_routes, "load_saved_recipe_output", lambda url: recipe_data if url == recipe_url else {})
+    monkeypatch.setattr(main_routes, "load_recipe_ingredients", lambda: {})
+    monkeypatch.setattr(main_routes, "recipe_archive_pdf_exists", lambda *args, **kwargs: False)
+    monkeypatch.setattr(main_routes, "recipe_pdf_public_url", lambda *args, **kwargs: "")
+
+    with TemporaryDirectory() as temp_dir, patch.object(
+        cookbook_service,
+        "COOKBOOKS_FILE",
+        Path(temp_dir) / "cookbooks.json",
+    ):
+        cookbook_service.save_cookbooks({
+            "cookbooks": [{
+                "id": "unclassified",
+                "name": "unclassified",
+                "recipes": [{
+                    "url": recipe_url,
+                    "name": "Photo Rice Bowl",
+                    "source_href": recipe_url,
+                    "source_display_url": recipe_url,
+                }],
+            }],
+        })
+
+        with app.test_request_context("/"):
+            recipe_rows = main_routes.recipe_view_rows([{"url": recipe_url, "name": "Photo Rice Bowl"}])
+            log_rows = main_routes.recipe_url_log_rows([{"url": recipe_url, "name": "Photo Rice Bowl", "quantity": 1}])
+            view = main_routes.cookbook_view_for_render([])
+            html = render_template(
+                "sections/cookbooks.html",
+                cookbook_view=view,
+                cookbook_count=len(view["cookbooks"]),
+                cookbook_recipe_count=sum(len(cookbook["recipes"]) for cookbook in view["cookbooks"]),
+            )
+
+    assert main_routes.recipe_source_href(recipe_url) == ""
+    assert main_routes.recipe_source_display_url(recipe_url) == "Uploaded file: meal.png"
+    assert recipe_rows[0]["source_href"] == ""
+    assert log_rows[0]["source_href"] == ""
+    assert view["cookbooks"][0]["recipes"][0]["source_href"] == ""
+    assert view["cookbooks"][0]["recipes"][0]["source_display_url"] == "Uploaded file: meal.png"
+    assert 'href="uploaded://meal.png"' not in html
+    assert 'class="recipe-url-summary-name recipe-url-summary-name-link"' not in html
+    assert "Photo Rice Bowl" in html
 
 
 def test_cookbook_view_generated_recipe_clears_stale_stub_state(monkeypatch):

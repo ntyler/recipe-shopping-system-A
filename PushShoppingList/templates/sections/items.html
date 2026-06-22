@@ -195,13 +195,20 @@
                                 Recipe {{ recipe.number }}:
                             </a>
                             <span class="recipe-view-name-group">
-                                 <a class="recipe-view-name recipe-view-name-link"
-                                    href="{{ recipe.url or recipe.source_display_url }}"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    title="{{ recipe.source_display_url }}">
-                                     {{ recipe.name }}
-                                 </a>
+                                 {% if recipe.source_href %}
+                                     <a class="recipe-view-name recipe-view-name-link"
+                                        href="{{ recipe.source_href }}"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        title="{{ recipe.source_display_url }}">
+                                         {{ recipe.name }}
+                                     </a>
+                                 {% else %}
+                                     <span class="recipe-view-name"
+                                           title="{{ recipe.source_display_url }}">
+                                         {{ recipe.name }}
+                                     </span>
+                                 {% endif %}
                                  {% if recipe.import_failure_status and recipe.import_failure_status.failed %}
                                      <span class="menu-recipe-status-badge menu-recipe-status-failed"
                                            title="{{ recipe.import_failure_status.title }}"

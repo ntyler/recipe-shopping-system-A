@@ -1033,8 +1033,17 @@ def cookbook_view_for_render(recipe_rows, food_rules=None, image_variants=None):
             scaled_servings = recipe_meta.get("scaled_servings") if use_scaled_meta else None
 
             recipe["name"] = recipe.get("name") or recipe_data.get("recipe_title") or recipe_url
-            recipe["source_href"] = recipe.get("source_href") or recipe_source_href(recipe_url)
-            recipe["source_display_url"] = recipe.get("source_display_url") or recipe_source_display_url(recipe_url)
+            recipe_source_link = recipe.get("source_href") or recipe_source_href(recipe_url)
+            recipe["source_href"] = (
+                recipe_source_link
+                if recipe_source_href_is_openable(recipe_source_link)
+                else recipe_source_href(recipe_url)
+            )
+            recipe["source_display_url"] = (
+                recipe.get("source_display_url")
+                if recipe["source_href"]
+                else recipe_source_display_url(recipe_url)
+            ) or recipe_source_display_url(recipe_url)
             recipe["source_type"] = recipe_data.get("source_type") or recipe.get("source_type") or ""
             recipe["ai_inferred"] = bool(recipe_data.get("ai_inferred") or recipe.get("ai_inferred"))
             if recipe_data:
@@ -1133,11 +1142,26 @@ def recipe_source_href(recipe_url):
     if imported_recipe_uses_pdf_path(recipe_url):
         return url_for("recipe_bp.recipe_archive_pdf_route", url=recipe_url)
 
-    return recipe_url
+    return recipe_url if recipe_source_href_is_openable(recipe_url) else ""
+
+
+def recipe_source_href_is_openable(value):
+    value = clean_display_text(value)
+    if not value:
+        return False
+
+    lower_value = value.lower()
+    if lower_value.startswith(("uploaded://", "manual://", "menu-item://")):
+        return False
+
+    return lower_value.startswith(("http://", "https://", "/"))
 
 
 def recipe_source_display_url(recipe_url):
     if recipe_url_type(recipe_url) == "File":
+        if not recipe_archive_pdf_exists(recipe_url):
+            filename = str(recipe_url or "").replace("uploaded://", "", 1).strip()
+            return f"Uploaded file: {filename}" if filename else "Uploaded file"
         return str(recipe_archive_pdf_path(recipe_url))
 
     return recipe_url

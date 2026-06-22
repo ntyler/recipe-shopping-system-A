@@ -10157,9 +10157,13 @@ async function submitCookbookApi(url, formData = new FormData(), method = "POST"
 }
 
 function recipeLogCookbookActionData(button) {
-    const row = button
+    const directRow = button
         ? button.closest(".recipe-url-summary-row, .recipe-view-card, .recipe-edit-cookbook-field")
         : null;
+    const anchorButton = directRow ? null : recipeEditMenuAnchorButtonFromButton(button);
+    const row = directRow || (anchorButton
+        ? anchorButton.closest(".recipe-url-summary-row, .recipe-view-card, .recipe-edit-cookbook-field")
+        : null);
 
     return {
         recipeUrl: (button && button.dataset.recipeUrl) || (row && (row.dataset.recipeUrl || row.dataset.recipeViewUrl)) || "",
@@ -19037,18 +19041,44 @@ function setRecipeEditorCookbook(recipe, fallbackUrl = "") {
         value.classList.toggle("muted", !name);
     }
 
-    field.querySelectorAll("[data-recipe-edit-cookbook-action]").forEach(button => {
+    recipeEditorCookbookMenus(field).forEach(menu => {
+        menu.dataset.recipeUrl = recipeUrl;
+    });
+
+    recipeEditorCookbookMenuButtons(field, "[data-recipe-edit-cookbook-action]").forEach(button => {
         button.dataset.recipeUrl = recipeUrl;
     });
 
-    field.querySelectorAll("[data-recipe-edit-cookbook-option]").forEach(button => {
+    recipeEditorCookbookMenuButtons(field, "[data-recipe-edit-cookbook-option]").forEach(button => {
         const optionId = button.dataset.cookbookId || "";
         button.hidden = Boolean(cookbookId && optionId === cookbookId);
     });
 
-    field.querySelectorAll("[data-recipe-edit-cookbook-delete]").forEach(button => {
+    recipeEditorCookbookMenuButtons(field, "[data-recipe-edit-cookbook-delete]").forEach(button => {
         button.hidden = !name || isUnclassified;
     });
+}
+
+function recipeEditorCookbookMenus(field = document.getElementById("recipeEditCookbookField")) {
+    if (!field) {
+        return [];
+    }
+
+    const menus = new Set(field.querySelectorAll(".recipe-edit-cookbook-menu"));
+    document.querySelectorAll(".recipe-edit-cookbook-menu[data-recipe-edit-portaled='1']").forEach(menu => {
+        const anchorField = menu.recipeEditAnchorButton
+            ? menu.recipeEditAnchorButton.closest("#recipeEditCookbookField")
+            : null;
+        if (anchorField === field) {
+            menus.add(menu);
+        }
+    });
+
+    return Array.from(menus);
+}
+
+function recipeEditorCookbookMenuButtons(field, selector) {
+    return recipeEditorCookbookMenus(field).flatMap(menu => Array.from(menu.querySelectorAll(selector)));
 }
 
 function updateRecipeEditorPdfControls(recipe, options = {}) {

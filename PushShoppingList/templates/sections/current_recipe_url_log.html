@@ -135,13 +135,19 @@
                                            onclick="return jumpToRecipeViewRecipe(this, event)">
                                             Recipe {{ loop.index }}:
                                         </a>
-                                        <a class="recipe-url-summary-name recipe-url-summary-name-link"
-                                           href="{{ recipe.url or recipe.source_display_url }}"
-                                           target="_blank"
-                                           rel="noopener noreferrer"
-                                           title="{{ recipe.source_display_url }}"
-                                           onclick="event.stopPropagation()"
-                                           data-recipe-url="{{ recipe.url }}">{{ recipe.name }}</a>
+                                        {% if recipe.source_href %}
+                                            <a class="recipe-url-summary-name recipe-url-summary-name-link"
+                                               href="{{ recipe.source_href }}"
+                                               target="_blank"
+                                               rel="noopener noreferrer"
+                                               title="{{ recipe.source_display_url }}"
+                                               onclick="event.stopPropagation()"
+                                               data-recipe-url="{{ recipe.url }}">{{ recipe.name }}</a>
+                                        {% else %}
+                                            <span class="recipe-url-summary-name"
+                                                  title="{{ recipe.source_display_url }}"
+                                                  data-recipe-url="{{ recipe.url }}">{{ recipe.name }}</span>
+                                        {% endif %}
                                         {% if recipe.import_failure_status and recipe.import_failure_status.failed %}
                                             <span class="menu-recipe-status-badge menu-recipe-status-failed"
                                                   title="{{ recipe.import_failure_status.title }}"

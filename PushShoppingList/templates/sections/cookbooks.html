@@ -529,14 +529,21 @@
                                                                     {% set recipe_has_menu_snapshot = recipe.parent_menu_snapshot_id or recipe.menu_mega_snapshot_id %}
                                                                     <span class="recipe-url-summary-title-line">
                                                                         <span class="recipe-url-summary-number">Recipe {{ recipe.number or loop.index }}:</span>
-                                                                        <a class="recipe-url-summary-name recipe-url-summary-name-link"
-                                                                           href="{{ recipe.source_href }}"
-                                                                           target="_blank"
-                                                                           rel="noopener noreferrer"
-                                                                           title="{{ recipe.source_display_url }}"
-                                                                           onclick="event.stopPropagation()">
-                                                                             {{ recipe.name }}
-                                                                         </a>
+                                                                        {% if recipe.source_href %}
+                                                                            <a class="recipe-url-summary-name recipe-url-summary-name-link"
+                                                                               href="{{ recipe.source_href }}"
+                                                                               target="_blank"
+                                                                               rel="noopener noreferrer"
+                                                                               title="{{ recipe.source_display_url }}"
+                                                                               onclick="event.stopPropagation()">
+                                                                                 {{ recipe.name }}
+                                                                             </a>
+                                                                        {% else %}
+                                                                            <span class="recipe-url-summary-name"
+                                                                                  title="{{ recipe.source_display_url }}">
+                                                                                {{ recipe.name }}
+                                                                            </span>
+                                                                        {% endif %}
                                                                          {% if recipe.import_failure_status and recipe.import_failure_status.failed %}
                                                                              <span class="menu-recipe-status-badge menu-recipe-status-failed"
                                                                                    title="{{ recipe.import_failure_status.title }}"
