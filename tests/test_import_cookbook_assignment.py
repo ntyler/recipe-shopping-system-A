@@ -208,6 +208,14 @@ def test_job_activity_can_reopen_import_progress_overlay():
 
     assert "function openJobActivityImportProgress(jobId)" in script
     assert "function reopenImportProgressFromJob(jobId)" in script
+    assert "function jobPopupRecipeUrl(job)" in script
+    assert "function jobCanOpenRecipePopup(job)" in script
+    assert "function openJobActivityRecipePopup(jobId)" in script
+    assert "function openJobActivityRecipePopupAsync(jobId)" in script
+    assert '"doc-photo-import", "estimate-per-serving", "create-recipe-pdf"' in script
+    assert "jobCanOpenRecipePopup(job)" in script
+    assert "openJobActivityRecipePopup" in script
+    assert "await openRecipeEditor({ dataset: { recipeUrl } });" in script
     assert "function menuEnrichmentRecipeUrls(job)" in script
     assert "function menuEnrichmentAlreadyQueuedForJob(job)" in script
     assert "function jobBlocksMenuEnrichmentAction(job)" in script

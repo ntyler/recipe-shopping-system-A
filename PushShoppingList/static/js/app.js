@@ -1029,6 +1029,60 @@ function jobCanOpenImportProgress(job) {
     return ["menu-import", "recipe-import", "menu-generate-recipes", "menu-deferred-heavy-tasks"].includes(jobType) && jobSourceUrls(job).length > 0;
 }
 
+function jobRecipePopupCandidateUrl(value) {
+    const url = String(value || "").trim();
+    if (!url) {
+        return "";
+    }
+
+    const editTarget = menuRecipeEditTargetUrl(url);
+    const targetUrl = editTarget || url;
+    if (/\.pdf(?:[?#]|$)/i.test(targetUrl) || /\/recipe-pdfs\//i.test(targetUrl) || /^\/recipe_pdf\b/i.test(targetUrl)) {
+        return "";
+    }
+    return targetUrl;
+}
+
+function jobRecipePopupUrls(job) {
+    const result = jobResultPayload(job);
+    const raw = result.raw && typeof result.raw === "object" ? result.raw : {};
+    const recipeJson = result.recipe_json && typeof result.recipe_json === "object" ? result.recipe_json : {};
+    const recipePayload = result.recipe && typeof result.recipe === "object" ? result.recipe : {};
+    const links = jobResultLinks(job);
+    const candidates = [
+        result.recipe_url,
+        result.source_url,
+        result.url,
+        result.recipeUrl,
+        result.sourceUrl,
+        raw.recipe_url,
+        raw.source_url,
+        raw.url,
+        recipeJson.recipe_url,
+        recipeJson.source_url,
+        recipeJson.url,
+        recipePayload.recipe_url,
+        recipePayload.source_url,
+        recipePayload.url,
+        ...jobSourceUrls(job),
+        ...links.map(link => link && (link.recipe_url || link.source_url || link.url)),
+    ];
+
+    return uniqueRecipeUrls(candidates.map(jobRecipePopupCandidateUrl).filter(Boolean));
+}
+
+function jobPopupRecipeUrl(job) {
+    const jobType = String((job && job.job_type) || "").trim();
+    if (!["doc-photo-import", "estimate-per-serving", "create-recipe-pdf", "upload-source-pdf", "upload-generated-pdf"].includes(jobType)) {
+        return "";
+    }
+    return jobRecipePopupUrls(job)[0] || "";
+}
+
+function jobCanOpenRecipePopup(job) {
+    return Boolean(jobPopupRecipeUrl(job));
+}
+
 function jobIsMenuProgressJob(job) {
     const jobType = String((job && job.job_type) || "").trim();
     return ["menu-import", "menu-generate-recipes", "menu-deferred-heavy-tasks"].includes(jobType);
@@ -1943,6 +1997,8 @@ function renderJobActivityRow(job, index = 0) {
     `;
     const openProgressButton = jobCanOpenImportProgress(job)
         ? `<button type="button" class="job-activity-row-action" onclick="return openJobActivityImportProgress('${escapeAttribute(job.id || job.job_id || "")}')">Open Popup</button>`
+        : jobCanOpenRecipePopup(job)
+            ? `<button type="button" class="job-activity-row-action" onclick="return openJobActivityRecipePopup('${escapeAttribute(job.id || job.job_id || "")}')">Open Popup</button>`
         : "";
     const startEnrichmentButton = jobCanStartMenuEnrichment(job)
         ? `<button type="button" class="job-activity-row-action job-activity-enrichment-action" onclick="return startMenuEnrichmentFromJobActivity('${escapeAttribute(job.id || job.job_id || "")}', this, 'fast')">Generate Fast Recipes</button>
@@ -2316,6 +2372,49 @@ async function retryJobActivityJob(jobId) {
 function openJobActivityImportProgress(jobId) {
     reopenImportProgressFromJob(jobId);
     return false;
+}
+
+function openJobActivityRecipePopup(jobId) {
+    openJobActivityRecipePopupAsync(jobId);
+    return false;
+}
+
+async function openJobActivityRecipePopupAsync(jobId) {
+    jobId = String(jobId || "").trim();
+    const summary = jobActivitySummaryElement();
+    if (!jobId) {
+        if (summary) {
+            summary.textContent = "This job does not have a recipe popup.";
+        }
+        return;
+    }
+
+    try {
+        const cachedJob = lastJobActivityJobs.find(candidate => jobActivityJobId(candidate) === jobId);
+        const job = cachedJob || await fetchJobStatus(jobId);
+        const recipeUrl = jobPopupRecipeUrl(job);
+        if (!recipeUrl) {
+            if (summary) {
+                summary.textContent = "This job does not have a recipe popup.";
+            }
+            return;
+        }
+
+        if (summary) {
+            summary.textContent = "Opening recipe popup...";
+        }
+        await refreshStoreMarkup({ requireRecipeLog: true, cacheBust: true });
+        await openRecipeEditor({ dataset: { recipeUrl } });
+        const refreshedSummary = jobActivitySummaryElement();
+        if (refreshedSummary) {
+            refreshedSummary.textContent = "Recipe popup opened.";
+        }
+    } catch (err) {
+        const currentSummary = jobActivitySummaryElement();
+        if (currentSummary) {
+            currentSummary.textContent = err.message || "Unable to open recipe popup.";
+        }
+    }
 }
 
 async function reopenImportProgressFromJob(jobId) {
