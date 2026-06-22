@@ -17751,6 +17751,11 @@ body {
     outline: none;
 }
 
+.recipe-edit-menu-section-menu button.is-selected {
+    background: rgba(59, 130, 246, 0.18);
+    color: #dbeafe;
+}
+
 .recipe-edit-row-menu button:disabled {
     opacity: 0.55;
     cursor: not-allowed;

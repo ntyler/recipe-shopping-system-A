@@ -1222,6 +1222,20 @@ def cookbook_menu_sections(recipes):
     return sections_by_mode
 
 
+def cookbook_menu_section_choices(recipes):
+    choices = []
+    seen = set()
+
+    for recipe in recipes or []:
+        section = clean_text(recipe.get("menu_section") if isinstance(recipe, dict) else "")
+        key = section.lower()
+        if section and key not in seen:
+            choices.append(section)
+            seen.add(key)
+
+    return choices
+
+
 def prepare_cookbook_menu_view(view):
     view = view if isinstance(view, dict) else {}
     view["menu_sort_options"] = cookbook_menu_sort_options()
@@ -1232,6 +1246,7 @@ def prepare_cookbook_menu_view(view):
             apply_recipe_menu_metadata(recipe)
 
         cookbook["menu_sections"] = cookbook_menu_sections(cookbook.get("recipes", []))
+        cookbook["menu_section_choices"] = cookbook_menu_section_choices(cookbook.get("recipes", []))
 
     for recipe in view.get("recipes", []):
         apply_recipe_menu_metadata(recipe)

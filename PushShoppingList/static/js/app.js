@@ -11169,7 +11169,7 @@ function collectFormCategorySources(form) {
         return sources;
     }
 
-    CATEGORY_ALL_FIELD_NAMES.forEach(field => {
+    categorySourceFieldsForForm(form).forEach(field => {
         const fieldValue = form.elements[field] ? form.elements[field].value : "";
         sources[field] = normalizeCategorySource(
             form.dataset[categorySourceDatasetKey(field)],
@@ -11186,13 +11186,19 @@ function setFormCategorySources(form, sources = {}, values = {}) {
         return;
     }
 
-    CATEGORY_ALL_FIELD_NAMES.forEach(field => {
+    categorySourceFieldsForForm(form).forEach(field => {
         form.dataset[categorySourceDatasetKey(field)] = normalizeCategorySource(
             sources[field],
             field,
             values[field],
         );
     });
+}
+
+function categorySourceFieldsForForm(form) {
+    return form && form.id === "recipeEditForm"
+        ? [...CATEGORY_FIELD_NAMES, "menu_section", "custom_categories"]
+        : CATEGORY_ALL_FIELD_NAMES;
 }
 
 function setCookbookCategoryFieldValue(form, name, value) {
@@ -11210,6 +11216,10 @@ function setCookbookCategoryFieldValue(form, name, value) {
     }
 
     field.value = nextValue;
+
+    if (name === "menu_section") {
+        updateRecipeEditorMenuSectionDisplay(nextValue);
+    }
 }
 
 function openCookbookCategoryEditor(button) {
@@ -17472,6 +17482,7 @@ function populateRecipeEditCategories(recipe = {}) {
     RECIPE_EDIT_CATEGORY_FIELD_NAMES.forEach(field => {
         setCookbookCategoryFieldValue(form, field, values[field]);
     });
+    updateRecipeEditorMenuSectionOptions(currentRecipeEditorCookbookId(), values.menu_section);
     setCookbookCategoryFieldValue(form, "custom_categories", values.custom_categories);
 
     if (recipeName) {
@@ -19057,6 +19068,8 @@ function setRecipeEditorCookbook(recipe, fallbackUrl = "") {
     recipeEditorCookbookMenuButtons(field, "[data-recipe-edit-cookbook-delete]").forEach(button => {
         button.hidden = !name || isUnclassified;
     });
+
+    updateRecipeEditorMenuSectionOptions(cookbookId);
 }
 
 function recipeEditorCookbookMenus(field = document.getElementById("recipeEditCookbookField")) {
@@ -19079,6 +19092,170 @@ function recipeEditorCookbookMenus(field = document.getElementById("recipeEditCo
 
 function recipeEditorCookbookMenuButtons(field, selector) {
     return recipeEditorCookbookMenus(field).flatMap(menu => Array.from(menu.querySelectorAll(selector)));
+}
+
+function recipeEditorMenuSectionField() {
+    return document.getElementById("recipeEditMenuSectionField");
+}
+
+function recipeEditorMenuSectionInput() {
+    return document.getElementById("recipeEditCategoryMenuSection");
+}
+
+function recipeEditorMenuSectionMenus(field = recipeEditorMenuSectionField()) {
+    if (!field) {
+        return [];
+    }
+
+    const menus = new Set(field.querySelectorAll(".recipe-edit-menu-section-menu"));
+    document.querySelectorAll(".recipe-edit-menu-section-menu[data-recipe-edit-portaled='1']").forEach(menu => {
+        const anchorField = menu.recipeEditAnchorButton
+            ? menu.recipeEditAnchorButton.closest("#recipeEditMenuSectionField")
+            : null;
+        if (anchorField === field) {
+            menus.add(menu);
+        }
+    });
+
+    return Array.from(menus);
+}
+
+function recipeEditorMenuSectionButtons(field, selector) {
+    return recipeEditorMenuSectionMenus(field).flatMap(menu => Array.from(menu.querySelectorAll(selector)));
+}
+
+function recipeEditorMenuSectionKey(value = "") {
+    return String(value || "").trim().toLowerCase();
+}
+
+function currentRecipeEditorMenuSectionValue() {
+    const input = recipeEditorMenuSectionInput();
+    return input ? String(input.value || "").trim() : "";
+}
+
+function setRecipeEditorMenuSectionValue(value = "", options = {}) {
+    const input = recipeEditorMenuSectionInput();
+    const nextValue = String(value || "").trim();
+
+    if (input) {
+        input.value = nextValue;
+    }
+
+    if (nextValue) {
+        ensureRecipeEditorMenuSectionOption(nextValue, currentRecipeEditorCookbookId());
+    }
+
+    updateRecipeEditorMenuSectionDisplay(nextValue);
+    updateRecipeEditorMenuSectionOptions(currentRecipeEditorCookbookId(), nextValue);
+
+    if (options.userSelected) {
+        const form = document.getElementById("recipeEditForm");
+        setFormCategorySource(form, RECIPE_EDIT_MENU_SECTION_FIELD_NAME, CATEGORY_SOURCE_USER_SELECTED);
+        setRecipeEditCategorySourceLabel("Saved");
+    }
+}
+
+function updateRecipeEditorMenuSectionDisplay(value = currentRecipeEditorMenuSectionValue()) {
+    const field = recipeEditorMenuSectionField();
+    const input = recipeEditorMenuSectionInput();
+    const name = document.getElementById("recipeEditMenuSectionName");
+    const wrapper = field ? field.querySelector(".recipe-edit-menu-section-value") : null;
+    const nextValue = String(value || (input && input.value) || "").trim();
+
+    if (name) {
+        name.textContent = nextValue || "No menu section";
+        name.title = nextValue || "";
+        name.classList.toggle("muted", !nextValue);
+    }
+
+    if (wrapper) {
+        wrapper.classList.toggle("muted", !nextValue);
+    }
+}
+
+function updateRecipeEditorMenuSectionOptions(cookbookId = currentRecipeEditorCookbookId(), currentValue = currentRecipeEditorMenuSectionValue()) {
+    const field = recipeEditorMenuSectionField();
+    const activeCookbookId = String(cookbookId || "").trim();
+    const activeKey = recipeEditorMenuSectionKey(currentValue);
+    const seen = new Set();
+    let visibleCount = 0;
+
+    recipeEditorMenuSectionButtons(field, "[data-recipe-edit-menu-section-option]").forEach(button => {
+        const optionCookbookId = String(button.dataset.cookbookId || "").trim();
+        const section = String(button.dataset.menuSection || button.textContent || "").trim();
+        const optionKey = `${optionCookbookId}|${recipeEditorMenuSectionKey(section)}`;
+        const visible = Boolean(activeCookbookId && optionCookbookId === activeCookbookId && section && !seen.has(optionKey));
+
+        button.hidden = !visible;
+        button.classList.toggle("is-selected", visible && recipeEditorMenuSectionKey(section) === activeKey);
+        button.setAttribute("aria-current", visible && recipeEditorMenuSectionKey(section) === activeKey ? "true" : "false");
+
+        if (visible) {
+            seen.add(optionKey);
+            visibleCount += 1;
+        }
+    });
+
+    recipeEditorMenuSectionButtons(field, "[data-recipe-edit-menu-section-empty]").forEach(label => {
+        label.hidden = visibleCount > 0;
+    });
+
+    updateRecipeEditorMenuSectionDisplay(currentValue);
+}
+
+function ensureRecipeEditorMenuSectionOption(value, cookbookId = currentRecipeEditorCookbookId()) {
+    const section = String(value || "").trim();
+    const activeCookbookId = String(cookbookId || "").trim();
+
+    if (!section || !activeCookbookId) {
+        return;
+    }
+
+    recipeEditorMenuSectionMenus().forEach(menu => {
+        const existing = Array.from(menu.querySelectorAll("[data-recipe-edit-menu-section-option]")).some(button => {
+            return String(button.dataset.cookbookId || "").trim() === activeCookbookId
+                && recipeEditorMenuSectionKey(button.dataset.menuSection || button.textContent) === recipeEditorMenuSectionKey(section);
+        });
+
+        if (existing) {
+            return;
+        }
+
+        const button = document.createElement("button");
+        button.type = "button";
+        button.dataset.recipeEditMenuSectionOption = "";
+        button.dataset.cookbookId = activeCookbookId;
+        button.dataset.menuSection = section;
+        button.textContent = section;
+        button.onclick = function () {
+            return selectRecipeEditMenuSection(this);
+        };
+
+        const empty = menu.querySelector("[data-recipe-edit-menu-section-empty]");
+        menu.insertBefore(button, empty || null);
+    });
+}
+
+function selectRecipeEditMenuSection(button) {
+    const value = button ? String(button.dataset.menuSection || "").trim() : "";
+
+    closeRecipeEditRowMenus();
+    setRecipeEditorMenuSectionValue(value, { userSelected: true });
+    return false;
+}
+
+function editRecipeEditMenuSection(button) {
+    const currentValue = currentRecipeEditorMenuSectionValue();
+    const nextValue = window.prompt("Menu section", currentValue);
+
+    if (nextValue === null) {
+        closeRecipeEditRowMenus();
+        return false;
+    }
+
+    closeRecipeEditRowMenus();
+    setRecipeEditorMenuSectionValue(nextValue, { userSelected: true });
+    return false;
 }
 
 function updateRecipeEditorPdfControls(recipe, options = {}) {

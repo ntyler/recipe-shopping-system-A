@@ -32,7 +32,12 @@ def test_recipe_editor_includes_inline_category_controls_above_ingredients():
     assert "recipeEditCategoryOccasion" in template
     assert "recipeEditCategoryDietaryPreference" in template
     assert "recipeEditCategoryPrepTimeGroup" in template
+    assert "recipeEditMenuSectionField" in template
     assert "recipeEditCategoryMenuSection" in template
+    assert 'type="hidden"' in template[template.index("recipeEditCategoryMenuSection"):template.index("recipeEditCategoryCustomCategories")]
+    assert "recipeEditMenuSectionName" in template
+    assert "data-recipe-edit-menu-section-option" in template
+    assert "Edit Menu Section" in template
     assert "recipeEditCategoryCustomCategories" in template
     assert "recipe-edit-category-menu" in template
     assert "Have ChatGPT Decide All" in template
@@ -43,6 +48,11 @@ def test_recipe_editor_includes_inline_category_controls_above_ingredients():
 
     assert "function populateRecipeEditCategories" in script
     assert "function saveRecipeEditorCategories" in script
+    assert "function selectRecipeEditMenuSection" in script
+    assert "function editRecipeEditMenuSection" in script
+    assert "function updateRecipeEditorMenuSectionOptions" in script
+    assert "function categorySourceFieldsForForm" in script
+    assert '? [...CATEGORY_FIELD_NAMES, "menu_section", "custom_categories"]' in script
     assert "function decideRecipeEditCategoriesWithChatGPT" in script
     assert "function applyRecipeEditCategorySuggestions" in script
     assert 'const RECIPE_EDIT_MENU_SECTION_FIELD_NAME = "menu_section";' in script
@@ -251,6 +261,8 @@ def test_recipe_menu_section_saves_as_cookbook_specific_metadata():
         metadata = cookbook_service.recipe_category_metadata_for_editor("https://example.com/spring-roll")
 
         assert metadata["menu_section"] == "Kitchen Appetizers"
+        view = cookbook_service.cookbook_view([])
+        assert "Kitchen Appetizers" in view["cookbooks"][0]["menu_section_choices"]
 
 
 def test_chatgpt_category_decision_normalizes_to_dropdown_choices():
