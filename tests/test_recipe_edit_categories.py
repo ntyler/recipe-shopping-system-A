@@ -51,6 +51,12 @@ def test_recipe_editor_includes_inline_category_controls_above_ingredients():
     assert "function selectRecipeEditMenuSection" in script
     assert "function editRecipeEditMenuSection" in script
     assert "function updateRecipeEditorMenuSectionOptions" in script
+    menu_section_options_block = script[
+        script.index("function updateRecipeEditorMenuSectionOptions"):
+        script.index("function ensureRecipeEditorMenuSectionOption")
+    ]
+    assert "ensureRecipeEditorMenuSectionOption(currentSection, activeCookbookId);" in menu_section_options_block
+    assert menu_section_options_block.index("ensureRecipeEditorMenuSectionOption(currentSection, activeCookbookId);") < menu_section_options_block.index("recipeEditorMenuSectionButtons(field, \"[data-recipe-edit-menu-section-option]\")")
     assert "function categorySourceFieldsForForm" in script
     assert '? [...CATEGORY_FIELD_NAMES, "menu_section", "custom_categories"]' in script
     assert "function decideRecipeEditCategoriesWithChatGPT" in script

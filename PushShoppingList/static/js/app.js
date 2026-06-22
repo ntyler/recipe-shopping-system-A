@@ -19176,9 +19176,14 @@ function updateRecipeEditorMenuSectionDisplay(value = currentRecipeEditorMenuSec
 function updateRecipeEditorMenuSectionOptions(cookbookId = currentRecipeEditorCookbookId(), currentValue = currentRecipeEditorMenuSectionValue()) {
     const field = recipeEditorMenuSectionField();
     const activeCookbookId = String(cookbookId || "").trim();
-    const activeKey = recipeEditorMenuSectionKey(currentValue);
+    const currentSection = String(currentValue || "").trim();
+    const activeKey = recipeEditorMenuSectionKey(currentSection);
     const seen = new Set();
     let visibleCount = 0;
+
+    if (activeCookbookId && currentSection) {
+        ensureRecipeEditorMenuSectionOption(currentSection, activeCookbookId);
+    }
 
     recipeEditorMenuSectionButtons(field, "[data-recipe-edit-menu-section-option]").forEach(button => {
         const optionCookbookId = String(button.dataset.cookbookId || "").trim();
@@ -19200,7 +19205,7 @@ function updateRecipeEditorMenuSectionOptions(cookbookId = currentRecipeEditorCo
         label.hidden = visibleCount > 0;
     });
 
-    updateRecipeEditorMenuSectionDisplay(currentValue);
+    updateRecipeEditorMenuSectionDisplay(currentSection);
 }
 
 function ensureRecipeEditorMenuSectionOption(value, cookbookId = currentRecipeEditorCookbookId()) {
