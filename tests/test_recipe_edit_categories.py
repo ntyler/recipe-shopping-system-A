@@ -64,6 +64,30 @@ def test_recipe_editor_includes_inline_category_controls_above_ingredients():
     assert "cookbook_category_overwrite" in script
 
 
+def test_recipe_editor_mobile_footer_uses_compact_ai_controls():
+    template = read_text("PushShoppingList/templates/sections/current_recipe_url_log.html")
+    css = read_text("PushShoppingList/static/css/app.css")
+
+    footer = template[template.index('<div class="recipe-edit-actions">'):template.index("</div>", template.index('<div class="recipe-edit-actions">'))]
+    assert 'data-short-label="Overwrite"' in footer
+    assert 'data-short-label="Preview"' in footer
+    assert 'data-short-label="Infer"' in footer
+
+    mobile_start = css.index("@media (max-width: 760px)", css.index(".recipe-edit-ai-infer"))
+    phone_start = css.index("@media (max-width: 520px)", mobile_start)
+    mobile_css = css[mobile_start:phone_start]
+    phone_css = css[phone_start:css.index("}", css.index("grid-template-columns: repeat(3", phone_start)) + 1]
+
+    assert "grid-template-columns: repeat(6, minmax(0, 1fr));" in mobile_css
+    assert ".recipe-edit-actions .recipe-edit-ai-overwrite-toggle" in mobile_css
+    assert "width: auto;" in mobile_css
+    assert "flex-basis: auto;" in mobile_css
+    assert "content: attr(data-short-label);" in mobile_css
+    assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in phone_css
+    assert ".recipe-edit-ai-overwrite-toggle {\n                width: 100%;" not in mobile_css
+    assert ".recipe-edit-ai-infer {\n                flex-basis: 100%;" not in mobile_css
+
+
 def test_recipe_editor_infer_missing_details_runs_full_ai_followups():
     script = read_text("PushShoppingList/static/js/app.js")
 
