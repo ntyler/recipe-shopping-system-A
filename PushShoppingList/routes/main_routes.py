@@ -2390,6 +2390,9 @@ def update_cookbook_recipe_categories_route(cookbook_id):
         "prep_time_group": request.form.get("prep_time_group", ""),
         "custom_categories": request.form.get("custom_categories", ""),
     }
+    if "menu_section" in request.form:
+        categories["menu_section"] = request.form.get("menu_section", "")
+
     category_sources = {}
     category_sources_json = request.form.get("category_sources", "")
     if category_sources_json:

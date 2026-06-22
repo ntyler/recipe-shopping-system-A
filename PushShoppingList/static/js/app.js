@@ -17137,8 +17137,10 @@ let recipeEditReturnState = null;
 let recipeEditorPrefetchBound = false;
 const RECIPE_EDITOR_CACHE_TTL_MS = 60 * 1000;
 const recipeEditorDataCache = new Map();
-const RECIPE_EDIT_CATEGORY_FIELD_NAMES = CATEGORY_FIELD_NAMES;
-const RECIPE_EDIT_CATEGORY_ALL_FIELD_NAMES = CATEGORY_ALL_FIELD_NAMES;
+const RECIPE_EDIT_MENU_SECTION_FIELD_NAME = "menu_section";
+const RECIPE_EDIT_CATEGORY_AI_FIELD_NAMES = CATEGORY_FIELD_NAMES;
+const RECIPE_EDIT_CATEGORY_FIELD_NAMES = [...CATEGORY_FIELD_NAMES, RECIPE_EDIT_MENU_SECTION_FIELD_NAME];
+const RECIPE_EDIT_CATEGORY_ALL_FIELD_NAMES = [...RECIPE_EDIT_CATEGORY_FIELD_NAMES, "custom_categories"];
 const RECIPE_EDIT_PDF_FIELD_ALIASES = {
     source_url: ["source_url", "url"],
     source_pdf_path: ["source_pdf_path", "webpage_backup_pdf_path", "pdf_path"],
@@ -17175,7 +17177,7 @@ const RECIPE_EDIT_MENU_METADATA_INPUT_IDS = {
     restaurant_promotions: "recipeEditRestaurantPromotions",
     restaurant_online_payment_available: "recipeEditRestaurantOnlinePaymentAvailable",
     restaurant_delivery_available: "recipeEditRestaurantDeliveryAvailable",
-    menu_section: "recipeEditMenuSection",
+    menu_section: "recipeEditCategoryMenuSection",
     menu_item_name: "recipeEditMenuItemName",
     menu_order_url: "recipeEditMenuOrderUrl",
     menu_price: "recipeEditMenuPrice",
@@ -17629,7 +17631,7 @@ function applyRecipeEditCategorySuggestions(categories = {}, mode = "missing") {
         return;
     }
 
-    RECIPE_EDIT_CATEGORY_FIELD_NAMES.forEach(field => {
+    RECIPE_EDIT_CATEGORY_AI_FIELD_NAMES.forEach(field => {
         const input = form.elements[field];
         const currentValue = input ? String(input.value || "").trim() : "";
         const nextValue = recipeEditCategorySuggestionValue(categories, field);

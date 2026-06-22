@@ -1011,10 +1011,6 @@
                         </summary>
                         <div class="recipe-edit-menu-metadata-grid">
                             <label class="recipe-edit-file-field">
-                                <span>Menu Section</span>
-                                <input type="text" id="recipeEditMenuSection">
-                            </label>
-                            <label class="recipe-edit-file-field">
                                 <span>Menu Item Name</span>
                                 <input type="text" id="recipeEditMenuItemName">
                             </label>
@@ -1263,6 +1259,14 @@
                                 <option value="{{ choice }}">{{ choice }}</option>
                             {% endfor %}
                         </select>
+                    </label>
+                    <label for="recipeEditCategoryMenuSection">
+                        <span>Menu Section</span>
+                        <input id="recipeEditCategoryMenuSection"
+                               type="text"
+                               name="menu_section"
+                               placeholder="Appetizers, Entrees, Drinks"
+                               autocomplete="off">
                     </label>
                     <label class="cookbook-category-custom-field recipe-edit-category-custom-field" for="recipeEditCategoryCustomCategories">
                         <span>Custom Categories</span>

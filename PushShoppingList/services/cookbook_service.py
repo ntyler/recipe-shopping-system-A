@@ -1057,8 +1057,12 @@ def recipe_category_metadata_for_editor(recipe_url, recipe_data=None, recipe_met
     ) or category_metadata_has_values(stored_metadata)
 
     apply_recipe_menu_metadata(record)
+    menu_section = clean_text(stored_record.get("menu_section")) or clean_text(recipe_data.get("menu_section"))
+    category_source_label = record.get("category_metadata_source", "")
+    if menu_section and category_source_label == "Blank":
+        category_source_label = "Saved"
 
-    return {
+    metadata = {
         **{
             field: record.get(field, "")
             for field in COOKBOOK_CATEGORY_FIELDS
@@ -1067,11 +1071,14 @@ def recipe_category_metadata_for_editor(recipe_url, recipe_data=None, recipe_met
         "restaurant_menu_category": record.get("restaurant_menu_category", ""),
         "alphabetical_group": record.get("alphabetical_group", ""),
         "category_metadata_sources": record.get("category_metadata_sources", {}),
-        "category_metadata_user_set": bool(record.get("category_metadata_user_set")),
-        "category_metadata_source": record.get("category_metadata_source", ""),
+        "category_metadata_user_set": bool(record.get("category_metadata_user_set")) or bool(menu_section),
+        "category_metadata_source": category_source_label,
         "short_description": record.get("short_description", ""),
         "menu_tags": record.get("menu_tags", []),
     }
+    if menu_section:
+        metadata["menu_section"] = menu_section
+    return metadata
 
 
 def add_recipe_category_display_value(tags, seen, value, field=None, split=False):
@@ -1136,6 +1143,7 @@ def recipe_menu_search_text(recipe):
         recipe.get("occasion"),
         recipe.get("dietary_preference"),
         recipe.get("prep_time_group"),
+        recipe.get("menu_section"),
         recipe.get("restaurant_menu_category"),
     ]
     parts.extend(recipe.get("custom_categories") or [])
@@ -1977,6 +1985,8 @@ def update_cookbook_recipe_categories(
     if not target_key:
         raise ValueError("Recipe is required.")
 
+    menu_section_provided = isinstance(categories, dict) and "menu_section" in categories
+    cleaned_menu_section = clean_text(categories.get("menu_section")) if menu_section_provided else ""
     cleaned_categories = clean_category_payload(categories)
     cleaned_sources = clean_category_source_payload(category_sources, cleaned_categories)
 
@@ -1996,12 +2006,18 @@ def update_cookbook_recipe_categories(
         if recipe is None:
             raise ValueError("Recipe was not found in this cookbook.")
 
+        existing_menu_section = clean_text(recipe.get("menu_section"))
         existing_metadata = stored_category_metadata(recipe)
-        has_manual_metadata = bool(recipe.get("category_metadata_user_set")) or category_metadata_has_values(existing_metadata)
+        menu_section_changed = menu_section_provided and existing_menu_section != cleaned_menu_section
+        has_manual_metadata = (
+            bool(recipe.get("category_metadata_user_set"))
+            or category_metadata_has_values(existing_metadata)
+            or bool(existing_menu_section)
+        )
 
         if (
             has_manual_metadata
-            and category_metadata_changed(existing_metadata, cleaned_categories)
+            and (category_metadata_changed(existing_metadata, cleaned_categories) or menu_section_changed)
             and not confirm_overwrite
         ):
             raise CookbookCategoryOverwriteConflict(recipe.get("name") or recipe_url)
@@ -2009,11 +2025,20 @@ def update_cookbook_recipe_categories(
         for field in COOKBOOK_CATEGORY_FIELDS:
             recipe[field] = cleaned_categories.get(field, "")
 
+        if menu_section_provided:
+            recipe["menu_section"] = cleaned_menu_section
+
+        active_menu_section = cleaned_menu_section if menu_section_provided else existing_menu_section
+        has_category_metadata = category_metadata_has_values(cleaned_categories) or bool(active_menu_section)
         recipe["custom_categories"] = cleaned_categories.get("custom_categories", [])
         recipe["category_metadata_sources"] = cleaned_sources
-        recipe["category_metadata_user_set"] = category_sources_have_user_selected(cleaned_sources)
-        recipe["category_metadata_source"] = category_metadata_source_label(cleaned_categories, cleaned_sources)
-        recipe["category_metadata_updated_at"] = now_iso() if category_metadata_has_values(cleaned_categories) else ""
+        recipe["category_metadata_user_set"] = category_sources_have_user_selected(cleaned_sources) or bool(active_menu_section)
+        recipe["category_metadata_source"] = (
+            category_metadata_source_label(cleaned_categories, cleaned_sources)
+            if category_metadata_has_values(cleaned_categories)
+            else ("Saved" if active_menu_section else "Blank")
+        )
+        recipe["category_metadata_updated_at"] = now_iso() if has_category_metadata else ""
         return save_cookbooks(payload)
 
 

@@ -178,6 +178,8 @@ def test_recipe_editor_menu_metadata_panels_are_wired_before_amount():
     assert 'id="recipeEditSourceMenuUrlLink"' in template
     assert 'id="recipeEditMenuOrderUrlLink"' in template
     assert 'id="recipeEditMenuOrderUrl"' in template
+    assert 'id="recipeEditCategoryMenuSection"' in template
+    assert 'id="recipeEditMenuSection"' not in template
     assert '<textarea id="recipeEditMenuDescription" rows="3">' in template
     assert "panel.hidden = !showPanels;" in js
     assert "RECIPE_EDIT_MENU_RELATION_INPUT_IDS" in js

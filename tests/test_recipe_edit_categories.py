@@ -32,16 +32,23 @@ def test_recipe_editor_includes_inline_category_controls_above_ingredients():
     assert "recipeEditCategoryOccasion" in template
     assert "recipeEditCategoryDietaryPreference" in template
     assert "recipeEditCategoryPrepTimeGroup" in template
+    assert "recipeEditCategoryMenuSection" in template
     assert "recipeEditCategoryCustomCategories" in template
     assert "recipe-edit-category-menu" in template
     assert "Have ChatGPT Decide All" in template
     assert "Have ChatGPT Decide Missing" in template
     assert template.index("recipeEditCategoriesSection") < template.index("recipeEditIngredientsTitle")
+    assert template.index("recipeEditCategoryPrepTimeGroup") < template.index("recipeEditCategoryMenuSection")
+    assert template.index("recipeEditCategoryMenuSection") < template.index("recipeEditCategoryCustomCategories")
 
     assert "function populateRecipeEditCategories" in script
     assert "function saveRecipeEditorCategories" in script
     assert "function decideRecipeEditCategoriesWithChatGPT" in script
     assert "function applyRecipeEditCategorySuggestions" in script
+    assert 'const RECIPE_EDIT_MENU_SECTION_FIELD_NAME = "menu_section";' in script
+    assert "const RECIPE_EDIT_CATEGORY_AI_FIELD_NAMES = CATEGORY_FIELD_NAMES;" in script
+    assert "const RECIPE_EDIT_CATEGORY_FIELD_NAMES = [...CATEGORY_FIELD_NAMES, RECIPE_EDIT_MENU_SECTION_FIELD_NAME];" in script
+    assert 'menu_section: "recipeEditCategoryMenuSection"' in script
     assert "ChatGPT will replace the current category selections. Continue?" in script
     assert "saveRecipeEditorCategories(sourceUrl, payload.original_url)" in script
     assert "cookbook_category_overwrite" in script
@@ -200,6 +207,50 @@ def test_recipe_category_metadata_preserves_ai_inferred_sources():
         assert metadata["category_metadata_sources"]["meal_type"] == "user_selected"
         assert metadata["category_metadata_sources"]["main_ingredient"] == "ai_inferred"
         assert metadata["category_metadata_sources"]["cuisine"] == "blank"
+
+
+def test_recipe_menu_section_saves_as_cookbook_specific_metadata():
+    with TemporaryDirectory() as temp_dir, patch.object(
+        cookbook_service,
+        "COOKBOOKS_FILE",
+        Path(temp_dir) / "cookbooks.json",
+    ):
+        cookbook_service.create_cookbook("Dinner")
+        cookbook_service.move_recipes_to_cookbook(
+            "dinner",
+            ["https://example.com/spring-roll"],
+            [{"name": "Spring Roll", "url": "https://example.com/spring-roll"}],
+        )
+
+        cookbook_service.update_cookbook_recipe_categories(
+            "dinner",
+            "https://example.com/spring-roll",
+            {
+                "menu_section": "Kitchen Appetizers",
+            },
+        )
+
+        metadata = cookbook_service.recipe_category_metadata_for_editor(
+            "https://example.com/spring-roll",
+            {"recipe_title": "Spring Roll", "menu_section": "Imported Section"},
+        )
+
+        assert metadata["menu_section"] == "Kitchen Appetizers"
+        assert metadata["category_metadata_user_set"] is True
+        assert metadata["category_metadata_source"] == "Saved"
+
+        cookbook_service.update_cookbook_recipe_categories(
+            "dinner",
+            "https://example.com/spring-roll",
+            {
+                "meal_type": cookbook_service.cookbook_category_choices()["meal_type"][1],
+            },
+            confirm_overwrite=True,
+        )
+
+        metadata = cookbook_service.recipe_category_metadata_for_editor("https://example.com/spring-roll")
+
+        assert metadata["menu_section"] == "Kitchen Appetizers"
 
 
 def test_chatgpt_category_decision_normalizes_to_dropdown_choices():
