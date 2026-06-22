@@ -12627,6 +12627,20 @@ function recipeFileClientContext() {
     };
 }
 
+function visionRecipeJsonFromPayload(data) {
+    const payload = data && typeof data === "object" ? data : {};
+    if (payload.recipe_json && typeof payload.recipe_json === "object") {
+        return payload.recipe_json;
+    }
+    if (payload.raw && typeof payload.raw === "object") {
+        return payload.raw;
+    }
+    if (Array.isArray(payload.ingredients)) {
+        return payload;
+    }
+    return null;
+}
+
 async function submitRecipeMediaVision() {
     if (recipeMediaVisionInProgress) {
         return;
@@ -12768,7 +12782,7 @@ async function submitRecipeMediaVision() {
         }
         setRecipeFileVisionDebug(data && data.debug, {
             visible: true,
-            recipeJson: data && data.recipe_json,
+            recipeJson: visionRecipeJsonFromPayload(data),
             errorData: data,
         });
         const responsePath = String((data && data.uploaded_file_path) || "").trim();
@@ -12786,7 +12800,7 @@ async function submitRecipeMediaVision() {
             throw error;
         }
 
-        const recipeJson = data && data.recipe_json ? data.recipe_json : null;
+        const recipeJson = visionRecipeJsonFromPayload(data);
         const ingredients = Array.isArray(recipeJson && recipeJson.ingredients)
             ? recipeJson.ingredients
             : [];
@@ -12882,7 +12896,7 @@ async function submitRecipeMediaVision() {
         }
         setRecipeFileVisionDebug(data && data.debug, {
             visible: true,
-            recipeJson: data && data.recipe_json,
+            recipeJson: visionRecipeJsonFromPayload(data),
             errorData: data,
         });
 

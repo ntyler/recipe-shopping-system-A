@@ -9671,6 +9671,7 @@ def extract_recipe_from_upload(file_storage, manual_description="", upload_mode=
         save_extracted_recipe_json(recipe_url, json_data)
 
         result = build_extract_result(recipe_url, json_data, extraction_method)
+        result["recipe_json"] = json_data
         import_object["recipe_json"] = json_data
         result["import_source"] = import_object
         result["source_type"] = import_source_type

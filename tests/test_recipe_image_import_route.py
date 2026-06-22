@@ -3,6 +3,7 @@ from pathlib import Path
 
 from flask import session
 from PIL import Image
+from werkzeug.datastructures import FileStorage
 
 from PushShoppingList.app import create_app
 from PushShoppingList.routes import recipe_routes
@@ -203,6 +204,47 @@ def test_generate_recipe_from_image_commits_estimate(monkeypatch, tmp_path):
             "Cook the rice.",
             "Top with onion.",
         ]
+
+
+def test_image_upload_result_exposes_recipe_json_for_background_job_modal(monkeypatch, tmp_path):
+    monkeypatch.setattr(recipe_extract_service, "UPLOAD_FOLDER", tmp_path / "uploads")
+    monkeypatch.setattr(recipe_extract_service, "RAW_FOLDER", tmp_path / "raw")
+    monkeypatch.setattr(recipe_extract_service, "OUTPUT_FOLDER", tmp_path / "output")
+    monkeypatch.setattr(recipe_extract_service, "PDF_FOLDER", tmp_path / "pdf")
+    monkeypatch.setattr(recipe_extract_service, "EXTRACTOR_FOLDER", tmp_path)
+    monkeypatch.setattr(recipe_extract_service, "archive_uploaded_recipe_pdf", lambda *args, **kwargs: None)
+    recipe_extract_service.UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
+    recipe_extract_service.RAW_FOLDER.mkdir(parents=True, exist_ok=True)
+    recipe_extract_service.OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
+    recipe_extract_service.PDF_FOLDER.mkdir(parents=True, exist_ok=True)
+
+    parsed_recipe = {
+        "display_name": "Photo Soup",
+        "recipe_title": "Photo Soup",
+        "ingredients": [
+            {"ingredient": "beef broth", "original_text": "4 cups beef broth"},
+            {"ingredient": "green onion", "original_text": "2 green onions"},
+        ],
+        "instructions": ["Simmer and serve."],
+    }
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "generateRecipeFromImage",
+        lambda *args, **kwargs: (parsed_recipe, None),
+    )
+
+    result = recipe_extract_service.extract_recipe_from_upload(
+        FileStorage(
+            stream=io.BytesIO(valid_png_bytes()),
+            filename="meal.png",
+            content_type="image/png",
+        ),
+        upload_mode="vision",
+    )
+
+    assert result["ok"] is True
+    assert result["recipe_json"]["ingredients"] == result["raw"]["ingredients"]
+    assert len(result["recipe_json"]["ingredients"]) == 2
 
 
 def test_generate_recipe_cover_image_saves_ai_cover(monkeypatch, tmp_path):
@@ -468,6 +510,7 @@ def test_generate_recipe_from_image_success_opens_editor_after_save():
     end = script.index("async function submitRecipeMediaRetry()")
     block = script[start:end]
 
+    assert "visionRecipeJsonFromPayload(data)" in block
     assert 'updateRecipeFileLoadingStep("save", "running", "Saving");' in block
     assert "Saving ingredients and refreshing the shopping list..." in block
     assert "Refreshing recipe and opening the editor..." in block
