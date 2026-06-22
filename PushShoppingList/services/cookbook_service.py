@@ -10,6 +10,7 @@ from flask import has_request_context
 
 from PushShoppingList.services.recipe_url_service import normalize_recipe_url_key
 from PushShoppingList.services.storage_service import scoped_package_path
+from PushShoppingList.services import menu_store_service
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 COOKBOOKS_FILE = scoped_package_path("cookbooks.json")
@@ -52,6 +53,20 @@ COOKBOOK_RECIPE_METADATA_FIELDS = (
 COOKBOOK_RECIPE_BOOLEAN_METADATA_FIELDS = (
     "ai_inferred",
     "needs_ai_recipe",
+)
+COOKBOOK_MENU_STORE_RECIPE_FIELDS = (
+    "restaurant_id",
+    "menu_id",
+    "menu_section_id",
+    "menu_item_id",
+    "menu_section",
+    "section_name",
+    "menu_item_name",
+    "item_name",
+    "menu_order_url",
+    "deep_link_url",
+    "menu_description",
+    "menu_price",
 )
 CATEGORY_SOURCE_USER_SELECTED = "user_selected"
 CATEGORY_SOURCE_AI_INFERRED = "ai_inferred"
@@ -1236,19 +1251,145 @@ def cookbook_menu_section_choices(recipes):
     return choices
 
 
+def menu_store_url_keys(row):
+    row = row if isinstance(row, dict) else {}
+    keys = set()
+
+    for field in ("url", "source_url", "source_href", "recipe_url", "menu_order_url", "deep_link_url"):
+        key = recipe_key(row.get(field))
+        if key:
+            keys.add(key)
+
+    return keys
+
+
+def menu_item_identifier_from_url(value):
+    text = clean_text(value)
+    if not text:
+        return ""
+
+    match = re.search(r"(?:menuItemIdInput|menu_item_id)=([^&#]+)", text, flags=re.IGNORECASE)
+    return clean_text(match.group(1)) if match else ""
+
+
+def menu_store_item_identifiers(row):
+    row = row if isinstance(row, dict) else {}
+    identifiers = {
+        clean_text(row.get("id")),
+        clean_text(row.get("menu_item_id")),
+    }
+
+    for field in ("url", "source_url", "source_href", "recipe_url", "menu_order_url", "deep_link_url"):
+        identifiers.add(menu_item_identifier_from_url(row.get(field)))
+
+    return {identifier for identifier in identifiers if identifier}
+
+
+def menu_store_section_lookup(menu_store):
+    return {
+        clean_text(section.get("id")): clean_text(section.get("section_name"))
+        for section in (menu_store or {}).get("sections", [])
+        if isinstance(section, dict) and clean_text(section.get("id"))
+    }
+
+
+def menu_store_item_matches_cookbook(item, cookbook_id=""):
+    item_cookbook_id = clean_text(item.get("cookbook_id") if isinstance(item, dict) else "")
+    active_cookbook_id = clean_text(cookbook_id)
+    return not item_cookbook_id or not active_cookbook_id or item_cookbook_id == active_cookbook_id
+
+
+def menu_store_item_for_recipe(recipe, menu_store, cookbook_id=""):
+    recipe = recipe if isinstance(recipe, dict) else {}
+    all_items = [
+        item
+        for item in (menu_store or {}).get("items", [])
+        if isinstance(item, dict)
+    ]
+    cookbook_items = [
+        item
+        for item in all_items
+        if menu_store_item_matches_cookbook(item, cookbook_id)
+    ]
+    recipe_urls = menu_store_url_keys(recipe)
+    recipe_identifiers = menu_store_item_identifiers(recipe)
+    recipe_names = {
+        normalized_label_key(recipe.get("name")),
+        normalized_label_key(recipe.get("menu_item_name")),
+        normalized_label_key(recipe.get("item_name")),
+    }
+    recipe_names.discard("")
+
+    if recipe_urls:
+        for item in all_items:
+            if recipe_urls.intersection(menu_store_url_keys(item)):
+                return item
+
+    if recipe_identifiers:
+        for item in all_items:
+            if recipe_identifiers.intersection(menu_store_item_identifiers(item)):
+                return item
+
+    if recipe_names:
+        for item in cookbook_items:
+            if normalized_label_key(item.get("item_name")) in recipe_names:
+                return item
+
+    return {}
+
+
+def apply_menu_store_metadata_to_recipe(recipe, menu_store, cookbook_id=""):
+    if not isinstance(recipe, dict):
+        return recipe
+
+    item = menu_store_item_for_recipe(recipe, menu_store, cookbook_id)
+    if not item:
+        return recipe
+
+    sections_by_id = menu_store_section_lookup(menu_store)
+    menu_section = (
+        clean_text(item.get("menu_section"))
+        or sections_by_id.get(clean_text(item.get("menu_section_id")), "")
+    )
+    metadata = {
+        "restaurant_id": item.get("restaurant_id"),
+        "menu_id": item.get("menu_id"),
+        "menu_section_id": item.get("menu_section_id"),
+        "menu_item_id": item.get("id") or item.get("menu_item_id"),
+        "menu_section": menu_section,
+        "section_name": menu_section,
+        "menu_item_name": item.get("item_name"),
+        "item_name": item.get("item_name"),
+        "menu_order_url": item.get("menu_order_url"),
+        "deep_link_url": item.get("menu_order_url"),
+        "menu_description": item.get("menu_description"),
+        "menu_price": item.get("menu_price"),
+    }
+
+    for field in COOKBOOK_MENU_STORE_RECIPE_FIELDS:
+        value = clean_text(metadata.get(field))
+        if value and not clean_text(recipe.get(field)):
+            recipe[field] = value
+
+    return recipe
+
+
 def prepare_cookbook_menu_view(view):
     view = view if isinstance(view, dict) else {}
     view["menu_sort_options"] = cookbook_menu_sort_options()
     view["category_choices"] = cookbook_category_choices()
+    menu_store = menu_store_service.load_menu_store()
 
     for cookbook in view.get("cookbooks", []):
         for recipe in cookbook.get("recipes", []):
+            apply_menu_store_metadata_to_recipe(recipe, menu_store, cookbook.get("id", ""))
             apply_recipe_menu_metadata(recipe)
 
         cookbook["menu_sections"] = cookbook_menu_sections(cookbook.get("recipes", []))
         cookbook["menu_section_choices"] = cookbook_menu_section_choices(cookbook.get("recipes", []))
 
     for recipe in view.get("recipes", []):
+        apply_menu_store_metadata_to_recipe(recipe, menu_store, recipe.get("cookbook_id", ""))
         apply_recipe_menu_metadata(recipe)
 
     return view

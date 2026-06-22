@@ -7,6 +7,7 @@ from unittest.mock import patch
 from PushShoppingList.app import create_app
 from PushShoppingList.routes import recipe_routes
 from PushShoppingList.services import cookbook_service
+from PushShoppingList.services import menu_store_service
 from PushShoppingList.services import recipe_edit_service
 from PushShoppingList.services import storage_service
 from PushShoppingList.services import user_account_service
@@ -293,6 +294,64 @@ def test_recipe_menu_section_saves_as_cookbook_specific_metadata():
         assert metadata["menu_section"] == "Kitchen Appetizers"
         view = cookbook_service.cookbook_view([])
         assert "Kitchen Appetizers" in view["cookbooks"][0]["menu_section_choices"]
+
+
+def test_cookbook_view_hydrates_blank_menu_sections_from_menu_store():
+    with TemporaryDirectory() as temp_dir, patch.object(
+        cookbook_service,
+        "COOKBOOKS_FILE",
+        Path(temp_dir) / "cookbooks.json",
+    ), patch.object(
+        menu_store_service,
+        "MENU_STORE_FILE",
+        Path(temp_dir) / "restaurant_menus.json",
+    ):
+        recipe_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-98-Chow_Mein"
+        cookbook = cookbook_service.create_cookbook("Vel Asian Cuisine")
+        cookbook_service.move_recipes_to_cookbook(
+            cookbook["id"],
+            [recipe_url],
+            [{"name": "Chow Mein", "url": recipe_url}],
+        )
+        menu_store_service.save_menu_store({
+            "restaurants": [],
+            "menus": [],
+            "sections": [{
+                "id": "section-fried-rice",
+                "section_name": "Fried Rice & Noodles",
+            }, {
+                "id": "section-other",
+                "section_name": "Other Recipes",
+            }],
+            "items": [{
+                "id": "item-ai-chow-mein",
+                "cookbook_id": cookbook["id"],
+                "menu_section_id": "section-other",
+                "recipe_url": "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-98-AI-Inferred_Chow_Mein",
+                "item_name": "Chow Mein",
+                "menu_price": "$18.49",
+            }, {
+                "id": "item-chow-mein",
+                "cookbook_id": "vel-asian-cusine",
+                "menu_id": "menu-velasian",
+                "restaurant_id": "restaurant-velasian",
+                "menu_section_id": "section-fried-rice",
+                "recipe_url": recipe_url,
+                "item_name": "Chow Mein",
+                "menu_price": "$13.99",
+                "menu_description": "Egg, carrot, napa, bok choy, onion, scallion serve with sweet chili sauce.",
+            }],
+            "pdf_logs": [],
+        })
+
+        view = cookbook_service.cookbook_view([])
+        recipe = view["cookbooks"][0]["recipes"][0]
+
+        assert recipe["menu_section"] == "Fried Rice & Noodles"
+        assert recipe["section_name"] == "Fried Rice & Noodles"
+        assert recipe["menu_item_name"] == "Chow Mein"
+        assert recipe["menu_price"] == "$13.99"
+        assert "Fried Rice & Noodles" in view["cookbooks"][0]["menu_section_choices"]
 
 
 def test_chatgpt_category_decision_normalizes_to_dropdown_choices():
