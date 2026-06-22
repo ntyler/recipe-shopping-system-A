@@ -166,6 +166,7 @@ def test_recipe_editor_menu_metadata_panels_are_wired_before_amount():
     menu_item_panel = template.index("recipeEditMenuItemDetails")
     recipe_amount = template.index("recipeEditScaleMultiplier")
     source_files_panel = template.index("recipeEditSourceFilesDetails")
+    menu_item_markup = template[menu_item_panel:recipe_amount]
 
     assert source_files_panel < restaurant_panel < menu_item_panel < recipe_amount
     assert "Restaurant / Menu Source Info" in template
@@ -178,7 +179,13 @@ def test_recipe_editor_menu_metadata_panels_are_wired_before_amount():
     assert 'id="recipeEditSourceMenuUrlLink"' in template
     assert 'id="recipeEditMenuOrderUrlLink"' in template
     assert 'id="recipeEditMenuOrderUrl"' in template
-    assert 'id="recipeEditCategoryMenuSection"' in template
+    assert "Menu Section" in menu_item_markup
+    assert 'id="recipeEditCategoryMenuSection"' in menu_item_markup
+    assert menu_item_markup.index("recipeEditMenuItemName") < menu_item_markup.index("recipeEditMenuSectionField")
+    assert menu_item_markup.index("recipeEditMenuSectionField") < menu_item_markup.index("recipeEditMenuOrderUrl")
+    menu_section_button_start = menu_item_markup.index("recipe-edit-menu-section-select")
+    menu_section_button_end = menu_item_markup.index(">", menu_section_button_start)
+    assert "recipe-edit-row-menu-btn" not in menu_item_markup[menu_section_button_start:menu_section_button_end]
     assert 'id="recipeEditMenuSection"' not in template
     assert '<textarea id="recipeEditMenuDescription" rows="3">' in template
     assert "panel.hidden = !showPanels;" in js

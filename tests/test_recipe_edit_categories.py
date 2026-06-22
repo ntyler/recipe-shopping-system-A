@@ -34,7 +34,6 @@ def test_recipe_editor_includes_inline_category_controls_above_ingredients():
     assert "recipeEditCategoryPrepTimeGroup" in template
     assert "recipeEditMenuSectionField" in template
     assert "recipeEditCategoryMenuSection" in template
-    assert 'type="hidden"' in template[template.index("recipeEditCategoryMenuSection"):template.index("recipeEditCategoryCustomCategories")]
     assert "recipeEditMenuSectionName" in template
     assert "data-recipe-edit-menu-section-option" in template
     assert "Edit Menu Section" in template
@@ -43,8 +42,9 @@ def test_recipe_editor_includes_inline_category_controls_above_ingredients():
     assert "Have ChatGPT Decide All" in template
     assert "Have ChatGPT Decide Missing" in template
     assert template.index("recipeEditCategoriesSection") < template.index("recipeEditIngredientsTitle")
-    assert template.index("recipeEditCategoryPrepTimeGroup") < template.index("recipeEditCategoryMenuSection")
-    assert template.index("recipeEditCategoryMenuSection") < template.index("recipeEditCategoryCustomCategories")
+    assert template.index("recipeEditCategoryPrepTimeGroup") < template.index("recipeEditCategoryCustomCategories")
+    assert template.index("recipeEditMenuItemDetails") < template.index("recipeEditCategoryMenuSection")
+    assert template.index("recipeEditCategoryMenuSection") < template.index("recipeEditMenuOrderUrl")
 
     assert "function populateRecipeEditCategories" in script
     assert "function saveRecipeEditorCategories" in script
