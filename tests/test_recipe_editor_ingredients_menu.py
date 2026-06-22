@@ -44,6 +44,18 @@ def test_ingredients_header_has_image_overflow_menu():
     assert "closeRecipeEditRowMenus();" in script
 
 
+def test_recipe_editor_hide_all_images_keeps_title_image_visible():
+    script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
+    function_start = script.index("function setRecipeEditorImagesVisibleFromMenu")
+    function_end = script.index("function recipeEditorImagePanelSelector", function_start)
+    function_block = script[function_start:function_end]
+
+    assert "const scope = options.imageScope || options.scope || \"all\";" in function_block
+    assert "modal.querySelectorAll(recipeEditorImagePanelSelector(options))" in function_block
+    assert "if (!visible && scope === \"all\")" in function_block
+    assert "keepRecipeCoverImagesVisible(modal);" in function_block
+
+
 def test_recipe_editor_row_delete_uses_portaled_menu_anchor():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     remove_start = script.index("function removeRecipeEditRow")

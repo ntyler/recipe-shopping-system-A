@@ -25980,6 +25980,7 @@ async function generateRecipeImagesFromEditor(button, options = {}) {
 
 function setRecipeEditorImagesVisibleFromMenu(button, visible, options = {}) {
     const modal = document.getElementById("recipeEditModal");
+    const scope = options.imageScope || options.scope || "all";
 
     closeRecipeEditRowMenus();
 
@@ -25991,6 +25992,10 @@ function setRecipeEditorImagesVisibleFromMenu(button, visible, options = {}) {
         modal.querySelectorAll(recipeEditorImagePanelSelector(options)),
         visible
     );
+
+    if (!visible && scope === "all") {
+        keepRecipeCoverImagesVisible(modal);
+    }
 
     return false;
 }
