@@ -135,23 +135,14 @@ def static_asset_version(filename):
 
 
 def lightweight_cookbook_view():
-    payload = load_cookbooks()
-    cookbooks = []
+    view = cookbook_view([])
 
-    for cookbook in payload.get("cookbooks", []):
-        cookbooks.append({
-            "id": cookbook.get("id", ""),
-            "name": cookbook.get("name", ""),
-            "is_unclassified": is_unclassified_cookbook(cookbook),
-            "recipes": [],
-        })
+    for cookbook in view.get("cookbooks", []):
+        cookbook["recipes"] = []
+        cookbook["menu_sections"] = {}
 
-    return prepare_cookbook_menu_view({
-        "cookbooks": cookbooks,
-        "recipes": [],
-        "menu_sort_options": [],
-        "menu_views": {},
-    })
+    view["recipes"] = []
+    return view
 
 
 def shared_page_context(active_public_user=None):

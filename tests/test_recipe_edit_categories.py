@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from PushShoppingList.app import create_app
+from PushShoppingList.routes import main_routes
 from PushShoppingList.routes import recipe_routes
 from PushShoppingList.services import cookbook_service
 from PushShoppingList.services import menu_store_service
@@ -352,6 +353,60 @@ def test_cookbook_view_hydrates_blank_menu_sections_from_menu_store():
         assert recipe["menu_item_name"] == "Chow Mein"
         assert recipe["menu_price"] == "$13.99"
         assert "Fried Rice & Noodles" in view["cookbooks"][0]["menu_section_choices"]
+
+
+def test_lightweight_recipe_edit_views_keep_all_hydrated_menu_section_choices():
+    with TemporaryDirectory() as temp_dir, patch.object(
+        cookbook_service,
+        "COOKBOOKS_FILE",
+        Path(temp_dir) / "cookbooks.json",
+    ), patch.object(
+        menu_store_service,
+        "MENU_STORE_FILE",
+        Path(temp_dir) / "restaurant_menus.json",
+    ):
+        spring_roll_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-1-Spring_Roll"
+        chow_mein_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=menu-item-98-Chow_Mein"
+        cookbook = cookbook_service.create_cookbook("Vel Asian Cuisine")
+        cookbook_service.move_recipes_to_cookbook(
+            cookbook["id"],
+            [spring_roll_url, chow_mein_url],
+            [
+                {"name": "Spring Roll", "url": spring_roll_url},
+                {"name": "Chow Mein", "url": chow_mein_url},
+            ],
+        )
+        menu_store_service.save_menu_store({
+            "restaurants": [],
+            "menus": [],
+            "sections": [
+                {"id": "section-appetizers", "section_name": "Kitchen Appetizers"},
+                {"id": "section-noodles", "section_name": "Fried Rice & Noodles"},
+            ],
+            "items": [
+                {
+                    "id": "item-spring-roll",
+                    "cookbook_id": cookbook["id"],
+                    "menu_section_id": "section-appetizers",
+                    "recipe_url": spring_roll_url,
+                    "item_name": "Spring Roll",
+                },
+                {
+                    "id": "item-chow-mein",
+                    "cookbook_id": cookbook["id"],
+                    "menu_section_id": "section-noodles",
+                    "recipe_url": chow_mein_url,
+                    "item_name": "Chow Mein",
+                },
+            ],
+            "pdf_logs": [],
+        })
+
+        for view in (recipe_routes.recipe_edit_cookbook_view(), main_routes.lightweight_cookbook_view()):
+            cookbook_view = view["cookbooks"][0]
+            assert cookbook_view["recipes"] == []
+            assert cookbook_view["menu_sections"] == {}
+            assert cookbook_view["menu_section_choices"] == ["Kitchen Appetizers", "Fried Rice & Noodles"]
 
 
 def test_chatgpt_category_decision_normalizes_to_dropdown_choices():

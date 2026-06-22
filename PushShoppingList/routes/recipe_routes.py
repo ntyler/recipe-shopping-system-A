@@ -87,6 +87,7 @@ from PushShoppingList.services.recipe_extract_service import unsupported_phone_i
 from PushShoppingList.services.cookbook_service import ensure_unclassified_cookbook_for_recipes
 from PushShoppingList.services.cookbook_service import ingredient_sections_from_recipe_data
 from PushShoppingList.services.cookbook_service import is_unclassified_cookbook
+from PushShoppingList.services.cookbook_service import cookbook_view
 from PushShoppingList.services.cookbook_service import load_cookbooks
 from PushShoppingList.services.cookbook_service import prepare_cookbook_menu_view
 from PushShoppingList.services.cookbook_service import COOKBOOK_CATEGORY_ALL_FIELDS
@@ -188,23 +189,14 @@ def static_asset_version(filename):
 
 
 def recipe_edit_cookbook_view():
-    payload = load_cookbooks()
-    cookbooks = []
+    view = cookbook_view([])
 
-    for cookbook in payload.get("cookbooks", []):
-        cookbooks.append({
-            "id": cookbook.get("id", ""),
-            "name": cookbook.get("name", ""),
-            "is_unclassified": is_unclassified_cookbook(cookbook),
-            "recipes": [],
-        })
+    for cookbook in view.get("cookbooks", []):
+        cookbook["recipes"] = []
+        cookbook["menu_sections"] = {}
 
-    return prepare_cookbook_menu_view({
-        "cookbooks": cookbooks,
-        "recipes": [],
-        "menu_sort_options": [],
-        "menu_views": {},
-    })
+    view["recipes"] = []
+    return view
 
 
 def _uploaded_recipe_workflow_key(url):
