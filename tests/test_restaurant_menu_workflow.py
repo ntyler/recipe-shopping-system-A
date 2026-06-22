@@ -1,4 +1,5 @@
 from pathlib import Path
+from io import BytesIO
 
 from PushShoppingList.services import cloudflare_r2_storage
 from PushShoppingList.services import cookbook_service
@@ -256,6 +257,61 @@ def test_menu_workflow_static_hooks_are_present():
     assert "/cookbooks/<cookbook_id>/menu-builder" in routes
     assert "/menus/<menu_id>/export-upload-pdf" in routes
     assert "menu_builder.css" in app_template
+
+
+def test_menu_import_preview_requires_admin(monkeypatch, tmp_path):
+    user_id = configure_menu_builder_test_paths(monkeypatch, tmp_path)
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    with app.test_client() as client:
+        sign_in_menu_user(client, user_id)
+        response = client.post(
+            "/menu-import/preview",
+            data={"menu_url": "https://example.com/menu"},
+            headers={"X-Requested-With": "fetch"},
+        )
+
+    assert response.status_code == 403
+    assert response.get_json()["error"].startswith("Menu import is admin-only.")
+
+
+def test_menu_import_job_route_requires_admin(monkeypatch, tmp_path):
+    user_id = configure_menu_builder_test_paths(monkeypatch, tmp_path)
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    with app.test_client() as client:
+        sign_in_menu_user(client, user_id)
+        response = client.post(
+            "/api/jobs/menu-import",
+            json={"urls": ["https://example.com/menu"]},
+        )
+
+    assert response.status_code == 403
+    assert response.get_json()["error"].startswith("Menu import is admin-only.")
+
+
+def test_menu_doc_photo_import_job_requires_admin_before_upload_staging(monkeypatch, tmp_path):
+    user_id = configure_menu_builder_test_paths(monkeypatch, tmp_path)
+    monkeypatch.setattr("PushShoppingList.routes.job_routes.workspace_data_root", lambda: tmp_path)
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    with app.test_client() as client:
+        sign_in_menu_user(client, user_id)
+        response = client.post(
+            "/api/jobs/doc-photo-import",
+            data={
+                "import_mode": "menu_extract",
+                "menu_media": (BytesIO(b"menu text"), "menu.txt"),
+            },
+            content_type="multipart/form-data",
+        )
+
+    assert response.status_code == 403
+    assert response.get_json()["error"].startswith("Menu import is admin-only.")
+    assert not (tmp_path / "job_uploads").exists()
 
 
 def sample_cookbook_payload():

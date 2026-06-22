@@ -15,6 +15,7 @@ from flask import url_for
 from PushShoppingList.routes.recipe_routes import commit_menu_import_result
 from PushShoppingList.routes.recipe_routes import ensure_menu_recipe_serving_basis_estimate
 from PushShoppingList.routes.recipe_routes import menu_recipe_progress_payload
+from PushShoppingList.routes.recipe_routes import require_admin_for_menu_import
 from PushShoppingList.routes.recipe_routes import require_account_for_import
 from PushShoppingList.routes.recipe_routes import selected_import_cookbook_from_form
 from PushShoppingList.routes.recipe_routes import selected_import_cookbook_from_json
@@ -185,6 +186,9 @@ def menu_import_preview_route():
     account_response = require_account_for_import(wants_json=wants_json_response())
     if account_response:
         return account_response
+    admin_response = require_admin_for_menu_import(wants_json=wants_json_response())
+    if admin_response:
+        return admin_response
 
     cookbook = selected_import_cookbook_from_form(request.form)
     uploaded_file = request.files.get("menu_media") or request.files.get("recipe_media")
@@ -261,6 +265,9 @@ def menu_import_generate_route():
     account_response = require_account_for_import(wants_json=wants_json_response())
     if account_response:
         return account_response
+    admin_response = require_admin_for_menu_import(wants_json=wants_json_response())
+    if admin_response:
+        return admin_response
 
     data = request.get_json(silent=True) if request.is_json else None
     data = data if isinstance(data, dict) else {}

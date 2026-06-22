@@ -110,15 +110,19 @@ def test_enter_recipe_links_has_four_independent_import_actions():
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "PushShoppingList/static/css/app.css").read_text(encoding="utf-8")
 
+    assert "{% set can_import_menus = current_user and current_user.is_admin %}" in template
     assert "Import Recipe URLs" in template
     assert "Import Doc / Photo" in template
     assert "Import Recipe URLs (Menu Extract)" in template
     assert "Import Doc / Photo (Menu Extract)" in template
     assert 'data-extraction-mode="menu_extract"' in template
+    assert "{% if can_import_menus %}" in template
+    assert 'title="Admin only"' in template
     assert "openRecipeMediaUpload('menu_extract')" in template
     assert 'formData.set("import_mode", normalizedImportMode)' in script
     assert 'extraction_mode: extractionMode' in script
     assert "grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));" in css
+    assert ".recipe-import-actions .extract-btn:disabled" in css
     assert ".recipe-import-action-url-menu { order: 3; }" in css
     assert ".recipe-import-action-upload-menu { order: 4; }" in css
 

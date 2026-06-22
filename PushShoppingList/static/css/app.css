@@ -649,6 +649,14 @@ body {
             box-sizing: border-box;
         }
 
+        .recipe-import-actions .extract-btn:disabled,
+        .recipe-import-actions .recipe-media-upload-btn:disabled {
+            background: #334155;
+            color: #9ca3af;
+            cursor: not-allowed;
+            opacity: 0.75;
+        }
+
         @media (max-width: 650px) {
             .recipe-import-actions {
                 grid-template-columns: 1fr;

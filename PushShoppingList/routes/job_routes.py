@@ -47,6 +47,8 @@ from PushShoppingList.services.user_account_service import is_admin_user
 
 job_bp = Blueprint("job_bp", __name__)
 
+MENU_IMPORT_ADMIN_ERROR = "Menu import is admin-only. Sign in with an admin account to use menu extraction."
+
 
 def actor_context():
     user = current_user()
@@ -132,6 +134,23 @@ def payload_truthy(payload, key, default=False):
     return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
+def payload_is_menu_extract(payload):
+    mode = str(
+        (payload if isinstance(payload, dict) else {}).get("import_mode")
+        or (payload if isinstance(payload, dict) else {}).get("extraction_mode")
+        or (payload if isinstance(payload, dict) else {}).get("mode")
+        or ""
+    ).strip().lower()
+    return mode in {"menu", "menu_extract", "menu-extract"}
+
+
+def require_admin_for_menu_import_job():
+    actor = actor_context()
+    if actor["is_admin"]:
+        return None
+    return jsonify({"ok": False, "error": MENU_IMPORT_ADMIN_ERROR}), 403
+
+
 def create_and_enqueue(job_type, payload, total_items=0):
     actor = actor_context()
     queue_name = queue_name_for_job(job_type, payload)
@@ -206,6 +225,10 @@ def job_access_or_404(job_id):
 
 @job_bp.route("/api/jobs/menu-import", methods=["POST"])
 def start_menu_import_job_route():
+    admin_response = require_admin_for_menu_import_job()
+    if admin_response:
+        return admin_response
+
     payload = form_or_json_payload()
     urls = urls_from_payload(payload, "menu_url", "url", "recipe_url")
     if not urls:
@@ -607,6 +630,18 @@ def save_job_upload(uploaded_file):
 
 @job_bp.route("/api/jobs/doc-photo-import", methods=["POST"])
 def start_doc_photo_import_job_route():
+    payload = form_or_json_payload()
+    import_mode = str(
+        payload.get("import_mode")
+        or payload.get("extraction_mode")
+        or payload.get("mode")
+        or "recipe"
+    ).strip().lower()
+    if payload_is_menu_extract({**payload, "import_mode": import_mode}):
+        admin_response = require_admin_for_menu_import_job()
+        if admin_response:
+            return admin_response
+
     uploaded_file = (
         request.files.get("recipe_media")
         or request.files.get("menu_media")
@@ -616,14 +651,7 @@ def start_doc_photo_import_job_route():
     if not uploaded_file or not uploaded_file.filename:
         return jsonify({"ok": False, "error": "No file was selected."}), 400
 
-    payload = form_or_json_payload()
     source_path = save_job_upload(uploaded_file)
-    import_mode = str(
-        payload.get("import_mode")
-        or payload.get("extraction_mode")
-        or payload.get("mode")
-        or "recipe"
-    ).strip().lower()
     payload = {
         **payload,
         "source_path": str(source_path),

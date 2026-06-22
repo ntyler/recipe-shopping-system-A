@@ -10,6 +10,7 @@
         {% endif %}
     {% endfor %}
 {% endif %}
+{% set can_import_menus = current_user and current_user.is_admin %}
 
 <div class="recipe-card">
     <h2 id="enterRecipeLinks" class="recipe-entry-heading">Enter Recipe Links</h2>
@@ -144,7 +145,15 @@
             <button class="recipe-media-upload-btn recipe-import-action-upload" type="button" onclick="openRecipeMediaUpload('recipe')">
                 Import Doc / Photo
             </button>
-            <button class="recipe-media-upload-btn recipe-import-action-upload-menu" type="button" onclick="openRecipeMediaUpload('menu_extract')">
+            <button class="recipe-media-upload-btn recipe-import-action-upload-menu"
+                    type="button"
+                    {% if can_import_menus %}
+                    onclick="openRecipeMediaUpload('menu_extract')"
+                    {% else %}
+                    disabled
+                    aria-disabled="true"
+                    title="Admin only"
+                    {% endif %}>
                 Import Doc / Photo (Menu Extract)
             </button>
         </form>
@@ -176,7 +185,13 @@
                 value="menu_extract"
                 data-extraction-mode="menu_extract"
                 aria-label="Import Recipe URLs (Menu Extract)"
-                onclick="return submitMenuUrlPreviewFromEntry()">Import Menu URL</button>
+                {% if can_import_menus %}
+                onclick="return submitMenuUrlPreviewFromEntry()"
+                {% else %}
+                disabled
+                aria-disabled="true"
+                title="Admin only"
+                {% endif %}>Import Menu URL</button>
 
         <form id="customMenuBuilderImportForm"
               class="recipe-media-upload-form"

@@ -169,6 +169,7 @@ recipe_bp = Blueprint("recipe_bp", __name__)
 
 NO_INGREDIENTS_ERROR = "No ingredients were found for this recipe URL."
 IMPORT_LOGIN_ERROR = "Sign in before importing recipes so imported data is saved to your account."
+MENU_IMPORT_ADMIN_ERROR = "Menu import is admin-only. Sign in with an admin account to use menu extraction."
 FOOD_REVIEW_LOGIN_ERROR = "Sign in before using food reviews so results stay tied to your account."
 IMPORT_CATEGORY_STATUS_MESSAGE = "Import complete. Generating ChatGPT categories..."
 IMAGE_RECIPE_WORKFLOW_STATES = {}
@@ -969,6 +970,18 @@ def require_account_for_import(wants_json=False):
     return redirect("/#userAccountSection")
 
 
+def require_admin_for_menu_import(wants_json=False):
+    """Restrict expensive menu extraction controls to admin accounts."""
+    if is_admin_user(current_user()):
+        return None
+
+    if wants_json:
+        return jsonify({"ok": False, "error": MENU_IMPORT_ADMIN_ERROR}), 403
+
+    flash(MENU_IMPORT_ADMIN_ERROR, "error")
+    return redirect("/#enterRecipeLinks")
+
+
 def require_account_for_food_review():
     """Food-review alternatives use workspace-specific food rules and saved recipe data."""
     if current_user() or is_guest_session():
@@ -1507,6 +1520,11 @@ def upload_recipe_media_route():
     ).strip()
     upload_mode = str(request.form.get("upload_mode") or "").strip().lower()
     menu_extract = import_request_is_menu_extract(request.form)
+    if menu_extract:
+        admin_response = require_admin_for_menu_import(wants_json=wants_json)
+        if admin_response:
+            return admin_response
+
     normalized_upload_mode = upload_mode if upload_mode in {
         "auto",
         "read",
