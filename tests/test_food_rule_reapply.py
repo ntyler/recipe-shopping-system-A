@@ -152,3 +152,59 @@ def test_reapply_food_rules_to_cookbook_summarizes_all_recipes(monkeypatch):
             assert data["checked_ingredient_count"] == 2
             assert data["flagged_ingredient_count"] == 1
             assert "Food rules reapplied to 2 recipes in Dinner." in data["summary_message"]
+
+
+def test_reapply_food_rules_to_current_recipes_summarizes_all_rows(monkeypatch):
+    app = create_app()
+    app.config.update(TESTING=True)
+    flagged_url = "https://example.com/spring-roll"
+    clean_url = "https://example.com/rice"
+    missing_url = "https://example.com/missing"
+
+    with TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        output_dir = temp_path / "outputs"
+        output_dir.mkdir()
+
+        with patch.object(main_routes, "OUTPUT_FOLDER", output_dir), patch.object(
+            recipe_edit_service,
+            "OUTPUT_FOLDER",
+            output_dir,
+        ), patch.object(
+            main_routes,
+            "load_food_rules",
+            lambda: FOOD_RULES,
+        ), patch.object(
+            main_routes,
+            "recipe_url_rows",
+            lambda: [
+                {"url": flagged_url, "name": "Spring Roll"},
+                {"url": clean_url, "name": "Rice"},
+                {"url": flagged_url, "name": "Spring Roll Duplicate"},
+                {"url": missing_url, "name": "Missing"},
+            ],
+        ):
+            recipe_edit_service.save_recipe_output(
+                flagged_url,
+                recipe_payload(flagged_url, "citric acid dipping sauce"),
+            )
+            recipe_edit_service.save_recipe_output(
+                clean_url,
+                recipe_payload(clean_url, "white rice"),
+            )
+
+            with app.test_client() as client:
+                configure_signed_in_user(monkeypatch, temp_path, client)
+                response = client.post("/api/recipes/current/reapply_food_rules")
+
+            assert response.status_code == 200
+            data = response.get_json()
+            assert data["ok"] is True
+            assert data["scope"] == "current_recipes"
+            assert data["recipe_count"] == 3
+            assert data["checked_recipe_count"] == 2
+            assert data["skipped_recipe_count"] == 1
+            assert data["flagged_recipe_count"] == 1
+            assert data["checked_ingredient_count"] == 2
+            assert data["flagged_ingredient_count"] == 1
+            assert "Food rules reapplied to 2 recipes in Current Recipes." in data["summary_message"]

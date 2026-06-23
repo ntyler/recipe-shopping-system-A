@@ -2515,6 +2515,59 @@ def reapply_recipe_food_rules_route():
     return jsonify(result), status
 
 
+def summarize_food_rule_reapply_results(results, scope_label):
+    checked_results = [result for result in results if result.get("ok")]
+    skipped_results = [result for result in results if not result.get("ok")]
+    flagged_recipe_count = sum(1 for result in checked_results if result.get("needs_review"))
+    flagged_ingredient_count = sum(int(result.get("flagged_ingredients") or 0) for result in checked_results)
+    checked_ingredient_count = sum(int(result.get("checked_ingredients") or 0) for result in checked_results)
+    summary_message = (
+        f"Food rules reapplied to {len(checked_results)} recipe"
+        f"{'' if len(checked_results) == 1 else 's'} in {scope_label}. "
+        f"{flagged_ingredient_count} ingredient"
+        f"{'' if flagged_ingredient_count == 1 else 's'} need review."
+    )
+    if skipped_results:
+        summary_message += (
+            f" {len(skipped_results)} recipe"
+            f"{'' if len(skipped_results) == 1 else 's'} skipped."
+        )
+
+    return {
+        "recipe_count": len(results),
+        "checked_recipe_count": len(checked_results),
+        "skipped_recipe_count": len(skipped_results),
+        "flagged_recipe_count": flagged_recipe_count,
+        "checked_ingredient_count": checked_ingredient_count,
+        "flagged_ingredient_count": flagged_ingredient_count,
+        "summary_message": summary_message,
+        "results": results,
+    }
+
+
+@main_bp.route("/api/recipes/current/reapply_food_rules", methods=["POST"])
+def reapply_current_recipes_food_rules_route():
+    food_rules = load_food_rules()
+    seen_recipe_keys = set()
+    results = []
+
+    for recipe in recipe_url_rows():
+        recipe_url = str(recipe.get("url") if isinstance(recipe, dict) else "").strip()
+        recipe_key = normalize_recipe_url_key(recipe_url)
+
+        if not recipe_url or not recipe_key or recipe_key in seen_recipe_keys:
+            continue
+
+        seen_recipe_keys.add(recipe_key)
+        results.append(apply_food_rules_to_saved_recipe(recipe_url, food_rules=food_rules))
+
+    return jsonify({
+        "ok": True,
+        "scope": "current_recipes",
+        **summarize_food_rule_reapply_results(results, "Current Recipes"),
+    })
+
+
 @main_bp.route("/api/cookbooks/<cookbook_id>/reapply_food_rules", methods=["POST"])
 def reapply_cookbook_food_rules_route(cookbook_id):
     cookbook = cookbook_for_food_rule_apply(cookbook_id)
@@ -2535,36 +2588,13 @@ def reapply_cookbook_food_rules_route(cookbook_id):
         seen_recipe_keys.add(recipe_key)
         results.append(apply_food_rules_to_saved_recipe(recipe_url, food_rules=food_rules))
 
-    checked_results = [result for result in results if result.get("ok")]
-    skipped_results = [result for result in results if not result.get("ok")]
-    flagged_recipe_count = sum(1 for result in checked_results if result.get("needs_review"))
-    flagged_ingredient_count = sum(int(result.get("flagged_ingredients") or 0) for result in checked_results)
-    checked_ingredient_count = sum(int(result.get("checked_ingredients") or 0) for result in checked_results)
     cookbook_name = cookbook.get("name") or "this cookbook"
-    summary_message = (
-        f"Food rules reapplied to {len(checked_results)} recipe"
-        f"{'' if len(checked_results) == 1 else 's'} in {cookbook_name}. "
-        f"{flagged_ingredient_count} ingredient"
-        f"{'' if flagged_ingredient_count == 1 else 's'} need review."
-    )
-    if skipped_results:
-        summary_message += (
-            f" {len(skipped_results)} recipe"
-            f"{'' if len(skipped_results) == 1 else 's'} skipped."
-        )
 
     return jsonify({
         "ok": True,
         "cookbook_id": cookbook_id,
         "cookbook_name": cookbook_name,
-        "recipe_count": len(results),
-        "checked_recipe_count": len(checked_results),
-        "skipped_recipe_count": len(skipped_results),
-        "flagged_recipe_count": flagged_recipe_count,
-        "checked_ingredient_count": checked_ingredient_count,
-        "flagged_ingredient_count": flagged_ingredient_count,
-        "summary_message": summary_message,
-        "results": results,
+        **summarize_food_rule_reapply_results(results, cookbook_name),
     })
 
 

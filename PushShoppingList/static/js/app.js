@@ -8545,6 +8545,40 @@ async function reapplyFoodRulesForCurrentRecipe(button, event = null) {
     return reapplyFoodRulesForCookbookRecipe(button, event);
 }
 
+async function reapplyFoodRulesForCurrentRecipes(button, event = null) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const originalText = button ? button.textContent : "";
+
+    try {
+        closeRecipeEditRowMenus();
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Re-applying...";
+        }
+        showRecipeQuantityUpdatedMessage("", "", "", "Re-applying food rules to current recipes...");
+        const data = await submitJsonApi("/api/recipes/current/reapply_food_rules");
+        await refreshStoreMarkup({ cacheBust: true });
+        const message = data.summary_message || "Food rules reapplied to current recipes.";
+        showRecipeQuantityUpdatedMessage("", "", "", message);
+        setCookbookStatus(message);
+    } catch (err) {
+        console.warn("Unable to re-apply current recipe food rules.", err);
+        showRecipeQuantityUpdatedMessage("", "", "", err.message || "Unable to re-apply food rules to current recipes.");
+        window.alert(err.message || "Unable to re-apply food rules to current recipes.");
+    } finally {
+        if (button && button.isConnected) {
+            button.disabled = false;
+            button.textContent = originalText || "Re-apply Food Rules to All Current Recipes";
+        }
+    }
+
+    return false;
+}
+
 function updateCookbookMoveButton() {
     const button = document.getElementById("cookbookMoveButton");
     const select = document.getElementById("cookbookMoveTarget");

@@ -198,6 +198,14 @@ def test_cookbook_submenus_have_food_rule_reapply_controls():
     menu_start = template.index('<div class="recipe-edit-row-menu cookbook-card-menu" hidden>')
     browser_start = template.index('<div class="cookbook-menu-browser"', menu_start)
     cookbook_menu_block = template[menu_start:browser_start]
+    current_header_menu_start = editor_template.index(
+        '<div class="recipe-edit-row-menu recipe-url-log-menu" hidden>'
+    )
+    current_header_menu_end = editor_template.index(
+        '<div class="recipe-url-summary-cookbook-menu-label">Menu AI</div>',
+        current_header_menu_start,
+    )
+    current_header_menu_block = editor_template[current_header_menu_start:current_header_menu_end]
 
     recipe_menu_start = template.index(
         '<div class="recipe-edit-row-menu overflow-menu cookbook-recipe-menu" hidden>'
@@ -211,6 +219,9 @@ def test_cookbook_submenus_have_food_rule_reapply_controls():
     assert "Food Rules" in cookbook_menu_block
     assert "Re-apply Food Rules to Cookbook" in cookbook_menu_block
     assert "reapplyFoodRulesForCookbook(this, event)" in cookbook_menu_block
+    assert "Food Rules" in current_header_menu_block
+    assert "Re-apply Food Rules to All Current Recipes" in current_header_menu_block
+    assert "reapplyFoodRulesForCurrentRecipes(this, event)" in current_header_menu_block
     assert "Re-apply Food Rules to This Recipe" in recipe_menu_block
     assert "reapplyFoodRulesForCookbookRecipe(this, event)" in recipe_menu_block
 
@@ -234,8 +245,10 @@ def test_cookbook_submenus_have_food_rule_reapply_controls():
     assert "function reapplyFoodRulesForCookbook" in script
     assert "function reapplyFoodRulesForCookbookRecipe" in script
     assert "function reapplyFoodRulesForCurrentRecipe" in script
+    assert "function reapplyFoodRulesForCurrentRecipes" in script
     assert "function reapplyFoodRulesForRecipeIngredients" in script
     assert "function reapplyFoodRulesForIngredient" in script
+    assert "/api/recipes/current/reapply_food_rules" in routes
     assert "/api/cookbooks/<cookbook_id>/reapply_food_rules" in routes
     assert "/api/recipes/reapply_food_rules" in routes
 

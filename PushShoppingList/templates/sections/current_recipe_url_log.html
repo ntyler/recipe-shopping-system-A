@@ -57,6 +57,10 @@
                            onchange="return toggleCurrentRecipesAiInferredBadges(this, event)">
                     <span>Hide AI-Inferred Recipe</span>
                 </label>
+                <div class="recipe-url-summary-cookbook-menu-label">Food Rules</div>
+                <button type="button" onclick="return reapplyFoodRulesForCurrentRecipes(this, event)">
+                    Re-apply Food Rules to All Current Recipes
+                </button>
                 <div class="recipe-url-summary-cookbook-menu-label">Menu AI</div>
                 <button type="button" onclick="return generateSelectedMenuStubRecipes(this)">
                     Generate Fast Recipes
