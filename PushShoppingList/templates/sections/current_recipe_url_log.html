@@ -427,6 +427,15 @@
                                             </div>
                                         </div>
                                     </div>
+                                    <div class="overflow-menu-section recipe-view-menu-section recipe-url-food-rules-menu-section">
+                                        <div class="overflow-menu-section-title recipe-view-menu-section-title">Food Rules</div>
+                                        <button type="button"
+                                                data-recipe-url="{{ recipe.url }}"
+                                                data-recipe-name="{{ recipe.name }}"
+                                                onclick="return reapplyFoodRulesForCurrentRecipe(this, event)">
+                                            Re-apply Food Rules to This Recipe
+                                        </button>
+                                    </div>
                                 <div class="overflow-menu-section recipe-view-menu-section">
                                     <div class="overflow-menu-section-title recipe-view-menu-section-title">Recipe</div>
                                     <button type="button"

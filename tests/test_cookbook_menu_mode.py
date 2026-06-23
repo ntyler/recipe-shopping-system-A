@@ -213,11 +213,27 @@ def test_cookbook_submenus_have_food_rule_reapply_controls():
     assert "reapplyFoodRulesForCookbook(this, event)" in cookbook_menu_block
     assert "Re-apply Food Rules to This Recipe" in recipe_menu_block
     assert "reapplyFoodRulesForCookbookRecipe(this, event)" in recipe_menu_block
+
+    current_menu_start = editor_template.index(
+        '<div class="recipe-edit-row-menu overflow-menu recipe-url-summary-menu" hidden>'
+    )
+    current_danger_section_start = editor_template.index(
+        '<div class="overflow-menu-section recipe-view-menu-section recipe-view-menu-section-danger">',
+        current_menu_start,
+    )
+    current_menu_block = editor_template[current_menu_start:current_danger_section_start]
+
+    assert "Food Rules" in current_menu_block
+    assert "Re-apply Food Rules to This Recipe" in current_menu_block
+    assert "reapplyFoodRulesForCurrentRecipe(this, event)" in current_menu_block
+    assert current_menu_block.index("Generate Images") < current_menu_block.index("Food Rules")
+    assert current_menu_block.index("Food Rules") < current_menu_block.index(">Recipe<")
     assert "Re-apply Food Rules to Ingredients" in editor_template
     assert "reapplyFoodRulesForRecipeIngredients(this)" in editor_template
     assert "Re-apply Food Rules" in script
     assert "function reapplyFoodRulesForCookbook" in script
     assert "function reapplyFoodRulesForCookbookRecipe" in script
+    assert "function reapplyFoodRulesForCurrentRecipe" in script
     assert "function reapplyFoodRulesForRecipeIngredients" in script
     assert "function reapplyFoodRulesForIngredient" in script
     assert "/api/cookbooks/<cookbook_id>/reapply_food_rules" in routes

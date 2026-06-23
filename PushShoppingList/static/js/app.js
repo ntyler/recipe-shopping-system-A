@@ -8541,6 +8541,10 @@ async function reapplyFoodRulesForCookbookRecipe(button, event = null) {
     return false;
 }
 
+async function reapplyFoodRulesForCurrentRecipe(button, event = null) {
+    return reapplyFoodRulesForCookbookRecipe(button, event);
+}
+
 function updateCookbookMoveButton() {
     const button = document.getElementById("cookbookMoveButton");
     const select = document.getElementById("cookbookMoveTarget");
