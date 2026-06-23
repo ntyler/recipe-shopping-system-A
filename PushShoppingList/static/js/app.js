@@ -21541,7 +21541,11 @@ function closeRecipeEditRowMenus() {
     document.querySelectorAll(recipeEditMovableRowSelector()).forEach(row => {
         row.classList.remove("recipe-edit-menu-open");
     });
-    document.querySelectorAll(".recipe-edit-row-menu-btn").forEach(button => {
+    document.querySelectorAll(
+        ".recipe-edit-row-menu-btn, "
+        + ".recipe-edit-row-menu-wrap button[aria-expanded], "
+        + ".recipe-edit-section-menu-wrap button[aria-expanded]"
+    ).forEach(button => {
         button.setAttribute("aria-expanded", "false");
     });
     closeRecipeViewGenerateSubmenus();

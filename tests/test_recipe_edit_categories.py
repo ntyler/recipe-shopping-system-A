@@ -60,6 +60,12 @@ def test_recipe_editor_includes_inline_category_controls_above_ingredients():
     assert "function updateRecipeEditorMenuSectionOptions" in script
     assert "function recipeEditorMenuSectionFields" in script
     assert "document.querySelectorAll(\"[data-recipe-edit-menu-section-name]\")" in script
+    close_menu_block = script[
+        script.index("function closeRecipeEditRowMenus"):
+        script.index("function closeRecipeViewGenerateSubmenus")
+    ]
+    assert ".recipe-edit-row-menu-wrap button[aria-expanded]" in close_menu_block
+    assert ".recipe-edit-section-menu-wrap button[aria-expanded]" in close_menu_block
     menu_section_options_block = script[
         script.index("function updateRecipeEditorMenuSectionOptions"):
         script.index("function ensureRecipeEditorMenuSectionOption")
