@@ -529,6 +529,71 @@ def test_uploaded_recipe_without_archive_pdf_does_not_render_dead_source_link(mo
     assert "Photo Rice Bowl" in html
 
 
+def test_cookbook_view_uses_saved_metadata_cover_image_when_cookbook_row_lacks_one(monkeypatch):
+    app = create_app()
+    app.config.update(TESTING=True)
+    recipe_url = (
+        "https://www.velasiancuisine.com/rs/menu_home.action"
+        "?resInput=RES4902&menu_item=menu-item-1-Spring_Roll"
+    )
+    recipe_data = {
+        "source_url": recipe_url,
+        "recipe_title": "Spring Roll",
+        "cover_image": {},
+        "ingredients": [{"ingredient": "spring roll wrappers"}],
+        "instructions": [{"instruction": "Fill and fry."}],
+        "nutrition": {},
+    }
+    metadata = {
+        main_routes.normalize_recipe_url_key(recipe_url): {
+            "cover_image": {
+                "path": "data/uploads/recipe_covers/spring-roll.png",
+                "alt": "Spring Roll",
+                "source": "ai_generated_image",
+                "mime_type": "image/png",
+            }
+        }
+    }
+
+    monkeypatch.setattr(main_routes, "load_saved_recipe_output", lambda url: recipe_data if url == recipe_url else {})
+    monkeypatch.setattr(main_routes, "load_recipe_ingredients", lambda: metadata)
+    monkeypatch.setattr(main_routes, "recipe_archive_pdf_exists", lambda *args, **kwargs: False)
+    monkeypatch.setattr(main_routes, "recipe_pdf_public_url", lambda *args, **kwargs: "")
+
+    with TemporaryDirectory() as temp_dir, patch.object(
+        cookbook_service,
+        "COOKBOOKS_FILE",
+        Path(temp_dir) / "cookbooks.json",
+    ):
+        cookbook_service.save_cookbooks({
+            "cookbooks": [{
+                "id": "vel-asian-cuisine",
+                "name": "Vel Asian Cuisine",
+                "recipes": [{
+                    "url": recipe_url,
+                    "name": "Spring Roll",
+                    "source_type": "menu_item_inferred",
+                    "ai_inferred": True,
+                }],
+            }],
+        })
+
+        with app.test_request_context("/"):
+            view = main_routes.cookbook_view_for_render([], image_variants=("thumb", "card"))
+            html = render_template(
+                "sections/cookbooks.html",
+                cookbook_view=view,
+                cookbook_count=len(view["cookbooks"]),
+                cookbook_recipe_count=sum(len(cookbook["recipes"]) for cookbook in view["cookbooks"]),
+            )
+
+    recipe = view["cookbooks"][0]["recipes"][0]
+    assert recipe["cover_image"]["alt"] == "Spring Roll"
+    assert recipe["cover_image"]["src"].startswith("/recipe_cover_image?url=")
+    assert "recipe-url-summary-row-with-cover" in html
+    assert 'data-deferred-src="/recipe_cover_image?url=' in html
+
+
 def test_cookbook_view_generated_recipe_clears_stale_stub_state(monkeypatch):
     recipe_url = "menu-item://vel-asain-cuisine/spring-roll"
     generated_recipe = {

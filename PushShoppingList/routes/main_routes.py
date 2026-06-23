@@ -982,29 +982,37 @@ def recipe_cover_image_src(recipe_url, cover_image):
     return str(cover_image.get("url") or "").strip()
 
 
-def cookbook_cover_image_for_view(recipe, variants=None):
+def cookbook_cover_image_for_view(recipe, recipe_data=None, recipe_meta=None, variants=None):
     if not isinstance(recipe, dict):
         return {}
 
     cover_image = recipe.get("cover_image")
 
-    if not isinstance(cover_image, dict):
-        return {}
+    if isinstance(cover_image, dict):
+        if cover_image.get("src"):
+            alt = str(cover_image.get("alt") or recipe.get("name") or "Recipe cover image").strip()
+            return {
+                **cover_image,
+                "alt": alt,
+            }
 
-    if cover_image.get("src"):
-        alt = str(cover_image.get("alt") or recipe.get("name") or "Recipe cover image").strip()
-        return {
-            **cover_image,
-            "alt": alt,
-        }
+        rendered_cover_image = recipe_cover_image_for_view(
+            recipe.get("url", ""),
+            {
+                "recipe_title": recipe.get("name"),
+                "cover_image": cover_image,
+            },
+            {"cover_image": cover_image},
+            variants=variants,
+        )
+
+        if rendered_cover_image:
+            return rendered_cover_image
 
     return recipe_cover_image_for_view(
         recipe.get("url", ""),
-        {
-            "recipe_title": recipe.get("name"),
-            "cover_image": cover_image,
-        },
-        {"cover_image": cover_image},
+        recipe_data if isinstance(recipe_data, dict) else {},
+        recipe_meta if isinstance(recipe_meta, dict) else {},
         variants=variants,
     )
 
@@ -1091,7 +1099,12 @@ def cookbook_view_for_render(recipe_rows, food_rules=None, image_variants=None):
             )
             recipe["serving_basis"] = recipe.get("serving_basis") or nutrition_summary["serving_basis"]
             recipe["calories"] = recipe.get("calories") or nutrition_summary["calories"]
-            recipe["cover_image"] = cookbook_cover_image_for_view(recipe, variants=image_variants)
+            recipe["cover_image"] = cookbook_cover_image_for_view(
+                recipe,
+                recipe_data=recipe_data,
+                recipe_meta=recipe_meta,
+                variants=image_variants,
+            )
 
     for recipe in view.get("recipes", []):
         recipe["cover_image"] = cookbook_cover_image_for_view(recipe, variants=image_variants)
