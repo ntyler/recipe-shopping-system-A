@@ -360,6 +360,7 @@ def normalize_item(raw_item, section_name, index):
         "source_type": clean_text(raw_item.get("source_type") or "imported"),
         "recipe_id": clean_nullable_text(raw_item.get("recipe_id")),
         "recipe_url": clean_nullable_text(raw_item.get("recipe_url") or raw_item.get("url")),
+        "source_menu_section": clean_nullable_text(raw_item.get("source_menu_section")),
         "menu_order_url": clean_nullable_text(
             raw_item.get("menu_order_url")
             or raw_item.get("deep_link_url")
@@ -530,6 +531,99 @@ def get_menu(menu_id, payload=None):
         "items": menu_items_for(payload, menu.get("id")),
         "pdf_logs": pdf_logs_for_menu(payload, menu.get("id")),
     }
+
+
+def regroup_menu_sections(menu_id, section_payload):
+    section_payload = section_payload if isinstance(section_payload, list) else []
+    if not section_payload:
+        return {}
+
+    with MENU_STORE_LOCK:
+        payload = load_menu_store()
+        menu = find_menu(payload, menu_id)
+        if not menu:
+            return {}
+
+        menu_id = menu.get("id")
+        now = utc_now_iso()
+        restaurant_id = menu.get("restaurant_id")
+        cookbook_id = menu.get("cookbook_id", "")
+        existing_sections = [
+            section for section in payload.get("sections", []) if section.get("menu_id") == menu_id
+        ]
+        existing_sections_by_name = {}
+        for section in existing_sections:
+            key = clean_text(section.get("section_name")).lower()
+            if key and key not in existing_sections_by_name:
+                existing_sections_by_name[key] = section
+
+        menu_items = [
+            item for item in payload.get("items", []) if item.get("menu_id") == menu_id
+        ]
+        menu_items_by_id = {
+            clean_text(item.get("id")): item
+            for item in menu_items
+            if clean_text(item.get("id"))
+        }
+        rebuilt_sections = []
+        assigned_item_ids = set()
+
+        for section_index, raw_section in enumerate(section_payload):
+            raw_section = raw_section if isinstance(raw_section, dict) else {}
+            raw_items = raw_section.get("items") if isinstance(raw_section.get("items"), list) else []
+            if not raw_items:
+                continue
+
+            normalized_section = normalize_section(raw_section, section_index)
+            section_name = normalized_section["section_name"]
+            section_key = section_name.lower()
+            section = existing_sections_by_name.get(section_key)
+            if not section:
+                section = {
+                    "id": new_id("section"),
+                    "menu_id": menu_id,
+                    "restaurant_id": restaurant_id,
+                    "cookbook_id": cookbook_id,
+                    "imported_at": now,
+                }
+
+            section.update({
+                "menu_id": menu_id,
+                "restaurant_id": restaurant_id,
+                "cookbook_id": cookbook_id,
+                **normalized_section,
+                "last_seen_at": now,
+            })
+            rebuilt_sections.append(section)
+
+            for item_index, raw_item in enumerate(raw_items):
+                raw_item = raw_item if isinstance(raw_item, dict) else {}
+                item_id = clean_text(raw_item.get("id") or raw_item.get("item_id"))
+                item = menu_items_by_id.get(item_id)
+                if not item or item_id in assigned_item_ids:
+                    continue
+
+                item["menu_section_id"] = section["id"]
+                item["menu_section"] = section_name
+                item["display_order"] = item_index + 1
+                item["last_seen_at"] = now
+                source_menu_section = clean_text(raw_item.get("source_menu_section"))
+                if source_menu_section:
+                    item["source_menu_section"] = source_menu_section
+                assigned_item_ids.add(item_id)
+
+        if not rebuilt_sections:
+            return {}
+
+        payload["sections"] = [
+            section for section in payload.get("sections", []) if section.get("menu_id") != menu_id
+        ] + rebuilt_sections
+        menu["section_count"] = len(rebuilt_sections)
+        menu["item_count"] = len(menu_items)
+        menu["updated_at"] = now
+
+        save_menu_store(payload)
+        return get_menu(menu_id, payload=payload)
 
 
 def list_menus(payload=None):

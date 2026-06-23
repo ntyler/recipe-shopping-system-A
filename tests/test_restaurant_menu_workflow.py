@@ -320,12 +320,14 @@ def sample_cookbook_payload():
             {
                 "id": "vel-asian-cuisine",
                 "name": "Vel Asian Cuisine",
+                "menu_section_order": ["Sushi Appetizers", "Kitchen Appetizers"],
                 "recipes": [
                     {
                         "url": "https://example.com/spring-roll",
                         "name": "Spring Roll",
                         "description": "Crispy vegetable rolls with sweet chili sauce.",
                         "restaurant_menu_category": "Starters",
+                        "menu_section": "Kitchen Appetizers",
                         "cuisine": "Asian",
                         "sections": {"MISC": [{"name": "cabbage"}, {"name": "carrot"}]},
                     },
@@ -334,6 +336,7 @@ def sample_cookbook_payload():
                         "name": "Mango Salad",
                         "description": "Fresh mango salad with herbs.",
                         "restaurant_menu_category": "Salads",
+                        "menu_section": "Sushi Appetizers",
                         "cuisine": "Asian",
                     },
                 ],
@@ -380,6 +383,7 @@ def test_cookbook_menu_builder_route_loads_selected_cookbook(monkeypatch, tmp_pa
     assert "Recipes" in body
     assert "Spring Roll" in body
     assert "Mango Salad" in body
+    assert "Menu Section" in body
 
 
 def test_cookbook_menu_builder_entry_selects_cookbook_inside_builder(monkeypatch, tmp_path):
@@ -486,3 +490,89 @@ def test_cookbook_generated_menu_service_uses_selected_recipes(monkeypatch, tmp_
     assert detail["menu"]["source_type"] == "cookbook_generated_menu"
     assert [item["recipe_url"] for item in detail["items"]] == ["https://example.com/spring-roll"]
     assert detail["items"][0]["recipe_id"] == "https://example.com/spring-roll"
+
+
+def test_cookbook_generated_menu_service_can_group_by_saved_menu_section(monkeypatch, tmp_path):
+    monkeypatch.setattr(menu_store_service, "MENU_STORE_FILE", tmp_path / "restaurant_menus.json")
+    cookbook = sample_cookbook_payload()["cookbooks"][0]
+
+    result = menu_builder_service.create_menu_from_cookbook(
+        cookbook,
+        options={
+            "source_content": "all",
+            "menu_title": "Menu Section Vel Menu",
+            "restaurant_name": "Vel Asian Cuisine",
+            "category_mode": "menu_section",
+            "include_descriptions": True,
+            "include_prices": True,
+            "include_dietary_tags": True,
+            "include_images": False,
+            "include_ai_generated_descriptions": True,
+            "include_ai_generated_prices": True,
+        },
+    )
+    detail = menu_store_service.get_menu(result["menu_id"])
+
+    assert [section["section_name"] for section in detail["sections"]] == [
+        "Sushi Appetizers",
+        "Kitchen Appetizers",
+    ]
+    assert detail["sections"][0]["items"][0]["item_name"] == "Mango Salad"
+    assert detail["sections"][1]["items"][0]["item_name"] == "Spring Roll"
+    assert detail["sections"][1]["items"][0]["source_menu_section"] == "Kitchen Appetizers"
+
+
+def test_existing_cookbook_menu_can_be_ordered_by_saved_menu_section(monkeypatch, tmp_path):
+    user_id = configure_menu_builder_test_paths(monkeypatch, tmp_path)
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    with app.test_client() as client:
+        sign_in_menu_user(client, user_id)
+        create_response = client.post(
+            "/cookbooks/vel-asian-cuisine/menu-builder/create",
+            data={
+                "source_content": "all",
+                "menu_title": "Vel Asian Cuisine Menu",
+                "restaurant_name": "Vel Asian Cuisine",
+                "price_style": "casual",
+                "category_mode": "restaurant_menu",
+                "include_descriptions": "1",
+                "include_prices": "1",
+                "include_dietary_tags": "1",
+                "include_images": "1",
+                "include_ai_generated_descriptions": "1",
+                "include_ai_generated_prices": "1",
+            },
+        )
+
+        menu_id = menu_store_service.load_menu_store()["menus"][0]["id"]
+        before_detail = menu_store_service.get_menu(menu_id)
+        before_item_ids = {
+            item["item_name"]: item["id"]
+            for item in before_detail["items"]
+        }
+        order_response = client.post(
+            f"/menus/{menu_id}/order-by-menu-section",
+            follow_redirects=True,
+        )
+
+    after_detail = menu_store_service.get_menu(menu_id)
+    after_item_ids = {
+        item["item_name"]: item["id"]
+        for item in after_detail["items"]
+    }
+
+    assert create_response.status_code == 302
+    assert order_response.status_code == 200
+    assert [section["section_name"] for section in before_detail["sections"]] == [
+        "Starters",
+        "Salads",
+    ]
+    assert [section["section_name"] for section in after_detail["sections"]] == [
+        "Sushi Appetizers",
+        "Kitchen Appetizers",
+    ]
+    assert before_item_ids == after_item_ids
+    assert after_detail["sections"][0]["items"][0]["item_name"] == "Mango Salad"
+    assert after_detail["sections"][1]["items"][0]["item_name"] == "Spring Roll"

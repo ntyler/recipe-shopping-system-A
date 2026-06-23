@@ -98,6 +98,13 @@ COOKBOOK_MENU_MODES = (
         "fallback": "🍽️ Other Recipes",
     },
     {
+        "key": "menu_section",
+        "label": "Menu Section",
+        "section_field": "menu_section",
+        "sections": (),
+        "fallback": "Other Recipes",
+    },
+    {
         "key": "cuisine",
         "label": "🌎 Cuisine",
         "section_field": "cuisine",
@@ -1207,8 +1214,21 @@ def recipe_section_labels_for_mode(recipe, mode):
     return [value or mode.get("fallback")]
 
 
+def recipe_section_sort_key_for_mode(index, recipe, mode, total_count):
+    if mode.get("key") != "menu_section":
+        return (index,)
+
+    try:
+        section_order = int(recipe.get("menu_section_order"))
+    except (TypeError, ValueError):
+        section_order = total_count
+
+    return (section_order, index)
+
+
 def cookbook_menu_sections(recipes):
     sections_by_mode = {}
+    indexed_recipes = list(enumerate(recipes or []))
 
     for mode in COOKBOOK_MENU_MODES:
         ordered_labels = list(mode.get("sections") or [])
@@ -1218,7 +1238,17 @@ def cookbook_menu_sections(recipes):
         if fallback and fallback not in section_recipes:
             section_recipes[fallback] = []
 
-        for recipe in recipes or []:
+        sorted_recipes = sorted(
+            indexed_recipes,
+            key=lambda row: recipe_section_sort_key_for_mode(
+                row[0],
+                row[1],
+                mode,
+                len(indexed_recipes),
+            ),
+        )
+
+        for _, recipe in sorted_recipes:
             for label in recipe_section_labels_for_mode(recipe, mode):
                 label = clean_text(label) or fallback
 

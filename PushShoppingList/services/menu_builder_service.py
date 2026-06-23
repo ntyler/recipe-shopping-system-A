@@ -6,6 +6,7 @@ from PushShoppingList.services.cookbook_service import apply_recipe_menu_metadat
 from PushShoppingList.services.cookbook_service import cookbook_menu_sections
 from PushShoppingList.services.cookbook_service import prepare_cookbook_menu_view
 from PushShoppingList.services.cookbook_service import recipe_key
+from PushShoppingList.services.menu_store_service import regroup_menu_sections
 from PushShoppingList.services.menu_store_service import upsert_menu_from_facts
 from PushShoppingList.services.recipe_extract_service import build_openai_chat_payload
 from PushShoppingList.services.recipe_extract_service import clean_json_response
@@ -180,6 +181,7 @@ def cookbook_recipe_menu_item(recipe, item_index, options):
         "image_url": cover_image_url(recipe) if include_images else None,
         "display_order": item_index + 1,
         "source_type": "cookbook_recipe",
+        "source_menu_section": clean_text(recipe.get("menu_section")),
         "recipe_id": recipe_key(recipe.get("url")),
         "recipe_url": clean_text(recipe.get("url")),
     }
@@ -288,6 +290,114 @@ def create_menu_from_cookbook(cookbook, options=None, selected_recipe_urls=None,
         "source_type": COOKBOOK_GENERATED_SOURCE_TYPE,
         "created_from_cookbook_id": cookbook_id,
     }
+
+
+def cookbook_recipes_by_key_for_menu_sections(cookbook):
+    recipes = {}
+    for recipe in (cookbook if isinstance(cookbook, dict) else {}).get("recipes", []):
+        if not isinstance(recipe, dict):
+            continue
+        apply_recipe_menu_metadata(recipe)
+        key = recipe_key(recipe.get("url"))
+        if key:
+            recipes[key] = recipe
+    return recipes
+
+
+def cookbook_recipes_by_name_for_menu_sections(cookbook):
+    recipes = {}
+    for recipe in (cookbook if isinstance(cookbook, dict) else {}).get("recipes", []):
+        if not isinstance(recipe, dict):
+            continue
+        name = clean_text(recipe.get("name")).lower()
+        if name and name not in recipes:
+            recipes[name] = recipe
+    return recipes
+
+
+def source_menu_section_for_menu_item(item, current_section, recipes_by_key, recipes_by_name):
+    item = item if isinstance(item, dict) else {}
+    current_section = current_section if isinstance(current_section, dict) else {}
+    recipe = (
+        recipes_by_key.get(recipe_key(item.get("recipe_url")))
+        or recipes_by_name.get(clean_text(item.get("item_name")).lower())
+        or {}
+    )
+    return (
+        clean_text(item.get("source_menu_section"))
+        or clean_text(recipe.get("menu_section") if isinstance(recipe, dict) else "")
+        or clean_text(item.get("menu_section"))
+        or clean_text(current_section.get("section_name"))
+        or "Other Recipes"
+    )
+
+
+def existing_menu_sections_by_cookbook_menu_section(menu_detail, cookbook):
+    menu_detail = menu_detail if isinstance(menu_detail, dict) else {}
+    cookbook = prepared_cookbook_for_menu_builder(cookbook)
+    cookbook_name = clean_text(cookbook.get("name")) or "Cookbook"
+    recipes_by_key = cookbook_recipes_by_key_for_menu_sections(cookbook)
+    recipes_by_name = cookbook_recipes_by_name_for_menu_sections(cookbook)
+    ordered_sections = cookbook.get("menu_section_choices") or []
+    order_index = {
+        clean_text(section).lower(): index
+        for index, section in enumerate(ordered_sections)
+        if clean_text(section)
+    }
+    grouped = {}
+
+    for current_section in menu_detail.get("sections", []):
+        for item in (current_section or {}).get("items", []):
+            section_name = source_menu_section_for_menu_item(
+                item,
+                current_section,
+                recipes_by_key,
+                recipes_by_name,
+            )
+            section_key = section_name.lower()
+            if section_key not in grouped:
+                grouped[section_key] = {
+                    "section_name": section_name,
+                    "section_description": f"{section_name} from {cookbook_name}",
+                    "display_order": len(grouped) + 1,
+                    "items": [],
+                    "_first_seen": len(grouped),
+                }
+
+            grouped[section_key]["items"].append({
+                "id": item.get("id"),
+                "source_menu_section": section_name,
+            })
+
+    sections = sorted(
+        grouped.values(),
+        key=lambda section: (
+            order_index.get(clean_text(section.get("section_name")).lower(), len(order_index)),
+            section.get("_first_seen", 0),
+            clean_text(section.get("section_name")).lower(),
+        ),
+    )
+    for index, section in enumerate(sections):
+        section.pop("_first_seen", None)
+        section["display_order"] = index + 1
+
+    return sections
+
+
+def order_menu_by_cookbook_menu_section(menu_detail, cookbook):
+    menu_detail = menu_detail if isinstance(menu_detail, dict) else {}
+    menu_id = clean_text((menu_detail.get("menu") or {}).get("id"))
+    if not menu_id:
+        raise ValueError("Menu was not found.")
+
+    sections = existing_menu_sections_by_cookbook_menu_section(menu_detail, cookbook)
+    if not sections:
+        raise ValueError("No menu items could be matched to cookbook menu sections.")
+
+    updated = regroup_menu_sections(menu_id, sections)
+    if not updated:
+        raise ValueError("Unable to update menu section order.")
+    return updated
 
 
 def build_custom_menu_prompt(options):

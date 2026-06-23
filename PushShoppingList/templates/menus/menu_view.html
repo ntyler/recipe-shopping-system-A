@@ -15,6 +15,11 @@
             <a href="{{ url_for('main_bp.index') }}#cookbooksCard">Back to Cookbook</a>
             <a href="{{ url_for('menu_bp.menu_view_route', menu_id=menu.id) }}">View Menu</a>
             <a href="{{ url_for('menu_bp.menu_edit_route', menu_id=menu.id) }}">Edit Menu</a>
+            {% if menu.cookbook_id %}
+                <form method="POST" action="{{ url_for('menu_bp.menu_order_by_menu_section_route', menu_id=menu.id) }}">
+                    <button type="submit">Order by Menu Section</button>
+                </form>
+            {% endif %}
             <form method="POST" action="{{ url_for('menu_bp.export_menu_pdf_route', menu_id=menu.id) }}">
                 <button type="submit">Export Menu PDF</button>
             </form>

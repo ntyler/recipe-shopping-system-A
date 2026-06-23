@@ -28,6 +28,7 @@ from PushShoppingList.services.menu_builder_service import cookbook_builder_form
 from PushShoppingList.services.menu_builder_service import cookbook_builder_stats
 from PushShoppingList.services.menu_builder_service import create_menu_from_cookbook
 from PushShoppingList.services.menu_builder_service import generate_custom_menu
+from PushShoppingList.services.menu_builder_service import order_menu_by_cookbook_menu_section
 from PushShoppingList.services.menu_builder_service import prepared_cookbook_for_menu_builder
 from PushShoppingList.services.menu_builder_service import selected_cookbook_menu_sections
 from PushShoppingList.services.menu_import_service import extract_menu_facts_from_upload
@@ -493,6 +494,39 @@ def menu_view_route(menu_id):
         "menus/menu_view.html",
         **menu_template_context(menu_detail=menu_detail),
     )
+
+
+@menu_bp.route("/menus/<menu_id>/order-by-menu-section", methods=["POST"])
+def menu_order_by_menu_section_route(menu_id):
+    account_response = require_account_for_import(wants_json=wants_json_response())
+    if account_response:
+        return account_response
+
+    menu_detail = get_menu(menu_id)
+    if not menu_detail:
+        abort(404)
+
+    cookbook = selected_cookbook_from_menu(menu_detail)
+    if not cookbook or not cookbook.get("recipes"):
+        message = "This menu needs a cookbook with saved recipes before it can be ordered by menu section."
+        if wants_json_response():
+            return jsonify({"ok": False, "success": False, "error": message}), 400
+        flash(message, "error")
+        return redirect(url_for("menu_bp.menu_view_route", menu_id=menu_id))
+
+    try:
+        updated = order_menu_by_cookbook_menu_section(menu_detail, cookbook)
+    except ValueError as exc:
+        if wants_json_response():
+            return jsonify({"ok": False, "success": False, "error": str(exc)}), 400
+        flash(str(exc), "error")
+        return redirect(url_for("menu_bp.menu_view_route", menu_id=menu_id))
+
+    if wants_json_response():
+        return jsonify({"ok": True, "success": True, "menu": updated})
+
+    flash("Menu ordered by saved menu sections.", "success")
+    return redirect(url_for("menu_bp.menu_view_route", menu_id=menu_id))
 
 
 @menu_bp.route("/menus/<menu_id>/edit", methods=["GET", "POST"])
