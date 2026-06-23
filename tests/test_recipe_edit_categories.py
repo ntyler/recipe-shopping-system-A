@@ -35,8 +35,11 @@ def test_recipe_editor_includes_inline_category_controls_above_ingredients():
     assert "recipeEditCategoryDietaryPreference" in template
     assert "recipeEditCategoryPrepTimeGroup" in template
     assert "recipeEditMenuSectionField" in template
+    assert "recipeEditCategoryMenuSectionField" in template
     assert "recipeEditCategoryMenuSection" in template
     assert "recipeEditMenuSectionName" in template
+    assert template.count("data-recipe-edit-menu-section-field") >= 2
+    assert template.count("data-recipe-edit-menu-section-name") >= 2
     assert "data-recipe-edit-menu-section-option" in template
     assert "Edit Menu Section" in template
     assert "recipeEditCategoryCustomCategories" in template
@@ -47,18 +50,22 @@ def test_recipe_editor_includes_inline_category_controls_above_ingredients():
     assert template.index("recipeEditCategoryPrepTimeGroup") < template.index("recipeEditCategoryCustomCategories")
     assert template.index("recipeEditMenuItemDetails") < template.index("recipeEditCategoryMenuSection")
     assert template.index("recipeEditCategoryMenuSection") < template.index("recipeEditMenuOrderUrl")
+    assert template.index("recipeEditCategoryPrepTimeGroup") < template.index("recipeEditCategoryMenuSectionField")
+    assert template.index("recipeEditCategoryMenuSectionField") < template.index("recipeEditCategoryCustomCategories")
 
     assert "function populateRecipeEditCategories" in script
     assert "function saveRecipeEditorCategories" in script
     assert "function selectRecipeEditMenuSection" in script
     assert "function editRecipeEditMenuSection" in script
     assert "function updateRecipeEditorMenuSectionOptions" in script
+    assert "function recipeEditorMenuSectionFields" in script
+    assert "document.querySelectorAll(\"[data-recipe-edit-menu-section-name]\")" in script
     menu_section_options_block = script[
         script.index("function updateRecipeEditorMenuSectionOptions"):
         script.index("function ensureRecipeEditorMenuSectionOption")
     ]
     assert "ensureRecipeEditorMenuSectionOption(currentSection, activeCookbookId);" in menu_section_options_block
-    assert menu_section_options_block.index("ensureRecipeEditorMenuSectionOption(currentSection, activeCookbookId);") < menu_section_options_block.index("recipeEditorMenuSectionButtons(field, \"[data-recipe-edit-menu-section-option]\")")
+    assert menu_section_options_block.index("ensureRecipeEditorMenuSectionOption(currentSection, activeCookbookId);") < menu_section_options_block.index("recipeEditorMenuSectionMenus().forEach(menu =>")
     assert "function categorySourceFieldsForForm" in script
     assert '? [...CATEGORY_FIELD_NAMES, "menu_section", "custom_categories"]' in script
     assert "function decideRecipeEditCategoriesWithChatGPT" in script

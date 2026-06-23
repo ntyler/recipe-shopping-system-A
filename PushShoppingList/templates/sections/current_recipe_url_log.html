@@ -1349,6 +1349,84 @@
                             {% endfor %}
                         </select>
                     </label>
+                    <div id="recipeEditCategoryMenuSectionField"
+                         class="recipe-edit-cookbook-field recipe-edit-menu-section-field recipe-edit-category-menu-section-field"
+                         data-recipe-edit-menu-section-field>
+                        <span class="recipe-edit-cookbook-label">Menu Section</span>
+                        <div class="recipe-url-summary-cookbook-value recipe-edit-cookbook-value recipe-edit-menu-section-value recipe-url-summary-cookbook-menu-wrap recipe-edit-row-menu-wrap muted">
+                            <button type="button"
+                                    class="recipe-url-summary-cookbook-select recipe-edit-cookbook-select recipe-edit-menu-section-select"
+                                    aria-label="Menu section actions"
+                                    aria-haspopup="true"
+                                    aria-expanded="false"
+                                    onclick="return toggleRecipeEditRowMenu(this, event)">
+                                <span class="recipe-url-summary-cookbook-name recipe-edit-cookbook-name recipe-edit-menu-section-name muted"
+                                      data-recipe-edit-menu-section-name>No menu section</span>
+                                <span class="recipe-url-summary-cookbook-chevron" aria-hidden="true"></span>
+                            </button>
+                            <div class="recipe-edit-row-menu recipe-url-summary-cookbook-menu recipe-edit-cookbook-menu recipe-edit-menu-section-menu" hidden>
+                                <button type="button"
+                                        data-recipe-edit-menu-section-edit
+                                        onclick="return editRecipeEditMenuSection(this)">
+                                    Edit Menu Section
+                                </button>
+                                <button type="button"
+                                        data-recipe-edit-menu-section-clear
+                                        data-menu-section=""
+                                        onclick="return selectRecipeEditMenuSection(this)">
+                                    Clear Menu Section
+                                </button>
+                                <div class="recipe-url-summary-cookbook-menu-label">Sections in this cookbook</div>
+                                {% if cookbook_view and cookbook_view.cookbooks %}
+                                    {% for cookbook in cookbook_view.cookbooks %}
+                                        {% for section in cookbook.menu_section_choices or [] %}
+                                            <div class="recipe-edit-menu-section-option-row"
+                                                 data-recipe-edit-menu-section-row
+                                                 data-cookbook-id="{{ cookbook.id }}"
+                                                 data-menu-section="{{ section }}">
+                                                <button type="button"
+                                                        class="recipe-edit-menu-section-option"
+                                                        data-recipe-edit-menu-section-option
+                                                        data-cookbook-id="{{ cookbook.id }}"
+                                                        data-menu-section="{{ section }}"
+                                                        onclick="return selectRecipeEditMenuSection(this)">
+                                                    {{ section }}
+                                                </button>
+                                                <div class="recipe-edit-menu-section-order-actions">
+                                                    <button type="button"
+                                                            class="recipe-edit-menu-section-order-btn"
+                                                            data-recipe-edit-menu-section-move
+                                                            data-cookbook-id="{{ cookbook.id }}"
+                                                            data-menu-section="{{ section }}"
+                                                            data-direction="-1"
+                                                            aria-label="Move {{ section }} up"
+                                                            title="Move section up"
+                                                            onclick="return moveRecipeEditMenuSection(this, -1)">
+                                                        <span class="recipe-edit-menu-section-order-icon recipe-edit-menu-section-order-icon-up" aria-hidden="true"></span>
+                                                    </button>
+                                                    <button type="button"
+                                                            class="recipe-edit-menu-section-order-btn"
+                                                            data-recipe-edit-menu-section-move
+                                                            data-cookbook-id="{{ cookbook.id }}"
+                                                            data-menu-section="{{ section }}"
+                                                            data-direction="1"
+                                                            aria-label="Move {{ section }} down"
+                                                            title="Move section down"
+                                                            onclick="return moveRecipeEditMenuSection(this, 1)">
+                                                        <span class="recipe-edit-menu-section-order-icon recipe-edit-menu-section-order-icon-down" aria-hidden="true"></span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    {% endfor %}
+                                {% endif %}
+                                <div class="recipe-url-summary-cookbook-menu-label recipe-edit-menu-section-empty"
+                                     data-recipe-edit-menu-section-empty>
+                                    No saved sections for this cookbook yet.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <label class="cookbook-category-custom-field recipe-edit-category-custom-field" for="recipeEditCategoryCustomCategories">
                         <span>Custom Categories</span>
                         <input id="recipeEditCategoryCustomCategories"
