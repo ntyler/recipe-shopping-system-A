@@ -4,13 +4,13 @@ import os
 
 
 DEFAULT_FIREBASE_WEB_CONFIG = {
-    "apiKey": "AIzaSyAzUeQBO2t98GVp_8zKpTFvmm_6ePX-U2U",
-    "authDomain": "recipe-shopping-app-d4a07.firebaseapp.com",
-    "projectId": "recipe-shopping-app-d4a07",
-    "storageBucket": "recipe-shopping-app-d4a07.firebasestorage.app",
-    "messagingSenderId": "1084430352486",
-    "appId": "1:1084430352486:web:71b25f380928a61bdfeda7",
-    "measurementId": "G-J44GKNGRDY",
+    "apiKey": "",
+    "authDomain": "",
+    "projectId": "",
+    "storageBucket": "",
+    "messagingSenderId": "",
+    "appId": "",
+    "measurementId": "",
 }
 FIREBASE_ADMIN_APP_NAME = "recipe_shopping_app"
 LOGGER = logging.getLogger(__name__)
@@ -58,7 +58,11 @@ def firebase_web_config():
             "SHOPPING_APP_FIREBASE_APP_ID",
             default=DEFAULT_FIREBASE_WEB_CONFIG["appId"],
         ),
-        "measurementId": DEFAULT_FIREBASE_WEB_CONFIG["measurementId"],
+        "measurementId": env_value(
+            "FIREBASE_MEASUREMENT_ID",
+            "SHOPPING_APP_FIREBASE_MEASUREMENT_ID",
+            default=DEFAULT_FIREBASE_WEB_CONFIG["measurementId"],
+        ),
     }
 
 

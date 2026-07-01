@@ -56,8 +56,8 @@ def test_guest_demo_access_is_primary_path_above_account_forms():
     assert "function formatGuestCountdown(msRemaining)" in script
     assert "function bindGuestAuthChoices()" in script
     assert "function showGuestAuthForm(choice, options = {})" in script
-    assert "initGuestCountdowns();" in script
-    assert "bindGuestAuthChoices();" in script
+    assert '["initGuestCountdowns", initGuestCountdowns]' in script
+    assert '["bindGuestAuthChoices", bindGuestAuthChoices]' in script
     assert "@media (max-width: 650px)" in css
     assert '@account_bp.route("/guest/start", methods=["GET"])' in route
     assert '@account_bp.route("/guest/delete", methods=["POST"])' in route
@@ -581,7 +581,7 @@ def test_usage_dashboard_receives_openai_usage_summary_from_route():
     assert "def api_openai_usage_dashboard_route():" in route
     assert '"dashboard": openai_usage_dashboard_for_user(current_public_user())' in route
     assert "openai_usage_dashboard_for_user" in route
-    assert "openai_usage_dashboard=openai_usage_dashboard_for_user(active_public_user)" in route
+    assert "openai_usage_dashboard = openai_usage_dashboard_for_user(active_public_user)" in route
 
 
 def test_usage_dashboard_refreshes_after_openai_routines():
@@ -715,8 +715,8 @@ def test_admin_support_view_is_admin_only_reasoned_and_audited():
     firebase_script = (ROOT / "PushShoppingList/static/js/firebase-auth.js").read_text(encoding="utf-8")
     assert "[data-account-notices-panel]" in firebase_script
     script = (ROOT / "PushShoppingList/static/js/app.js").read_text(encoding="utf-8")
-    assert 'const SUPPORT_EMAIL = "support@recipeshoppinglist.com";' in script
-    assert 'const SUPPORT_ADMIN_EMAILS = ["ntylerbert@gmail.com"];' in script
+    assert 'const SUPPORT_EMAIL = SUPPORT_PUBLIC_CONFIG.supportEmail || "support@recipeshoppinglist.com";' in script
+    assert "const SUPPORT_ADMIN_EMAILS = Array.isArray(SUPPORT_PUBLIC_CONFIG.supportAdminEmails)" in script
     assert "function getPublicSupportEmail(email)" in script
     assert "function getPublicSupportIdentity(email)" in script
     assert "? SUPPORT_EMAIL" in script

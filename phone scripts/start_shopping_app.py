@@ -1,3 +1,4 @@
+import os
 import time
 from urllib.parse import quote
 
@@ -8,28 +9,36 @@ import requests
 from objc_util import UIApplication, NSURL
 
 
-SSH_HOSTS = [
-    "100.112.145.109",
-    "desktop-in7s09s.tail906b20.ts.net",
-    "desktop-in7s09s",
-]
-SSH_PORT = 22
-SSH_TIMEOUT = 8
-USERNAME = "Tyler"
-PASSWORD = keychain.get_password("windows_ssh", "Tyler")
+def env_list(name, default):
+    return [
+        value.strip()
+        for value in os.getenv(name, default).split(",")
+        if value.strip()
+    ]
 
-REPO_DIR = r"D:\GitHub\recipe-shopping-system-A"
-WINDOWS_PYTHON_EXE = r"C:\Python39\python.exe"
+
+SSH_HOSTS = env_list(
+    "SHOPPING_PHONE_SSH_HOSTS",
+    "your-tailscale-ip,your-windows-host.your-tailnet.ts.net,your-windows-host",
+)
+SSH_PORT = int(os.getenv("SHOPPING_PHONE_SSH_PORT", "22"))
+SSH_TIMEOUT = int(os.getenv("SHOPPING_PHONE_SSH_TIMEOUT", "8"))
+USERNAME = os.getenv("SHOPPING_PHONE_SSH_USERNAME", "your-windows-username")
+KEYCHAIN_SERVICE = os.getenv("SHOPPING_PHONE_KEYCHAIN_SERVICE", "windows_ssh")
+PASSWORD = keychain.get_password(KEYCHAIN_SERVICE, USERNAME)
+
+REPO_DIR = os.getenv("SHOPPING_PHONE_REPO_DIR", r"C:\path\to\recipe-shopping-system-A")
+WINDOWS_PYTHON_EXE = os.getenv("SHOPPING_PHONE_WINDOWS_PYTHON_EXE", r"C:\Python39\python.exe")
 LAUNCH_IF_NEEDED = rf"{REPO_DIR}\launch_if_needed.py"
 
-APP_URL = "https://desktop-in7s09s.tail906b20.ts.net/"
-LOCAL_APP_PORT = 5083
-ENSURE_FUNNEL = True
-OPEN_TAILSCALE_FIRST = True
+APP_URL = os.getenv("SHOPPING_PHONE_APP_URL", "https://your-windows-host.your-tailnet.ts.net/")
+LOCAL_APP_PORT = int(os.getenv("SHOPPING_PHONE_LOCAL_APP_PORT", "5083"))
+ENSURE_FUNNEL = os.getenv("SHOPPING_PHONE_ENSURE_FUNNEL", "1").strip().lower() in {"1", "true", "yes", "on"}
+OPEN_TAILSCALE_FIRST = os.getenv("SHOPPING_PHONE_OPEN_TAILSCALE_FIRST", "1").strip().lower() in {"1", "true", "yes", "on"}
 
 # Create this iOS Shortcut with Tailscale's built-in "Connect" action.
 # If you leave this blank, the script will just open the Tailscale app.
-TAILSCALE_CONNECT_SHORTCUT = "Connect Tailscale"
+TAILSCALE_CONNECT_SHORTCUT = os.getenv("SHOPPING_PHONE_TAILSCALE_SHORTCUT", "Connect Tailscale")
 
 
 if not PASSWORD:

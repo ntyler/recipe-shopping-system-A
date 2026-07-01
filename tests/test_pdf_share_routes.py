@@ -29,7 +29,7 @@ def test_pdf_share_routes_create_serve_and_revoke(monkeypatch, tmp_path):
         tmp_path,
         current_user={
             "user_id": "user-1",
-            "email": "ntylerbert@gmail.com",
+            "email": "admin@example.com",
         },
     )
     monkeypatch.setattr(
@@ -37,7 +37,7 @@ def test_pdf_share_routes_create_serve_and_revoke(monkeypatch, tmp_path):
         "current_user",
         lambda: {
             "user_id": "user-1",
-            "email": "ntylerbert@gmail.com",
+            "email": "admin@example.com",
         },
     )
 
@@ -90,7 +90,7 @@ def test_authenticated_pdf_view_rejects_traversal(monkeypatch, tmp_path):
         tmp_path,
         current_user={
             "user_id": "user-1",
-            "email": "ntylerbert@gmail.com",
+            "email": "admin@example.com",
         },
     )
     monkeypatch.setattr(
@@ -98,7 +98,7 @@ def test_authenticated_pdf_view_rejects_traversal(monkeypatch, tmp_path):
         "current_user",
         lambda: {
             "user_id": "user-1",
-            "email": "ntylerbert@gmail.com",
+            "email": "admin@example.com",
         },
     )
 
@@ -114,7 +114,7 @@ def test_pdf_cloudflare_upload_route_returns_public_url(monkeypatch, tmp_path):
         tmp_path,
         current_user={
             "user_id": "user-1",
-            "email": "ntylerbert@gmail.com",
+            "email": "admin@example.com",
         },
     )
     monkeypatch.setattr(
@@ -122,7 +122,7 @@ def test_pdf_cloudflare_upload_route_returns_public_url(monkeypatch, tmp_path):
         "current_user",
         lambda: {
             "user_id": "user-1",
-            "email": "ntylerbert@gmail.com",
+            "email": "admin@example.com",
         },
     )
     monkeypatch.setattr(pdf_routes, "recipe_url_for_pdf_filename", lambda filename: "manual://recipe/test")
@@ -179,7 +179,7 @@ def test_cloudflare_unlinked_pdf_routes_require_admin(monkeypatch, tmp_path):
 def test_cloudflare_unlinked_pdf_routes_scan_for_admin_and_delete_selected(monkeypatch, tmp_path):
     admin_user = {
         "user_id": "admin-1",
-        "email": "ntylerbert@gmail.com",
+        "email": "admin@example.com",
         "is_admin": True,
     }
     configure_pdf_share_routes(monkeypatch, tmp_path, current_user=admin_user)

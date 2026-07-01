@@ -29,8 +29,8 @@ def test_two_factor_recovery_token_targets_owner_not_signed_in_session(tmp_path,
     monkeypatch.setattr(accounts, "USERS_FILE", tmp_path / "users.json")
     accounts.save_users({
         "users": [
-            firebase_user("freepdf", "freepdfjobsearch@gmail.com", "firebase-freepdf"),
-            firebase_user("admin", "ntylerbert@gmail.com", "firebase-admin"),
+            firebase_user("freepdf", "user@example.com", "firebase-freepdf"),
+            firebase_user("admin", "admin@example.com", "firebase-admin"),
         ],
     })
 
@@ -41,15 +41,15 @@ def test_two_factor_recovery_token_targets_owner_not_signed_in_session(tmp_path,
         with client.session_transaction() as session:
             session["user_id"] = "admin"
             session["firebase_uid"] = "firebase-admin"
-            session["email"] = "ntylerbert@gmail.com"
+            session["email"] = "admin@example.com"
 
         page = client.get(f"/?two_factor_recovery_token={recovery['token']}")
         html = page.data.decode("utf-8")
 
         assert page.status_code == 200
-        assert "freepdfjobsearch@gmail.com" in html
+        assert "user@example.com" in html
         assert "Signed-in browser session" in html
-        assert "ntylerbert@gmail.com" in html
+        assert "admin@example.com" in html
 
         response = client.post(
             "/account/2fa/recovery/complete",
@@ -88,7 +88,7 @@ def test_two_factor_recovery_token_page_hides_pending_sign_in_form(tmp_path, mon
     monkeypatch.setattr(accounts, "USERS_FILE", tmp_path / "users.json")
     accounts.save_users({
         "users": [
-            firebase_user("freepdf", "freepdfjobsearch@gmail.com", "firebase-freepdf"),
+            firebase_user("freepdf", "user@example.com", "firebase-freepdf"),
         ],
     })
     recovery = accounts.request_two_factor_recovery("freepdf")
@@ -104,7 +104,7 @@ def test_two_factor_recovery_token_page_hides_pending_sign_in_form(tmp_path, mon
 
     assert response.status_code == 200
     assert "Disable Two-Factor Authentication" in html
-    assert "freepdfjobsearch@gmail.com" in html
+    assert "user@example.com" in html
     assert "Cancel" in html
     assert "Two-Factor Verification" not in html
     assert "Verify Code" not in html
@@ -114,7 +114,7 @@ def test_pending_two_factor_session_cannot_request_recovery_email(tmp_path, monk
     monkeypatch.setattr(accounts, "USERS_FILE", tmp_path / "users.json")
     accounts.save_users({
         "users": [
-            firebase_user("freepdf", "freepdfjobsearch@gmail.com", "firebase-freepdf"),
+            firebase_user("freepdf", "user@example.com", "firebase-freepdf"),
         ],
     })
     app = create_app()
@@ -138,12 +138,12 @@ def test_local_admin_two_factor_unlock_defaults_to_admin_accounts(tmp_path, monk
     monkeypatch.setattr(accounts, "USERS_FILE", tmp_path / "users.json")
     accounts.save_users({
         "users": [
-            firebase_user("freepdf", "freepdfjobsearch@gmail.com", "firebase-freepdf"),
-            firebase_user("admin", "ntylerbert@gmail.com", "firebase-admin"),
+            firebase_user("freepdf", "user@example.com", "firebase-freepdf"),
+            firebase_user("admin", "admin@example.com", "firebase-admin"),
         ],
     })
 
-    admin_result = accounts.admin_disable_two_factor_for_identity("ntylerbert@gmail.com")
+    admin_result = accounts.admin_disable_two_factor_for_identity("admin@example.com")
 
     assert admin_result["ok"]
     assert admin_result["changed"]
@@ -151,13 +151,13 @@ def test_local_admin_two_factor_unlock_defaults_to_admin_accounts(tmp_path, monk
     assert not accounts.two_factor_enabled(admin_user)
     assert admin_user["two_factor_disabled_by_admin_actor"] == "local_admin_script"
 
-    non_admin_result = accounts.admin_disable_two_factor_for_identity("freepdfjobsearch@gmail.com")
+    non_admin_result = accounts.admin_disable_two_factor_for_identity("user@example.com")
 
     assert not non_admin_result["ok"]
     assert accounts.two_factor_enabled(accounts.find_user_by_id("freepdf"))
 
     allowed_result = accounts.admin_disable_two_factor_for_identity(
-        "freepdfjobsearch@gmail.com",
+        "user@example.com",
         allow_non_admin=True,
         reason="support-approved unlock",
     )
@@ -173,7 +173,7 @@ def test_firebase_resync_after_completed_two_factor_does_not_restart_challenge(t
     monkeypatch.setattr(accounts, "USERS_FILE", tmp_path / "users.json")
     accounts.save_users({
         "users": [
-            firebase_user("freepdf", "freepdfjobsearch@gmail.com", "firebase-freepdf"),
+            firebase_user("freepdf", "user@example.com", "firebase-freepdf"),
         ],
     })
     app = create_app()
@@ -184,7 +184,7 @@ def test_firebase_resync_after_completed_two_factor_does_not_restart_challenge(t
 
         result = accounts.sign_in_firebase_user({
             "uid": "firebase-freepdf",
-            "email": "freepdfjobsearch@gmail.com",
+            "email": "user@example.com",
             "email_verified": True,
         })
 
@@ -199,7 +199,7 @@ def test_firebase_resync_for_unsigned_session_still_requires_two_factor(tmp_path
     monkeypatch.setattr(accounts, "USERS_FILE", tmp_path / "users.json")
     accounts.save_users({
         "users": [
-            firebase_user("freepdf", "freepdfjobsearch@gmail.com", "firebase-freepdf"),
+            firebase_user("freepdf", "user@example.com", "firebase-freepdf"),
         ],
     })
     app = create_app()
@@ -207,7 +207,7 @@ def test_firebase_resync_for_unsigned_session_still_requires_two_factor(tmp_path
     with app.test_request_context("/auth/firebase-login"):
         result = accounts.sign_in_firebase_user({
             "uid": "firebase-freepdf",
-            "email": "freepdfjobsearch@gmail.com",
+            "email": "user@example.com",
             "email_verified": True,
         })
 
@@ -278,12 +278,12 @@ def test_remember_device_skips_firebase_two_factor_for_thirty_days(tmp_path, mon
             "ok": True,
             "firebase_user": {
                 "uid": "firebase-freepdf",
-                "email": "freepdfjobsearch@gmail.com",
+                "email": "user@example.com",
                 "email_verified": True,
             },
         },
     )
-    user = firebase_user("freepdf", "freepdfjobsearch@gmail.com", "firebase-freepdf")
+    user = firebase_user("freepdf", "user@example.com", "firebase-freepdf")
     user["two_factor"]["secret"] = ""
     user["two_factor"]["backup_codes"] = accounts.hash_backup_codes(["ABC123"])
     accounts.save_users({"users": [user]})

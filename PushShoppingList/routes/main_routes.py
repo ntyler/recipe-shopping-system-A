@@ -118,6 +118,8 @@ from PushShoppingList.services.openai_usage_service import openai_usage_dashboar
 from PushShoppingList.services.openai_usage_service import record_openai_usage
 from PushShoppingList.services.menu_store_service import menu_pdf_logs_by_cookbook
 from PushShoppingList.services.menu_store_service import menus_by_cookbook
+from PushShoppingList.services.user_account_service import SUPPORT_ADMIN_EMAILS
+from PushShoppingList.services.user_account_service import SUPPORT_EMAIL
 from PushShoppingList.services.user_account_service import current_public_user
 from PushShoppingList.services.user_account_service import is_admin_user
 from PushShoppingList.services.user_account_service import public_two_factor_recovery_user
@@ -151,6 +153,8 @@ def lightweight_cookbook_view():
 def shared_page_context(active_public_user=None):
     active_public_user = active_public_user or current_public_user()
     admin_support_notices = support_access_notices_for_user(active_public_user, limit=2)
+    admin_support_history = support_access_notices_for_user(active_public_user, limit=None)
+    openai_usage_dashboard = openai_usage_dashboard_for_user(active_public_user)
     chatgpt_force_refresh = bool(session.pop("chatgpt_model_force_refresh", False))
     chatgpt_show_advanced = bool(session.get("chatgpt_model_show_advanced", False))
     chatgpt_models_dashboard = chatgpt_models_dashboard_for_user(
@@ -168,7 +172,7 @@ def shared_page_context(active_public_user=None):
     return {
         "message": "",
         "feedback_dashboard": feedback_dashboard_for_user(active_public_user),
-        "openai_usage_dashboard": {},
+        "openai_usage_dashboard": openai_usage_dashboard,
         "chatgpt_models_dashboard": chatgpt_models_dashboard,
         "feedback_messages": session.pop("feedback_messages", []),
         "admin_support_dashboard": {
@@ -181,7 +185,7 @@ def shared_page_context(active_public_user=None):
             "reason": session.get("admin_support_reason", ""),
         },
         "admin_support_notices": admin_support_notices,
-        "admin_support_history": admin_support_notices,
+        "admin_support_history": admin_support_history,
         "password_reset_token": request.args.get("reset_token", ""),
         "two_factor_recovery_token": two_factor_recovery_token,
         "two_factor_recovery_user": public_two_factor_recovery_user(two_factor_recovery_token),
@@ -191,6 +195,10 @@ def shared_page_context(active_public_user=None):
         "app_js_version": static_asset_version("js/app.js"),
         "firebase_auth_js_version": static_asset_version("js/firebase-auth.js"),
         "firebase_web_config": firebase_web_config(),
+        "support_public_config": {
+            "supportEmail": SUPPORT_EMAIL,
+            "supportAdminEmails": list(SUPPORT_ADMIN_EMAILS) if is_admin_user(active_public_user) else [],
+        },
         "performance_diagnostics_enabled": (
             current_app.debug
             or os.getenv("SHOPPING_PERFORMANCE_DIAGNOSTICS", "").strip().lower()

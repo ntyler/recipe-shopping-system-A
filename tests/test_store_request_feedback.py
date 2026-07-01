@@ -168,7 +168,7 @@ def test_feedback_ticket_portal_renders_public_support_identity(monkeypatch, tmp
                     "event": "Support Update Added",
                     "status": "Investigating",
                     "timestamp": "2026-06-04T13:00:00Z",
-                    "actor": "ntylerbert@gmail.com",
+                    "actor": "admin@example.com",
                 }],
                 "notifications": [{
                     "notification_id": "notice-1",
@@ -180,7 +180,7 @@ def test_feedback_ticket_portal_renders_public_support_identity(monkeypatch, tmp
                 "comments": [{
                     "commentText": "Can you try it again?",
                     "authorUid": "admin-1",
-                    "authorEmail": "ntylerbert@gmail.com",
+                    "authorEmail": "admin@example.com",
                     "authorType": "support",
                     "createdAt": "2026-06-04T13:01:00Z",
                 }],
@@ -202,7 +202,7 @@ def test_feedback_ticket_portal_renders_public_support_identity(monkeypatch, tmp
     assert "Support Team" in html
     assert "Admin Update" not in html
     assert "support@recipeshoppinglist.com" in html
-    assert "ntylerbert@gmail.com" not in html
+    assert "admin@example.com" not in html
     assert "Normal Priority" in html
     assert "Reply to Support" in html
     assert "Reopen Ticket" in html

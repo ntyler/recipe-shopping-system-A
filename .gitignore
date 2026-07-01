@@ -1,47 +1,68 @@
+# Python and test caches
 __pycache__/
-*.pyc
+*.py[cod]
+.pytest_cache/
 venv/
+.venv/
+
+# Local IDE/agent state
+.vscode/
+.idea/
+.codex/
+.agents/
+
+# Local environment and credentials
 .env
-.env.local
 .env.*
+!.env.example
 local_env.bat
+local_env*.bat
+!local_env.example.bat
 firebase-service-account*.json
 serviceAccountKey.json
 *.service-account.json
-.vscode/
-.idea/
-PushShoppingList/services/recipe-extractor/data/extract_progress.json
-PushShoppingList/services/recipe-extractor/data/product_progress.json
-PushShoppingList/services/recipe-extractor/data/recipe_image_progress.json
-PushShoppingList/services/recipe-extractor/data/recipe_ingredients.json
-PushShoppingList/services/recipe-extractor/data/home_address.json
-PushShoppingList/services/recipe-extractor/data/home_address_history.json
-PushShoppingList/services/recipe-extractor/data/store_settings.json
-PushShoppingList/services/recipe-extractor/data/shopping_item_state.json
-PushShoppingList/services/recipe-extractor/data/pdf/
-PushShoppingList/services/recipe-extractor/data/pdf_cloud_records.json
-PushShoppingList/services/recipe-extractor/data/pdf_dropbox_links.json
-PushShoppingList/services/recipe-extractor/data/pdf_share_links.json
-PushShoppingList/services/recipe-extractor/data/logs/
-PushShoppingList/services/recipe-extractor/data/raw/*_PDF_ERROR.txt
-PushShoppingList/services/recipe-extractor/data/raw/*_SOCIAL_PDF_API_RESPONSE.txt
-PushShoppingList/services/recipe-extractor/data/raw/*_SOCIAL_PDF_API_ERROR.txt
-PushShoppingList/services/recipe-extractor/data/raw/product_pages/
-PushShoppingList/services/recipe-extractor/data/raw/product_prompts/
-PushShoppingList/services/recipe-extractor/data/browser_profiles/
+*service-account*.json
+
+# Local databases, logs, backups, and generated documents
+*.db
+*.sqlite
+*.sqlite3
+*.accdb
+*.mdb
+*.log
+*.bak
+*.pdf
+shopping_app_*.log
+flask_*.log
+instance/
+
+# Browser, Selenium, and Playwright runtime output
+tmp_selenium_profile/
+**/browser_profiles/
+**/.selenium/
+**/selenium_profile/
+output/playwright/
+
+# App runtime/user data
 PushShoppingList/cookbooks.json
 PushShoppingList/shopping_stores_Results.json
 PushShoppingList/users.json
 PushShoppingList/guest_sessions.json
 PushShoppingList/user_data/
-PushShoppingList/static/uploads/avatars/*
-!PushShoppingList/static/uploads/avatars/.gitkeep
-PushShoppingList/static/generated/**/*__thumb.webp
-PushShoppingList/static/generated/**/*__card.webp
-PushShoppingList/static/generated/**/*__detail.webp
-shopping_app_*.log
-flask_*.log
+PushShoppingList/admin_support_audit.json
+PushShoppingList/device_status_events.json
+PushShoppingList/feedback.json
+PushShoppingList/openai_model_list_cache.json
+PushShoppingList/openai_model_overrides.json
+PushShoppingList/openai_model_recommendation_cache.json
 
-# Local secrets
-.env
-*.env
+# Recipe extraction output and scraped/generated artifacts
+PushShoppingList/services/recipe-extractor/data/
+PushShoppingList/downloaded_recipe_html/
+PushShoppingList/static/generated/
+
+# User uploads; keep the avatar placeholder folder
+PushShoppingList/static/uploads/**
+!PushShoppingList/static/uploads/
+!PushShoppingList/static/uploads/avatars/
+!PushShoppingList/static/uploads/avatars/.gitkeep

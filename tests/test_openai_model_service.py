@@ -10,7 +10,7 @@ if str(ROOT) not in sys.path:
 from PushShoppingList.services import openai_model_service as models
 
 
-ADMIN_USER = {"email": "ntylerbert@gmail.com"}
+ADMIN_USER = {"email": "admin@example.com"}
 EXPECTED_OPENAI_MODEL_ENV_VARS = {
     "OPENAI_MENU_MODEL",
     "OPENAI_MENU_CLEANUP_MODEL",

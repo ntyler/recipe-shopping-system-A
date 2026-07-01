@@ -1,6 +1,6 @@
 @echo off
 
-cd /d D:\GitHub\recipe-shopping-system-A
+cd /d "%~dp0"
 
 echo Starting shopping app with Waitress...
 

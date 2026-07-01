@@ -36,11 +36,27 @@ AVATAR_UPLOAD_DIR = Path(os.getenv("SHOPPING_APP_AVATAR_UPLOAD_DIR", PACKAGE_DIR
 ALLOWED_AVATAR_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 PHONE_DIGITS_PATTERN = re.compile(r"\d+")
-ADMIN_EMAIL = "ntylerbert@gmail.com"
-SUPPORT_EMAIL = "support@recipeshoppinglist.com"
-SUPPORT_ADMIN_EMAILS = (
-    "ntylerbert@gmail.com",
-)
+
+
+def configured_email(name, default):
+    return str(os.getenv(name, default) or default).strip().lower()
+
+
+def configured_email_tuple(name, default):
+    raw_value = str(os.getenv(name, default) or default)
+    return tuple(
+        email.strip().lower()
+        for email in re.split(r"[,;]", raw_value)
+        if email.strip()
+    )
+
+
+ADMIN_EMAIL = configured_email("SHOPPING_APP_ADMIN_EMAIL", "admin@example.com")
+SUPPORT_EMAIL = str(
+    os.getenv("SHOPPING_APP_SUPPORT_EMAIL", "support@recipeshoppinglist.com")
+    or "support@recipeshoppinglist.com"
+).strip()
+SUPPORT_ADMIN_EMAILS = configured_email_tuple("SHOPPING_APP_SUPPORT_ADMIN_EMAILS", ADMIN_EMAIL)
 PASSWORD_RESET_TTL_HOURS = 1
 ACCOUNT_DELETE_TTL_HOURS = 1
 ACCOUNT_VERIFICATION_TTL_HOURS = 24

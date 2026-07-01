@@ -65,7 +65,7 @@ def configure_feedback(monkeypatch, tmp_path):
     accounts.save_users({"users": [
         make_user("user-1", "user1@example.com"),
         make_user("user-2", "user2@example.com"),
-        make_user("admin-1", "ntylerbert@gmail.com"),
+        make_user("admin-1", "admin@example.com"),
     ]})
     seed_feedback(feedback_file)
     return feedback_file
@@ -177,7 +177,7 @@ def test_feedback_admin_update_saves_priority_support_comment_and_public_identit
         assert feedback["status"] == "Waiting on User"
         assert feedback["priority"] == "Critical"
         assert feedback["comments"][0]["authorType"] == "support"
-        assert feedback["comments"][0]["authorEmail"] == "ntylerbert@gmail.com"
+        assert feedback["comments"][0]["authorEmail"] == "admin@example.com"
         assert feedback["comments"][0]["authorPublicEmail"] == "support@recipeshoppinglist.com"
         assert any(entry["event"] == "Support Update Added" for entry in feedback["timeline"])
         assert any(entry["event"] == "Resolution Notes Added" for entry in feedback["timeline"])
@@ -220,13 +220,13 @@ def test_feedback_user_view_uses_public_support_identity(monkeypatch, tmp_path):
     payload["feedback"][0]["timeline"].append({
         "event": "Investigating",
         "timestamp": "2026-06-04T13:30:00Z",
-        "actorPrivateEmail": "ntylerbert@gmail.com",
+        "actorPrivateEmail": "admin@example.com",
         "actorType": "support",
     })
     payload["feedback"][0]["comments"] = [{
         "commentText": "Support reply.",
-        "authorEmail": "ntylerbert@gmail.com",
-        "authorPrivateEmail": "ntylerbert@gmail.com",
+        "authorEmail": "admin@example.com",
+        "authorPrivateEmail": "admin@example.com",
         "authorType": "support",
         "createdAt": "2026-06-04T13:35:00Z",
     }]

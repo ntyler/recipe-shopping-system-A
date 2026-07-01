@@ -92,7 +92,7 @@ $env:SHOPPING_APP_ACCOUNT_LINK_BASE_URL="https://app.recipeshoppinglist.com"
 
 When using `start_app.bat`, place the same values in an untracked `local_env.bat` file. A safe template is included at `local_env.example.bat`, and `start_app.bat` loads `local_env.bat` before starting Flask.
 
-Optional Firebase Authentication settings:
+Required Firebase Authentication settings for account sign-in:
 
 ```powershell
 $env:FIREBASE_API_KEY="your_web_api_key"
@@ -104,9 +104,7 @@ $env:FIREBASE_APP_ID="your_web_app_id"
 $env:FIREBASE_MEASUREMENT_ID="your_measurement_id"
 ```
 
-The app has local-development Firebase web defaults for the Recipe Shopping App project. For backend verification, set one of these and keep the service account file untracked:
-
-For the current Recipe Shopping App Firebase project, the frontend and backend should both use measurement ID `G-J44GKNGRDY`.
+The app intentionally does not ship a real Firebase project config. Use your own Firebase web app values locally and keep service account credentials untracked. For backend verification, set one of these:
 
 ```powershell
 $env:FIREBASE_SERVICE_ACCOUNT_PATH="C:\path\to\firebase-service-account.json"
@@ -298,10 +296,10 @@ http://<computer-lan-ip>:5000
 
 If you use `start_app.bat`, replace `5000` with `5083`.
 
-Example from the current setup:
+Example LAN URL:
 
 ```text
-http://192.168.68.62:5083
+http://<computer-lan-ip>:5083
 ```
 
 If a Cloudflare Tunnel is pointed at the local Flask port, the public app URL is:
@@ -321,7 +319,7 @@ The User Account section uses Firebase Authentication on the frontend and Flask 
 - Backend session verification uses `/auth/firebase-login`, `/auth/logout`, and `/auth/session`.
 - The UI shows `Connected via Firebase Authentication` only after backend verification succeeds.
 - Browser refreshes should keep the Firebase session and Flask account state in sync.
-- `ntylerbert@gmail.com` is treated as `Admin`; other signed-in users are `User` unless code or stored user data changes.
+- `admin@example.com` is treated as `Admin`; other signed-in users are `User` unless code or stored user data changes.
 - The signed-in account card stays focused on profile photo, name, email, role, email verification status, created date, and last sign-in date.
 
 Account Menu groups and items:
@@ -399,7 +397,7 @@ Two-factor authentication is account-specific:
 - Admin lockout recovery is local-only. Run the break-glass script from the app host, not through a web route:
 
 ```powershell
-py -3.11 PushShoppingList\scripts\disable_2fa.py --email ntylerbert@gmail.com --confirm
+py -3.11 PushShoppingList\scripts\disable_2fa.py --email admin@example.com --confirm
 ```
 
 To intentionally unlock a non-admin user from the local host:
@@ -499,10 +497,10 @@ tailscale serve --bg http://127.0.0.1:5083
 tailscale serve status
 ```
 
-Current tailnet URL:
+Example tailnet URL:
 
 ```text
-https://desktop-in7s09s.tail906b20.ts.net/
+https://your-windows-host.your-tailnet.ts.net/
 ```
 
 Turn off tailnet-only Serve:
@@ -520,10 +518,10 @@ tailscale funnel --bg --yes http://127.0.0.1:5083
 tailscale funnel status
 ```
 
-Current public Funnel URL:
+Example public Funnel URL:
 
 ```text
-https://desktop-in7s09s.tail906b20.ts.net/
+https://your-windows-host.your-tailnet.ts.net/
 ```
 
 Turn off public Funnel access:
@@ -570,7 +568,7 @@ Phone GPS/geolocation requires a secure browser origin. `http://<ip>:5000` or `h
 Tailscale Serve and Tailscale Funnel provide HTTPS at:
 
 ```text
-https://desktop-in7s09s.tail906b20.ts.net/
+https://your-windows-host.your-tailnet.ts.net/
 ```
 
 Waitress serves HTTP only. For the most reliable phone experience, use Tailscale Funnel, Cloudflare Tunnel, ngrok, Nginx, or another HTTPS proxy in front of the app.
@@ -655,7 +653,7 @@ Notifications are best treated as convenience alerts. The actual UI sync comes f
 10. Sign in with email/password.
 11. Test forgot password.
 12. Test Google sign-in.
-13. Sign in as `ntylerbert@gmail.com` and confirm the Admin role and Admin access enabled badge.
+13. Sign in as `admin@example.com` and confirm the Admin role and Admin access enabled badge.
 14. Sign in as another user and confirm the User role.
 15. Confirm `Connected via Firebase Authentication` appears only after backend session verification succeeds.
 16. Confirm email verification status is shown. If the email is already verified, the Account Menu item should read `Email Verified` and be disabled.

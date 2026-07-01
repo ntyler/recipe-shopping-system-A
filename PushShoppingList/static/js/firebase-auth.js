@@ -15,13 +15,13 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
 
 const localDevelopmentFirebaseConfig = {
-    apiKey: "AIzaSyAzUeQBO2t98GVp_8zKpTFvmm_6ePX-U2U",
-    authDomain: "recipe-shopping-app-d4a07.firebaseapp.com",
-    projectId: "recipe-shopping-app-d4a07",
-    storageBucket: "recipe-shopping-app-d4a07.firebasestorage.app",
-    messagingSenderId: "1084430352486",
-    appId: "1:1084430352486:web:71b25f380928a61bdfeda7",
-    measurementId: "G-J44GKNGRDY"
+    apiKey: "",
+    authDomain: "",
+    projectId: "",
+    storageBucket: "",
+    messagingSenderId: "",
+    appId: "",
+    measurementId: ""
 };
 
 window.shoppingFirebaseAuthStatus = window.shoppingFirebaseAuthStatus || {

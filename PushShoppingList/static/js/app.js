@@ -2,8 +2,33 @@ function saveScroll() {
     localStorage.setItem("scrollY", window.scrollY);
 }
 
-const SUPPORT_EMAIL = "support@recipeshoppinglist.com";
-const SUPPORT_ADMIN_EMAILS = ["ntylerbert@gmail.com"];
+function supportPublicConfigFromPage() {
+    const fallback = {
+        supportEmail: "support@recipeshoppinglist.com",
+        supportAdminEmails: [],
+    };
+    const element = document.getElementById("supportPublicConfig");
+
+    if (!element) {
+        return fallback;
+    }
+
+    try {
+        return {
+            ...fallback,
+            ...JSON.parse(element.textContent || "{}"),
+        };
+    } catch (error) {
+        console.warn("Support public config JSON could not be parsed.", error);
+        return fallback;
+    }
+}
+
+const SUPPORT_PUBLIC_CONFIG = supportPublicConfigFromPage();
+const SUPPORT_EMAIL = SUPPORT_PUBLIC_CONFIG.supportEmail || "support@recipeshoppinglist.com";
+const SUPPORT_ADMIN_EMAILS = Array.isArray(SUPPORT_PUBLIC_CONFIG.supportAdminEmails)
+    ? SUPPORT_PUBLIC_CONFIG.supportAdminEmails.map((email) => String(email || "").trim().toLowerCase()).filter(Boolean)
+    : [];
 const CATEGORY_FIELD_NAMES = [
     "meal_type",
     "cuisine",

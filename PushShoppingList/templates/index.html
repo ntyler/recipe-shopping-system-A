@@ -185,8 +185,9 @@
     </div>
 </main>
 
-<script src="{{ url_for('static', filename='js/app.js', v=app_js_version) }}"></script>
+<script id="supportPublicConfig" type="application/json">{{ support_public_config|tojson }}</script>
 <script id="firebaseWebConfig" type="application/json">{{ firebase_web_config|tojson }}</script>
+<script src="{{ url_for('static', filename='js/app.js', v=app_js_version) }}"></script>
 <script type="module" src="{{ url_for('static', filename='js/firebase-auth.js', v=firebase_auth_js_version) }}"></script>
 
 </body>

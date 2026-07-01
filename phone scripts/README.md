@@ -19,9 +19,9 @@ Add Tailscale's built-in **Connect** action to that Shortcut. The script runs th
 The script tries SSH in this order:
 
 ```text
-100.112.145.109
-desktop-in7s09s.tail906b20.ts.net
-desktop-in7s09s
+100.x.y.z
+your-windows-host.your-tailnet.ts.net
+your-windows-host
 ```
 
 The raw Tailscale IP is first because Pythonista/iPhone DNS can be less reliable than connecting directly to the Tailscale address.
@@ -36,16 +36,16 @@ Expected Pythonista packages/imports:
 The script expects the Windows SSH password to be saved in Pythonista's keychain:
 
 ```python
-keychain.set_password("windows_ssh", "Tyler", "your_windows_password")
+keychain.set_password("windows_ssh", "your-windows-username", "your_windows_password")
 ```
 
-Current app URL:
+Example app URL:
 
 ```text
-https://desktop-in7s09s.tail906b20.ts.net/
+https://your-windows-host.your-tailnet.ts.net/
 ```
 
-Current local app port used by `start_app.bat` and `start_shopping_app.py`:
+Example local app port used by `start_app.bat` and `start_shopping_app.py`:
 
 ```text
 5083
@@ -132,7 +132,7 @@ or:
 Run this on the Windows PC:
 
 ```powershell
-curl.exe -sS --noproxy "*" --max-time 8 http://192.168.68.62:5083/ -o NUL -w "%{http_code}`n"
+curl.exe -sS --noproxy "*" --max-time 8 http://<computer-lan-ip>:5083/ -o NUL -w "%{http_code}`n"
 ```
 
 Expected output:
@@ -157,8 +157,8 @@ tailscale status
 Expected output includes both devices:
 
 ```text
-100.112.145.109  desktop-in7s09s    ... windows
-100.121.121.80   iphone-15-pro-max  ... iOS
+100.x.y.z  your-windows-host    ... windows
+100.a.b.c   your-phone  ... iOS
 ```
 
 Next step:
@@ -233,7 +233,7 @@ Expected output:
 ```text
 Available on the internet:
 
-https://desktop-in7s09s.tail906b20.ts.net/
+https://your-windows-host.your-tailnet.ts.net/
 |-- proxy http://127.0.0.1:5083
 
 Funnel started and running in the background.
@@ -256,9 +256,9 @@ Expected output:
 
 ```text
 # Funnel on:
-#     - https://desktop-in7s09s.tail906b20.ts.net
+#     - https://your-windows-host.your-tailnet.ts.net
 
-https://desktop-in7s09s.tail906b20.ts.net (Funnel on)
+https://your-windows-host.your-tailnet.ts.net (Funnel on)
 |-- / proxy http://127.0.0.1:5083
 ```
 
@@ -267,7 +267,7 @@ Next step:
 - If Funnel is on, open the app URL from Safari:
 
 ```text
-https://desktop-in7s09s.tail906b20.ts.net/
+https://your-windows-host.your-tailnet.ts.net/
 ```
 
 ### 8. Test The Phone Script
@@ -282,7 +282,7 @@ Expected output if the app is already online:
 
 ```text
 Shopping app is already online
-Opening Safari: https://desktop-in7s09s.tail906b20.ts.net/
+Opening Safari: https://your-windows-host.your-tailnet.ts.net/
 SSH closed
 ```
 
@@ -293,13 +293,13 @@ Running Shortcut: Connect Tailscale
 Make sure Tailscale says Connected, then return to Pythonista.
 Press Enter here after Tailscale is connected...
 Connecting to Windows PC over Tailscale...
-Trying SSH host: 100.112.145.109
-SSH connected: 100.112.145.109
+Trying SSH host: 100.x.y.z
+SSH connected: 100.x.y.z
 Launching shopping app...
 Ensuring Tailscale Funnel is on...
 Waiting for shopping app...
 Shopping app is online
-Opening Safari: https://desktop-in7s09s.tail906b20.ts.net/
+Opening Safari: https://your-windows-host.your-tailnet.ts.net/
 SSH closed
 ```
 
