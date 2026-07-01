@@ -400,6 +400,8 @@ def test_menu_generate_ollama_route_sets_provider_metadata(monkeypatch, tmp_path
     assert payload["ollama_support"] is True
     assert payload["ollama_model"] == "qwen-test:14b"
     assert payload["ollama_base_url"] == "http://localhost:11434"
+    assert payload["ollama_batch_size_env_var"] == "OLLAMA_FULL_RECIPE_BATCH_SIZE"
+    assert payload["ollama_workers_env_var"] == "OLLAMA_FULL_RECIPE_WORKERS"
     assert payload["recipe_urls"] == [recipe_url]
 
 
@@ -1261,6 +1263,9 @@ def test_menu_generate_ollama_job_uses_local_batch_defaults(monkeypatch, tmp_pat
     batch_kwargs = []
     batch_lengths = []
     providers = []
+    started_item_ids = []
+    started_lock = threading.Lock()
+    both_started = threading.Event()
     saved_urls = []
 
     monkeypatch.setattr(recipe_routes, "load_editable_recipe", lambda url: {"recipe": stubs[url]})
@@ -1283,6 +1288,11 @@ def test_menu_generate_ollama_job_uses_local_batch_defaults(monkeypatch, tmp_pat
         batch_lengths.append(len(batch))
         providers.append(provider)
         item_id = batch[0]["menu_item"]["menu_item_id"]
+        with started_lock:
+            started_item_ids.append(item_id)
+            if len(started_item_ids) == 2:
+                both_started.set()
+        assert both_started.wait(2), "Ollama item generation requests did not overlap"
         return {
             "ok": True,
             "items": {
@@ -1343,16 +1353,17 @@ def test_menu_generate_ollama_job_uses_local_batch_defaults(monkeypatch, tmp_pat
         successful_menu_serving_basis,
     )
 
+    input_recipe_urls = recipe_urls + [recipe_urls[0]]
     job = job_service.create_job(
         "menu-generate-recipes",
         input_payload={
-            "recipe_urls": recipe_urls,
+            "recipe_urls": input_recipe_urls,
             "menu_enrichment_mode": "full",
             "ollama_support": True,
             "run_deferred_heavy_tasks": False,
         },
         user_id="owner",
-        total_items=2,
+        total_items=len(input_recipe_urls),
     )
 
     finished = job_tasks.run_menu_generate_recipes_job(job["id"], job["input_payload"])
@@ -1361,15 +1372,18 @@ def test_menu_generate_ollama_job_uses_local_batch_defaults(monkeypatch, tmp_pat
     assert batch_kwargs == [{"min_items": 1, "max_items": 1, "target_chars": 100000}]
     assert batch_lengths == [1, 1]
     assert providers == ["ollama_only", "ollama_only"]
+    assert set(started_item_ids) == {"item-1", "item-2"}
     assert saved_urls == recipe_urls
     assert finished["result_payload"]["model_used"] == "qwen2.5:7b"
     assert finished["result_payload"]["model_source"] == "ollama_only"
     assert finished["result_payload"]["provider_label"] == "Ollama only"
     assert finished["result_payload"]["recipe_batch_size"] == 1
-    assert finished["result_payload"]["batch_workers"] == 1
+    assert finished["result_payload"]["batch_workers"] == 2
     assert finished["result_payload"]["openai_fallback_count"] == 0
     assert finished["result_payload"]["openai_fallback_summary"] == "OpenAI fallback count: 0"
     assert finished["result_payload"]["batch_rate_limited_processor"] is False
+    assert finished["result_payload"]["completed_items"] == 2
+    assert finished["result_payload"]["saving_items"] == 2
 
 
 def test_menu_recipe_batch_dispatch_limiter_waits_for_request_capacity():

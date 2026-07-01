@@ -14,7 +14,7 @@ OLLAMA_FULL_RECIPE_WORKERS_ENV_VAR = "OLLAMA_FULL_RECIPE_WORKERS"
 OLLAMA_FULL_RECIPE_PROVIDER_ENV_VAR = "OLLAMA_FULL_RECIPE_PROVIDER"
 OLLAMA_FULL_RECIPE_MODEL_DEFAULT = "qwen2.5:7b"
 OLLAMA_FULL_RECIPE_BATCH_SIZE_DEFAULT = 1
-OLLAMA_FULL_RECIPE_WORKERS_DEFAULT = 1
+OLLAMA_FULL_RECIPE_WORKERS_DEFAULT = 2
 OLLAMA_BASE_URL_DEFAULT = "http://localhost:11434"
 OLLAMA_PROVIDER_ONLY = "ollama_only"
 OLLAMA_PROVIDER_AUTO = "auto_ollama_openai"
@@ -88,6 +88,11 @@ def _env_int(name, default, minimum=1, maximum=32):
     return max(int(minimum), min(int(maximum), value))
 
 
+def _env_is_set(name):
+    value = os.getenv(str(name or ""))
+    return value is not None and _clean_text(value) != ""
+
+
 def ollama_full_recipe_model():
     return _clean_text(os.getenv(OLLAMA_FULL_RECIPE_MODEL_ENV_VAR)) or OLLAMA_FULL_RECIPE_MODEL_DEFAULT
 
@@ -116,13 +121,23 @@ def ollama_full_recipe_batch_size():
     )
 
 
-def ollama_full_recipe_workers(batch_total=None):
+def ollama_full_recipe_default_workers(model=None):
+    model_name = _clean_text(model or ollama_full_recipe_model()).lower()
+    if "qwen2.5:14b" in model_name or "qwen2.5:32b" in model_name:
+        return 1
+    if "qwen2.5:7b" in model_name:
+        return 2
+    return OLLAMA_FULL_RECIPE_WORKERS_DEFAULT
+
+
+def ollama_full_recipe_workers(batch_total=None, model=None):
+    default_workers = ollama_full_recipe_default_workers(model)
     workers = _env_int(
         OLLAMA_FULL_RECIPE_WORKERS_ENV_VAR,
-        OLLAMA_FULL_RECIPE_WORKERS_DEFAULT,
+        default_workers,
         minimum=1,
         maximum=8,
-    )
+    ) if _env_is_set(OLLAMA_FULL_RECIPE_WORKERS_ENV_VAR) else default_workers
     if batch_total:
         return max(1, min(workers, int(batch_total)))
     return workers
@@ -689,6 +704,19 @@ def infer_menu_item_recipe_batch_with_ollama_support(
         fallback_allowed = (
             provider == OLLAMA_PROVIDER_AUTO
             and str(ollama_result.get("error_code") or "") in OLLAMA_FALLBACK_ERROR_CODES
+        )
+        _log_ollama_event(
+            "ollama_item_failed",
+            entry,
+            started=item_started,
+            model=model,
+            provider=provider,
+            json_valid=ollama_result.get("json_valid"),
+            low_confidence=ollama_result.get("low_confidence"),
+            fallback_used=fallback_allowed,
+            success=False,
+            error=ollama_result.get("error", ""),
+            error_code=ollama_result.get("error_code", ""),
         )
         if not fallback_allowed:
             error = (

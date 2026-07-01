@@ -543,6 +543,49 @@ function renderJobModelDetails(job) {
     const fallbackSummary = String(result.openai_fallback_summary || "").trim();
     const fallbackUsed = Boolean(result.fallback_used);
     const parts = [];
+    const firstNumber = (...values) => {
+        for (const value of values) {
+            if (value === undefined || value === null || value === "") {
+                continue;
+            }
+            const numberValue = Number(value);
+            if (Number.isFinite(numberValue)) {
+                return Math.max(0, Math.floor(numberValue));
+            }
+        }
+        return 0;
+    };
+
+    if (ollamaSupport) {
+        const displayModel = ollamaModel || model;
+        const totalItems = firstNumber(result.total_items, job && job.total_items, result.completed_items_total, result.saving_items_total);
+        const completedItems = firstNumber(job && job.completed_items, result.completed_items, result.recipe_inference_completed, result.full_recipes_generated);
+        const savingItems = firstNumber(result.saving_items, result.recipe_inference_completed, result.full_recipes_generated);
+        const countText = (value) => totalItems > 0 ? `${value}/${totalItems}` : String(value);
+
+        if (displayModel) {
+            parts.push(`<span>model=<strong>${escapeHtml(displayModel)}</strong></span>`);
+        }
+        if (provider) {
+            parts.push(`<span>provider=<strong>${escapeHtml(provider)}</strong></span>`);
+        } else if (providerLabel) {
+            parts.push(`<span>Provider: <strong>${escapeHtml(providerLabel)}</strong></span>`);
+        }
+        if (batchWorkers > 0) {
+            parts.push(`<span>workers=<strong>${escapeHtml(String(batchWorkers))}</strong></span>`);
+        }
+        if (batchSize > 0) {
+            parts.push(`<span>batch_size=<strong>${escapeHtml(String(batchSize))}</strong></span>`);
+        }
+        parts.push(`<span>completed_items=<strong>${escapeHtml(countText(completedItems))}</strong></span>`);
+        parts.push(`<span>saving_items=<strong>${escapeHtml(countText(savingItems))}</strong></span>`);
+        parts.push(`<span>OpenAI fallback count: <strong>${escapeHtml(String(fallbackCount))}</strong></span>`);
+        if (fallbackUsed && fallbackSummary) {
+            parts.push(`<span>${escapeHtml(fallbackSummary)}</span>`);
+        }
+
+        return parts.length ? `<div class="job-activity-model">${parts.join("")}</div>` : "";
+    }
 
     if (providerLabel) {
         parts.push(`<span>Provider: <strong>${escapeHtml(providerLabel)}</strong></span>`);
@@ -568,7 +611,7 @@ function renderJobModelDetails(job) {
         parts.push(`<span>Workers: <strong>${escapeHtml(batchWorkers)}</strong></span>`);
     }
     if (ollamaSupport) {
-        parts.push(`<span>OpenAI fallback count: <strong>${escapeHtml(fallbackCount)}</strong></span>`);
+        parts.push(`<span>OpenAI fallback count: <strong>${escapeHtml(String(fallbackCount))}</strong></span>`);
     }
     if (fallbackUsed && fallbackSummary) {
         parts.push(`<span>${escapeHtml(fallbackSummary)}</span>`);

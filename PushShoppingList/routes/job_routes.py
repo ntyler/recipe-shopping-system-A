@@ -37,8 +37,10 @@ from PushShoppingList.services.recipe_extract_service import resolve_menu_model_
 from PushShoppingList.services.recipe_extract_service import resolve_vision_model
 from PushShoppingList.services.recipe_extract_service import resolve_vision_model_source
 from PushShoppingList.services.ollama_service import OLLAMA_BASE_URL_ENV_VAR
+from PushShoppingList.services.ollama_service import OLLAMA_FULL_RECIPE_BATCH_SIZE_ENV_VAR
 from PushShoppingList.services.ollama_service import OLLAMA_FULL_RECIPE_MODEL_ENV_VAR
 from PushShoppingList.services.ollama_service import OLLAMA_FULL_RECIPE_PROVIDER_ENV_VAR
+from PushShoppingList.services.ollama_service import OLLAMA_FULL_RECIPE_WORKERS_ENV_VAR
 from PushShoppingList.services.ollama_service import ollama_base_url
 from PushShoppingList.services.ollama_service import ollama_full_recipe_model
 from PushShoppingList.services.ollama_service import ollama_full_recipe_provider
@@ -303,6 +305,8 @@ def start_menu_generate_recipes_job(ollama_support=False):
             "ollama_model_env_var": OLLAMA_FULL_RECIPE_MODEL_ENV_VAR,
             "ollama_base_url_env_var": OLLAMA_BASE_URL_ENV_VAR,
             "ollama_provider_env_var": OLLAMA_FULL_RECIPE_PROVIDER_ENV_VAR,
+            "ollama_batch_size_env_var": OLLAMA_FULL_RECIPE_BATCH_SIZE_ENV_VAR,
+            "ollama_workers_env_var": OLLAMA_FULL_RECIPE_WORKERS_ENV_VAR,
         })
     if enrichment_mode:
         payload["menu_enrichment_mode"] = enrichment_mode

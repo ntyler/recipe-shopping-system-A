@@ -93,9 +93,14 @@ def test_ollama_defaults_to_local_model_and_conservative_concurrency(monkeypatch
 
     assert ollama_service.ollama_full_recipe_model() == "qwen2.5:7b"
     assert ollama_service.ollama_full_recipe_batch_size() == 1
-    assert ollama_service.ollama_full_recipe_workers(batch_total=8) == 1
+    assert ollama_service.ollama_full_recipe_workers(batch_total=8) == 2
+    assert ollama_service.ollama_full_recipe_workers(batch_total=8, model="qwen2.5:14b") == 1
+    assert ollama_service.ollama_full_recipe_workers(batch_total=8, model="qwen2.5:32b") == 1
     assert ollama_service.ollama_full_recipe_provider() == "ollama_only"
     assert ollama_service.ollama_provider_label() == "Ollama only"
+
+    monkeypatch.setenv("OLLAMA_FULL_RECIPE_WORKERS", "3")
+    assert ollama_service.ollama_full_recipe_workers(batch_total=8, model="qwen2.5:14b") == 3
 
 
 def test_ollama_only_keeps_low_confidence_result_without_openai_fallback(monkeypatch):
