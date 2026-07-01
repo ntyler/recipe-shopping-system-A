@@ -26,6 +26,7 @@ from PushShoppingList.services.feedback_service import feedback_dashboard_for_us
 from PushShoppingList.services.guest_session_service import is_guest_session
 from PushShoppingList.services.cookbook_service import cookbook_view
 from PushShoppingList.services.cookbook_service import create_cookbook
+from PushShoppingList.services.cookbook_service import find_cookbook
 from PushShoppingList.services.cookbook_service import find_or_create_cookbook
 from PushShoppingList.services.cookbook_service import is_unclassified_cookbook
 from PushShoppingList.services.cookbook_service import load_cookbooks
@@ -39,6 +40,7 @@ from PushShoppingList.services.cookbook_service import move_recipes_to_cookbook
 from PushShoppingList.services.cookbook_service import prepare_cookbook_menu_view
 from PushShoppingList.services.cookbook_service import purge_cookbook_recipe_urls
 from PushShoppingList.services.cookbook_service import purge_selected_cookbook_recipe_urls
+from PushShoppingList.services.cookbook_service import purge_unclassified_cookbook_recipe_urls
 from PushShoppingList.services.cookbook_service import recipe_ingredients_for_record
 from PushShoppingList.services.cookbook_service import recipe_cookbook_assignments
 from PushShoppingList.services.cookbook_service import remove_recipe_from_cookbook
@@ -2252,10 +2254,15 @@ def purge_cookbook_recipes_route(cookbook_id):
         }), 400
 
     try:
-        recipe_urls = purge_cookbook_recipe_urls(cookbook_id)
-        for recipe_url in recipe_urls:
-            remove_recipe_and_unused_ingredients(recipe_url)
-            remove_recipe_url(recipe_url)
+        cookbook = find_cookbook(load_cookbooks(), cookbook_id)
+        unclassified_purge = is_unclassified_cookbook(cookbook)
+        if unclassified_purge:
+            recipe_urls = purge_unclassified_cookbook_recipe_urls(cookbook_id)
+        else:
+            recipe_urls = purge_cookbook_recipe_urls(cookbook_id)
+            for recipe_url in recipe_urls:
+                remove_recipe_and_unused_ingredients(recipe_url)
+                remove_recipe_url(recipe_url)
     except ValueError as err:
         status = 400 if "unclassified" in str(err).lower() else 404
         return jsonify({"ok": False, "error": str(err)}), status

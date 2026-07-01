@@ -366,19 +366,25 @@ def test_fetch_purge_cookbook_recipes_keeps_cookbook_and_reuses_cleanup(monkeypa
     ]
 
 
-def test_fetch_purge_unclassified_recipes_keeps_cookbook_and_reuses_cleanup(monkeypatch, tmp_path):
+def test_fetch_purge_unclassified_recipes_only_clears_unclassified(monkeypatch, tmp_path):
     app = create_app()
     app.config.update(TESTING=True)
     calls = []
 
-    def fake_purge_cookbook_recipe_urls(cookbook_id):
-        calls.append(("cookbook", cookbook_id))
+    monkeypatch.setattr(
+        main_routes,
+        "load_cookbooks",
+        lambda: {"cookbooks": [{"id": "unclassified", "name": "unclassified", "recipes": []}]},
+    )
+
+    def fake_purge_unclassified_cookbook_recipe_urls(cookbook_id):
+        calls.append(("unclassified", cookbook_id))
         return ["https://example.com/chili", "https://example.com/soup"]
 
     monkeypatch.setattr(
         main_routes,
-        "purge_cookbook_recipe_urls",
-        fake_purge_cookbook_recipe_urls,
+        "purge_unclassified_cookbook_recipe_urls",
+        fake_purge_unclassified_cookbook_recipe_urls,
     )
     monkeypatch.setattr(
         main_routes,
@@ -402,11 +408,7 @@ def test_fetch_purge_unclassified_recipes_keeps_cookbook_and_reuses_cleanup(monk
     assert response.status_code == 200
     assert response.get_json() == {"ok": True, "purged_recipe_count": 2}
     assert calls == [
-        ("cookbook", "unclassified"),
-        ("ingredients", "https://example.com/chili"),
-        ("url", "https://example.com/chili"),
-        ("ingredients", "https://example.com/soup"),
-        ("url", "https://example.com/soup"),
+        ("unclassified", "unclassified"),
     ]
 
 

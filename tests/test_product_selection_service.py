@@ -814,7 +814,7 @@ class ProductSelectionServiceTest(unittest.TestCase):
                 ["https://example.com/pasta"],
             )
 
-    def test_purge_unclassified_cookbook_recipe_urls_keeps_cookbook(self):
+    def test_purge_unclassified_cookbook_recipe_urls_only_clears_unclassified(self):
         from PushShoppingList.services import cookbook_service
 
         with TemporaryDirectory() as temp_dir, patch.object(
@@ -853,7 +853,7 @@ class ProductSelectionServiceTest(unittest.TestCase):
             self.assertEqual(unclassified["recipes"], [])
             self.assertEqual(
                 [recipe["url"] for recipe in meal_prep["recipes"]],
-                ["https://example.com/pasta"],
+                ["https://example.com/chili", "https://example.com/pasta"],
             )
 
     def test_cookbook_restore_adds_recipe_log_and_shopping_items(self):

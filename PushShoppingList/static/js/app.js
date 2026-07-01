@@ -11654,7 +11654,10 @@ async function purgeAllCookbookRecipes(button) {
     const requiredConfirmation = "PURGE";
     const isUnclassified = isUnclassifiedCookbookAction(button);
     const actionLabel = isUnclassified ? "Purge" : "Delete and purge";
-    const promptMessage = `${actionLabel} ${recipeCount} ${recipeLabel} from ${cookbookName}?\n\nThe cookbook will remain, but those recipes will be removed from current recipes, saved recipe data, every cookbook, and unused shopping-list ingredients.\n\nType ${requiredConfirmation} to continue.`;
+    const promptDetail = isUnclassified
+        ? `The cookbook will remain, and those recipes will only be removed from ${cookbookName}. Recipes that are also in other cookbooks will stay there.`
+        : "The cookbook will remain, but those recipes will be removed from current recipes, saved recipe data, every cookbook, and unused shopping-list ingredients.";
+    const promptMessage = `${actionLabel} ${recipeCount} ${recipeLabel} from ${cookbookName}?\n\n${promptDetail}\n\nType ${requiredConfirmation} to continue.`;
     const confirmation = window.prompt(promptMessage, "");
 
     if (!cookbookId || String(confirmation || "").trim().toUpperCase() !== requiredConfirmation) {
@@ -11698,7 +11701,9 @@ async function purgeAllCookbookRecipes(button) {
             "",
             "",
             "",
-            `${purgedCount} ${purgedCount === 1 ? "recipe was" : "recipes were"} purged; ${cookbookName} was kept.`
+            isUnclassified
+                ? `${purgedCount} ${purgedCount === 1 ? "recipe was" : "recipes were"} removed from ${cookbookName}; other cookbooks were kept.`
+                : `${purgedCount} ${purgedCount === 1 ? "recipe was" : "recipes were"} purged; ${cookbookName} was kept.`
         );
     } catch (err) {
         console.warn("Unable to purge cookbook recipes.", err);

@@ -1892,7 +1892,7 @@ def delete_cookbook_and_purge_recipe_urls(cookbook_id):
         return purge_urls
 
 
-def purge_cookbook_recipe_urls(cookbook_id, require_unclassified=False):
+def purge_cookbook_recipe_urls(cookbook_id, require_unclassified=False, remove_from_other_cookbooks=True):
     with COOKBOOKS_LOCK:
         payload = load_cookbooks()
         target = find_cookbook(payload, cookbook_id)
@@ -1921,7 +1921,7 @@ def purge_cookbook_recipe_urls(cookbook_id, require_unclassified=False):
                 cookbook["recipes"] = []
                 continue
 
-            if purge_keys:
+            if purge_keys and remove_from_other_cookbooks:
                 cookbook["recipes"] = [
                     recipe
                     for recipe in cookbook.get("recipes", [])
@@ -1933,7 +1933,11 @@ def purge_cookbook_recipe_urls(cookbook_id, require_unclassified=False):
 
 
 def purge_unclassified_cookbook_recipe_urls(cookbook_id):
-    return purge_cookbook_recipe_urls(cookbook_id, require_unclassified=True)
+    return purge_cookbook_recipe_urls(
+        cookbook_id,
+        require_unclassified=True,
+        remove_from_other_cookbooks=False,
+    )
 
 
 def rename_cookbook(cookbook_id, name):
