@@ -9,11 +9,27 @@ import requests
 OLLAMA_BASE_URL_ENV_VAR = "OLLAMA_BASE_URL"
 OLLAMA_FULL_RECIPE_MODEL_ENV_VAR = "OLLAMA_FULL_RECIPE_MODEL"
 OLLAMA_FULL_RECIPE_TIMEOUT_ENV_VAR = "OLLAMA_FULL_RECIPE_TIMEOUT_SECONDS"
-OLLAMA_FULL_RECIPE_MODEL_DEFAULT = "qwen2.5:14b"
+OLLAMA_FULL_RECIPE_BATCH_SIZE_ENV_VAR = "OLLAMA_FULL_RECIPE_BATCH_SIZE"
+OLLAMA_FULL_RECIPE_WORKERS_ENV_VAR = "OLLAMA_FULL_RECIPE_WORKERS"
+OLLAMA_FULL_RECIPE_PROVIDER_ENV_VAR = "OLLAMA_FULL_RECIPE_PROVIDER"
+OLLAMA_FULL_RECIPE_MODEL_DEFAULT = "qwen2.5:7b"
+OLLAMA_FULL_RECIPE_BATCH_SIZE_DEFAULT = 1
+OLLAMA_FULL_RECIPE_WORKERS_DEFAULT = 1
 OLLAMA_BASE_URL_DEFAULT = "http://localhost:11434"
+OLLAMA_PROVIDER_ONLY = "ollama_only"
 OLLAMA_PROVIDER_AUTO = "auto_ollama_openai"
-OLLAMA_PROVIDER_LABEL = "Auto - Ollama first, OpenAI fallback"
+OLLAMA_PROVIDER_DEFAULT = OLLAMA_PROVIDER_ONLY
+OLLAMA_PROVIDER_LABELS = {
+    OLLAMA_PROVIDER_ONLY: "Ollama only",
+    OLLAMA_PROVIDER_AUTO: "Auto Ollama/OpenAI",
+}
+OLLAMA_PROVIDER_LABEL = OLLAMA_PROVIDER_LABELS[OLLAMA_PROVIDER_AUTO]
 OLLAMA_ACTION_NAME = "generate-full-recipes-ollama-support"
+OLLAMA_FALLBACK_ERROR_CODES = {
+    "OLLAMA_CONNECTION_FAILED",
+    "OLLAMA_JSON_INVALID",
+    "OLLAMA_REQUIRED_FIELDS_MISSING",
+}
 
 REQUIRED_FULL_RECIPE_FIELDS = (
     "recipe_name",
@@ -64,8 +80,52 @@ def _bool_text(value):
     return "true" if bool(value) else "false"
 
 
+def _env_int(name, default, minimum=1, maximum=32):
+    try:
+        value = int(os.getenv(str(name or "")) or int(default or 0))
+    except (TypeError, ValueError):
+        value = int(default or 0)
+    return max(int(minimum), min(int(maximum), value))
+
+
 def ollama_full_recipe_model():
     return _clean_text(os.getenv(OLLAMA_FULL_RECIPE_MODEL_ENV_VAR)) or OLLAMA_FULL_RECIPE_MODEL_DEFAULT
+
+
+def normalize_ollama_provider(value):
+    provider = _clean_text(value).lower()
+    return provider if provider in {OLLAMA_PROVIDER_ONLY, OLLAMA_PROVIDER_AUTO} else OLLAMA_PROVIDER_DEFAULT
+
+
+def ollama_full_recipe_provider(value=None):
+    if value is not None and _clean_text(value):
+        return normalize_ollama_provider(value)
+    return normalize_ollama_provider(os.getenv(OLLAMA_FULL_RECIPE_PROVIDER_ENV_VAR))
+
+
+def ollama_provider_label(provider=None):
+    return OLLAMA_PROVIDER_LABELS.get(normalize_ollama_provider(provider), OLLAMA_PROVIDER_LABELS[OLLAMA_PROVIDER_DEFAULT])
+
+
+def ollama_full_recipe_batch_size():
+    return _env_int(
+        OLLAMA_FULL_RECIPE_BATCH_SIZE_ENV_VAR,
+        OLLAMA_FULL_RECIPE_BATCH_SIZE_DEFAULT,
+        minimum=1,
+        maximum=8,
+    )
+
+
+def ollama_full_recipe_workers(batch_total=None):
+    workers = _env_int(
+        OLLAMA_FULL_RECIPE_WORKERS_ENV_VAR,
+        OLLAMA_FULL_RECIPE_WORKERS_DEFAULT,
+        minimum=1,
+        maximum=8,
+    )
+    if batch_total:
+        return max(1, min(workers, int(batch_total)))
+    return workers
 
 
 def ollama_base_url():
@@ -416,21 +476,37 @@ def generate_ollama_full_recipe_for_entry(entry, model="", base_url="", timeout_
             json_valid = False
             parse_error = str(exc)
             repair_attempted = True
-            repair_response = call_ollama_generate(
-                build_ollama_full_recipe_prompt(
-                    entry,
-                    repair_response=raw_response,
-                    repair_error=parse_error,
-                ),
-                model=model,
-                base_url=base_url,
-                timeout_seconds=timeout_seconds,
-            )
-            if cancellation_check:
-                cancellation_check()
-            payload = parse_ollama_json_response(repair_response)
-            raw_response = repair_response
-            json_valid = True
+            try:
+                repair_response = call_ollama_generate(
+                    build_ollama_full_recipe_prompt(
+                        entry,
+                        repair_response=raw_response,
+                        repair_error=parse_error,
+                    ),
+                    model=model,
+                    base_url=base_url,
+                    timeout_seconds=timeout_seconds,
+                )
+                if cancellation_check:
+                    cancellation_check()
+                payload = parse_ollama_json_response(repair_response)
+                raw_response = repair_response
+                json_valid = True
+            except Exception as repair_exc:
+                return {
+                    "ok": False,
+                    "inference": {},
+                    "json_valid": False,
+                    "low_confidence": False,
+                    "low_confidence_reasons": [],
+                    "missing_fields": [],
+                    "repair_attempted": True,
+                    "duration_seconds": time.perf_counter() - started,
+                    "raw_response": raw_response,
+                    "error": str(repair_exc) or parse_error or "Ollama recipe JSON could not be parsed.",
+                    "error_code": "OLLAMA_JSON_INVALID",
+                    "exception_type": type(repair_exc).__name__,
+                }
 
         validation = validate_ollama_full_recipe_payload(payload, entry)
         inference = {
@@ -445,7 +521,7 @@ def generate_ollama_full_recipe_for_entry(entry, model="", base_url="", timeout_
             "repair_attempted": repair_attempted,
         }
         return {
-            "ok": bool(validation["ok"]) and not validation["low_confidence"],
+            "ok": bool(validation["ok"]),
             "inference": inference,
             "json_valid": json_valid,
             "low_confidence": bool(validation["low_confidence"]),
@@ -455,8 +531,14 @@ def generate_ollama_full_recipe_for_entry(entry, model="", base_url="", timeout_
             "duration_seconds": time.perf_counter() - started,
             "raw_response": raw_response,
             "error": "" if validation["ok"] else "Ollama recipe JSON is missing required fields.",
+            "error_code": "" if validation["ok"] else "OLLAMA_REQUIRED_FIELDS_MISSING",
         }
     except Exception as exc:
+        error_code = (
+            "OLLAMA_CONNECTION_FAILED"
+            if isinstance(exc, (requests.ConnectionError, requests.Timeout))
+            else "OLLAMA_REQUEST_FAILED"
+        )
         return {
             "ok": False,
             "inference": {},
@@ -468,6 +550,7 @@ def generate_ollama_full_recipe_for_entry(entry, model="", base_url="", timeout_
             "duration_seconds": time.perf_counter() - started,
             "raw_response": raw_response,
             "error": str(exc) or "Ollama recipe generation failed.",
+            "error_code": error_code,
             "exception_type": type(exc).__name__,
         }
 
@@ -506,19 +589,28 @@ def _fallback_failure(fallback_result, item_id):
     return failure if isinstance(failure, dict) else {}
 
 
-def _log_ollama_support_item(provider, entry, started, model, json_valid=False, low_confidence=False, fallback_used=False, success=False, error=""):
+def _log_ollama_event(action, entry, started=None, model="", provider="", json_valid=False, low_confidence=False, fallback_used=False, success=False, error="", **fields):
+    duration = ""
+    if started is not None:
+        duration = f" duration={time.perf_counter() - started:.3f}s"
+    extra = " ".join(
+        f"{key}={json.dumps(value, ensure_ascii=True) if isinstance(value, (dict, list)) else value}"
+        for key, value in fields.items()
+        if value not in (None, "")
+    )
     print(
         "[MenuRecipeGeneration] "
-        f"action={OLLAMA_ACTION_NAME} "
+        f"action={action} "
         f"provider={provider} "
         f"ollama_model={model} "
         f"menu_item_name={json.dumps(menu_item_name_from_entry(entry), ensure_ascii=True)} "
-        f"duration={time.perf_counter() - started:.3f}s "
+        f"{duration} "
         f"json_valid={_bool_text(json_valid)} "
         f"low_confidence={_bool_text(low_confidence)} "
         f"fallback_used={_bool_text(fallback_used)} "
         f"success={_bool_text(success)} "
         f"error={json.dumps(str(error or ''), ensure_ascii=True)}"
+        f"{(' ' + extra) if extra else ''}"
     )
 
 
@@ -527,12 +619,14 @@ def infer_menu_item_recipe_batch_with_ollama_support(
     user_id=None,
     model_resolution=None,
     openai_infer_batch=None,
+    provider=None,
     cancellation_check=None,
 ):
     del user_id
     entries = [entry for entry in entries or [] if isinstance(entry, dict)]
     model = ollama_full_recipe_model()
     base_url = ollama_base_url()
+    provider = normalize_ollama_provider(provider)
     items = {}
     failures = {}
     ollama_success_count = 0
@@ -547,6 +641,14 @@ def infer_menu_item_recipe_batch_with_ollama_support(
             cancellation_check()
         item_id = menu_item_id_from_entry(entry)
         item_started = time.perf_counter()
+        _log_ollama_event(
+            "ollama_item_start",
+            entry,
+            started=item_started,
+            model=model,
+            provider=provider,
+            success=False,
+        )
         ollama_result = generate_ollama_full_recipe_for_entry(
             entry,
             model=model,
@@ -555,13 +657,22 @@ def infer_menu_item_recipe_batch_with_ollama_support(
         )
         if ollama_result.get("ok"):
             inference = ollama_result.get("inference") if isinstance(ollama_result.get("inference"), dict) else {}
+            inference = {
+                **inference,
+                "provider": inference.get("provider") or "ollama",
+                "ai_provider": provider,
+                "ollama_support": True,
+                "fallback_used": False,
+                "ollama_model": inference.get("ollama_model") or model,
+            }
             items[item_id] = inference
             ollama_success_count += 1
-            _log_ollama_support_item(
-                "ollama",
+            _log_ollama_event(
+                "ollama_item_complete",
                 entry,
-                item_started,
-                model,
+                started=item_started,
+                model=model,
+                provider=provider,
                 json_valid=ollama_result.get("json_valid"),
                 low_confidence=ollama_result.get("low_confidence"),
                 fallback_used=False,
@@ -575,8 +686,52 @@ def infer_menu_item_recipe_batch_with_ollama_support(
         if ollama_result.get("low_confidence"):
             ollama_low_confidence_count += 1
 
+        fallback_allowed = (
+            provider == OLLAMA_PROVIDER_AUTO
+            and str(ollama_result.get("error_code") or "") in OLLAMA_FALLBACK_ERROR_CODES
+        )
+        if not fallback_allowed:
+            error = (
+                ollama_result.get("error")
+                or "Ollama recipe generation failed without OpenAI fallback."
+            )
+            failures[item_id or str(len(failures) + 1)] = {
+                "error": error,
+                "provider": provider,
+                "ollama_model": model,
+                "ollama_error": error,
+                "ollama_error_code": ollama_result.get("error_code", ""),
+            }
+            _log_ollama_event(
+                "ollama_item_complete",
+                entry,
+                started=item_started,
+                model=model,
+                provider=provider,
+                json_valid=ollama_result.get("json_valid"),
+                low_confidence=ollama_result.get("low_confidence"),
+                fallback_used=False,
+                success=False,
+                error=error,
+                error_code=ollama_result.get("error_code", ""),
+            )
+            continue
+
         fallback_started = time.perf_counter()
         openai_fallback_count += 1
+        _log_ollama_event(
+            "openai_fallback_start",
+            entry,
+            started=fallback_started,
+            model=model,
+            provider=provider,
+            json_valid=ollama_result.get("json_valid"),
+            low_confidence=ollama_result.get("low_confidence"),
+            fallback_used=True,
+            success=False,
+            error=ollama_result.get("error", ""),
+            error_code=ollama_result.get("error_code", ""),
+        )
         fallback_result = _call_openai_fallback(openai_infer_batch, [entry], cancellation_check=cancellation_check)
         fallback_result = fallback_result if isinstance(fallback_result, dict) else {}
         fallback_item = _fallback_item_result(fallback_result, item_id)
@@ -587,23 +742,21 @@ def infer_menu_item_recipe_batch_with_ollama_support(
                 "provider": "openai",
                 "ollama_support": True,
                 "fallback_used": True,
-                "fallback_reason": (
-                    "low_confidence"
-                    if ollama_result.get("low_confidence")
-                    else "invalid_json_or_ollama_error"
-                ),
+                "fallback_reason": ollama_result.get("error_code") or "ollama_failed",
                 "ollama_model": model,
                 "ollama_error": ollama_result.get("error", ""),
+                "ollama_error_code": ollama_result.get("error_code", ""),
                 "ollama_json_valid": bool(ollama_result.get("json_valid")),
                 "ollama_low_confidence": bool(ollama_result.get("low_confidence")),
             }
             items[item_id] = fallback_item
             openai_fallback_success_count += 1
-            _log_ollama_support_item(
-                "openai",
+            _log_ollama_event(
+                "openai_fallback_complete",
                 entry,
-                fallback_started,
-                model,
+                started=fallback_started,
+                model=model,
+                provider=provider,
                 json_valid=ollama_result.get("json_valid"),
                 low_confidence=ollama_result.get("low_confidence"),
                 fallback_used=True,
@@ -621,16 +774,18 @@ def infer_menu_item_recipe_batch_with_ollama_support(
         )
         failures[item_id or str(len(failures) + 1)] = {
             "error": error,
-            "provider": OLLAMA_PROVIDER_AUTO,
+            "provider": provider,
             "ollama_model": model,
             "ollama_error": ollama_result.get("error", ""),
+            "ollama_error_code": ollama_result.get("error_code", ""),
             "openai_error": fallback_result.get("error_message") or fallback_result.get("error") or "",
         }
-        _log_ollama_support_item(
-            "openai",
+        _log_ollama_event(
+            "openai_fallback_complete",
             entry,
-            fallback_started,
-            model,
+            started=fallback_started,
+            model=model,
+            provider=provider,
             json_valid=ollama_result.get("json_valid"),
             low_confidence=ollama_result.get("low_confidence"),
             fallback_used=True,
@@ -639,9 +794,9 @@ def infer_menu_item_recipe_batch_with_ollama_support(
         )
 
     provider_summary = {
-        "ai_provider": OLLAMA_PROVIDER_AUTO,
-        "provider": OLLAMA_PROVIDER_AUTO,
-        "provider_label": OLLAMA_PROVIDER_LABEL,
+        "ai_provider": provider,
+        "provider": provider,
+        "provider_label": ollama_provider_label(provider),
         "ollama_support": True,
         "ollama_model": model,
         "ollama_base_url": base_url,
@@ -654,14 +809,14 @@ def infer_menu_item_recipe_batch_with_ollama_support(
         "ollama_low_confidence_count": ollama_low_confidence_count,
         "ollama_json_invalid_count": ollama_json_invalid_count,
         "fallback_used": openai_fallback_count > 0,
-        "openai_fallback_summary": f"OpenAI fallback used for {openai_fallback_count} of {len(entries)} items",
+        "openai_fallback_summary": f"OpenAI fallback count: {openai_fallback_count}",
     }
     return {
         "ok": not failures,
         "items": items,
         "failures": failures,
         "model": model,
-        "model_source": OLLAMA_PROVIDER_AUTO,
+        "model_source": provider,
         "provider_summary": provider_summary,
         **provider_summary,
     }

@@ -85,16 +85,35 @@ def test_generate_ollama_full_recipe_repairs_invalid_json_once(monkeypatch):
     assert calls[0]["url"].endswith("/api/generate")
 
 
-def test_ollama_batch_falls_back_to_openai_for_low_confidence(monkeypatch):
+def test_ollama_defaults_to_local_model_and_conservative_concurrency(monkeypatch):
+    monkeypatch.delenv("OLLAMA_FULL_RECIPE_MODEL", raising=False)
+    monkeypatch.delenv("OLLAMA_FULL_RECIPE_BATCH_SIZE", raising=False)
+    monkeypatch.delenv("OLLAMA_FULL_RECIPE_WORKERS", raising=False)
+    monkeypatch.delenv("OLLAMA_FULL_RECIPE_PROVIDER", raising=False)
+
+    assert ollama_service.ollama_full_recipe_model() == "qwen2.5:7b"
+    assert ollama_service.ollama_full_recipe_batch_size() == 1
+    assert ollama_service.ollama_full_recipe_workers(batch_total=8) == 1
+    assert ollama_service.ollama_full_recipe_provider() == "ollama_only"
+    assert ollama_service.ollama_provider_label() == "Ollama only"
+
+
+def test_ollama_only_keeps_low_confidence_result_without_openai_fallback(monkeypatch):
     monkeypatch.setattr(
         ollama_service,
         "generate_ollama_full_recipe_for_entry",
         lambda *args, **kwargs: {
-            "ok": False,
+            "ok": True,
+            "inference": {
+                "predicted_ingredients": ["crab"],
+                "predicted_equipment": [],
+                "predicted_instructions": ["Fill.", "Fry.", "Drain.", "Serve."],
+            },
             "json_valid": True,
             "low_confidence": True,
             "low_confidence_reasons": ["equipment_empty"],
             "error": "",
+            "error_code": "",
         },
     )
     fallback_calls = []
@@ -118,11 +137,61 @@ def test_ollama_batch_falls_back_to_openai_for_low_confidence(monkeypatch):
         [menu_entry()],
         model_resolution=SimpleNamespace(model="gpt-test", source="test"),
         openai_infer_batch=fake_openai_fallback,
+        provider="ollama_only",
+    )
+
+    assert result["ok"] is True
+    assert result["items"]["item-1"]["provider"] == "ollama"
+    assert result["items"]["item-1"].get("fallback_used") is not True
+    assert result["ollama_low_confidence_count"] == 0
+    assert result["openai_fallback_count"] == 0
+    assert result["fallback_used"] is False
+    assert fallback_calls == []
+
+
+def test_auto_ollama_openai_falls_back_for_required_missing_fields(monkeypatch):
+    monkeypatch.setattr(
+        ollama_service,
+        "generate_ollama_full_recipe_for_entry",
+        lambda *args, **kwargs: {
+            "ok": False,
+            "inference": {},
+            "json_valid": True,
+            "low_confidence": True,
+            "low_confidence_reasons": ["equipment_empty"],
+            "missing_fields": ["equipment"],
+            "error": "Ollama recipe JSON is missing required fields.",
+            "error_code": "OLLAMA_REQUIRED_FIELDS_MISSING",
+        },
+    )
+    fallback_calls = []
+
+    def fake_openai_fallback(entries, cancellation_check=None):
+        fallback_calls.append(entries)
+        return {
+            "ok": True,
+            "items": {
+                "item-1": {
+                    "predicted_ingredients": ["crab"],
+                    "predicted_equipment": ["skillet"],
+                    "predicted_instructions": ["Fill.", "Fry.", "Drain.", "Serve."],
+                },
+            },
+            "model": "gpt-test",
+            "model_source": "test",
+        }
+
+    result = ollama_service.infer_menu_item_recipe_batch_with_ollama_support(
+        [menu_entry()],
+        model_resolution=SimpleNamespace(model="gpt-test", source="test"),
+        openai_infer_batch=fake_openai_fallback,
+        provider="auto_ollama_openai",
     )
 
     assert result["ok"] is True
     assert result["items"]["item-1"]["provider"] == "openai"
     assert result["items"]["item-1"]["fallback_used"] is True
+    assert result["items"]["item-1"]["fallback_reason"] == "OLLAMA_REQUIRED_FIELDS_MISSING"
     assert result["openai_fallback_count"] == 1
     assert result["openai_fallback_success_count"] == 1
     assert result["fallback_used"] is True

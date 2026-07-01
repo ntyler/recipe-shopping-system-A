@@ -391,10 +391,12 @@ def test_menu_generate_ollama_route_sets_provider_metadata(monkeypatch, tmp_path
     assert response.status_code == 202
     assert data["job"]["job_type"] == "menu-generate-recipes"
     assert data["job"]["model_used"] == "qwen-test:14b"
-    assert data["job"]["model_source"] == "auto_ollama_openai"
+    assert data["job"]["model_source"] == "ollama_only"
     assert data["job"]["model_env_var"] == "OLLAMA_FULL_RECIPE_MODEL"
     assert payload["menu_enrichment_mode"] == "full"
-    assert payload["ai_provider"] == "auto_ollama_openai"
+    assert payload["ai_provider"] == "ollama_only"
+    assert payload["provider"] == "ollama_only"
+    assert payload["provider_label"] == "Ollama only"
     assert payload["ollama_support"] is True
     assert payload["ollama_model"] == "qwen-test:14b"
     assert payload["ollama_base_url"] == "http://localhost:11434"
@@ -1222,6 +1224,154 @@ def test_menu_generate_job_predicts_batches_in_parallel(monkeypatch, tmp_path):
     assert finished["result_payload"]["batch_workers"] == 2
 
 
+def test_menu_generate_ollama_job_uses_local_batch_defaults(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    monkeypatch.delenv("OLLAMA_FULL_RECIPE_MODEL", raising=False)
+    monkeypatch.delenv("OLLAMA_FULL_RECIPE_BATCH_SIZE", raising=False)
+    monkeypatch.delenv("OLLAMA_FULL_RECIPE_WORKERS", raising=False)
+    monkeypatch.delenv("OLLAMA_FULL_RECIPE_PROVIDER", raising=False)
+    monkeypatch.setenv("MENU_RECIPE_FULL_BATCH_SIZE", "8")
+    monkeypatch.setenv("MENU_ITEM_BATCH_INFERENCE_WORKERS", "8")
+    recipe_urls = [
+        "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=spring-roll",
+        "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=pad-thai",
+    ]
+    stubs = {
+        recipe_urls[0]: {
+            "source_url": recipe_urls[0],
+            "recipe_title": "Spring Roll",
+            "display_name": "Spring Roll",
+            "needs_ai_recipe": True,
+            "recipe_status": "stub",
+            "menu_item_id": "item-1",
+            "cookbook_id": "cb1",
+            "cookbook_name": "Dinner",
+        },
+        recipe_urls[1]: {
+            "source_url": recipe_urls[1],
+            "recipe_title": "Pad Thai",
+            "display_name": "Pad Thai",
+            "needs_ai_recipe": True,
+            "recipe_status": "stub",
+            "menu_item_id": "item-2",
+            "cookbook_id": "cb1",
+            "cookbook_name": "Dinner",
+        },
+    }
+    batch_kwargs = []
+    batch_lengths = []
+    providers = []
+    saved_urls = []
+
+    monkeypatch.setattr(recipe_routes, "load_editable_recipe", lambda url: {"recipe": stubs[url]})
+    monkeypatch.setattr(
+        recipe_extract_service,
+        "menu_batch_item_from_stub",
+        lambda url, loaded_stub, index: {
+            "menu_item_id": loaded_stub["menu_item_id"],
+            "item_name": loaded_stub["recipe_title"],
+            "menu_section": "Entrees",
+        },
+    )
+
+    def fake_menu_inference_batches(entries, **kwargs):
+        batch_kwargs.append(kwargs)
+        return [[entry] for entry in entries]
+
+    def fake_ollama_batch(batch, user_id=None, model_resolution=None, openai_infer_batch=None, provider=None, cancellation_check=None):
+        del user_id, model_resolution, openai_infer_batch, cancellation_check
+        batch_lengths.append(len(batch))
+        providers.append(provider)
+        item_id = batch[0]["menu_item"]["menu_item_id"]
+        return {
+            "ok": True,
+            "items": {
+                item_id: {
+                    "predicted_ingredients": [{"ingredient": item_id}],
+                    "predicted_equipment": [{"name": "skillet"}],
+                    "predicted_instructions": [
+                        {"instruction": "Prep."},
+                        {"instruction": "Cook."},
+                        {"instruction": "Season."},
+                        {"instruction": "Serve."},
+                    ],
+                    "provider": "ollama",
+                    "ollama_model": "qwen2.5:7b",
+                },
+            },
+            "failures": {},
+            "model": "qwen2.5:7b",
+            "model_source": provider,
+            "provider_summary": {
+                "ollama_success_count": 1,
+                "openai_fallback_count": 0,
+                "openai_fallback_success_count": 0,
+                "ollama_failed_count": 0,
+                "ollama_low_confidence_count": 0,
+                "ollama_json_invalid_count": 0,
+            },
+        }
+
+    monkeypatch.setattr(recipe_extract_service, "menu_inference_batches", fake_menu_inference_batches)
+    monkeypatch.setattr(
+        "PushShoppingList.services.ollama_service.infer_menu_item_recipe_batch_with_ollama_support",
+        fake_ollama_batch,
+    )
+    monkeypatch.setattr(recipe_routes, "add_items", lambda ingredients: None)
+    monkeypatch.setattr(recipe_routes, "save_ingredients_for_recipe", lambda url, ingredients, result: saved_urls.append(url))
+    monkeypatch.setattr(recipe_routes, "save_recipe_url_name", lambda url, name: None)
+    monkeypatch.setattr(
+        "PushShoppingList.services.recipe_ingredient_service.save_ingredients_for_recipes",
+        lambda records: saved_urls.extend(record["url"] for record in records),
+    )
+    monkeypatch.setattr("PushShoppingList.services.recipe_url_service.save_recipe_url_names", lambda records: None)
+    monkeypatch.setattr(recipe_routes, "record_recipe_import_activity", lambda *args, **kwargs: None)
+    monkeypatch.setattr(cookbook_service, "cookbook_recipe_assignment_for_url", lambda url: {
+        "cookbook_id": "cb1",
+        "cookbook_name": "Dinner",
+    })
+    monkeypatch.setattr("PushShoppingList.services.recipe_url_service.add_recipe_urls", lambda urls: None)
+    monkeypatch.setattr("PushShoppingList.scripts.sort_ingredients.main", lambda: None)
+    monkeypatch.setattr(
+        recipe_routes,
+        "apply_imported_recipe_category_routine",
+        lambda url, result, assignment, trigger_source="": {"ok": True, "status": "updated"},
+    )
+    monkeypatch.setattr(
+        recipe_routes,
+        "ensure_menu_recipe_serving_basis_estimate",
+        successful_menu_serving_basis,
+    )
+
+    job = job_service.create_job(
+        "menu-generate-recipes",
+        input_payload={
+            "recipe_urls": recipe_urls,
+            "menu_enrichment_mode": "full",
+            "ollama_support": True,
+            "run_deferred_heavy_tasks": False,
+        },
+        user_id="owner",
+        total_items=2,
+    )
+
+    finished = job_tasks.run_menu_generate_recipes_job(job["id"], job["input_payload"])
+
+    assert finished["status"] == "completed"
+    assert batch_kwargs == [{"min_items": 1, "max_items": 1, "target_chars": 100000}]
+    assert batch_lengths == [1, 1]
+    assert providers == ["ollama_only", "ollama_only"]
+    assert saved_urls == recipe_urls
+    assert finished["result_payload"]["model_used"] == "qwen2.5:7b"
+    assert finished["result_payload"]["model_source"] == "ollama_only"
+    assert finished["result_payload"]["provider_label"] == "Ollama only"
+    assert finished["result_payload"]["recipe_batch_size"] == 1
+    assert finished["result_payload"]["batch_workers"] == 1
+    assert finished["result_payload"]["openai_fallback_count"] == 0
+    assert finished["result_payload"]["openai_fallback_summary"] == "OpenAI fallback count: 0"
+    assert finished["result_payload"]["batch_rate_limited_processor"] is False
+
+
 def test_menu_recipe_batch_dispatch_limiter_waits_for_request_capacity():
     current_time = [0.0]
     sleep_calls = []
@@ -1943,7 +2093,7 @@ def test_menu_generate_cancel_checkpoint_confirms_cancelled(monkeypatch, tmp_pat
 def test_menu_generate_cancel_uses_non_waiting_batch_executor_shutdown():
     source = (ROOT / "PushShoppingList/services/job_tasks.py").read_text(encoding="utf-8")
     start = source.index('thread_name_prefix="menu-recipe-batch"')
-    end = source.index('raise_if_menu_enrichment_cancelled("after_openai_batches")')
+    end = source.index('raise_if_menu_enrichment_cancelled(batch_stage("after_openai_batches"))')
     batch_executor_block = source[start:end]
 
     assert "executor.shutdown(wait=False, cancel_futures=True)" in batch_executor_block

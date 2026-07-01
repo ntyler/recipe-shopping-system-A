@@ -232,13 +232,15 @@ def test_job_activity_can_reopen_import_progress_overlay():
     assert "waitForCompletion: false" in script
     assert 'menu_enrichment_mode: enrichmentMode' in script
     assert "/api/jobs/menu-generate-recipes-ollama" in script
-    assert 'payload.ai_provider = "auto_ollama_openai"' in script
+    assert "payload.ai_provider = options.aiProvider" in script
     assert "payload.ollama_support = true" in script
     assert "sourceJobId: jobId" in script
     assert 'source_job_id: options.sourceJobId || ""' in script
     assert "Provider: <strong>" in script
-    assert "Ollama Model: <strong>" in script
-    assert "openai_fallback_summary" in script
+    assert "Ollama model: <strong>" in script
+    assert "Batch size: <strong>" in script
+    assert "Workers: <strong>" in script
+    assert "OpenAI fallback count: <strong>" in script
     assert "!menuImportFollowupBlocksEnrichment(job)" in script
     assert "&& jobBlocksMenuEnrichmentAction(candidate)" in script
     assert "hiddenExtractJobId = null" in script

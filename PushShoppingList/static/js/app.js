@@ -533,7 +533,13 @@ function renderJobModelDetails(job) {
     const envVar = String((job && job.model_env_var) || "").trim();
     const source = String((job && job.model_source) || "").trim();
     const providerLabel = String(result.provider_label || "").trim();
+    const provider = String(result.ai_provider || result.provider || source || "").trim().toLowerCase();
     const ollamaModel = String(result.ollama_model || "").trim();
+    const ollamaSupport = Boolean(result.ollama_support || ollamaModel || provider.includes("ollama"));
+    const batchSize = Number(result.recipe_batch_size || 0);
+    const batchWorkers = Number(result.batch_workers || 0);
+    const fallbackCountRaw = Number(result.openai_fallback_count || 0);
+    const fallbackCount = Number.isFinite(fallbackCountRaw) ? fallbackCountRaw : 0;
     const fallbackSummary = String(result.openai_fallback_summary || "").trim();
     const fallbackUsed = Boolean(result.fallback_used);
     const parts = [];
@@ -545,15 +551,24 @@ function renderJobModelDetails(job) {
         parts.push(`<span>Model: <strong>${escapeHtml(model)}</strong></span>`);
     }
     if (ollamaModel && ollamaModel !== model) {
-        parts.push(`<span>Ollama Model: <strong>${escapeHtml(ollamaModel)}</strong></span>`);
+        parts.push(`<span>Ollama model: <strong>${escapeHtml(ollamaModel)}</strong></span>`);
     } else if (ollamaModel && providerLabel) {
-        parts.push(`<span>Ollama Model: <strong>${escapeHtml(ollamaModel)}</strong></span>`);
+        parts.push(`<span>Ollama model: <strong>${escapeHtml(ollamaModel)}</strong></span>`);
     }
     if (envVar) {
         parts.push(`<span>Env: <strong>${escapeHtml(envVar)}</strong></span>`);
     }
     if (source) {
         parts.push(`<span>Source: <strong>${escapeHtml(source)}</strong></span>`);
+    }
+    if (ollamaSupport && batchSize > 0) {
+        parts.push(`<span>Batch size: <strong>${escapeHtml(batchSize)}</strong></span>`);
+    }
+    if (ollamaSupport && batchWorkers > 0) {
+        parts.push(`<span>Workers: <strong>${escapeHtml(batchWorkers)}</strong></span>`);
+    }
+    if (ollamaSupport) {
+        parts.push(`<span>OpenAI fallback count: <strong>${escapeHtml(fallbackCount)}</strong></span>`);
     }
     if (fallbackUsed && fallbackSummary) {
         parts.push(`<span>${escapeHtml(fallbackSummary)}</span>`);
@@ -30352,9 +30367,11 @@ async function startMenuRecipeGeneration(urls, button, options = {}) {
         source_job_id: options.sourceJobId || "",
     };
     if (ollamaSupport) {
-        payload.ai_provider = "auto_ollama_openai";
-        payload.provider = "auto_ollama_openai";
         payload.ollama_support = true;
+        if (options.aiProvider) {
+            payload.ai_provider = options.aiProvider;
+            payload.provider = options.aiProvider;
+        }
     }
 
     const startData = await startBackgroundJob(ollamaSupport ? "/api/jobs/menu-generate-recipes-ollama" : "/api/jobs/menu-generate-recipes", {

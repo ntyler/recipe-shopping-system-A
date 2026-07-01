@@ -38,9 +38,11 @@ from PushShoppingList.services.recipe_extract_service import resolve_vision_mode
 from PushShoppingList.services.recipe_extract_service import resolve_vision_model_source
 from PushShoppingList.services.ollama_service import OLLAMA_BASE_URL_ENV_VAR
 from PushShoppingList.services.ollama_service import OLLAMA_FULL_RECIPE_MODEL_ENV_VAR
-from PushShoppingList.services.ollama_service import OLLAMA_PROVIDER_AUTO
+from PushShoppingList.services.ollama_service import OLLAMA_FULL_RECIPE_PROVIDER_ENV_VAR
 from PushShoppingList.services.ollama_service import ollama_base_url
 from PushShoppingList.services.ollama_service import ollama_full_recipe_model
+from PushShoppingList.services.ollama_service import ollama_full_recipe_provider
+from PushShoppingList.services.ollama_service import ollama_provider_label
 from PushShoppingList.services.openai_model_service import model_value_for_env as active_model_value_for_env
 from PushShoppingList.services.storage_service import active_guest_session_id
 from PushShoppingList.services.storage_service import active_user_id
@@ -289,15 +291,18 @@ def start_menu_generate_recipes_job(ollama_support=False):
         "force_reprocess": payload_truthy(payload, "force_reprocess", False),
     }
     if ollama_support:
+        ollama_provider = ollama_full_recipe_provider(payload.get("ai_provider") or payload.get("provider"))
         payload.update({
             "menu_enrichment_mode": "full",
-            "ai_provider": OLLAMA_PROVIDER_AUTO,
-            "provider": OLLAMA_PROVIDER_AUTO,
+            "ai_provider": ollama_provider,
+            "provider": ollama_provider,
+            "provider_label": ollama_provider_label(ollama_provider),
             "ollama_support": True,
             "ollama_model": ollama_full_recipe_model(),
             "ollama_base_url": ollama_base_url(),
             "ollama_model_env_var": OLLAMA_FULL_RECIPE_MODEL_ENV_VAR,
             "ollama_base_url_env_var": OLLAMA_BASE_URL_ENV_VAR,
+            "ollama_provider_env_var": OLLAMA_FULL_RECIPE_PROVIDER_ENV_VAR,
         })
     if enrichment_mode:
         payload["menu_enrichment_mode"] = enrichment_mode
@@ -306,7 +311,7 @@ def start_menu_generate_recipes_job(ollama_support=False):
         recipe_model_resolution = None
         recipe_model_env_var = OLLAMA_FULL_RECIPE_MODEL_ENV_VAR
         model_used = ollama_full_recipe_model()
-        model_source = OLLAMA_PROVIDER_AUTO
+        model_source = payload.get("ai_provider") or ollama_full_recipe_provider()
     else:
         recipe_model_resolution = menu_item_recipe_model_resolution(effective_enrichment_mode)
         recipe_model_env_var = (
@@ -325,7 +330,8 @@ def start_menu_generate_recipes_job(ollama_support=False):
     if ollama_support:
         print(
             "[MenuRecipeGeneration] action=generate-full-recipes-ollama-support_requested "
-            f"total_items={len(urls)} ollama_model={model_used} ollama_base_url={payload.get('ollama_base_url', '')}"
+            f"total_items={len(urls)} provider={payload.get('ai_provider', '')} "
+            f"ollama_model={model_used} ollama_base_url={payload.get('ollama_base_url', '')}"
         )
     return create_and_enqueue("menu-generate-recipes", payload, total_items=len(urls))
 
