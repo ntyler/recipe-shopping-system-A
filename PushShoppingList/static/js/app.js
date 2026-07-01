@@ -12513,6 +12513,35 @@ function recipeHasPerServingEstimate(recipe = {}) {
     return false;
 }
 
+function recipeHasNutritionData(recipe = {}) {
+    const nutrition = recipe ? recipe.nutrition : null;
+
+    if (!nutrition) {
+        return false;
+    }
+
+    if (Array.isArray(nutrition)) {
+        return nutrition.some(item => (
+            Boolean(String(item && item.key || "").trim())
+            || Boolean(String(item && item.value || "").trim())
+        ));
+    }
+
+    if (typeof nutrition === "object") {
+        return Object.values(nutrition).some(value => {
+            if (Array.isArray(value)) {
+                return value.some(item => Boolean(String(item || "").trim()));
+            }
+            if (value && typeof value === "object") {
+                return Object.values(value).some(item => Boolean(String(item || "").trim()));
+            }
+            return Boolean(String(value || "").trim());
+        });
+    }
+
+    return Boolean(String(nutrition || "").trim());
+}
+
 function recipeMediaEstimatePerServingAllowed(recipe = recipeMediaUploadPreview) {
     return recipeHasPerServingEstimate(recipe);
 }
@@ -23162,17 +23191,31 @@ async function estimateRecipeNutrition(button, options = {}) {
     const payload = collectRecipeEditorPayload();
     const returnResult = Boolean(options.returnResult);
     const setStatusMessages = options.setStatus !== false;
-    const forceEstimate = Boolean(options.forceEstimate || options.force);
+    let forceEstimate = Boolean(options.forceEstimate || options.force);
 
-    if (!forceEstimate && payload && payload.recipe && recipeHasPerServingEstimate(payload.recipe)) {
-        updateRecipeEditorPdfControls(payload.recipe, {
-            updateInputValues: false,
-            useCurrentForMissing: true,
-        });
-        if (setStatusMessages) {
-            setRecipeEditStatus("Per-serving nutrition is already available.");
+    if (!forceEstimate && payload && payload.recipe && recipeHasNutritionData(payload.recipe)) {
+        const hasPerServingEstimate = recipeHasPerServingEstimate(payload.recipe);
+        const shouldPromptOverwrite = options.promptOverwrite !== false && Boolean(button);
+        const overwriteExisting = shouldPromptOverwrite
+            ? window.confirm("Nutrition data already exists. Overwrite it with a new per-serving estimate?")
+            : false;
+
+        if (overwriteExisting) {
+            forceEstimate = true;
+        } else {
+            updateRecipeEditorPdfControls(payload.recipe, {
+                updateInputValues: false,
+                useCurrentForMissing: true,
+            });
+            if (setStatusMessages) {
+                setRecipeEditStatus(
+                    shouldPromptOverwrite
+                        ? "Existing nutrition data was kept."
+                        : (hasPerServingEstimate ? "Per-serving nutrition is already available." : "Nutrition data is already available.")
+                );
+            }
+            return returnResult ? { ok: true, already_available: hasPerServingEstimate, canceled: shouldPromptOverwrite } : false;
         }
-        return returnResult ? { ok: true, already_available: true } : false;
     }
 
     if (button) {

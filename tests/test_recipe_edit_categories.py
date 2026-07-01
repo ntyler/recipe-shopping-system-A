@@ -126,6 +126,20 @@ def test_recipe_editor_infer_missing_details_runs_full_ai_followups():
     assert "Save Recipe to keep nutrition/categories." in script
 
 
+def test_recipe_editor_estimate_per_serving_prompts_before_overwrite():
+    script = read_text("PushShoppingList/static/js/app.js")
+
+    assert "let forceEstimate = Boolean(options.forceEstimate || options.force);" in script
+    assert "function recipeHasNutritionData(recipe = {})" in script
+    assert "recipeHasNutritionData(payload.recipe)" in script
+    assert "const hasPerServingEstimate = recipeHasPerServingEstimate(payload.recipe);" in script
+    assert "window.confirm(\"Nutrition data already exists. Overwrite it with a new per-serving estimate?\")" in script
+    assert "forceEstimate = true;" in script
+    assert "Existing nutrition data was kept." in script
+    assert "canceled: shouldPromptOverwrite" in script
+    assert "force_estimate: forceEstimate" in script
+
+
 def test_recipe_nutrition_estimate_force_bypasses_existing_nutrition(monkeypatch, tmp_path):
     calls = []
 
