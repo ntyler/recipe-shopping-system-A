@@ -898,6 +898,10 @@ body {
             background: #7f151b;
         }
 
+        .pdf-share-action-btn-wide {
+            min-width: 218px;
+        }
+
         .pdf-share-action-btn:disabled {
             opacity: 0.65;
             cursor: not-allowed;

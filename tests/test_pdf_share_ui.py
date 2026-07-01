@@ -36,6 +36,8 @@ def test_shared_recipe_pdf_section_is_wired_into_user_account_menu():
     assert "Check Orphaned PDFs" not in section_template
     assert "PDF Maintenance" in admin_support_template
     assert "Check Unlinked PDFs" in admin_support_template
+    assert "Check and Delete All Unlinked PDFs" in admin_support_template
+    assert "checkAndDeleteAllCloudflareUnlinkedPdfs(this)" in admin_support_template
     assert "Delete Selected Unlinked PDFs" in admin_support_template
     assert "deleteSelectedCloudflareUnlinkedPdfs(this)" in admin_support_template
     assert "data-cloudflare-orphan-pdf-list" in admin_support_template
@@ -65,8 +67,10 @@ def test_shared_recipe_pdf_section_is_wired_into_user_account_menu():
     assert "function copyPdfCloudflareLink" in js
     assert "function checkCloudflareOrphanPdfs" in js
     assert "function selectedCloudflareUnlinkedPdfKeys" in js
+    assert "function cloudflareUnlinkedPdfKeysFromData" in js
     assert "function updateCloudflareUnlinkedDeleteButton" in js
     assert "function deleteSelectedCloudflareUnlinkedPdfs" in js
+    assert "function checkAndDeleteAllCloudflareUnlinkedPdfs" in js
     assert "function deleteAllCloudflareOrphanPdfs" in js
     assert "/pdfs/cloudflare_unlinked" in js
     assert "/pdfs/cloudflare_unlinked/delete" in js

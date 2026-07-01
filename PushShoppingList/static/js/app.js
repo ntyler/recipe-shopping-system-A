@@ -15499,6 +15499,23 @@ function selectedCloudflareUnlinkedPdfKeys(panel = cloudflareOrphanPdfPanel()) {
         .filter(Boolean);
 }
 
+function cloudflareUnlinkedPdfKeysFromData(data) {
+    const rows = Array.isArray(data.unlinked_pdfs)
+        ? data.unlinked_pdfs
+        : (Array.isArray(data.orphaned_pdfs) ? data.orphaned_pdfs : []);
+    const seen = new Set();
+
+    return rows
+        .map((pdf) => String((pdf && pdf.object_key) || "").trim())
+        .filter((key) => {
+            if (!key || seen.has(key)) {
+                return false;
+            }
+            seen.add(key);
+            return true;
+        });
+}
+
 function updateCloudflareUnlinkedDeleteButton() {
     const panel = cloudflareOrphanPdfPanel();
     const deleteButton = panel ? panel.querySelector("[data-cloudflare-orphan-pdf-delete]") : null;
@@ -15758,8 +15775,96 @@ async function deleteSelectedCloudflareUnlinkedPdfs(button) {
     return false;
 }
 
+async function checkAndDeleteAllCloudflareUnlinkedPdfs(button) {
+    const originalText = button ? button.textContent : "";
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Checking...";
+    }
+    setCloudflareOrphanPdfStatus("Checking Cloudflare PDFs before deletion...");
+
+    try {
+        const scanResponse = await fetch("/pdfs/cloudflare_unlinked", {
+            method: "GET",
+            headers: {
+                "X-Requested-With": "fetch",
+            },
+        });
+        const scanData = await scanResponse.json();
+
+        if (!scanResponse.ok || !scanData.ok) {
+            throw new Error(scanData.error || "Unable to check Cloudflare PDFs.");
+        }
+
+        renderCloudflareOrphanPdfs(scanData);
+        const keys = cloudflareUnlinkedPdfKeysFromData(scanData);
+        const unlinkedCount = Number(scanData.unlinked_pdf_count || scanData.orphaned_pdf_count || keys.length || 0);
+
+        if (keys.length === 0) {
+            setCloudflareOrphanPdfStatus("No unlinked PDFs found.");
+            return false;
+        }
+
+        const allLabel = `${keys.length} unlinked PDF${keys.length === 1 ? "" : "s"}`;
+        if (!window.confirm(`Delete all ${allLabel} from Cloudflare R2? This cannot be undone.`)) {
+            setCloudflareOrphanPdfStatus(cloudflareOrphanPdfLabel(unlinkedCount));
+            return false;
+        }
+
+        if (button) {
+            button.textContent = "Deleting...";
+        }
+        setCloudflareOrphanPdfStatus(`Deleting all ${allLabel}...`);
+
+        const deleteResponse = await fetch("/pdfs/cloudflare_unlinked/delete", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "fetch",
+            },
+            body: JSON.stringify({
+                object_keys: keys,
+            }),
+        });
+        let deleteData = {};
+        try {
+            deleteData = await deleteResponse.json();
+        } catch (_err) {
+            deleteData = {};
+        }
+
+        if (Array.isArray(deleteData.unlinked_pdfs) || Array.isArray(deleteData.orphaned_pdfs)) {
+            renderCloudflareOrphanPdfs(deleteData);
+        }
+
+        if (!deleteResponse.ok || !deleteData.ok) {
+            throw new Error(deleteData.error || deleteData.message || "Unable to delete all unlinked PDFs.");
+        }
+
+        const deletedCount = Number(deleteData.deleted_count || 0);
+        const skippedCount = Number(deleteData.skipped_count || 0);
+        let message = `Deleted ${deletedCount} unlinked PDF${deletedCount === 1 ? "" : "s"}.`;
+        if (skippedCount > 0 && deletedCount > 0) {
+            message += ` ${skippedCount} skipped because they were no longer unlinked.`;
+        }
+        setCloudflareOrphanPdfStatus(message);
+    } catch (err) {
+        console.warn("Unable to check and delete all Cloudflare unlinked PDFs.", err);
+        setCloudflareOrphanPdfStatus(err.message || "Unable to delete all unlinked PDFs.", true);
+    } finally {
+        if (button && button.isConnected) {
+            button.disabled = false;
+            button.textContent = originalText || "Check and Delete All Unlinked PDFs";
+        }
+        updateCloudflareUnlinkedDeleteButton();
+    }
+
+    return false;
+}
+
 function deleteAllCloudflareOrphanPdfs(button) {
-    return deleteSelectedCloudflareUnlinkedPdfs(button);
+    return checkAndDeleteAllCloudflareUnlinkedPdfs(button);
 }
 
 function updatePdfShareRow(row, data) {
