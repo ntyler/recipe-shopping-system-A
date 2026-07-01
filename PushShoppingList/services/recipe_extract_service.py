@@ -12355,6 +12355,14 @@ def build_menu_batch_inference_result(recipe_url, stub, menu_item, inference, mo
         or stub.get("difficulty_level")
         or ""
     )
+    estimated_cost = clean_recipe_text(
+        inference.get("estimated_cost")
+        or inference.get("cost_estimate")
+        or stub.get("estimated_cost")
+        or ""
+    )
+    ai_provider = clean_recipe_text(inference.get("ai_provider") or inference.get("provider") or "")
+    ollama_model = clean_recipe_text(inference.get("ollama_model") or "")
     category_metadata = _menu_recipe_category_metadata(inference, menu_item)
 
     recipe = {
@@ -12367,6 +12375,7 @@ def build_menu_batch_inference_result(recipe_url, stub, menu_item, inference, mo
         "cook_time": cook_time,
         "total_time": total_time,
         "level": difficulty_level or clean_recipe_text(stub.get("level") or ""),
+        "estimated_cost": estimated_cost,
         "source_type": "menu_item_inferred",
         "ai_inferred": True,
         "needs_ai_recipe": False,
@@ -12400,6 +12409,10 @@ def build_menu_batch_inference_result(recipe_url, stub, menu_item, inference, mo
             "AI-inferred from a restaurant menu item, not an exact restaurant recipe.",
         ],
     }
+    if ai_provider:
+        recipe["ai_provider"] = ai_provider
+    if ollama_model:
+        recipe["ollama_model"] = ollama_model
     recipe = attach_menu_item_metadata(recipe, menu_item)
     recipe["recipe_record_url"] = recipe_url
     recipe["source_url"] = recipe_url
@@ -12415,6 +12428,11 @@ def build_menu_batch_inference_result(recipe_url, stub, menu_item, inference, mo
         "cook_time": cook_time,
         "total_time": total_time,
         "difficulty_level": difficulty_level,
+        "estimated_cost": estimated_cost,
+        "ai_provider": ai_provider or None,
+        "ollama_model": ollama_model or None,
+        "fallback_used": bool(inference.get("fallback_used")),
+        "fallback_reason": clean_recipe_text(inference.get("fallback_reason") or ""),
         "confidence": confidence,
         "model": model or resolve_menu_model(),
         "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
@@ -12473,6 +12491,9 @@ def build_menu_batch_inference_result(recipe_url, stub, menu_item, inference, mo
         "model": normalized.get("model", ""),
         "model_used": normalized.get("model_used", ""),
         "model_source": normalized.get("model_source", ""),
+        "estimated_cost": normalized.get("estimated_cost", ""),
+        "ai_provider": normalized.get("ai_provider", ""),
+        "ollama_model": normalized.get("ollama_model", ""),
         "raw": normalized,
         "inference": inference,
         **{

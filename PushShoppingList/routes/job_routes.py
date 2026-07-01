@@ -36,6 +36,11 @@ from PushShoppingList.services.recipe_extract_service import resolve_menu_model
 from PushShoppingList.services.recipe_extract_service import resolve_menu_model_source
 from PushShoppingList.services.recipe_extract_service import resolve_vision_model
 from PushShoppingList.services.recipe_extract_service import resolve_vision_model_source
+from PushShoppingList.services.ollama_service import OLLAMA_BASE_URL_ENV_VAR
+from PushShoppingList.services.ollama_service import OLLAMA_FULL_RECIPE_MODEL_ENV_VAR
+from PushShoppingList.services.ollama_service import OLLAMA_PROVIDER_AUTO
+from PushShoppingList.services.ollama_service import ollama_base_url
+from PushShoppingList.services.ollama_service import ollama_full_recipe_model
 from PushShoppingList.services.openai_model_service import model_value_for_env as active_model_value_for_env
 from PushShoppingList.services.storage_service import active_guest_session_id
 from PushShoppingList.services.storage_service import active_user_id
@@ -256,8 +261,7 @@ def debug_job_queue_route():
     })
 
 
-@job_bp.route("/api/jobs/menu-generate-recipes", methods=["POST"])
-def start_menu_generate_recipes_job_route():
+def start_menu_generate_recipes_job(ollama_support=False):
     payload = json_payload()
     urls = urls_from_payload(payload, "recipe_url", "url", "source_url")
     recipe_urls = payload.get("recipe_urls")
@@ -276,28 +280,64 @@ def start_menu_generate_recipes_job_route():
     ).strip().lower()
     if enrichment_mode not in {"fast", "full"}:
         enrichment_mode = ""
+    if ollama_support:
+        enrichment_mode = "full"
 
     payload = {
         **payload,
         "recipe_urls": urls,
         "force_reprocess": payload_truthy(payload, "force_reprocess", False),
     }
+    if ollama_support:
+        payload.update({
+            "menu_enrichment_mode": "full",
+            "ai_provider": OLLAMA_PROVIDER_AUTO,
+            "provider": OLLAMA_PROVIDER_AUTO,
+            "ollama_support": True,
+            "ollama_model": ollama_full_recipe_model(),
+            "ollama_base_url": ollama_base_url(),
+            "ollama_model_env_var": OLLAMA_FULL_RECIPE_MODEL_ENV_VAR,
+            "ollama_base_url_env_var": OLLAMA_BASE_URL_ENV_VAR,
+        })
     if enrichment_mode:
         payload["menu_enrichment_mode"] = enrichment_mode
     effective_enrichment_mode = enrichment_mode or "fast"
-    recipe_model_resolution = menu_item_recipe_model_resolution(effective_enrichment_mode)
-    recipe_model_env_var = (
-        OPENAI_MENU_FAST_RECIPE_MODEL_ENV_VAR
-        if effective_enrichment_mode == "fast"
-        else OPENAI_MENU_RECIPE_MODEL_ENV_VAR
-    )
+    if ollama_support:
+        recipe_model_resolution = None
+        recipe_model_env_var = OLLAMA_FULL_RECIPE_MODEL_ENV_VAR
+        model_used = ollama_full_recipe_model()
+        model_source = OLLAMA_PROVIDER_AUTO
+    else:
+        recipe_model_resolution = menu_item_recipe_model_resolution(effective_enrichment_mode)
+        recipe_model_env_var = (
+            OPENAI_MENU_FAST_RECIPE_MODEL_ENV_VAR
+            if effective_enrichment_mode == "fast"
+            else OPENAI_MENU_RECIPE_MODEL_ENV_VAR
+        )
+        model_used = recipe_model_resolution.model
+        model_source = recipe_model_resolution.source
     payload = with_model_metadata(
         payload,
-        model_used=recipe_model_resolution.model,
-        model_source=recipe_model_resolution.source,
+        model_used=model_used,
+        model_source=model_source,
         model_env_var=recipe_model_env_var,
     )
+    if ollama_support:
+        print(
+            "[MenuRecipeGeneration] action=generate-full-recipes-ollama-support_requested "
+            f"total_items={len(urls)} ollama_model={model_used} ollama_base_url={payload.get('ollama_base_url', '')}"
+        )
     return create_and_enqueue("menu-generate-recipes", payload, total_items=len(urls))
+
+
+@job_bp.route("/api/jobs/menu-generate-recipes", methods=["POST"])
+def start_menu_generate_recipes_job_route():
+    return start_menu_generate_recipes_job(ollama_support=False)
+
+
+@job_bp.route("/api/jobs/menu-generate-recipes-ollama", methods=["POST"])
+def start_menu_generate_recipes_ollama_job_route():
+    return start_menu_generate_recipes_job(ollama_support=True)
 
 
 def menu_generate_recipe_urls_from_payload(payload):

@@ -360,6 +360,47 @@ def test_menu_generate_route_returns_trigger_item_source_link(monkeypatch, tmp_p
     assert data["job"]["source_items"][0]["recipe_url"] == recipe_url
 
 
+def test_menu_generate_ollama_route_sets_provider_metadata(monkeypatch, tmp_path):
+    configure_job_paths(monkeypatch, tmp_path)
+    monkeypatch.setattr(openai_model_service, "MODEL_OVERRIDES_FILE", tmp_path / "openai_model_overrides.json")
+    monkeypatch.setenv("OLLAMA_FULL_RECIPE_MODEL", "qwen-test:14b")
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    recipe_url = "https://www.velasiancuisine.com/rs/menu_home.action?resInput=RES4902&menu_item=spring-roll"
+    monkeypatch.setattr(
+        job_routes,
+        "enqueue_job",
+        lambda job_id, **kwargs: {"ok": True, "mode": "test", "job_id": job_id, **kwargs},
+    )
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["user_id"] = "owner"
+
+        response = client.post(
+            "/api/jobs/menu-generate-recipes-ollama",
+            json={"recipe_urls": [recipe_url], "menu_enrichment_mode": "fast"},
+            headers={"X-Requested-With": "fetch"},
+        )
+        data = response.get_json()
+
+    job = job_service.get_job(data["job_id"])
+    payload = job["input_payload"]
+
+    assert response.status_code == 202
+    assert data["job"]["job_type"] == "menu-generate-recipes"
+    assert data["job"]["model_used"] == "qwen-test:14b"
+    assert data["job"]["model_source"] == "auto_ollama_openai"
+    assert data["job"]["model_env_var"] == "OLLAMA_FULL_RECIPE_MODEL"
+    assert payload["menu_enrichment_mode"] == "full"
+    assert payload["ai_provider"] == "auto_ollama_openai"
+    assert payload["ollama_support"] is True
+    assert payload["ollama_model"] == "qwen-test:14b"
+    assert payload["ollama_base_url"] == "http://localhost:11434"
+    assert payload["recipe_urls"] == [recipe_url]
+
+
 def test_cancelled_menu_generate_job_resume_queues_only_remaining_urls(monkeypatch, tmp_path):
     configure_job_paths(monkeypatch, tmp_path)
     recipe_urls = [

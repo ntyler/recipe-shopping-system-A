@@ -41,3 +41,7 @@ PushShoppingList/static/generated/**/*__card.webp
 PushShoppingList/static/generated/**/*__detail.webp
 shopping_app_*.log
 flask_*.log
+
+# Local secrets
+.env
+*.env

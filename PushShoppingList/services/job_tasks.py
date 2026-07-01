@@ -201,6 +201,9 @@ def job_start_metadata(job):
     from PushShoppingList.services.recipe_extract_service import resolve_menu_model_source
     from PushShoppingList.services.recipe_extract_service import resolve_vision_model
     from PushShoppingList.services.recipe_extract_service import resolve_vision_model_source
+    from PushShoppingList.services.ollama_service import OLLAMA_FULL_RECIPE_MODEL_ENV_VAR
+    from PushShoppingList.services.ollama_service import OLLAMA_PROVIDER_AUTO
+    from PushShoppingList.services.ollama_service import ollama_full_recipe_model
 
     job = job if isinstance(job, dict) else {}
     payload = job.get("input_payload") if isinstance(job.get("input_payload"), dict) else {}
@@ -217,6 +220,13 @@ def job_start_metadata(job):
 
     if job_type == "menu-generate-recipes":
         enrichment_mode = menu_enrichment_mode(payload)
+        ai_provider = str(payload.get("ai_provider") or payload.get("provider") or "").strip().lower()
+        if payload_bool(payload, "ollama_support", False) or ai_provider == OLLAMA_PROVIDER_AUTO:
+            return model_metadata(
+                ollama_full_recipe_model(),
+                OLLAMA_PROVIDER_AUTO,
+                OLLAMA_FULL_RECIPE_MODEL_ENV_VAR,
+            )
         model_resolution = menu_item_recipe_model_resolution(enrichment_mode)
         model_env_var = (
             OPENAI_MENU_FAST_RECIPE_MODEL_ENV_VAR
@@ -751,6 +761,12 @@ def run_menu_generate_recipes_job(job_id, payload):
     from PushShoppingList.services.recipe_extract_service import save_menu_batch_inference_results
     from PushShoppingList.services.recipe_url_service import add_recipe_urls
     from PushShoppingList.services.recipe_url_service import save_recipe_url_names
+    from PushShoppingList.services.ollama_service import OLLAMA_FULL_RECIPE_MODEL_ENV_VAR
+    from PushShoppingList.services.ollama_service import OLLAMA_PROVIDER_AUTO
+    from PushShoppingList.services.ollama_service import OLLAMA_PROVIDER_LABEL
+    from PushShoppingList.services.ollama_service import infer_menu_item_recipe_batch_with_ollama_support
+    from PushShoppingList.services.ollama_service import ollama_base_url
+    from PushShoppingList.services.ollama_service import ollama_full_recipe_model
     from PushShoppingList.services.storage_service import active_user_id
     from PushShoppingList.services.cookbook_service import cookbook_recipe_assignment_for_url
 
@@ -758,6 +774,11 @@ def run_menu_generate_recipes_job(job_id, payload):
     job_started_at = time.perf_counter()
     enrichment_mode = menu_enrichment_mode(payload)
     fast_mode = enrichment_mode == "fast"
+    ai_provider = str(payload.get("ai_provider") or payload.get("provider") or "").strip().lower()
+    ollama_support = (not fast_mode) and (
+        payload_bool(payload, "ollama_support", False)
+        or ai_provider == OLLAMA_PROVIDER_AUTO
+    )
     force_reprocess = payload_bool(payload, "force_reprocess", False)
     run_heavy_tasks = (not fast_mode) and payload_bool(payload, "run_deferred_heavy_tasks", True)
     recipe_batch_size = menu_recipe_batch_size(enrichment_mode)
@@ -779,11 +800,31 @@ def run_menu_generate_recipes_job(job_id, payload):
         if fast_mode
         else OPENAI_MENU_RECIPE_MODEL_ENV_VAR
     )
-    model_info = stored_job_model_metadata(job_id, model_metadata(
-        recipe_model_resolution.model,
-        recipe_model_resolution.source,
-        recipe_model_env_var,
-    ))
+    provider_static_payload = {}
+    if ollama_support:
+        recipe_model_env_var = OLLAMA_FULL_RECIPE_MODEL_ENV_VAR
+        provider_static_payload = {
+            "ai_provider": OLLAMA_PROVIDER_AUTO,
+            "provider": OLLAMA_PROVIDER_AUTO,
+            "provider_label": OLLAMA_PROVIDER_LABEL,
+            "ollama_support": True,
+            "ollama_model": str(payload.get("ollama_model") or ollama_full_recipe_model()).strip() or ollama_full_recipe_model(),
+            "ollama_base_url": str(payload.get("ollama_base_url") or ollama_base_url()).strip() or ollama_base_url(),
+            "openai_fallback_model": recipe_model_resolution.model,
+            "openai_fallback_model_source": recipe_model_resolution.source,
+        }
+        model_info = stored_job_model_metadata(job_id, model_metadata(
+            provider_static_payload["ollama_model"],
+            OLLAMA_PROVIDER_AUTO,
+            recipe_model_env_var,
+        ))
+        model_info = {**model_info, **provider_static_payload}
+    else:
+        model_info = stored_job_model_metadata(job_id, model_metadata(
+            recipe_model_resolution.model,
+            recipe_model_resolution.source,
+            recipe_model_env_var,
+        ))
     created_urls = []
     skipped_urls = []
     failed_items = 0
@@ -795,9 +836,30 @@ def run_menu_generate_recipes_job(job_id, payload):
     nutrition_failed_count = 0
     generated_recipe_results = {}
     failed_recipe_items = []
+    ollama_success_count = 0
+    openai_fallback_count = 0
+    openai_fallback_success_count = 0
+    ollama_failed_count = 0
+    ollama_low_confidence_count = 0
+    ollama_json_invalid_count = 0
 
     def elapsed_seconds():
         return max(0.0, time.perf_counter() - job_started_at)
+
+    def provider_result_payload():
+        if not ollama_support:
+            return {}
+        return {
+            **provider_static_payload,
+            "ollama_success_count": ollama_success_count,
+            "openai_fallback_count": openai_fallback_count,
+            "openai_fallback_success_count": openai_fallback_success_count,
+            "ollama_failed_count": ollama_failed_count,
+            "ollama_low_confidence_count": ollama_low_confidence_count,
+            "ollama_json_invalid_count": ollama_json_invalid_count,
+            "fallback_used": openai_fallback_count > 0,
+            "openai_fallback_summary": f"OpenAI fallback used for {openai_fallback_count} of {total} items",
+        }
 
     def update_menu_progress(progress_stage, **kwargs):
         progress_started = time.perf_counter()
@@ -996,8 +1058,15 @@ def run_menu_generate_recipes_job(job_id, payload):
         f"batch_rate_limited_processor={batch_processor_enabled} "
         f"batch_max_requests_per_minute={batch_dispatch_limiter.max_requests_per_minute:g} "
         f"batch_max_tokens_per_minute={batch_dispatch_limiter.max_tokens_per_minute:g} "
-        f"model={recipe_model_resolution.model}"
+        f"model={model_info.get('model_used') or recipe_model_resolution.model}"
     )
+    if ollama_support:
+        print(
+            "[MenuRecipeGeneration] action=generate-full-recipes-ollama-support_start "
+            f"job_id={job_id} total_items={total} pending_items={len(pending_entries)} "
+            f"provider={OLLAMA_PROVIDER_AUTO} ollama_model={provider_static_payload.get('ollama_model', '')} "
+            f"openai_fallback_model={recipe_model_resolution.model}"
+        )
     if batch_total:
         print(
             "[Job Worker] action=menu-item-recipe-batch-parallel-start "
@@ -1005,7 +1074,7 @@ def run_menu_generate_recipes_job(job_id, payload):
             f"item_count={len(pending_entries)}"
         )
 
-    def call_infer_prediction_batch(batch, cancellation_check):
+    def call_openai_prediction_batch(batch, cancellation_check):
         variants = [
             {
                 "user_id": inference_user_id,
@@ -1041,6 +1110,17 @@ def run_menu_generate_recipes_job(job_id, payload):
         if last_type_error:
             raise last_type_error
         return infer_menu_item_recipe_batch(batch, user_id=inference_user_id)
+
+    def call_infer_prediction_batch(batch, cancellation_check):
+        if not ollama_support:
+            return call_openai_prediction_batch(batch, cancellation_check)
+        return infer_menu_item_recipe_batch_with_ollama_support(
+            batch,
+            user_id=inference_user_id,
+            model_resolution=recipe_model_resolution,
+            openai_infer_batch=call_openai_prediction_batch,
+            cancellation_check=cancellation_check,
+        )
 
     def run_prediction_batch(batch_index, batch):
         with job_context(
@@ -1125,11 +1205,25 @@ def run_menu_generate_recipes_job(job_id, payload):
 
     def record_prediction_result(batch_index, batch_result):
         nonlocal predicted_batches_completed
+        nonlocal ollama_success_count
+        nonlocal openai_fallback_count
+        nonlocal openai_fallback_success_count
+        nonlocal ollama_failed_count
+        nonlocal ollama_low_confidence_count
+        nonlocal ollama_json_invalid_count
         raise_if_menu_enrichment_cancelled(
             "record_prediction_result",
             batch=f"{batch_index}/{batch_total}",
         )
         predicted_batches_completed += 1
+        if ollama_support and isinstance(batch_result, dict):
+            provider_summary = batch_result.get("provider_summary") if isinstance(batch_result.get("provider_summary"), dict) else batch_result
+            ollama_success_count += int(provider_summary.get("ollama_success_count") or 0)
+            openai_fallback_count += int(provider_summary.get("openai_fallback_count") or 0)
+            openai_fallback_success_count += int(provider_summary.get("openai_fallback_success_count") or 0)
+            ollama_failed_count += int(provider_summary.get("ollama_failed_count") or 0)
+            ollama_low_confidence_count += int(provider_summary.get("ollama_low_confidence_count") or 0)
+            ollama_json_invalid_count += int(provider_summary.get("ollama_json_invalid_count") or 0)
         update_menu_progress(
             "ai_generation",
             current_step=f"AI generation: batch {predicted_batches_completed} of {batch_total}",
@@ -1151,6 +1245,7 @@ def run_menu_generate_recipes_job(job_id, payload):
                 "batch_index": batch_index,
                 "batch_workers": batch_worker_count,
                 "recipe_batch_size": recipe_batch_size,
+                **provider_result_payload(),
                 **batch_dispatch_payload(),
             },
         )
@@ -1702,6 +1797,7 @@ def run_menu_generate_recipes_job(job_id, payload):
             "batch_workers": batch_worker_count,
             "recipe_batch_size": recipe_batch_size,
             **batch_dispatch_payload(),
+            **provider_result_payload(),
             "menu_enrichment_mode": enrichment_mode,
             "enrichment_deferred": False,
             "run_generated_pdfs": False,
@@ -1828,6 +1924,7 @@ def run_menu_generate_recipes_job(job_id, payload):
             "menu_enrichment_mode": enrichment_mode,
             "deferred_heavy_tasks_job": heavy_job,
             "deferred_heavy_tasks_job_id": heavy_job.get("job_id", ""),
+            **provider_result_payload(),
             "enrichment_deferred": True,
             "run_generated_pdfs": bool(run_generated_pdfs),
             "stage": "Complete",
@@ -2335,6 +2432,7 @@ def run_menu_generate_recipes_job(job_id, payload):
         "batch_workers": batch_worker_count,
         "recipe_batch_size": recipe_batch_size,
         **batch_dispatch_payload(),
+        **provider_result_payload(),
         "menu_enrichment_mode": enrichment_mode,
         "deferred_heavy_tasks_job": heavy_job,
         "deferred_heavy_tasks_job_id": heavy_job.get("job_id", ""),

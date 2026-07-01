@@ -528,19 +528,35 @@ function renderJobSourceList(job, itemFilter = jobActivityItemFilter) {
 }
 
 function renderJobModelDetails(job) {
+    const result = jobResultPayload(job);
     const model = String((job && job.model_used) || "").trim();
     const envVar = String((job && job.model_env_var) || "").trim();
     const source = String((job && job.model_source) || "").trim();
+    const providerLabel = String(result.provider_label || "").trim();
+    const ollamaModel = String(result.ollama_model || "").trim();
+    const fallbackSummary = String(result.openai_fallback_summary || "").trim();
+    const fallbackUsed = Boolean(result.fallback_used);
     const parts = [];
 
+    if (providerLabel) {
+        parts.push(`<span>Provider: <strong>${escapeHtml(providerLabel)}</strong></span>`);
+    }
     if (model) {
         parts.push(`<span>Model: <strong>${escapeHtml(model)}</strong></span>`);
+    }
+    if (ollamaModel && ollamaModel !== model) {
+        parts.push(`<span>Ollama Model: <strong>${escapeHtml(ollamaModel)}</strong></span>`);
+    } else if (ollamaModel && providerLabel) {
+        parts.push(`<span>Ollama Model: <strong>${escapeHtml(ollamaModel)}</strong></span>`);
     }
     if (envVar) {
         parts.push(`<span>Env: <strong>${escapeHtml(envVar)}</strong></span>`);
     }
     if (source) {
         parts.push(`<span>Source: <strong>${escapeHtml(source)}</strong></span>`);
+    }
+    if (fallbackUsed && fallbackSummary) {
+        parts.push(`<span>${escapeHtml(fallbackSummary)}</span>`);
     }
 
     return parts.length ? `<div class="job-activity-model">${parts.join("")}</div>` : "";
@@ -1792,9 +1808,10 @@ function mergeJobActivityUpdates(updatedJobs, existingJobs = lastJobActivityJobs
     ]);
 }
 
-async function startMenuEnrichmentFromJobActivity(jobId, button, enrichmentMode = "fast") {
+async function startMenuEnrichmentJobFromJobActivity(jobId, button, enrichmentMode = "fast", options = {}) {
     jobId = String(jobId || "").trim();
     enrichmentMode = String(enrichmentMode || "").trim().toLowerCase() === "full" ? "full" : "fast";
+    const ollamaSupport = Boolean(options.ollamaSupport);
     const summary = jobActivitySummaryElement();
     if (!jobId) {
         if (summary) {
@@ -1818,10 +1835,13 @@ async function startMenuEnrichmentFromJobActivity(jobId, button, enrichmentMode 
             enrichmentMode,
             runDeferredHeavyTasks: enrichmentMode === "full",
             sourceJobId: jobId,
+            ollamaSupport,
         });
 
         if (summary) {
-            const label = enrichmentMode === "full" ? "full recipe enrichment" : "fast recipe generation";
+            const label = ollamaSupport
+                ? "full recipe enrichment with Ollama support"
+                : enrichmentMode === "full" ? "full recipe enrichment" : "fast recipe generation";
             summary.textContent = `Queued ${label} for ${recipeUrls.length} menu item${recipeUrls.length === 1 ? "" : "s"}.`;
         }
         await refreshJobActivityPanel();
@@ -1832,6 +1852,14 @@ async function startMenuEnrichmentFromJobActivity(jobId, button, enrichmentMode 
     }
 
     return false;
+}
+
+async function startMenuEnrichmentFromJobActivity(jobId, button, enrichmentMode = "fast") {
+    return startMenuEnrichmentJobFromJobActivity(jobId, button, enrichmentMode);
+}
+
+async function startMenuOllamaSupportFromJobActivity(jobId, button) {
+    return startMenuEnrichmentJobFromJobActivity(jobId, button, "full", { ollamaSupport: true });
 }
 
 async function resumeJobActivityJob(jobId, button) {
@@ -2002,7 +2030,8 @@ function renderJobActivityRow(job, index = 0) {
         : "";
     const startEnrichmentButton = jobCanStartMenuEnrichment(job)
         ? `<button type="button" class="job-activity-row-action job-activity-enrichment-action" onclick="return startMenuEnrichmentFromJobActivity('${escapeAttribute(job.id || job.job_id || "")}', this, 'fast')">Generate Fast Recipes</button>
-           <button type="button" class="job-activity-row-action job-activity-enrichment-action" onclick="return startMenuEnrichmentFromJobActivity('${escapeAttribute(job.id || job.job_id || "")}', this, 'full')">Generate Full Recipes</button>`
+           <button type="button" class="job-activity-row-action job-activity-enrichment-action" onclick="return startMenuEnrichmentFromJobActivity('${escapeAttribute(job.id || job.job_id || "")}', this, 'full')">Generate Full Recipes</button>
+           <button type="button" class="job-activity-row-action job-activity-enrichment-action" onclick="return startMenuOllamaSupportFromJobActivity('${escapeAttribute(job.id || job.job_id || "")}', this)">Generate Full Recipes (Ollama support)</button>`
         : "";
     const retryButton = job.status === "failed"
         ? `<button type="button" class="job-activity-row-action" onclick="return retryJobActivityJob('${escapeAttribute(job.id || job.job_id || "")}')">Retry</button>`
@@ -30309,21 +30338,29 @@ async function startMenuRecipeGeneration(urls, button, options = {}) {
     }
     const enrichmentMode = String(options.enrichmentMode || "fast").trim().toLowerCase() === "full" ? "full" : "fast";
     const forceReprocess = Boolean(options.forceReprocess);
+    const ollamaSupport = Boolean(options.ollamaSupport);
     const modeLabel = enrichmentMode === "full" ? "full recipe enrichment" : "fast recipe generation";
     if (urls.length > 25 && !window.confirm(`This will run ${modeLabel} for ${urls.length} menu items and may increase API cost. Continue?`)) {
         return false;
     }
 
-    const startData = await startBackgroundJob("/api/jobs/menu-generate-recipes", {
+    const payload = {
+        recipe_urls: urls,
+        force_reprocess: forceReprocess,
+        menu_enrichment_mode: enrichmentMode,
+        run_deferred_heavy_tasks: enrichmentMode === "full" && options.runDeferredHeavyTasks !== false,
+        source_job_id: options.sourceJobId || "",
+    };
+    if (ollamaSupport) {
+        payload.ai_provider = "auto_ollama_openai";
+        payload.provider = "auto_ollama_openai";
+        payload.ollama_support = true;
+    }
+
+    const startData = await startBackgroundJob(ollamaSupport ? "/api/jobs/menu-generate-recipes-ollama" : "/api/jobs/menu-generate-recipes", {
         button,
         creatingText: "Starting...",
-        payload: {
-            recipe_urls: urls,
-            force_reprocess: forceReprocess,
-            menu_enrichment_mode: enrichmentMode,
-            run_deferred_heavy_tasks: enrichmentMode === "full" && options.runDeferredHeavyTasks !== false,
-            source_job_id: options.sourceJobId || "",
-        },
+        payload,
     });
     if (!startData || !startData.job_id) {
         throw new Error("Unable to start menu recipe generation.");
