@@ -20990,6 +20990,14 @@ body {
     box-shadow: inset 4px 0 0 #eab308;
 }
 
+.ai-pantry-review-row-frozen-in-time {
+    border-color: #1d6d64;
+    background:
+        linear-gradient(90deg, rgba(13, 88, 78, 0.30), rgba(27, 31, 32, 0.96) 42%),
+        #1b1f20;
+    box-shadow: inset 4px 0 0 #14b8a6;
+}
+
 .ai-pantry-review-select {
     display: flex;
     align-items: center;
@@ -21028,6 +21036,11 @@ body {
 .ai-pantry-review-row-due-soon .ai-pantry-review-date-badge {
     color: #fef08a;
     background: rgba(113, 63, 18, 0.22);
+}
+
+.ai-pantry-review-row-frozen-in-time .ai-pantry-review-date-badge {
+    color: #ccfbf1;
+    background: rgba(13, 88, 78, 0.26);
 }
 
 .ai-pantry-review-dates {
@@ -21092,6 +21105,15 @@ body {
 
 .ai-pantry-date-field-due-soon small {
     color: #fef08a;
+}
+
+.ai-pantry-date-field-frozen-safe input {
+    border-color: #14b8a6;
+    background: rgba(13, 88, 78, 0.26);
+}
+
+.ai-pantry-date-field-frozen-safe small {
+    color: #ccfbf1;
 }
 
 .ai-pantry-recipe-header {

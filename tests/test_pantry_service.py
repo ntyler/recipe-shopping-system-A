@@ -71,6 +71,32 @@ def test_purchased_chicken_gets_freeze_and_expiration_suggestions(monkeypatch, t
     assert item["expiration_date"] == "2026-07-04"
 
 
+def test_mark_frozen_records_frozen_date(monkeypatch, tmp_path):
+    configure_scoped_data(monkeypatch, tmp_path)
+    app = create_app()
+
+    with app.test_request_context("/"):
+        session["user_id"] = "pantry-user"
+        result = pantry_service.add_or_increment_pantry_item(
+            {
+                "ingredient_name": "Chicken breasts",
+                "quantity": 1,
+                "source": "shopping_list",
+            },
+            reference_date="2026-07-02",
+        )
+        updated = pantry_service.update_pantry_item_lifecycle_action(
+            result["item"]["id"],
+            "mark_frozen",
+            reference_date="2026-07-03",
+        )
+
+    assert updated["ok"] is True
+    assert updated["item"]["status"] == "frozen"
+    assert updated["item"]["storage_location"] == "freezer"
+    assert updated["item"]["frozen_date"] == "2026-07-03"
+
+
 def test_opened_broth_gets_opened_shelf_life_suggestions(monkeypatch, tmp_path):
     configure_scoped_data(monkeypatch, tmp_path)
     app = create_app()
@@ -266,6 +292,7 @@ def test_add_receipt_candidate_saves_lifecycle_dates(monkeypatch, tmp_path):
                 "candidate_0_opened_date": "2026-07-02",
                 "candidate_0_expiration_date": "2026-07-08",
                 "candidate_0_freeze_by_date": "2026-07-05",
+                "candidate_0_frozen_date": "2026-07-04",
             },
         )
 
@@ -278,10 +305,14 @@ def test_add_receipt_candidate_saves_lifecycle_dates(monkeypatch, tmp_path):
     assert inventory[0]["opened_date"] == "2026-07-02"
     assert inventory[0]["expiration_date"] == "2026-07-08"
     assert inventory[0]["freeze_by_date"] == "2026-07-05"
+    assert inventory[0]["frozen_date"] == "2026-07-04"
+    assert inventory[0]["status"] == "frozen"
+    assert inventory[0]["storage_location"] == "freezer"
     assert "Bought 2026-07-01" in inventory[0]["notes"]
     assert "Opened 2026-07-02" in inventory[0]["notes"]
     assert "Use by 2026-07-08" in inventory[0]["notes"]
     assert "Freeze by 2026-07-05" in inventory[0]["notes"]
+    assert "Frozen on 2026-07-04" in inventory[0]["notes"]
 
 
 def test_hydrate_receipt_review_dates_uses_receipt_history(monkeypatch, tmp_path):
@@ -362,6 +393,58 @@ def test_receipt_candidate_review_status_marks_today_or_tomorrow_dates_due_soon(
     assert status["label"] == "Use by tomorrow"
 
 
+def test_receipt_candidate_review_status_suppresses_use_by_when_frozen_before_deadline():
+    status = pantry_service.receipt_candidate_review_status(
+        {
+            "expiration_date": "2026-06-29",
+            "freeze_by_date": "2026-06-29",
+            "frozen_date": "2026-06-29",
+        },
+        reference_date="2026-07-02",
+    )
+
+    assert status["row_status"] == "frozen-in-time"
+    assert status["label"] == "Frozen before deadline"
+    assert status["date_statuses"]["expiration_date"]["urgency"] == "frozen-safe"
+    assert status["date_statuses"]["freeze_by_date"]["urgency"] == "frozen-safe"
+    assert status["date_statuses"]["frozen_date"]["urgency"] == "frozen-safe"
+
+
+def test_pantry_section_marks_receipt_candidate_frozen_before_deadline(monkeypatch, tmp_path):
+    configure_scoped_data(monkeypatch, tmp_path)
+    app = create_app()
+
+    with app.test_client() as client:
+        sign_in(client)
+        with client.session_transaction() as session:
+            session["pantry_receipt_review"] = {
+                "receipt_id": "receipt-1",
+                "candidates": [
+                    {
+                        "raw_line": "65000000000    ATLANTIC SALMO    19.98  F",
+                        "product_name": "Atlantic Salmo",
+                        "normalized_name": "salmon",
+                        "quantity": 2,
+                        "confidence": 0.85,
+                        "purchased_date": "2026-06-28",
+                        "expiration_date": "2026-06-29",
+                        "freeze_by_date": "2026-06-29",
+                        "frozen_date": "2026-06-29",
+                    }
+                ],
+            }
+
+        response = client.get("/sections/pantry")
+        html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "ai-pantry-review-row-frozen-in-time" in html
+    assert "Frozen before deadline" in html
+    assert "Original use by preserved" in html
+    assert "Freeze deadline met" in html
+    assert "ai-pantry-date-field-frozen-safe" in html
+
+
 def test_pantry_section_hydrates_old_receipt_review_dates(monkeypatch, tmp_path):
     configure_scoped_data(monkeypatch, tmp_path)
     monkeypatch.setattr(pantry_service, "PANTRY_RECEIPT_HISTORY_FILE", tmp_path / "pantry_receipt_history.json")
@@ -403,6 +486,7 @@ def test_pantry_section_hydrates_old_receipt_review_dates(monkeypatch, tmp_path)
     assert 'name="candidate_0_purchased_date"' in html
     assert 'name="candidate_0_expiration_date"' in html
     assert 'name="candidate_0_freeze_by_date"' in html
+    assert 'name="candidate_0_frozen_date"' in html
     assert 'value="2026-06-28"' in html
     assert 'value="2026-06-29"' in html
 
@@ -531,20 +615,24 @@ def test_ai_pantry_template_includes_lifecycle_controls():
     assert "pantry-lifecycle-badge" in template
     assert 'name="opened_date"' in template
     assert 'name="freeze_by_date"' in template
+    assert 'name="frozen_date"' in template
     assert "ai-pantry-add-date-label" in template
     assert "ai-pantry-review-dates" in template
     assert 'name="candidate_{{ loop.index0 }}_purchased_date"' in template
     assert 'name="candidate_{{ loop.index0 }}_opened_date"' in template
     assert 'name="candidate_{{ loop.index0 }}_expiration_date"' in template
     assert 'name="candidate_{{ loop.index0 }}_freeze_by_date"' in template
+    assert 'name="candidate_{{ loop.index0 }}_frozen_date"' in template
     assert "ai-pantry-review-row-{{ review_status.row_status or 'fresh' }}" in template
     assert "ai-pantry-review-date-badge" in template
     assert "ai-pantry-date-field-{{ use_by_status.urgency or 'fresh' }}" in template
     assert "ai-pantry-date-field-{{ freeze_by_status.urgency or 'fresh' }}" in template
+    assert "ai-pantry-date-field-{{ frozen_status.urgency or 'fresh' }}" in template
     assert "<span>Bought</span>" in template
     assert "<span>Opened</span>" in template
     assert "<span>Use by</span>" in template
     assert "<span>Freeze by</span>" in template
+    assert "<span>Frozen on</span>" in template
     assert "mark_opened" in template
 
 

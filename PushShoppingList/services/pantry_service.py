@@ -23,6 +23,7 @@ PANTRY_DATE_FIELDS = (
     "opened_date",
     "expiration_date",
     "freeze_by_date",
+    "frozen_date",
     "reminder_dismissed_until",
 )
 PANTRY_STATUS_VALUES = {"available", "opened", "frozen", "used"}
@@ -252,8 +253,11 @@ def normalize_pantry_item(item):
     ingredient_name = str(item.get("ingredient_name") or item.get("product_name") or "").strip()
     normalized_name = normalize_ingredient_name(item.get("normalized_name") or ingredient_name)
     opened_date = normalize_date_value(item.get("opened_date"))
+    frozen_date = normalize_date_value(item.get("frozen_date"))
     storage_location = clean_storage_location(item.get("storage_location"))
-    status = clean_pantry_status(item.get("status") or ("opened" if opened_date else "available"))
+    status = clean_pantry_status(item.get("status") or ("frozen" if frozen_date else ("opened" if opened_date else "available")))
+    if frozen_date and not storage_location:
+        storage_location = "freezer"
 
     return {
         "id": str(item.get("id") or uuid.uuid4().hex),
@@ -273,6 +277,7 @@ def normalize_pantry_item(item):
         "opened_date": opened_date,
         "expiration_date": normalize_date_value(item.get("expiration_date")),
         "freeze_by_date": normalize_date_value(item.get("freeze_by_date")),
+        "frozen_date": frozen_date,
         "storage_location": storage_location,
         "status": status,
         "reminder_enabled": clean_bool(item.get("reminder_enabled"), default=True),
@@ -610,6 +615,7 @@ def update_pantry_item_lifecycle_action(item_id, action, user_id=None, guest_ses
             item_id,
             {
                 "status": "frozen",
+                "frozen_date": today,
                 "storage_location": "freezer",
                 "reminder_dismissed_until": "",
             },
@@ -674,6 +680,35 @@ def pantry_target_dates(item):
     )
 
 
+def pantry_freeze_deadline(item):
+    freeze_by = parse_date_value(item.get("freeze_by_date"))
+    if freeze_by:
+        return {
+            "field": "freeze_by_date",
+            "date": freeze_by,
+            "value": item.get("freeze_by_date", ""),
+            "label": "Freeze by",
+        }
+
+    use_by = parse_date_value(item.get("expiration_date"))
+    if use_by:
+        return {
+            "field": "expiration_date",
+            "date": use_by,
+            "value": item.get("expiration_date", ""),
+            "label": "Use by",
+        }
+
+    return {}
+
+
+def frozen_on_or_before_deadline(item):
+    frozen_date = parse_date_value(item.get("frozen_date"))
+    deadline = pantry_freeze_deadline(item)
+    deadline_date = deadline.get("date")
+    return bool(frozen_date and deadline_date and frozen_date <= deadline_date)
+
+
 def pantry_item_lifecycle_status(item, reference_date=None):
     today = parse_date_value(reference_date) or datetime.utcnow().date()
     status = clean_pantry_status(item.get("status"))
@@ -687,10 +722,31 @@ def pantry_item_lifecycle_status(item, reference_date=None):
             "sort_key": (99, ""),
         }
     if status == "frozen":
+        frozen_label = date_label(item.get("frozen_date"))
+        deadline = pantry_freeze_deadline(item)
+        deadline_date = deadline.get("date")
+        frozen_date = parse_date_value(item.get("frozen_date"))
+        deadline_text = deadline.get("label", "deadline")
+
+        if frozen_date and deadline_date and frozen_date > deadline_date:
+            return {
+                "key": "frozen_late",
+                "label": "Frozen late",
+                "detail": f"Frozen after {deadline_text}",
+                "urgency": "soon",
+                "sort_key": (4, item.get("frozen_date", "")),
+            }
+
+        detail = "Stored in freezer"
+        if frozen_label and deadline_date:
+            detail = f"Frozen {frozen_label} before {deadline_text}"
+        elif frozen_label:
+            detail = f"Frozen {frozen_label}"
+
         return {
             "key": "frozen",
             "label": "Frozen",
-            "detail": "Stored in freezer",
+            "detail": detail,
             "urgency": "safe",
             "sort_key": (90, ""),
         }
@@ -793,6 +849,36 @@ def receipt_candidate_review_status(candidate, reference_date=None):
         field: receipt_candidate_date_status(field, candidate.get(field), reference_date=reference_date)
         for field in ("expiration_date", "freeze_by_date")
     }
+    if candidate.get("frozen_date"):
+        statuses["frozen_date"] = receipt_candidate_date_status("frozen_date", candidate.get("frozen_date"), reference_date=reference_date) or {
+            "key": "frozen-recorded",
+            "urgency": "fresh",
+            "label": "Frozen date recorded",
+        }
+
+    if frozen_on_or_before_deadline(candidate):
+        statuses["frozen_date"] = {
+            "key": "frozen-in-time",
+            "urgency": "frozen-safe",
+            "label": "Frozen before deadline",
+        }
+        for field, label in (
+            ("expiration_date", "Original use by preserved"),
+            ("freeze_by_date", "Freeze deadline met"),
+        ):
+            if statuses.get(field):
+                statuses[field] = {
+                    **statuses[field],
+                    "urgency": "frozen-safe",
+                    "label": label,
+                    "suppressed_by_frozen_date": True,
+                }
+        return {
+            "row_status": "frozen-in-time",
+            "label": "Frozen before deadline",
+            "date_statuses": statuses,
+        }
+
     use_status = statuses.get("expiration_date") or {}
     freeze_status = statuses.get("freeze_by_date") or {}
 
@@ -831,6 +917,7 @@ def pantry_items_for_view():
         item["opened_date_label"] = date_label(item.get("opened_date"))
         item["expiration_date_label"] = date_label(item.get("expiration_date"))
         item["freeze_by_date_label"] = date_label(item.get("freeze_by_date"))
+        item["frozen_date_label"] = date_label(item.get("frozen_date"))
         item["lifecycle_status"] = pantry_item_lifecycle_status(item)
 
     return items
@@ -1051,6 +1138,7 @@ def receipt_candidate(line, product_name, quantity=None, price_line="", sale_lin
         "opened_date": lifecycle_dates["opened_date"],
         "expiration_date": lifecycle_dates["expiration_date"],
         "freeze_by_date": lifecycle_dates["freeze_by_date"],
+        "frozen_date": lifecycle_dates["frozen_date"],
         "confidence": receipt_line_confidence(product_name),
         "needs_review": True,
     }
@@ -1089,6 +1177,7 @@ def receipt_candidate_lifecycle_dates(product_name, normalized_name, purchased_d
         "opened_date": suggested.get("opened_date", ""),
         "expiration_date": suggested.get("expiration_date", ""),
         "freeze_by_date": suggested.get("freeze_by_date", ""),
+        "frozen_date": suggested.get("frozen_date", ""),
     }
 
 
@@ -1124,7 +1213,7 @@ def hydrate_receipt_candidate_dates(candidate, purchased_date=""):
         hydrated.get("purchased_date") or purchased_date,
     )
 
-    for field in ("purchased_date", "opened_date", "expiration_date", "freeze_by_date"):
+    for field in ("purchased_date", "opened_date", "expiration_date", "freeze_by_date", "frozen_date"):
         if not hydrated.get(field) and lifecycle_dates.get(field):
             hydrated[field] = lifecycle_dates[field]
 

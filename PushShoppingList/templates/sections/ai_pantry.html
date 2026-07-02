@@ -106,6 +106,7 @@
                                     {% if item.purchased_date_label %}<span>Bought {{ item.purchased_date_label }}</span>{% endif %}
                                     {% if item.opened_date_label %}<span>Opened {{ item.opened_date_label }}</span>{% endif %}
                                     {% if item.freeze_by_date_label %}<span>Freeze by {{ item.freeze_by_date_label }}</span>{% endif %}
+                                    {% if item.frozen_date_label %}<span>Frozen on {{ item.frozen_date_label }}</span>{% endif %}
                                     {% if item.expiration_date_label %}<span>Use by {{ item.expiration_date_label }}</span>{% endif %}
                                 </div>
                             </div>
@@ -180,6 +181,13 @@
                                            type="date"
                                            value="{{ item.freeze_by_date }}"
                                            aria-label="Freeze-by date for {{ item.ingredient_name }}">
+                                </label>
+                                <label class="ai-pantry-inventory-date-label">
+                                    <span>Frozen On</span>
+                                    <input name="frozen_date"
+                                           type="date"
+                                           value="{{ item.frozen_date }}"
+                                           aria-label="Frozen-on date for {{ item.ingredient_name }}">
                                 </label>
                                 <label class="ai-pantry-inventory-notes-label">
                                     <span>Notes</span>
@@ -312,6 +320,10 @@
                     <span>Freeze by</span>
                     <input name="freeze_by_date" type="date" aria-label="Freeze-by date">
                 </label>
+                <label class="ai-pantry-add-date-label">
+                    <span>Frozen on</span>
+                    <input name="frozen_date" type="date" aria-label="Frozen-on date">
+                </label>
                 <input name="notes" placeholder="Notes">
                 <button type="submit">Add to Pantry</button>
             </form>
@@ -370,6 +382,7 @@
                             {% set date_statuses = review_status.date_statuses if review_status.date_statuses else {} %}
                             {% set use_by_status = date_statuses.expiration_date if date_statuses.expiration_date else {} %}
                             {% set freeze_by_status = date_statuses.freeze_by_date if date_statuses.freeze_by_date else {} %}
+                            {% set frozen_status = date_statuses.frozen_date if date_statuses.frozen_date else {} %}
                             <article class="ai-pantry-review-row ai-pantry-review-row-{{ review_status.row_status or 'fresh' }}">
                                 <label class="ai-pantry-review-select">
                                     <input type="checkbox" name="candidate_index" value="{{ loop.index0 }}" checked>
@@ -417,6 +430,16 @@
                                                aria-label="Freeze-by date for {{ candidate.product_name }}">
                                         {% if freeze_by_status.label %}
                                             <small>{{ freeze_by_status.label }}</small>
+                                        {% endif %}
+                                    </label>
+                                    <label class="ai-pantry-date-field ai-pantry-date-field-{{ frozen_status.urgency or 'fresh' }}">
+                                        <span>Frozen on</span>
+                                        <input name="candidate_{{ loop.index0 }}_frozen_date"
+                                               type="date"
+                                               value="{{ candidate.frozen_date }}"
+                                               aria-label="Frozen-on date for {{ candidate.product_name }}">
+                                        {% if frozen_status.label %}
+                                            <small>{{ frozen_status.label }}</small>
                                         {% endif %}
                                     </label>
                                 </div>

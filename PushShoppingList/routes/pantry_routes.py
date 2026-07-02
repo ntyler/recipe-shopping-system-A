@@ -45,6 +45,7 @@ def add_pantry_item_route():
         "opened_date": request.form.get("opened_date", ""),
         "expiration_date": request.form.get("expiration_date", ""),
         "freeze_by_date": request.form.get("freeze_by_date", ""),
+        "frozen_date": request.form.get("frozen_date", ""),
         "storage_location": request.form.get("storage_location", ""),
         "status": request.form.get("status", ""),
     })
@@ -66,6 +67,7 @@ def update_pantry_item_route(item_id):
             "opened_date": request.form.get("opened_date"),
             "expiration_date": request.form.get("expiration_date"),
             "freeze_by_date": request.form.get("freeze_by_date"),
+            "frozen_date": request.form.get("frozen_date"),
             "storage_location": request.form.get("storage_location"),
             "status": request.form.get("status"),
         },
@@ -188,6 +190,7 @@ def add_receipt_candidates_route():
             "opened_date": request.form.get(f"candidate_{index}_opened_date") or candidate.get("opened_date", ""),
             "expiration_date": request.form.get(f"candidate_{index}_expiration_date") or candidate.get("expiration_date", ""),
             "freeze_by_date": request.form.get(f"candidate_{index}_freeze_by_date") or candidate.get("freeze_by_date", ""),
+            "frozen_date": request.form.get(f"candidate_{index}_frozen_date") or candidate.get("frozen_date", ""),
         }
         receipt_details = [f"Qty {candidate.get('quantity') or 1}"]
         if candidate.get("unit_price_label"):
@@ -199,6 +202,7 @@ def add_receipt_candidates_route():
             ("Opened", "opened_date"),
             ("Use by", "expiration_date"),
             ("Freeze by", "freeze_by_date"),
+            ("Frozen on", "frozen_date"),
         ):
             if lifecycle_dates.get(field):
                 receipt_details.append(f"{label} {lifecycle_dates[field]}")
