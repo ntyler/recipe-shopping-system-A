@@ -13,16 +13,28 @@
             {% for store_key in enabled_stores %}
                 {% set store = available_stores.get(store_key) %}
                 {% if store %}
-                    <button type="button"
-                            class="store-btn item-menu-store-btn {% if purchase_state.get('store') == store_key %}active{% endif %}"
-                            data-store="{{ store_key }}"
-                            data-store-url="{{ store.url }}"
-                            data-item-key="{{ purchase_key }}"
-                            data-row-key="{{ item_key }}"
-                            data-item-name="{{ item_menu_store_search_name|default(item_menu_display_name) }}"
-                            onclick="setTimeout(closeRecipeEditRowMenus, 0)">
-                        {{ store.label }}
-                    </button>
+                    <div class="item-menu-store-row">
+                        <button type="button"
+                                class="store-btn item-menu-store-btn {% if purchase_state.get('store') == store_key %}active{% endif %}"
+                                data-store="{{ store_key }}"
+                                data-item-key="{{ purchase_key }}"
+                                data-row-key="{{ item_key }}"
+                                data-item-name="{{ item_menu_store_search_name|default(item_menu_display_name) }}"
+                                onclick="setTimeout(closeRecipeEditRowMenus, 0)">
+                            {{ store.label }}
+                        </button>
+                        <a class="item-menu-store-link"
+                           href="{{ store.url }}"
+                           target="_blank"
+                           rel="noopener noreferrer"
+                           title="Open {{ store.label }} search"
+                           aria-label="Open {{ store.label }} search for {{ item_menu_store_search_name|default(item_menu_display_name) }}"
+                           data-store-url="{{ store.url }}"
+                           data-row-key="{{ item_key }}"
+                           data-item-name="{{ item_menu_store_search_name|default(item_menu_display_name) }}">
+                            ↗
+                        </a>
+                    </div>
                 {% endif %}
             {% endfor %}
         </div>

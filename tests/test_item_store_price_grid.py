@@ -89,12 +89,21 @@ def test_item_rows_use_price_grid_and_overflow_menu():
     assert "openProductAlternatives(this)" in price_grid
     assert 'data-item-key="{{ product_choice_key }}"' in price_grid
     assert "item-row-menu recipe-edit-row-menu overflow-menu" in action_menu
+    assert "item-menu-store-row" in action_menu
+    assert "item-menu-store-link" in action_menu
+    assert "↗" in action_menu
     assert "item-store-price-cell.cheapest" in css
     assert "item-store-price-cell.selected" in css
+    assert ".item-menu-store-row" in css
+    assert ".item-row-menu .item-menu-store-link" in css
     assert "item-store-price-header:focus-visible" in css
     assert "item-store-price-cell:focus-visible" in css
     assert "async function selectItemStoreFromPriceHeader" in app_js
     assert "await saveItemStoreSelection(itemKey, storeKey)" in app_js
+    assert "function bindStoreLinks" in app_js
+    assert "function storeSearchUrl" in app_js
+    bind_store_buttons = app_js[app_js.index("function bindStoreButtons"):app_js.index("function storeSearchUrl")]
+    assert "window.open" not in bind_store_buttons
 
 
 def test_shopping_views_context_exposes_stores_for_lazy_item_menu(monkeypatch):

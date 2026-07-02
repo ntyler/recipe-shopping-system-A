@@ -3092,6 +3092,7 @@ function afterDynamicMarkupLoaded(options = {}) {
     bindRecipeEditorPrefetch();
     bindImportCookbookSelector();
     bindStoreButtons();
+    bindStoreLinks();
     bindSectionHeaderToggles();
     bindRecipeDetailToggles();
     bindRecipeTaskChecks();
@@ -25766,18 +25767,42 @@ function bindStoreButtons() {
             if (itemKey) {
                 await saveItemStoreSelection(itemKey, wasActive ? "" : storeKey);
             }
+        });
+    });
+}
 
-            if (localStorage.getItem("open-store-urls") === "0") {
+function storeSearchUrl(searchBaseUrl, ingredient) {
+    if (!searchBaseUrl) {
+        return "";
+    }
+
+    return ingredient ? `${searchBaseUrl}${encodeURIComponent(ingredient)}` : searchBaseUrl;
+}
+
+function bindStoreLinks() {
+    document.querySelectorAll(".item-menu-store-link").forEach(link => {
+        if (link.dataset.storeLinkBound === "1") {
+            return;
+        }
+
+        link.dataset.storeLinkBound = "1";
+        link.addEventListener("click", event => {
+            const rowKey = link.dataset.rowKey || "";
+            const row = link.closest(".row") || (rowKey
+                ? document.querySelector(`.row[data-key="${cssEscape(rowKey)}"]`)
+                : null);
+            const itemText = row ? row.querySelector(".item-text") : null;
+            const ingredient = link.dataset.itemName || (itemText ? itemText.textContent.trim() : "");
+            const href = storeSearchUrl(link.dataset.storeUrl || link.getAttribute("href") || "", ingredient);
+
+            if (!href) {
                 return;
             }
 
-            const itemText = row ? row.querySelector(".item-text") : null;
-            const searchBaseUrl = button.dataset.storeUrl || "";
-            const ingredient = button.dataset.itemName || (itemText ? itemText.textContent.trim() : "");
-
-            if (searchBaseUrl && ingredient) {
-                window.open(`${searchBaseUrl}${encodeURIComponent(ingredient)}`, "_blank", "noopener");
-            }
+            event.preventDefault();
+            event.stopPropagation();
+            closeRecipeEditRowMenus();
+            window.open(href, "_blank", "noopener");
         });
     });
 }
@@ -29486,6 +29511,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ["bindRecipeNameInputs", bindRecipeNameInputs],
         ["bindImportCookbookSelector", bindImportCookbookSelector],
         ["bindStoreButtons", bindStoreButtons],
+        ["bindStoreLinks", bindStoreLinks],
         ["bindSectionHeaderToggles", bindSectionHeaderToggles],
         ["initJobActivityPanel", initJobActivityPanel],
         ["initLazySections", initLazySections],

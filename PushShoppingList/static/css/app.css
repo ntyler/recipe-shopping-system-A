@@ -4806,6 +4806,12 @@ body {
             margin: 0;
         }
 
+        .item-menu-store-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 34px;
+            align-items: stretch;
+        }
+
         .item-row-menu .store-btn,
         .item-row-menu .product-search-btn,
         .item-row-menu .edit-qty-btn {
@@ -4827,6 +4833,26 @@ body {
             box-shadow: none;
         }
 
+        .item-menu-store-row .store-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .item-row-menu .item-menu-store-link {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 34px;
+            padding: 0 10px;
+            border-left: 1px solid var(--submenu-divider);
+            color: #93c5fd;
+            font-size: 14px;
+            font-weight: 900;
+            line-height: 1;
+            text-decoration: none;
+        }
+
         .item-row-menu .store-btn.active {
             background: rgba(0, 120, 215, 0.22);
             color: #dbeafe;
@@ -4843,6 +4869,8 @@ body {
 
         .item-row-menu .store-btn:hover,
         .item-row-menu .store-btn:focus,
+        .item-row-menu .item-menu-store-link:hover,
+        .item-row-menu .item-menu-store-link:focus,
         .item-row-menu .product-search-btn:hover,
         .item-row-menu .product-search-btn:focus,
         .item-row-menu .edit-qty-btn:hover,
