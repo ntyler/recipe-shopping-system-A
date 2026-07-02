@@ -20756,6 +20756,19 @@ body {
     gap: 8px;
 }
 
+.ai-pantry-add-date-label {
+    display: grid;
+    gap: 4px;
+    align-self: stretch;
+}
+
+.ai-pantry-add-date-label span {
+    color: #d1d5db;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1;
+}
+
 .ai-pantry-use-soon-list {
     display: grid;
     gap: 10px;
@@ -20915,17 +20928,24 @@ body {
 }
 
 .ai-pantry-review-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) auto;
     align-items: center;
-    gap: 8px;
+    gap: 8px 12px;
     border: 1px solid #4d514c;
     border-radius: 8px;
     padding: 9px 10px;
     background: #1b1f20;
 }
 
+.ai-pantry-review-select {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
 .ai-pantry-review-name {
-    flex: 1 1 180px;
     min-width: 0;
     font-weight: 700;
 }
@@ -20937,6 +20957,36 @@ body {
     flex-wrap: wrap;
     justify-content: flex-end;
     color: #d1d5db;
+}
+
+.ai-pantry-review-dates {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 8px;
+}
+
+.ai-pantry-review-dates label {
+    display: grid;
+    gap: 4px;
+}
+
+.ai-pantry-review-dates span {
+    color: #d1d5db;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.ai-pantry-review-dates input {
+    width: 100%;
+    box-sizing: border-box;
+    background: #202425;
+    color: #fff;
+    border: 1px solid #555;
+    border-radius: 8px;
+    padding: 8px 9px;
+    font-size: 12px;
 }
 
 .ai-pantry-recipe-header {

@@ -206,18 +206,70 @@ def test_parse_receipt_text_filters_meijer_receipt_sections():
     assert sum(candidate["quantity"] for candidate in candidates) == 18
 
     price_details = {candidate["product_name"]: candidate for candidate in candidates}
+    assert {candidate["purchased_date"] for candidate in candidates} == {"2026-06-28"}
     assert price_details["Green Onions"]["unit_price_label"] == "$1.09"
     assert price_details["Green Onions"]["line_total_label"] == "$1.09"
     assert price_details["Baked Beans"]["unit_price_label"] == "$2.39"
     assert price_details["Baked Beans"]["line_total_label"] == "$4.78"
+    assert price_details["Whole Milk"]["expiration_date"] == "2026-07-05"
     assert price_details["Atlantic Salmo"]["unit_price_label"] == "$9.99"
     assert price_details["Atlantic Salmo"]["line_total_label"] == "$19.98"
+    assert price_details["Atlantic Salmo"]["expiration_date"] == "2026-06-29"
+    assert price_details["Atlantic Salmo"]["freeze_by_date"] == "2026-06-29"
     assert price_details["Cab Steak"]["unit_price_label"] == "$16.99"
     assert price_details["Cab Steak"]["line_total_label"] == "$33.98"
+    assert price_details["Cab Steak"]["expiration_date"] == "2026-07-01"
+    assert price_details["Cab Steak"]["freeze_by_date"] == "2026-06-30"
     assert price_details["Mjr Im Crab"]["unit_price_label"] == "$2.50"
     assert price_details["Mjr Im Crab"]["line_total_label"] == "$2.50"
     assert price_details["Snow Crab"]["unit_price_label"] == "$23.98"
     assert price_details["Snow Crab"]["line_total_label"] == "$23.98"
+
+
+def test_add_receipt_candidate_saves_lifecycle_dates(monkeypatch, tmp_path):
+    configure_scoped_data(monkeypatch, tmp_path)
+    monkeypatch.setattr(pantry_service, "PANTRY_RECEIPT_HISTORY_FILE", tmp_path / "pantry_receipt_history.json")
+    app = create_app()
+    candidate = pantry_service.parse_receipt_text(
+        """
+        07/01/26             LEXI
+        4148302201     WHOLE MILK         5.29  F
+        """
+    )[0]
+
+    with app.test_client() as client:
+        sign_in(client)
+        with client.session_transaction() as session:
+            session["pantry_receipt_review"] = {
+                "receipt_id": "receipt-1",
+                "candidates": [candidate],
+            }
+
+        response = client.post(
+            "/pantry/receipt/add",
+            data={
+                "action": "selected",
+                "candidate_index": "0",
+                "candidate_0_purchased_date": "2026-07-01",
+                "candidate_0_opened_date": "2026-07-02",
+                "candidate_0_expiration_date": "2026-07-08",
+                "candidate_0_freeze_by_date": "2026-07-05",
+            },
+        )
+
+    assert response.status_code == 302
+    inventory_file = tmp_path / "user_data" / "pantry-user" / "pantry_inventory.json"
+    inventory = json.loads(inventory_file.read_text(encoding="utf-8"))["items"]
+
+    assert len(inventory) == 1
+    assert inventory[0]["purchased_date"] == "2026-07-01"
+    assert inventory[0]["opened_date"] == "2026-07-02"
+    assert inventory[0]["expiration_date"] == "2026-07-08"
+    assert inventory[0]["freeze_by_date"] == "2026-07-05"
+    assert "Bought 2026-07-01" in inventory[0]["notes"]
+    assert "Opened 2026-07-02" in inventory[0]["notes"]
+    assert "Use by 2026-07-08" in inventory[0]["notes"]
+    assert "Freeze by 2026-07-05" in inventory[0]["notes"]
 
 
 def test_match_recipe_to_pantry_reports_missing_ingredients(monkeypatch, tmp_path):
@@ -344,6 +396,16 @@ def test_ai_pantry_template_includes_lifecycle_controls():
     assert "pantry-lifecycle-badge" in template
     assert 'name="opened_date"' in template
     assert 'name="freeze_by_date"' in template
+    assert "ai-pantry-add-date-label" in template
+    assert "ai-pantry-review-dates" in template
+    assert 'name="candidate_{{ loop.index0 }}_purchased_date"' in template
+    assert 'name="candidate_{{ loop.index0 }}_opened_date"' in template
+    assert 'name="candidate_{{ loop.index0 }}_expiration_date"' in template
+    assert 'name="candidate_{{ loop.index0 }}_freeze_by_date"' in template
+    assert "<span>Bought</span>" in template
+    assert "<span>Opened</span>" in template
+    assert "<span>Use by</span>" in template
+    assert "<span>Freeze by</span>" in template
     assert "mark_opened" in template
 
 

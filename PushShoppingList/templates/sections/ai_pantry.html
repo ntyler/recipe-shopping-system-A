@@ -296,10 +296,22 @@
                     <option value="opened">Opened</option>
                     <option value="frozen">Frozen</option>
                 </select>
-                <input name="purchased_date" type="date" aria-label="Purchased date">
-                <input name="opened_date" type="date" aria-label="Opened date">
-                <input name="expiration_date" type="date" aria-label="Expiration date">
-                <input name="freeze_by_date" type="date" aria-label="Freeze-by date">
+                <label class="ai-pantry-add-date-label">
+                    <span>Bought</span>
+                    <input name="purchased_date" type="date" aria-label="Purchased date">
+                </label>
+                <label class="ai-pantry-add-date-label">
+                    <span>Opened</span>
+                    <input name="opened_date" type="date" aria-label="Opened date">
+                </label>
+                <label class="ai-pantry-add-date-label">
+                    <span>Use by</span>
+                    <input name="expiration_date" type="date" aria-label="Expiration date">
+                </label>
+                <label class="ai-pantry-add-date-label">
+                    <span>Freeze by</span>
+                    <input name="freeze_by_date" type="date" aria-label="Freeze-by date">
+                </label>
                 <input name="notes" placeholder="Notes">
                 <button type="submit">Add to Pantry</button>
             </form>
@@ -354,16 +366,48 @@
                 <form method="POST" action="{{ url_for('pantry_bp.add_receipt_candidates_route') }}">
                     <div class="ai-pantry-review-list">
                         {% for candidate in receipt_candidates %}
-                            <label class="ai-pantry-review-row">
-                                <input type="checkbox" name="candidate_index" value="{{ loop.index0 }}" checked>
-                                <span class="ai-pantry-review-name">{{ candidate.product_name }}</span>
+                            <article class="ai-pantry-review-row">
+                                <label class="ai-pantry-review-select">
+                                    <input type="checkbox" name="candidate_index" value="{{ loop.index0 }}" checked>
+                                    <span class="ai-pantry-review-name">{{ candidate.product_name }}</span>
+                                </label>
                                 <span class="ai-pantry-review-meta">
                                     <small>Qty {{ candidate.quantity or 1 }}</small>
                                     {% if candidate.unit_price_label %}<small>Each {{ candidate.unit_price_label }}</small>{% endif %}
                                     {% if candidate.line_total_label %}<small>Total {{ candidate.line_total_label }}</small>{% endif %}
                                     <small>confidence {{ candidate.confidence }}</small>
                                 </span>
-                            </label>
+                                <div class="ai-pantry-review-dates" aria-label="Lifecycle dates for {{ candidate.product_name }}">
+                                    <label>
+                                        <span>Bought</span>
+                                        <input name="candidate_{{ loop.index0 }}_purchased_date"
+                                               type="date"
+                                               value="{{ candidate.purchased_date }}"
+                                               aria-label="Bought date for {{ candidate.product_name }}">
+                                    </label>
+                                    <label>
+                                        <span>Opened</span>
+                                        <input name="candidate_{{ loop.index0 }}_opened_date"
+                                               type="date"
+                                               value="{{ candidate.opened_date }}"
+                                               aria-label="Opened date for {{ candidate.product_name }}">
+                                    </label>
+                                    <label>
+                                        <span>Use by</span>
+                                        <input name="candidate_{{ loop.index0 }}_expiration_date"
+                                               type="date"
+                                               value="{{ candidate.expiration_date }}"
+                                               aria-label="Use-by date for {{ candidate.product_name }}">
+                                    </label>
+                                    <label>
+                                        <span>Freeze by</span>
+                                        <input name="candidate_{{ loop.index0 }}_freeze_by_date"
+                                               type="date"
+                                               value="{{ candidate.freeze_by_date }}"
+                                               aria-label="Freeze-by date for {{ candidate.product_name }}">
+                                    </label>
+                                </div>
+                            </article>
                         {% endfor %}
                     </div>
                     <div class="ai-pantry-review-actions">

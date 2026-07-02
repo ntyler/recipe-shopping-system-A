@@ -121,7 +121,7 @@ SHELF_LIFE_RULES = (
         "freeze_by_days": 1,
     },
     {
-        "terms": ("fish", "salmon", "tilapia", "cod", "shrimp", "seafood"),
+        "terms": ("fish", "salmon", "salmo", "tilapia", "cod", "shrimp", "crab", "lobster", "seafood"),
         "storage_location": "fridge",
         "fridge_days": 1,
         "freeze_by_days": 1,
@@ -884,6 +884,7 @@ def parse_receipt_text(receipt_text):
         for raw_line in str(receipt_text or "").splitlines()
         if raw_line and raw_line.strip()
     ]
+    purchased_date = receipt_purchase_date(lines)
     structured_candidates = []
     fallback_candidates = []
 
@@ -902,6 +903,7 @@ def parse_receipt_text(receipt_text):
                     quantity=receipt_line_quantity(next_line or line),
                     price_line=next_line,
                     sale_line=sale_line,
+                    purchased_date=purchased_date,
                 )
             )
             continue
@@ -909,17 +911,25 @@ def parse_receipt_text(receipt_text):
         if not likely_generic_receipt_item_line(line):
             continue
 
-        fallback_candidates.append(receipt_candidate(line, clean_receipt_product_name(line), price_line=line))
+        fallback_candidates.append(
+            receipt_candidate(
+                line,
+                clean_receipt_product_name(line),
+                price_line=line,
+                purchased_date=purchased_date,
+            )
+        )
 
     candidates = structured_candidates if structured_candidates else fallback_candidates
     return [candidate for candidate in candidates if candidate]
 
 
-def receipt_candidate(line, product_name, quantity=None, price_line="", sale_line=""):
+def receipt_candidate(line, product_name, quantity=None, price_line="", sale_line="", purchased_date=""):
     product_name = str(product_name or "").strip()
     normalized_name = normalize_ingredient_name(product_name)
     quantity = quantity if quantity is not None else receipt_line_quantity(line)
     price_details = receipt_price_details(line, quantity=quantity, price_line=price_line, sale_line=sale_line)
+    lifecycle_dates = receipt_candidate_lifecycle_dates(product_name, normalized_name, purchased_date)
 
     if not normalized_name:
         return None
@@ -933,8 +943,48 @@ def receipt_candidate(line, product_name, quantity=None, price_line="", sale_lin
         "line_total": price_details["line_total"],
         "unit_price_label": price_details["unit_price_label"],
         "line_total_label": price_details["line_total_label"],
+        "purchased_date": lifecycle_dates["purchased_date"],
+        "opened_date": lifecycle_dates["opened_date"],
+        "expiration_date": lifecycle_dates["expiration_date"],
+        "freeze_by_date": lifecycle_dates["freeze_by_date"],
         "confidence": receipt_line_confidence(product_name),
         "needs_review": True,
+    }
+
+
+def receipt_purchase_date(lines):
+    for line in lines[:12]:
+        lowered = str(line or "").lower()
+        if "since" in lowered or "savings" in lowered:
+            continue
+
+        match = re.search(r"\b(?P<date>\d{1,2}/\d{1,2}/\d{2,4})\b", str(line or ""))
+        if match:
+            normalized = normalize_date_value(match.group("date"))
+            if normalized:
+                return normalized
+
+    return ""
+
+
+def receipt_candidate_lifecycle_dates(product_name, normalized_name, purchased_date):
+    purchased_date = normalize_date_value(purchased_date)
+    suggested = apply_lifecycle_suggestions(
+        {
+            "ingredient_name": normalized_name or product_name,
+            "product_name": product_name,
+            "normalized_name": normalized_name,
+            "purchased_date": purchased_date,
+            "source": "receipt",
+        },
+        reference_date=purchased_date,
+    )
+
+    return {
+        "purchased_date": suggested.get("purchased_date", ""),
+        "opened_date": suggested.get("opened_date", ""),
+        "expiration_date": suggested.get("expiration_date", ""),
+        "freeze_by_date": suggested.get("freeze_by_date", ""),
     }
 
 

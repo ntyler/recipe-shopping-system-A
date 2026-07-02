@@ -181,11 +181,25 @@ def add_receipt_candidates_route():
         if index not in selected_indexes:
             continue
 
+        lifecycle_dates = {
+            "purchased_date": request.form.get(f"candidate_{index}_purchased_date") or candidate.get("purchased_date", ""),
+            "opened_date": request.form.get(f"candidate_{index}_opened_date") or candidate.get("opened_date", ""),
+            "expiration_date": request.form.get(f"candidate_{index}_expiration_date") or candidate.get("expiration_date", ""),
+            "freeze_by_date": request.form.get(f"candidate_{index}_freeze_by_date") or candidate.get("freeze_by_date", ""),
+        }
         receipt_details = [f"Qty {candidate.get('quantity') or 1}"]
         if candidate.get("unit_price_label"):
             receipt_details.append(f"Each {candidate.get('unit_price_label')}")
         if candidate.get("line_total_label"):
             receipt_details.append(f"Total {candidate.get('line_total_label')}")
+        for label, field in (
+            ("Bought", "purchased_date"),
+            ("Opened", "opened_date"),
+            ("Use by", "expiration_date"),
+            ("Freeze by", "freeze_by_date"),
+        ):
+            if lifecycle_dates.get(field):
+                receipt_details.append(f"{label} {lifecycle_dates[field]}")
         receipt_note = " | ".join(
             part
             for part in [
@@ -202,6 +216,7 @@ def add_receipt_candidates_route():
             "source": "receipt",
             "confidence": candidate.get("confidence", DEFAULT_CONFIDENCE_BY_SOURCE["receipt"]),
             "notes": receipt_note,
+            **lifecycle_dates,
         })
         added.append(result["item"].get("ingredient_name") or candidate.get("product_name", "Item"))
 
