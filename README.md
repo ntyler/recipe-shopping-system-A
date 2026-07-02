@@ -624,10 +624,19 @@ Notification preferences currently include:
 - Cloudflare Upload Complete
 - Store Search Complete
 - Shopping List Updated
+- Pantry Expiration Reminders
 - Feedback Response
 - Security Alerts
 
 Device display is ready for multi-device notification management and currently shows devices such as Windows PC, iPhone, and Browser when available.
+
+AI Pantry expiration reminders are sent by a small daily scanner. It checks signed-in users' pantry inventory for due expiration or freeze-by dates, sends one reminder per item/date, and records the reminder marker to avoid duplicate alerts. Run a dry check with:
+
+```powershell
+python PushShoppingList\scripts\send_pantry_reminders.py --dry-run
+```
+
+For scheduled reminders on Windows, run that script without `--dry-run` from Task Scheduler once per day while the same app environment variables are available.
 
 `NTFY_TOPIC` is still useful as a fallback/global topic for guest activity or code paths that do not have a signed-in user topic.
 

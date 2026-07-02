@@ -20467,7 +20467,9 @@ body {
 
 .ai-pantry-search input,
 .ai-pantry-add-form input,
+.ai-pantry-add-form select,
 .ai-pantry-inline-form input,
+.ai-pantry-inline-form select,
 .ai-pantry-receipt-form input,
 .ai-pantry-receipt-form textarea,
 .ai-pantry-feeling-form input,
@@ -20607,7 +20609,7 @@ body {
     grid-column: 4 / 5;
     grid-row: 1;
     display: grid;
-    grid-template-columns: minmax(72px, 0.45fr) minmax(88px, 0.52fr) minmax(130px, 0.85fr) minmax(160px, 1.1fr);
+    grid-template-columns: repeat(4, minmax(104px, 1fr));
     gap: 12px;
     min-width: 0;
 }
@@ -20623,7 +20625,8 @@ body {
     text-transform: uppercase;
 }
 
-.ai-pantry-inventory-row .ai-pantry-inline-form input {
+.ai-pantry-inventory-row .ai-pantry-inline-form input,
+.ai-pantry-inventory-row .ai-pantry-inline-form select {
     width: 100%;
     min-height: 38px;
     box-sizing: border-box;
@@ -20634,10 +20637,15 @@ body {
     font-size: 14px;
 }
 
-.ai-pantry-inventory-row .ai-pantry-inline-form input:focus {
+.ai-pantry-inventory-row .ai-pantry-inline-form input:focus,
+.ai-pantry-inventory-row .ai-pantry-inline-form select:focus {
     border-color: #5b8cff;
     outline: none;
     box-shadow: 0 0 0 2px rgba(91, 140, 255, 0.18);
+}
+
+.ai-pantry-lifecycle-action-form {
+    display: none;
 }
 
 .ai-pantry-inventory-menu-wrap {
@@ -20671,6 +20679,54 @@ body {
     flex-wrap: wrap;
 }
 
+.ai-pantry-lifecycle-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.ai-pantry-lifecycle-summary span,
+.pantry-lifecycle-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    border: 1px solid #334155;
+    border-radius: 999px;
+    padding: 3px 8px;
+    background: #101722;
+    color: #cbd5e1;
+    font-size: 11px;
+    font-weight: 850;
+    line-height: 1.2;
+}
+
+.pantry-lifecycle-expired {
+    border-color: #7f1d1d;
+    background: #371517;
+    color: #fecaca;
+}
+
+.pantry-lifecycle-urgent,
+.pantry-lifecycle-soon {
+    border-color: #8a5d13;
+    background: #33250f;
+    color: #fde68a;
+}
+
+.pantry-lifecycle-fresh,
+.pantry-lifecycle-safe {
+    border-color: #1f6f45;
+    background: #10281b;
+    color: #bbf7d0;
+}
+
+.pantry-lifecycle-neutral {
+    border-color: #475569;
+    background: #111827;
+    color: #cbd5e1;
+}
+
 .confidence-pill,
 .ai-pantry-status {
     border-radius: 999px;
@@ -20698,6 +20754,72 @@ body {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
     gap: 8px;
+}
+
+.ai-pantry-use-soon-list {
+    display: grid;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.ai-pantry-use-soon-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border: 1px solid #4d514c;
+    border-radius: 8px;
+    background: #151b22;
+    padding: 12px;
+}
+
+.ai-pantry-use-soon-row strong,
+.ai-pantry-use-soon-row span,
+.ai-pantry-use-soon-row small {
+    display: block;
+}
+
+.ai-pantry-use-soon-row strong {
+    color: #f8fafc;
+    font-size: 15px;
+}
+
+.ai-pantry-use-soon-row span,
+.ai-pantry-use-soon-row small {
+    color: #cbd5e1;
+    font-size: 12px;
+}
+
+.ai-pantry-use-soon-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.ai-pantry-use-soon-actions form {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.ai-pantry-use-soon-actions button {
+    width: auto;
+    margin: 0;
+    padding: 7px 9px;
+    border: 1px solid #4b5563;
+    border-radius: 7px;
+    background: #243244;
+    color: #f8fafc;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.ai-pantry-use-soon-actions button.secondary {
+    background: #101827;
+    color: #cbd5e1;
 }
 
 .ai-pantry-feeling-form {
@@ -21015,6 +21137,18 @@ body {
     .ai-pantry-missing-row {
         align-items: stretch;
         flex-direction: column;
+    }
+
+    .ai-pantry-use-soon-row,
+    .ai-pantry-use-soon-actions,
+    .ai-pantry-use-soon-actions form {
+        align-items: stretch;
+        flex-direction: column;
+        justify-content: flex-start;
+    }
+
+    .ai-pantry-use-soon-actions button {
+        width: 100%;
     }
 }
 

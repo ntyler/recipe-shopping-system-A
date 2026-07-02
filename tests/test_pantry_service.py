@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 from flask import session
 
@@ -6,10 +7,15 @@ from PushShoppingList.app import create_app
 from PushShoppingList.services import pantry_service
 from PushShoppingList.services import shopping_list_service
 from PushShoppingList.services import storage_service
+from PushShoppingList.services import user_account_service as accounts
 
 
 def configure_scoped_data(monkeypatch, tmp_path):
     monkeypatch.setattr(storage_service, "USER_DATA_DIR", tmp_path / "user_data")
+
+
+def configure_users_file(monkeypatch, tmp_path):
+    monkeypatch.setattr(accounts, "USERS_FILE", tmp_path / "users.json")
 
 
 def sign_in(client, user_id="pantry-user"):
@@ -41,6 +47,50 @@ def test_add_or_increment_pantry_item_uses_normalized_name(monkeypatch, tmp_path
     assert inventory[0]["normalized_name"] == "egg"
     assert inventory[0]["quantity"] == 3
     assert inventory[0]["source"] == "shopping_list"
+
+
+def test_purchased_chicken_gets_freeze_and_expiration_suggestions(monkeypatch, tmp_path):
+    configure_scoped_data(monkeypatch, tmp_path)
+    app = create_app()
+
+    with app.test_request_context("/"):
+        session["user_id"] = "pantry-user"
+        result = pantry_service.add_or_increment_pantry_item(
+            {
+                "ingredient_name": "Chicken breasts",
+                "quantity": 1,
+                "source": "shopping_list",
+            },
+            reference_date="2026-07-02",
+        )
+
+    item = result["item"]
+    assert item["purchased_date"] == "2026-07-02"
+    assert item["storage_location"] == "fridge"
+    assert item["freeze_by_date"] == "2026-07-03"
+    assert item["expiration_date"] == "2026-07-04"
+
+
+def test_opened_broth_gets_opened_shelf_life_suggestions(monkeypatch, tmp_path):
+    configure_scoped_data(monkeypatch, tmp_path)
+    app = create_app()
+
+    with app.test_request_context("/"):
+        session["user_id"] = "pantry-user"
+        result = pantry_service.add_or_increment_pantry_item(
+            {
+                "ingredient_name": "Chicken broth",
+                "opened_date": "2026-07-02",
+                "source": "manual",
+            },
+            reference_date="2026-07-02",
+        )
+
+    item = result["item"]
+    assert item["status"] == "opened"
+    assert item["storage_location"] == "fridge"
+    assert item["freeze_by_date"] == "2026-07-09"
+    assert item["expiration_date"] == "2026-07-12"
 
 
 def test_parse_receipt_text_returns_purchase_candidates():
@@ -108,6 +158,81 @@ def test_move_bought_items_to_pantry_route(monkeypatch, tmp_path):
 
     assert {item["normalized_name"] for item in inventory} == {"milk", "egg"}
     assert all(item["source"] == "shopping_list" for item in inventory)
+
+
+def test_send_due_pantry_reminders_sends_once_and_records_marker(monkeypatch, tmp_path):
+    configure_scoped_data(monkeypatch, tmp_path)
+    configure_users_file(monkeypatch, tmp_path)
+    accounts.save_users({
+        "users": [
+            {
+                "user_id": "user-1",
+                "username": "user@example.com",
+                "email": "user@example.com",
+                "notification_topic": "shopping-user-reminder-topic",
+                "ntfy_topic": "shopping-user-reminder-topic",
+                "notifications_enabled": True,
+            }
+        ]
+    })
+    pantry_service.save_pantry_inventory(
+        {
+            "items": [
+                {
+                    "id": "broth-1",
+                    "ingredient_name": "Chicken broth",
+                    "quantity": 1,
+                    "source": "manual",
+                    "purchased_date": "2026-07-01",
+                    "expiration_date": "2026-07-03",
+                }
+            ]
+        },
+        user_id="user-1",
+    )
+    posts = []
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+    def fake_post(url, data=None, headers=None, timeout=None):
+        posts.append({
+            "url": url,
+            "data": data,
+            "headers": headers,
+            "timeout": timeout,
+        })
+        return FakeResponse()
+
+    monkeypatch.setattr(accounts.requests, "post", fake_post)
+
+    first_result = pantry_service.send_due_pantry_reminders(
+        user_ids=["user-1"],
+        reference_date="2026-07-02",
+    )
+    second_result = pantry_service.send_due_pantry_reminders(
+        user_ids=["user-1"],
+        reference_date="2026-07-02",
+    )
+    inventory = pantry_service.load_pantry_inventory(user_id="user-1")["items"]
+
+    assert first_result["sent_count"] == 1
+    assert second_result["sent_count"] == 0
+    assert posts[0]["url"] == "https://ntfy.sh/shopping-user-reminder-topic"
+    assert posts[0]["headers"]["Title"] == "Use soon: Chicken broth"
+    assert b"Use by is tomorrow" in posts[0]["data"]
+    assert inventory[0]["last_reminder_key"] == "broth-1:expiration_date:2026-07-03"
+
+
+def test_ai_pantry_template_includes_lifecycle_controls():
+    template = Path("PushShoppingList/templates/sections/ai_pantry.html").read_text(encoding="utf-8")
+
+    assert 'href="#aiPantryUseSoon"' in template
+    assert "pantry-lifecycle-badge" in template
+    assert 'name="opened_date"' in template
+    assert 'name="freeze_by_date"' in template
+    assert "mark_opened" in template
 
 
 def test_add_missing_ingredients_route_dedupes_shopping_list(monkeypatch, tmp_path):

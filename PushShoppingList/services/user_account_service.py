@@ -71,6 +71,7 @@ NOTIFICATION_PREFERENCE_OPTIONS = (
     ("cloudflare_upload_complete", "Cloudflare Upload Complete"),
     ("store_search_complete", "Store Search Complete"),
     ("shopping_list_updated", "Shopping List Updated"),
+    ("pantry_expiration_reminders", "Pantry Expiration Reminders"),
     ("feedback_response", "Feedback Response"),
     ("security_alerts", "Security Alerts"),
 )
@@ -1991,6 +1992,51 @@ def record_notification_sent(user_id, timestamp=None):
     user["last_notification_sent"] = timestamp
     user["updated_at"] = timestamp
     save_users(payload)
+
+
+def send_user_notification(
+    user_id,
+    title,
+    message,
+    preference_key="",
+    tags="",
+    priority="",
+):
+    payload = load_users()
+    user = find_user_by_id_in_payload(payload, user_id)
+
+    if not user:
+        return {"ok": False, "error": "User was not found."}
+
+    if not notification_preference_enabled(user, preference_key):
+        return {"ok": False, "skipped": True, "reason": "notifications_disabled"}
+
+    topic = notification_topic(user) or ensure_user_notification_topic_fields(user)
+    if not topic:
+        return {"ok": False, "skipped": True, "reason": "missing_topic"}
+
+    headers = {"Title": str(title or "Recipe Shopping List").strip() or "Recipe Shopping List"}
+    if tags:
+        headers["Tags"] = str(tags)
+    if priority:
+        headers["Priority"] = str(priority)
+
+    try:
+        response = requests.post(
+            f"https://ntfy.sh/{topic}",
+            data=str(message or "").encode("utf-8"),
+            headers=headers,
+            timeout=5,
+        )
+        response.raise_for_status()
+    except Exception:
+        return {"ok": False, "error": "The notification could not be sent."}
+
+    timestamp = now_iso()
+    user["last_notification_sent"] = timestamp
+    user["updated_at"] = timestamp
+    save_users(payload)
+    return {"ok": True, "user": public_user(user)}
 
 
 def send_test_notification(user_id):

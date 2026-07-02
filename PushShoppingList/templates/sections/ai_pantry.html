@@ -37,6 +37,7 @@
 
         <nav class="ai-pantry-nav" aria-label="AI Pantry sections">
             <a href="#aiPantryInventory">Inventory</a>
+            <a href="#aiPantryUseSoon">Use Soon</a>
             <a href="#aiPantryAddItems">Add Items</a>
             <a href="#aiPantryUploadReceipt">Upload Receipt</a>
             <a href="#aiPantryCookWithWhatIHave">Cook With What I Have</a>
@@ -84,7 +85,9 @@
                                  data-pantry-quantity="{{ item.quantity }}"
                                  data-pantry-unit="{{ item.unit }}"
                                  data-pantry-category="{{ item.category }}"
-                                 data-pantry-search="{{ (item.ingredient_name ~ ' ' ~ item.product_name ~ ' ' ~ item.category ~ ' ' ~ item.source)|lower }}">
+                                 data-pantry-storage="{{ item.storage_location }}"
+                                 data-pantry-status="{{ item.status }}"
+                                 data-pantry-search="{{ (item.ingredient_name ~ ' ' ~ item.product_name ~ ' ' ~ item.category ~ ' ' ~ item.source ~ ' ' ~ item.storage_location ~ ' ' ~ item.status)|lower }}">
                             <span class="recipe-edit-row-handle ai-pantry-inventory-handle" aria-hidden="true"></span>
                             <span class="recipe-edit-row-number ai-pantry-inventory-number">{{ loop.index }}</span>
                             <div class="ai-pantry-item-main ai-pantry-inventory-name">
@@ -97,6 +100,13 @@
                                     <span>{{ item.category or "Uncategorized" }}</span>
                                     <span>{{ item.source }}</span>
                                     <span class="confidence-pill confidence-{{ item.confidence_label|lower }}">{{ item.confidence_label }}</span>
+                                    <span class="pantry-lifecycle-badge pantry-lifecycle-{{ item.lifecycle_status.urgency }}">{{ item.lifecycle_status.label }}</span>
+                                </div>
+                                <div class="ai-pantry-lifecycle-summary">
+                                    {% if item.purchased_date_label %}<span>Bought {{ item.purchased_date_label }}</span>{% endif %}
+                                    {% if item.opened_date_label %}<span>Opened {{ item.opened_date_label }}</span>{% endif %}
+                                    {% if item.freeze_by_date_label %}<span>Freeze by {{ item.freeze_by_date_label }}</span>{% endif %}
+                                    {% if item.expiration_date_label %}<span>Use by {{ item.expiration_date_label }}</span>{% endif %}
                                 </div>
                             </div>
                             <form class="ai-pantry-inline-form"
@@ -126,6 +136,51 @@
                                            placeholder="Category"
                                            aria-label="Category for {{ item.ingredient_name }}">
                                 </label>
+                                <label class="ai-pantry-inventory-location-label">
+                                    <span>Location</span>
+                                    <select name="storage_location" aria-label="Storage location for {{ item.ingredient_name }}">
+                                        <option value="">Unset</option>
+                                        {% for location in ["pantry", "fridge", "freezer", "counter"] %}
+                                            <option value="{{ location }}" {% if item.storage_location == location %}selected{% endif %}>{{ location|title }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                                <label class="ai-pantry-inventory-status-label">
+                                    <span>Status</span>
+                                    <select name="status" aria-label="Status for {{ item.ingredient_name }}">
+                                        {% for status in ["available", "opened", "frozen", "used"] %}
+                                            <option value="{{ status }}" {% if item.status == status %}selected{% endif %}>{{ status|title }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                                <label class="ai-pantry-inventory-date-label">
+                                    <span>Bought</span>
+                                    <input name="purchased_date"
+                                           type="date"
+                                           value="{{ item.purchased_date }}"
+                                           aria-label="Purchased date for {{ item.ingredient_name }}">
+                                </label>
+                                <label class="ai-pantry-inventory-date-label">
+                                    <span>Opened</span>
+                                    <input name="opened_date"
+                                           type="date"
+                                           value="{{ item.opened_date }}"
+                                           aria-label="Opened date for {{ item.ingredient_name }}">
+                                </label>
+                                <label class="ai-pantry-inventory-date-label">
+                                    <span>Use By</span>
+                                    <input name="expiration_date"
+                                           type="date"
+                                           value="{{ item.expiration_date }}"
+                                           aria-label="Expiration date for {{ item.ingredient_name }}">
+                                </label>
+                                <label class="ai-pantry-inventory-date-label">
+                                    <span>Freeze By</span>
+                                    <input name="freeze_by_date"
+                                           type="date"
+                                           value="{{ item.freeze_by_date }}"
+                                           aria-label="Freeze-by date for {{ item.ingredient_name }}">
+                                </label>
                                 <label class="ai-pantry-inventory-notes-label">
                                     <span>Notes</span>
                                     <input name="notes"
@@ -138,6 +193,24 @@
                                   id="pantryDelete{{ loop.index }}"
                                   action="{{ url_for('pantry_bp.delete_pantry_item_route', item_id=item.id) }}"
                                   onsubmit="return confirm('Delete {{ item.ingredient_name }} from pantry?');"></form>
+                            <form method="POST"
+                                  class="ai-pantry-lifecycle-action-form"
+                                  id="pantryOpen{{ loop.index }}"
+                                  action="{{ url_for('pantry_bp.update_pantry_item_lifecycle_route', item_id=item.id) }}">
+                                <input type="hidden" name="action" value="mark_opened">
+                            </form>
+                            <form method="POST"
+                                  class="ai-pantry-lifecycle-action-form"
+                                  id="pantryFreeze{{ loop.index }}"
+                                  action="{{ url_for('pantry_bp.update_pantry_item_lifecycle_route', item_id=item.id) }}">
+                                <input type="hidden" name="action" value="mark_frozen">
+                            </form>
+                            <form method="POST"
+                                  class="ai-pantry-lifecycle-action-form"
+                                  id="pantryDismiss{{ loop.index }}"
+                                  action="{{ url_for('pantry_bp.update_pantry_item_lifecycle_route', item_id=item.id) }}">
+                                <input type="hidden" name="action" value="dismiss_today">
+                            </form>
                             <div class="recipe-edit-row-menu-wrap ai-pantry-inventory-menu-wrap">
                                 <button type="button"
                                         class="recipe-edit-row-menu-btn ai-pantry-inventory-menu-btn"
@@ -150,6 +223,9 @@
                                 </button>
                                 <div class="recipe-edit-row-menu ai-pantry-inventory-menu" hidden>
                                     <button type="submit" form="pantryUpdate{{ loop.index }}">Save inventory item</button>
+                                    <button type="submit" form="pantryOpen{{ loop.index }}">Mark opened today</button>
+                                    <button type="submit" form="pantryFreeze{{ loop.index }}">Mark frozen</button>
+                                    <button type="submit" form="pantryDismiss{{ loop.index }}">Dismiss reminders today</button>
                                     <button type="submit" form="pantryDelete{{ loop.index }}" class="delete">Delete inventory item</button>
                                 </div>
                             </div>
@@ -159,6 +235,35 @@
                 </div>
             {% else %}
                 <div class="ai-pantry-empty">No pantry items yet.</div>
+            {% endif %}
+        </section>
+
+        <section id="aiPantryUseSoon" class="ai-pantry-section ai-pantry-use-soon-section">
+            <div class="ai-pantry-section-header">
+                <h3>Use Soon</h3>
+            </div>
+            {% if pantry_use_soon_items %}
+                <div class="ai-pantry-use-soon-list">
+                    {% for item in pantry_use_soon_items %}
+                        <article class="ai-pantry-use-soon-row pantry-lifecycle-row-{{ item.lifecycle_status.urgency }}">
+                            <div>
+                                <strong>{{ item.ingredient_name }}</strong>
+                                {% if item.product_name %}<span>{{ item.product_name }}</span>{% endif %}
+                                <small>{{ item.lifecycle_status.detail }}</small>
+                            </div>
+                            <div class="ai-pantry-use-soon-actions">
+                                <span class="pantry-lifecycle-badge pantry-lifecycle-{{ item.lifecycle_status.urgency }}">{{ item.lifecycle_status.label }}</span>
+                                <form method="POST" action="{{ url_for('pantry_bp.update_pantry_item_lifecycle_route', item_id=item.id) }}">
+                                    <button type="submit" name="action" value="mark_opened">Opened</button>
+                                    <button type="submit" name="action" value="mark_frozen">Frozen</button>
+                                    <button type="submit" name="action" value="dismiss_today" class="secondary">Dismiss</button>
+                                </form>
+                            </div>
+                        </article>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="ai-pantry-empty">Nothing needs attention yet.</div>
             {% endif %}
         </section>
 
@@ -179,6 +284,22 @@
                 <input name="quantity" type="number" min="0" step="0.25" value="1">
                 <input name="unit" placeholder="Unit">
                 <input name="category" placeholder="Category">
+                <select name="storage_location" aria-label="Storage location">
+                    <option value="">Storage location</option>
+                    <option value="pantry">Pantry</option>
+                    <option value="fridge">Fridge</option>
+                    <option value="freezer">Freezer</option>
+                    <option value="counter">Counter</option>
+                </select>
+                <select name="status" aria-label="Pantry status">
+                    <option value="available">Available</option>
+                    <option value="opened">Opened</option>
+                    <option value="frozen">Frozen</option>
+                </select>
+                <input name="purchased_date" type="date" aria-label="Purchased date">
+                <input name="opened_date" type="date" aria-label="Opened date">
+                <input name="expiration_date" type="date" aria-label="Expiration date">
+                <input name="freeze_by_date" type="date" aria-label="Freeze-by date">
                 <input name="notes" placeholder="Notes">
                 <button type="submit">Add to Pantry</button>
             </form>

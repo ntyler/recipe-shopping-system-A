@@ -10,6 +10,7 @@ from PushShoppingList.services.pantry_service import add_or_increment_pantry_ite
 from PushShoppingList.services.pantry_service import delete_pantry_item
 from PushShoppingList.services.pantry_service import save_receipt_upload
 from PushShoppingList.services.pantry_service import update_pantry_item
+from PushShoppingList.services.pantry_service import update_pantry_item_lifecycle_action
 from PushShoppingList.services.pantry_service import update_receipt_history_status
 from PushShoppingList.services.shopping_list_service import add_items
 
@@ -39,6 +40,12 @@ def add_pantry_item_route():
         "source": "manual",
         "confidence": DEFAULT_CONFIDENCE_BY_SOURCE["manual"],
         "notes": request.form.get("notes", ""),
+        "purchased_date": request.form.get("purchased_date", ""),
+        "opened_date": request.form.get("opened_date", ""),
+        "expiration_date": request.form.get("expiration_date", ""),
+        "freeze_by_date": request.form.get("freeze_by_date", ""),
+        "storage_location": request.form.get("storage_location", ""),
+        "status": request.form.get("status", ""),
     })
     action = "added" if result.get("created") else "updated"
     pantry_message("success", f"{ingredient_name} {action} in pantry.")
@@ -54,10 +61,29 @@ def update_pantry_item_route(item_id):
             "unit": request.form.get("unit"),
             "category": request.form.get("category"),
             "notes": request.form.get("notes"),
+            "purchased_date": request.form.get("purchased_date"),
+            "opened_date": request.form.get("opened_date"),
+            "expiration_date": request.form.get("expiration_date"),
+            "freeze_by_date": request.form.get("freeze_by_date"),
+            "storage_location": request.form.get("storage_location"),
+            "status": request.form.get("status"),
         },
     )
     pantry_message("success" if result.get("ok") else "error", "Pantry item updated." if result.get("ok") else result.get("error", "Unable to update pantry item."))
     return redirect(url_for("main_bp.index", _anchor="aiPantryInventory"))
+
+
+@pantry_bp.route("/pantry/items/<item_id>/lifecycle", methods=["POST"])
+def update_pantry_item_lifecycle_route(item_id):
+    result = update_pantry_item_lifecycle_action(
+        item_id,
+        request.form.get("action", ""),
+    )
+    pantry_message(
+        "success" if result.get("ok") else "error",
+        "Pantry item updated." if result.get("ok") else result.get("error", "Unable to update pantry item."),
+    )
+    return redirect(url_for("main_bp.index", _anchor="aiPantryUseSoon"))
 
 
 @pantry_bp.route("/pantry/items/<item_id>/delete", methods=["POST"])
@@ -89,6 +115,7 @@ def move_bought_items_to_pantry_route():
             "quantity": quantity,
             "source": "shopping_list",
             "confidence": DEFAULT_CONFIDENCE_BY_SOURCE["shopping_list"],
+            "purchased_date": data.get("purchased_date", ""),
         })
         added.append(result["item"].get("ingredient_name") or item_name)
 
