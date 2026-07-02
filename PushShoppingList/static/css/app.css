@@ -20924,6 +20924,21 @@ body {
     background: #1b1f20;
 }
 
+.ai-pantry-review-name {
+    flex: 1 1 180px;
+    min-width: 0;
+    font-weight: 700;
+}
+
+.ai-pantry-review-meta {
+    display: flex;
+    flex: 0 1 auto;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    color: #d1d5db;
+}
+
 .ai-pantry-recipe-header {
     display: flex;
     align-items: center;

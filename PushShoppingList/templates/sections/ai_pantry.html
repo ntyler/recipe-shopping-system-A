@@ -331,7 +331,10 @@
                         <div class="ai-pantry-history-row">
                             <span>{{ receipt.created_at }}</span>
                             <span>{{ receipt.status }}</span>
-                            <span>{{ receipt.candidate_count or 0 }} candidate(s)</span>
+                            <span>{{ receipt.candidate_count or 0 }} purchase line(s)</span>
+                            {% if receipt.total_item_count is defined %}
+                                <span>{{ receipt.total_item_count }} item(s)</span>
+                            {% endif %}
                             {% if receipt.added_count is defined %}
                                 <span>{{ receipt.added_count }} added</span>
                             {% endif %}
@@ -346,14 +349,20 @@
             <section id="aiPantryReceiptReview" class="ai-pantry-section ai-pantry-review-section">
                 <div class="ai-pantry-section-header">
                     <h3>Detected Purchases</h3>
+                    <p>{{ receipt_candidates|length }} purchase line(s), {{ receipt_candidates|sum(attribute="quantity") }} total item(s)</p>
                 </div>
                 <form method="POST" action="{{ url_for('pantry_bp.add_receipt_candidates_route') }}">
                     <div class="ai-pantry-review-list">
                         {% for candidate in receipt_candidates %}
                             <label class="ai-pantry-review-row">
                                 <input type="checkbox" name="candidate_index" value="{{ loop.index0 }}" checked>
-                                <span>{{ candidate.product_name }}</span>
-                                <small>confidence {{ candidate.confidence }}</small>
+                                <span class="ai-pantry-review-name">{{ candidate.product_name }}</span>
+                                <span class="ai-pantry-review-meta">
+                                    <small>Qty {{ candidate.quantity or 1 }}</small>
+                                    {% if candidate.unit_price_label %}<small>Each {{ candidate.unit_price_label }}</small>{% endif %}
+                                    {% if candidate.line_total_label %}<small>Total {{ candidate.line_total_label }}</small>{% endif %}
+                                    <small>confidence {{ candidate.confidence }}</small>
+                                </span>
                             </label>
                         {% endfor %}
                     </div>

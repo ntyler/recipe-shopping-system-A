@@ -181,13 +181,27 @@ def add_receipt_candidates_route():
         if index not in selected_indexes:
             continue
 
+        receipt_details = [f"Qty {candidate.get('quantity') or 1}"]
+        if candidate.get("unit_price_label"):
+            receipt_details.append(f"Each {candidate.get('unit_price_label')}")
+        if candidate.get("line_total_label"):
+            receipt_details.append(f"Total {candidate.get('line_total_label')}")
+        receipt_note = " | ".join(
+            part
+            for part in [
+                candidate.get("raw_line", ""),
+                f"Receipt details: {', '.join(receipt_details)}",
+            ]
+            if part
+        )
+
         result = add_or_increment_pantry_item({
             "ingredient_name": candidate.get("normalized_name") or candidate.get("product_name"),
             "product_name": candidate.get("product_name", ""),
             "quantity": candidate.get("quantity") or 1,
             "source": "receipt",
             "confidence": candidate.get("confidence", DEFAULT_CONFIDENCE_BY_SOURCE["receipt"]),
-            "notes": candidate.get("raw_line", ""),
+            "notes": receipt_note,
         })
         added.append(result["item"].get("ingredient_name") or candidate.get("product_name", "Item"))
 

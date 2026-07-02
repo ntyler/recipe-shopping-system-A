@@ -105,6 +105,10 @@ def test_parse_receipt_text_returns_purchase_candidates():
 
     assert [candidate["normalized_name"] for candidate in candidates] == ["egg", "milk"]
     assert candidates[0]["quantity"] == 2
+    assert candidates[0]["unit_price_label"] == "$2.00"
+    assert candidates[0]["line_total_label"] == "$3.99"
+    assert candidates[1]["unit_price_label"] == "$4.49"
+    assert candidates[1]["line_total_label"] == "$4.49"
     assert candidates[0]["needs_review"] is True
 
 
@@ -199,6 +203,21 @@ def test_parse_receipt_text_filters_meijer_receipt_sections():
     assert quantities["Atlantic Salmo"] == 2
     assert quantities["Cab Steak"] == 2
     assert quantities["Mjr Im Crab"] == 1
+    assert sum(candidate["quantity"] for candidate in candidates) == 18
+
+    price_details = {candidate["product_name"]: candidate for candidate in candidates}
+    assert price_details["Green Onions"]["unit_price_label"] == "$1.09"
+    assert price_details["Green Onions"]["line_total_label"] == "$1.09"
+    assert price_details["Baked Beans"]["unit_price_label"] == "$2.39"
+    assert price_details["Baked Beans"]["line_total_label"] == "$4.78"
+    assert price_details["Atlantic Salmo"]["unit_price_label"] == "$9.99"
+    assert price_details["Atlantic Salmo"]["line_total_label"] == "$19.98"
+    assert price_details["Cab Steak"]["unit_price_label"] == "$16.99"
+    assert price_details["Cab Steak"]["line_total_label"] == "$33.98"
+    assert price_details["Mjr Im Crab"]["unit_price_label"] == "$2.50"
+    assert price_details["Mjr Im Crab"]["line_total_label"] == "$2.50"
+    assert price_details["Snow Crab"]["unit_price_label"] == "$23.98"
+    assert price_details["Snow Crab"]["line_total_label"] == "$23.98"
 
 
 def test_match_recipe_to_pantry_reports_missing_ingredients(monkeypatch, tmp_path):

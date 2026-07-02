@@ -893,11 +893,15 @@ def parse_receipt_text(receipt_text):
 
         structured_name = structured_receipt_product_name(line)
         if structured_name:
+            next_line = lines[index + 1] if index + 1 < len(lines) else ""
+            sale_line = receipt_sale_line_from_lookahead(lines[index + 1:index + 3])
             structured_candidates.append(
                 receipt_candidate(
                     line,
                     structured_name,
-                    quantity=receipt_line_quantity(lines[index + 1] if index + 1 < len(lines) else line),
+                    quantity=receipt_line_quantity(next_line or line),
+                    price_line=next_line,
+                    sale_line=sale_line,
                 )
             )
             continue
@@ -905,15 +909,17 @@ def parse_receipt_text(receipt_text):
         if not likely_generic_receipt_item_line(line):
             continue
 
-        fallback_candidates.append(receipt_candidate(line, clean_receipt_product_name(line)))
+        fallback_candidates.append(receipt_candidate(line, clean_receipt_product_name(line), price_line=line))
 
     candidates = structured_candidates if structured_candidates else fallback_candidates
     return [candidate for candidate in candidates if candidate]
 
 
-def receipt_candidate(line, product_name, quantity=None):
+def receipt_candidate(line, product_name, quantity=None, price_line="", sale_line=""):
     product_name = str(product_name or "").strip()
     normalized_name = normalize_ingredient_name(product_name)
+    quantity = quantity if quantity is not None else receipt_line_quantity(line)
+    price_details = receipt_price_details(line, quantity=quantity, price_line=price_line, sale_line=sale_line)
 
     if not normalized_name:
         return None
@@ -922,7 +928,11 @@ def receipt_candidate(line, product_name, quantity=None):
         "raw_line": line,
         "product_name": product_name,
         "normalized_name": normalized_name,
-        "quantity": quantity if quantity is not None else receipt_line_quantity(line),
+        "quantity": quantity,
+        "unit_price": price_details["unit_price"],
+        "line_total": price_details["line_total"],
+        "unit_price_label": price_details["unit_price_label"],
+        "line_total_label": price_details["line_total_label"],
         "confidence": receipt_line_confidence(product_name),
         "needs_review": True,
     }
@@ -978,6 +988,109 @@ def receipt_line_quantity(line):
     return int(match.group(1)) if match else 1
 
 
+def receipt_price_details(line, quantity=1, price_line="", sale_line=""):
+    quantity = parse_quantity(quantity, default=1) or 1
+    unit_price = None
+    line_total = None
+    at_price = receipt_at_line_price_details(price_line)
+
+    if at_price:
+        unit_price = at_price.get("unit_price")
+        line_total = at_price.get("line_total")
+
+    sale_total = receipt_sale_line_total(sale_line)
+    if sale_total is not None:
+        line_total = sale_total
+
+    if line_total is None:
+        line_total = receipt_trailing_amount(line)
+
+    if line_total is None and price_line and not at_price:
+        line_total = receipt_trailing_amount(price_line)
+
+    if unit_price is None and line_total is not None:
+        unit_price = receipt_round_money(line_total / quantity)
+    elif unit_price is not None and line_total is None:
+        line_total = receipt_round_money(unit_price * quantity)
+
+    return {
+        "unit_price": unit_price,
+        "line_total": line_total,
+        "unit_price_label": receipt_money_label(unit_price),
+        "line_total_label": receipt_money_label(line_total),
+    }
+
+
+def receipt_at_line_price_details(line):
+    text = str(line or "").strip()
+    promo_match = re.search(r"^\s*(?P<quantity>\d+)\s*@\s*(?P<promo_quantity>\d+)\s*/\s*(?P<promo_total>\d+\.\d{2})\b", text)
+    if promo_match:
+        quantity = int(promo_match.group("quantity"))
+        promo_quantity = int(promo_match.group("promo_quantity"))
+        promo_total = parse_receipt_money(promo_match.group("promo_total"))
+        if promo_quantity > 0 and promo_total is not None:
+            unit_price = receipt_round_money(promo_total / promo_quantity)
+            return {
+                "quantity": quantity,
+                "unit_price": unit_price,
+                "line_total": receipt_round_money(unit_price * quantity),
+            }
+
+    price_match = re.search(
+        r"^\s*(?P<quantity>\d+)\s*@\s*(?P<unit_price>\d+(?:\.\d{2})?)(?:\s+(?P<line_total>\d+\.\d{2})\s*[FT]?)?\s*$",
+        text,
+    )
+    if not price_match:
+        return {}
+
+    quantity = int(price_match.group("quantity"))
+    unit_price = parse_receipt_money(price_match.group("unit_price"))
+    line_total = parse_receipt_money(price_match.group("line_total"))
+    if unit_price is not None and line_total is None:
+        line_total = receipt_round_money(unit_price * quantity)
+
+    return {
+        "quantity": quantity,
+        "unit_price": unit_price,
+        "line_total": line_total,
+    }
+
+
+def receipt_sale_line_from_lookahead(lines):
+    for line in lines:
+        if re.search(r"\bnow\b", str(line or ""), flags=re.IGNORECASE):
+            return line
+    return ""
+
+
+def receipt_sale_line_total(line):
+    match = re.search(r"\bnow\s+(?P<amount>\d+\.\d{2})\b", str(line or ""), flags=re.IGNORECASE)
+    return parse_receipt_money(match.group("amount")) if match else None
+
+
+def receipt_trailing_amount(line):
+    match = re.search(r"(?:^|\s)[$]?\s*(?P<amount>\d+\.\d{2})\s*[FT]?\s*$", str(line or ""))
+    return parse_receipt_money(match.group("amount")) if match else None
+
+
+def parse_receipt_money(value):
+    if value is None:
+        return None
+
+    try:
+        return receipt_round_money(float(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def receipt_round_money(value):
+    return round(float(value) + 0.0000001, 2)
+
+
+def receipt_money_label(value):
+    return f"${value:.2f}" if value is not None else ""
+
+
 def receipt_line_confidence(product_name):
     word_count = len(str(product_name or "").split())
     if word_count >= 2:
@@ -1018,6 +1131,7 @@ def save_receipt_upload(upload=None, pasted_text=""):
             receipt_text = extract_receipt_text_from_file(PANTRY_RECEIPT_UPLOAD_DIR / stored_name)
 
     candidates = parse_receipt_text(receipt_text)
+    total_item_count = sum(parse_quantity(candidate.get("quantity"), default=1) for candidate in candidates)
     record = {
         "receipt_id": receipt_id,
         "created_at": timestamp,
@@ -1025,6 +1139,7 @@ def save_receipt_upload(upload=None, pasted_text=""):
         "pasted_text": receipt_text if not stored_path else "",
         "text_excerpt": receipt_text[:500],
         "candidate_count": len(candidates),
+        "total_item_count": total_item_count,
         "status": "pending",
     }
     append_receipt_history(record)
