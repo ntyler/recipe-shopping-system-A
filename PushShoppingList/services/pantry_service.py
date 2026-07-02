@@ -54,8 +54,18 @@ RECEIPT_SKIP_WORDS = {
     "approval",
     "auth",
     "card",
+    "cvm",
     "tender",
     "receipt",
+    "savings",
+    "specials",
+    "since",
+    "payment",
+    "payments",
+    "mperks",
+    "number of items",
+    "was",
+    "now",
 }
 
 BRAND_AND_STORE_WORDS = {
@@ -869,50 +879,102 @@ def send_due_pantry_reminders(user_ids=None, reference_date=None, dry_run=False)
 
 
 def parse_receipt_text(receipt_text):
-    candidates = []
+    lines = [
+        raw_line.strip()
+        for raw_line in str(receipt_text or "").splitlines()
+        if raw_line and raw_line.strip()
+    ]
+    structured_candidates = []
+    fallback_candidates = []
 
-    for raw_line in str(receipt_text or "").splitlines():
-        line = raw_line.strip()
+    for index, line in enumerate(lines):
         if not line or should_skip_receipt_line(line):
             continue
 
-        product_name = clean_receipt_product_name(line)
-        normalized_name = normalize_ingredient_name(product_name)
-
-        if not normalized_name:
+        structured_name = structured_receipt_product_name(line)
+        if structured_name:
+            structured_candidates.append(
+                receipt_candidate(
+                    line,
+                    structured_name,
+                    quantity=receipt_line_quantity(lines[index + 1] if index + 1 < len(lines) else line),
+                )
+            )
             continue
 
-        candidates.append({
-            "raw_line": line,
-            "product_name": product_name,
-            "normalized_name": normalized_name,
-            "quantity": receipt_line_quantity(line),
-            "confidence": receipt_line_confidence(product_name),
-            "needs_review": True,
-        })
+        if not likely_generic_receipt_item_line(line):
+            continue
 
-    return candidates
+        fallback_candidates.append(receipt_candidate(line, clean_receipt_product_name(line)))
+
+    candidates = structured_candidates if structured_candidates else fallback_candidates
+    return [candidate for candidate in candidates if candidate]
 
 
-def should_skip_receipt_line(line):
-    lowered = line.lower()
+def receipt_candidate(line, product_name, quantity=None):
+    product_name = str(product_name or "").strip()
+    normalized_name = normalize_ingredient_name(product_name)
 
-    if len(re.sub(r"[^a-z]", "", lowered)) < 2:
-        return True
+    if not normalized_name:
+        return None
 
-    return any(word in lowered for word in RECEIPT_SKIP_WORDS)
+    return {
+        "raw_line": line,
+        "product_name": product_name,
+        "normalized_name": normalized_name,
+        "quantity": quantity if quantity is not None else receipt_line_quantity(line),
+        "confidence": receipt_line_confidence(product_name),
+        "needs_review": True,
+    }
+
+
+def structured_receipt_product_name(line):
+    match = re.match(r"^\s*\*?\d{4,}\s+(?P<body>.+?)\s*$", str(line or ""))
+    if not match:
+        return ""
+
+    body = match.group("body")
+    body = re.sub(r"\s+\d+(?:\.\d{2})?\s*[FT]?\s*$", " ", body)
+    body = re.sub(r"\s+[FT]\s*$", " ", body)
+    product_name = clean_receipt_product_name(body)
+
+    if not product_name or should_skip_receipt_line(product_name):
+        return ""
+
+    return product_name
+
+
+def likely_generic_receipt_item_line(line):
+    text = str(line or "").strip()
+    if not text or should_skip_receipt_line(text):
+        return False
+    if re.search(r"\b\d{1,2}/\d{1,2}/\d{2,4}\b", text):
+        return False
+    if not re.search(r"(?:[$]\s*)?\d+\.\d{2}\b", text):
+        return False
+
+    product_name = clean_receipt_product_name(text)
+    normalized_name = normalize_ingredient_name(product_name)
+
+    return bool(normalized_name)
 
 
 def clean_receipt_product_name(line):
-    text = re.sub(r"[$]\s*\d+(?:\.\d{2})?", " ", line)
+    text = re.sub(r"[$]\s*\d+(?:\.\d{2})?", " ", str(line or ""))
+    text = re.sub(r"\b\d+(?:\.\d{2})\b", " ", text)
     text = re.sub(r"\b\d{5,}\b", " ", text)
+    text = re.sub(r"^\s*\*?\d{4,}\s+", " ", text)
     text = re.sub(r"^\s*\d+\s*[xX]\s*", " ", text)
+    text = re.sub(r"\b[FT]\b\s*$", " ", text)
     text = re.sub(r"[^A-Za-z\s]", " ", text)
     return " ".join(text.split()).title()
 
 
 def receipt_line_quantity(line):
-    match = re.search(r"^\s*(\d+)\s*[xX]\b", line)
+    match = re.search(r"^\s*(\d+)\s*[xX]\b", str(line or ""))
+    if not match:
+        match = re.search(r"^\s*(\d+)\s*@", str(line or ""))
+
     return int(match.group(1)) if match else 1
 
 
@@ -921,6 +983,22 @@ def receipt_line_confidence(product_name):
     if word_count >= 2:
         return 0.85
     return 0.72
+
+
+def should_skip_receipt_line(line):
+    lowered = str(line or "").lower()
+
+    if len(re.sub(r"[^a-z]", "", lowered)) < 2:
+        return True
+
+    for word in RECEIPT_SKIP_WORDS:
+        if " " in word:
+            if word in lowered:
+                return True
+        elif re.search(rf"\b{re.escape(word)}\b", lowered):
+            return True
+
+    return False
 
 
 def save_receipt_upload(upload=None, pasted_text=""):

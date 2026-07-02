@@ -108,6 +108,99 @@ def test_parse_receipt_text_returns_purchase_candidates():
     assert candidates[0]["needs_review"] is True
 
 
+def test_parse_receipt_text_filters_meijer_receipt_sections():
+    candidates = pantry_service.parse_receipt_text(
+        """
+          06/28/26             LEXI
+        MEIJER SAVINGS
+        SPECIALS                      11.98
+        SAVINGS TOTAL   11.98
+          YOUR TOTAL SAVINGS
+              SINCE 01/01/26
+        GROCERY
+        4068           GREEN ONIONS       1.09  F
+        3940001612     BAKED BEANS
+             2  @  2.39                   4.78  F
+        71928352782    HONEY HAM STK      4.49  F
+        71076040004    HANKS SODA         4.99   T
+        4148302201     WHOLE MILK         5.29  F
+        3120506000     FROZEN PIZZA       7.99  F
+        71373300834    MEIJER JERKY       8.99  F
+        71373360156    ATLANTIC SALMO
+             2  @  9.99                  19.98  F
+        85005647228    SALMON MIGNON     14.99  F
+        1644710027     BISON STEAK       15.99  F
+        *4125018910    MJR IM CRAB
+             1  @ 2 / 5.00
+             was      3.49       now      2.50  F
+        *4125018911    MJR IM CRAB
+             1  @ 2 / 5.00
+             was      3.49       now      2.50  F
+        *4125018912    IM LOBSTER
+             1  @ 2 / 5.00
+             was      3.49       now      2.50  F
+        *71373300827   CAB STEAK
+             2  @  16.99
+             was     37.98       now     33.98  F
+        *71373365883   SNOW CRAB
+             was     28.99       now     23.98  F
+                   mPerks # -- ********03
+        TOTAL
+                   IN 7% Sales Tax       .35
+                   TOTAL TAX             .35
+                   TOTAL              154.39
+        PAYMENTS
+          VISA Payment         TENDER   154.39
+        XXXXXXXXXXXX4901        (X)
+         APPROVAL CODE 104445
+         US DEBIT
+         AID A0000000980840
+         TC  F6B002DB9C4CF5F6
+         NO CVM REQUIRED
+                   NUMBER OF ITEMS         18
+        Tx:296  Op:2218927 Tm:17  St:134  18:13:57
+        """
+    )
+
+    product_names = [candidate["product_name"] for candidate in candidates]
+
+    assert product_names == [
+        "Green Onions",
+        "Baked Beans",
+        "Honey Ham Stk",
+        "Hanks Soda",
+        "Whole Milk",
+        "Frozen Pizza",
+        "Meijer Jerky",
+        "Atlantic Salmo",
+        "Salmon Mignon",
+        "Bison Steak",
+        "Mjr Im Crab",
+        "Mjr Im Crab",
+        "Im Lobster",
+        "Cab Steak",
+        "Snow Crab",
+    ]
+    assert {candidate["product_name"] for candidate in candidates}.isdisjoint(
+        {
+            "Lexi",
+            "Meijer Savings",
+            "Specials",
+            "Since",
+            "Grocery",
+            "Mperks",
+            "Payments",
+            "Number Of Items",
+            "Tx Op Tm St",
+        }
+    )
+    quantities = {candidate["product_name"]: candidate["quantity"] for candidate in candidates}
+    assert quantities["Baked Beans"] == 2
+    assert quantities["Atlantic Salmo"] == 2
+    assert quantities["Cab Steak"] == 2
+    assert quantities["Mjr Im Crab"] == 1
+
+
 def test_match_recipe_to_pantry_reports_missing_ingredients(monkeypatch, tmp_path):
     configure_scoped_data(monkeypatch, tmp_path)
     recipe = {
