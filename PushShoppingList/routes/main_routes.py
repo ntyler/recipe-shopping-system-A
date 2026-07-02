@@ -69,6 +69,7 @@ from PushShoppingList.services.item_state_service import save_item_purchase_mapp
 from PushShoppingList.services.pantry_service import pantry_items_for_view
 from PushShoppingList.services.pantry_service import pantry_recipe_matches_for_view
 from PushShoppingList.services.pantry_service import pantry_use_soon_items_for_view
+from PushShoppingList.services.pantry_service import hydrate_receipt_review_dates
 from PushShoppingList.services.pantry_service import receipt_history_for_view
 from PushShoppingList.services.pdf_share_service import list_available_pdfs
 from PushShoppingList.services.purchase_mapping_service import purchase_mapping_for_item
@@ -388,6 +389,9 @@ def pantry_context():
         include_detail_images=False,
     )
     pantry_items = pantry_items_for_view()
+    pantry_receipt_review = hydrate_receipt_review_dates(session.get("pantry_receipt_review", {}))
+    if pantry_receipt_review.get("candidates"):
+        session["pantry_receipt_review"] = pantry_receipt_review
 
     return {
         **recipe_context,
@@ -397,7 +401,7 @@ def pantry_context():
             recipe_context["recipe_view_rows"],
             pantry_items,
         ),
-        "pantry_receipt_review": session.get("pantry_receipt_review", {}),
+        "pantry_receipt_review": pantry_receipt_review,
         "pantry_receipt_history": receipt_history_for_view(),
         "pantry_messages": session.pop("pantry_messages", []),
     }

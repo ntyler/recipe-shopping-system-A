@@ -8,6 +8,7 @@ from flask import url_for
 from PushShoppingList.services.pantry_service import DEFAULT_CONFIDENCE_BY_SOURCE
 from PushShoppingList.services.pantry_service import add_or_increment_pantry_item
 from PushShoppingList.services.pantry_service import delete_pantry_item
+from PushShoppingList.services.pantry_service import hydrate_receipt_review_dates
 from PushShoppingList.services.pantry_service import save_receipt_upload
 from PushShoppingList.services.pantry_service import update_pantry_item
 from PushShoppingList.services.pantry_service import update_pantry_item_lifecycle_action
@@ -158,6 +159,7 @@ def upload_receipt_route():
 @pantry_bp.route("/pantry/receipt/add", methods=["POST"])
 def add_receipt_candidates_route():
     review = session.get("pantry_receipt_review") if isinstance(session.get("pantry_receipt_review"), dict) else {}
+    review = hydrate_receipt_review_dates(review)
     candidates = review.get("candidates") if isinstance(review.get("candidates"), list) else []
     action = request.form.get("action", "selected")
 

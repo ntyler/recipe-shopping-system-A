@@ -988,6 +988,66 @@ def receipt_candidate_lifecycle_dates(product_name, normalized_name, purchased_d
     }
 
 
+def hydrate_receipt_review_dates(review):
+    if not isinstance(review, dict):
+        return {}
+
+    candidates = review.get("candidates") if isinstance(review.get("candidates"), list) else []
+    if not candidates:
+        return dict(review)
+
+    purchased_date = normalize_date_value(review.get("purchased_date"))
+    if not purchased_date:
+        purchased_date = receipt_purchase_date_from_history(review.get("receipt_id"))
+
+    hydrated_candidates = [
+        hydrate_receipt_candidate_dates(candidate, purchased_date)
+        for candidate in candidates
+        if isinstance(candidate, dict)
+    ]
+    hydrated = dict(review)
+    hydrated["candidates"] = hydrated_candidates
+    if purchased_date:
+        hydrated["purchased_date"] = purchased_date
+    return hydrated
+
+
+def hydrate_receipt_candidate_dates(candidate, purchased_date=""):
+    hydrated = dict(candidate or {})
+    lifecycle_dates = receipt_candidate_lifecycle_dates(
+        hydrated.get("product_name") or hydrated.get("normalized_name") or "",
+        hydrated.get("normalized_name") or normalize_ingredient_name(hydrated.get("product_name")),
+        hydrated.get("purchased_date") or purchased_date,
+    )
+
+    for field in ("purchased_date", "opened_date", "expiration_date", "freeze_by_date"):
+        if not hydrated.get(field) and lifecycle_dates.get(field):
+            hydrated[field] = lifecycle_dates[field]
+
+    return hydrated
+
+
+def receipt_purchase_date_from_history(receipt_id):
+    receipt_id = str(receipt_id or "").strip()
+    if not receipt_id:
+        return ""
+
+    for receipt in load_receipt_history().get("receipts", []):
+        if receipt.get("receipt_id") != receipt_id:
+            continue
+
+        text_candidates = [
+            receipt.get("text_excerpt", ""),
+            receipt.get("pasted_text", ""),
+        ]
+        for text in text_candidates:
+            purchased_date = receipt_purchase_date(str(text or "").splitlines())
+            if purchased_date:
+                return purchased_date
+
+    return ""
+
+
 def structured_receipt_product_name(line):
     match = re.match(r"^\s*\*?\d{4,}\s+(?P<body>.+?)\s*$", str(line or ""))
     if not match:

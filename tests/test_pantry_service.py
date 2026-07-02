@@ -272,6 +272,88 @@ def test_add_receipt_candidate_saves_lifecycle_dates(monkeypatch, tmp_path):
     assert "Freeze by 2026-07-05" in inventory[0]["notes"]
 
 
+def test_hydrate_receipt_review_dates_uses_receipt_history(monkeypatch, tmp_path):
+    monkeypatch.setattr(pantry_service, "PANTRY_RECEIPT_HISTORY_FILE", tmp_path / "pantry_receipt_history.json")
+    pantry_service.save_receipt_history(
+        {
+            "receipts": [
+                {
+                    "receipt_id": "receipt-1",
+                    "created_at": "2026-07-02T22:25:11Z",
+                    "text_excerpt": "06/28/26             LEXI\nGROCERY\n4148302201     WHOLE MILK         5.29  F",
+                    "candidate_count": 1,
+                    "status": "pending",
+                }
+            ],
+        }
+    )
+    review = {
+        "receipt_id": "receipt-1",
+        "candidates": [
+            {
+                "raw_line": "4148302201     WHOLE MILK         5.29  F",
+                "product_name": "Whole Milk",
+                "normalized_name": "milk",
+                "quantity": 1,
+                "confidence": 0.85,
+            }
+        ],
+    }
+
+    hydrated = pantry_service.hydrate_receipt_review_dates(review)
+    candidate = hydrated["candidates"][0]
+
+    assert hydrated["purchased_date"] == "2026-06-28"
+    assert candidate["purchased_date"] == "2026-06-28"
+    assert candidate["expiration_date"] == "2026-07-05"
+    assert candidate.get("freeze_by_date", "") == ""
+
+
+def test_pantry_section_hydrates_old_receipt_review_dates(monkeypatch, tmp_path):
+    configure_scoped_data(monkeypatch, tmp_path)
+    monkeypatch.setattr(pantry_service, "PANTRY_RECEIPT_HISTORY_FILE", tmp_path / "pantry_receipt_history.json")
+    pantry_service.save_receipt_history(
+        {
+            "receipts": [
+                {
+                    "receipt_id": "receipt-1",
+                    "created_at": "2026-07-02T22:25:11Z",
+                    "text_excerpt": "06/28/26             LEXI\nGROCERY\n85005647228    SALMON MIGNON     14.99  F",
+                    "candidate_count": 1,
+                    "status": "pending",
+                }
+            ],
+        }
+    )
+    app = create_app()
+
+    with app.test_client() as client:
+        sign_in(client)
+        with client.session_transaction() as session:
+            session["pantry_receipt_review"] = {
+                "receipt_id": "receipt-1",
+                "candidates": [
+                    {
+                        "raw_line": "85005647228    SALMON MIGNON     14.99  F",
+                        "product_name": "Salmon Mignon",
+                        "normalized_name": "salmon mignon",
+                        "quantity": 1,
+                        "confidence": 0.85,
+                    }
+                ],
+            }
+
+        response = client.get("/sections/pantry")
+        html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert 'name="candidate_0_purchased_date"' in html
+    assert 'name="candidate_0_expiration_date"' in html
+    assert 'name="candidate_0_freeze_by_date"' in html
+    assert 'value="2026-06-28"' in html
+    assert 'value="2026-06-29"' in html
+
+
 def test_match_recipe_to_pantry_reports_missing_ingredients(monkeypatch, tmp_path):
     configure_scoped_data(monkeypatch, tmp_path)
     recipe = {
