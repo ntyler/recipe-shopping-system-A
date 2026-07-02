@@ -1,7 +1,16 @@
 from pathlib import Path
 
+from PushShoppingList.services import user_account_service as accounts
+
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_ntylerbert_gmail_is_admin():
+    user = {"email": "ntylerbert@gmail.com"}
+
+    assert accounts.is_admin_user(user) is True
+    assert accounts.public_user(user)["role"] == "Admin"
 
 
 def test_two_factor_remember_checkbox_text_stays_adjacent():

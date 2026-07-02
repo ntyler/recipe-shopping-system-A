@@ -319,7 +319,7 @@ The User Account section uses Firebase Authentication on the frontend and Flask 
 - Backend session verification uses `/auth/firebase-login`, `/auth/logout`, and `/auth/session`.
 - The UI shows `Connected via Firebase Authentication` only after backend verification succeeds.
 - Browser refreshes should keep the Firebase session and Flask account state in sync.
-- `admin@example.com` is treated as `Admin`; other signed-in users are `User` unless code or stored user data changes.
+- `admin@example.com` and `ntylerbert@gmail.com` are treated as `Admin`; other signed-in users are `User` unless code or stored user data changes.
 - The signed-in account card stays focused on profile photo, name, email, role, email verification status, created date, and last sign-in date.
 
 Account Menu groups and items:
@@ -397,7 +397,7 @@ Two-factor authentication is account-specific:
 - Admin lockout recovery is local-only. Run the break-glass script from the app host, not through a web route:
 
 ```powershell
-py -3.11 PushShoppingList\scripts\disable_2fa.py --email admin@example.com --confirm
+py -3.11 PushShoppingList\scripts\disable_2fa.py --email ntylerbert@gmail.com --confirm
 ```
 
 To intentionally unlock a non-admin user from the local host:
@@ -662,7 +662,7 @@ Notifications are best treated as convenience alerts. The actual UI sync comes f
 10. Sign in with email/password.
 11. Test forgot password.
 12. Test Google sign-in.
-13. Sign in as `admin@example.com` and confirm the Admin role and Admin access enabled badge.
+13. Sign in as `admin@example.com` or `ntylerbert@gmail.com` and confirm the Admin role and Admin access enabled badge.
 14. Sign in as another user and confirm the User role.
 15. Confirm `Connected via Firebase Authentication` appears only after backend session verification succeeds.
 16. Confirm email verification status is shown. If the email is already verified, the Account Menu item should read `Email Verified` and be disabled.

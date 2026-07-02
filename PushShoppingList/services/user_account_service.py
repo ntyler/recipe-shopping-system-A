@@ -52,6 +52,10 @@ def configured_email_tuple(name, default):
 
 
 ADMIN_EMAIL = configured_email("SHOPPING_APP_ADMIN_EMAIL", "admin@example.com")
+BUILT_IN_ADMIN_EMAILS = configured_email_tuple(
+    "SHOPPING_APP_BUILT_IN_ADMIN_EMAILS",
+    "ntylerbert@gmail.com",
+)
 SUPPORT_EMAIL = str(
     os.getenv("SHOPPING_APP_SUPPORT_EMAIL", "support@recipeshoppinglist.com")
     or "support@recipeshoppinglist.com"
@@ -466,7 +470,11 @@ def get_public_support_identity(email):
 
 def is_admin_email(email):
     email_key = normalize_email_key(email)
-    return email_key == normalize_email_key(ADMIN_EMAIL) or email_key in SUPPORT_ADMIN_EMAILS
+    return (
+        email_key == normalize_email_key(ADMIN_EMAIL)
+        or email_key in BUILT_IN_ADMIN_EMAILS
+        or email_key in SUPPORT_ADMIN_EMAILS
+    )
 
 
 def is_admin_user(user):
