@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from PushShoppingList.routes import main_routes
 from PushShoppingList.services.product_selection_service import store_price_cells_for_item
 
 
@@ -94,6 +95,36 @@ def test_item_rows_use_price_grid_and_overflow_menu():
     assert "item-store-price-cell:focus-visible" in css
     assert "async function selectItemStoreFromPriceHeader" in app_js
     assert "await saveItemStoreSelection(itemKey, storeKey)" in app_js
+
+
+def test_shopping_views_context_exposes_stores_for_lazy_item_menu(monkeypatch):
+    stores = {
+        "aldi": {"label": "Aldi", "url": "https://example.test/aldi?q="},
+        "meijer": {"label": "Meijer", "url": "https://example.test/meijer?q="},
+    }
+
+    monkeypatch.setattr(main_routes, "load_items", lambda: [])
+    monkeypatch.setattr(main_routes, "load_item_state", lambda: {})
+    monkeypatch.setattr(
+        main_routes,
+        "load_store_settings",
+        lambda: {"stores": stores, "enabled_stores": ["aldi", "meijer"]},
+    )
+    monkeypatch.setattr(main_routes, "product_choices_by_item", lambda: {})
+    monkeypatch.setattr(
+        main_routes,
+        "recipe_rows_context",
+        lambda **kwargs: {"recipe_view_rows": [], "food_rules": []},
+    )
+    monkeypatch.setattr(main_routes, "recipe_quantity_lookup", lambda rows: {})
+    monkeypatch.setattr(main_routes, "recipe_quantity_sources_lookup", lambda rows: {})
+    monkeypatch.setattr(main_routes, "apply_manual_item_quantities", lambda quantities, state: {})
+    monkeypatch.setattr(main_routes, "purchase_mapping_lookup_for_items", lambda items, item_state=None: {})
+
+    context = main_routes.shopping_views_context()
+
+    assert context["available_stores"] == stores
+    assert context["enabled_stores"] == ["aldi", "meijer"]
 
 
 def test_recipe_ingredient_menu_sits_with_name_and_store_tools_sit_under_quantity():

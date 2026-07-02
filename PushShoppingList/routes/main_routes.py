@@ -342,6 +342,8 @@ def shopping_views_context():
             store_settings["stores"],
             store_settings["enabled_stores"],
         ),
+        "available_stores": store_settings["stores"],
+        "enabled_stores": store_settings["enabled_stores"],
         "product_choices": product_choices,
         "item_store_price_cells": store_price_cells_for_item,
         "normalize": normalize,
