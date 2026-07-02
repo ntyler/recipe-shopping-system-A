@@ -160,6 +160,9 @@ def test_food_review_badges_open_active_review_flow():
     assert "function prefetchRecipeEditorDataFromTarget" in script
     assert "[data-recipe-url][onclick*='openRecipeFoodReviewFromRecipeView']" in script
     assert "await cached.promise;" in script
+    assert "allowCreateIngredient: INGREDIENT_AND_OR_SEPARATOR_PATTERN.test(choiceText)" in script
+    assert "|| Boolean(review.allowCreateIngredient)" in script
+    assert "createIngredientFromFoodReviewChoice(this, event)" in script
 
     assert recipe_view.count("openRecipeFoodReviewFromRecipeView(this, event)") == 1
     assert current_recipes.count("openRecipeFoodReviewFromRecipeView(this, event)") >= 1

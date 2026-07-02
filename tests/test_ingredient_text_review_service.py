@@ -95,6 +95,20 @@ class IngredientTextReviewServiceTests(unittest.TestCase):
         self.assertIn("large egg yolk beaten with 1 tablespoon water", status["marker"])
         self.assertIn("egg wash prep", status["marker"])
 
+    def test_recipe_choice_review_detects_and_slash_or_options(self):
+        review = main_routes.recipe_ingredient_choice_review({
+            "ingredient": "fresh Italian flat-leaf parsley and/or basil",
+            "original_text": "1 tablespoon fresh Italian flat-leaf parsley and/or basil",
+        })
+
+        self.assertTrue(review["needs_review"])
+        self.assertEqual(review["kind"], "ingredient_choice")
+        self.assertEqual(
+            [option["ingredient"] for option in review["options"]],
+            ["fresh Italian flat-leaf parsley", "basil"],
+        )
+        self.assertTrue(review["allow_create_ingredient"])
+
 
 class FakeOpenAIClient:
     def __init__(self, response_content):

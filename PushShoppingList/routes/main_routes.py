@@ -1655,18 +1655,22 @@ def recipe_ingredient_choice_review(ingredient):
     return {}
 
 
+INGREDIENT_CHOICE_SEPARATOR_PATTERN = re.compile(r"\s+(?:and\s*/\s*or|and/or|or)\s+", re.IGNORECASE)
+INGREDIENT_AND_OR_SEPARATOR_PATTERN = re.compile(r"\s+(?:and\s*/\s*or|and/or)\s+", re.IGNORECASE)
+
+
 def ingredient_choice_review_from_text(value, source_field):
     text = str(value or "").strip()
     choice_text = re.sub(r"\([^)]*\)", " ", text)
 
-    if not re.search(r"\s+\bor\b\s+", choice_text, flags=re.IGNORECASE):
+    if not INGREDIENT_CHOICE_SEPARATOR_PATTERN.search(choice_text):
         return {}
 
     options = unique_ingredient_choice_options(
         expand_ingredient_choice_shared_nouns(
             [
                 clean_ingredient_choice_option(option)
-                for option in re.split(r"\s+\bor\b\s+", choice_text, flags=re.IGNORECASE)
+                for option in INGREDIENT_CHOICE_SEPARATOR_PATTERN.split(choice_text)
             ]
         )
     )
@@ -1688,6 +1692,7 @@ def ingredient_choice_review_from_text(value, source_field):
             for option in options
         ],
         "source": source_field,
+        "allow_create_ingredient": bool(INGREDIENT_AND_OR_SEPARATOR_PATTERN.search(choice_text)),
     }
 
 

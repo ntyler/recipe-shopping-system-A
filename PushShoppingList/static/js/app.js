@@ -22330,6 +22330,7 @@ function ingredientChoiceReviewFromRow(row) {
             prompt: ingredientTextReview.prompt || "Pick grocery item",
             reason: ingredientTextReview.reason || "",
             options: ingredientTextReview.options,
+            allowCreateIngredient: Boolean(ingredientTextReview.allowCreateIngredient),
         };
     }
 
@@ -22378,6 +22379,7 @@ function normalizeIngredientTextReview(value) {
         reason: String(value.reason || "").trim(),
         prompt: String(value.prompt || "Pick grocery item").trim(),
         options,
+        allowCreateIngredient: Boolean(value.allowCreateIngredient || value.allow_create_ingredient),
         source: String(value.source || "chatgpt").trim(),
         text_key: String(value.text_key || "").trim(),
     };
@@ -22431,17 +22433,20 @@ function normalizeIngredientTextReviewKey(value) {
     return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+const INGREDIENT_CHOICE_SEPARATOR_PATTERN = /\s+(?:and\s*\/\s*or|and\/or|or)\s+/i;
+const INGREDIENT_AND_OR_SEPARATOR_PATTERN = /\s+(?:and\s*\/\s*or|and\/or)\s+/i;
+
 function ingredientChoiceReviewFromText(value, sourceField) {
     const text = String(value || "").trim();
     const choiceText = text.replace(/\([^)]*\)/g, " ");
 
-    if (!/\s+\bor\b\s+/i.test(choiceText)) {
+    if (!INGREDIENT_CHOICE_SEPARATOR_PATTERN.test(choiceText)) {
         return null;
     }
 
     const options = uniqueIngredientChoiceOptions(
         expandIngredientChoiceSharedNouns(
-            choiceText.split(/\s+\bor\b\s+/i).map(cleanIngredientChoiceOption)
+            choiceText.split(INGREDIENT_CHOICE_SEPARATOR_PATTERN).map(cleanIngredientChoiceOption)
         )
     );
 
@@ -22452,6 +22457,7 @@ function ingredientChoiceReviewFromText(value, sourceField) {
     return {
         sourceField,
         options,
+        allowCreateIngredient: INGREDIENT_AND_OR_SEPARATOR_PATTERN.test(choiceText),
     };
 }
 
@@ -22545,7 +22551,14 @@ function renderIngredientChoiceReview(row, review) {
 
     optionsWrap.innerHTML = options.map((option, index) => {
         const optionData = recipeIngredientChoiceDataAttributes(option, review);
-        const canCreateIngredient = review.sourceField === "ingredient_text_review" && index > 0;
+        const canCreateIngredient = (
+            index > 0
+            && (
+                review.sourceField === "ingredient_text_review"
+                || Boolean(review.allowCreateIngredient)
+                || Boolean(review.allow_create_ingredient)
+            )
+        );
 
         return `
             <span class="recipe-edit-choice-row">
