@@ -133,6 +133,18 @@ SHELF_LIFE_RULES = (
         "freeze_by_days": 2,
     },
     {
+        "terms": ("ham", "ham stk", "ham steak", "honey ham", "deli meat", "lunch meat"),
+        "storage_location": "fridge",
+        "fridge_days": 5,
+        "freeze_by_days": 2,
+    },
+    {
+        "terms": ("green onion", "green onions", "scallion", "scallions", "onion", "onions"),
+        "storage_location": "fridge",
+        "fridge_days": 7,
+        "freeze_by_days": 5,
+    },
+    {
         "terms": ("lettuce", "spinach", "greens", "leafy greens", "herbs", "cilantro", "parsley"),
         "storage_location": "fridge",
         "fridge_days": 5,
@@ -152,6 +164,26 @@ SHELF_LIFE_RULES = (
         "storage_location": "fridge",
         "opened_days": 7,
         "fridge_days": 7,
+    },
+    {
+        "terms": ("frozen pizza",),
+        "storage_location": "freezer",
+        "freezer_days": 180,
+    },
+    {
+        "terms": ("jerky", "beef jerky", "meat stick", "meat sticks"),
+        "storage_location": "pantry",
+        "pantry_days": 180,
+    },
+    {
+        "terms": ("baked bean", "baked beans", "canned bean", "canned beans", "beans"),
+        "storage_location": "pantry",
+        "pantry_days": 365,
+    },
+    {
+        "terms": ("soda", "pop", "soft drink"),
+        "storage_location": "pantry",
+        "pantry_days": 180,
     },
 )
 
@@ -428,10 +460,6 @@ def apply_lifecycle_suggestions(item, reference_date=None, overwrite=False):
     if not suggested.get("storage_location"):
         suggested["storage_location"] = rule.get("storage_location", "")
 
-    if suggested.get("storage_location") == "freezer":
-        suggested["status"] = "frozen"
-        return suggested
-
     base_date = (
         suggested.get("opened_date")
         or suggested.get("purchased_date")
@@ -439,6 +467,13 @@ def apply_lifecycle_suggestions(item, reference_date=None, overwrite=False):
     )
 
     if not base_date:
+        return suggested
+
+    if suggested.get("storage_location") == "freezer":
+        suggested["status"] = "frozen"
+        freezer_days = rule.get("freezer_days")
+        if freezer_days is not None and (overwrite or not suggested.get("expiration_date")):
+            suggested["expiration_date"] = date_plus_days(base_date, freezer_days)
         return suggested
 
     is_opened = suggested.get("status") == "opened" or bool(suggested.get("opened_date"))
