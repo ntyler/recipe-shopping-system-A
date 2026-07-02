@@ -321,6 +321,47 @@ def test_hydrate_receipt_review_dates_uses_receipt_history(monkeypatch, tmp_path
     assert candidate.get("freeze_by_date", "") == ""
 
 
+def test_receipt_candidate_review_status_prioritizes_use_by_over_freeze_by():
+    status = pantry_service.receipt_candidate_review_status(
+        {
+            "expiration_date": "2026-07-01",
+            "freeze_by_date": "2026-06-30",
+        },
+        reference_date="2026-07-02",
+    )
+
+    assert status["row_status"] == "use-expired"
+    assert status["label"] == "Past use by"
+    assert status["date_statuses"]["expiration_date"]["urgency"] == "expired"
+    assert status["date_statuses"]["freeze_by_date"]["urgency"] == "freeze-expired"
+
+
+def test_receipt_candidate_review_status_marks_past_freeze_by_amber():
+    status = pantry_service.receipt_candidate_review_status(
+        {
+            "expiration_date": "2026-07-05",
+            "freeze_by_date": "2026-06-30",
+        },
+        reference_date="2026-07-02",
+    )
+
+    assert status["row_status"] == "freeze-expired"
+    assert status["label"] == "Freeze window passed"
+
+
+def test_receipt_candidate_review_status_marks_today_or_tomorrow_dates_due_soon():
+    status = pantry_service.receipt_candidate_review_status(
+        {
+            "expiration_date": "2026-07-03",
+            "freeze_by_date": "",
+        },
+        reference_date="2026-07-02",
+    )
+
+    assert status["row_status"] == "due-soon"
+    assert status["label"] == "Use by tomorrow"
+
+
 def test_pantry_section_hydrates_old_receipt_review_dates(monkeypatch, tmp_path):
     configure_scoped_data(monkeypatch, tmp_path)
     monkeypatch.setattr(pantry_service, "PANTRY_RECEIPT_HISTORY_FILE", tmp_path / "pantry_receipt_history.json")
@@ -496,6 +537,10 @@ def test_ai_pantry_template_includes_lifecycle_controls():
     assert 'name="candidate_{{ loop.index0 }}_opened_date"' in template
     assert 'name="candidate_{{ loop.index0 }}_expiration_date"' in template
     assert 'name="candidate_{{ loop.index0 }}_freeze_by_date"' in template
+    assert "ai-pantry-review-row-{{ review_status.row_status or 'fresh' }}" in template
+    assert "ai-pantry-review-date-badge" in template
+    assert "ai-pantry-date-field-{{ use_by_status.urgency or 'fresh' }}" in template
+    assert "ai-pantry-date-field-{{ freeze_by_status.urgency or 'fresh' }}" in template
     assert "<span>Bought</span>" in template
     assert "<span>Opened</span>" in template
     assert "<span>Use by</span>" in template

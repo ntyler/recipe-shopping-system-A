@@ -750,6 +750,75 @@ def pantry_item_lifecycle_status(item, reference_date=None):
     }
 
 
+def receipt_candidate_date_status(field, value, reference_date=None):
+    target_date = parse_date_value(value)
+    if not target_date or field not in {"expiration_date", "freeze_by_date"}:
+        return {}
+
+    today = parse_date_value(reference_date) or datetime.utcnow().date()
+    days_until = (target_date - today).days
+    is_use_by = field == "expiration_date"
+
+    if days_until < 0:
+        return {
+            "key": "use-expired" if is_use_by else "freeze-expired",
+            "urgency": "expired" if is_use_by else "freeze-expired",
+            "label": "Past use by" if is_use_by else "Freeze window passed",
+            "days_until": days_until,
+        }
+    if days_until == 0:
+        return {
+            "key": "use-today" if is_use_by else "freeze-today",
+            "urgency": "due-soon",
+            "label": "Use today" if is_use_by else "Freeze today",
+            "days_until": days_until,
+        }
+    if days_until == 1:
+        return {
+            "key": "use-tomorrow" if is_use_by else "freeze-tomorrow",
+            "urgency": "due-soon",
+            "label": "Use by tomorrow" if is_use_by else "Freeze by tomorrow",
+            "days_until": days_until,
+        }
+
+    return {
+        "key": "fresh",
+        "urgency": "fresh",
+        "days_until": days_until,
+    }
+
+
+def receipt_candidate_review_status(candidate, reference_date=None):
+    statuses = {
+        field: receipt_candidate_date_status(field, candidate.get(field), reference_date=reference_date)
+        for field in ("expiration_date", "freeze_by_date")
+    }
+    use_status = statuses.get("expiration_date") or {}
+    freeze_status = statuses.get("freeze_by_date") or {}
+
+    if use_status.get("urgency") == "expired":
+        row_status = "use-expired"
+        label = use_status.get("label", "Past use by")
+    elif freeze_status.get("urgency") == "freeze-expired":
+        row_status = "freeze-expired"
+        label = freeze_status.get("label", "Freeze window passed")
+    elif use_status.get("urgency") == "due-soon":
+        row_status = "due-soon"
+        label = use_status.get("label", "Use soon")
+    elif freeze_status.get("urgency") == "due-soon":
+        row_status = "due-soon"
+        label = freeze_status.get("label", "Freeze soon")
+    else:
+        row_status = "fresh"
+        label = ""
+
+    return {
+        "row_status": row_status,
+        "label": label,
+        "date_statuses": statuses,
+    }
+
+
 def pantry_items_for_view():
     items = sorted(
         load_pantry_inventory()["items"],
@@ -1058,6 +1127,8 @@ def hydrate_receipt_candidate_dates(candidate, purchased_date=""):
     for field in ("purchased_date", "opened_date", "expiration_date", "freeze_by_date"):
         if not hydrated.get(field) and lifecycle_dates.get(field):
             hydrated[field] = lifecycle_dates[field]
+
+    hydrated["review_status"] = receipt_candidate_review_status(hydrated)
 
     return hydrated
 

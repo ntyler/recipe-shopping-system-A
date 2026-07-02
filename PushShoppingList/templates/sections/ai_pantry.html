@@ -366,7 +366,11 @@
                 <form method="POST" action="{{ url_for('pantry_bp.add_receipt_candidates_route') }}">
                     <div class="ai-pantry-review-list">
                         {% for candidate in receipt_candidates %}
-                            <article class="ai-pantry-review-row">
+                            {% set review_status = candidate.review_status if candidate.review_status else {} %}
+                            {% set date_statuses = review_status.date_statuses if review_status.date_statuses else {} %}
+                            {% set use_by_status = date_statuses.expiration_date if date_statuses.expiration_date else {} %}
+                            {% set freeze_by_status = date_statuses.freeze_by_date if date_statuses.freeze_by_date else {} %}
+                            <article class="ai-pantry-review-row ai-pantry-review-row-{{ review_status.row_status or 'fresh' }}">
                                 <label class="ai-pantry-review-select">
                                     <input type="checkbox" name="candidate_index" value="{{ loop.index0 }}" checked>
                                     <span class="ai-pantry-review-name">{{ candidate.product_name }}</span>
@@ -376,6 +380,9 @@
                                     {% if candidate.unit_price_label %}<small>Each {{ candidate.unit_price_label }}</small>{% endif %}
                                     {% if candidate.line_total_label %}<small>Total {{ candidate.line_total_label }}</small>{% endif %}
                                     <small>confidence {{ candidate.confidence }}</small>
+                                    {% if review_status.label %}
+                                        <small class="ai-pantry-review-date-badge">{{ review_status.label }}</small>
+                                    {% endif %}
                                 </span>
                                 <div class="ai-pantry-review-dates" aria-label="Lifecycle dates for {{ candidate.product_name }}">
                                     <label>
@@ -392,19 +399,25 @@
                                                value="{{ candidate.opened_date }}"
                                                aria-label="Opened date for {{ candidate.product_name }}">
                                     </label>
-                                    <label>
+                                    <label class="ai-pantry-date-field ai-pantry-date-field-{{ use_by_status.urgency or 'fresh' }}">
                                         <span>Use by</span>
                                         <input name="candidate_{{ loop.index0 }}_expiration_date"
                                                type="date"
                                                value="{{ candidate.expiration_date }}"
                                                aria-label="Use-by date for {{ candidate.product_name }}">
+                                        {% if use_by_status.label %}
+                                            <small>{{ use_by_status.label }}</small>
+                                        {% endif %}
                                     </label>
-                                    <label>
+                                    <label class="ai-pantry-date-field ai-pantry-date-field-{{ freeze_by_status.urgency or 'fresh' }}">
                                         <span>Freeze by</span>
                                         <input name="candidate_{{ loop.index0 }}_freeze_by_date"
                                                type="date"
                                                value="{{ candidate.freeze_by_date }}"
                                                aria-label="Freeze-by date for {{ candidate.product_name }}">
+                                        {% if freeze_by_status.label %}
+                                            <small>{{ freeze_by_status.label }}</small>
+                                        {% endif %}
                                     </label>
                                 </div>
                             </article>

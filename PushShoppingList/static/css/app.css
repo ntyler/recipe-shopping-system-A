@@ -20938,6 +20938,30 @@ body {
     background: #1b1f20;
 }
 
+.ai-pantry-review-row-use-expired {
+    border-color: #9f2929;
+    background:
+        linear-gradient(90deg, rgba(127, 29, 29, 0.34), rgba(27, 31, 32, 0.96) 42%),
+        #1b1f20;
+    box-shadow: inset 4px 0 0 #ef4444;
+}
+
+.ai-pantry-review-row-freeze-expired {
+    border-color: #9a5b14;
+    background:
+        linear-gradient(90deg, rgba(120, 53, 15, 0.34), rgba(27, 31, 32, 0.96) 42%),
+        #1b1f20;
+    box-shadow: inset 4px 0 0 #f59e0b;
+}
+
+.ai-pantry-review-row-due-soon {
+    border-color: #8a711b;
+    background:
+        linear-gradient(90deg, rgba(113, 63, 18, 0.28), rgba(27, 31, 32, 0.96) 42%),
+        #1b1f20;
+    box-shadow: inset 4px 0 0 #eab308;
+}
+
 .ai-pantry-review-select {
     display: flex;
     align-items: center;
@@ -20959,6 +20983,25 @@ body {
     color: #d1d5db;
 }
 
+.ai-pantry-review-date-badge {
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    padding: 2px 7px;
+    color: #fecaca;
+    background: rgba(127, 29, 29, 0.24);
+    font-weight: 900;
+}
+
+.ai-pantry-review-row-freeze-expired .ai-pantry-review-date-badge {
+    color: #fed7aa;
+    background: rgba(120, 53, 15, 0.24);
+}
+
+.ai-pantry-review-row-due-soon .ai-pantry-review-date-badge {
+    color: #fef08a;
+    background: rgba(113, 63, 18, 0.22);
+}
+
 .ai-pantry-review-dates {
     display: grid;
     grid-column: 1 / -1;
@@ -20969,6 +21012,13 @@ body {
 .ai-pantry-review-dates label {
     display: grid;
     gap: 4px;
+}
+
+.ai-pantry-date-field small {
+    color: #cbd5e1;
+    font-size: 10px;
+    font-weight: 900;
+    line-height: 1.1;
 }
 
 .ai-pantry-review-dates span {
@@ -20987,6 +21037,33 @@ body {
     border-radius: 8px;
     padding: 8px 9px;
     font-size: 12px;
+}
+
+.ai-pantry-date-field-expired input {
+    border-color: #ef4444;
+    background: rgba(127, 29, 29, 0.34);
+}
+
+.ai-pantry-date-field-expired small {
+    color: #fecaca;
+}
+
+.ai-pantry-date-field-freeze-expired input {
+    border-color: #f59e0b;
+    background: rgba(120, 53, 15, 0.34);
+}
+
+.ai-pantry-date-field-freeze-expired small {
+    color: #fed7aa;
+}
+
+.ai-pantry-date-field-due-soon input {
+    border-color: #eab308;
+    background: rgba(113, 63, 18, 0.28);
+}
+
+.ai-pantry-date-field-due-soon small {
+    color: #fef08a;
 }
 
 .ai-pantry-recipe-header {
